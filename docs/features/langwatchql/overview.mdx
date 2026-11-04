@@ -34,7 +34,7 @@ You can send the same statement from REST, the CLI or MCP, and each one needs th
       -d '{"sql": "SELECT TraceId, TraceName, OccurredAt, TotalDurationMs FROM langwatch.traces WHERE OccurredAt >= subtractDays(now(), 1) AND ContainsErrorStatus ORDER BY OccurredAt DESC LIMIT 100"}'
     ```
 
-    Send `projectId` in the body to read one project only. Request fields, auth headers and status codes are in [Run a LangWatchQL query](/api-reference/query/run-a-langwatchql-query).
+    A key that reaches several projects must name them: send `projects`, a list of ids or `"all"`, or `projectId` for one. Without it the request is refused with 422 `projects_required`. Request fields, auth headers and status codes are in [Run a LangWatchQL query](/api-reference/query/run-a-langwatchql-query).
   </Tab>
   <Tab title="CLI">
     `langwatch query` runs a statement and prints a table. Add `--format json`, `jsonl` or `csv` for other formats, and `--out` to write a file.
@@ -53,6 +53,7 @@ You can send the same statement from REST, the CLI or MCP, and each one needs th
     | Command | What it does |
     | --- | --- |
     | `langwatch query --sql-file <path>` | Reads the statement from a file |
+    | `langwatch query --project <id>`, `--projects <id,id>`, `--projects all` | Names the projects to read. A key that reaches several projects must name them |
     | `langwatch query --param key=value` | Binds a `{key:Type}` parameter; repeat it for each one |
     | `langwatch query --start <datetime> --end <datetime>` | Fills the reserved period parameters |
     | `langwatch query --page-by keyset` | Pages through a large result, see [Limits and cost](/features/langwatchql/limits-and-cost#how-do-i-get-more-than-10000-rows) |

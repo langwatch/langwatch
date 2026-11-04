@@ -405,7 +405,7 @@ function appFunctionPositionMessage(name: string): string {
 const APP_FUNCTION_ALIAS_EVAL_ADVICE =
   "Its answer is decided after the query runs, so this clause would read the text it judges instead. " +
   "Run the statement as an Instant Eval first, then sort, group or filter the answers " +
-  "with a second query over analytics.judgments.";
+  "with a second query over the judgments view.";
 
 const APP_FUNCTION_ALIAS_EXTRACTION_ADVICE =
   "Its value is filled in after the query runs, so this clause would read the key it was called with instead. " +

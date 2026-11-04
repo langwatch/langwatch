@@ -46,9 +46,11 @@ LIMIT 200
 langwatch query --sql-file transcripts.sql --format jsonl --out transcripts.jsonl
 ```
 
+`LIMIT 200` is the conversation cap, so a week with more conversations returns only the first 200 ids. To get the next 200, add `OFFSET 200` after the `LIMIT`, and go on until a page has fewer than 200 rows.
+
 ## What are eval functions
 
-An eval function asks a question in plain words of a text and returns the answer as a column. You can give it any text column, including the output of an extraction function, so one query can judge every conversation in a time window:
+An eval function asks a question in plain words of a text and returns the answer as a column. You can give it any text column, including the output of an extraction function, so one query can judge each conversation in a time window, up to the cap in the table above:
 
 ```sql
 eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed
@@ -63,6 +65,6 @@ eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoye
 | `eval_category(text, instructions, options)` | One of 2 to 255 options, each written `name: meaning` |
 | `eval_category_probs(text, instructions, options)` | A JSON object of each option and its probability |
 
-One query judges at most 1,000 distinct texts. Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column is null for a row the judge skipped, and the response then includes the `INSTANT_EVAL_SKIPPED` diagnostic.
+One query judges at most 1,000 distinct texts. If the text comes from an extraction function, that function's cap also applies, so a query that judges conversations reads at most 200. Eval functions need Instant Evals switched on for the project and a key that reads a single project. Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column is null for a row the judge skipped, and the response then includes the `INSTANT_EVAL_SKIPPED` diagnostic.
 
 **Also check:** [Instant Evals](/features/instant-evals/overview) runs the same kind of question from the CLI, and writes every verdict to the `judgments` view.

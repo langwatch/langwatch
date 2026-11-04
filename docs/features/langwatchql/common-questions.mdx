@@ -23,6 +23,14 @@ The view "<v>" is not available to you. Use one of the views from the schema end
 
 Check the spelling and the database prefix: `langwatch.` on LangWatch Cloud. On a self-hosted deployment the prefix is the database named in `CLICKHOUSE_URL`, which is `langwatch` in the shipped chart and `.env.example`. Pick a view from the `availableViews` list in the violation, or from `langwatch query schema`. There is no `conversations` or `threads` view: group `langwatch.trace_metrics` by `ConversationId` instead.
 
+## The eval function is not available to you
+
+```text
+The function "<f>" is not available to you. A judgement is charged to one project, so it needs Instant Evals switched on for a key that reads a single project; ask an administrator to enable them, use a project key, or remove the call.
+```
+
+Ask an administrator to switch on Instant Evals for the project, and use a key that reads only that project.
+
 ## The field is not available to you
 
 ```text

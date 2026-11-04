@@ -179,7 +179,7 @@ describe("given nesting the validator does not allow", () => {
       const result = withTail("ORDER BY s DESC");
 
       expect(codesOf(result)).toContain("APP_FUNCTION_POSITION");
-      expect(messagesOf(result)).toContain("analytics.judgments");
+      expect(messagesOf(result)).toContain("the judgments view");
     });
 
     /** @scenario "Sorting by an eval's alias is refused rather than sorting by the text it judges" */

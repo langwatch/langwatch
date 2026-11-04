@@ -44220,6 +44220,14 @@ The view "<v>" is not available to you. Use one of the views from the schema end
 
 Check the spelling and the database prefix: `langwatch.` on LangWatch Cloud. On a self-hosted deployment the prefix is the database named in `CLICKHOUSE_URL`, which is `langwatch` in the shipped chart and `.env.example`. Pick a view from the `availableViews` list in the violation, or from `langwatch query schema`. There is no `conversations` or `threads` view: group `langwatch.trace_metrics` by `ConversationId` instead.
 
+## The eval function is not available to you
+
+```text
+The function "<f>" is not available to you. A judgement is charged to one project, so it needs Instant Evals switched on for a key that reads a single project; ask an administrator to enable them, use a project key, or remove the call.
+```
+
+Ask an administrator to switch on Instant Evals for the project, and use a key that reads only that project.
+
 ## The field is not available to you
 
 ```text
@@ -44359,9 +44367,11 @@ LIMIT 200
 langwatch query --sql-file transcripts.sql --format jsonl --out transcripts.jsonl
 ```
 
+`LIMIT 200` is the conversation cap, so a week with more conversations returns only the first 200 ids. To get the next 200, add `OFFSET 200` after the `LIMIT`, and go on until a page has fewer than 200 rows.
+
 ## What are eval functions
 
-An eval function asks a question in plain words of a text and returns the answer as a column. You can give it any text column, including the output of an extraction function, so one query can judge every conversation in a time window:
+An eval function asks a question in plain words of a text and returns the answer as a column. You can give it any text column, including the output of an extraction function, so one query can judge each conversation in a time window, up to the cap in the table above:
 
 ```sql
 eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed
@@ -44376,7 +44386,7 @@ eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoye
 | `eval_category(text, instructions, options)` | One of 2 to 255 options, each written `name: meaning` |
 | `eval_category_probs(text, instructions, options)` | A JSON object of each option and its probability |
 
-One query judges at most 1,000 distinct texts. Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column is null for a row the judge skipped, and the response then includes the `INSTANT_EVAL_SKIPPED` diagnostic.
+One query judges at most 1,000 distinct texts. If the text comes from an extraction function, that function's cap also applies, so a query that judges conversations reads at most 200. Eval functions need Instant Evals switched on for the project and a key that reads a single project. Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column is null for a row the judge skipped, and the response then includes the `INSTANT_EVAL_SKIPPED` diagnostic.
 
 **Also check:** [Instant Evals](/features/instant-evals/overview) runs the same kind of question from the CLI, and writes every verdict to the `judgments` view.
 
@@ -44391,7 +44401,7 @@ keywords: langwatch, langwatchql, lwql, sql examples, traces, spans, evaluations
 description: Worked LangWatchQL statements for traces, spans, evaluations, simulations, per-minute rollups, conversations, coding-agent sessions and Instant Eval judgments.
 ---
 
-Each statement below runs as written with `langwatch query "<statement>"` or in the `sql` field of `POST /api/v1/query`. The one exception is the judgments statement, which has a `{run:String}` parameter that needs a value. Every one filters on its view's time column, because that filter is what keeps the read small: without it the query reads every partition your project has.
+Each statement below runs as written with `langwatch query "<statement>"` or in the `sql` field of `POST /api/v1/query`. The one exception is the judgments statement, which has a `{run:String}` parameter that needs a value. If your key reaches several projects, also name them: add `--projects <id,id>` or `--projects all` to the command, or send `projects` in the body. Every one filters on its view's time column, because that filter is what keeps the read small: without it the query reads every partition your project has.
 
 ## Traces: the most recent failures
 
@@ -44569,7 +44579,8 @@ description: How many rows a query returns, how large and long it can be, how ma
 | What | Limit | Over the limit |
 | --- | --- | --- |
 | Rows per response | 10,000. A statement with no `LIMIT` gets `LIMIT 10000` added: after the last clause, or before its `OFFSET` if it has one. | A `LIMIT` above 10,000 is refused with 400 `lwql_not_permitted`, `LIMIT_TOO_HIGH` |
-| Result size | About 8,000,000 bytes | 413 `lwql_result_too_large`. You never get a cut result. |
+| Result size | About 8,000,000 bytes | 413 `lwql_result_too_large`, with no partial result |
+| Response size with extraction functions | About 32,000,000 bytes after the content is read | Trailing rows are dropped, and the response includes the `APP_FUNCTION_RESULT_TRUNCATED` diagnostic |
 | Statement length | 50,000 characters | The request is refused |
 | Run time | 10 seconds | 504 `query_timeout` |
 | Memory | 1 GB | 422 `query_memory_exceeded` |
@@ -44578,7 +44589,7 @@ description: How many rows a query returns, how large and long it can be, how ma
 | Queries running at once | 10, shared by the whole deployment, not per project or per key | 503 `lwql_busy` |
 {/* lwql-limits-end */}
 
-Adding `LIMIT 10000` is the only change LangWatch makes to your statement. The server limits are the shipped defaults, which LangWatch Cloud uses. LangWatchQL refuses a `SETTINGS` clause that changes them.
+Adding `LIMIT 10000` is the only change LangWatch makes to your statement, with one exception: on an aggregate project whose member has a dated window, each view is also replaced by a subquery that keeps rows inside that window. The server limits are the shipped defaults, which LangWatch Cloud uses. LangWatchQL refuses a `SETTINGS` clause that changes them.
 
 ## How many queries can I run per minute
 
@@ -44620,10 +44631,11 @@ Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered 
 {/* lwql-error-codes-start */}
 | Status | Code | What it means |
 | --- | --- | --- |
-| 400 | `validation_error` | The request body is not valid |
+| 400 | `malformed_request` | The request body cannot be read, for example it is not valid JSON |
 | 400 | `lwql_unparseable` | The statement is not valid ClickHouse SQL |
 | 400 | `lwql_not_permitted` | The statement uses something LangWatchQL does not allow, such as a second statement, a view or a function |
 | 400 | `lwql_unknown_identifier` | The statement uses a column that does not exist |
+| 400 | `lwql_invalid_query` | The database rejected the statement as written, for example an aggregate in `WHERE` or a type clash |
 | 400 | `lwql_parameter_missing` | The statement declares a parameter the request has no value for. `meta.parameters` lists them: send each under `parameters` |
 | 400 | `lwql_parameter_invalid` | A parameter value does not match its declared type. `meta.parameter` names it: send a `DateTime` as `YYYY-MM-DD HH:MM:SS` in UTC |
 | 401 | `missing_credentials`, `invalid_credentials` | No API key, or a key LangWatch does not know |
@@ -44631,13 +44643,16 @@ Eval functions (`eval`, `eval_passed`, `eval_score` and the others) are metered 
 | 403 | `lwql_not_enabled` | LangWatchQL is not enabled for this project. Ask an administrator to enable it |
 | 404 | `project_not_found` | The `projectId` in the body does not exist, or the key cannot read it with `analytics:view` |
 | 413 | `lwql_result_too_large` | The result is over the result size limit in [Limits](#limits) |
+| 422 | `validation_error` | The request body does not match the expected shape, for example it sends both `projectId` and `projects` |
 | 422 | `projects_required` | The key reaches several projects. Send `projects`, a list of project ids, or `"all"` |
 | 422 | `projects_unreadable` | The key reads no project. Ask an admin to grant it `analytics:view` on one |
 | 422 | `query_scan_limit_exceeded`, `query_memory_exceeded` | The query reads too much data or uses too much memory |
 | 422 | `lwql_app_function_key_cap` | An extraction function needs more distinct keys than its cap |
+| 422 | `lwql_app_function_read_budget` | The query asks for more trace content than one run may read. Use a smaller `LIMIT` or run it in pages |
 | 422 | `instant_eval_query_budget_exceeded` | The eval functions in the query are over their token budget |
 | 429 | `lwql_rate_limited` | Too many queries this minute for this project |
 | 503 | `lwql_busy` | Too many queries are running at once |
+| 503 | `lwql_app_function_hydration_failed` | The query ran, but the conversation or trace content could not be read |
 | 503 | `lwql_unavailable` | LangWatchQL is not set up on this deployment. Contact support, or your administrator if you self-host |
 | 503 | `clickhouse_unavailable` | The database is down for a moment. Retry in a few seconds |
 | 504 | `query_timeout` | The query ran past the run time limit in [Limits](#limits) |
@@ -44686,7 +44701,7 @@ You can send the same statement from REST, the CLI or MCP, and each one needs th
       -d '{"sql": "SELECT TraceId, TraceName, OccurredAt, TotalDurationMs FROM langwatch.traces WHERE OccurredAt >= subtractDays(now(), 1) AND ContainsErrorStatus ORDER BY OccurredAt DESC LIMIT 100"}'
     ```
 
-    Send `projectId` in the body to read one project only. Request fields, auth headers and status codes are in [Run a LangWatchQL query](/api-reference/query/run-a-langwatchql-query).
+    A key that reaches several projects must name them: send `projects`, a list of ids or `"all"`, or `projectId` for one. Without it the request is refused with 422 `projects_required`. Request fields, auth headers and status codes are in [Run a LangWatchQL query](/api-reference/query/run-a-langwatchql-query).
 
   ### CLI
 
@@ -44706,6 +44721,7 @@ You can send the same statement from REST, the CLI or MCP, and each one needs th
     | Command | What it does |
     | --- | --- |
     | `langwatch query --sql-file <path>` | Reads the statement from a file |
+    | `langwatch query --project <id>`, `--projects <id,id>`, `--projects all` | Names the projects to read. A key that reaches several projects must name them |
     | `langwatch query --param key=value` | Binds a `{key:Type}` parameter; repeat it for each one |
     | `langwatch query --start <datetime> --end <datetime>` | Fills the reserved period parameters |
     | `langwatch query --page-by keyset` | Pages through a large result, see [Limits and cost](/features/langwatchql/limits-and-cost#how-do-i-get-more-than-10000-rows) |
