@@ -1065,6 +1065,14 @@ figure > .docs-shot {
   margin-top: 32px;
 }
 
+/* Highlighted code is about half of a long page's elements, mostly below the fold. Off-screen
+   blocks skip style and layout until they near the viewport. The region is the horizontal
+   scroller, so the paint containment this implies clips nothing. 5.5rem is the median block
+   height; `auto` keeps a block's real height once it has rendered. */
+.docs-code-region {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 5.5rem;
+}
 .docs-code-region > pre {
   margin: 0;
   font: inherit;
@@ -2155,16 +2163,20 @@ body {
   }
 }
 
-/* Phones and tablets: a slim contents bar under the header with a reading-progress line. */
+/* Phones and tablets: a slim contents bar under the header with a reading-progress line. The bar
+   bleeds into the gutter and pads back, so its label stays on the article's edge while the hover
+   tint and the progress line clear the text. */
 .docs-toc-disclosure {
   position: sticky;
   top: var(--docs-header-h);
   z-index: 5;
+  margin-inline: -12px;
   background: var(--chakra-colors-docs-paper);
   border-bottom: 1px solid var(--chakra-colors-border);
 }
 .docs-toc-disclosure > summary {
   position: relative;
+  padding-inline: 12px;
   transition: background-color 160ms ease-out;
 }
 @media (hover: hover) {

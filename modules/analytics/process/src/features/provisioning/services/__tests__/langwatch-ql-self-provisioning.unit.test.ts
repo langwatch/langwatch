@@ -1,5 +1,8 @@
+import { scryptSync } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
+import { LWQL_VIEW_CATALOG } from "../../../../rules/lwql-view-catalog.rules.ts";
 import type { LangWatchQLNames } from "../../../../services/langwatch-ql-access-model.service.ts";
 import { lwqlAppFunctionNames } from "../../../app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { canProvisionAppFunctions } from "../../../app-functions/rules/langwatch-ql-app-function-store.rules.ts";
@@ -21,6 +24,7 @@ const POSTGRES = {
   endpoint: { host: "pg", port: 5432, database: "langwatch" },
   readerPassword: "reader-secret",
 };
+const SCHEMA = "langwatch_db";
 const SELF_PROVISION_SOURCE = {
   CLICKHOUSE_URL: "http://admin:admin-secret@clickhouse:8123/langwatch",
   LWQL_CLICKHOUSE_PASSWORD: "restricted-secret",
@@ -34,6 +38,7 @@ function statementsWith({ includeAppFunctions }: { includeAppFunctions?: boolean
     restrictedPassword: "restricted-secret",
     sourceDatabase: SOURCE_DATABASE,
     postgres: POSTGRES,
+    schema: SCHEMA,
     ...(includeAppFunctions === undefined ? {} : { includeAppFunctions }),
   });
 }
@@ -75,6 +80,7 @@ describe("the self-provisioned ClickHouse statements", () => {
         restrictedPassword: "pw",
         sourceDatabase: SOURCE_DATABASE,
         postgres: POSTGRES,
+        schema: SCHEMA,
       }),
     ).toThrow(/application's own ClickHouse database/);
   });
@@ -108,6 +114,7 @@ describe("given two stacks whose databases share one ClickHouse server", () => {
       restrictedPassword: "pw",
       sourceDatabase: database,
       postgres: { ...POSTGRES, endpoint: { ...POSTGRES.endpoint, database } },
+      schema: SCHEMA,
     });
 
   /** @scenario "Each ClickHouse database provisions its own named collection" */
@@ -245,6 +252,7 @@ describe("given the rendered-mode statements a converge runs", () => {
       restrictedPassword: "restricted-secret",
       sourceDatabase: SOURCE_DATABASE,
       postgres: POSTGRES,
+      schema: SCHEMA,
       mode: "rendered",
     });
     const engineTables = statements.filter((s) => s.includes("ENGINE = PostgreSQL"));
@@ -255,9 +263,18 @@ describe("given the rendered-mode statements a converge runs", () => {
   });
 });
 
+/** Every catalog view holding exactly the columns its catalog entry declares. */
+const CATALOG_COLUMNS = Object.fromEntries(
+  LWQL_VIEW_CATALOG.map((view) => [view.name, view.columns.map((column) => column.name)]),
+);
+
 describe("given what the reconvergence check finds in ClickHouse", () => {
   const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
-  const fingerprint = selfProvisioning.credentialFingerprint({ names: NAMES, postgres: POSTGRES });
+  const fingerprint = selfProvisioning.credentialFingerprint({
+    names: NAMES,
+    postgres: POSTGRES,
+    schema: SCHEMA,
+  });
   const current = postgresMapping.credentialComment({ fingerprint });
   const drift = (
     found: string[],
@@ -268,7 +285,7 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
       names: NAMES,
       relations,
       functions: ["lwql_trace"],
-      found: { relations: found, functions, comments },
+      found: { relations: found, functions, comments, columns: CATALOG_COLUMNS },
       credentialFingerprint: fingerprint,
     });
 
@@ -292,6 +309,21 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
     });
   });
 
+  /** @scenario "The reconvergence check reads a present view with no column data as unknown, not as drift" */
+  it("names no view whose columns the read did not return", () => {
+    const comments = Object.fromEntries(relations.map((name) => [name, current]));
+
+    expect(
+      selfProvisioning.findDrift({
+        names: NAMES,
+        relations,
+        functions: ["lwql_trace"],
+        found: { relations, functions: ["lwql_trace"], comments, columns: {} },
+        credentialFingerprint: fingerprint,
+      }),
+    ).toEqual({ objects: [], isKeyMapMissing: false });
+  });
+
   describe("when an engine table was built on other credentials, or before it was stamped", () => {
     const engineTables = relations.filter((name) => name.endsWith("_pg"));
     const [rotated, unstamped] = engineTables;
@@ -299,6 +331,7 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
       fingerprint: selfProvisioning.credentialFingerprint({
         names: NAMES,
         postgres: { ...POSTGRES, readerPassword: "the-password-before-rotation" },
+        schema: SCHEMA,
       }),
     });
 
@@ -313,6 +346,26 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
         objects: [rotated, unstamped],
         isKeyMapMissing: false,
       });
+    });
+
+    /** @scenario "The reconvergence check rebuilds an engine table built before the schema was pinned" */
+    it("names an engine table stamped by a fingerprint for another schema", () => {
+      const [beforeSchema] = engineTables;
+      if (!beforeSchema) throw new Error("the catalog maps no PostgreSQL dataset");
+      // The stamp before #9263: five-element material, same salt and scrypt cost (salt is private).
+      const { host, port, database, user, password } = selfProvisioning.namedCollectionValues({
+        names: NAMES,
+        postgres: POSTGRES,
+      });
+      const withoutSchema = scryptSync(
+        JSON.stringify([host, port, database, user, password]),
+        "lwql-postgres-named-collection",
+        8,
+      ).toString("hex");
+      const comments = Object.fromEntries(relations.map((name) => [name, current]));
+      comments[beforeSchema] = postgresMapping.credentialComment({ fingerprint: withoutSchema });
+
+      expect(drift(relations, ["lwql_trace"], comments).objects).toEqual([beforeSchema]);
     });
 
     /** @scenario "The reconvergence check rebuilds an engine table built on other credentials" */
@@ -330,7 +383,11 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
 describe("given whether ClickHouse holds the app's collection values", () => {
   const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
   const [engineTable] = relations.filter((name) => name.endsWith("_pg"));
-  const fingerprint = selfProvisioning.credentialFingerprint({ names: NAMES, postgres: POSTGRES });
+  const fingerprint = selfProvisioning.credentialFingerprint({
+    names: NAMES,
+    postgres: POSTGRES,
+    schema: SCHEMA,
+  });
   const engineTablesOf = (statements: string[]) =>
     statements.filter((s) => s.includes("ENGINE = PostgreSQL"));
   const statementsWithCollection = ({
@@ -347,6 +404,7 @@ describe("given whether ClickHouse holds the app's collection values", () => {
       restrictedPassword: "restricted-secret",
       sourceDatabase: SOURCE_DATABASE,
       postgres: POSTGRES,
+      schema: SCHEMA,
       mode,
       collectionLoaded,
       ...(only === undefined ? {} : { only }),
@@ -371,6 +429,16 @@ describe("given whether ClickHouse holds the app's collection values", () => {
   });
 
   describe("when no probe showed it", () => {
+    /** @scenario "Engine tables read the app's PostgreSQL schema" */
+    it("pins the plan's schema in every engine table's DDL", () => {
+      const deploy = engineTablesOf(
+        statementsWithCollection({ collectionLoaded: false, mode: "rendered" }),
+      );
+
+      expect(deploy.length).toBeGreaterThan(0);
+      for (const statement of deploy) expect(statement).toContain("schema='langwatch_db'");
+    });
+
     /** @scenario "No engine table is rebuilt until ClickHouse holds the app's collection values" */
     it("replaces a rendered deploy's engine tables unstamped, so a later check rebuilds them", () => {
       const deploy = engineTablesOf(
@@ -402,6 +470,7 @@ describe("given the drift a reconvergence check converges", () => {
       restrictedPassword: "restricted-secret",
       sourceDatabase: SOURCE_DATABASE,
       postgres: POSTGRES,
+      schema: SCHEMA,
       mode: "rendered",
       only,
     });
@@ -471,9 +540,10 @@ describe("given what the reconvergence check finds in PostgreSQL", () => {
 
 describe("given the collection probe", () => {
   it("names the collection it reads through", () => {
-    expect(selfProvisioning.collectionProbe({ names: NAMES, postgres: POSTGRES }).collection).toBe(
-      `lwql_postgres_${NAMES.database}`,
-    );
+    expect(
+      selfProvisioning.collectionProbe({ names: NAMES, postgres: POSTGRES, schema: "public" })
+        .collection,
+    ).toBe(`lwql_postgres_${NAMES.database}`);
   });
 
   it("refuses a database name that is not an identifier before any SQL is built", () => {
@@ -481,6 +551,7 @@ describe("given the collection probe", () => {
       selfProvisioning.collectionProbe({
         names: { ...NAMES, database: "lwql'; DROP" },
         postgres: POSTGRES,
+        schema: "public",
       }),
     ).toThrow(/named collection must match/);
   });

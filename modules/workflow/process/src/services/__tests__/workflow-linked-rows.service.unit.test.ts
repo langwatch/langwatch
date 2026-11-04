@@ -2,7 +2,11 @@
  * @vitest-environment node
  * @see modules/workflow/specs/workflow-service.feature
  */
-import type { AgentApi } from "@langwatch/agent-contract";
+import {
+  AgentDeployedLabelProtectedError,
+  type AgentApi,
+  type AgentOverview,
+} from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Workflow } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
@@ -45,6 +49,7 @@ describe("the workflow's linked rows", () => {
         agents: createApiFixture<AgentApi>(
           {
             listWorkflowConfigs: async () => [{ id: "agent_1", config: {} }],
+            getById: async () => createApiFixture<AgentOverview>({ labels: [] }, "AgentOverview"),
             archive: async (input) => {
               calls.push(`agent ${input.id}`);
               return createApiFixture({}, "Agent");
@@ -57,10 +62,62 @@ describe("the workflow's linked rows", () => {
       const result = await service.cascadeArchive({
         projectId: "project_1",
         workflowId: "workflow_1",
+        by: { id: "user_ada" },
       });
 
       expect(calls).toEqual(["agent agent_1", "workflow workflow_1"]);
       expect(result).toEqual({ workflow: archivedWorkflow, archivedAgentsCount: 1 });
+    });
+  });
+
+  describe("when one of its agents is deployed and the caller may not deploy", () => {
+    /** @scenario "Archiving a workflow refuses a deployed agent the caller may not undeploy" */
+    it("asks the deploy check for the deployed agent first and archives nothing", async () => {
+      const archived: string[] = [];
+      const callers: unknown[] = [];
+      const service = WorkflowLinkedRowsService.create({
+        workflows: {
+          archive: async (input) => {
+            archived.push(`workflow ${input.id}`);
+            return archivedWorkflow;
+          },
+        } satisfies Pick<WorkflowService, "archive">,
+        agents: createApiFixture<AgentApi>(
+          {
+            listWorkflowConfigs: async () => [
+              { id: "agent_plain", config: {} },
+              { id: "agent_deployed", config: {} },
+            ],
+            getById: async ({ id }) =>
+              createApiFixture<AgentOverview>(
+                { labels: id === "agent_deployed" ? [{ label: "production", version: 1 }] : [] },
+                "AgentOverview",
+              ),
+            archive: async (input) => {
+              callers.push(input.caller);
+              if (input.id === "agent_deployed") {
+                throw new AgentDeployedLabelProtectedError({
+                  agentId: input.id,
+                  labels: ["production"],
+                });
+              }
+              archived.push(`agent ${input.id}`);
+              return createApiFixture({}, "Agent");
+            },
+          },
+          "AgentApi",
+        ),
+      });
+
+      await expect(
+        service.cascadeArchive({
+          projectId: "project_1",
+          workflowId: "workflow_1",
+          by: { id: "user_grace" },
+        }),
+      ).rejects.toMatchObject({ code: "agent_deployed_label_protected" });
+      expect(archived).toEqual([]);
+      expect(callers).toEqual([{ type: "user", id: "user_grace" }]);
     });
   });
 });

@@ -8,6 +8,7 @@ import {
   findLangWatchQLMissingGates,
   type LangWatchQLAcceptedGranularityStep,
   type LangWatchQLGranularityStep,
+  type LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
 import type {
   ChartFrameDashboardContext,
@@ -28,6 +29,13 @@ import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
 import { createLangWatchQLExecute } from "../../../behavior/lwql-execute.ts";
 import type { LangWatchQLParameterValue } from "../../../model/lwql-request-state.ts";
+
+/** The diagnostics that say the server limited a run, shown on the card as one (i) line. */
+const LIMIT_DIAGNOSTIC_CODES: readonly string[] = [
+  "SHARE_WINDOW_LIMITED",
+  "SOURCES_IGNORED",
+  "GRANULARITY_COARSENED",
+];
 
 /** Widgets run against the last 24 hours at an hourly step — no toolbar. */
 const DEFAULT_GRANULARITY: LangWatchQLGranularityStep = 3600;
@@ -93,13 +101,28 @@ export function useDashboardWidgetExecutor(
   );
   const [lastRuns, setLastRuns] = useState<Record<string, QueryLastRun>>({});
 
+  // What the server limited, per statement: the (i) line a card shows (dashboards-v2 AC213).
+  const [limitsBySql, setLimitsBySql] = useState<Record<string, readonly string[]>>({});
+  const noteLimits = useCallback(
+    ({ query, result }: { query: string; result: LangWatchQLQueryResult }) => {
+      const messages = result.diagnostics
+        .filter(({ code }) => LIMIT_DIAGNOSTIC_CODES.includes(code))
+        .map(({ message }) => message);
+      setLimitsBySql((prev) =>
+        prev[query]?.join() === messages.join() ? prev : { ...prev, [query]: messages },
+      );
+    },
+    [],
+  );
+  const limits = useMemo(() => [...new Set(Object.values(limitsBySql).flat())], [limitsBySql]);
+
   const recordRun = useCallback((name: string, run: QueryLastRun) => {
     setLastRuns((prev) => ({ ...prev, [name]: run }));
   }, []);
 
   const runValidated = useCallback(
     async (
-      query: Pick<DashboardWidgetQuery, "sql" | "sources">,
+      query: Pick<DashboardWidgetQuery, "sql" | "sources" | "projects">,
       params: Readonly<Record<string, LangWatchQLParameterValue>>,
       signal?: AbortSignal,
     ): Promise<ChartQueryResult> => {
@@ -111,14 +134,16 @@ export function useDashboardWidgetExecutor(
           granularitySeconds,
           // What the query stores; null asks the server for the default (dashboards-v2 AC200f).
           sources: query.sources ?? null,
+          ...(query.projects ? { projects: query.projects } : {}),
         },
         // `execute` requires a signal; callers without one (e.g. `runStandalone`)
         // get a fresh controller's signal, which simply never aborts.
         { signal: signal ?? new AbortController().signal },
       );
+      noteLimits({ query: query.sql, result });
       return toChartQueryResult(result);
     },
-    [execute, pageWindow, granularitySeconds],
+    [execute, pageWindow, granularitySeconds, noteLimits],
   );
 
   const executeQuery: ChartFrameExecuteQuery = useCallback(
@@ -187,5 +212,5 @@ export function useDashboardWidgetExecutor(
     [pageWindow, granularitySeconds],
   );
 
-  return { executeQuery, runStandalone, params, lastRuns };
+  return { executeQuery, runStandalone, params, lastRuns, limits };
 }

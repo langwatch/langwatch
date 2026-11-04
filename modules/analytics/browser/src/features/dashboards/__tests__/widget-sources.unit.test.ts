@@ -5,11 +5,16 @@
 
 import { describe, expect, it } from "vitest";
 
-import { picksNoSources, widgetSourcesLine } from "../model/widget-sources.ts";
+import { picksNoSources, widgetCardFooter, widgetSourcesLine } from "../model/widget-sources.ts";
 
-const query = (name: string, sources?: string[] | null) => ({
+const READS =
+  "SELECT count() FROM trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)}";
+const IGNORES = "SELECT count() FROM trace_metrics";
+const NO_ORIGIN = "SELECT count() FROM trace_metrics_by_minute";
+
+const query = (name: string, sources?: string[] | null, sql = READS) => ({
   name,
-  sql: "SELECT 1",
+  sql,
   ...(sources === undefined ? {} : { sources: sources as never }),
 });
 
@@ -43,5 +48,33 @@ describe("widgetSourcesLine", () => {
   /** @scenario "AC200 Sources: each query shows its sources as pills, and the card names them" */
   it("is empty for a widget with no query, so the card shows no footer", () => {
     expect(widgetSourcesLine([])).toBe("");
+  });
+
+  /** @scenario "AC204 Sources: SQL that does not read the parameter counts every origin and says so" */
+  it("says all sources when no query reads the parameter, whatever the lists store", () => {
+    expect(widgetSourcesLine([query("a", ["application"], IGNORES)])).toBe("Sources: all sources");
+    expect(picksNoSources([query("a", [], IGNORES)])).toBe(false);
+  });
+
+  /** @scenario "AC202f Stock widgets: a widget that reads a view with no origin says that sources do not apply" */
+  it("says sources do not apply when every view the widget reads keeps no origin", () => {
+    expect(widgetSourcesLine([query("a", ["application"], NO_ORIGIN)])).toBe(
+      "Sources don't apply: this widget reads a view that keeps no origin",
+    );
+  });
+});
+
+describe("widgetCardFooter", () => {
+  /** @scenario "AC213 Diagnostics: a card shows what the server limited as one (i) line" */
+  it("adds one (i) line of the limiting messages, and none when the run was not limited", () => {
+    const message = "Some projects share data only from a date, so earlier rows are not included";
+
+    expect(
+      widgetCardFooter({ sourcesLine: "Sources: application", projectsLine: "", limits: message }),
+    ).toBe(`Sources: application \u00b7 \u24d8 ${message}`);
+    expect(
+      widgetCardFooter({ sourcesLine: "Sources: application", projectsLine: "", limits: "" }),
+    ).toBe("Sources: application");
+    expect(message).not.toMatch(/project-|\d/);
   });
 });

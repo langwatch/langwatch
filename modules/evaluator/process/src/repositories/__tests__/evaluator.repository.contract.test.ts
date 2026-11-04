@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { EvaluatorVersionNotFoundError, type Evaluator } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability";
 /**
  * @vitest-environment node
@@ -29,6 +30,8 @@ type Backend = Readonly<{
   projectId: () => string;
   otherProjectId: () => string;
   id: (suffix: string) => string;
+  /** Writes a row as a release before versions did: no version, no creator. */
+  seedUnversioned: (input: { id: string; name: string }) => Promise<Evaluator>;
 }>;
 
 function contractCases(backend: Backend): void {
@@ -206,10 +209,167 @@ function contractCases(backend: Backend): void {
       ).resolves.toEqual([]);
     });
   });
+
+  describe("when an evaluator is updated twice", () => {
+    const updateTo = (input: { id: string; name: string }) =>
+      backend.repository().update({
+        id: input.id,
+        projectId: backend.projectId(),
+        data: { name: input.name },
+        commitMessage: `renamed to ${input.name}`,
+      });
+
+    it("lists its versions newest first and reads the newest without a number", async () => {
+      const created = await create();
+      await updateTo({ id: created.id, name: "Second" });
+      await updateTo({ id: created.id, name: "Third" });
+      const lookup = { projectId: backend.projectId(), evaluatorId: created.id };
+
+      const versions = await backend.repository().findVersions(lookup);
+
+      expect(versions.map((version) => version.version)).toEqual([3, 2, 1]);
+      await expect(backend.repository().findVersion(lookup)).resolves.toMatchObject({
+        version: 3,
+        name: "Third",
+      });
+      await expect(
+        backend.repository().findVersion({ ...lookup, version: 1 }),
+      ).resolves.toMatchObject({ name: "Exact match", commitMessage: null });
+      await expect(
+        backend.repository().findVersion({ ...lookup, versionId: versions[1]?.id }),
+      ).resolves.toMatchObject({ version: 2, commitMessage: "renamed to Second" });
+      await expect(
+        backend
+          .repository()
+          .latestVersionNumbers({ projectId: backend.projectId(), ids: [created.id] }),
+      ).resolves.toEqual(new Map([[created.id, 3]]));
+    });
+
+    it("answers no version of it to another project", async () => {
+      const created = await create();
+
+      await expect(
+        backend
+          .repository()
+          .findVersion({ projectId: backend.otherProjectId(), evaluatorId: created.id }),
+      ).resolves.toBeUndefined();
+      await expect(
+        backend.repository().findVersions({
+          projectId: backend.otherProjectId(),
+          evaluatorId: created.id,
+        }),
+      ).resolves.toEqual([]);
+    });
+  });
+
+  describe("when an update changes nothing a version holds", () => {
+    it("appends no version and answers the row as it is stored", async () => {
+      const created = await create();
+
+      const updated = await backend.repository().update({
+        id: created.id,
+        projectId: backend.projectId(),
+        data: { name: created.name },
+      });
+
+      await expect(
+        backend
+          .repository()
+          .findVersions({ projectId: backend.projectId(), evaluatorId: created.id }),
+      ).resolves.toHaveLength(1);
+      const stored = await backend
+        .repository()
+        .findById({ id: created.id, projectId: backend.projectId() });
+      expect(stored?.updatedAt.getTime()).toBe(updated.updatedAt.getTime());
+      expect(updated.updatedAt.getTime()).toBeGreaterThanOrEqual(created.updatedAt.getTime());
+    });
+  });
+
+  describe("when a deploy label is assigned", () => {
+    it("moves between versions, reads back by evaluator and is removed once", async () => {
+      const created = await create();
+      await backend.repository().update({
+        id: created.id,
+        projectId: backend.projectId(),
+        data: { name: "Second" },
+      });
+      const [second, first] = await backend
+        .repository()
+        .findVersions({ projectId: backend.projectId(), evaluatorId: created.id });
+      const assign = (versionId: string) =>
+        backend.repository().assignLabel({
+          projectId: backend.projectId(),
+          evaluatorId: created.id,
+          label: "production",
+          versionId,
+          actorId: null,
+        });
+      const labels = () =>
+        backend.repository().findLabels({ projectId: backend.projectId(), ids: [created.id] });
+
+      await expect(assign(first?.id ?? "")).resolves.toMatchObject({ version: 1 });
+      await expect(assign(second?.id ?? "")).resolves.toMatchObject({ version: 2 });
+      await expect(labels()).resolves.toEqual([
+        expect.objectContaining({ label: "production", version: 2, versionId: second?.id }),
+      ]);
+
+      const remove = () =>
+        backend.repository().removeLabel({
+          projectId: backend.projectId(),
+          evaluatorId: created.id,
+          label: "production",
+        });
+      await expect(remove()).resolves.toBe(true);
+      await expect(remove()).resolves.toBe(false);
+      await expect(labels()).resolves.toEqual([]);
+    });
+
+    it("refuses a version the evaluator does not hold", async () => {
+      const created = await create();
+
+      await expect(
+        backend.repository().assignLabel({
+          projectId: backend.projectId(),
+          evaluatorId: created.id,
+          label: "production",
+          versionId: "evaluatorversion_unknown",
+          actorId: null,
+        }),
+      ).rejects.toBeInstanceOf(EvaluatorVersionNotFoundError);
+    });
+  });
+
+  describe("when the backfill reaches an evaluator", () => {
+    it("writes no version 1 for an evaluator that already has one", async () => {
+      const created = await create();
+
+      await expect(
+        backend.repository().backfillFirstVersion({ evaluator: created, createdById: null }),
+      ).resolves.toBe(false);
+    });
+
+    it("writes version 1 from the row of an unversioned evaluator, once", async () => {
+      const seeded = await backend.seedUnversioned({ id: backend.id("old"), name: "Older" });
+
+      await expect(
+        backend.repository().backfillFirstVersion({ evaluator: seeded, createdById: null }),
+      ).resolves.toBe(true);
+      await expect(
+        backend.repository().backfillFirstVersion({ evaluator: seeded, createdById: null }),
+      ).resolves.toBe(false);
+      await expect(
+        backend
+          .repository()
+          .findVersions({ projectId: backend.projectId(), evaluatorId: seeded.id }),
+      ).resolves.toEqual([
+        expect.objectContaining({ version: 1, name: "Older", authorKind: "system" }),
+      ]);
+    });
+  });
 }
 
 describe("given the memory evaluator repository", () => {
-  let repository: EvaluatorRepository;
+  let repository: MemoryEvaluatorRepository;
 
   beforeEach(() => {
     repository = MemoryEvaluatorRepository.create();
@@ -220,6 +380,26 @@ describe("given the memory evaluator repository", () => {
     projectId: () => "project_1",
     otherProjectId: () => "project_2",
     id: (suffix) => `evaluator_${suffix}`,
+    seedUnversioned: async ({ id, name }) => {
+      const at = new Date();
+      const row: Evaluator = {
+        id,
+        projectId: "project_1",
+        name,
+        slug: `${id}-slug`,
+        type: "evaluator",
+        config: { evaluatorType: "langevals/exact_match" },
+        workflowId: null,
+        copiedFromEvaluatorId: null,
+        archivedAt: null,
+        createdAt: at,
+        updatedAt: at,
+        createdById: null,
+        updatedById: null,
+      };
+      repository.seedUnversioned(row);
+      return row;
+    },
   });
 });
 
@@ -251,6 +431,13 @@ describe.skipIf(!databaseUrl)("given the Postgres evaluator repository", () => {
 
   const clean = () =>
     cleanupTestRows(database(), [
+      // Copies first: relation emulation refuses to delete a source a copy still names.
+      [
+        "evaluator",
+        { projectId: { in: [projectId, otherProjectId] }, copiedFromEvaluatorId: { not: null } },
+      ],
+      ["evaluatorVersionLabel", { projectId: { in: [projectId, otherProjectId] } }],
+      ["evaluatorVersion", { projectId: { in: [projectId, otherProjectId] } }],
       ["evaluator", { projectId: { in: [projectId, otherProjectId] } }],
     ]);
 
@@ -291,5 +478,20 @@ describe.skipIf(!databaseUrl)("given the Postgres evaluator repository", () => {
     projectId: () => projectId,
     otherProjectId: () => otherProjectId,
     id: (suffix) => `evaluator_${namespace}_${suffix}`,
+    seedUnversioned: async ({ id, name }) => {
+      await database().evaluator.create({
+        data: {
+          id,
+          projectId,
+          name,
+          slug: `${id}-slug`,
+          type: "evaluator",
+          config: { evaluatorType: "langevals/exact_match" },
+        },
+      });
+      const row = await repository.findById({ id, projectId });
+      if (!row) throw new Error(`Seeded evaluator ${id} did not read back`);
+      return row;
+    },
   });
 });

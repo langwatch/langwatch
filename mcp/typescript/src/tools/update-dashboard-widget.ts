@@ -11,7 +11,7 @@ import type { WidgetSource } from "../schemas/widget-sources.js";
 import {
   type DashboardWidgetQueriesInput,
   normalizeDashboardWidgetQueries,
-  withSources,
+  withLists,
 } from "./dashboard-widget-queries.js";
 
 export interface UpdateDashboardWidgetParams {
@@ -23,16 +23,18 @@ export interface UpdateDashboardWidgetParams {
   description?: string;
   /** Set on every query; alone, it is sent with the widget's stored queries. */
   sources?: WidgetSource[] | null;
+  /** Set on every query; alone, it is sent with the widget's stored queries. */
+  projects?: string[] | null;
 }
 
 export async function handleUpdateDashboardWidget(
   params: UpdateDashboardWidgetParams,
 ): Promise<string> {
-  const { dashboardId, widgetId, name, code, description, sources } = params;
-  const fields = [name, code, params.queries, description, sources];
+  const { dashboardId, widgetId, name, code, description, sources, projects } = params;
+  const fields = [name, code, params.queries, description, sources, projects];
   if (fields.every((field) => field === undefined)) {
     throw new Error(
-      "Provide at least one of name, code, queries, description or sources to change.",
+      "Provide at least one of name, code, queries, description, sources or projects to change.",
     );
   }
 
@@ -42,8 +44,9 @@ export async function handleUpdateDashboardWidget(
       ? undefined
       : normalizeDashboardWidgetQueries({ queries: params.queries });
   // Sources alone: the stored queries go back with the new list on each.
-  const base = given ?? (sources === undefined ? undefined : current.definition.queries);
-  const queries = base === undefined ? undefined : withSources({ queries: base, sources });
+  const listed = sources !== undefined || projects !== undefined;
+  const base = given ?? (listed ? current.definition.queries : undefined);
+  const queries = base === undefined ? undefined : withLists({ queries: base, sources, projects });
 
   const changes = {
     ...(name === undefined ? {} : { name }),

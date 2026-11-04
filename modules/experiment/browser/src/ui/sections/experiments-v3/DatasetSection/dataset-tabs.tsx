@@ -1,5 +1,6 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Menu } from "@langwatch/design-system/menu";
-import { Box, Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
+import { Badge, Box, Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import { generate } from "@langwatch/ksuid";
 import {
   ArrowLeftRight,
@@ -11,10 +12,15 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 
+import { useDatasetVersionOptions } from "../../../../behavior/experiments-v3/use-dataset-version-options.ts";
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import type { DatasetReference } from "../../../../model/experiments-v3/types.ts";
+import {
+  DatasetVersionSubmenu,
+  datasetVersionBadge,
+} from "../../../elements/experiments-v3/dataset-version-submenu.tsx";
 
 type DatasetTabsProps = {
   onSelectExisting: () => void;
@@ -78,6 +84,9 @@ export function DatasetTabs({
     setActiveDataset(newId);
   };
 
+  const activeDataset = datasets.find((dataset) => dataset.id === activeDatasetId);
+  const activeSavedDataset = activeDataset?.type === "saved" ? activeDataset : undefined;
+
   const handleRemoveDataset = (datasetId: string) => {
     if (datasets.length <= 1) return;
     removeDataset(datasetId);
@@ -100,6 +109,15 @@ export function DatasetTabs({
           onRemove={() => handleRemoveDataset(dataset.id)}
           onSaveAs={() => onSaveAsDataset(dataset)}
           canRemove={datasets.length > 1}
+          versionMenu={
+            dataset.id === activeSavedDataset?.id && activeSavedDataset.datasetId ? (
+              <DatasetVersionPin
+                datasetRefId={activeSavedDataset.id}
+                datasetId={activeSavedDataset.datasetId}
+                datasetVersion={activeSavedDataset.datasetVersion}
+              />
+            ) : null
+          }
         />
       ))}
 
@@ -168,6 +186,29 @@ export function DatasetTabs({
   );
 }
 
+/** The version of the active saved dataset the experiment pins; Latest pins none. */
+function DatasetVersionPin({
+  datasetRefId,
+  datasetId,
+  datasetVersion,
+}: {
+  datasetRefId: string;
+  datasetId: string;
+  datasetVersion: number | null | undefined;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const updateDataset = useEvaluationsV3Store((state) => state.updateDataset);
+  const { versions } = useDatasetVersionOptions({ projectId: project?.id, datasetId });
+
+  return (
+    <DatasetVersionSubmenu
+      versions={versions}
+      value={datasetVersion}
+      onChange={(version) => updateDataset(datasetRefId, { datasetVersion: version ?? undefined })}
+    />
+  );
+}
+
 // ============================================================================
 // Dataset Tab Component
 // ============================================================================
@@ -180,6 +221,8 @@ type DatasetTabProps = {
   onRemove: () => void;
   onSaveAs: () => void;
   canRemove: boolean;
+  /** The saved dataset's version submenu, for the active saved tab only. */
+  versionMenu: ReactNode;
 };
 
 function DatasetTab({
@@ -190,8 +233,10 @@ function DatasetTab({
   onRemove,
   onSaveAs,
   canRemove,
+  versionMenu,
 }: DatasetTabProps) {
   const isSaved = dataset.type === "saved";
+  const badge = isSaved ? datasetVersionBadge(dataset.datasetVersion) : null;
 
   // If not active, just render a clickable button (no dropdown)
   if (!isActive) {
@@ -211,6 +256,7 @@ function DatasetTab({
           <Text textStyle="caption" fontWeight="medium">
             {dataset.name}
           </Text>
+          {badge && <VersionBadge label={badge} />}
         </HStack>
       </Button>
     );
@@ -236,6 +282,7 @@ function DatasetTab({
             <Text textStyle="caption" fontWeight="semibold">
               {dataset.name}
             </Text>
+            {badge && <VersionBadge label={badge} />}
             <ChevronDown size={10} />
           </HStack>
         </Button>
@@ -247,6 +294,7 @@ function DatasetTab({
             <Text>Switch Dataset</Text>
           </HStack>
         </Menu.Item>
+        {versionMenu}
         {dataset.type === "inline" && (
           <Menu.Item value="save" onClick={onSaveAs}>
             <HStack gap={2}>
@@ -264,5 +312,14 @@ function DatasetTab({
         </Menu.Item>
       </Menu.Content>
     </Menu.Root>
+  );
+}
+
+/** The version a saved dataset tab is pinned to, beside its name. */
+function VersionBadge({ label }: { label: string }) {
+  return (
+    <Badge size="xs" variant="subtle" data-testid="experiment-dataset-version-badge">
+      {label}
+    </Badge>
   );
 }

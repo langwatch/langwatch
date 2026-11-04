@@ -91,6 +91,14 @@ Feature: Transport declaration split
     And no value of a type the output schema does not allow for its field
 
   @unit
+  Scenario: A refused answer's log names the failing field without the caller's keys
+    Given a procedure whose output schema is a union of objects with an open record inside
+    When its answer is refused at a field inside one union arm
+    Then the logged issue path is read from the root of the answer, through the union arm
+    And it keeps array and tuple indices and the keys the schema declares
+    And every other key or number on the path, and anything below an open value, is logged as a placeholder
+
+  @unit
   Scenario: A procedure that declares no output and answers a value is logged and answers nothing
     Given a procedure that declares no output
     When its handler answers a value

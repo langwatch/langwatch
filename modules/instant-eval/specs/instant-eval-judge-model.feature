@@ -570,8 +570,110 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then Instant Evals is one of the options
 
     @integration
-    Scenario: The score range shows only for Instant Evals
+    Scenario: The score range shows for Instant Evals and not for a provider model
       Given a score judge
       When a member picks Instant Evals as its model
       Then the score range fields are shown
-      And they are hidden for any other model
+      And they are hidden again when a provider model is picked
+
+    @integration
+    Scenario: The score range shows for a judge on its own decision model
+      Given a score judge on an own decision model
+      When a member opens its settings
+      Then the score range fields are shown
+
+  Rule: A judge may pick its own decision model when the organization has the flag
+
+    # ADR-182. The server weighs the flag and the provider keys and answers with the models the
+    # project may pick, so no flag is read in the browser and nothing offered would fail to run.
+
+    @integration
+    Scenario: The judge model picker offers the project's own decision models
+      Given a project the server releases Instant Evals for
+      And the server answers with Instant Evals and an own decision model
+      When a member opens the model picker on an LLM judge
+      Then Instant Evals is the first option
+      And the own decision model is one of the options
+
+    @integration
+    Scenario: The picker offers Instant Evals alone when the server offers no own model
+      Given a project the server releases Instant Evals for
+      And the server answers with the hosted model only
+      When a member opens the model picker on an LLM judge
+      Then Instant Evals is the only option
+
+    @integration
+    Scenario: The picker offers nothing of its own when Instant Evals are not released
+      Given a project the server does not release Instant Evals for
+      When a member opens the model picker on an LLM judge
+      Then Instant Evals is not an option
+      And no own decision model is an option
+
+    @integration
+    Scenario: A judge holding a decision model nobody offers any more asks for an update
+      Given a project the server releases Instant Evals for
+      And an LLM judge saved on a decision model the server no longer offers
+      When a member looks at that judge
+      Then the model is marked as needing an update
+
+    @integration
+    Scenario: A decision model nobody offers tells the member to pick another model
+      Given a project the server releases Instant Evals for
+      And an LLM judge saved on a decision model the server no longer offers
+      When a member reads why the model needs an update
+      Then it tells them the decision model is no longer available to this project
+      And it does not ask them to re-add a provider that is enabled already
+
+    @integration
+    Scenario: A model whose provider is not enabled still asks for the provider
+      Given an LLM judge saved on a model of a provider the project has not stored
+      When a member reads why the model needs an update
+      Then it names that provider and asks for it to be re-added
+
+    @integration
+    Scenario: A judge's model waits for the decision models before it is marked
+      Given a project the server releases Instant Evals for
+      And an LLM judge saved on an own decision model
+      When a member opens its settings before the server answers with the project's models
+      Then no model is shown yet, so none is marked as needing an update
+
+    @unit
+    Scenario: A judge on an own decision model is answered by Instant Evals
+      Given an LLM judge whose model is an own decision model
+      When the evaluation runs
+      Then Instant Evals answer it, not the evaluation service
+      And the picked model is carried to the resolver
+
+    @unit
+    Scenario: A judge on an own decision model runs on it
+      Given an LLM judge whose model is an own decision model the project may run
+      When the evaluation runs
+      Then the judge leaf is called with that model
+
+    @unit
+    Scenario: A judge whose own decision model cannot run is an error, never moved onto the hosted model
+      Given an LLM judge whose model is an own decision model with no key
+      When the evaluation runs
+      Then it answers an error naming "classifier_key_invalid"
+      And LangWatch's classifier is not called
+
+    @unit
+    Scenario: A judge holding an own pick with the flag off is an error
+      Given an LLM judge whose model is an own decision model
+      And the flag is off for the organization
+      When the evaluation runs
+      Then it answers an error naming "classifier_not_configured"
+      And LangWatch's classifier is not called
+
+    @unit
+    Scenario: A judge expressing no decision model runs on the project's column
+      Given an LLM judge whose model is Instant Evals
+      And the project's Instant Evals column is an own decision model
+      When the evaluation runs
+      Then the judge runs on the project's column
+
+    @unit
+    Scenario: A judge on an id the decision model catalogue does not hold runs as it does today
+      Given an LLM judge whose model reads like a decision model the catalogue does not hold
+      When the evaluation runs
+      Then Instant Evals do not answer it

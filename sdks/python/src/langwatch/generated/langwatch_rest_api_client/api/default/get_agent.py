@@ -6,18 +6,30 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_agent_response_200 import GetAgentResponse200
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
+    *,
+    label: str | Unset = UNSET,
+    version: int | Unset = UNSET,
 ) -> dict[str, Any]:
+
+    params: dict[str, Any] = {}
+
+    params["label"] = label
+
+    params["version"] = version
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/api/v1/agents/{id}".format(
             id=quote(str(id), safe=""),
         ),
+        "params": params,
     }
 
     return _kwargs
@@ -51,11 +63,18 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
+    label: str | Unset = UNSET,
+    version: int | Unset = UNSET,
 ) -> Response[GetAgentResponse200]:
     """Get an agent in the caller's project
 
+     Reads the latest version unless `label` or `version` is given. The id also takes a suffix:
+    `agent_1:production`, `agent_1:3` or `agent_1:latest`.
+
     Args:
         id (str):
+        label (str | Unset):
+        version (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -67,6 +86,8 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         id=id,
+        label=label,
+        version=version,
     )
 
     response = client.get_httpx_client().request(
@@ -80,11 +101,18 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
+    label: str | Unset = UNSET,
+    version: int | Unset = UNSET,
 ) -> GetAgentResponse200 | None:
     """Get an agent in the caller's project
 
+     Reads the latest version unless `label` or `version` is given. The id also takes a suffix:
+    `agent_1:production`, `agent_1:3` or `agent_1:latest`.
+
     Args:
         id (str):
+        label (str | Unset):
+        version (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -97,6 +125,8 @@ def sync(
     return sync_detailed(
         id=id,
         client=client,
+        label=label,
+        version=version,
     ).parsed
 
 
@@ -104,11 +134,18 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
+    label: str | Unset = UNSET,
+    version: int | Unset = UNSET,
 ) -> Response[GetAgentResponse200]:
     """Get an agent in the caller's project
 
+     Reads the latest version unless `label` or `version` is given. The id also takes a suffix:
+    `agent_1:production`, `agent_1:3` or `agent_1:latest`.
+
     Args:
         id (str):
+        label (str | Unset):
+        version (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -120,6 +157,8 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         id=id,
+        label=label,
+        version=version,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -131,11 +170,18 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
+    label: str | Unset = UNSET,
+    version: int | Unset = UNSET,
 ) -> GetAgentResponse200 | None:
     """Get an agent in the caller's project
 
+     Reads the latest version unless `label` or `version` is given. The id also takes a suffix:
+    `agent_1:production`, `agent_1:3` or `agent_1:latest`.
+
     Args:
         id (str):
+        label (str | Unset):
+        version (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -149,5 +195,7 @@ async def asyncio(
         await asyncio_detailed(
             id=id,
             client=client,
+            label=label,
+            version=version,
         )
     ).parsed

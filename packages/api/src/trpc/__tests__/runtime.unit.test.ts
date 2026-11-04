@@ -39,10 +39,6 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
       logged.push({ fields, message });
     },
   }),
-  validationMeta: (error: { issues: { path: PropertyKey[]; code: string }[] }) => ({
-    issueCount: error.issues.length,
-    issues: error.issues.map((issue) => ({ path: "<redacted>", code: issue.code })),
-  }),
 }));
 
 interface ReviewApi {
@@ -318,7 +314,7 @@ describe("a mounted contract procedure", () => {
 
       expect(record.fields.validation).toEqual({
         issueCount: 1,
-        issues: [{ path: "<redacted>", code: "invalid_type" }],
+        issues: [{ path: "comment", code: "invalid_type", expected: "string" }],
       });
 
       expect(JSON.stringify(record)).not.toContain("annotation-1");

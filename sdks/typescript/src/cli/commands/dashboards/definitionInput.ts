@@ -2,6 +2,8 @@ import { readFileSync } from "fs";
 
 import type { CreateDashboardWidgetInput } from "@/client-sdk/services/dashboards/dashboards-api.service";
 
+import { parseCommaList } from "../comma-list";
+
 type DashboardWidgetDefinitionInput = Pick<CreateDashboardWidgetInput, "code" | "queries">;
 type DashboardWidgetQueryInput = CreateDashboardWidgetInput["queries"][number];
 
@@ -44,10 +46,7 @@ const isTraceSource = (value: string): value is TraceSource =>
  */
 export const resolveSources = (flag: string | undefined): TraceSource[] | undefined => {
   if (flag === undefined) return undefined;
-  const picked = flag
-    .split(",")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
+  const picked = parseCommaList(flag);
   const unknown = picked.filter((part) => !isTraceSource(part));
   if (picked.length === 0 || unknown.length > 0) {
     const named = unknown.length > 0 ? `unknown source "${unknown[0]}"; ` : "";
@@ -56,6 +55,22 @@ export const resolveSources = (flag: string | undefined): TraceSource[] | undefi
     );
   }
   return picked.filter(isTraceSource);
+};
+
+/**
+ * `--projects A,B`: the project ids every query of the widget reads, or undefined when the flag
+ * is absent, so each query keeps what it stores.
+ */
+export const resolveProjects = (flag: string | undefined): string[] | undefined => {
+  if (flag === undefined) return undefined;
+  const picked = parseCommaList(flag);
+  if (picked.length === 0) {
+    throw new WidgetInputError("--projects: pass a comma list of project ids");
+  }
+  if (picked.some((id) => id.toLowerCase() === "all")) {
+    throw new WidgetInputError('--projects: a widget stores project ids, not "all"; name them');
+  }
+  return picked;
 };
 
 /**

@@ -52,6 +52,8 @@ export class EvaluationJudgingService {
     data: Readonly<{ data: Record<string, unknown> }>;
     settings?: Record<string, unknown> | undefined;
     droppedCategories: string[];
+    /** The decision model this judge picked; the resolver weighs it, the guards are unchanged. */
+    decisionModel?: string | undefined;
     /** Only a queued monitor command carries one; it becomes the retry key (decision 9). */
     idempotencyKey?: string | undefined;
     guardrailDirection?: GuardrailCheckDirection | undefined;
@@ -74,6 +76,7 @@ export class EvaluationJudgingService {
     idempotencyKey,
     guardrailDirection,
     signal,
+    decisionModel,
   }: {
     projectId: string;
     judge: InstantEvalJudge;
@@ -81,6 +84,7 @@ export class EvaluationJudgingService {
     idempotencyKey?: string | undefined;
     guardrailDirection?: GuardrailCheckDirection | undefined;
     signal?: AbortSignal | undefined;
+    decisionModel?: string | undefined;
   }): Promise<SingleEvaluationResult> {
     const guardrailSkip = instantEvalGuardrailSkipOf({ direction: guardrailDirection });
     if (guardrailSkip.kind === "skipped") return guardrailSkip.result;
@@ -89,7 +93,10 @@ export class EvaluationJudgingService {
     const request = buildInstantEvalJudgeRequest({ judge, inputs });
     if (request.kind === "nothing_to_judge") return instantEvalSkipResultOf("nothing_to_judge");
 
-    const resolved = await this.deps.decisionModels.resolveDecisionModel({ projectId });
+    const resolved = await this.deps.decisionModels.resolveDecisionModel({
+      projectId,
+      ...(decisionModel === undefined ? {} : { model: decisionModel }),
+    });
     // A broken own key never falls back to LangWatch's classifier (ADR-182 decision 9).
     if (resolved.kind === "own_unavailable") {
       return instantEvalSkipResultOf(instantEvalUnavailableDecisionModelSkipOf(resolved));

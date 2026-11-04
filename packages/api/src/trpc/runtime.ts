@@ -88,6 +88,7 @@ import {
 } from "../access/input-permission.ts";
 import { promoteStoreFailure } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
+import { declaredPath } from "../output-issue-path.ts";
 import { withoutUndeclaredKeys } from "../output-salvage.ts";
 import {
   auditScopeId,
@@ -1711,7 +1712,10 @@ function validateDeclaredOutput({
     {
       endpoint: procedure,
       protocol: "trpc",
-      validation: validationMeta(parsed.error, { privacy: "schema-only" }),
+      validation: validationMeta(parsed.error, {
+        privacy: "schema-only",
+        schemaPath: (path) => declaredPath(schema, path),
+      }),
     },
     "tRPC handler response did not match its declared output schema",
   );
