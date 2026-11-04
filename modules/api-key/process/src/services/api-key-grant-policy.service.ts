@@ -274,7 +274,7 @@ export class ApiKeyGrantPolicyService {
         { ...binding, role: "CUSTOM", customRoleId: null },
         organizationId,
       );
-      const candidates = (grantable ?? categorizablePermissions()).filter((permission) =>
+      const candidates: string[] = (grantable ?? categorizablePermissions()).filter((permission) =>
         bindingScopeCanGrantPermission({ scopeType: binding.scopeType, permission }),
       );
       const missing = new Set(

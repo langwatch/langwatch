@@ -36,10 +36,7 @@ import {
   resolveExpiresAt,
 } from "../../model/api-key-form.ts";
 import { useApiKeyHost } from "../../model/api-key-host.ts";
-import {
-  deriveBindingRole,
-  type PermissionMode,
-} from "../../model/api-key-permissions.ts";
+import { deriveBindingRole, type PermissionMode } from "../../model/api-key-permissions.ts";
 import {
   PermissionCategoryList,
   PermissionCounter,

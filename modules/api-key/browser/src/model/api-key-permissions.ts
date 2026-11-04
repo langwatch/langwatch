@@ -11,10 +11,7 @@ import {
   type PermissionCategory,
 } from "@langwatch/api-key-contract";
 import { permissionSatisfiedBy } from "@langwatch/authorization";
-import {
-  builtinRolePermissions,
-  roleKeyForTeamRole,
-} from "@langwatch/authz-contract";
+import { builtinRolePermissions, roleKeyForTeamRole } from "@langwatch/authz-contract";
 
 /** The team-role vocabulary the API key surfaces speak. */
 export type ApiKeyTeamRole = "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";

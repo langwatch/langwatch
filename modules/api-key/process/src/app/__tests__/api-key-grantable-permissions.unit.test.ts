@@ -40,7 +40,7 @@ async function appOver({ held }: { held: string[] }) {
         listUserBindings: vi.fn(async () => []),
         findPermissionsBeyondCaller: vi.fn(async ({ caller, permissions }) => {
           askedFor.push(caller);
-          return permissions.filter((permission) => !held.includes(permission));
+          return permissions.filter((permission: string) => !held.includes(permission));
         }),
       }),
       organizations: createApiFixture<OrganizationApi>({}),
