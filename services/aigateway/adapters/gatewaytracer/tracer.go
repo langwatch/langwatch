@@ -102,6 +102,8 @@ func DefaultSpanName(r *http.Request) string {
 		return "lw_gateway.messages"
 	case "/v1/embeddings":
 		return "lw_gateway.embeddings"
+	case "/v1/decisions":
+		return "lw_gateway.decisions"
 	case "/v1/models":
 		return "lw_gateway.models"
 	}

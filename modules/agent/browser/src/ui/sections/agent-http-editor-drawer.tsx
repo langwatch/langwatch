@@ -22,6 +22,8 @@ export interface AgentHttpEditorDrawerProps extends HttpAgentEditorOptions {
   renderVariables: (input: RenderAgentVariablesInput) => ReactNode;
   renderTestPanel(input: { agentId: string; projectId: string }): ReactNode;
   explainTestError: HttpTestErrorExplanation;
+  /** The experiment target's deploy label picker, shown above the name in the workbench. */
+  deployLabel?: ReactNode;
 }
 
 const FOCUS_IDS = { name: "name", url: "url", mapping: "mapping" } as const;
@@ -112,7 +114,12 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
             This HTTP agent could not be loaded. Close the editor and try again.
           </Box>
         )}
-        <Box paddingX={6} paddingTop={unavailable ? 0 : 4}>
+        {props.deployLabel && (
+          <Box paddingX={6} paddingTop={unavailable ? 0 : 4}>
+            {props.deployLabel}
+          </Box>
+        )}
+        <Box paddingX={6} paddingTop={unavailable || props.deployLabel ? 0 : 4}>
           <Field.Root required invalid={attempted && nameMissing}>
             <Field.Label>Agent Name</Field.Label>
             <Input

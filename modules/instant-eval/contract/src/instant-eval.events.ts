@@ -1,5 +1,5 @@
 /**
- * What one run records as it goes. None of the five carries judged text: a page
+ * What one run records as it goes. None of the six carries judged text: a page
  * event carries counts and a cursor, so a hundred thousand rows is a couple of
  * hundred events. @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
@@ -109,6 +109,10 @@ const instantEvalPageJudgedEventDataSchemaDefinition = z.object({
   skipped: z.number().int().nonnegative(),
   inputTokens: z.number().int().nonnegative(),
   requests: z.number().int().nonnegative(),
+  /** What this page's routed calls cost us, summed; zero when the run is not routed. */
+  costNanoUsd: z.number().int().nonnegative().default(0),
+  /** The input tokens `costNanoUsd` covers; an event written before it reads as unrouted. */
+  routedInputTokens: z.number().int().nonnegative().default(0),
   /** The last trace id of this page, where the next one starts. Null ends the run. */
   cursor: z.string().nullable(),
   cursorSpanId: z.string().nullable().default(null),
@@ -169,6 +173,8 @@ const instantEvalFinishedEventDataSchemaDefinition = z.object({
   /** What the run judged in total, summed from its pages. */
   inputTokens: z.number().int().nonnegative(),
   requests: z.number().int().nonnegative(),
+  /** What the run's routed calls cost us, summed from its pages; zero when it was not routed. */
+  costNanoUsd: z.number().int().nonnegative().default(0),
   /** What the judge charged us, and what the customer is charged. */
   costUsd: z.number().nonnegative(),
   priceUsd: z.number().nonnegative(),
@@ -193,10 +199,48 @@ export const instantEvalFinishedEventSchema: InstantEvalFinishedEventSchema =
   instantEvalFinishedEventSchemaDefinition;
 export type InstantEvalFinishedEvent = z.infer<typeof instantEvalFinishedEventSchema>;
 
+/**
+ * A routed page that reported after its run finished: the finish did not count it, so it is
+ * billed on its own spend row, and its cost and price are added to the finished run's row.
+ */
+const instantEvalLatePageBilledEventDataSchemaDefinition = z.object({
+  runId: z.string().min(1),
+  page: z.number().int().positive(),
+  inputTokens: z.number().int().nonnegative(),
+  requests: z.number().int().nonnegative(),
+  costNanoUsd: z.number().int().nonnegative(),
+  routedInputTokens: z.number().int().nonnegative(),
+  /** What this page cost us and what the customer is charged for it, as its spend row bills. */
+  costUsd: z.number().nonnegative(),
+  priceUsd: z.number().nonnegative(),
+});
+export interface InstantEvalLatePageBilledEventDataSchema extends Named<
+  typeof instantEvalLatePageBilledEventDataSchemaDefinition
+> {}
+export const instantEvalLatePageBilledEventDataSchema: InstantEvalLatePageBilledEventDataSchema =
+  instantEvalLatePageBilledEventDataSchemaDefinition;
+export type InstantEvalLatePageBilledEventData = z.infer<
+  typeof instantEvalLatePageBilledEventDataSchema
+>;
+
+const instantEvalLatePageBilledEventSchemaDefinition = z.object({
+  ...instantEvalEventSchema.shape,
+  type: z.literal(INSTANT_EVAL_EVENT_TYPES.LATE_PAGE_BILLED),
+  version: z.literal(INSTANT_EVAL_EVENT_VERSIONS.LATE_PAGE_BILLED),
+  data: instantEvalLatePageBilledEventDataSchema,
+});
+export interface InstantEvalLatePageBilledEventSchema extends Named<
+  typeof instantEvalLatePageBilledEventSchemaDefinition
+> {}
+export const instantEvalLatePageBilledEventSchema: InstantEvalLatePageBilledEventSchema =
+  instantEvalLatePageBilledEventSchemaDefinition;
+export type InstantEvalLatePageBilledEvent = z.infer<typeof instantEvalLatePageBilledEventSchema>;
+
 /** Every event one run's pipeline folds. */
 export type InstantEvalProcessingEvent =
   | InstantEvalRequestedEvent
   | InstantEvalPlannedEvent
   | InstantEvalPageJudgedEvent
   | InstantEvalCancelRequestedEvent
-  | InstantEvalFinishedEvent;
+  | InstantEvalFinishedEvent
+  | InstantEvalLatePageBilledEvent;

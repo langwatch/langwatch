@@ -190,6 +190,22 @@ describe("ExperimentRunPlanService.buildPlan", () => {
     });
   });
 
+  describe("given a run over rows 2 and then 0", () => {
+    /** @scenario "A run's plan numbers its target cells row by row in the order the rows were asked for" */
+    it("numbers both targets of row 2 before those of row 0", () => {
+      const plan = planOf(
+        requestWith({ scope: { type: "rows", rowIndices: [2, 0] }, evaluators: [exactMatch] }),
+      );
+
+      expect(plan.cells.map((cell) => [cell.ordinal, cell.rowIndex, cell.targetId])).toEqual([
+        [0, 2, "target_a"],
+        [1, 2, "target_b"],
+        [2, 0, "target_a"],
+        [3, 0, "target_b"],
+      ]);
+    });
+  });
+
   describe("given a run started by a Langy session or by a key that names no person", () => {
     /** @scenario "A run's plan credits whoever started it and names its slug and link" */
     it.each([

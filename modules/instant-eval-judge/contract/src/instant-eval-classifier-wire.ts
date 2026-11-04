@@ -132,7 +132,7 @@ function findVerdict({
   if (question.kind === "score") {
     return findWeightedScore({ question, answer }).map((score) => ({
       questionId: question.id,
-      score,
+      ...score,
     }));
   }
   return findCategoryVerdict({ question, answer });
@@ -140,8 +140,8 @@ function findVerdict({
 
 /**
  * The probability-weighted mean of a score question's levels: a distribution
- * split evenly between 2 and 4 means 3, and either endpoint would be a worse
- * answer than the one we can compute.
+ * split evenly between 2 and 4 means 3, a better answer than either endpoint.
+ * With it the levels' weighted standard deviation: how sure that mean is.
  */
 function findWeightedScore({
   question,
@@ -149,25 +149,28 @@ function findWeightedScore({
 }: {
   question: InstantEvalScoreQuestion;
   answer: ClassifierAnswer;
-}): number[] {
+}): { score: number; spread?: number }[] {
   const levels = instantEvalScoreLevels(question);
   const { probabilities } = answer;
   if (probabilities) {
-    let total = 0;
-    let weight = 0;
+    const weighted: { level: number; probability: number }[] = [];
     for (const [key, probability] of Object.entries(probabilities)) {
       const [level] = findLevelForKey({
         key,
         levels,
         ...(answer.legend ? { legend: answer.legend } : {}),
       });
-      if (level === undefined) continue;
-      total += level * probability;
-      weight += probability;
+      if (level !== undefined) weighted.push({ level, probability });
     }
-    if (weight > 0) return [total / weight];
+    const weight = weighted.reduce((sum, { probability }) => sum + probability, 0);
+    if (weight > 0) {
+      const mean = weighted.reduce((sum, w) => sum + w.level * w.probability, 0) / weight;
+      const variance =
+        weighted.reduce((sum, w) => sum + w.probability * (w.level - mean) ** 2, 0) / weight;
+      return [{ score: mean, spread: Math.sqrt(variance) }];
+    }
   }
-  return typeof answer.score === "number" ? [question.range.min + answer.score] : [];
+  return typeof answer.score === "number" ? [{ score: question.range.min + answer.score }] : [];
 }
 
 /**

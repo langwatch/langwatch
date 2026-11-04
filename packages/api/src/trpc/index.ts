@@ -13,6 +13,7 @@ export {
   bindTrpcMiddlewareContext,
   bindTrpcHeader,
   browserSessionContext,
+  browserSessionWindowContext,
   callerAddressContext,
   createTrpcErrorFormatter,
   createTrpcHandlerBinding,

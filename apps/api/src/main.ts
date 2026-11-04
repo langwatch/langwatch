@@ -1,6 +1,11 @@
 import "@langwatch/time/polyfill";
 import { buildChartFrameDocument } from "@langwatch/analytics-contract/chart-frame-document";
 import { CHART_FRAME_PATH } from "@langwatch/analytics-contract/chart-frame-protocol";
+import {
+  buildDocsSessionFrameDocument,
+  buildDocsSessionFrameRefusal,
+  DOCS_SESSION_FRAME_PATH,
+} from "@langwatch/api-key-contract/docs-session-frame";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { type HealthRoute, processConfig, Server, type ProcessServer } from "@langwatch/process";
 import { servingUpgradeGate } from "@langwatch/upgrade/gate";
@@ -58,7 +63,12 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
         .trpc()
         .rest()
         .browserBundle()
-        .framedDocument({ path: CHART_FRAME_PATH, document: buildChartFrameDocument }),
+        .framedDocument({ path: CHART_FRAME_PATH, document: buildChartFrameDocument })
+        .embeddedDocument({
+          path: DOCS_SESSION_FRAME_PATH,
+          document: buildDocsSessionFrameDocument,
+          refusal: buildDocsSessionFrameRefusal,
+        }),
     )
     .boot();
 

@@ -65,6 +65,21 @@ export const modelProviderTrpcTransport: TrpcRouterDeclaration<
     (await app.listForProject({ projectId: input.projectId })).map(toListEntry),
   )
 
+  .procedure("listDecisionModelsForProject")
+  .withPermission("project:view")
+  .handle(async ({ app, input }) => [
+    ...(await app.listDecisionModelsForProject({ projectId: input.projectId })),
+  ])
+
+  .procedure("listDecisionModelsForScopes")
+  .withPermission("project:view")
+  .handle(async ({ app, input }) => [
+    ...(await app.listDecisionModelsForScopes({
+      projectId: input.projectId,
+      scopes: input.scopes,
+    })),
+  ])
+
   .procedure("listAllForOrganizationForFrontend")
   .withPermission("organization:view")
   .handle(async ({ app, input }) =>

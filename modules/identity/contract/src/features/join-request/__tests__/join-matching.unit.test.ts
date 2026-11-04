@@ -94,6 +94,30 @@ describe("given a verified work address", () => {
       ]);
     });
 
+    /** @scenario The team with the most colleagues leads the list */
+    it("offers the largest organization first, and equal sizes in the order they came", () => {
+      const solo = (n: number): JoinCandidateOrganization => ({
+        ...acme,
+        organizationId: `org_solo_${n}`,
+        name: `Solo ${n}`,
+        verifiedMembersOnDomain: 1,
+        memberCount: 1,
+      });
+      const team = { ...acme, organizationId: "org_team", memberCount: 4 };
+
+      const decision = lookup([solo(1), solo(2), solo(3), solo(4), solo(5), team, solo(6)]);
+
+      expect(asked(decision).map((organization) => organization.organizationId)).toEqual([
+        "org_team",
+        "org_solo_1",
+        "org_solo_2",
+        "org_solo_3",
+        "org_solo_4",
+        "org_solo_5",
+        "org_solo_6",
+      ]);
+    });
+
     /** @scenario The colleague count is coarse and never a list */
     it("rounds the member count rather than reporting it exactly", () => {
       const decision = lookup([{ ...acme, memberCount: 117 }]);

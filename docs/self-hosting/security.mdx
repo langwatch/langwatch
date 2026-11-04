@@ -206,7 +206,7 @@ ingress:
   # Defaults to ["/api/internal"]. Add prefixes your install keeps in-cluster.
   blockedPaths:
     - /api/internal
-    - /api/cron # only if you do NOT drive cron from an external scheduler
+    - /api/cron   # only if you do NOT drive cron from an external scheduler
 ```
 
 Before you change it:
@@ -301,7 +301,9 @@ runAsUser: 1000
 fsGroup: 1000
 seccompProfile:
   type: RuntimeDefault
+```
 
+```yaml
 # Container-level (global.containerSecurityContext)
 runAsNonRoot: true
 allowPrivilegeEscalation: false

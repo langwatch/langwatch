@@ -72,6 +72,7 @@ class Records implements DatasetRecordRepository {
     throw new Error("unused");
   });
   deleteMany = vi.fn(async () => 0);
+  replaceAll = vi.fn(async () => undefined);
 }
 
 describe("DatasetService upload boundary", () => {

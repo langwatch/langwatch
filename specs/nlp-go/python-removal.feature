@@ -74,8 +74,8 @@ Feature: Python langwatch_nlp removed — nlpgo is the sole NLP engine
   Scenario: a code block runs user Python via the embedded sandbox
     Given a workflow with a code-block node
     When nlpgo executes the node
-    Then it spawns a transient "python3 runner.py" subprocess
-    And the runner and its dspy stub are materialized from the binary (no files copied into the image)
+    Then it spawns a transient "python3 -c <runner source>" subprocess
+    And the runner and its dspy stub come from the binary, never written to disk
     And the subprocess is killed when the node finishes or the timeout elapses
 
   @integration @v1 @unimplemented
