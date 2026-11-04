@@ -35937,7 +35937,7 @@ keywords: langwatch, agent testing, state of world, side effects, seed data, tes
 description: Test an agent that changes data by what changed, not by what it says it did. Parameters describe the case, the first turn builds it, and a state_of_world span shows the judge the result.
 ---
 
-This page covers checking state: parameters as the case, seeding the world and checking a value without the judge. For which cases to write, see [Scenario Suite Design](/agent-testing/designing-a-suite). For organising and running the suite, see [Build a Scenario Suite](/agent-testing/build-a-scenario-suite).
+To test an agent that changes data, check the state it leaves behind: make run parameters the case, seed the world on the first turn, and compare a value without the judge. For which cases to write, see [Scenario Suite Design](/agent-testing/designing-a-suite). For organising and running the suite, see [Build a Scenario Suite](/agent-testing/build-a-scenario-suite).
 
 ## Why the reply is not enough
 
@@ -35971,6 +35971,8 @@ With the defaults `customer_tier = plus`, `charges = 2` and `amount = 49.95`, th
 The connected agent declares the same names as keyword arguments, so it receives the values too:
 
 ```python
+import langwatch
+
 @langwatch.connect_agent(name="support-agent")
 async def support_agent(
     messages: list[dict],
