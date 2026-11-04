@@ -38,6 +38,21 @@ describe("DECISION_MODELS", () => {
     },
   );
 
+  /** @scenario "A decision model reads as its model name, as a chat model does" */
+  it.each(DECISION_MODELS.map((entry) => [entry.id, entry] as const))(
+    "%s names the model only, never its provider",
+    (_, entry) => {
+      const providerNames = [
+        entry.provider,
+        findModelProviderDefinition(entry.provider)?.name ?? "",
+      ];
+      const label = entry.label.toLowerCase();
+      for (const name of providerNames.filter(Boolean))
+        expect(label).not.toContain(name.toLowerCase());
+      expect(entry.label).not.toMatch(/\(|Decisions API/);
+    },
+  );
+
   it("never repeats an id", () => {
     const ids = DECISION_MODELS.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);

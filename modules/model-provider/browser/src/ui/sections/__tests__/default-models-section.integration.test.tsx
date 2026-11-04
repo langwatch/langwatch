@@ -228,7 +228,7 @@ describe("given the Default Models table", () => {
 
       expect(screen.getByRole("columnheader", { name: "Instant Evals" })).toBeInTheDocument();
       const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
-      expect(cell.textContent).toBe("LangWatch Instant Preview");
+      expect(cell.textContent).toBe("Instant Preview");
       expect(cell.textContent).not.toMatch(/Not configured/);
     });
 
@@ -248,7 +248,7 @@ describe("given the Default Models table", () => {
       renderSection();
 
       expect(screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals").textContent).toBe(
-        "Inception Mercury Decide",
+        "Mercury Decide",
       );
     });
   });
