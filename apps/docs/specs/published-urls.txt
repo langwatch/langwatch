@@ -679,6 +679,7 @@
 /features/instant-evals/cli
 /features/instant-evals/limits-and-cost
 /features/instant-evals/overview
+/features/instant-evals/own-model
 /features/instant-evals/questions
 /features/instant-evals/results
 /features/instant-evals/targets
