@@ -52,6 +52,25 @@ export function readHeldAddressProof({
   }
 }
 
+/** Whether this document was loaded by a reload; a fresh visit to sign-up starts over. */
+export function arrivedByReload(): boolean {
+  try {
+    const entry = performance.getEntriesByType("navigation")[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    return entry?.type === "reload";
+  } catch {
+    return false;
+  }
+}
+
+/** The held proof on a reload; on any other arrival it is dropped and `null` returned. */
+export function takeHeldAddressProofOnReload(): HeldAddressProof | null {
+  if (arrivedByReload()) return readHeldAddressProof();
+  forgetHeldAddressProof();
+  return null;
+}
+
 export function forgetHeldAddressProof(): void {
   try {
     window.sessionStorage.removeItem(KEY);
