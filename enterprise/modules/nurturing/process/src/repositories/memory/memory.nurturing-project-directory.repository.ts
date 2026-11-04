@@ -6,12 +6,22 @@ import type {
 
 /** The Postgres twin's semantics; the maps stand in for the owners' tables. */
 export class MemoryNurturingProjectDirectoryRepository implements NurturingProjectDirectoryRepository {
-  private constructor(
-    private readonly placed: ReadonlyMap<string, string>,
-    private readonly created: ReadonlyMap<string, number>,
-    private readonly organizationsCreated: ReadonlyMap<string, number>,
-    private readonly traced: ReadonlySet<string>,
-  ) {}
+  private readonly placed: ReadonlyMap<string, string>;
+  private readonly created: ReadonlyMap<string, number>;
+  private readonly organizationsCreated: ReadonlyMap<string, number>;
+  private readonly traced: ReadonlySet<string>;
+
+  private constructor(held: {
+    placed: ReadonlyMap<string, string>;
+    created: ReadonlyMap<string, number>;
+    organizationsCreated: ReadonlyMap<string, number>;
+    traced: ReadonlySet<string>;
+  }) {
+    this.placed = held.placed;
+    this.created = held.created;
+    this.organizationsCreated = held.organizationsCreated;
+    this.traced = held.traced;
+  }
 
   /**
    * `placed` maps each held project to its organization, `created` to its creation (epoch ms),
@@ -29,12 +39,12 @@ export class MemoryNurturingProjectDirectoryRepository implements NurturingProje
     organizationsCreated?: ReadonlyMap<string, number>;
     traced?: ReadonlySet<string>;
   } = {}): MemoryNurturingProjectDirectoryRepository {
-    return new MemoryNurturingProjectDirectoryRepository(
+    return new MemoryNurturingProjectDirectoryRepository({
       placed,
       created,
       organizationsCreated,
       traced,
-    );
+    });
   }
 
   async hasTracedProject({

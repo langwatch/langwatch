@@ -288,15 +288,18 @@ describe("NurturingDeliveryService organization facts", () => {
         { ...source, kind: "coding_session_days_first_3", codingSessionDaysFirst3: 2 },
         { coding_session_days_first_3: 2 },
       ],
-    ] as const)("identifies every active member with %j", async (signal, traits) => {
-      const { cio, deliver } = await organizationWithMembers();
+    ] satisfies [NurturingSignal, object][])(
+      "identifies every active member with %j",
+      async (signal, traits) => {
+        const { cio, deliver } = await organizationWithMembers();
 
-      await deliver(signal as unknown as NurturingSignal);
-      await settle();
+        await deliver(signal);
+        await settle();
 
-      expect(traitsOf(cio.identifies(), "admin-1")).toEqual([traits]);
-      expect(traitsOf(cio.identifies(), "member-2")).toEqual([traits]);
-    });
+        expect(traitsOf(cio.identifies(), "admin-1")).toEqual([traits]);
+        expect(traitsOf(cio.identifies(), "member-2")).toEqual([traits]);
+      },
+    );
 
     /** @scenario "The active days stay the admin's" */
     it("tells only the admin the active days", async () => {
