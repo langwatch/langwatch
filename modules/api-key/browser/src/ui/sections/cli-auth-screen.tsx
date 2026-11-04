@@ -343,9 +343,12 @@ export default function CliAuthScreen() {
     selectedScopes: keyScopes.selectedScopes,
     management: requestsManagement,
   });
+  // The ceiling is the server's answer now: until it lands, no row is held, so nothing may be
+  // judged ungrantable yet.
+  const isLoadingAccess = myBindings.isLoading || keyPermissions.isLoadingCeiling;
   const management = managementRequestFor({
     requestsManagement,
-    isLoadingBindings: myBindings.isLoading,
+    isLoadingBindings: isLoadingAccess,
     selectedScopes: keyScopes.selectedScopes,
     userPermissions: keyPermissions.userPermissions,
   });
@@ -354,7 +357,7 @@ export default function CliAuthScreen() {
     selectedOrgId,
     requiresProject,
     selectedProjectId,
-    isLoadingBindings: myBindings.isLoading || keyPermissions.isLoadingCeiling,
+    isLoadingBindings: isLoadingAccess,
     isBindingsFailed: myBindings.isError || keyPermissions.isCeilingFailed,
     scopeCount: keyScopes.selectedScopes.length,
     permissionCount: keyPermissions.permissions.length,

@@ -20,6 +20,7 @@ import { SettingsField } from "@langwatch/design-system/settings-field";
 import { TriangleAlert } from "lucide-react";
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
+import { useGrantablePermissions } from "../../behavior/use-grantable-permissions.ts";
 import {
   bindingsToPermissionMode,
   bindingsToScopes,
@@ -30,7 +31,6 @@ import {
   teamRolePermissions,
   type PermissionMode,
 } from "../../model/api-key-permissions.ts";
-import { useGrantablePermissions } from "../../behavior/use-grantable-permissions.ts";
 import {
   PermissionCategoryList,
   PermissionCounter,
@@ -82,6 +82,7 @@ function highestSelections(userPermissions: string[]): Record<string, Permission
 }
 
 const ACCESS_UNREADABLE = "Your access couldn't be read. Close this drawer and try again.";
+const ACCESS_LOADING = "Loading your access…";
 
 function storedSelections({
   apiKey,
@@ -224,6 +225,8 @@ export function EditApiKeyDrawer({
   });
   const userPermissions = grantable.permissions;
   const accessUnreadable = myBindings.isError || grantable.isError;
+  // Until the ceiling lands every row clamps to none, and a save would send no permissions.
+  const accessLoading = myBindings.isLoading || grantable.isLoading;
 
   useEffect(() => {
     if (apiKey) {
@@ -298,7 +301,11 @@ export function EditApiKeyDrawer({
           label: "Save",
           onClick: handleSave,
           loading: isUpdating,
-          disabledReason: accessUnreadable ? ACCESS_UNREADABLE : void 0,
+          disabledReason: accessUnreadable
+            ? ACCESS_UNREADABLE
+            : accessLoading
+              ? ACCESS_LOADING
+              : void 0,
         },
       }}
     >

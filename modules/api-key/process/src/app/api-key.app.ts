@@ -536,11 +536,6 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   }
 
   /**
-   * One key id resolved to a display name, for a caller who already has the id. Answers null
-   * identically for an id that does not exist and one that belongs to another organization, so
-   * it cannot be used to enumerate.
-   */
-  /**
    * What a restricted key's permission rows may offer, read off the mint's own resolver so a
    * group grant counts. Another owner's ceiling is asked only by an organization admin, the
    * one who may assign a key to someone else; anyone else is answered for themselves.
@@ -566,6 +561,11 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     });
   }
 
+  /**
+   * One key id resolved to a display name, for a caller who already has the id. Answers null
+   * identically for an id that does not exist and one that belongs to another organization, so
+   * it cannot be used to enumerate.
+   */
   async findKeyName(
     input: Readonly<{ organizationId: string; apiKeyId: string }>,
     by: ApiKeyCaller,
