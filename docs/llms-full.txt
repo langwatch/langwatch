@@ -19062,7 +19062,9 @@ Claude Code, Codex, GitHub Copilot and GitHub Copilot in VS Code (`code`) report
 
 A `langwatch <tool>` wrapper run can also set this up. For Codex, a run that sends telemetry directly installs the `notify` program. For Claude Code and both Copilot tools, a direct run writes the reporting hooks only when you accept its prompt to keep the plain command reporting, or when that wiring is already there. A gateway-route run writes none.
 
-For Claude Code and both Copilot tools, if a direct run leaves no hooks in the file [the table above](#what-langwatch-instrument-does) names, and no LangWatch plugin runs them, run `langwatch instrument <tool>`: with no hooks, a session does not report its repository by itself. For Codex, look in `$CODEX_HOME/config.toml` for the `# >>> langwatch codex notify begin >>>` block. If it is missing, run `langwatch instrument codex`, which also turns conversation capture back on. If that command warns about your own `notify`, use the fix in the same table.
+For Claude Code and both Copilot tools, if a direct run leaves no hooks in the file [the table above](#what-langwatch-instrument-does) names, and no LangWatch plugin runs them, run `langwatch instrument <tool>`: with no hooks, a session does not report its repository by itself.
+
+For Codex, look in `$CODEX_HOME/config.toml` for the `# >>> langwatch codex notify begin >>>` block. If it is missing, run `langwatch instrument codex`, which also turns conversation capture back on. If that command warns about your own `notify`, use the fix in the same table.
 
 For Gemini CLI and opencode, these commands wire the telemetry only, so their sessions show cost and tokens on [the sessions list](/coding-agents/sessions) but are not joined to a pull request.
 
@@ -19311,7 +19313,9 @@ It also reports the repository and branch the session worked in, read from the s
 
 To collect the usage numbers and no content, remove the `notify` setting from `~/.codex/config.toml` and keep the `[otel]` block. Tokens, cost, model, timing, tool counts and prompt lengths continue.
 
-With this wiring, the session then joins a pull request only if `langwatch ingest context` runs and the declaration reaches LangWatch. The default sandbox queues it, and with no `notify` program it can go undelivered. So give the sandbox network access, or run the command from your own terminal in the checkout with `--agent codex --session-id <id>`. Agents are told to run it only when they change checkout, so ask for it if the session stays in one place. Later LangWatch commands can put `notify` back: see [how to turn content off](/coding-agents/measure-pull-requests#what-content-is-captured-and-how-to-turn-it-off).
+With this wiring, the session then joins a pull request only if `langwatch ingest context` runs and the declaration reaches LangWatch. The default sandbox queues it, and with no `notify` program it can go undelivered.
+
+So give the sandbox network access, or run the command from your own terminal in the checkout with `--agent codex --session-id <id>`. Agents are told to run it only when they change checkout, so ask for it if the session stays in one place. Later LangWatch commands can put `notify` back: see [how to turn content off](/coding-agents/measure-pull-requests#what-content-is-captured-and-how-to-turn-it-off).
 
 <Warning>
   The `[otel]` block holds an ingest key on the `Authorization` header, because Codex reads that

@@ -77,7 +77,9 @@ Claude Code, Codex, GitHub Copilot and GitHub Copilot in VS Code (`code`) report
 
 A `langwatch <tool>` wrapper run can also set this up. For Codex, a run that sends telemetry directly installs the `notify` program. For Claude Code and both Copilot tools, a direct run writes the reporting hooks only when you accept its prompt to keep the plain command reporting, or when that wiring is already there. A gateway-route run writes none.
 
-For Claude Code and both Copilot tools, if a direct run leaves no hooks in the file [the table above](#what-langwatch-instrument-does) names, and no LangWatch plugin runs them, run `langwatch instrument <tool>`: with no hooks, a session does not report its repository by itself. For Codex, look in `$CODEX_HOME/config.toml` for the `# >>> langwatch codex notify begin >>>` block. If it is missing, run `langwatch instrument codex`, which also turns conversation capture back on. If that command warns about your own `notify`, use the fix in the same table.
+For Claude Code and both Copilot tools, if a direct run leaves no hooks in the file [the table above](#what-langwatch-instrument-does) names, and no LangWatch plugin runs them, run `langwatch instrument <tool>`: with no hooks, a session does not report its repository by itself.
+
+For Codex, look in `$CODEX_HOME/config.toml` for the `# >>> langwatch codex notify begin >>>` block. If it is missing, run `langwatch instrument codex`, which also turns conversation capture back on. If that command warns about your own `notify`, use the fix in the same table.
 
 For Gemini CLI and opencode, these commands wire the telemetry only, so their sessions show cost and tokens on [the sessions list](/coding-agents/sessions) but are not joined to a pull request.
 
