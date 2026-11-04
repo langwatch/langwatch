@@ -51,6 +51,8 @@ export const prismaTableCatalogue = {
   "Topic": "Topic",
   "Dataset": "Dataset",
   "DatasetRecord": "DatasetRecord",
+  "DatasetVersion": "DatasetVersion",
+  "DatasetVersionRun": "DatasetVersionRun",
   "Dashboard": "Dashboard",
   "DashboardFavourite": "DashboardFavourite",
   "DashboardsV2": "DashboardsV2",
@@ -1060,6 +1062,33 @@ export const prismaModelFieldCatalogue = {
     "entry",
     "createdAt",
     "updatedAt"
+  ],
+  "DatasetVersion": [
+    "id",
+    "projectId",
+    "datasetId",
+    "version",
+    "name",
+    "trigger",
+    "contentHash",
+    "columnTypes",
+    "rowCount",
+    "sizeBytes",
+    "chunkCount",
+    "restoredFromVersion",
+    "authorId",
+    "authorKind",
+    "pinnedAt",
+    "createdAt"
+  ],
+  "DatasetVersionRun": [
+    "id",
+    "projectId",
+    "datasetId",
+    "versionId",
+    "runId",
+    "experimentId",
+    "createdAt"
   ],
   "Dashboard": [
     "id",
@@ -2310,6 +2339,7 @@ export const prismaModelFieldCatalogue = {
     "codingAgentTypes",
     "codingActiveDays",
     "codingLastActiveDay",
+    "lastTraceAt",
     "updatedAt"
   ],
   "BillingMeterCheckpoint": [
@@ -3314,6 +3344,8 @@ export const prismaRelationCatalogue = {
     "dataset": "Dataset",
     "project": "Project"
   },
+  "DatasetVersion": {},
+  "DatasetVersionRun": {},
   "Dashboard": {
     "project": "Project",
     "graphs": "CustomGraph"

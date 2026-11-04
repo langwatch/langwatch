@@ -1221,14 +1221,14 @@ interface Input {
 
 // aiTools.providerAvailability
 type Input = z.infer<typeof organizationScope>; // ../contract/src/ai-tools.trpc.ts:18
-// Output: aiToolProviderAvailabilitySchema, ../contract/src/ai-tool-catalog.ts:355
+// Output: aiToolProviderAvailabilitySchema, ../contract/src/ai-tool-catalog.ts:371
 interface Output {
   configuredProviders: string[];
 }
 
 // aiTools.claudeCodeOtlpEndpoint
 type Input = z.infer<typeof organizationScope>; // ../contract/src/ai-tools.trpc.ts:18
-// Output: aiToolOtlpEndpointSchema, ../contract/src/ai-tool-catalog.ts:367
+// Output: aiToolOtlpEndpointSchema, ../contract/src/ai-tool-catalog.ts:383
 interface Output {
   endpoint: string | null;
 }
@@ -1243,7 +1243,7 @@ interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:123
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:125
 
 // aiTools.create
 // Input: aiToolCreateSchema, ../contract/src/ai-tools.trpc.ts:45
@@ -1256,7 +1256,7 @@ interface Input {
   order?: number;
   config: Record<string, unknown>;
 }
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:123
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:125
 
 // aiTools.update
 // Input: aiToolUpdateSchema, ../contract/src/ai-tools.trpc.ts:58
@@ -1271,11 +1271,11 @@ interface Input {
   type?: "coding_assistant" | "model_provider" | "external_tool";
   config?: Record<string, unknown>;
 }
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:123
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:125
 
 // aiTools.remove
 type Input = z.infer<typeof entryInOrganization>; // ../contract/src/ai-tools.trpc.ts:19
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:123
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:125
 
 // aiTools.setEnabled
 // Input: inline, ../contract/src/ai-tools.trpc.ts:94
@@ -1284,7 +1284,7 @@ interface Input {
   id: string;
   enabled: boolean;
 }
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:123
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:125
 
 // aiTools.importStarterPack
 // Input: inline, ../contract/src/ai-tools.trpc.ts:98
@@ -1292,7 +1292,7 @@ interface Input {
   organizationId: string;
   slugs?: string[];
 }
-// Output: aiToolStarterPackImportSchema, ../contract/src/ai-tool-catalog.ts:401
+// Output: aiToolStarterPackImportSchema, ../contract/src/ai-tool-catalog.ts:417
 interface Output {
   created: number;
   updated: number;
@@ -1773,7 +1773,7 @@ type Output = z.infer<typeof governanceBudgetOverviewForUserSchema>; // ../contr
 
 // governance.cliBootstrap
 type Input = z.infer<typeof organizationScope>; // ../contract/src/governance.trpc.ts:24
-type Output = z.infer<typeof cliBootstrapResultSchema>; // ../contract/src/features/cli/cli-bootstrap.ts:56
+type Output = z.infer<typeof cliBootstrapResultSchema>; // ../contract/src/features/cli/cli-bootstrap.ts:57
 ```
 
 ### `ingestionKey`
@@ -1874,7 +1874,7 @@ interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:76
+type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
 // ingestionSources.create
 type Input = z.infer<typeof ingestionSourceCreateInputSchema>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:32
@@ -1893,15 +1893,15 @@ interface Input {
   pullSchedule?: string | null;
   traceProjectId?: string | null;
 }
-type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:76
+type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
 // ingestionSources.rotateSecret
 type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:15
-type Output = z.infer<typeof ingestionSourceWithSecretSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:90
+type Output = z.infer<typeof ingestionSourceWithSecretSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:95
 
 // ingestionSources.archive
 type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:15
-type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:76
+type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
 // ingestionSources.validateOttl
 // Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:89
@@ -1917,7 +1917,7 @@ interface Input {
   organizationId: string;
   sourceType: string;
 }
-// Output: ottlStarterTemplateSchema, ../contract/src/features/ingestion/ingestion-source.ts:107
+// Output: ottlStarterTemplateSchema, ../contract/src/features/ingestion/ingestion-source.ts:112
 interface Output {
   enabled: boolean;
   statements: string[];

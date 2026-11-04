@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Every signal an owner records for nurturing: ids plus what the owner's event
- * holds, one member per kind main sent. Nurturing fetches nothing.
+ * holds, one member per kind main sent.
  * @see enterprise/modules/nurturing/specs/nurturing.feature
  */
 import type { Named } from "@langwatch/module";
@@ -351,6 +351,20 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
   }),
   z.object({
     kind: z.literal("sessions_page_viewed"),
+    ...signalSource,
+    userId: id,
+    page: id,
+  }),
+  z.object({
+    /** A usage, cost or plan page open: moves the person's usage_page_viewed_at. */
+    kind: z.literal("usage_page_opened"),
+    ...signalSource,
+    userId: id,
+    page: id,
+  }),
+  z.object({
+    /** The same open as the event Customer.io receives only for the person's first. */
+    kind: z.literal("usage_page_viewed"),
     ...signalSource,
     userId: id,
     page: id,

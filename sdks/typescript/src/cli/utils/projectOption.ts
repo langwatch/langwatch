@@ -32,6 +32,7 @@ export const COMMANDS_WITHOUT_PROJECT: Record<string, string> = {
   gemini: "runs a coding tool on this machine",
   opencode: "runs a coding tool on this machine",
   grok: "runs a coding tool on this machine",
+  pi: "runs a coding tool on this machine",
   commands: "lists this CLI's own commands",
   docs: "prints documentation bundled with this CLI",
   "scenario-docs": "prints documentation bundled with this CLI",

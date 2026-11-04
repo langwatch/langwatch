@@ -142,13 +142,13 @@ no push notification.
 
 **The setting is the person's own.** Per person and per board: `undecided` until they
 choose, then `on` with an hour (0 to 23), an IANA time zone and a maximum (1, 3, 5 or
-10), or `off`. Three procedures read it, turn it on or change it, and turn it off; "No
-thanks" on the offer is the same off. Each takes `analytics:view` and names no person,
-so a caller reaches their own setting alone, an administrator included. The writes are
-refused on an aggregate, and all three while `release_insights` is off. Any board may be
-turned on, a From LangWatch board too. A stored board is read as the person when they
-turn it on, so one they cannot open answers `dashboard_not_found`, like one that does
-not exist; a template's pointer is kept as sent, since no server reads the catalogue.
+10), or `off`. Three procedures read it, turn it on or change it, and turn it off. Each
+takes `analytics:view` and names no person, so a caller reaches their own setting alone,
+an administrator included. The writes are refused on an aggregate, and all three while
+`release_insights` is off. Any board may be turned on, a From LangWatch board too. A
+stored board is read as the person when they turn it on, so one they cannot open answers
+`dashboard_not_found`, like one that does not exist; a template's pointer is kept as
+sent, since no server reads the catalogue.
 Turning off asks no board, so the run of a board that is gone can still be turned off.
 The row keeps what they last chose while the run is off. There is no cap on how many
 boards a person turns on.
@@ -164,11 +164,11 @@ minute within the hour. The browser's defaults are 09, its own time zone and 3. 
 shows while `release_insights` is off, without `analytics:view`, or on an aggregate,
 whose read answers `undecided` and whose writes are refused.
 
-**The offer is one rule, and the answer is the server's.** A board that opened with at
-least one widget offers the run in a dialog to a person who is `undecided`, once per
-visit. Closing the dialog decides nothing; "No thanks" stores `off`. The rule is one
-pure function, `shouldOfferDailyInsights`, so how often a board asks changes in one
-place, and the browser stores no answer of its own.
+**A board never asks by itself, and the answer is the server's.** Opening a board opens
+no dialog and writes nothing. A person who is `undecided` sees the quiet switch, and
+turning it on sends the browser's defaults. Only the person's own choice stores `on` or
+`off`, and the browser stores no answer of its own. Amended 2026-11-02: the board no
+longer offers the run in a dialog; the quiet switch is the one way to turn it on.
 
 **A write shows before it is folded.** A write is answered before the worker folds its
 event, so the browser writes the new state into the cached read first, and puts the read
@@ -321,9 +321,9 @@ contract; insight knows nothing of ops.
 - Daily runs on From LangWatch boards need the template catalogue, or the part of it
   a brief needs, readable on the server. Until then they are skipped, visibly: the
   control says "Did not run" and that Langy cannot read From LangWatch boards yet. The
-  offer and the schedule sentence on such a board still say Langy reads it.
+  schedule sentence on such a board still says Langy reads it.
 - The browser counts every widget of a board, while a run reads custom chart widgets
-  only. A board of builder graphs alone gets the offer, and its run ends `board_empty`.
+  only. A board of builder graphs alone shows the control, and its run ends `board_empty`.
 - The control's "N new" tag counts the person's unseen insights whose pointer has the
   board's id. A From LangWatch board is pointed at by its template id in a run and by
   `curated/<template id>` in a chat, so chat insights from a template are not counted.

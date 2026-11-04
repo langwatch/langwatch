@@ -1,1 +1,6 @@
-export { changelogPath, readReleases, withReleaseNotes } from "./compile/releases.ts";
+export {
+  RELEASES_SLUG,
+  changelogPath,
+  readReleases,
+  withReleaseNotes,
+} from "./compile/releases.ts";

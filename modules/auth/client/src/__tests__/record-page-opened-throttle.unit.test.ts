@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { recordPageOpenedOncePerHour } from "../behavior/use-record-page-opened.ts";
+import { recordPageOpenedOncePerHour } from "../use-record-page-opened.ts";
 
 const HOUR = 60 * 60 * 1000;
 

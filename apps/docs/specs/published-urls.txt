@@ -222,13 +222,17 @@
 /api-reference/datasets/delete-dataset
 /api-reference/datasets/delete-records
 /api-reference/datasets/evaluate-a-dataset
+/api-reference/datasets/get-a-dataset-version
 /api-reference/datasets/get-dataset
 /api-reference/datasets/get-entries
 /api-reference/datasets/get-records
 /api-reference/datasets/import-an-uploaded-file-into-a-dataset
 /api-reference/datasets/list-dataset
+/api-reference/datasets/list-dataset-versions
 /api-reference/datasets/overview
 /api-reference/datasets/post-dataset-entries
+/api-reference/datasets/restore-a-dataset-version
+/api-reference/datasets/save-a-dataset-version
 /api-reference/datasets/update-dataset
 /api-reference/datasets/update-records
 /api-reference/evaluations
@@ -674,6 +678,7 @@
 /features/instant-evals/cli
 /features/instant-evals/limits-and-cost
 /features/instant-evals/overview
+/features/instant-evals/own-model
 /features/instant-evals/questions
 /features/instant-evals/results
 /features/instant-evals/targets

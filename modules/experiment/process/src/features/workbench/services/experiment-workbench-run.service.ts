@@ -7,11 +7,8 @@ import {
   ExperimentNotFoundError,
   ExperimentRunLoopUnavailableError,
   ExperimentRunNotFoundError as RunNotFoundError,
-  InvalidExperimentConfigurationError,
   generateHumanReadableId,
-  persistedEvaluationsV3StateSchema,
   runsSavedDataset,
-  type ExecutionScope,
   type ExperimentRunWithItems,
   type RunResultsRequest,
   type RunStatusAnswer,
@@ -21,7 +18,6 @@ import {
   type SavedRunRequest,
   type WorkbenchRunAnswer,
   type executionRequestSchema,
-  ExperimentEvaluationInputError,
 } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -37,13 +33,10 @@ import type { ExperimentRunRefusal } from "../../../rules/experiment-run-availab
 import { getRunUrl } from "../../../rules/experiment-run-url.rules.ts";
 import { workbenchActorFrom } from "../../../rules/experiment-workbench-actor.rules.ts";
 import { workbenchRunState } from "../../../rules/experiment-workbench-run-state.rules.ts";
-import {
-  ExperimentExecutionDataService,
-  type LoadedExecutionData,
-} from "../../../services/experiment-execution-data.service.ts";
-import { ExperimentSavedStateExecutionService } from "../../../services/experiment-saved-state-execution.service.ts";
+import { ExperimentExecutionDataService } from "../../../services/experiment-execution-data.service.ts";
 import type { ExperimentService } from "../../../services/experiment.service.ts";
 import { ExperimentRunPlanService } from "../../run/services/experiment-run-plan.service.ts";
+import { ExperimentSavedRunPreparationService } from "./experiment-saved-run-preparation.service.ts";
 import type { ExperimentWorkbenchObserver } from "./experiment-workbench-observer.service.ts";
 import {
   ExperimentWorkbenchPipelineRunService,
@@ -80,7 +73,9 @@ export class ExperimentWorkbenchRunService {
   /** `POST /:slug/run`: a polled run by default, a streamed one when the caller accepts events. */
   async startSavedRun(input: SavedRunRequest): Promise<SavedRunAnswer> {
     const { projectId, slug } = input;
-    const saved = await this.#prepareSavedRun(input);
+    const saved = await ExperimentSavedRunPreparationService.create({
+      experiments: this.experiments,
+    }).prepare({ input, runs: this.#pipeline() });
 
     logger.info(
       { projectId, slug, isSSE: input.acceptsEvents, rowCount: saved.data.datasetRows.length },
@@ -98,6 +93,7 @@ export class ExperimentWorkbenchRunService {
         origin: "saved",
         actor: workbenchActorFrom({ credential: input.credential }),
         experimentSlug: slug,
+        ...(saved.boardRowIndices ? { boardRowIndices: saved.boardRowIndices } : {}),
         ...options,
       });
       return {
@@ -135,59 +131,6 @@ export class ExperimentWorkbenchRunService {
     return { kind: "started", runId, status: "running", total: run.start.total, runUrl };
   }
 
-  /** The saved workbench, the body's run inputs and the data they load, or main's refusals. */
-  async #prepareSavedRun(input: SavedRunRequest) {
-    const { projectId, slug } = input;
-    const runs = this.#pipeline();
-    const savedExperiment = await this.experiments.findBySlugAndType({
-      projectId,
-      slug,
-      type: "EVALUATIONS_V3",
-    });
-    if (!savedExperiment) throw new ExperimentNotFoundError(slug);
-
-    const parseResult = persistedEvaluationsV3StateSchema.safeParse(savedExperiment.workbenchState);
-    if (!parseResult.success) {
-      logger.error({ slug, errors: parseResult.error.issues }, "Invalid workbenchState");
-      throw new InvalidExperimentConfigurationError(slug);
-    }
-    if (!parseResult.data.datasets[0]) {
-      throw new ExperimentEvaluationInputError({ status: 400, reason: "No dataset configured" });
-    }
-    const savedState = ExperimentSavedStateExecutionService.create();
-    const runInputs = savedState.parseRunInputs({ body: input.body });
-    const prepared = await savedState.prepareSavedStateExecution({
-      experiments: this.experiments,
-      services: runs.services,
-      projectId,
-      slug,
-      runInputs: {
-        data: runInputs.data,
-        datasetId: runInputs.dataset_id,
-        parameters: runInputs.parameters,
-      },
-    });
-    const scope: ExecutionScope = runInputs.row_indices
-      ? { type: "rows", rowIndices: runInputs.row_indices }
-      : { type: "full" };
-    const data: LoadedExecutionData = {
-      datasetRows: prepared.datasetRows,
-      datasetColumns: prepared.datasetColumns,
-      loadedPrompts: prepared.loadedPrompts,
-      loadedAgents: prepared.loadedAgents,
-      loadedEvaluators: prepared.loadedEvaluators,
-      loadedWorkflows: prepared.loadedWorkflows,
-    };
-    return {
-      experimentId: prepared.experiment.id,
-      state: prepared.state,
-      data,
-      scope,
-      runInputs,
-      carriedOverCells: savedState.planSavedRunCarryOver({ prepared, scope }),
-    };
-  }
-
   /** `POST /execute`: the browser's run, planned here and executed by the worker's run pipeline. */
   async executeWorkbenchRun(
     input: WorkbenchExecutionRequest,
@@ -200,13 +143,19 @@ export class ExperimentWorkbenchRunService {
     // The refusal a process without Redis or a public address owes, as before the pipeline.
     const runs = this.#startable();
 
+    // The page runs the rows it shows; a pinned version is for runs from the API, CI or an SDK.
     const dataResult = await ExperimentExecutionDataService.create().loadExecutionData({
       projectId,
-      dataset: input.dataset,
+      dataset: { ...input.dataset, datasetVersion: null },
       targets: input.targets,
       evaluators: input.evaluators,
       services: runs.services,
-      inputs: { data: input.data, datasetId: input.dataset_id, parameters: input.parameters },
+      inputs: {
+        data: input.data,
+        datasetId: input.dataset_id,
+        parameters: input.parameters,
+        by: { kind: "user", id: by.id },
+      },
     });
     const state = workbenchRunState(input);
 
