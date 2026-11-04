@@ -395,6 +395,26 @@ describe("given a private route whose path is not a plain ClickHouse database na
   );
 
   /** @scenario "A private route whose database is not a plain ClickHouse name is refused" */
+  it.each([
+    ["an unparsable URL", "http://route-user:route-secret-pw@[bad/x"],
+    ["a reserved database", "https://route-user:route-secret-pw@private.invalid:8443/system"],
+  ])("keeps no part of the URL in the reasons of %s", async (_, url) => {
+    const { run } = attempt({ kind: "private", organizationId: "org-shape", url });
+
+    const refusal = (await run()) as Error & { reasons: Error[] };
+
+    expect(refusal.reasons).toHaveLength(1);
+    const dump = JSON.stringify([
+      refusal.message,
+      ...refusal.reasons.map((reason) => [
+        reason.message,
+        Object.getOwnPropertyNames(reason).map((name) => String(Reflect.get(reason, name))),
+      ]),
+    ]);
+    expect(dump).not.toMatch(/route-user|route-secret-pw|private\.invalid|bad\/x/);
+  });
+
+  /** @scenario "A private route whose database is not a plain ClickHouse name is refused" */
   it("accepts a plain name and dials it", async () => {
     const { run } = attempt(withPath("/acme_db"));
 

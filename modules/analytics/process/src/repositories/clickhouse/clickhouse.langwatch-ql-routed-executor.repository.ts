@@ -10,6 +10,7 @@ import {
   TenantScopeError,
 } from "@langwatch/clickhouse-client";
 
+import { RESERVED_DATABASES } from "../../rules/langwatch-ql-policy.rules.ts";
 import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionRequest,
@@ -26,7 +27,7 @@ export type LangWatchQLExecutorFactory = (input: {
   target: LangWatchQLTarget;
 }) => LangWatchQLExecutorRepository;
 
-const PLAIN_DATABASE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const PLAIN_DATABASE_NAME = /^[a-z_][a-z0-9_]*$/;
 
 const NOT_AVAILABLE = "LangWatchQL is not available for this organization's ClickHouse.";
 
@@ -39,10 +40,15 @@ function isRouteRefusal(error: unknown): error is Error {
   return error instanceof TenantScopeError || error instanceof PrivateRouteUnavailableError;
 }
 
+/** The refusal, with a fixed reason for operators; no part of the route URL goes in. */
+function refused(reason: string): LangWatchQLUnavailableError {
+  return new LangWatchQLUnavailableError({ message: NOT_AVAILABLE, reasons: [new Error(reason)] });
+}
+
 /**
  * The route's server as the LangWatchQL identity: its origin and database, never the route's
- * own user or password. A URL without an http or https origin, or naming a database that is
- * not a plain identifier, is refused without its text, which may carry those credentials.
+ * user or password. A URL that is not http(s), or names a reserved or non-lower-case-identifier
+ * database, is refused without its text, which may carry those credentials.
  */
 function privateConnectionOf({
   shared,
@@ -51,20 +57,21 @@ function privateConnectionOf({
   shared: LangWatchQLConnection;
   url: string;
 }): LangWatchQLConnection {
-  let origin: string;
+  let parsed: URL;
   let database: string;
   try {
-    const parsed = new URL(url);
-    // Any other scheme parses to the origin "null", which no driver can dial.
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("scheme");
-    origin = parsed.origin;
+    parsed = new URL(url);
     database = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
-    // The name is written unquoted into generated SQL, so only a plain identifier may pass.
-    if (database !== "" && !PLAIN_DATABASE_NAME.test(database)) throw new Error("database");
   } catch {
-    throw new LangWatchQLUnavailableError({ message: NOT_AVAILABLE });
+    // Never the caught error: a URL parse failure carries the whole URL, password included.
+    throw refused("unparsable route URL");
   }
-  return { ...shared, url: origin, database: database === "" ? shared.database : database };
+  // Any other scheme parses to the origin "null", which no driver can dial.
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw refused("bad scheme");
+  // Written unquoted into generated SQL: only a lower-case identifier, never a reserved one.
+  if (database !== "" && !PLAIN_DATABASE_NAME.test(database)) throw refused("bad name shape");
+  if (RESERVED_DATABASES.includes(database)) throw refused("reserved database");
+  return { ...shared, url: parsed.origin, database: database === "" ? shared.database : database };
 }
 
 /** Routes each statement by its projects, with one executor per private organization. */

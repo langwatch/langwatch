@@ -837,7 +837,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 
   @unit
   Scenario: A private route whose database is not a plain ClickHouse name is refused
-    Given an organization routed to a URL whose path is not a plain identifier, or carries SQL once decoded
+    Given an organization routed to a URL whose path is not a plain lower-case identifier, carries SQL once decoded, or names a reserved database such as system
     When a LangWatchQL query reads that organization's projects
     Then the query layer refuses it with error code lwql_unavailable before any statement runs
     And the refusal names no part of the route URL
