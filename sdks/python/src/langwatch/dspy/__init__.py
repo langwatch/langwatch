@@ -50,7 +50,7 @@ logger = logging.getLogger("langwatch.dspy")
 # how much optimization telemetry accumulates in memory.
 MAX_BUFFERED_STEPS = 50
 
-# `/api/dspy/log_steps` refuses bodies over its 20 MB `bodyLimit` with a 413,
+# `/api/v1/dspy/log_steps` refuses bodies over its 20 MB `bodyLimit` with a 413,
 # a client error no retry can fix. Buffered steps are posted in bodies that
 # stay within it, so a buffer that grew during an outage is delivered in
 # several accepted requests instead of being refused whole.
