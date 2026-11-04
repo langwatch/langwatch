@@ -161,6 +161,9 @@ const ingestionPullRunFailedEventDataSchemaDefinition = sourceEnvelopeSchema.saf
   retryable: z.boolean(),
   retryAfterMs: z.number().nullable().optional(),
   replacedByRunId: z.string().optional(),
+  nextCursor: z.string().nullable().optional(),
+  eventCount: z.number().int().nonnegative().optional(),
+  errorCount: z.number().int().nonnegative().optional(),
 });
 export interface IngestionPullRunFailedEventDataSchema extends Named<
   typeof ingestionPullRunFailedEventDataSchemaDefinition

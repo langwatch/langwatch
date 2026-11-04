@@ -122,6 +122,10 @@ export interface NormalizedPullEventSchema extends Named<
 export const normalizedPullEventSchema: NormalizedPullEventSchema =
   normalizedPullEventSchemaDefinition;
 export type NormalizedPullEvent = z.infer<typeof normalizedPullEventSchema>;
+const pullFailureSchema = z.object({ error: z.string(), errorCode: z.string() }).strict();
+/** A safe terminal failure of the primary read, independent of successful side reads. */
+export type PullFailure = z.infer<typeof pullFailureSchema>;
+
 export type PullResult = {
   events: NormalizedPullEvent[];
   /**
@@ -148,6 +152,8 @@ export type PullResult = {
    * source refused part-way through a run reports zero failures forever.
    */
   unreadPage?: true;
+  /** Explicitly fails the run while retaining the events and cursor it did collect. */
+  failure?: PullFailure;
   /**
    * The instant this run is known to have read up to, ISO 8601 — distinct
    * from when the run finished: this value doesn't move until the read

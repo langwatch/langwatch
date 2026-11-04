@@ -29,6 +29,8 @@ import {
   type GovernancePuller as PullerAdapter,
   type NormalizedPullEvent,
   type PullResult,
+  type PullFailure,
+  PULL_REFUSED_ERROR_CODE,
   type PullRunOptions,
   copilotStudioDataversePullConfigSchema,
   type CopilotStudioDataversePullConfig,
@@ -318,6 +320,7 @@ export class HttpCopilotStudioDataverseChannel
   ): Promise<PullResult> {
     const walk: TranscriptWalk = { events: [], errorCount: 0, last: null, isTruncated: false };
     const previous = HttpCopilotStudioDataverseChannel.parseCursor(options.cursor);
+    let failure: PullFailure | undefined;
 
     // Cost, seats and directory never throw and never count an error: an
     // error with an unmoved cursor makes the worker discard the conversations.
@@ -355,6 +358,9 @@ export class HttpCopilotStudioDataverseChannel
       });
     } catch (error) {
       walk.errorCount += 1;
+      if (error instanceof ProviderSignInError && [400, 401, 403].includes(error.status ?? 0)) {
+        failure = { error: error.message, errorCode: PULL_REFUSED_ERROR_CODE };
+      }
       logger.error(
         { error: error instanceof Error ? error.message : String(error) },
         "copilot studio dataverse pull failed",
@@ -383,6 +389,7 @@ export class HttpCopilotStudioDataverseChannel
         : options.cursor,
       errorCount: walk.errorCount,
       ...(transcriptReadFailed ? { unreadPage: true as const } : {}),
+      ...(failure ? { failure } : {}),
       ...(walk.isTruncated ? { completeness: "truncated" as const } : {}),
     };
   }

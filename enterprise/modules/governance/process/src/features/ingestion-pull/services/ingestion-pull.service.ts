@@ -1,5 +1,6 @@
 import {
   PULL_FAILED_ERROR_CODE,
+  type PullFailure,
   PULL_REFUSED_ERROR_CODE,
 } from "@langwatch/enterprise-governance-contract";
 import { isDispatchError } from "@langwatch/eventing";
@@ -29,6 +30,7 @@ export type IngestionPullRunResult = {
   errorCount?: number;
   completeness?: "complete" | "truncated";
   unreadPage?: true;
+  failure?: PullFailure;
   readThroughAt?: number | null;
 };
 
@@ -58,6 +60,9 @@ export interface IngestionPullOutcomeChannel {
     retryable: false;
     retryAfterMs?: number | null;
     replacedByRunId?: string;
+    nextCursor?: string | null;
+    eventCount?: number;
+    errorCount?: number;
   }): Promise<void>;
 }
 
@@ -125,6 +130,20 @@ export class IngestionPullService {
       });
     } catch (error) {
       await this.settleFailedPull({ input, error });
+      return;
+    }
+
+    if (result.failure) {
+      this.metrics.count("failed_final");
+      this.metrics.observeDuration(this.clock() - startedAt);
+      await this.outcomePort.failed({
+        ...this.failureEnvelope(input),
+        ...result.failure,
+        retryable: false,
+        nextCursor: result.nextCursor,
+        eventCount: result.eventCount,
+        ...(result.errorCount !== undefined ? { errorCount: result.errorCount } : {}),
+      });
       return;
     }
 

@@ -158,3 +158,48 @@ describe("given a transport failure", () => {
     ]);
   });
 });
+
+describe("given a refused primary read with successful side reads", () => {
+  /** @scenario "A refused transcript sign-in keeps side reads but records a failed run" */
+  it("records one failed outcome with the progress and refusal instead of completing", async () => {
+    const failure = {
+      error: "Microsoft refused the application's credentials (HTTP 400)",
+      errorCode: PULL_REFUSED_ERROR_CODE,
+    };
+    const { service, outcome } = pullService(async () => ({
+      nextCursor: "side-progress",
+      eventCount: 1,
+      errorCount: 1,
+      unreadPage: true,
+      readThroughAt: null,
+      failure,
+    }));
+    await service.execute({ tenantId: "project-1", attempt: 1, pull: pull() });
+
+    expect(outcome.failedCalls).toEqual([
+      expect.objectContaining({
+        ...failure,
+        nextCursor: "side-progress",
+        eventCount: 1,
+        errorCount: 1,
+        retryable: false,
+      }),
+    ]);
+    expect(outcome.completedCalls).toEqual([]);
+  });
+
+  it("still completes an unread page result without an explicit failure", async () => {
+    const { service, outcome } = pullService(async () => ({
+      nextCursor: "partial-progress",
+      eventCount: 1,
+      errorCount: 1,
+      unreadPage: true,
+    }));
+    await service.execute({ tenantId: "project-1", attempt: 1, pull: pull() });
+
+    expect(outcome.completedCalls).toEqual([
+      expect.objectContaining({ unreadPage: true, nextCursor: "partial-progress" }),
+    ]);
+    expect(outcome.failedCalls).toEqual([]);
+  });
+});
