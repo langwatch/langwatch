@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+import { mergeCoverageCommits } from "../src/rules/lwql-builtin-statement-coverage.rules.ts";
 import {
   LWQL_BUILTIN_STATEMENT_COVERAGE,
   LWQL_BUILTIN_STATEMENT_HASHES,
@@ -31,7 +32,17 @@ function sqlsOf(path: string): string[] {
   return (JSON.parse(readFileSync(path, "utf8")) as { sql: string }[]).map(({ sql }) => sql);
 }
 
+/**
+ * The commit that last changed the fixture. Refuses a fixture with uncommitted edits: `git log`
+ * would name the previous commit for text it does not hold, so commit the fixture, then regenerate.
+ */
 function fixtureCommit(): string {
+  const dirty = execFileSync("git", ["status", "--porcelain", "--", FIXTURE_PATH], {
+    encoding: "utf8",
+  }).trim();
+  if (dirty !== "") {
+    throw new Error("Commit the stock widget fixture before regenerating, so its commit is named.");
+  }
   return execFileSync("git", ["log", "-1", "--format=%h", "--abbrev=11", "--", FIXTURE_PATH], {
     encoding: "utf8",
   }).trim();
@@ -48,15 +59,16 @@ function versionsFromArguments(): StockVersion[] {
 }
 
 function main(): void {
-  const versions: StockVersion[] = [
-    { commit: fixtureCommit(), sqls: sqlsOf(FIXTURE_PATH) },
-    ...versionsFromArguments(),
-  ];
-  const commits = [...LWQL_BUILTIN_STATEMENT_COVERAGE.commits];
+  const newest: StockVersion = { commit: fixtureCommit(), sqls: sqlsOf(FIXTURE_PATH) };
+  const older = versionsFromArguments();
+  const commits = mergeCoverageCommits({
+    existing: LWQL_BUILTIN_STATEMENT_COVERAGE.commits,
+    newest: newest.commit,
+    older: older.map(({ commit }) => commit),
+  });
   const hashes = new Set(LWQL_BUILTIN_STATEMENT_HASHES);
 
-  for (const { commit, sqls } of versions) {
-    if (!commits.includes(commit)) commits.push(commit);
+  for (const { sqls } of [newest, ...older]) {
     for (const sql of sqls) hashes.add(createHash("sha256").update(sql).digest("hex"));
   }
   const oldestCommit = commits.at(-1) ?? "";

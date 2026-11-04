@@ -69,7 +69,11 @@ export class LangWatchQLValidationService {
     reportRowLimitViolations(ctx);
 
     if (ctx.violations.length > 0) {
-      return { ok: false, violations: ctx.violations };
+      return {
+        ok: false,
+        violations: ctx.violations,
+        ...(ctx.refusedViews.length > 0 ? { refusedViews: ctx.refusedViews } : {}),
+      };
     }
 
     return {
@@ -130,6 +134,7 @@ export class LangWatchQLValidationService {
       blocks: [],
       appFunctions: [],
       topLevelLimits: [],
+      refusedViews: [],
     };
   }
 

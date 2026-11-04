@@ -39,6 +39,7 @@ import {
   langWatchQLMissingParameters,
   type ValidatedLangWatchQL,
 } from "../rules/langwatch-ql-validation-shape.rules.ts";
+import { markIfCallerAccessRefusal } from "../rules/lwql-caller-access-refusal.rules.ts";
 import type { LwqlCatalogue } from "../rules/lwql-catalogue.rules.ts";
 import { LWQL_CATALOG, LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
@@ -232,6 +233,11 @@ export class LangWatchQLService {
     readonly sql: string;
     readonly isInstantEvalsEnabled: boolean;
   }) {
+    const visible = catalogShapes.visibleViews({
+      protections,
+      views: this.views,
+      catalog: this.catalog,
+    });
     const validation = this.validation.validate({
       sql,
       // The datasets this caller can reach, not every dataset the catalog has. A dataset gated
@@ -241,11 +247,7 @@ export class LangWatchQLService {
       // permissions that dataset requires.
       allowedTables: catalogShapes.allowedTables({
         database: this.deps.database,
-        views: catalogShapes.visibleViews({
-          protections,
-          views: this.views,
-          catalog: this.catalog,
-        }),
+        views: visible,
       }),
       // Derived from the *full* catalog on purpose: a column of a hidden
       // dataset must stay gated so that naming it unqualified — where no table
@@ -270,7 +272,14 @@ export class LangWatchQLService {
         "LangWatchQL refused by policy",
       );
 
-      throw lwqlValidationErrors.forRejection(validation);
+      const error = lwqlValidationErrors.forRejection(validation);
+      markIfCallerAccessRefusal({
+        error,
+        rejection: validation,
+        database: this.deps.database,
+        views: { all: this.views, visible },
+      });
+      throw error;
     }
 
     return validation;

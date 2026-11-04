@@ -4,7 +4,10 @@
  * @see specs/lwql/query-origin.feature
  * @vitest-environment node
  */
-import { LangWatchQLInvalidQueryError } from "@langwatch/analytics-contract";
+import {
+  LangWatchQLInvalidQueryError,
+  LangWatchQLNotPermittedError,
+} from "@langwatch/analytics-contract";
 import { counter } from "@langwatch/observability/metrics";
 import {
   createRecordingMeterProvider,
@@ -112,13 +115,19 @@ describe("given a built-in statement fails", () => {
 
     service.reportBuiltInFailure({
       projectId: "project-1",
+      source: "gateway",
       error: clickhouseError({ code: "215" }),
     });
 
     expect(lines.filter((line) => line.level === 50)).toHaveLength(1);
     const record = payloadOf(lines.findLine("error", FAILURE_MESSAGE));
-    expect(Object.keys(record).toSorted()).toEqual(["errorCode", "origin", "projectId"]);
-    expect(record).toMatchObject({ origin: "built_in", errorCode: "215", projectId: "project-1" });
+    expect(Object.keys(record).toSorted()).toEqual(["errorCode", "origin", "projectId", "source"]);
+    expect(record).toEqual({
+      origin: "built_in",
+      errorCode: "215",
+      projectId: "project-1",
+      source: "gateway",
+    });
     expect(JSON.stringify(lines)).not.toContain(PARAM_MARKER);
   });
 });
@@ -215,5 +224,81 @@ describe("given the service decides the origin itself", () => {
 
     expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "user_written" })).toBe(1);
+  });
+});
+
+/** What a member's own refusal looks like once the policy has refused their statement. */
+function accessRefusal({ missingGates }: { missingGates?: string[] }) {
+  return new LangWatchQLNotPermittedError([
+    {
+      code: "GATED_COLUMN",
+      clause: "select",
+      message: "The field is not available to you.",
+      hint: "Remove the field.",
+      ...(missingGates ? { missingGates } : {}),
+    } as never,
+  ]);
+}
+
+describe("given the caller's own access is refused", () => {
+  /** @scenario "A caller's own access refusal is neither reported nor counted" */
+  it.each(["built_in", "user_written"] as const)(
+    "writes no line and raises no count for a %s statement on the workbench path",
+    (origin) => {
+      const { lines, service } = reporter(origin);
+
+      service.reportFailure({
+        projectId: "project-1",
+        sql: STATEMENT,
+        error: accessRefusal({ missingGates: ["cost:view"] }),
+      });
+
+      expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
+      expect(meter.valueOf(FAILURE_METRIC, { origin })).toBe(0);
+    },
+  );
+
+  /** @scenario "A caller's own access refusal is neither reported nor counted" */
+  it("writes no line and raises no count on the server-written path", () => {
+    const { lines, service } = reporter("built_in");
+
+    service.reportBuiltInFailure({
+      projectId: "project-1",
+      source: "gateway",
+      error: accessRefusal({ missingGates: ["cost:view"] }),
+    });
+
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
+    expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(0);
+  });
+
+  /** @scenario "A built-in failure that is not an access refusal is still reported" */
+  it("still reports a refusal that names no gate, on both paths", () => {
+    const { lines, service } = reporter("built_in");
+    const error = accessRefusal({});
+
+    service.reportFailure({ projectId: "project-1", sql: STATEMENT, error });
+    service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
+
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(2);
+    expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(2);
+  });
+
+  /** @scenario "A caller's own access refusal is neither reported nor counted" */
+  it("rethrows the very same refusal from the workbench path", async () => {
+    const { service } = reporter("built_in");
+    const refusal = accessRefusal({ missingGates: ["cost:view"] });
+
+    const rejection = await service
+      .reportingFailures({
+        projectId: "project-1",
+        sql: STATEMENT,
+        run: async () => {
+          throw refusal;
+        },
+      })
+      .catch((error: unknown) => error);
+
+    expect(rejection).toBe(refusal);
   });
 });

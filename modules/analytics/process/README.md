@@ -166,10 +166,10 @@ executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResu
 
 #### `reportBuiltInQueryFailure`
 
-A statement the server itself wrote failed: reported as built in, with no statement hash.
+A statement the server itself wrote failed: reported as built in, with no statement hash, under its fixed `source` label. A caller's own access refusal is not reported.
 
 ```typescript
-reportBuiltInQueryFailure(input: { projectId: string; error: unknown }): void;
+reportBuiltInQueryFailure(input: { projectId: string; source: string; error: unknown }): void;
 ```
 
 #### `assertProjectsReadable`
@@ -494,8 +494,8 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:57`.
 
 | Kind   | Leaf                              | Environment variable                      | Declared at                              |
 | ------ | --------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:418`           |
-| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:419`           |
+| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:420`           |
+| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:421`           |
 | config | `langwatchQl.url`                 | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:11` |
 | config | `langwatchQl.username`            | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:12` |
 | config | `langwatchQl.database`            | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:13` |

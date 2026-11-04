@@ -1,6 +1,7 @@
 import type { Logger } from "@langwatch/observability";
 import type { CounterHandle } from "@langwatch/observability/metrics";
 
+import { isCallerAccessRefusal } from "../rules/lwql-caller-access-refusal.rules.ts";
 import {
   hashStatement,
   originOfStatement,
@@ -21,8 +22,8 @@ function errorCodeOf(error: unknown): string {
 
 /**
  * Reports a failed LangWatchQL query by who wrote it: a built-in statement is one error line
- * (origin, error code, project id, statement hash; never the text or parameter values), a
- * user-written one only a count. Both are counted by origin; the code never decides the origin.
+ * (never the text or parameter values), a user-written one only a count; the code never decides
+ * the origin. A caller's own access refusal is neither reported nor counted, on either path.
  * @see specs/lwql/query-origin.feature
  */
 export class LangWatchQLFailureReportService {
@@ -72,6 +73,7 @@ export class LangWatchQLFailureReportService {
     sql: string;
     error: unknown;
   }): void {
+    if (isCallerAccessRefusal({ error })) return;
     const origin = this.originOf({ sql });
     this.failures.inc({ origin }, 1);
     if (origin === "user_written") return;
@@ -82,11 +84,20 @@ export class LangWatchQLFailureReportService {
     );
   }
 
-  /** A failed statement the server itself wrote: built in, with no hash. */
-  reportBuiltInFailure({ projectId, error }: { projectId: string; error: unknown }): void {
+  /** A failed statement the server itself wrote: built in, named by its fixed `source`, no hash. */
+  reportBuiltInFailure({
+    projectId,
+    source,
+    error,
+  }: {
+    projectId: string;
+    source: string;
+    error: unknown;
+  }): void {
+    if (isCallerAccessRefusal({ error })) return;
     this.failures.inc({ origin: "built_in" }, 1);
     this.logger.error(
-      { origin: "built_in", errorCode: errorCodeOf(error), projectId },
+      { origin: "built_in", errorCode: errorCodeOf(error), projectId, source },
       BUILT_IN_FAILURE_MESSAGE,
     );
   }

@@ -945,7 +945,7 @@ export class AnalyticsModule
     if (supplied.length > 0) throw new LangWatchQLReservedParameterSuppliedError(supplied);
   }
 
-  reportBuiltInQueryFailure(input: { projectId: string; error: unknown }): void {
+  reportBuiltInQueryFailure(input: { projectId: string; source: string; error: unknown }): void {
     this.#failureReport.reportBuiltInFailure(input);
   }
 

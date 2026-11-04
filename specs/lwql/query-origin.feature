@@ -6,6 +6,8 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
 
   A statement is built in when its sha256 hash is on the generated, grow-only list of stock
   statements. The origin is never sent by a caller and never decided by the error code.
+  The one thing the error code does decide is whether a statement failed at all: a refusal of
+  the caller's own access is not a failure of the statement (see its rule below).
 
   Rule: The built-in list is generated from the stock statements and only ever grows
 
@@ -19,6 +21,19 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
     Scenario: The list says what it covers
       Given the generated list
       Then its header states how many stock statement versions it covers and from which oldest commit
+
+    @unit
+    Scenario: A new stock version is named newest and the oldest stays oldest
+      Given the generated list names its covered commits newest first
+      When the list is regenerated after a newer stock version is committed
+      Then the new commit is first and the oldest commit is unchanged
+
+    @unit
+    Scenario: Removing a hash from the list fails the check
+      Given the committed baseline of hashes the list has held
+      When any one of them is taken off the generated list
+      Then the check names it as missing
+      # Limit: it cannot see a hash that was never pinned, nor a baseline edited with the list.
 
     @unit
     Scenario: A statement edited by one character is user-written
@@ -60,10 +75,15 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
     Scenario: A built-in failure outside the workbench carries no hash
       Given the source presence probe, whose statements are fixed constants
       When one of its statements fails
-      Then the error line names the origin as built in and carries no statement hash
+      Then the error line names the origin as built in and its fixed source label
+      And the error line carries only the origin, the error code, the project id and the source
+      And it carries no statement hash and no statement text
 
   Rule: Only the statement failing is reported; a refused request input is not
 
+    A refusal of the caller's own access (every violation names a permission the caller lacks,
+    or a view their protections hide) is about the caller, not the statement text: it is decided
+    from the parsed statement but writes no built-in line and is not counted, on either path.
     A refusal of the request's own projects, or of a reserved parameter name it supplies, is
     not the statement failing: it is refused before the report, writes no built-in line and is
     not counted. The statement's own failures (parse, policy, execution, busy, timeout) are
@@ -76,6 +96,25 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
       When the workbench door refuses the projects
       Then no error-level record is written
       And the failure count does not rise
+
+    @unit
+    Scenario: A caller's own access refusal is neither reported nor counted
+      Given a statement is refused because of the caller's own access, either a field whose
+        permission the caller lacks (a stock widget reading a cost column without cost:view) or
+        a view the full catalogue holds that the caller's protections hide (the gateway probe
+        without gatewayUsage:view)
+      When the failure reaches either report path, the workbench door or the server-written one
+      Then no error-level record is written
+      And the failure count does not rise, for a built-in and for a user-written statement alike
+      And the member receives exactly the refusal they received before, with no extra field
+      # Every violation must be of that kind. A view the catalogue lacks, or a table chosen by a
+      # bound parameter, is refused for anyone: it stays reported, alone or beside a hidden view.
+
+    @unit
+    Scenario: A built-in failure that is not an access refusal is still reported
+      Given a built-in statement is refused with no gate named, or names a view the catalogue lacks
+      When the failure is reported
+      Then one built-in failure is reported and counted
 
     @unit
     Scenario: A statement failure still writes the built-in failure
@@ -128,6 +167,8 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
       Then the report carries no origin from the request
 
     @integration @unimplemented
-    Scenario: REST, hydration, instant evals and saved chart runs are always user-written
+    Scenario: REST, hydration, instant evals and saved chart runs are not reported or counted
       Given a failure on any path other than the tRPC door and the source presence probe
-      Then no hash is compared and the failure is user-written
+      Then no hash is compared
+      And no error-level record is written
+      And the failure count does not rise

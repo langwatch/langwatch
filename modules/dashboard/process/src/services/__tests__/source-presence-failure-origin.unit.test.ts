@@ -30,9 +30,12 @@ describe("given every source presence statement fails", () => {
 
     expect(Object.values(presence)).toEqual(DASHBOARD_SOURCES.map(() => "failed"));
     expect(reportBuiltInQueryFailure).toHaveBeenCalledTimes(DASHBOARD_SOURCES.length);
-    expect(reportBuiltInQueryFailure).toHaveBeenCalledWith({
-      projectId: "project-1",
-      error: failure,
-    });
+    for (const source of DASHBOARD_SOURCES) {
+      expect(reportBuiltInQueryFailure).toHaveBeenCalledWith({
+        projectId: "project-1",
+        source,
+        error: failure,
+      });
+    }
   });
 });

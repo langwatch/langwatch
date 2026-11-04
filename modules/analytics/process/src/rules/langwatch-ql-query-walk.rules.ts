@@ -1118,6 +1118,7 @@ function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
   const isAllowedTable = ctx.policy.allowedTables.has(qualified);
   if (!isAllowedTable) {
     const written = reference.database ? `${reference.database}.${reference.name}` : reference.name;
+    const reported = ctx.violations.length;
     report({
       ctx,
       frame,
@@ -1126,6 +1127,8 @@ function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       node,
       extra: { availableViews: ctx.policy.availableViews },
     });
+    const violation = ctx.violations[reported];
+    if (violation) ctx.refusedViews.push({ violation, table: qualified });
     return null;
   }
   addOnce(ctx.tables, qualified);
