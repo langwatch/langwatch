@@ -15,6 +15,7 @@ import {
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
   LangWatchQLExecutorRepository,
+  type LangWatchQLRoute,
   type LangWatchQLTenantRouting,
 } from "../langwatch-ql-executor.repository.ts";
 import type { LangWatchQLTarget } from "./clickhouse.langwatch-ql-executor.repository.ts";
@@ -107,8 +108,27 @@ export class RoutedLangWatchQLExecutorRepository extends LangWatchQLExecutorRepo
   }
 
   async execute(request: LangWatchQLExecutionRequest): Promise<LangWatchQLExecutionResult> {
-    const executor = await this.executorFor(request.tenantIds);
+    const { executor } = await this.resolveRoute({ tenantIds: request.tenantIds });
     return executor.execute(request);
+  }
+
+  /** Asks the route once; the executor returned never asks again, and names its own database. */
+  override async resolveRoute({
+    tenantIds,
+  }: {
+    tenantIds: readonly string[];
+  }): Promise<LangWatchQLRoute> {
+    // An empty set carries the empty capability, which reads zero rows on any server.
+    if (tenantIds.length === 0) return { executor: this.sharedExecutor };
+    const route = await this.routeOrRefuse(tenantIds);
+    if (route.kind === "shared") return { executor: this.sharedExecutor };
+
+    const connection = privateConnectionOf({ shared: this.connection, url: route.url });
+    const cached = this.privateExecutors.get(route.organizationId);
+    if (cached !== undefined) return { executor: cached, database: connection.database };
+    const executor = this.createExecutor({ connection, target: "private" });
+    this.privateExecutors.set(route.organizationId, executor);
+    return { executor, database: connection.database };
   }
 
   override async close(): Promise<void> {
@@ -119,22 +139,6 @@ export class RoutedLangWatchQLExecutorRepository extends LangWatchQLExecutorRepo
       (result): result is PromiseRejectedResult => result.status === "rejected",
     );
     if (failure !== undefined) throw failure.reason;
-  }
-
-  private async executorFor(tenantIds: readonly string[]): Promise<LangWatchQLExecutorRepository> {
-    // An empty set carries the empty capability, which reads zero rows on any server.
-    if (tenantIds.length === 0) return this.sharedExecutor;
-    const route = await this.routeOrRefuse(tenantIds);
-    if (route.kind === "shared") return this.sharedExecutor;
-
-    const cached = this.privateExecutors.get(route.organizationId);
-    if (cached !== undefined) return cached;
-    const executor = this.createExecutor({
-      connection: privateConnectionOf({ shared: this.connection, url: route.url }),
-      target: "private",
-    });
-    this.privateExecutors.set(route.organizationId, executor);
-    return executor;
   }
 
   private async routeOrRefuse(tenantIds: readonly string[]): Promise<TenantRoute> {

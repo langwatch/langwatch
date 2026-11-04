@@ -780,6 +780,44 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the query layer refuses it with error code lwql_unavailable, saying LangWatchQL is not set up on this organization's ClickHouse yet
     And the refusal names no URL, user or password
 
+  @unit
+  Scenario: A statement on a private route names the route's database, never the shared one
+    Given an organization routed to its own ClickHouse, whose route names the database acme_db
+    When a LangWatchQL query or pass reads that organization's projects
+    Then unqualified table names resolve to acme_db
+    And a statement naming acme_db runs, and it runs only on the route's server
+    And a statement naming the shared database is refused with error code lwql_not_permitted before any statement runs
+    And on an organization without a private ClickHouse a statement naming acme_db is refused the same way
+    And the generated member-window and completeness statements name acme_db too
+
+  @unit
+  Scenario: A pass on a private route validates against the route's database and asks the route once
+    Given an organization routed to its own ClickHouse
+    When a pass runs a statement over that organization's project
+    Then the statement is validated against the route's database
+    And the route is asked once for the pass
+
+  @unit
+  Scenario: A private route's statement may not use FINAL or SAMPLE on a PostgreSQL-resident view
+    Given an organization routed to its own ClickHouse
+    When a query or a pass names a PostgreSQL-resident view qualified with the route's database and uses FINAL
+    Then it is refused with error code lwql_table_modifier_unsupported before any statement runs
+
+  @unit
+  Scenario: A bad statement for an organization with no usable route gets the route refusal first
+    Given an organization whose route is missing or broken
+    When a LangWatchQL query reads that organization's projects with a statement the policy would refuse
+    Then the query layer refuses it with the route's refusal, lwql_unavailable or private_dataplane_unavailable
+    And no statement runs
+
+  @unit
+  Scenario: A save needs no route
+    Given a statement is saved without being run
+    When it is validated
+    Then no route is asked
+    And a statement naming the shared database saves, and is refused at run on a private organization
+    And a statement naming a private route's database is refused at save
+
   # ---------------------------------------------------------------------------
   # Resource safety (later PR of this issue — #6480)
   # ---------------------------------------------------------------------------

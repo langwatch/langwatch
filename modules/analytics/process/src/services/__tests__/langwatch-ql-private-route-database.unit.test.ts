@@ -101,6 +101,7 @@ describe("given a statement for an organization whose route names its own databa
     expect(qualifiersOf(privateExecutor()?.requests ?? [])).toEqual([dialled]);
   });
 
+  /** @scenario "A statement on a private route names the route's database, never the shared one" */
   it("qualifies the completeness read with that database too", async () => {
     const { done, privateExecutor } = privateRun({ sql: PERIOD_SQL, timeWindow: WINDOW });
     await done;
@@ -110,6 +111,7 @@ describe("given a statement for an organization whose route names its own databa
     expect(new Set(qualifiersOf(requests))).toEqual(new Set([privateExecutor()?.connection.database]));
   });
 
+  /** @scenario "A statement on a private route names the route's database, never the shared one" */
   it("qualifies a dated member's window and its trace lookup with that database", async () => {
     const { done, privateExecutor } = privateRun({
       sql: "SELECT count() AS n FROM evaluations LIMIT 1",

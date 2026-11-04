@@ -51,9 +51,23 @@ export type LangWatchQLTenantRouting = (input: {
   tenantIds: readonly string[];
 }) => Promise<TenantRoute>;
 
+/** The server a run goes to, and the database its tables live in where that is not the shared one. */
+export interface LangWatchQLRoute {
+  readonly executor: LangWatchQLExecutorRepository;
+  readonly database?: string;
+}
+
 /** The narrow seam the LangWatchQL service depends on. */
 export abstract class LangWatchQLExecutorRepository {
   abstract execute(request: LangWatchQLExecutionRequest): Promise<LangWatchQLExecutionResult>;
+
+  /**
+   * Where a run over these projects goes. A single-server executor is its own answer, on the
+   * deployment's database.
+   */
+  resolveRoute(_input: { tenantIds: readonly string[] }): Promise<LangWatchQLRoute> {
+    return Promise.resolve({ executor: this });
+  }
 
   /**
    * Releases whatever transport this executor holds.

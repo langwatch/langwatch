@@ -35,7 +35,6 @@ const lwqlDiagnostics = LangWatchQLDiagnosticsService.create();
 const logger = createLogger("langwatch:analytics:lwql");
 
 type LangWatchQLExecutionDependencies = {
-  readonly database: string;
   readonly views: readonly LangWatchQLViewDefinition[];
   readonly limits: LangWatchQLResultLimits;
   /** The clock the diagnostics ask "has this period finished yet" against. */
@@ -47,6 +46,8 @@ type LangWatchQLExecutionDependencies = {
 
 type LangWatchQLExecutionInput = {
   readonly executor: LangWatchQLExecutorRepository;
+  /** The database this run's route names; where unqualified views resolve. */
+  readonly database: string;
   readonly projects: readonly LangWatchQLCaller[];
   readonly protections: LangWatchQLProtections;
   readonly sql: string;
@@ -78,8 +79,8 @@ export class LangWatchQLExecutionService {
     signal,
     ...run
   }: LangWatchQLExecutionInput): Promise<LangWatchQLQueryResult> {
-    const { database, views } = this.deps;
-    const { validation, granularity, memberWindows } = run;
+    const { views } = this.deps;
+    const { database, validation, granularity, memberWindows } = run;
     const execution = await this.runRestricted({
       ...run,
       tenantIds: projects.map((project) => project.id),
@@ -145,6 +146,7 @@ export class LangWatchQLExecutionService {
   /** The statement as the database runs it, refused when its rows outgrow `maxResultBytes`. */
   private async runRestricted({
     executor,
+    database,
     sql,
     validation,
     granularity,
@@ -155,7 +157,7 @@ export class LangWatchQLExecutionService {
   }: Omit<LangWatchQLExecutionInput, "projects" | "protections" | "signal"> & {
     readonly tenantIds: readonly string[];
   }): Promise<LangWatchQLExecutionResult> {
-    const { database, views, limits } = this.deps;
+    const { views, limits } = this.deps;
     // The resolved record plus the step this run was bucketed at, when the
     // statement declares the parameter. Built unconditionally and omitted when
     // empty, so an unparameterised query keeps the request shape it had.
