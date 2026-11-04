@@ -9,7 +9,6 @@ import {
   type TenantRoute,
   TenantScopeError,
 } from "@langwatch/clickhouse-client";
-import { HandledError } from "@langwatch/handled-error";
 
 import {
   type LangWatchQLConnection,
@@ -28,13 +27,13 @@ export type LangWatchQLExecutorFactory = (input: {
 
 const NOT_AVAILABLE = "LangWatchQL is not available for this organization's ClickHouse.";
 
-/** A set spanning organizations, or a private organization whose route is missing or broken. */
+/**
+ * A set spanning organizations, or a private organization whose route is missing or broken.
+ * The handled private_dataplane_unavailable is not one: it names the variable (never its
+ * value), is safe to show, and passes through with its own code.
+ */
 function isRouteRefusal(error: unknown): error is Error {
-  return (
-    error instanceof TenantScopeError ||
-    error instanceof PrivateRouteUnavailableError ||
-    (error instanceof HandledError && error.code === "private_dataplane_unavailable")
-  );
+  return error instanceof TenantScopeError || error instanceof PrivateRouteUnavailableError;
 }
 
 /**

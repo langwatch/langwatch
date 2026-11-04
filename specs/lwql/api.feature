@@ -761,8 +761,9 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given an organization recorded as keeping its data on its own ClickHouse
     And this deployment has no route to that ClickHouse
     When a LangWatchQL query reads that organization's projects
-    Then the query layer refuses it with error code lwql_unavailable, saying LangWatchQL is not available for this organization's ClickHouse
-    And the REST API answers 503 internal_error with "An unknown error occurred", so that code and sentence do not reach a REST caller (ruling 2026-10-05: a 5xx the platform owns stays opaque)
+    Then the query layer refuses it with error code private_dataplane_unavailable, the router's own refusal, unchanged
+    And the REST API answers 503 private_dataplane_unavailable, saying the organization keeps its data on its own ClickHouse, which this deployment cannot reach
+    And the refusal names the variable that is missing or malformed, never its value; the label inside the variable is shown to that organization's caller
     And no statement runs on the shared ClickHouse
 
   @unit
