@@ -214,7 +214,7 @@ Drew accepted both on 2026-10-29 (Convoz ask 12563, then Laze).
 - **Dashboard reads are not prefix reads.** A widget reads by question over a time window, and the key leads with the trace. Partitions prune by `OccurredAt` and the `QuestionHash` bloom filter skips granules. This is unmeasured. If it is slow, add a time-leading rollup as ADR-034 did for evaluations.
 - **The key cap.** A quick `eval()` refuses above 1,000 trace keys (`langwatch-ql-app-function-shapes.rules.ts:96-103`). Whether a recalled key counts toward the cap goes to the build PLAN.
 - **The chip and the view see runs only.** Results from asks, dashboards and monitors show in the trace drawer, not in the `eval:"q"` chip or `analytics.judgments`, until those move (section 3).
-- **A key version bump empties the drawer.** After a bump, the drawer shows no result on a trace until something judges it again. A bump is only for a key bug, when the old rows cannot be trusted, so this is accepted.
+- **A key version bump starts recall over.** After a bump, every recall misses: dashboard widgets, asks, runs and monitors pay to judge again, and the drawer shows no Instant Evals result on a trace until something judges it (monitor results still show from `evaluation_runs`). A bump is only for a key bug, when the old rows cannot be trusted, so this is accepted.
 - **The drawer can lag the text.** After a trace's text changes, the drawer shows the last verdict with its time until something judges the new text; an ask on the new text misses, judges, and the drawer then shows that.
 - **Old judgments.** `instant_eval_judgments` keeps its rows with no expiry, and runs keep writing it. A copy into `eval_results` is its own plan: an old row has no question text, `QuestionHash`, `JudgeModel` or `InputHash`, so the copy must rebuild them losslessly from `instant_eval_runs.Questions` and the run's judge before it may run. Rows it cannot rebuild are not copied and recall does not serve them. The old table is not dropped while the run page, the Explorer chip or the LWQL view read it; any drop is an operator step, never a goose file.
 
@@ -227,7 +227,7 @@ Drew accepted both on 2026-10-29 (Convoz ask 12563, then Laze).
 - Instant eval results follow the trace's retention, not "never expire".
 - Monitors keep writing `evaluation_runs`. A monitor on the Instant Evals judge also writes `eval_results` and gets recall.
 - A trace or span run writes two tables: `instant_eval_judgments` for its run page, chip and view, and `eval_results` for recall.
-- The usage report (`usage-report.ts:394-396`) counts stored judgments of `instant_eval_judgments` today. It moves to `eval_results` rows with `Status = judged`, deduplicated by the replacing merge (`FINAL`), plus `instant_eval_judgments` rows of thread runs (joined to `instant_eval_runs`, as 00097 has no run kind). A recall adds no row, so it is not counted. Judge calls that store no row (thread- and text-keyed asks) are not counted today and stay uncounted. The metric's text changes from run judgments to Instant Evals judgments.
+- The usage report (`usage-report.ts:394-396`) counts `instant_eval_judgments`, so it counts runs only, as today; asks, dashboards and monitors are not counted today either. Counting `eval_results` is its own change, planned with the first writer (build step 2).
 
 ## References
 
