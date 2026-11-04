@@ -307,3 +307,36 @@ describe("given the router refuses an organization with private_dataplane_unavai
     expect(shared?.query).not.toHaveBeenCalled();
   });
 });
+
+// Finding 3: a route URL with no usable origin is refused, never dialled as "null".
+describe("given a private route whose URL has no usable origin", () => {
+  it("refuses with lwql_unavailable, names no URL or credential, and builds no executor", async () => {
+    const createExecutor = vi.fn(
+      (input: Parameters<typeof ClickHouseLangWatchQLExecutorRepository.create>[0]) =>
+        ClickHouseLangWatchQLExecutorRepository.create(input),
+    );
+    const executor = RoutedLangWatchQLExecutorRepository.create({
+      connection: SHARED,
+      route: () =>
+        Promise.resolve({
+          kind: "private",
+          organizationId: "org-opaque",
+          url: "clickhouse://u:p@host:9000/db",
+        }),
+      createExecutor,
+    });
+
+    const refusal = await executor
+      .execute({ sql: "SELECT 1", tenantCapability: "capability", tenantIds: ["project-x"] })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({
+      code: "lwql_unavailable",
+      message: "LangWatchQL is not available for this organization's ClickHouse.",
+    });
+    expect((refusal as Error).message).not.toMatch(/clickhouse:\/\/|u:p|host:9000/);
+    expect(createExecutor).toHaveBeenCalledTimes(1);
+    expect(createExecutor.mock.calls[0]?.[0].target).toBe("shared");
+    expect(drivers).toHaveLength(1);
+  });
+});
