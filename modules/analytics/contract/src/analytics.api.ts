@@ -183,6 +183,8 @@ export interface AnalyticsApi {
    */
   langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[] }): number;
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+  /** A statement the server itself wrote failed: reported as built in, with no statement hash. */
+  reportBuiltInQueryFailure(input: { projectId: string; error: unknown }): void;
   /**
    * Proves each project exists and holds `analytics:view` for the member, so a widget never
    * stores a project its writer could not read.

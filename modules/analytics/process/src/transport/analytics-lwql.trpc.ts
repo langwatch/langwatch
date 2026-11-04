@@ -65,6 +65,8 @@ export interface AnalyticsLwqlApi {
   executeLangWatchQL(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult>;
+  /** A statement from this door failed: told built-in from user-written by its text as sent. */
+  reportQueryFailure(input: { projectId: string; sql: string; error: unknown }): void;
 }
 
 export const AnalyticsLwqlApi = moduleApi<AnalyticsLwqlApi>()("analytics");

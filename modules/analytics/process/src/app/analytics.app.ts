@@ -883,6 +883,14 @@ export class AnalyticsModule
     return this.#dependencies.langWatchQL.execute({ project, ...run, isInstantEvalsEnabled });
   }
 
+  reportQueryFailure(_input: { projectId: string; sql: string; error: unknown }): void {
+    throw new Error("not implemented");
+  }
+
+  reportBuiltInQueryFailure(_input: { projectId: string; error: unknown }): void {
+    throw new Error("not implemented");
+  }
+
   async assertProjectsReadable(input: {
     userId?: string;
     reach?: LangWatchQLKeyReach;
