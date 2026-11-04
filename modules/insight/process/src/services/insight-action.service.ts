@@ -38,6 +38,13 @@ const REAL_CLOCK: InsightActionClock = {
 const FORK_READY_TIMEOUT_MS = 5_000;
 const FORK_READY_POLL_MS = 200;
 
+type ForkToAwait = Readonly<{
+  id: string;
+  messageCount: number;
+  projectId: string;
+  userId: string;
+}>;
+
 /**
  * Sends one stored action to Langy as the person who clicked it. The turn always lands in a
  * conversation of theirs: the source when they own it, a fork when they do not, a new seeded
@@ -147,24 +154,24 @@ export class InsightActionService {
    * as the clicker's mints an empty conversation; one sent before the copied messages land runs
    * without their history. So the wait is for both, and the count is what the fork said it copied.
    */
-  private async isForkReady({
-    id,
-    messageCount,
-    projectId,
-    userId,
-  }: {
-    id: string;
-    messageCount: number;
-    projectId: string;
-    userId: string;
-  }): Promise<boolean> {
+  private async isForkReady(fork: ForkToAwait): Promise<boolean> {
     const deadline = this.clock.now() + FORK_READY_TIMEOUT_MS;
     while (this.clock.now() < deadline) {
-      const fork = await this.langy.findByIdVisible({ id, projectId, userId });
-      if (fork?.isOwn && fork.messageCount >= messageCount) return true;
+      if (await this.hasForkLanded(fork)) return true;
       const left = Math.max(0, deadline - this.clock.now());
       await this.clock.sleep(Math.min(FORK_READY_POLL_MS, left));
     }
-    return false;
+    // The last sleep ended at the deadline, and the fork may have landed during it.
+    return this.hasForkLanded(fork);
+  }
+
+  /** A read that fails is not a verdict on the fork: it is not ready, and the seeded path runs. */
+  private async hasForkLanded({ id, messageCount, projectId, userId }: ForkToAwait) {
+    try {
+      const fork = await this.langy.findByIdVisible({ id, projectId, userId });
+      return fork?.isOwn === true && fork.messageCount >= messageCount;
+    } catch {
+      return false;
+    }
   }
 }

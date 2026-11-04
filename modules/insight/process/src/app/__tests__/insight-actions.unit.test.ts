@@ -37,8 +37,9 @@ const DRAFT_EVALUATOR: InsightActionInput = {
 };
 
 type HeldConversation = { isOwn: boolean; origin: LangyConversationOrigin };
-/** What one read of a fork answers: its row as far as it has landed, or nothing yet. */
-type ForkRead = { isOwn: boolean; messageCount: number } | null;
+const READ_FAILS = "read fails";
+/** What one read of a fork answers: its row as far as it has landed, nothing yet, or a failure. */
+type ForkRead = { isOwn: boolean; messageCount: number } | null | typeof READ_FAILS;
 type SentMessage = {
   via: "create" | "continue";
   conversationId: string | null;
@@ -106,6 +107,7 @@ function fakeLangy({ forkReads = [LANDED] }: { forkReads?: ForkRead[] } = {}) {
       if (forked.length > 0 && id === `fork-${forked.length}`) {
         const read = forkReads[Math.min(forkReadsDone, forkReads.length - 1)] ?? null;
         forkReadsDone += 1;
+        if (read === READ_FAILS) throw new Error("Langy could not be read");
         if (!read) return null;
         const row = { isOwn: read.isOwn, origin: LANGY_CONVERSATION_ORIGIN.INTERACTIVE };
         return detail(id, row, read.messageCount);
@@ -399,6 +401,40 @@ describe("given an insight saved from a conversation another person shared", () 
       expect(langy.sent[0]?.text).toContain(
         `This conversation starts from the insight "${TITLE}":`,
       );
+      expect(run).toEqual({
+        conversationId: "conversation-new-1",
+        turnId: "turn-1",
+        sourceGone: false,
+        forkNotReady: true,
+        forkTitle: FORK_TITLE,
+      });
+    });
+
+    /** @scenario "A fork that lands as the wait ends is still continued" */
+    it("reads once more at the deadline, and continues the fork that landed by then", async () => {
+      const readsInsideTheWait = 25;
+      const { run, langy, elapsedMs } = await clickOnSharedOverFakeClock({
+        forkReads: [...Array<ForkRead>(readsInsideTheWait).fill(null), LANDED],
+      });
+
+      expect(elapsedMs).toBe(5_000);
+      expect(langy.forkReadCount()).toBe(readsInsideTheWait + 1);
+      expect(langy.sent).toEqual([
+        expect.objectContaining({ via: "continue", conversationId: "fork-1", userId: OWNER }),
+      ]);
+      expect(run).toEqual({ conversationId: "fork-1", turnId: "turn-1", ...IN_PLACE });
+    });
+
+    /** @scenario "A fork that cannot be read counts as not ready" */
+    it("keeps waiting through failed reads, then starts a seeded conversation", async () => {
+      const { run, langy, elapsedMs } = await clickOnSharedOverFakeClock({
+        forkReads: [READ_FAILS],
+      });
+
+      expect(elapsedMs).toBe(5_000);
+      expect(langy.sent).toEqual([
+        expect.objectContaining({ via: "create", conversationId: null, userId: OWNER }),
+      ]);
       expect(run).toEqual({
         conversationId: "conversation-new-1",
         turnId: "turn-1",

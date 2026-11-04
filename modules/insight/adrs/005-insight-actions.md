@@ -19,10 +19,17 @@ clicker's.
 four `actions`, each `{ label, prompt }`. "Save as insight" passes them into the filing.
 The filing strips control and invisible format characters (a prompt keeps line breaks and
 tabs), refuses a link to any host but `langwatch.ai` and `app.langwatch.ai`, and enforces the
-caps (label 40, prompt 1,000 characters). A link is any scheme, `//`, `www.` or `host/path`
-form, running to the next whitespace; a bare `evil.com` is not one, since words like "e.g."
-would match. "Save as insight" drops a proposed action the filing would refuse, rather than
-failing the whole save. The module mints the ids `a0`..`a3` by position. The actions ride
+caps (label 40, prompt 1,000 characters). `javascript`, `data`, `vbscript`, `file`, `mailto` and
+`ftp` are refused on sight, from a word's start, and any other scheme but `http` or `https` is
+refused when a slash follows it, whatever the host; `slack:x` and `metadata:user_id` are words.
+An `http(s):`, `//`, `www.` or `host/path` address runs to the next whitespace or the next
+`http(s):`, and its host must be allowed. `host/path` counts only with a common ending (`com`,
+`net`, `org`, `io`, `ai`, `co`, `dev`, `app`, `xyz`, `info`), so `trace.cost/day` stays words;
+the accepted cost is that `evil.biz/x` passes, and a bare `evil.com` is not a link either, since
+words like "e.g." would match. A browser drops a tab or line break inside an address, so a tab
+directly after one is refused, and so is a line break before `.`, `@`, `/`, `:` or a host name;
+an ordinary next line is kept. "Save as insight" drops a proposed action the filing would
+refuse, rather than failing the whole save. The module mints the ids `a0`..`a3` by position. The actions ride
 on the filed event (`actions`, default `[]`) and the renewed event (`actions`, default
 `null`, which keeps them), and on `InsightProjection.actions`, a nullable JSON column
 filled by replay.
@@ -38,7 +45,8 @@ the prompt word for word. The browser mints a click id; Langy's idempotency key 
 The clicker owns the source conversation: Langy continues it. They do not: it is forked
 for them and the fork is continued once it reads as theirs and its copied messages have
 landed. A fork only sends commands the worker folds later, so a click waits about five seconds
-for that; if it is still not ready, a seeded conversation starts, the answer says
+for that, with one last read at the end, and a read that fails counts as not ready; if it is
+still not ready, a seeded conversation starts, the answer says
 `forkNotReady` and names the copy, and the copy is left in place. The source is gone, archived
 or not visible: a new conversation starts, seeded with the insight's title, body, query and
 window, and the answer says `sourceGone` so the card can say so. Nobody else's conversation is
@@ -60,6 +68,9 @@ source is a run's conversation.
   message once. Accepted: a stray empty fork is harmless.
 - A click whose fork is late answers late: up to the wait, plus one read of a row that has not
   landed. The fork it gave up on stays in the clicker's list.
+- A click that answers after the person left the page does not move them or touch the address:
+  a toast says Langy has the action and to look under Recent chats in the Langy panel. While
+  they stay on the page, the conversation opens with the query of the latest render.
 - Langy is taught the `actions` field only where a skill teaches the `insights` card. Today
   that is the daily-insights skill, whose runs keep no actions, so no interactive answer
   proposes actions until a chat skill teaches the card.

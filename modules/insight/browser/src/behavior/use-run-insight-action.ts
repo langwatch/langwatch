@@ -5,7 +5,7 @@
  */
 
 import type { InsightActionRun } from "@langwatch/insight-contract";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import { type InsightSuccessNotice, useInsightHost } from "../model/insight-host.ts";
 import { insightApi } from "./insight-api.ts";
@@ -15,6 +15,12 @@ function mintClickId(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
+
+/** A click answered after the person left the page: they stay put, and learn where it went. */
+const SENT_AFTER_LEAVING: InsightSuccessNotice = {
+  title: "Langy has your action",
+  description: "Find the conversation under Recent chats in the Langy panel.",
+};
 
 /** What the person is told when the turn is not in the conversation they expected. */
 function noticeOf({
@@ -41,11 +47,20 @@ function noticeOf({
 export function useRunInsightAction({ projectId }: { projectId: string }) {
   const host = useInsightHost();
   const isSending = useRef(false);
-  // On the mutation, not on `mutate()`: those are dropped once the caller unmounts, and a person
-  // who leaves the page while it sends still gets their conversation.
+  const isOnPage = useRef(true);
+  useEffect(() => {
+    isOnPage.current = true;
+    return () => {
+      isOnPage.current = false;
+    };
+  }, []);
+  // On the mutation, not on `mutate()`: those are dropped once the caller unmounts. Each render
+  // hands the mutation on its way these options, so while on the page `host` reads the query now.
   const runAction = insightApi.insights.runAction.useMutation({
     onSuccess: (run) => {
-      host.openLangyConversation(run.conversationId);
+      // A host from a page that is gone would write its old query over the page they moved to.
+      if (isOnPage.current) host.openLangyConversation(run.conversationId);
+      else host.succeeded(SENT_AFTER_LEAVING);
       const notice = noticeOf(run);
       if (notice) host.succeeded(notice);
     },

@@ -183,8 +183,8 @@ describe("given an insight with actions in the inbox", () => {
   });
 
   describe("when the person leaves the page, and then the click answers", () => {
-    /** @scenario "A click that answers after the person left the page still opens the conversation" */
-    it("still opens Langy on the conversation", async () => {
+    /** @scenario "A click that answers after the person left the page leaves them where they are, and says where the conversation is" */
+    it("does not touch the address, and points them to Recent chats in the Langy panel", async () => {
       const { answerRun, host, runs, unmount } = renderInbox();
 
       await userEvent.click(await screen.findByRole("button", { name: FIND_TRACES.label }));
@@ -192,7 +192,17 @@ describe("given an insight with actions in the inbox", () => {
       unmount();
       answerRun({ conversationId: "conversation-1", turnId: "turn-1", ...IN_PLACE });
 
-      await waitFor(() => expect(host.openedConversations).toEqual(["conversation-1"]));
+      await waitFor(() =>
+        expect(host.successes).toEqual([
+          {
+            title: "Langy has your action",
+            description: "Find the conversation under Recent chats in the Langy panel.",
+          },
+        ]),
+      );
+      expect(host.openedConversations).toEqual([]);
+      expect(host.queries).toEqual([]);
+      expect(host.navigations).toEqual([]);
     });
   });
 });

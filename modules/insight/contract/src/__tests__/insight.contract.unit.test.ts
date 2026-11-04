@@ -160,6 +160,20 @@ describe("given a file request with actions", () => {
         "file:///etc/hosts",
         "//evil.com/x",
         "evil.com/x",
+        "javascript://langwatch.ai/%0aalert(1)",
+        "vbscript://langwatch.ai/x",
+        "data://langwatch.ai/x",
+        "file://langwatch.ai/etc/passwd",
+        "ftp://langwatch.ai/x",
+        "evilscheme://langwatch.ai/x",
+        "evilscheme:\\\\langwatch.ai\\x",
+        `${"a".repeat(40)}://langwatch.ai/x`,
+        "javascript:alert('@langwatch.ai')",
+        "javascript:eval(atob('YWxlcnQoMSk='),'@langwatch.ai')",
+        "JavaScript:alert(1)",
+        "java\tscript:alert(1)",
+        "[a](https://langwatch.ai/x)[b](https://evil.com)",
+        "[a](https://langwatch.ai/x)[b](javascript://evil.com)",
       ]) {
         const prompt = `Go to ${address} now.`;
 
@@ -168,7 +182,44 @@ describe("given a file request with actions", () => {
       for (const prompt of [
         "Go to https://langwatch.ai/x now.",
         "Go to https://app.langwatch.ai/x now.",
+        "Go to langwatch.ai/x now.",
         "Compare cost e.g. by model, i.e. per day, at 12:30 and/or over 2.5/day.",
+        "Group by metadata:user_id and profile:enterprise.",
+        "Note: a data point is missing.",
+        "Post it to slack:x.",
+        "Compare trace.cost/day.",
+        "Divide cost.total/1000.",
+        "Compare usage.total/tokens.total.",
+        // Accepted cost: an ending off the short list reads as ordinary words.
+        "Go to evil.biz/x now.",
+      ]) {
+        expect(pathsOf([{ label: "Do it", prompt }]), prompt).toEqual([]);
+      }
+    });
+  });
+
+  describe("when a tab or a line break directly follows an action's link", () => {
+    /** @scenario "A tab or a line break that could carry a link on to another host is refused" */
+    it("refuses what a browser would join to the link, and takes an ordinary next line", () => {
+      for (const prompt of [
+        "Go to https://langwatch.ai\t.evil.com now.",
+        "Go to https://langwatch.ai\n.evil.com now.",
+        "Go to https://langwatch.ai\t@evil.com now.",
+        "Go to https://langwatch.ai\n@evil.com now.",
+        "Go to [x](<https://langwatch.ai\t@evil.com>) now.",
+        "Go to https://langwatch.ai\n/x now.",
+        "Go to https://langwatch.ai\n:8080 now.",
+        "Go to https://langwatch.ai\nevil.com now.",
+        "Go to https://langwatch.ai\n\t.evil.com now.",
+        "Go to https://langwatch.ai/x\tthen stop.",
+      ]) {
+        expect(pathsOf([{ label: "Do it", prompt }]), prompt).toEqual([["actions", 0, "prompt"]]);
+      }
+      for (const prompt of [
+        "Open https://langwatch.ai/x\nThen filter by model.",
+        "Open https://langwatch.ai.\nThen filter by model.",
+        "Open https://langwatch.ai/x\n\n1. Filter by model.",
+        "Open https://langwatch.ai/x\n\tThen filter by model.",
       ]) {
         expect(pathsOf([{ label: "Do it", prompt }]), prompt).toEqual([]);
       }

@@ -89,18 +89,36 @@ export const MAX_INSIGHT_ACTIONS = 4;
 export const INSIGHT_ACTION_LINK_HOSTS = ["langwatch.ai", "app.langwatch.ai"] as const;
 
 const ALLOWED_LINK_HOSTS: ReadonlySet<string> = new Set(INSIGHT_ACTION_LINK_HOSTS);
+const WEB_SCHEMES: ReadonlySet<string> = new Set(["http", "https"]);
+
+/** Refused whatever follows. From a word's start, so `metadata:x` and `profile:x` stay words. */
+const REFUSED_SCHEME = /\b(?:javascript|data|vbscript|file|mailto|ftp):\S/i;
+/** Any scheme before a slash. No word start: a scheme past the bound still matches by its tail. */
+const SCHEME_BEFORE_SLASH = /([a-z][a-z0-9+.-]{0,31}):[/\\]/gi;
 /**
- * A scheme, `//`, `www.` or `host/path`, each running to the next whitespace. A bare `evil.com`
- * is not one: words like "e.g." would match. The bounds keep a long filing's scan linear.
+ * `http(s):`, `//`, `www.` or `host/path` with a common ending, to the next whitespace or the next
+ * `http(s):`. A browser drops a tab or line break inside an address, so `continued` catches what
+ * would carry on past one. Other host/path words read as ordinary: `trace.cost/day`, `evil.biz/x`.
  */
 const WEB_ADDRESS =
-  /(?:[a-z][a-z0-9+.-]{0,31}:[/\\]|(?:https?|ftp|javascript|data|vbscript|file|mailto):\S|[/\\]{2}\S|\bwww\.|(?:[\p{L}\p{N}-]{1,63}\.){1,8}\p{L}[\p{L}\p{N}-]{1,62}(?::\d{1,5})?[/\\])\S*/giu;
-const SCHEME_AND_SLASHES = /^(?:(?:https?|ftp):|[a-z][a-z0-9+.-]{0,31}:(?=\/))?\/*/i;
-const SENTENCE_END = /[.,;:!?)\]}>"'`*]+$/;
+  /(?:\bhttps?:(?=[\S\t])|[/\\]{2}\S|\bwww\.|(?:[\p{L}\p{N}-]{1,63}\.){1,8}(?:com|net|org|io|ai|co|dev|app|xyz|info)(?::\d{1,5})?[/\\])(?:(?!https?:)\S)*(?<continued>\t|\n[\t\n]*(?:[.@/\\:]|[\p{L}\p{N}-]{1,63}\.\p{L}))?/giu;
+const HTTP_AND_SLASHES = /^(?:https?:)?\/*/i;
+const SENTENCE_END = /[.,;:!?)\]}>"'`*]{1,32}$/;
+
+/** Read without tabs, which a browser drops: `java<TAB>script:` is `javascript:`. */
+function namesRefusedScheme(words: string): boolean {
+  const text = words.replaceAll("\t", "");
+  return (
+    REFUSED_SCHEME.test(text) ||
+    [...text.matchAll(SCHEME_BEFORE_SLASH)].some(
+      ([, scheme = ""]) => !WEB_SCHEMES.has(scheme.toLowerCase()),
+    )
+  );
+}
 
 /** The host a browser would go to: after any `user@`, before any port, path, query or fragment. */
 function hostOf(address: string): string {
-  const authority = address.replace(SCHEME_AND_SLASHES, "").split(/[/?#]/, 1)[0] ?? "";
+  const authority = address.replace(HTTP_AND_SLASHES, "").split(/[/?#]/, 1)[0] ?? "";
   const host = authority.slice(authority.lastIndexOf("@") + 1);
   return host.replace(/:\d*$/, "").toLowerCase();
 }
@@ -111,9 +129,12 @@ function isAllowedLink(address: string): boolean {
   return !link.includes("\\") && ALLOWED_LINK_HOSTS.has(hostOf(link));
 }
 
-/** Every web address the words name points at an allowed host. */
+/** No refused scheme, and every web address the words name points at an allowed host. */
 function namesOnlyAllowedLinks(words: string): boolean {
-  return [...words.matchAll(WEB_ADDRESS)].every(([address]) => isAllowedLink(address));
+  if (namesRefusedScheme(words)) return false;
+  return [...words.matchAll(WEB_ADDRESS)].every(
+    ({ 0: address, groups }) => !groups?.continued && isAllowedLink(address),
+  );
 }
 
 const NOT_ALLOWED_LINK = "A link in an action may only point at langwatch.ai";

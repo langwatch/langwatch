@@ -101,16 +101,11 @@ class CapabilityInsightHost extends InsightHostApi {
   }
 
   /**
-   * Langy's own deep-link reader opens the panel on it and strips the parameter again. The query
-   * is read from the address, not `route.reading()`: a click answers late, this host may be a
-   * snapshot of an older render, and `setQuery` replaces the whole query.
+   * Langy's own deep-link reader opens the panel on it and strips the parameter again. `setQuery`
+   * replaces the whole query, so this carries the rest of what the route reads.
    */
   openLangyConversation(conversationId: string): void {
-    const query = Object.fromEntries(new URLSearchParams(window.location.search));
-    this.deps.route.setQuery(
-      { ...query, [LANGY_CONVERSATION_PARAM]: conversationId },
-      { replace: true },
-    );
+    this.setQuery({ ...this.query(), [LANGY_CONVERSATION_PARAM]: conversationId });
   }
 }
 

@@ -15,9 +15,18 @@ Feature: Action buttons on an insight
 
     @unit
     Scenario: A link dressed to slip past the host check is refused
-      Given a file request whose action names another host with quoted credentials, one slash, backslashes, another scheme, two leading slashes, or as host and path
+      Given a file request whose action names another host with quoted credentials, one slash, backslashes, two leading slashes, or as host and path with a common ending
+      And one whose action names any scheme but http or https before a slash, whatever the host, or javascript, data, vbscript, file, mailto or ftp at all
+      And one whose allowed link is followed in the same word by a link to another host
       When the request is validated
-      Then it is refused, and links to langwatch.ai and a sentence of ordinary words are accepted
+      Then it is refused, and links to langwatch.ai are accepted
+      And so are words that only look like a link: metadata:user_id, profile:enterprise, slack:x, trace.cost/day, cost.total/1000
+
+    @unit
+    Scenario: A tab or a line break that could carry a link on to another host is refused
+      Given a file request whose action's link is followed by a tab, or by a line break and then a dot, an at sign, a slash, a colon or a host name
+      When the request is validated
+      Then it is refused, and a link followed by a line break and an ordinary line is accepted
 
     @unit
     Scenario: Invisible format characters are dropped from an action
@@ -155,6 +164,19 @@ Feature: Action buttons on an insight
       And the answer says the fork was not ready, names the copy, and does not say the original is gone
 
     @unit
+    Scenario: A fork that lands as the wait ends is still continued
+      Given a fork that lands during the last pause of the wait
+      When its owner clicks an action
+      Then one last read finds it, and Langy continues the fork
+
+    @unit
+    Scenario: A fork that cannot be read counts as not ready
+      Given a fork whose every read fails
+      When its owner clicks an action
+      Then Langy starts a new conversation once the wait ends
+      And the answer says the fork was not ready, and does not say the original is gone
+
+    @unit
     Scenario: A click whose source conversation is gone starts a new seeded conversation
       Given an insight whose source conversation is archived or no longer visible
       When its owner clicks an action
@@ -248,16 +270,17 @@ Feature: Action buttons on an insight
       And they are not told the original conversation is gone
 
     @integration
-    Scenario: A click that answers after the person left the page still opens the conversation
+    Scenario: A click that answers after the person left the page leaves them where they are, and says where the conversation is
       Given an action on its way
       When the person leaves the page, and then the click answers
-      Then Langy opens on the conversation
+      Then the address is left alone
+      And they are told Langy has the action, and to find the conversation under Recent chats in the Langy panel
 
     @integration
-    Scenario: Opening the conversation keeps the query the address holds now
-      Given an action on its way, and an address whose query has changed since the click
+    Scenario: A folder switched while a click is on its way is kept when the conversation opens
+      Given an action on its way, and a folder switched since the click
       When the click answers and the conversation opens
-      Then the address keeps its query as it is now, and names the conversation
+      Then the address keeps the folder switched to, and names the conversation
 
     @integration
     Scenario: No action shows while release_insight_actions is off
