@@ -144,7 +144,7 @@ describe("HttpVoiceMediaRelayChannel", () => {
         // The opening handshake listens for "error" on the socket to refuse an unopened relay.
         // That listener must not outlive the handshake, or a later, unrelated error on the same
         // socket would terminate an already-paired call.
-        (relay as unknown as { socket: WebSocket }).socket.emit("error", new Error("transient"));
+        (relay as VoiceMediaRelay & { socket: WebSocket }).socket.emit("error", new Error("transient"));
 
         const heard = new Promise<string>((resolve) =>
           twilio.once("message", (data) => resolve(frameBytes(data).toString("utf8"))),

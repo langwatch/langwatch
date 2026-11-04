@@ -83,11 +83,13 @@ export class HttpVoiceMediaRelayChannel implements VoiceMediaRelayChannel {
         OPEN_TIMEOUT_MS,
       );
 
+      const onOpeningError = (): void => refuse({ status: 0 });
+      const onOpeningClose = (): void => refuse({ status: 0 });
       socket.once("unexpected-response", (_request, response) => {
         void refusalOf(response).then(refuse);
       });
-      socket.on("error", () => refuse({ status: 0 }));
-      socket.once("close", () => refuse({ status: 0 }));
+      socket.on("error", onOpeningError);
+      socket.once("close", onOpeningClose);
       socket.once("message", (data, isBinary) => {
         const ready = isBinary ? undefined : parseJson({ data, schema: readyFrameSchema });
         if (!ready) {
@@ -95,6 +97,10 @@ export class HttpVoiceMediaRelayChannel implements VoiceMediaRelayChannel {
           socket.close(PROTOCOL_ERROR.code, PROTOCOL_ERROR.reason);
           return;
         }
+        // These opening-phase listeners would otherwise outlive the handshake and
+        // terminate the socket on a later, unrelated error or close of an open relay.
+        socket.off("error", onOpeningError);
+        socket.off("close", onOpeningClose);
         // Built inside this listener, so it hears every frame after the ready frame.
         const relay = WsVoiceMediaRelay.create({
           socket,

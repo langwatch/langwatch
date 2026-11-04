@@ -92,6 +92,12 @@ Feature: Voice agents: a self-hosted install relays phone media through the Lang
     Then the relay reports the join with that signature
     And every frame reaches the worker in order, including frames sent before it listened
 
+  @integration
+  Scenario: A transient socket error after open does not terminate an active relay
+    Given an open relay with Twilio joined
+    When the relay's socket reports an error after it opened
+    Then the relay keeps carrying frames between the worker and Twilio
+
   # ---------------------------------------------------------------------------
   # Through the claim, end to end
   # ---------------------------------------------------------------------------
