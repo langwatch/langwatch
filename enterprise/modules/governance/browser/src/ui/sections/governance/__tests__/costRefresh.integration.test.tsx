@@ -33,6 +33,7 @@ const harness = vi.hoisted(() => ({
   summaryUpdatedAt: 0,
 }));
 
+vi.mock("@langwatch/auth-client", () => ({ useRecordPageOpened: () => undefined }));
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const read = (path: string, data: unknown) => ({
     useQuery: (args: unknown, options: Record<string, unknown> = {}) => {
