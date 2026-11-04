@@ -13,11 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const OWN_DECISION_MODEL = {
   value: "openai/decisions:gpt-6-luna",
-  label: "OpenAI Decisions API",
+  label: "gpt-6-luna",
 };
 const HOSTED_DECISION_MODEL = {
   value: "langwatch/instant-evals",
-  label: "LangWatch Instant Preview",
+  label: "Instant Preview",
 };
 
 const state = vi.hoisted(() => ({
