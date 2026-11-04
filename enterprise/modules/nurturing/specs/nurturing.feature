@@ -2,7 +2,8 @@ Feature: Nurturing sends the signals its owners record
   Each owner tells nurturing through a subscriber on its own pipeline, with ids
   plus what the owner's event holds. The signal lands as an event on nurturing's
   pipeline, and nurturing's subscriber sends Customer.io and PostHog what main
-  sent. Nurturing names no peer and fetches nothing.
+  sent. Nurturing names no peer. It reads the owners only for who hears an
+  organization's fact: see organization-member-facts.feature.
 
   @unit
   Scenario: An owner's signal lands on nurturing's pipeline keyed by its source event

@@ -1,6 +1,7 @@
 import {
   DatasetNotReadyError,
   DuplicateRecordIdError,
+  type DatasetColumnRenames,
   type DatasetColumns,
   type DatasetRecordInput,
 } from "@langwatch/dataset-contract";
@@ -54,18 +55,32 @@ export type ChunkLine = { id: string; entry: unknown };
  */
 const RECORD_KSUID_RESOURCE = "record";
 
-export const mapPreviousColumnsToNewColumns = (
-  records: DatasetRecordInput[],
-  previousColumns: DatasetColumns,
-  newColumns: DatasetColumns,
-): DatasetRecordInput[] => {
+/**
+ * Which new column each previous column's values move to. Renames, when the save
+ * names them, decide alone beside unchanged names; without them the leftovers
+ * pair off by position.
+ */
+const columnMapping = ({
+  previousColumns,
+  newColumns,
+  renames,
+}: {
+  previousColumns: DatasetColumns;
+  newColumns: DatasetColumns;
+  renames: DatasetColumnRenames | undefined;
+}): Record<string, string | undefined> => {
   const mapping: Record<string, string | undefined> = {};
-  for (const previous of previousColumns) {
-    const exact = newColumns.find((column) => column.name === previous.name);
-    if (exact) {
-      mapping[previous.name] = exact.name;
-    }
+  const newNames = new Set(newColumns.map((column) => column.name));
+  const renamedFrom = new Set(renames?.map((rename) => rename.from));
+  const renamedTo = new Set(renames?.map((rename) => rename.to));
+  for (const rename of renames ?? []) {
+    if (newNames.has(rename.to)) mapping[rename.from] = rename.to;
   }
+  for (const previous of previousColumns) {
+    if (renamedFrom.has(previous.name) || renamedTo.has(previous.name)) continue;
+    if (newNames.has(previous.name)) mapping[previous.name] = previous.name;
+  }
+  if (renames) return mapping;
 
   const previousUnmapped = previousColumns.filter((column) => !(column.name in mapping));
   const newUnmapped = newColumns.filter((column) => !Object.values(mapping).includes(column.name));
@@ -75,6 +90,21 @@ export const mapPreviousColumnsToNewColumns = (
       mapping[previous.name] = next.name;
     }
   });
+  return mapping;
+};
+
+export const mapPreviousColumnsToNewColumns = ({
+  records,
+  previousColumns,
+  newColumns,
+  renames,
+}: {
+  records: DatasetRecordInput[];
+  previousColumns: DatasetColumns;
+  newColumns: DatasetColumns;
+  renames?: DatasetColumnRenames | undefined;
+}): DatasetRecordInput[] => {
+  const mapping = columnMapping({ previousColumns, newColumns, renames });
 
   return records.map((record) => {
     const mapped: DatasetRecordInput = record.id ? { id: record.id } : {};

@@ -133,6 +133,13 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "dataset:fill-empty-slugs",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dataset",
+    "description": "Gives each dataset stored without a slug one made from its name."
+  },
+  {
     "id": "dataset:create-first-versions",
     "kind": "data",
     "mode": "background",
