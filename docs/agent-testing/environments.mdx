@@ -100,6 +100,8 @@ langwatch run-plan run --test-suite "Checkout" \
   --name "Checkout: production vs local" --wait
 ```
 
+A run against `production` runs on real data, so scope it to scenarios that only read data.
+
 The same shape compares two deployed environments, `staging` against `production`, or one environment against another model:
 
 ```bash
