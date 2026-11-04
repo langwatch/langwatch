@@ -119,9 +119,9 @@ describe("ScenarioConnectorService", () => {
       await connector.callTurn(turn);
       await connector.callTurn(turn);
 
-      expect(posts.map(({ input }) => (input as { idempotencyKey: string }).idempotencyKey)).toEqual(
-        ["run_1:att_1:call:0", "run_1:att_1:call:1"],
-      );
+      expect(
+        posts.map(({ input }) => (input as { idempotencyKey: string }).idempotencyKey),
+      ).toEqual(["run_1:att_1:call:0", "run_1:att_1:call:1"]);
     });
 
     it("posts each block as the one code node of its workflow, the code under its budget", async () => {

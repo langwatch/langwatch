@@ -338,7 +338,10 @@ describe("AgentManagementPage", () => {
           id: "agent_connector",
           type: "connector",
           config: {
-            call: { language: "python", code: "def call(message, rows, state):\n    return message" },
+            call: {
+              language: "python",
+              code: "def call(message, rows, state):\n    return message",
+            },
             secretNames: [],
           },
         },
