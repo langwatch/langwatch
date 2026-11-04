@@ -60,7 +60,7 @@ LangWatch does not apply a pass threshold for you. `--wait` exits non-zero when 
 ```bash
 RESULT=$(langwatch run-plan run --test-suite Refunds --target connected:support-agent@staging \
   --name "Refunds nightly" --repeat 3 --wait --format json) || true
-echo "$RESULT" | jq -e '.outcome == "passed" or .outcome == "failed"'
+echo "$RESULT" | jq -es '.[0].outcome == "passed" or .[0].outcome == "failed"'
 ```
 
 The job then stays green on `failed`, so your team reads the pass bar on Results. `failed` also counts a run that errored with no verdict.
