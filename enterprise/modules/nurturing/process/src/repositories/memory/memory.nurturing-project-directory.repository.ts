@@ -7,10 +7,12 @@ import type {
 /** The Postgres twin's semantics; `placed` and `created` stand in for the owners' tables. */
 export class MemoryNurturingProjectDirectoryRepository implements NurturingProjectDirectoryRepository {
   private constructor(
-    private readonly placed: ReadonlyMap<string, string>,
-    private readonly created: ReadonlyMap<string, number>,
-    private readonly traced: ReadonlySet<string>,
-    private readonly personalOwners: ReadonlyMap<string, string>,
+    private readonly state: Readonly<{
+      placed: ReadonlyMap<string, string>;
+      created: ReadonlyMap<string, number>;
+      traced: ReadonlySet<string>;
+      personalOwners: ReadonlyMap<string, string>;
+    }>,
   ) {}
 
   /**
@@ -29,28 +31,33 @@ export class MemoryNurturingProjectDirectoryRepository implements NurturingProje
     traced?: ReadonlySet<string>;
     personalOwners?: ReadonlyMap<string, string>;
   } = {}): MemoryNurturingProjectDirectoryRepository {
-    return new MemoryNurturingProjectDirectoryRepository(placed, created, traced, personalOwners);
+    return new MemoryNurturingProjectDirectoryRepository({
+      placed,
+      created,
+      traced,
+      personalOwners,
+    });
   }
 
   async findPersonalOwnerUserIds({
     projectId,
   }: Readonly<{ projectId: string }>): Promise<string[]> {
-    const owner = this.personalOwners.get(projectId);
+    const owner = this.state.personalOwners.get(projectId);
     return owner === undefined ? [] : [owner];
   }
 
   async hasTracedProject({
     organizationId,
   }: Readonly<{ organizationId: string }>): Promise<boolean> {
-    return [...this.placed].some(
-      ([projectId, placedIn]) => placedIn === organizationId && this.traced.has(projectId),
+    return [...this.state.placed].some(
+      ([projectId, placedIn]) => placedIn === organizationId && this.state.traced.has(projectId),
     );
   }
 
   async getPlacement({
     projectId,
   }: Readonly<{ projectId: string }>): Promise<NurturingProjectPlacement> {
-    const organizationId = this.placed.get(projectId);
+    const organizationId = this.state.placed.get(projectId);
     return organizationId === undefined
       ? { outcome: "unknown" }
       : { outcome: "known", organizationId };
@@ -59,9 +66,9 @@ export class MemoryNurturingProjectDirectoryRepository implements NurturingProje
   async getFirstProjectCreatedAt({
     organizationId,
   }: Readonly<{ organizationId: string }>): Promise<{ firstProjectCreatedAt: number | null }> {
-    const createdAts = [...this.placed]
+    const createdAts = [...this.state.placed]
       .filter(([, placedIn]) => placedIn === organizationId)
-      .flatMap(([projectId]) => this.created.get(projectId) ?? []);
+      .flatMap(([projectId]) => this.state.created.get(projectId) ?? []);
     return { firstProjectCreatedAt: createdAts.length > 0 ? Math.min(...createdAts) : null };
   }
 }
