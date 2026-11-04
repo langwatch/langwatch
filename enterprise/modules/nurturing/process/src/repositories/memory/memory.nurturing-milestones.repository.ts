@@ -4,16 +4,38 @@ import type {
   NurturingMilestonesRepository,
   NurturingOrganizationCounts,
   NurturingOrganizationRow,
+  NurturingTraceMilestonesRepository,
 } from "../nurturing-milestones.repository.ts";
 
 /** The Postgres twin's semantics over nurturing's own organizations. */
 export class MemoryNurturingMilestonesRepository
-  implements NurturingMilestonesRepository, NurturingCodingMilestonesRepository
+  implements
+    NurturingMilestonesRepository,
+    NurturingCodingMilestonesRepository,
+    NurturingTraceMilestonesRepository
 {
   readonly #organizations = new Map<string, NurturingOrganizationRow>();
+  readonly #lastTraceAt = new Map<string, number>();
 
   static create(): MemoryNurturingMilestonesRepository {
     return new MemoryNurturingMilestonesRepository();
+  }
+
+  async recordLastTrace({
+    organizationId,
+    occurredAt,
+  }: Readonly<{ organizationId: string; occurredAt: number }>): Promise<void> {
+    if (!this.#organizations.has(organizationId)) return;
+    const known = this.#lastTraceAt.get(organizationId);
+    if (known === undefined || known < occurredAt) {
+      this.#lastTraceAt.set(organizationId, occurredAt);
+    }
+  }
+
+  async findLastTraceAt({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<number | null> {
+    return this.#lastTraceAt.get(organizationId) ?? null;
   }
 
   async recordOrganization({

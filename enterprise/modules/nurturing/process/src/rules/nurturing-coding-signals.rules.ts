@@ -7,7 +7,7 @@ type AdminFact = Readonly<{
   adminUserId: string;
 }>;
 
-/** The project's latest stored session, against the admin; Customer.io debounces it per project. */
+/** The project's latest stored session; delivery tells every active member, once per window. */
 export function codingSessionStoredSignal({
   data,
   adminUserId,
