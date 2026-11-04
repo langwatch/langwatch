@@ -51,4 +51,5 @@ const (
 	RequestTypeImageGeneration = aitrace.RequestTypeImageGeneration
 	RequestTypeImageEdit       = aitrace.RequestTypeImageEdit
 	RequestTypeRealtimeSession = aitrace.RequestTypeRealtimeSession
+	RequestTypeDecisions       = aitrace.RequestTypeDecisions
 )

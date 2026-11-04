@@ -1,0 +1,235 @@
+import { Box } from "@langwatch/design-system/primitives";
+import type { ReactNode } from "react";
+
+import { TypeRegion } from "../../../lib/type-mode.tsx";
+import type { TypeMode } from "../../../lib/type-mode.tsx";
+import { neighbours, trailOf } from "../../navigation/model.ts";
+import { MobileNav, sectionOf, SideNav, site } from "../../navigation/ui.ts";
+import { SearchTemplates } from "../../search/ui.ts";
+import { AgentLauncher } from "./agent-launcher.tsx";
+import { SiteAnnouncement } from "./announcement.tsx";
+import { SiteBanner } from "./banner.tsx";
+import { GithubLink } from "./github-link.tsx";
+import { Header, HEADER_HEIGHT, type PageKind } from "./header.tsx";
+import { PageFooter } from "./page-footer.tsx";
+import { PageHeader } from "./page-header.tsx";
+import { SiteFooter } from "./site-footer.tsx";
+import { TocDisclosure, TocRail } from "./toc.tsx";
+import type { TocEntry } from "./toc.tsx";
+
+const ENDPOINT_QUERY = "@media (min-width: 80rem)";
+
+type ShellProps = {
+  slug: string;
+  kind: PageKind;
+  title: string;
+  description: string;
+  toc: TocEntry[];
+  children?: ReactNode;
+  typeMode?: TypeMode;
+  wide?: boolean;
+  /** The page's last commit date when docs.json shows timestamps; "" for none. */
+  updated?: string;
+  /** A frontmatter tag such as "Deprecated", shown beside the breadcrumb. */
+  tag?: string;
+  endpoint?: { summary: ReactNode; playground: ReactNode; reference: ReactNode };
+  /** A page that is its own scene (the 404): children fill the main column, this the rail. */
+  aside?: ReactNode;
+};
+
+function LeftRail({ children }: { children: ReactNode }) {
+  return (
+    <Box
+      className="docs-nav-plane"
+      gridArea="nav"
+      display={{ base: "none", lg: "block" }}
+      position="relative"
+      zIndex="0"
+    >
+      <Box
+        className="docs-left-rail"
+        data-docs-rail=""
+        display="flex"
+        flexDirection="column"
+        paddingTop="6"
+        paddingBottom="10"
+        paddingX="4"
+      >
+        {children}
+      </Box>
+    </Box>
+  );
+}
+
+export function DocsShell({
+  slug,
+  kind,
+  title,
+  description,
+  toc,
+  children,
+  endpoint,
+  typeMode = "expressive",
+  wide = false,
+  updated = "",
+  tag = "",
+  aside,
+}: ShellProps) {
+  const section = sectionOf({ slug });
+  const trail = section ? (trailOf({ items: section.children, slug }) ?? []) : [];
+  const breadcrumb = [section?.title ?? "Docs", ...trail.slice(-1)];
+  const { previous, next } = neighbours({ section, slug });
+  const showRail = kind !== "endpoint" && toc.length >= 2;
+  const header = (
+    <PageHeader
+      slug={slug}
+      title={title}
+      description={description}
+      breadcrumb={breadcrumb}
+      tag={tag}
+      actions={site.contextual}
+    />
+  );
+  const contents = kind !== "endpoint" && toc.length >= 2 ? <TocDisclosure entries={toc} /> : null;
+  const footer =
+    slug === "404" ? null : (
+      <PageFooter slug={slug} previous={previous} next={next} updated={updated} />
+    );
+
+  return (
+    <Box
+      className="docs-shell"
+      minHeight="100vh"
+      bg="transparent"
+      color="fg"
+      position="relative"
+      isolation="isolate"
+      css={{
+        // The header's 1px bottom border sits under its height; leave it out and a full rail
+        // overruns the viewport by a pixel, clipping its last link.
+        "--docs-header-h": `calc(${HEADER_HEIGHT.base} + 1px + var(--docs-banners-h))`,
+        "@media (min-width: 64rem)": {
+          "--docs-header-h": `calc(${HEADER_HEIGHT.lg} + 1px + var(--docs-banners-h))`,
+        },
+        overflowX: "clip",
+      }}
+    >
+      <a className="docs-skip-link" href="#content">
+        Skip to content
+      </a>
+      {section ? (
+        <a className="docs-skip-link" href="#page-tree">
+          Skip to page list
+        </a>
+      ) : null}
+      <Box className="docs-top" position="sticky" top="0" zIndex="sticky">
+        <SiteAnnouncement announcement={site.announcement} />
+        <SiteBanner />
+        <Header kind={kind} />
+      </Box>
+      <Box
+        className="docs-layout"
+        data-kind={kind}
+        data-has-toc={showRail ? "true" : "false"}
+        data-wide={wide || !showRail ? "true" : "false"}
+        data-scene={aside ? "true" : void 0}
+      >
+        <LeftRail>
+          <SideNav active={section} launcher={<AgentLauncher />} slug={slug} treeId="page-tree" />
+        </LeftRail>
+        {aside ? (
+          <>
+            <Box id="content" as="main" tabIndex={-1} className="docs-scene-main">
+              {children}
+            </Box>
+            <Box as="aside" className="docs-scene-aside">
+              {aside}
+            </Box>
+          </>
+        ) : null}
+        {!aside && endpoint ? (
+          <>
+            <Box
+              id="content"
+              as="main"
+              tabIndex={-1}
+              gridArea={{ base: "main", lg: "main" }}
+              minWidth="0"
+              maxWidth="none"
+              marginX="0"
+              width="100%"
+              paddingBottom="12"
+              css={{ [ENDPOINT_QUERY]: { display: "contents" } }}
+            >
+              <Box
+                className="docs-endpoint-top"
+                css={{ [ENDPOINT_QUERY]: { gridArea: "top", minWidth: 0 } }}
+              >
+                {header}
+                {endpoint.summary}
+                {contents ? <Box marginTop="6">{contents}</Box> : null}
+              </Box>
+              <Box
+                className="docs-endpoint-play"
+                marginY="6"
+                css={{
+                  [ENDPOINT_QUERY]: {
+                    gridArea: "play",
+                    marginTop: 0,
+                    marginInlineStart: "0",
+                    alignSelf: "start",
+                    marginBlock: "3rem 0",
+                  },
+                }}
+              >
+                {endpoint.playground}
+              </Box>
+              <Box
+                className="docs-endpoint-ref"
+                css={{ [ENDPOINT_QUERY]: { gridArea: "ref", minWidth: 0 } }}
+              >
+                {endpoint.reference}
+                {footer}
+              </Box>
+            </Box>
+          </>
+        ) : null}
+        {!aside && !endpoint ? (
+          <Box
+            id="content"
+            as="main"
+            tabIndex={-1}
+            gridArea="main"
+            minWidth="0"
+            width="100%"
+            maxWidth="none"
+            marginX={{ base: "auto", lg: "0" }}
+            paddingBottom="12"
+          >
+            {header}
+            {kind === "guide" ? contents : null}
+            <TypeRegion
+              mode={typeMode}
+              as="article"
+              className="docs-prose"
+              marginTop={{ base: "8", xl: "10" }}
+            >
+              {children}
+            </TypeRegion>
+            {footer}
+          </Box>
+        ) : null}
+        {showRail ? (
+          <Box gridArea="toc" paddingTop="0" display={{ base: "none", xl: "block" }}>
+            <Box className="docs-toc-container" data-docs-rail="" paddingTop="10" paddingBottom="6">
+              <TocRail entries={toc} />
+            </Box>
+          </Box>
+        ) : null}
+      </Box>
+      <SiteFooter />
+      <MobileNav githubLink={<GithubLink site={site} />} site={site} />
+      <SearchTemplates />
+    </Box>
+  );
+}

@@ -3,6 +3,7 @@ import {
   type DatasetColumn,
   type DatasetReference,
   type EvaluationsV3State,
+  ExperimentEvaluationInputError,
   ExperimentRunLoopUnavailableError,
   extractPersistedState,
   findOrCreateWorkflowExperimentInputSchema,
@@ -39,6 +40,7 @@ import type {
 } from "../../../services/experiment-execution-data.service.ts";
 import { ExperimentExecutionDataService } from "../../../services/experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "../../../services/experiment-result-dispatch.service.ts";
+import { ExperimentRunDatasetVersionService } from "../../../services/experiment-run-dataset-version.service.ts";
 import type { ExperimentService } from "../../../services/experiment.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "../../run/services/experiment-run-command-dispatcher.service.ts";
 import { ExperimentRunPlanService } from "../../run/services/experiment-run-plan.service.ts";
@@ -87,7 +89,7 @@ type PreparedEvaluation = {
 
 type WorkflowEvaluationInputs = Pick<
   WorkflowEvaluationRequest,
-  "projectId" | "workflowId" | "versionId" | "data" | "datasetId" | "parameters"
+  "projectId" | "workflowId" | "versionId" | "data" | "datasetId" | "datasetVersion" | "parameters"
 >;
 
 export class WorkflowEvaluationService {
@@ -127,6 +129,7 @@ export class WorkflowEvaluationService {
       total,
       ...(input.data ? { data: input.data } : {}),
       ...(input.datasetId ? { datasetId: input.datasetId } : {}),
+      ...(input.datasetVersion !== undefined ? { datasetVersion: input.datasetVersion } : {}),
       ...(input.parameters ? { parameters: input.parameters } : {}),
       ...(input.rowIndices ? { rowIndices: input.rowIndices } : {}),
     });
@@ -173,6 +176,7 @@ export class WorkflowEvaluationService {
           versionId: request.workflowVersionId,
           data: request.data,
           datasetId: request.datasetId,
+          datasetVersion: request.datasetVersion,
           parameters: request.parameters,
         }),
         runUrl: getRunUrl({
@@ -219,6 +223,14 @@ export class WorkflowEvaluationService {
       }),
       plan,
     });
+    await ExperimentRunDatasetVersionService.create({
+      datasets: this.dependencies.services.datasets,
+    }).link({
+      projectId: request.tenantId,
+      runId: request.runId,
+      experimentId: request.experimentId,
+      datasetVersion: dataResult.datasetVersion,
+    });
   }
 
   /** A request the worker cannot prepare completes failed, with the refusal when it is handled. */
@@ -253,6 +265,7 @@ export class WorkflowEvaluationService {
     versionId,
     data,
     datasetId,
+    datasetVersion,
     parameters,
   }: WorkflowEvaluationInputs): Promise<PreparedEvaluation> {
     const workflow = await this.dependencies.workflowSource.findEvaluableWorkflow({
@@ -287,6 +300,13 @@ export class WorkflowEvaluationService {
       data || datasetId
         ? { resolvedDatasetId: datasetId, datasetRef: emptyDatasetRef(workflow.name) }
         : WorkflowEvaluationService.attachedDataset({ entry, workflowName: workflow.name });
+    if (datasetVersion !== undefined && !resolvedDatasetId) {
+      throw new ExperimentEvaluationInputError({
+        status: 400,
+        reason:
+          "A dataset_version names a saved dataset's version, and this run reads no saved dataset",
+      });
+    }
 
     const dataResult = await ExperimentExecutionDataService.create().loadExecutionData({
       projectId,
@@ -294,7 +314,12 @@ export class WorkflowEvaluationService {
       targets: [target],
       evaluators: [],
       services: this.dependencies.services,
-      inputs: { data, datasetId: resolvedDatasetId, parameters },
+      inputs: {
+        data,
+        datasetId: resolvedDatasetId,
+        ...(datasetVersion !== undefined ? { datasetVersion } : {}),
+        parameters,
+      },
     });
     const state = WorkflowEvaluationService.evaluationState({
       workflowName: workflow.name,

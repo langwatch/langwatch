@@ -73,6 +73,12 @@ const messagesOf = ({
   ];
 };
 
+/** Whether the parameter takes any text, so an empty cell is a value it can hold. */
+const isFreeText = (definition: ScenarioParameterDefinition): boolean =>
+  definition.type !== "number" &&
+  definition.type !== "boolean" &&
+  !(definition.options && definition.options.length > 0);
+
 /** A mapped cell that holds a number, or nothing when it holds no number. */
 const coerceNumberValue = (value: unknown): number | undefined => {
   const parsed = typeof value === "number" ? value : Number(value);
@@ -89,9 +95,9 @@ const coerceBooleanValue = (value: unknown): boolean | undefined => {
 };
 
 /**
- * A value read as the type the parameter declares, or nothing — both an
- * empty cell and one the declared type can't read. Left out of the call so
- * the function's own default applies, not the agent seeing `NaN` or "undefined".
+ * A value read as the declared type. Nothing when the input is absent (unmapped,
+ * or its column is not in the dataset) or unreadable, so the default applies.
+ * An empty cell is empty text for free text; a number, boolean or choice has none.
  */
 const coerceParameterValue = ({
   value,
@@ -100,7 +106,8 @@ const coerceParameterValue = ({
   value: unknown;
   definition: ScenarioParameterDefinition;
 }): string | number | boolean | undefined => {
-  if (value === undefined || value === null || value === "") return undefined;
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return isFreeText(definition) ? "" : undefined;
   if (definition.type === "number") return coerceNumberValue(value);
   if (definition.type === "boolean") return coerceBooleanValue(value);
   return typeof value === "string" ? value : (JSON.stringify(value) ?? "");
@@ -124,8 +131,7 @@ export const buildConnectedCall = ({
       value: inputs[definition.name],
       definition,
     });
-    // A parameter with no value keeps the default the function declares, so
-    // nothing is sent for it.
+    // A parameter with no input keeps the default the function declares.
     if (value !== undefined) params[definition.name] = value;
   }
   return {

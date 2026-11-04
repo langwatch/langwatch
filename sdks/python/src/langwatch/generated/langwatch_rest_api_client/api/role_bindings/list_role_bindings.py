@@ -92,7 +92,7 @@ def sync_detailed(
 ) -> Response[ListRoleBindingsResponse200]:
     """List the organization's role bindings, each naming its principal (user, group or API key), role,
     scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts
-    the filtered set. superseded by /api/grants, which answers the same rows as grants
+    the filtered set. superseded by /api/grants, which answers the same rows as grants.
 
     Args:
         user_id (str | Unset):
@@ -141,7 +141,7 @@ def sync(
 ) -> ListRoleBindingsResponse200 | None:
     """List the organization's role bindings, each naming its principal (user, group or API key), role,
     scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts
-    the filtered set. superseded by /api/grants, which answers the same rows as grants
+    the filtered set. superseded by /api/grants, which answers the same rows as grants.
 
     Args:
         user_id (str | Unset):
@@ -185,7 +185,7 @@ async def asyncio_detailed(
 ) -> Response[ListRoleBindingsResponse200]:
     """List the organization's role bindings, each naming its principal (user, group or API key), role,
     scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts
-    the filtered set. superseded by /api/grants, which answers the same rows as grants
+    the filtered set. superseded by /api/grants, which answers the same rows as grants.
 
     Args:
         user_id (str | Unset):
@@ -232,7 +232,7 @@ async def asyncio(
 ) -> ListRoleBindingsResponse200 | None:
     """List the organization's role bindings, each naming its principal (user, group or API key), role,
     scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts
-    the filtered set. superseded by /api/grants, which answers the same rows as grants
+    the filtered set. superseded by /api/grants, which answers the same rows as grants.
 
     Args:
         user_id (str | Unset):

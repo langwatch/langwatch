@@ -65,7 +65,6 @@ describe("getSignInProviderMounts", () => {
         {
           providerId: "auth0",
           clientSecret: "auth0-secret",
-          accountIssuer: "local:oauth:auth0",
           requireIdTokenVerification: true,
           redirectURI: `${BETTER_AUTH_URL}/api/auth/callback/auth0`,
         },

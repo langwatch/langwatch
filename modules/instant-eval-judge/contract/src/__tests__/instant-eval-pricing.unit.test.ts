@@ -8,7 +8,10 @@ import { describe, expect, it } from "vitest";
 import {
   INSTANT_EVAL_PRICING,
   instantEvalCostUsd,
+  pickInstantEvalJudgementRoutedSpend,
   instantEvalPriceUsd,
+  pickInstantEvalRoutedSpend,
+  toNanoUsdPrecision,
 } from "../instant-eval-pricing.ts";
 
 describe("given a response from the classifier", () => {
@@ -56,6 +59,40 @@ describe("given a judgement whose raw product carries float noise", () => {
       expect(costUsd).toBe(0.008892534);
       expect(priceUsd).toBe(0.011560294);
       expect(String(priceUsd)).not.toMatch(/0000000\d$/);
+    });
+
+    /** @scenario "A priced amount is rounded to nano-USD precision" */
+    it("rounds a summed amount the same way, for a caller that adds costs", () => {
+      expect(toNanoUsdPrecision(0.1 + 0.2)).toBe(0.3);
+      expect(toNanoUsdPrecision(0.0000000014)).toBe(0.000000001);
+    });
+  });
+});
+
+describe("given a spend that may be routed", () => {
+  describe("when its routed part is read", () => {
+    /** @scenario "Routed and unrouted tokens are billed separately" */
+    it("is routed when it has routed tokens or a routed cost above zero, and unrouted otherwise", () => {
+      expect(pickInstantEvalRoutedSpend({})).toBeUndefined();
+      expect(pickInstantEvalRoutedSpend({ costNanoUsd: 0, routedInputTokens: 0 })).toBeUndefined();
+      // A backend that bills output tokens alone has a cost and no routed input tokens.
+      expect(pickInstantEvalRoutedSpend({ costNanoUsd: 5000, routedInputTokens: 0 })).toEqual({
+        costNanoUsd: 5000,
+        routedInputTokens: 0,
+      });
+      expect(pickInstantEvalRoutedSpend({ costNanoUsd: 0, routedInputTokens: 40 })).toEqual({
+        costNanoUsd: 0,
+        routedInputTokens: 40,
+      });
+    });
+
+    /** @scenario "A routed judgement with a cost of zero is still routed" */
+    it("routes all of a judgement's tokens when it carries a cost, zero included", () => {
+      expect(pickInstantEvalJudgementRoutedSpend({ inputTokens: 500 })).toBeUndefined();
+      expect(pickInstantEvalJudgementRoutedSpend({ inputTokens: 500, costNanoUsd: 0 })).toEqual({
+        costNanoUsd: 0,
+        routedInputTokens: 500,
+      });
     });
   });
 });

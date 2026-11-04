@@ -73,6 +73,7 @@ export const SURFACE_LABEL: Record<CapabilitySurface, string> = {
   datasets: "Datasets",
   prompts: "Prompts",
   dashboards: "Dashboards",
+  analyticsReports: "Analytics Reports",
   simulations: "Simulations",
   scenarios: "Scenarios",
   agents: "Agents",
@@ -116,13 +117,12 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
   },
   datasets: { path: "datasets", resourceHref: nestedResourceHref },
   prompts: { path: "prompts" },
-  // The dashboard VIEWER, and the specific dashboard when we know which one.
-  // This pointed at "analytics/custom" — the empty graph builder — so every
-  // "Open in Dashboards" landed on a blank form with no dashboard in it. The
-  // REST layer already builds the correct form (`/analytics/reports?dashboard=`).
-  dashboards: {
+  // A Dashboards dashboard opens at its own page; an Analytics Report (and the graphs and
+  // saved charts on one) in the Reports viewer, the forms the REST links use (AC199z).
+  dashboards: { path: "dashboards", resourceHref: nestedResourceHref },
+  analyticsReports: {
     path: "analytics/reports",
-    resourceHref: (base, resourceId) => `${base}?dashboard=${resourceId}`,
+    resourceHref: (base, resourceId) => `${base}?dashboard=${encodeURIComponent(resourceId)}`,
   },
   simulations: { path: "simulations" },
   // A scenario lives in the scenario LIBRARY, and its own page is that library
@@ -242,7 +242,8 @@ export const SURFACE_BY_FEATURE: Record<string, CapabilitySurface> = {
   "library.workflows": "workflows",
   "library.evaluators": "evaluators",
   "library.datasets": "datasets",
-  dashboards: "dashboards",
+  dashboards: "analyticsReports",
+  "dashboard-widgets": "dashboards",
   triggers: "automations",
   "settings.projects": "projects",
   "settings.api-keys": "apiKeys",

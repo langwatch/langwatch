@@ -346,9 +346,17 @@ export const modelProviders = {
         AZURE_OPENAI_API_VERSION: z.string().nullable().optional(),
         AZURE_API_GATEWAY_BASE_URL: z.string().nullable().optional(),
         AZURE_API_GATEWAY_VERSION: z.string().nullable().optional(),
+        // Deployment names for the Instant Evals decision models; unset, the model's own name.
+        AZURE_OPENAI_DECISIONS_DEPLOYMENT: z.string().nullable().optional(),
+        AZURE_DECISION_1_DEPLOYMENT: z.string().nullable().optional(),
       })
       .passthrough(),
-    optionalKeys: ["AZURE_OPENAI_API_VERSION", "AZURE_API_GATEWAY_VERSION"],
+    optionalKeys: [
+      "AZURE_OPENAI_API_VERSION",
+      "AZURE_API_GATEWAY_VERSION",
+      "AZURE_OPENAI_DECISIONS_DEPLOYMENT",
+      "AZURE_DECISION_1_DEPLOYMENT",
+    ],
     enabledSince: Temporal.Instant.from("2023-01-01T00:00:00Z"),
   },
   bedrock: {
@@ -456,6 +464,36 @@ export const modelProviders = {
     enabledSince: Temporal.Instant.from("2026-10-19T00:00:00Z"),
     blurb:
       "Clef and Clef Flash, decision models Instant Evals can run on. Your account is billed directly by Cloudflare.",
+  },
+  typesafe: {
+    name: "TypeSafe",
+    type: "decision",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "TYPESAFE_API_KEY",
+    keysSchema: z.object({ TYPESAFE_API_KEY: z.string().min(1) }),
+    enabledSince: Temporal.Instant.from("2026-11-02T00:00:00Z"),
+    blurb:
+      "Jev, a decision model Instant Evals can run on. Your account is billed directly by TypeSafe.",
+  },
+  openrouter: {
+    name: "OpenRouter",
+    type: "decision",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "OPENROUTER_API_KEY",
+    keysSchema: z.object({ OPENROUTER_API_KEY: z.string().min(1) }),
+    enabledSince: Temporal.Instant.from("2026-11-02T00:00:00Z"),
+    blurb:
+      "Jev, Microsoft Decision 1 and Liquid d1.1, decision models Instant Evals can run on. Your account is billed directly by OpenRouter.",
+  },
+  fireworks: {
+    name: "Fireworks",
+    type: "decision",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "FIREWORKS_API_KEY",
+    keysSchema: z.object({ FIREWORKS_API_KEY: z.string().min(1) }),
+    enabledSince: Temporal.Instant.from("2026-11-02T00:00:00Z"),
+    blurb:
+      "Rune, a decision model Instant Evals can run on. Your account is billed directly by Fireworks.",
   },
   azure_safety: {
     name: "Azure Safety",
