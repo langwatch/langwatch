@@ -180,11 +180,20 @@ describe("decisionFailureOf", () => {
     [401, "final", "classifier_key_invalid"],
     [402, "final", "classifier_key_invalid"],
     [403, "final", "classifier_key_invalid"],
+    [404, "final", "classifier_failed"],
     [413, "final", "classifier_input_too_large"],
     [422, "final", "classifier_failed"],
     [429, "retry", "classifier_rate_limited"],
     [503, "retry", "classifier_provider_unavailable"],
-  ] as const)("maps %i to a %s %s", (status, kind, reason) => {
-    expect(decisionFailureOf({ status })).toEqual({ kind, reason });
+  ] as const)("maps %i on LangWatch's key to a %s %s", (status, kind, reason) => {
+    expect(decisionFailureOf({ status, isOwnModel: false })).toEqual({ kind, reason });
+  });
+
+  /** @scenario "A model or deployment the account does not hold is skipped as not configured" */
+  it("maps an own model's 404 to a final classifier_not_configured, not a failure", () => {
+    expect(decisionFailureOf({ status: 404, isOwnModel: true })).toEqual({
+      kind: "final",
+      reason: "classifier_not_configured",
+    });
   });
 });

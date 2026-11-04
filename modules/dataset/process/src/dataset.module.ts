@@ -5,6 +5,7 @@ import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { DatasetModule } from "#app/dataset.app";
 import { datasetNormalizationEventing } from "#eventing/dataset-normalization.pipeline";
+import { datasetVersionsEventing } from "#eventing/dataset-versions.pipeline";
 import { datasetRepositories } from "#repositories/dataset-repositories.registry";
 import { DatasetMigrationService } from "#services/dataset-migration.service";
 import { datasetRecordTrpcTransport } from "#transport/dataset-record.trpc";
@@ -21,8 +22,9 @@ export const datasetProcessModule: PublishedProcessModule<
   .withTransports(createDatasetRest(), datasetTrpcTransport, datasetRecordTrpcTransport)
   .provideMiddlewareContext({ projectRequestContext: projectRequestContextOf })
   .withEventing(datasetNormalizationEventing)
+  .withEventing(datasetVersionsEventing)
   // Background, after old writers are gone: an older image may still write postgres-layout content.
-  .withMigrations(({ repositories, dependencies }) => [
+  .withMigrations(({ app, repositories, dependencies }) => [
     defineMigrationStep({
       id: "dataset:move-content-to-object-storage",
       kind: "data",
@@ -35,5 +37,14 @@ export const datasetProcessModule: PublishedProcessModule<
           storage: repositories.migrationChunks,
           projects: dependencies.projects,
         }).runStep(args),
+    }),
+    // Background and paced by its own work: it snapshots in its run and sends no queue work.
+    defineMigrationStep({
+      id: "dataset:create-first-versions",
+      kind: "data",
+      mode: "background",
+      description: "Saves version 1 of every dataset that has no version history yet.",
+      after: ["dataset:move-content-to-object-storage"],
+      run: app.firstVersionsRun(),
     }),
   ]);
