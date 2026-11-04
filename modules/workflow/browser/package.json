@@ -72,7 +72,7 @@
     "react-icons": "catalog:",
     "react-markdown": "catalog:",
     "react-resizable-panels": "catalog:",
-    "react-spinners": "^0.17.0",
+    "react-spinners": "^0.17.1",
     "recharts": "catalog:",
     "remark-gfm": "catalog:",
     "use-debounce": "catalog:",
