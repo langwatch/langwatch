@@ -231,5 +231,15 @@
         "promptFile": "coding-agent-cost.docs.txt"
       }
     ]
+  },
+  "agent-testing/red-teaming.mdx": {
+    "red-team": [
+      {
+        "title": "Red team my agent",
+        "skill": "langwatch/skills/recipes/red-team",
+        "slashCommand": "/red-team",
+        "promptFile": "recipes-red-team.docs.txt"
+      }
+    ]
   }
 }
