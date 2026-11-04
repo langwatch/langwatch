@@ -45,6 +45,16 @@ export function InviteLanding({ inviteCode }: { inviteCode: string }) {
     );
   }
 
+  // Spent already, most often by this person: "Join" again would only answer that it was.
+  if (session && landing.data.alreadyAccepted) {
+    return (
+      <AlreadyAccepted
+        organizationName={landing.data.organizationName}
+        inviterName={landing.data.inviterName}
+      />
+    );
+  }
+
   return session ? (
     <ConfirmAndJoin
       inviteCode={inviteCode}
@@ -308,6 +318,36 @@ function ConfirmAndJoin({
           </Box>
         )}
       </Text>
+    </AuthCard>
+  );
+}
+
+/**
+ * A spent invitation opened while signed in goes in, as a fresh join would; the card is
+ * what shows while the navigation runs, with the link in case it does not.
+ */
+function AlreadyAccepted({
+  organizationName,
+  inviterName,
+}: {
+  organizationName: string;
+  inviterName: string | null;
+}) {
+  useEffect(() => {
+    hardRedirect("/");
+  }, []);
+
+  return (
+    <AuthCard
+      title="This invitation was already accepted"
+      intro="Taking you to LangWatch."
+      actions={<FrontDoorLinkButton href="/" label="Continue to LangWatch" />}
+    >
+      <InvitingOrganization
+        organizationName={organizationName}
+        inviterName={inviterName}
+        testId="invite-already-accepted"
+      />
     </AuthCard>
   );
 }

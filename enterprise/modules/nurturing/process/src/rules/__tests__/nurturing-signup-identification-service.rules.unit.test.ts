@@ -15,6 +15,7 @@ const SIGNUP = {
   name: "Jane Doe",
   organizationId: "org-1",
   organizationName: "Acme Corp",
+  traces: { hasTraces: false, lastTraceAt: null },
 };
 
 afterEach(() => vi.useRealTimers());

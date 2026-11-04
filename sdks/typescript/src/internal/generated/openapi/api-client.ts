@@ -622,7 +622,7 @@ export interface paths {
         delete: operations["deleteApiDatasetBySlugOrId"];
         options?: never;
         head?: never;
-        /** @description Update a dataset by its slug or id */
+        /** @description Update a dataset by its slug or id. New `columnTypes` re-key every record; send `columnRenames` to say which existing column each renamed column came from, so a save that deletes one column and renames another moves the right values. */
         patch: operations["patchApiDatasetBySlugOrId"];
         trace?: never;
     };
@@ -9170,6 +9170,11 @@ export interface operations {
                         /** @enum {string} */
                         type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                     }[];
+                    /** @description Which existing column each renamed column came from, as `{ from, to }` names. Sent, values move by these renames and by unchanged names only. Omitted, columns left over after matching names pair by position. */
+                    columnRenames?: {
+                        from: string;
+                        to: string;
+                    }[];
                 };
             };
         };
@@ -9840,7 +9845,7 @@ export interface operations {
                     "text/event-stream": string;
                 };
             };
-            /** @description The body was not valid JSON, failed input validation, or the experiment has no dataset configured */
+            /** @description The body was not valid JSON, failed input validation, the experiment has no dataset configured, or `dataset_version` was sent while the run reads no saved dataset (no `dataset_id` and an inline active dataset) */
             400: {
                 headers: {
                     [name: string]: unknown;

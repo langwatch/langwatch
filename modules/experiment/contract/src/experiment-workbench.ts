@@ -594,6 +594,18 @@ export type EvaluationsV3Actions = {
    * `targetId`, only that target's own and the evaluators' mappings for it.
    */
   removeMappingsToMissingColumns: (args: { datasetId: string; targetId?: string }) => void;
+  /**
+   * Apply the columns drawer's edit. A column's `id` names the column it was
+   * edited from, so values, queued saved edits and mappings follow a rename.
+   */
+  applyDatasetColumnsEdit: (args: {
+    datasetId: string;
+    edited: {
+      datasetId: string;
+      name: string;
+      columnTypes: { name: string; type: string; id?: string }[];
+    };
+  }) => void;
   updateColumnType: (datasetId: string, columnId: string, type: DatasetColumnType) => void;
 
   // Target actions

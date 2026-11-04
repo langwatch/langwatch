@@ -24,7 +24,7 @@ None.
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/enterprise-billing-client`, `@langwatch/enterprise-licensing-client`.
+- Client packages (package.json): `@langwatch/auth-client`, `@langwatch/enterprise-billing-client`, `@langwatch/enterprise-licensing-client`.
 - Lends: `LicenseBillingSectionToken`, `ContactSalesToken`, `SeatProrationPreviewToken`.
 - Host APIs it requires: `BillingHostApi`.
 - Config slices: `billing`.

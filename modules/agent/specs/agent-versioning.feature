@@ -255,6 +255,46 @@ Feature: Agent versions and deploy labels
     When the backfill step runs as a dry run
     Then no version is written and no checkpoint is saved
 
+  # --- Fresh reads after a write ---
+
+  @unit
+  Scenario: Every write to an agent records that it changed
+    Given an HTTP agent "Support bot" calling "https://old.example.test/chat"
+    When a user changes its URL to "https://new.example.test/chat"
+    Then an "agent changed" fact is recorded for that agent in its own project
+    And creating, copying, pushing to copies, syncing a copy and moving a label record one too
+    And a workflow's new fields written into its linked agents record one for each agent
+    And a push records one only for the copies it wrote
+    And a copy, push or sync also records one for the source agent, so its copies list refetches
+
+  @unit
+  Scenario: Two writes to an agent in the same millisecond stay two changed facts
+    Given an HTTP agent "Support bot"
+    When two writes to it land in the same millisecond
+    Then each records its own "agent changed" fact
+    And a redelivery of one of them is still that one fact
+
+  @unit
+  Scenario: A committed agent write still succeeds when its changed fact cannot be recorded
+    Given an HTTP agent "Support bot"
+    And the "agent changed" fact cannot be sent
+    When a user changes its URL
+    Then the change is saved and returned
+    And the failure is logged instead of failing the save
+
+  @unit
+  Scenario: Every read of an agent goes stale when the agent changes or is archived
+    Given the agents list, one agent, its copies, its history and its versions are read
+    When an "agent changed" or "agent archived" fact is committed
+    Then each of those reads is hinted stale and refetches in every open tab
+
+  @integration
+  Scenario: A saved URL change shows at once in the tab that saved it
+    Given an HTTP agent calling "https://old.example.test/chat" that the editor has read
+    When the user saves it with the URL "https://new.example.test/chat"
+    Then the agent, the agents list and its versions are read again
+    And the editor, opened again, shows "https://new.example.test/chat" without a reload
+
   # --- UI ---
 
   @integration
@@ -300,3 +340,11 @@ Feature: Agent versions and deploy labels
     When the user opens the target's agent drawer
     Then the deploy label picker shows "latest" by default
     And picking "production" pins the target to "production"
+
+  @integration
+  Scenario: A target pinned to a label opens its agent drawer on that label
+    Given an agent target in the workbench pinned to "production"
+    When the user clicks the target's column header
+    Then the agent drawer's deploy label picker shows "production", not "latest"
+    And the label comes from the drawer address, so a reload of that address shows it too
+    And after a reload the picker still writes to the target, and a change replaces the address
