@@ -31,7 +31,7 @@ async function sendTraceWithMetadata(opts: {
         type: "llm",
         span_id: spanId,
         name: "chat-completion",
-        model: "gpt-4o-mini",
+        model: "gpt-6-luna",
         input: {
           type: "chat_messages",
           value: [

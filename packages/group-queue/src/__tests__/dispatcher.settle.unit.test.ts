@@ -5,7 +5,7 @@ import fastq from "fastq";
 import { describe, expect, it, vi } from "vitest";
 
 import { GroupQueueDispatcher } from "../dispatcher.ts";
-import type { DispatchResult } from "../scripts.ts";
+import type { ClaimedBatch, DispatchResult } from "../scripts.ts";
 
 const SIGNAL_KEY = "{test}:gq:signal";
 const waitOptions = { timeout: 2_000, interval: 5 };
@@ -20,9 +20,9 @@ function startDispatcher({ settleWindowMs }: { settleWindowMs: number }) {
     getEarliestReadyScore: async (): Promise<number | null> =>
       peeks++ === 0 ? nowInstant().epochMilliseconds + 20 : null,
     getEarliestCandidateScore: async (): Promise<number | null> => null,
-    dispatchBatch: async (): Promise<DispatchResult[]> => {
+    claimBatch: async (): Promise<ClaimedBatch> => {
       calls.push("dispatch");
-      return [];
+      return { claims: [], passedOverUntilMs: null };
     },
   };
   const blockingConnection = {

@@ -130,3 +130,166 @@ describe("given a run that judged nothing", () => {
     });
   });
 });
+
+describe("given a routed run", () => {
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("prices the summed routed cost and hands it to the judge with the tokens", async () => {
+    const { service, recorded } = finishing();
+
+    const spend = await service.finish({
+      runId: RUN_ID,
+      projectId: PROJECT_ID,
+      outcome: "finished",
+      inputTokens: 1_000_000,
+      requests: 10,
+      costNanoUsd: 2_000_000_000,
+      routedInputTokens: 1_000_000,
+    });
+
+    expect(spend.costUsd).toBe(2);
+    expect(spend.priceUsd).toBe(2 * INSTANT_EVAL_PRICING.markup);
+    expect(recorded[0]).toMatchObject({
+      inputTokens: 1_000_000,
+      costNanoUsd: 2_000_000_000,
+      routedInputTokens: 1_000_000,
+    });
+  });
+
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("prices a mixed run's unrouted tokens at the published rate on top of its routed cost", async () => {
+    const { service, recorded } = finishing();
+
+    const spend = await service.finish({
+      runId: RUN_ID,
+      projectId: PROJECT_ID,
+      outcome: "finished",
+      inputTokens: 1_000_000,
+      requests: 10,
+      costNanoUsd: 100_000_000,
+      routedInputTokens: 500_000,
+    });
+
+    expect(spend.costUsd).toBe(0.121);
+    expect(recorded[0]).toMatchObject({ costNanoUsd: 100_000_000, routedInputTokens: 500_000 });
+  });
+
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("hands a routed run that cost nothing to the judge as routed, so its tokens bill nothing", async () => {
+    const { service, recorded } = finishing();
+
+    const spend = await service.finish({
+      runId: RUN_ID,
+      projectId: PROJECT_ID,
+      outcome: "finished",
+      inputTokens: 1_000_000,
+      requests: 10,
+      costNanoUsd: 0,
+      routedInputTokens: 1_000_000,
+    });
+
+    expect(spend.costUsd).toBe(0);
+    expect(recorded[0]).toMatchObject({ costNanoUsd: 0, routedInputTokens: 1_000_000 });
+  });
+
+  /** @scenario "Routed and unrouted tokens are billed separately" */
+  it("hands a routed cost that covers no input tokens to the judge, as the run's cost counts it", async () => {
+    const { service, recorded } = finishing();
+
+    const spend = await service.finish({
+      runId: RUN_ID,
+      projectId: PROJECT_ID,
+      outcome: "finished",
+      inputTokens: 1_000_000,
+      requests: 10,
+      costNanoUsd: 5_000_000,
+      routedInputTokens: 0,
+    });
+
+    // $0.005 of output-only routed cost, plus one million unrouted tokens at $0.042.
+    expect(spend.costUsd).toBe(0.047);
+    expect(recorded[0]).toMatchObject({ costNanoUsd: 5_000_000, routedInputTokens: 0 });
+  });
+
+  /** @scenario "A routed cost with no input tokens is still billed" */
+  it("records a routed run's cost that came with no input tokens", async () => {
+    const { service, recorded } = finishing();
+
+    const spend = await service.finish({
+      runId: RUN_ID,
+      projectId: PROJECT_ID,
+      outcome: "finished",
+      inputTokens: 0,
+      requests: 1,
+      costNanoUsd: 5000,
+      routedInputTokens: 0,
+    });
+
+    expect(spend).toEqual({ costUsd: 0.000005, priceUsd: 0.0000065 });
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toMatchObject({ inputTokens: 0, costNanoUsd: 5000 });
+  });
+
+  /** @scenario "A page event without a routed cost still reads and prices from tokens" */
+  it("prices the tokens as before when the run carries no routed cost", async () => {
+    const { service, recorded } = finishing();
+
+    await service.finish({
+      runId: RUN_ID,
+      projectId: PROJECT_ID,
+      outcome: "finished",
+      inputTokens: 1_000_000,
+      requests: 10,
+    });
+
+    expect(recorded[0]).not.toHaveProperty("costNanoUsd");
+  });
+});
+
+describe("given a routed page that reported after its run finished", () => {
+  /** @scenario "A routed page that reports after its run finished is billed on its own" */
+  it("bills the page on a record of its own, and holds nothing to release", async () => {
+    const { service, recorded, released } = finishing();
+
+    const spend = await service.billLatePage({
+      runId: RUN_ID,
+      projectId: PROJECT_ID,
+      page: 3,
+      inputTokens: 1_000_000,
+      requests: 4,
+      costNanoUsd: 5_000_000,
+      routedInputTokens: 1_000_000,
+    });
+
+    expect(spend).toEqual({ costUsd: 0.005, priceUsd: 0.0065 });
+    expect(recorded).toEqual([
+      {
+        projectId: PROJECT_ID,
+        runId: RUN_ID,
+        latePage: 3,
+        inputTokens: 1_000_000,
+        requests: 4,
+        costNanoUsd: 5_000_000,
+        routedInputTokens: 1_000_000,
+        occurredAt: AT,
+      },
+    ]);
+    expect(released).toEqual([]);
+  });
+
+  /** @scenario "A routed page that reports after its run finished is billed on its own" */
+  it("raises a bill it cannot record, so the intent retries it", async () => {
+    const { service } = finishing({ recorderFails: true });
+
+    await expect(
+      service.billLatePage({
+        runId: RUN_ID,
+        projectId: PROJECT_ID,
+        page: 3,
+        inputTokens: 0,
+        requests: 4,
+        costNanoUsd: 5000,
+        routedInputTokens: 0,
+      }),
+    ).rejects.toThrow("the spend spine is away");
+  });
+});

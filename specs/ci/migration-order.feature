@@ -124,16 +124,31 @@ Feature: Migration order check
     When the PR adds a different Prisma migration with the same timestamp
     Then the goose-number rule does not apply, because Prisma records each migration by its full name
 
-  # A code step a release manifest names has run on real installs: its file is
-  # frozen exactly as a merged migration is (rethink 6.5 point 2).
+  # A code step a release manifest names has run on real installs: its
+  # defineMigrationStep declaration is frozen exactly as a merged migration is
+  # (rethink 6.5 point 2). The rest of the file, such as a module file
+  # registering a new step or eventing pipeline, may still change.
   @unit
-  Scenario: A PR changes the file of a code step a release manifest names
-    Given a release manifest on the base branch names the code step "topic:seed-clusters"
-    And a module file on the base branch declares that step id
-    When the PR modifies, renames or deletes that file
-    Then the check fails
+  Scenario: A PR changes the declaration of a code step a release manifest names
+    Given a release manifest on the base branch names the code steps "topic:seed-clusters" and "topic:prune-clusters"
+    And one module file on the base branch declares both
+    When the PR edits inside the declaration of one or both steps
+    Then the check fails for each step whose declaration changed, and only those
     And the comment says the release shipped the step and a released step cannot change
-    And the comment gives the git checkout that restores it
+    And the comment says to restore the declaration as the base branch has it
+
+  @unit
+  Scenario: A PR removes a code step a release manifest names
+    Given a release manifest on the base branch names the code step "topic:seed-clusters"
+    When the PR removes its declaration, or deletes the file without declaring it elsewhere
+    Then the check fails
+    And the comment says the released step was removed
+
+  @unit
+  Scenario: A PR changes the rest of a file declaring a released code step
+    Given a release manifest on the base branch names the code step "topic:seed-clusters"
+    When the PR edits the declaring file outside the declaration, reformats the declaration, or moves it unchanged to another file
+    Then the check passes
 
   @unit
   Scenario: A code step no release manifest names yet may still change

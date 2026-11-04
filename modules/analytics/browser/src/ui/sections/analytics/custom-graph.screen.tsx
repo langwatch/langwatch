@@ -96,6 +96,7 @@ import {
 import { FilterIconWithBadge } from "../../../ui/sections/filter-icon-with-badge.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
 import { FilterToggle, FilterToggleButton } from "../../../ui/sections/filter-toggle.tsx";
+import { LegacyAnalyticsBanner } from "../../../ui/sections/legacy-analytics-banner.tsx";
 import { SavedViewsScope } from "../../../ui/sections/saved-views-scope.tsx";
 import { SeriesFiltersDialog } from "../../../ui/sections/series-filters-dialog.tsx";
 import { AnalyticsOverflowMenu } from "../analytics-overflow-menu.tsx";
@@ -1544,7 +1545,7 @@ function GraphTypeField({ form }: { form: ReturnType<typeof useForm<CustomGraphF
  * The chart builder, at both of its addresses. ONE SCREEN, TWO KEYS, AND THE MODE ARRIVES AS A
  * PROP.
  */
-function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
+function CustomGraphScreenBody({ mode }: { mode: CustomGraphScreenMode }) {
   const host = useAnalyticsHost();
   const graphId = host.route().params.id;
   const projectId = host.project()?.id ?? "";
@@ -1597,6 +1598,16 @@ function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
         : {})}
       {...(alert ? { alert } : {})}
     />
+  );
+}
+
+/** The banner sits above every state, loading included, so no branch carries its own copy. */
+function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
+  return (
+    <>
+      <LegacyAnalyticsBanner />
+      <CustomGraphScreenBody mode={mode} />
+    </>
   );
 }
 

@@ -573,3 +573,65 @@ describe("given more rows than one page holds", () => {
     });
   });
 });
+
+describe("given the reader switches organization without leaving the audit page", () => {
+  describe("when the page re-renders under the new organization", () => {
+    /** @scenario The audit page re-reads the whole trail after an organization switch */
+    it("reads the whole new organization rather than the project it was filtered by", () => {
+      state.auditLogs = [auditRow()];
+      state.totalCount = 1;
+      const { rerenderWithHost } = renderWithOrganizationHost(
+        <AuditLogScreen />,
+        planHost({ scope: { organizationId: "org-1", projectId: "proj-1" } }),
+      );
+
+      expect(calls.listQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ organizationId: "org-1", projectId: "proj-1" }),
+      );
+
+      rerenderWithHost(planHost({ scope: { organizationId: "org-2", projectId: void 0 } }));
+
+      expect(calls.listQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ organizationId: "org-2", projectId: void 0 }),
+      );
+    });
+
+    /** @scenario The audit page re-reads the whole trail after an organization switch */
+    it("exports the whole new organization, not the project the filter named", async () => {
+      state.auditLogs = [auditRow()];
+      state.totalCount = 1;
+      state.fetchPages = [{ auditLogs: [auditRow()], totalCount: 1 }];
+      const { rerenderWithHost } = renderWithOrganizationHost(
+        <AuditLogScreen />,
+        planHost({ scope: { organizationId: "org-1", projectId: "proj-1" } }),
+      );
+
+      rerenderWithHost(planHost({ scope: { organizationId: "org-2", projectId: void 0 } }));
+      await exportVia("Current view (filters as shown)");
+
+      await waitFor(() => expect(calls.exportFetch).toHaveBeenCalled());
+      expect(calls.exportFetch).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-2", projectId: void 0 }),
+      );
+    });
+  });
+
+  describe("when they switch back to the organization they started in", () => {
+    /** @scenario The audit page re-reads the whole trail after an organization switch */
+    it("leaves the old project forgotten rather than reviving it", () => {
+      state.auditLogs = [auditRow()];
+      state.totalCount = 1;
+      const { rerenderWithHost } = renderWithOrganizationHost(
+        <AuditLogScreen />,
+        planHost({ scope: { organizationId: "org-1", projectId: "proj-1" } }),
+      );
+
+      rerenderWithHost(planHost({ scope: { organizationId: "org-2", projectId: void 0 } }));
+      rerenderWithHost(planHost({ scope: { organizationId: "org-1", projectId: void 0 } }));
+
+      expect(calls.listQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ organizationId: "org-1", projectId: void 0 }),
+      );
+    });
+  });
+});

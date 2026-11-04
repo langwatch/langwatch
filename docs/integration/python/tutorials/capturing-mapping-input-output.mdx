@@ -79,16 +79,18 @@ import langwatch
 import os
 
 # Assume we have already setup LangWatch
-
 # langwatch.setup()
 
 @langwatch.trace(
-name="UserIntentProcessing",
-input={"user_query": "Book a flight to London"}, # Output can be set later via update() if determined by function logic
+    name="UserIntentProcessing",
+    input={"user_query": "Book a flight to London"},
+    # Output can be set later via update() if determined by function logic
 )
-def process_user_intent(raw_query_data: dict): # raw_query_data might be large or contain sensitive info # The 'input' parameter above provides a clean version.
-intent = "book_flight"
-entities = {"destination": "London"}
+def process_user_intent(raw_query_data: dict):
+    # raw_query_data might be large or contain sensitive info
+    # The 'input' parameter above provides a clean version.
+    intent = "book_flight"
+    entities = {"destination": "London"}
 
     # Explicitly set the output for the root span of the trace
     current_trace = langwatch.get_current_trace()
@@ -98,8 +100,7 @@ entities = {"destination": "London"}
     return {"status": "success", "intent": intent} # Actual function return
 
 process_user_intent({"query": "Book a flight to London", "user_id": "123"})
-
-````
+```
 
 ```python Span with explicit input/output
 import langwatch
@@ -117,7 +118,7 @@ def handle_chat():
         name="LLMCall",
         type="llm",
         input=[user_message],
-        model="gpt-5"
+        model="gpt-6-luna"
     ) as llm_span:
         # Simulate LLM call
         assistant_response_content = "LangWatch helps you monitor your LLM applications."
@@ -129,7 +130,7 @@ def handle_chat():
     print("Chat finished.")
 
 handle_chat()
-````
+```
 
 </CodeGroup>
 
@@ -198,7 +199,7 @@ def advanced_chat_example():
         ChatMessage(role="user", content="What is the weather in London?")
     ]
 
-    with langwatch.span(name="GetWeatherToolCall", type="llm", input=messages, model="gpt-5") as llm_span:
+    with langwatch.span(name="GetWeatherToolCall", type="llm", input=messages, model="gpt-6-luna") as llm_span:
         # Simulate model deciding to call a tool
         tool_call_id = "call_abc123"
         assistant_response_with_tool = ChatMessage(
@@ -231,7 +232,7 @@ def advanced_chat_example():
         messages.append(assistant_response_with_tool) # Assistant's decision to call tool
         messages.append(tool_response_message)      # Tool's response
 
-    with langwatch.span(name="FinalLLMResponse", type="llm", input=messages, model="gpt-5") as final_llm_span:
+    with langwatch.span(name="FinalLLMResponse", type="llm", input=messages, model="gpt-6-luna") as final_llm_span:
         final_assistant_content = "The weather in London is 15°C and cloudy."
         final_assistant_message = ChatMessage(role="assistant", content=final_assistant_content)
         final_llm_span.update(output=[final_assistant_message])
