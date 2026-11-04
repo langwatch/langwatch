@@ -18,6 +18,8 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: vi.fn(() => mockLogger),
 }));
 
+import { MemoryPendingVoiceCallRepository } from "../../../../repositories/memory/memory.pending-voice-call.repository.ts";
+import { MemoryScenarioCancellationRepository } from "../../../../repositories/memory/memory.scenario-cancellation.repository.ts";
 import { VoiceCallClaimService } from "../voice-call-claim.service.ts";
 
 function upgradeOn(socket: Socket): VoiceMediaUpgrade {
@@ -35,7 +37,10 @@ describe("VoiceCallClaimService", () => {
   describe("given an upgrade with no pending call", () => {
     it("registers a socket error listener before the claim settles, so a reset does not throw", () => {
       const service = VoiceCallClaimService.create({
-        pending: { take: async () => ({ taken: false }) },
+        pending: MemoryPendingVoiceCallRepository.create(),
+        cancellations: MemoryScenarioCancellationRepository.create(),
+        authTokenFor: async () => "synthetic-auth-token",
+        publicBaseUrl: "wss://voice.example.test",
         spawnChild: () => {
           throw new Error("not expected: no call was pending");
         },
