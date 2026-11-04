@@ -38,7 +38,7 @@ function isRouteRefusal(error: unknown): error is Error {
 
 /**
  * The route's server as the LangWatchQL identity: its origin and database, never the route's
- * own user or password. A URL that does not parse is refused without its text, which may
+ * own user or password. A URL without an http or https origin is refused without its text, which may
  * carry those credentials.
  */
 function privateConnectionOf({
@@ -52,6 +52,8 @@ function privateConnectionOf({
   let database: string;
   try {
     const parsed = new URL(url);
+    // Any other scheme parses to the origin "null", which no driver can dial.
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("scheme");
     origin = parsed.origin;
     database = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
   } catch {
