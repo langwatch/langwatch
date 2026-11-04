@@ -66,6 +66,10 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.eval_results
     -- sha256 of the judged column name and the judged text.
     InputHash String DEFAULT '' CODEC(ZSTD(1)),
 
+    -- The judged column (input, output, ...); 'monitor' for a monitor. Readers
+    -- group by it, so a changed text replaces its old verdict on read.
+    JudgedColumn LowCardinality(String) DEFAULT '' CODEC(ZSTD(1)),
+
     -- The version of the recall key's hashing.
     KeyVersion UInt16 CODEC(ZSTD(1)),
 
