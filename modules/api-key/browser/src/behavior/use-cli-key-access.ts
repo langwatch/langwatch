@@ -1,7 +1,6 @@
 /** What the minted CLI key may reach: its scopes and, within them, its permissions. */
 
 import {
-  computePermissionsFromSelections,
   defaultCliKeyPermissions,
   selectionsFromPermissions,
   type AccessLevel,
@@ -10,6 +9,7 @@ import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker
 import { useEffect, useMemo, useState } from "react";
 
 import { clampSelectionsToAvailability } from "../model/api-key-permissions.ts";
+import { cliKeyPermissions } from "../model/cli-key-permissions.ts";
 import { defaultCliKeyScopes } from "../model/cli-key-scope-defaults.ts";
 import { useGrantablePermissions } from "./use-grantable-permissions.ts";
 
@@ -123,7 +123,11 @@ export function useCliKeyPermissions({
 
   const permissions = useMemo<string[]>(
     () =>
-      isCustomized ? computePermissionsFromSelections(effectiveSelections) : defaultPermissionsHeld,
+      cliKeyPermissions({
+        isCustomized,
+        selections: effectiveSelections,
+        defaultPermissionsHeld,
+      }),
     [isCustomized, effectiveSelections, defaultPermissionsHeld],
   );
 
