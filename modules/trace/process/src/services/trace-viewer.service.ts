@@ -15,6 +15,7 @@ import {
   type CustomersAndLabelsResult,
   type DistinctFieldNamesResult,
   type PromptStudioSpanResult,
+  type Protections,
 } from "@langwatch/trace-contract";
 
 import type { TraceViewerProtectionService } from "./trace-viewer-protection.service.ts";
@@ -115,7 +116,7 @@ export interface TraceLegacyRead {
   findSpanForPromptStudio(input: {
     projectId: string;
     spanId: string;
-    protections: unknown;
+    protections: Protections;
   }): Promise<PromptStudioSpanResult | null>;
 }
 

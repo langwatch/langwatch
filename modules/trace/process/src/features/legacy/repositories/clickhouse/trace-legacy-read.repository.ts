@@ -61,6 +61,7 @@ import {
   type PromptStudioSpanRow,
   derivePromptStudioSpan,
 } from "../../rules/trace-legacy-prompt-studio-span.rules.ts";
+import { redactPromptStudioRows } from "../../rules/trace-prompt-studio-protection.rules.ts";
 import { traceStartedAt } from "../../rules/trace-legacy-summary-mapping.rules.ts";
 import {
   TraceLegacyReadRepository,
@@ -1720,6 +1721,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   async findSpanForPromptStudio({
     projectId,
     spanId,
+    protections,
   }: {
     projectId: string;
     spanId: string;
@@ -1765,7 +1767,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           });
 
           const rows = promptStudioSpanRowsSchema.parse(await queryResult.json());
-          return derivePromptStudioSpan({ rows, spanId }) ?? null;
+          // Attribute policies apply before any variable or parameter is read (#8549).
+          return (
+            derivePromptStudioSpan({ rows: redactPromptStudioRows(rows, protections), spanId }) ??
+            null
+          );
         } catch (error) {
           if (HandledError.isHandled(error)) throw error;
           this.logger.warn(

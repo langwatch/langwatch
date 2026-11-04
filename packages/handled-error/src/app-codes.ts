@@ -763,6 +763,7 @@ export const APP_ERROR_CODES = [
   "slack_connection_in_use",
   "slack_integration_invalid_token",
   "slack_integration_missing",
+  "span_content_withheld",
   "span_not_found",
   "spend_source_unavailable",
   "sso_activation_arrivals_undecided",

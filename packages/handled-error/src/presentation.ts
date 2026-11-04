@@ -455,6 +455,11 @@ const presentations = {
         : "Ask for a smaller page and page forward.";
     },
   },
+  span_content_withheld: {
+    title: "Span content withheld",
+    describe: () =>
+      "This span can't be opened in the playground: the project's privacy settings hide part of its content from you, or it is older than your plan's visibility window.",
+  },
   span_not_found: {
     title: "Span not found",
     describe: () => "It may have been deleted along with its trace.",

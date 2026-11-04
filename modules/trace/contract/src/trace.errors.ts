@@ -132,6 +132,32 @@ export class SpanNotFoundError extends NotFoundError {
   }
 }
 
+/**
+ * A span's content is not opened in the prompt playground for this viewer
+ * (#8549): a privacy rule hides one of its content categories from them, or
+ * the span started before their plan's visibility window.
+ */
+export class SpanContentWithheldError extends HandledError {
+  declare readonly code: "span_content_withheld";
+  constructor(
+    spanId: string,
+    reason: "content_hidden" | "outside_visibility_window",
+  ) {
+    super(
+      "span_content_withheld",
+      reason === "content_hidden"
+        ? "This span's content is hidden from you by the project's privacy settings"
+        : "This span is older than your plan's visibility window",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        meta: { spanId, reason },
+      },
+    );
+    this.name = "SpanContentWithheldError";
+  }
+}
+
 export class PageTooDeepError extends HandledError {
   declare readonly code: "page_too_deep";
 

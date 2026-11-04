@@ -185,6 +185,7 @@ import {
   type TraceReadSampleTracesInput,
   TrackedEventInvalidError,
   trackEventRESTParamsValidatorSchema,
+  SpanContentWithheldError,
   SpanNotFoundError,
   traceListPageSchema,
   type TracesConversationContext,
@@ -281,6 +282,11 @@ import {
   derivePromptStudioSpan,
   promptStudioRowFromStoredSpan,
 } from "../features/legacy/rules/trace-legacy-prompt-studio-span.rules.ts";
+import {
+  promptStudioContentHidden,
+  promptStudioSpanWithholding,
+  redactPromptStudioRows,
+} from "../features/legacy/rules/trace-prompt-studio-protection.rules.ts";
 import {
   describeTraceLegacyValidationError,
   traceLegacySearchBodySchema,
@@ -2027,30 +2033,48 @@ export class TraceModule implements TraceApi, CollectorApp {
       occurredAtMs?: number;
     };
   }): Promise<unknown> {
-    if (input.trace !== undefined) {
-      const spans = await this.#dependencies.traces.spans.findStoredSpansByTraceId({
-        authorization: await this.authorizationForTrace(input.trace),
-        traceId: input.trace.traceId,
-        ...occurredAtHint(input.trace.occurredAtMs),
-      });
-      const span = derivePromptStudioSpan({
-        rows: spans.map(promptStudioRowFromStoredSpan),
-        spanId: input.spanId,
-      });
-      if (!span) throw new SpanNotFoundError(input.spanId);
-      return span;
-    }
+    // One rule for both reads (#8549): the drawer's content protections and the
+    // plan's visibility window decide, and a span the viewer may not fully read
+    // is refused rather than opened as an editable prompt.
     const protections = await this.resolveViewerProtections({
       projectId: input.projectId,
       userId: input.viewerUserId,
+      ...(input.trace === undefined ? {} : { authorization: input.trace.authorization }),
     });
-    const span = await this.findPromptStudioSpan({
-      projectId: input.projectId,
-      spanId: input.spanId,
-      protections,
-    });
+    if (promptStudioContentHidden(protections)) {
+      throw new SpanContentWithheldError(input.spanId, "content_hidden");
+    }
+    const span =
+      input.trace === undefined
+        ? await this.findPromptStudioSpan({
+            projectId: input.projectId,
+            spanId: input.spanId,
+            protections,
+          })
+        : await this.#tracePromptStudioSpan({ ...input, trace: input.trace, protections });
     if (!span) throw new SpanNotFoundError(input.spanId);
+    const withheld = promptStudioSpanWithholding({ span, protections });
+    if (withheld) throw new SpanContentWithheldError(input.spanId, withheld);
     return span;
+  }
+
+  /** The prompt studio span read through a link naming its trace, attributes protected. */
+  async #tracePromptStudioSpan(input: {
+    spanId: string;
+    trace: { authorization: Authorization; traceId: string; tenantId?: string; occurredAtMs?: number };
+    protections: Protections;
+  }): Promise<PromptStudioSpanResult | null> {
+    const spans = await this.#dependencies.traces.spans.findStoredSpansByTraceId({
+      authorization: await this.authorizationForTrace(input.trace),
+      traceId: input.trace.traceId,
+      ...occurredAtHint(input.trace.occurredAtMs),
+    });
+    return (
+      derivePromptStudioSpan({
+        rows: redactPromptStudioRows(spans.map(promptStudioRowFromStoredSpan), input.protections),
+        spanId: input.spanId,
+      }) ?? null
+    );
   }
 
   /** The viewer's protections and whether the trace sits past their visibility window. */
@@ -2682,7 +2706,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   findPromptStudioSpan(input: {
     projectId: string;
     spanId: string;
-    protections: unknown;
+    protections: Protections;
   }): Promise<PromptStudioSpanResult | null> {
     return this.#dependencies.traces.read.findSpanForPromptStudio(input);
   }
