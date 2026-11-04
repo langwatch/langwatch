@@ -163,9 +163,9 @@ export const FEATURE_FLAGS = [
   {
     key: "release_instant_evals_judge_router",
     scope: "PRODUCT",
-    defaultValue: false,
+    defaultValue: true,
     description:
-      "Routes an organization's Instant Evals judgements through the LangWatch Judge router: a decision model answers what it is sure of and an LLM answers the rest, priced by the summed cost of every call. Off by default; enable per organization via a targeting rule. On, an LLM-judge evaluation on LangWatch Instant Preview sends the llm_judge route and the Instant Evals column says it routes; an own decision model is never routed. Off, no caller sends a route and every judgement is the single hosted classifier call it is today. On LangWatch Cloud only; the route table and prices are deploy-time configuration.",
+      "Routes an organization's Instant Evals judgements through the LangWatch Judge router: a decision model answers what it is sure of and an LLM answers the rest, priced by the summed cost of every call. On by default; turn it off per organization via a targeting rule. On, an LLM-judge evaluation on LangWatch Instant Preview sends the llm_judge route and the Instant Evals column says it routes; an own decision model is never routed. Off, no caller sends a route and every judgement is the single hosted classifier call it is today. The route table and prices are deploy-time configuration; with none set, as on a self-hosted install, every slot goes to the hosted classifier at its published rate, so the answer and the cost are today's.",
   },
   {
     key: "release_lwql_workbench",

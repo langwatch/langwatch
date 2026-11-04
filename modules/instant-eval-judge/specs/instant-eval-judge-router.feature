@@ -256,10 +256,11 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then its routed cost reads as zero and its spend is priced from its input tokens
 
   @unit
-  Scenario: The router flag is off by default
+  Scenario: The router flag is on by default
     Given the feature flag registry
     When the router flag is read with no targeting rule
-    Then it is off, so no caller sends a route
+    Then it is on, so the LLM-judge caller sends a route
+    And with no route table configured, as on a self-hosted install, the call is today's classifier call at today's rate
 
   # --- The LLM-judge caller (ADR-190 open question 2: one caller behind the flag) ---
 
