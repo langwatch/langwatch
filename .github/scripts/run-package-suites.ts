@@ -5,6 +5,7 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -165,6 +166,83 @@ export const isHeavyPackage = ({
   pkg: DiscoveredPackage;
 }): boolean => weightOf(pkg) >= HEAVY_SECONDS;
 
+/** What a shard's packages add up to, per way they run. */
+export interface ShardLoad {
+  /** Heavy packages, which run alone. */
+  alone: number;
+  /** Every light suite, which shares the shard's concurrency slots. */
+  shared: number;
+  /** Light integration and browser suites, each lane one suite at a time. */
+  integration: number;
+  browser: number;
+}
+
+const EMPTY_LOAD: ShardLoad = { alone: 0, shared: 0, integration: 0, browser: 0 };
+
+/**
+ * A shard's wall time, which the split balances: heavy packages run alone and add
+ * all their weight; light suites share `concurrency` slots, but the integration and
+ * browser lanes run one suite at a time, so the light part takes the longest of them.
+ */
+export const wallTimeOf = ({ load, concurrency }: { load: ShardLoad; concurrency: number }) =>
+  load.alone + Math.max(load.shared / concurrency, load.integration, load.browser);
+
+/**
+ * `load` with one package added. The weights file records a package, not its
+ * scripts, so a light package's weight is spread evenly over its scripts' lanes.
+ */
+export const withPackage = ({
+  load,
+  weight,
+  scripts,
+}: {
+  load: ShardLoad;
+  weight: number;
+  scripts: readonly string[];
+}): ShardLoad => {
+  if (weight >= HEAVY_SECONDS) return { ...load, alone: load.alone + weight };
+  const next = { ...load, shared: load.shared + weight };
+  for (const script of scripts) {
+    const lane = laneOf(script);
+    if (lane !== "shared") next[lane] += weight / scripts.length;
+  }
+  return next;
+};
+
+/**
+ * Splits packages into `total` groups, heaviest first, each onto the group whose wall
+ * time it raises least. Every shard computes this alone, so ties break on name then
+ * lowest group, or a package runs twice or not at all.
+ */
+export const balanceByWallTime = <T extends { name: string; scripts: readonly string[] }>({
+  items,
+  weightOf,
+  concurrency,
+  total,
+}: {
+  items: readonly T[];
+  weightOf: (item: T) => number;
+  concurrency: number;
+  total: number;
+}): { groups: T[][]; walls: number[] } => {
+  const loads: ShardLoad[] = Array.from({ length: total }, () => ({ ...EMPTY_LOAD }));
+  const groupOf = new Map<string, number>();
+  const byWeight = items
+    .map((item) => ({ item, weight: weightOf(item) }))
+    .toSorted((a, b) => b.weight - a.weight || a.item.name.localeCompare(b.item.name));
+  for (const { item, weight } of byWeight) {
+    const candidates = loads.map((load) => withPackage({ load, weight, scripts: item.scripts }));
+    const walls = candidates.map((load) => wallTimeOf({ load, concurrency }));
+    const best = walls.indexOf(Math.min(...walls));
+    groupOf.set(item.name, best);
+    loads[best] = candidates[best]!;
+  }
+  return {
+    groups: loads.map((_, group) => items.filter((item) => groupOf.get(item.name) === group)),
+    walls: loads.map((load) => wallTimeOf({ load, concurrency })),
+  };
+};
+
 /** Seconds a package costs when the weights file does not name it. */
 export const DEFAULT_WEIGHT_SECONDS = 5;
 
@@ -194,51 +272,6 @@ export const parseWeights = (
   });
   return { weights, errors };
 };
-
-/**
- * Splits `items` into `total` groups, heaviest first onto the lightest group.
- * Every shard computes this alone, so ties break on name then lowest group:
- * the answers must agree exactly or a package runs twice or not at all.
- */
-export const balanceShards = <T extends { name: string }>({
-  items,
-  weightOf,
-  total,
-}: {
-  items: readonly T[];
-  weightOf: (item: T) => number;
-  total: number;
-}): T[][] => {
-  const loads = Array.from({ length: total }, () => 0);
-  const groupOf = new Map<string, number>();
-  const byWeight = items
-    .map((item) => ({ item, weight: weightOf(item) }))
-    .toSorted((a, b) => b.weight - a.weight || a.item.name.localeCompare(b.item.name));
-  for (const { item, weight } of byWeight) {
-    const lightest = loads.indexOf(Math.min(...loads));
-    groupOf.set(item.name, lightest);
-    loads[lightest] += weight;
-  }
-  return loads.map((_, group) => items.filter((item) => groupOf.get(item.name) === group));
-};
-
-/** This shard's share of `items` under the weighted split. */
-export const shardOf = <T extends { name: string }>({
-  items,
-  weightOf,
-  shard,
-}: {
-  items: readonly T[];
-  weightOf: (item: T) => number;
-  shard: { index: number; total: number };
-}): T[] => balanceShards({ items, weightOf, total: shard.total })[shard.index - 1] ?? [];
-
-/** The slow packages of a run, in the weights file's own format, to paste back. */
-export const formatMeasured = (measured: { name: string; seconds: number }[]): string[] =>
-  measured
-    .filter((entry) => entry.seconds >= 20)
-    .toSorted((a, b) => b.seconds - a.seconds || (a.name < b.name ? -1 : 1))
-    .map((entry) => `${entry.name}  ${Math.round(entry.seconds)}`);
 
 /**
  * The nightly flaky-test hunt names each package suite's JSON report after the
@@ -297,6 +330,31 @@ const LANES: Record<string, "integration" | "browser"> = {
 };
 export const laneOf = (script: string): "integration" | "browser" | "shared" =>
   LANES[script] ?? "shared";
+
+/**
+ * Packages whose suites keep the launcher's two workers even with the shard to
+ * themselves: design-system's story tests time out under any CPU sharing, and
+ * more workers in one suite is sharing too.
+ */
+export const KEEPS_LAUNCHER_WORKERS: ReadonlySet<string> = new Set(["@langwatch/design-system"]);
+
+/**
+ * What a job adds to its environment. A heavy unit suite runs alone, so it takes
+ * every core rather than the launcher's two. Integration and browser lanes keep
+ * their own counts: their files share a datastore or an apt lock.
+ */
+export const workerEnvFor = ({
+  job,
+  heavy,
+  cores,
+}: {
+  job: SuiteJob;
+  heavy: boolean;
+  cores: number;
+}): Record<string, string> =>
+  heavy && cores > 2 && laneOf(job.script) === "shared" && !KEEPS_LAUNCHER_WORKERS.has(job.pkg.name)
+    ? { VITEST_MAX_WORKERS: String(cores) }
+    : {};
 
 /** The scripts nx.json caches. They run through Nx, so an unchanged suite replays its pass. */
 const CACHED_SCRIPTS = new Set(["test", "test:unit"]);
@@ -480,12 +538,10 @@ export const createSuiteRunner = ({
   now?: () => number;
 }) => {
   const unfinished = new Map<SuiteJob, { title: string; chunks: Buffer[] }>();
-  const secondsOf = new Map<string, number>();
   const report = (job: SuiteJob, title: string, chunks: Buffer[], startedAt: number) => {
     // Absent once flushed on cancellation: its output is printed already.
     const pending = unfinished.delete(job);
     const seconds = (now() - startedAt) / 1000;
-    secondsOf.set(job.pkg.name, (secondsOf.get(job.pkg.name) ?? 0) + seconds);
     if (live) log("::endgroup::");
     else if (pending)
       printGroup({ log, write, header: `${title} (${Math.round(seconds)}s)`, chunks });
@@ -511,7 +567,7 @@ export const createSuiteRunner = ({
       printGroup({ log, write, header: `${title} (unfinished)`, chunks });
     }
   };
-  return { run, flushUnfinished, secondsOf };
+  return { run, flushUnfinished };
 };
 
 const printGroup = ({
@@ -704,8 +760,17 @@ if (isEntrypoint()) {
   // An excluded package runs nothing, so it adds nothing to a shard's time.
   const weightOf = (pkg: DiscoveredPackage): number =>
     excluded.has(pkg.name) ? 0 : (parsedWeights.weights.get(pkg.name) ?? DEFAULT_WEIGHT_SECONDS);
-  const assigned = shardOf({ items: reached, weightOf, shard });
-  const expected = assigned.reduce((sum, pkg) => sum + weightOf(pkg), 0);
+  let concurrency: number;
+  try {
+    concurrency = parseConcurrency(process.env.PACKAGE_SUITES_CONCURRENCY);
+  } catch (error) {
+    console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+  // Every shard reads the same concurrency from the job's env, so they agree.
+  const split = balanceByWallTime({ items: reached, weightOf, concurrency, total: shard.total });
+  const assigned = split.groups[shard.index - 1] ?? [];
+  const expected = split.walls[shard.index - 1] ?? 0;
   console.log(
     `Shard ${shard.index}/${shard.total}: ${assigned.length} of ${reached.length} packages, ` +
       `about ${Math.round(expected)}s of suites.`,
@@ -726,16 +791,11 @@ if (isEntrypoint()) {
         : undefined,
     });
   };
-  let concurrency: number;
-  try {
-    concurrency = parseConcurrency(process.env.PACKAGE_SUITES_CONCURRENCY);
-  } catch (error) {
-    console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
-    process.exit(1);
-  }
   for (const line of exclusionNotices(assigned, excluded)) console.log(line);
-  // Each suite keeps its own configured worker count. VITEST_MAX_WORKERS would
-  // outrank it, and an integration suite's serial files would then overlap.
+  // A suite keeps its own configured worker count unless workerEnvFor gives a
+  // heavy unit suite every core; VITEST_MAX_WORKERS outranks the config, so it
+  // is never set for an integration suite, whose serial files would overlap.
+  const cores = availableParallelism();
   const live = concurrency === 1;
   console.log(`Running up to ${concurrency} suite(s) at once.`);
   const huntCommandFor = (job: SuiteJob): string[] | undefined => {
@@ -748,6 +808,10 @@ if (isEntrypoint()) {
       // The hunt skips nx, whose cache would replay a result instead of rerunning under the seed.
       spawn("pnpm", huntCommandFor(job) ?? commandFor(job), {
         stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          ...workerEnvFor({ job, heavy: isHeavyPackage({ weightOf, pkg: job.pkg }), cores }),
+        },
       }),
     log: (line) => console.log(line),
     write: (output) => process.stdout.write(output),
@@ -777,27 +841,12 @@ if (isEntrypoint()) {
   const statusOf = (pkg: DiscoveredPackage) => (script: string) =>
     [...statuses].find(([job]) => job.pkg === pkg && job.script === script)?.[1] ?? 1;
   const outcomes = assigned.map((pkg) => outcomeOf(pkg, excluded, statusOf(pkg)));
-  const measured = outcomes
-    .filter((outcome) => outcome.outcome === "passed")
-    .map((outcome) => ({ name: outcome.name, seconds: runner.secondsOf.get(outcome.name) ?? 0 }));
   for (const line of failureAnnotations(outcomes)) console.log(line);
 
   const summary = summarise(outcomes);
   for (const line of summary) console.log(line);
   if (process.env.GITHUB_STEP_SUMMARY) {
-    const times = formatMeasured(measured);
-    const refresh =
-      times.length === 0
-        ? []
-        : [
-            "",
-            "<details><summary>Measured seconds (weights file format)</summary>",
-            "",
-            "```",
-            ...times,
-            "```",
-            "</details>",
-          ];
+    const refresh = ["", "Refresh the shard weights with `go run ./cmd/suiteweights`."];
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${[...summary, ...refresh].join("\n")}\n`);
   }
 

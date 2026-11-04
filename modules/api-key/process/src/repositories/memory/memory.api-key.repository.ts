@@ -36,6 +36,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
       createdByDeviceLabel: data.createdByDeviceLabel ?? null,
       parentApiKeyId: data.parentApiKeyId ?? null,
       isSystemManaged: data.isSystemManaged ?? false,
+      createdByBrowserSessionId: data.createdByBrowserSessionId ?? null,
       id: generate(API_KEY_KSUID_RESOURCE).toString(),
       expiresAt: expiresAt ? toDate(expiresAt) : null,
       revokedAt: startsDisabled ? now : null,
@@ -149,6 +150,22 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
         key.revokedAt === null &&
         input.apiKeyIds.includes(key.id),
     );
+  }
+
+  async findLiveBySessions(input: {
+    userId: string;
+    name: string;
+    browserSessionIds: readonly string[];
+  }): Promise<{ id: string; organizationId: string }[]> {
+    const rows = this.#list(
+      (key) =>
+        key.userId === input.userId &&
+        key.name === input.name &&
+        key.isSystemManaged === true &&
+        key.revokedAt === null &&
+        input.browserSessionIds.includes(key.createdByBrowserSessionId ?? ""),
+    );
+    return rows.map(({ id, organizationId }) => ({ id, organizationId }));
   }
 
   async findIngestKeysForUser(input: {

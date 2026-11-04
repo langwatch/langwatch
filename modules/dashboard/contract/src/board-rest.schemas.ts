@@ -1,5 +1,5 @@
 /**
- * The Dashboards boards REST wire shapes: `/api/v1/dashboards` and its widgets, and the
+ * The Dashboards REST wire shapes: `/api/v1/dashboards` and its widgets, and the
  * `/api/v1/projects/:projectId/analytics/boards` reads.
  */
 import type { Named } from "@langwatch/module";
@@ -18,9 +18,9 @@ const boardResourceSchemaDefinition = z.object({
   name: dashboardNameSchema,
   /** `null` until a member writes one. */
   description: z.string().nullable(),
-  /** Who sees the board; a project credential never reads one set to Only me. */
+  /** Who sees the dashboard; a project credential never reads one set to Only me. */
   scope: dashboardScopeSchema,
-  /** The member who made it; `null` for a board a project credential made. */
+  /** The member who made it; `null` for a dashboard a project credential made. */
   createdById: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -29,7 +29,7 @@ const boardResourceSchemaDefinition = z.object({
 export interface BoardResourceSchema extends Named<typeof boardResourceSchemaDefinition> {}
 export const boardResourceSchema: BoardResourceSchema = boardResourceSchemaDefinition;
 
-/** One row of the list, which also reports how many widgets the board holds. */
+/** One row of the list, which also reports how many widgets the dashboard holds. */
 const boardListItemSchemaDefinition = z.object({
   ...boardResourceSchema.shape,
   widgetCount: z.number().int().nonnegative(),
@@ -50,7 +50,7 @@ export const boardProjectParamsSchema: BoardProjectParamsSchema =
 
 const boardParamsSchemaDefinition = z.object({
   ...boardProjectParamsSchema.shape,
-  boardId: dashboardIdSchema,
+  dashboardId: dashboardIdSchema,
 });
 export interface BoardParamsSchema extends Named<typeof boardParamsSchemaDefinition> {}
 export const boardParamsSchema: BoardParamsSchema = boardParamsSchemaDefinition;

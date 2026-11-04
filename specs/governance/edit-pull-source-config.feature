@@ -57,6 +57,48 @@ Feature: Edit the configuration of a pull-mode ingestion source
       And saving a usage source stores a bucket width of "1d"
 
     @unit
+    Scenario: A pull configuration its adapter would refuse is refused at save time
+      Given a pull source whose adapter has a configuration schema
+      When a create or an update submits a configuration that schema refuses
+      Then the save is refused before it is stored
+      And the refusal names the field the adapter refused
+      # The adapter checked its configuration only when it pulled, so a value
+      # the form let through was stored and then failed every scheduled run,
+      # with the source still reporting it was waiting for its first event.
+
+    @integration
+    Scenario: A Databricks Genie configuration its adapter refuses is not stored
+      Given an admin creating a Databricks Genie source
+      When its "Read history from" value is a bare date the adapter's schema refuses
+      Then the save is refused and names the "Read history from" field
+      And no source is stored
+
+    @unit
+    Scenario: An adapter name that is not registered is never read as one
+      Given a configuration whose adapter is named "constructor"
+      When it is checked against the adapters' schemas
+      Then no schema is applied and nothing is refused on that account
+
+    @unit
+    Scenario: A stored configuration its adapter refuses is reported on the source
+      Given a pull source stored before its adapter's schema was checked at save time
+      And its configuration is one that schema refuses
+      When an admin reads the source
+      Then the source carries what the adapter refuses about it
+
+    @integration
+    Scenario: A source holding a configuration its adapter refuses says to fix the connection
+      Given a pull source whose stored configuration its adapter refuses
+      And its last pull failed
+      When the admin opens the source
+      Then the page names what the adapter refuses
+      And tells the admin to fix the connection with Edit
+      And does not say the next scheduled pull will retry
+      # Retrying a configuration the adapter refuses fails the same way every
+      # time, so "the next scheduled pull will retry" left the admin waiting on
+      # a fix only they could make.
+
+    @unit
     Scenario: An invalid cron expression is rejected at save time
       When the admin enters a pull schedule of "not a cron"
       And saves the form
@@ -134,6 +176,95 @@ Feature: Edit the configuration of a pull-mode ingestion source
       When a pull run records a cursor before the change is written
       Then the save is refused rather than applied
       And the source keeps the report and the cursor the pull run left it with
+
+  Rule: A Copilot Studio source's connection can be corrected after create
+
+    # Before this the edit drawer offered only the name, description and
+    # destination, so a mistyped environment address meant archiving the
+    # source and typing the whole app registration again (#9275).
+
+    @unit
+    Scenario: The edit form opens on the stored connection
+      Given a Copilot Studio source
+      When the admin opens the edit form
+      Then the environment address is shown as stored
+      And the agent list, seat and directory switches show their stored values
+      And the tenant ID, client ID and client secret fields are empty
+
+    @unit
+    Scenario: Leaving the app registration blank keeps it
+      Given a Copilot Studio source
+      When the admin corrects only the environment address
+      And saves the form
+      Then the submitted configuration carries no credentials key at all
+
+    @unit
+    Scenario: Replacing the app registration takes all three values
+      Given a Copilot Studio source
+      When the admin enters a new client secret but leaves the tenant ID empty
+      And saves the form
+      Then the save is refused before it is sent
+      And the refusal says all three values are needed together
+
+    @unit
+    Scenario: The environment is fixed once the source has pulled
+      Given a Copilot Studio source that has completed at least one pull
+      When the admin submits a different environment address
+      Then the save is refused
+      And the form shows the environment address read-only and says why
+      # Its cursor belongs to the environment it read. Pointed elsewhere, the
+      # next run would carry on from a position in another environment's
+      # history and quietly skip whatever came before it there.
+
+    @unit
+    Scenario: A source that has pulled can still have its address respelled
+      Given a Copilot Studio source that has completed at least one pull
+      When the admin submits the same environment with a trailing slash
+      Then the save is accepted
+
+    @unit
+    Scenario: An update that omits the environment address of a pulled source is told to carry it
+      Given a Copilot Studio source that has completed at least one pull
+      When an update replaces the configuration without an environment address
+      Then the save is refused
+      And the refusal says the configuration has to carry the same environment address
+
+    @unit
+    Scenario: A Copilot Studio source cannot be created without its app registration
+      Given a Copilot Studio configuration with a valid environment address
+      When it is created without a tenant ID, client ID or client secret
+      Then the save is refused before it is stored
+      And the refusal names the missing parts of the app registration
+
+    @unit
+    Scenario: A replacement app registration is checked as a whole
+      Given a Copilot Studio source
+      When an update sends credentials without a client secret
+      Then the save is refused before it is stored
+      And an update that sends no credentials at all keeps the stored ones
+
+    @unit
+    Scenario: A billing app registration typed without the main one is refused
+      Given a Copilot Studio source that reads its bill with its own app registration
+      When the admin enters a billing client ID and secret but leaves the tenant ID, client ID and client secret empty
+      And saves the form
+      Then the save is refused before it is sent
+      And the refusal names the billing fields
+
+    @integration
+    Scenario: The edit drawer shows the stored connection with its secrets blank
+      Given a Copilot Studio source that has completed at least one pull
+      When the admin opens the edit drawer
+      Then the environment address, tenant ID, client ID and client secret fields are shown
+      And the three secret fields are empty and say they are replaced together
+      And the environment address is read-only, with a note saying why
+
+    @integration
+    Scenario: The Copilot Studio edit drawer moves the destination alongside the cadence
+      Given a Copilot Studio source that lands its conversations in one project
+      When the admin opens the edit drawer's Advanced group
+      Then the pull cadence and the destination picker are shown in that one group
+      And picking another project and saving carries that project in the update
 
   Rule: Copy that does not apply to a pull source is not shown
 

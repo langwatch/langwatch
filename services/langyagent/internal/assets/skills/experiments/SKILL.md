@@ -93,7 +93,7 @@ for index, row in experiment.loop(dataset.iterrows()):
         "ragas/response_relevancy",
         index=index,
         data={"input": row["input"], "output": response},
-        settings={"model": "openai/gpt-5-mini", "max_tokens": 2048},
+        settings={"model": "openai/gpt-6-luna", "max_tokens": 2048},
     )
 ```
 
@@ -117,7 +117,7 @@ await experiment.run(dataset, async ({ item, index }) => {
   await experiment.evaluate("ragas/response_relevancy", {
     index,
     data: { input: item.input, output: response },
-    settings: { model: "openai/gpt-5-mini", max_tokens: 2048 },
+    settings: { model: "openai/gpt-6-luna", max_tokens: 2048 },
   });
 });
 ```
@@ -134,7 +134,7 @@ Register one target per candidate inside the loop, then compare the row once. Ev
 
 ```python
 for index, row in experiment.loop(dataset.iterrows()):
-    with experiment.target("gpt-5-mini"):
+    with experiment.target("gpt-6-luna"):
         experiment.log_response(call_gpt(row["input"]))
 
     with experiment.target("claude-sonnet-5"):
@@ -150,7 +150,7 @@ Inside an async loop, await `experiment.acompare(...)`, which takes the same opt
 ```typescript
 await experiment.run(dataset, async ({ item, index }) => {
   await Promise.all([
-    experiment.withTarget("gpt-5-mini", () => callGpt(item.input)),
+    experiment.withTarget("gpt-6-luna", () => callGpt(item.input)),
     experiment.withTarget("claude-sonnet-5", () => callClaude(item.input)),
   ]);
 

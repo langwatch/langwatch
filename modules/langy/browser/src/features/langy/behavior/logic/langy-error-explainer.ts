@@ -19,6 +19,9 @@ import {
 /** Where a provider's key, endpoint, deployments and default models are edited. */
 export const MODEL_PROVIDERS_SETTINGS_HREF = "/settings/model-providers";
 
+/** Where an admin raises an AI gateway spending limit. */
+export const GATEWAY_BUDGETS_HREF = "/gateway/budgets";
+
 export type LangyErrorRender =
   | "card"
   | "inline"
@@ -29,7 +32,7 @@ export type LangyErrorRender =
 
 export interface LangyErrorAction {
   label: string;
-  kind: "connect-github" | "configure-model" | "reconnect-codex" | "retry";
+  kind: "connect-github" | "configure-model" | "open-budgets" | "reconnect-codex" | "retry";
 }
 
 /** One serialized reason from the HandledError chain (recursive). */
@@ -229,6 +232,30 @@ export function promoteModelUnavailableError(domain: LangyDomainError): LangyDom
   return hasReasonKind(domain.reasons, MODEL_UNAVAILABLE_REASONS)
     ? { ...domain, code: "langy_model_unavailable" }
     : domain;
+}
+
+/** The gateway's code for a call its spending limit refused (402). */
+const BUDGET_EXCEEDED_REASON = "budget_exceeded";
+
+/** The budget `meta` keys the card's copy reads; each is an enumerated gateway value. */
+const BUDGET_META_KEYS = ["budget_scope", "budget_window"] as const;
+
+/**
+ * A turn the gateway refused on a spending limit is re-keyed to the gateway's code, so the card
+ * names whose limit ran out and when it resets, with no retry. Only the enumerated scope and window
+ * are carried, never `message`. Spec: specs/langy/langy-model-provider-failures.feature
+ */
+export function promoteBudgetExceededError(domain: LangyDomainError): LangyDomainError {
+  if (domain.code !== "langy_agent_errored") return domain;
+  const reason = findReason(domain.reasons, BUDGET_EXCEEDED_REASON);
+  if (!reason) return domain;
+
+  const meta: Record<string, unknown> = {};
+  for (const key of BUDGET_META_KEYS) {
+    const value = reason.meta?.[key];
+    if (typeof value === "string" && /^[a-z_]{1,32}$/i.test(value)) meta[key] = value;
+  }
+  return { ...domain, code: BUDGET_EXCEEDED_REASON, meta, retryable: false };
 }
 
 /**
@@ -506,7 +533,9 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
   // also carries an upstream status keeps its own card. "Not reachable at all"
   // is checked before "reached and refused" for the same reason.
   const domain = promoteUpstreamProviderError(
-    promoteProviderConfigError(promoteModelUnavailableError(promoteCodexAgentError(received))),
+    promoteProviderConfigError(
+      promoteModelUnavailableError(promoteBudgetExceededError(promoteCodexAgentError(received))),
+    ),
   );
   // Always carried through for debugging, regardless of the matched case.
   const debug = {
@@ -620,6 +649,16 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
         render: "card",
         action: { label: "Open model providers", kind: "configure-model" },
         traceId: domain.traceId,
+        ...debug,
+      };
+
+    case "budget_exceeded":
+      // An AI gateway spending limit refused the call. It stays refused until the window
+      // resets or an admin raises the limit, so no retry: the action opens the budgets page.
+      return {
+        ...copy,
+        render: "card",
+        action: { label: "View budgets", kind: "open-budgets" },
         ...debug,
       };
 

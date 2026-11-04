@@ -1,6 +1,6 @@
 ---
 title: Deja View
-description: "Time-travel debugger for event-sourced aggregates"
+description: "Deja View is a time-travel debugger for event-sourced aggregates: search an aggregate, read its events and compute any projection at any point."
 ---
 
 **Deja View** (`/ops/dejaview`) is a time-travel debugger for LangWatch's event-sourcing system. It lets you search for any aggregate, inspect its full event history, and compute any projection's state at any point in that history, all from a single interface.
@@ -75,7 +75,7 @@ For example:
 
 Deja View encodes its full state in the URL fragment, making every view shareable:
 
-```
+```text
 /ops/dejaview#query=trace_abc&tenant=project_xyz&event=5&proj=TraceAnalytics
 ```
 

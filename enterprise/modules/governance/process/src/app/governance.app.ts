@@ -829,6 +829,7 @@ export class GovernanceModule implements GovernanceRestApi {
       secrets: ingestionSecrets,
       destinations: PullDestinationService.create({
         configuredBase: vendorBases.databricksWorkspace,
+        dataverseEnvironmentBase: vendorBases.dataverseEnvironment,
       }),
       providerAccounts: HttpProviderAccountChannel.create({ vendorBases }),
       diagnostics: { warn: (message, context) => logger.warn(context, message) },

@@ -24,7 +24,7 @@ A filled `image` cell shows the picture. A filled `file` cell shows a chip with 
 
 After an upload the cell holds a LangWatch reference:
 
-```
+```text
 /api/files/{projectId}/{objectId}/{fileName}
 ```
 
@@ -70,7 +70,7 @@ An evaluator reads an uploaded file as base64 data. An external URL goes to the 
 
 An agent runs outside LangWatch, so it cannot open a LangWatch reference. When an `image` or a `file` column is mapped to an HTTP agent input, to a connected agent parameter, to a code agent input or to a workflow input, LangWatch reads the file first and sends a base64 data URL:
 
-```
+```text
 data:<mediaType>;name=<urlencoded file name>;base64,<data>
 ```
 

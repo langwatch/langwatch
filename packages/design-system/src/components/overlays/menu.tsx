@@ -101,7 +101,7 @@ export const MenuTriggerItem = React.forwardRef<HTMLDivElement, MenuTriggerItemP
       <ChakraMenu.TriggerItem ref={ref} {...rest}>
         {startIcon}
         {children}
-        <ChevronRight aria-hidden="true" />
+        <ChevronRight size={14} aria-hidden="true" style={{ marginInlineStart: "auto" }} />
       </ChakraMenu.TriggerItem>
     );
   },

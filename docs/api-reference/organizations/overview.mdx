@@ -16,7 +16,7 @@ This is the one LangWatch API that exists before any organization does, which is
 
 Creating an organization hands back an organization admin API key along with it. That key is what the rest of the management APIs take, so a run can go from an empty deployment to a fully configured organization without a browser step:
 
-```
+```text
 instance key  ->  POST /api/v1/organizations  ->  organization + admin API key
                                                      |
                                                      v
@@ -28,7 +28,7 @@ instance key  ->  POST /api/v1/organizations  ->  organization + admin API key
 
 The instance administrator credential, as a Bearer token:
 
-```
+```http
 Authorization: Bearer <LANGWATCH_INSTANCE_ADMIN_API_KEY>
 ```
 
