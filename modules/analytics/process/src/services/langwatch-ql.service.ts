@@ -42,26 +42,19 @@ import {
 } from "../rules/langwatch-ql-validation-shape.rules.ts";
 import type { LwqlCatalogue } from "../rules/lwql-catalogue.rules.ts";
 import { LWQL_CATALOG, LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
-import {
-  LangWatchQLCatalogShapesService,
-  type LangWatchQLViewDefinition,
-} from "../services/langwatch-ql-catalog-shapes.service.ts";
+import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLExecutionService } from "./langwatch-ql-execution.service.ts";
 import { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
+import { LangWatchQLPolicyValidationService } from "./langwatch-ql-policy-validation.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import { LangWatchQLTimeWindowService } from "./langwatch-ql-time-window.service.ts";
-import { LangWatchQLValidationErrorService } from "./langwatch-ql-validation-errors.service.ts";
-import { LangWatchQLValidationService } from "./langwatch-ql-validation.service.ts";
-
-const catalogShapes = LangWatchQLCatalogShapesService.create();
 
 const lwqlCapability = LangWatchQLCapabilityService.create();
 const timeWindows = LangWatchQLTimeWindowService.create();
 const lwqlSchema = LangWatchQLSchemaService.create();
 const lwqlCompleteness = LangWatchQLCompletenessService.create();
-const lwqlValidationErrors = LangWatchQLValidationErrorService.create();
 
 const logger = createLogger("langwatch:analytics:lwql");
 
@@ -97,7 +90,7 @@ export interface LangWatchQLServiceDependencies {
 export class LangWatchQLService {
   private readonly views: readonly LangWatchQLViewDefinition[];
   private readonly catalog: LwqlCatalogue;
-  private readonly validation = LangWatchQLValidationService.create();
+  private readonly policyValidation: LangWatchQLPolicyValidationService;
   private readonly execution: LangWatchQLExecutionService;
 
   /** Releases the transport the executor holds, where it holds one. */
@@ -108,6 +101,10 @@ export class LangWatchQLService {
   private constructor(private readonly deps: LangWatchQLServiceDependencies) {
     this.views = deps.views ?? LWQL_VIEW_CATALOG;
     this.catalog = deps.catalog ?? LWQL_CATALOG;
+    this.policyValidation = LangWatchQLPolicyValidationService.create({
+      views: this.views,
+      catalog: this.catalog,
+    });
     this.execution = LangWatchQLExecutionService.create({
       views: this.views,
       limits: deps.limits ?? DEFAULT_LWQL_RESULT_LIMITS,
@@ -190,7 +187,7 @@ export class LangWatchQLService {
     readonly database?: string;
   }): ValidatedLangWatchQL {
     assertNoReservedNameAssigned(sql);
-    const validation = this.validateAgainstPolicy({
+    const validation = this.policyValidation.validate({
       projectId,
       database,
       protections,
@@ -225,64 +222,6 @@ export class LangWatchQLService {
       ...(window.parameters ? { boundParameters: window.parameters } : {}),
       awaitingTimeWindow: window.awaitingTimeWindow,
     };
-  }
-
-  /** The policy half of validation: what this caller may name, refused with the policy's error. */
-  private validateAgainstPolicy({
-    projectId,
-    database,
-    protections,
-    sql,
-    isInstantEvalsEnabled,
-  }: {
-    readonly projectId: string;
-    readonly database: string;
-    readonly protections: LangWatchQLProtections;
-    readonly sql: string;
-    readonly isInstantEvalsEnabled: boolean;
-  }) {
-    const validation = this.validation.validate({
-      sql,
-      // The datasets this caller can reach, not every dataset the catalog has. A dataset gated
-      // as a whole is absent from the schema endpoint, and `allowedTables` is what makes it
-      // *unnameable* rather than merely unlisted: derived from the full catalog, a caller could
-      // name a hidden dataset and read its row-policed rows despite holding none of the
-      // permissions that dataset requires.
-      allowedTables: catalogShapes.allowedTables({
-        database,
-        views: catalogShapes.visibleViews({
-          protections,
-          views: this.views,
-          catalog: this.catalog,
-        }),
-      }),
-      // Derived from the *full* catalog on purpose: a column of a hidden
-      // dataset must stay gated so that naming it unqualified — where no table
-      // reference reveals which dataset it came from — is refused too.
-      gatedColumns: catalogShapes.gatedColumns({ protections, views: this.views }),
-      // What would lift each of those, so a refusal can say "you may not see this" apart from
-      // "this query is broken". It names a permission, never a value.
-      gatedColumnGates: catalogShapes.gatedColumnGates({ protections, views: this.views }),
-      // An app function returning captured content is as restricted as a
-      // column holding it, so the gate reads the same permissions.
-      heldPermissions: [...catalogShapes.heldPermissions(protections)],
-      isInstantEvalsEnabled,
-      defaultDatabase: database,
-    });
-
-    if (!validation.ok) {
-      logger.info(
-        {
-          projectId,
-          violations: validation.violations.map((violation) => violation.code),
-        },
-        "LangWatchQL refused by policy",
-      );
-
-      throw lwqlValidationErrors.forRejection(validation);
-    }
-
-    return validation;
   }
 
   /** The result with what the run was bound to, and the notes on what limited or ignored it. */
