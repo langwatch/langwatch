@@ -43751,10 +43751,6 @@ description: Run Instant Evals on a decision model in your own provider account,
 
 Instant Evals run on **LangWatch Instant Preview** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
 
-<Note>
-  This is off by default. Ask LangWatch to turn it on for your organization. Until then, the **Instant Evals** column offers LangWatch Instant Preview only.
-</Note>
-
 ## The models you can pick
 
 | Model in the picker               | Provider to add       | What the provider needs                                                       |
