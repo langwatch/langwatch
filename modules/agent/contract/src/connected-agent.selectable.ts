@@ -46,7 +46,6 @@ export function ownerOnlyCopy(ownerName?: string | null): string {
 /** The docs page on hooks that live in the agent's own code. */
 export const HOOKS_DOCS_URL = "https://langwatch.ai/docs/agent-testing/setup-and-teardown-hooks";
 
-/** What to tell about hooks: the declared ones while the agent is online, else the general line. */
 export function connectedAgentHooksCopy({
   isOnline,
   hooks,
