@@ -28,10 +28,9 @@ export class NurturingMemberFactsService {
   private constructor(private readonly dependencies: MemberFactsDependencies) {}
 
   /**
-   * Records a trace's time, spends the organization's window, and returns every active member,
-   * read only after that window is won, so one busy organization costs one read and one batch
-   * per window. Empty when the window already sent. A failed read gives the window back.
-   * A project its owners do not place tells only the admin the signal names, as before.
+   * Records a trace's time, spends the organization's window, then returns every active member
+   * (one read per window). Empty when the window already sent; a failed read gives it back.
+   * A project its owners do not place tells only the admin the signal names.
    */
   async recordFactAndClaimRecipients(signal: MemberFactSignal): Promise<readonly string[]> {
     const placement = await this.dependencies.projects.getPlacement({
