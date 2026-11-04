@@ -21,7 +21,7 @@ export type VoiceCallCancelOutcome = {
 
 export type PendingVoiceCallPutResult =
   | { stored: true }
-  | { stored: false; reason: "cancelled" | "claimed" };
+  | { stored: false; reason: "cancelled" | "claimed" | "pending" };
 export type PendingVoiceCallPeekResult = { found: true; call: PendingVoiceCall } | { found: false };
 export type PendingVoiceCallClaimResult =
   | { claimed: true; call: PendingVoiceCall }
@@ -36,7 +36,11 @@ export type PendingVoiceCallAttachResult =
  * (dev/docs/ARCHITECTURE.md §8, https://github.com/langwatch/tasks/issues/1002).
  */
 export interface PendingVoiceCallRepository {
-  /** Stores the call for `ttlSeconds`; refused when the run was already cancelled. */
+  /**
+   * Stores the call for `ttlSeconds`; refused when the run is already cancelled, claimed, or has
+   * a different call still pending — a run holds at most one pending call at a time, regardless
+   * of nonce, so a second dial can never clobber the first's call SID.
+   */
   put(input: { call: PendingVoiceCall; ttlSeconds: number }): Promise<PendingVoiceCallPutResult>;
   /** Reads the call without consuming it. */
   peek(key: PendingVoiceCallKey): Promise<PendingVoiceCallPeekResult>;

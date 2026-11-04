@@ -36,7 +36,8 @@ export class VoiceCallDialService {
   }): Promise<VoiceCallDialResult> {
     const { projectId, scenarioRunId, nonce, to, streamUrl } = input;
 
-    // `put` overwrites a still-pending call, so it only refuses a retry once the call is claimed.
+    // A same-nonce retry short-circuits here; `put` itself refuses a different nonce while a
+    // call is still pending, so a run never holds more than one pending call at a time.
     const existing = await this.pending.peek({ scenarioRunId, nonce });
     if (existing.found) return { dialed: false, reason: "already-dialed" };
 
@@ -47,7 +48,7 @@ export class VoiceCallDialService {
     if (!stored.stored) {
       return {
         dialed: false,
-        reason: stored.reason === "claimed" ? "already-dialed" : "cancelled",
+        reason: stored.reason === "cancelled" ? "cancelled" : "already-dialed",
       };
     }
 

@@ -75,6 +75,22 @@ describe("VoiceCallDialService", () => {
     });
   });
 
+  describe("given a dial with a different nonce while a call is pending", () => {
+    it("does not dial again and keeps the first call's SID", async () => {
+      const { pending, callControl, service } = setup();
+      await service.dial(DIAL);
+
+      const retry = await service.dial({ ...DIAL, nonce: "nonce-2" });
+
+      expect(retry).toEqual({ dialed: false, reason: "already-dialed" });
+      expect(callControl.placedCalls).toHaveLength(1);
+      await expect(pending.peek({ scenarioRunId: "run-1", nonce: "nonce-1" })).resolves.toEqual({
+        found: true,
+        call: CALL,
+      });
+    });
+  });
+
   describe("given a run cancelled before the dial", () => {
     it("dials nothing and answers cancelled", async () => {
       const { pending, callControl, service } = setup();
