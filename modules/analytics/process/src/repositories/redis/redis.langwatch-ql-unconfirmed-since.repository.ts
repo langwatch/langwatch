@@ -6,11 +6,26 @@ const KEY = "lwql:collection-unconfirmed-since";
 /** Checks run every 5 minutes; a run no check has extended for an hour has ended. */
 const RUN_TTL_MS = 60 * 60_000;
 
+/**
+ * Keep a stored first failure time and extend its hour, or store this
+ * failure's time when there is none or the stored value is not a time, in one
+ * step. Two checks can be delivered at once; as separate commands, both could
+ * read a value that is not a time and each write their own, and the later
+ * write would move the first failure forward. Returns the time now stored.
+ */
+const MARK_SCRIPT = `
+local stored = redis.call("get", KEYS[1])
+local since = tonumber(stored)
+if since and since == since and since > 0 and since ~= math.huge then
+  redis.call("pexpire", KEYS[1], ARGV[2])
+  return stored
+end
+redis.call("set", KEYS[1], ARGV[1], "PX", ARGV[2])
+return ARGV[1]
+`;
+
 /** Only what the clock calls. */
-export type LwqlUnconfirmedSinceRedis = Pick<
-  StoreClients["redis"],
-  "set" | "get" | "pexpire" | "del"
->;
+export type LwqlUnconfirmedSinceRedis = Pick<StoreClients["redis"], "eval" | "del">;
 
 /** The first failure's time in the deployment's Redis. */
 export class RedisLwqlUnconfirmedSinceRepository extends LwqlUnconfirmedSinceRepository {
@@ -27,15 +42,10 @@ export class RedisLwqlUnconfirmedSinceRepository extends LwqlUnconfirmedSinceRep
   }
 
   async mark(at: number): Promise<number> {
-    await this.redis.set(KEY, String(at), "PX", RUN_TTL_MS, "NX");
-    const since = Number(await this.redis.get(KEY));
-    if (!(Number.isFinite(since) && since > 0)) {
-      // NX left a value that is not a time; replace it so the next check sees `at`.
-      await this.redis.set(KEY, String(at), "PX", RUN_TTL_MS);
-      return at;
-    }
-    await this.redis.pexpire(KEY, RUN_TTL_MS);
-    return since;
+    const since = Number(
+      await this.redis.eval(MARK_SCRIPT, 1, KEY, String(at), String(RUN_TTL_MS)),
+    );
+    return Number.isFinite(since) && since > 0 ? since : at;
   }
 
   async clear(): Promise<void> {
