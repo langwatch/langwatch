@@ -14,28 +14,48 @@ Feature: Coding agent terminal view
   Background:
     Given a coding agent session with prompts, tool calls, and a final reply
 
+  @integration
   Scenario: The transcript shows every beat, not just the final turn
     Given the session's last model call is a single tool request with no reply text
     When the Terminal tab renders the session
     Then every prompt, message, and tool call from the whole session is shown
     And the session does not collapse to a single step
 
+  @integration
   Scenario: A tool the user denied is shown even though it left no span
     Given the user denied a tool call partway through the session
     When the Terminal tab renders the session
     Then the denied call is shown as rejected, not silently missing
 
+  @integration
   Scenario: A tool call that was aborted reads differently from one the user denied
     Given a tool call was cancelled or timed out before it ran
     When the Terminal tab renders the session
     Then the call is shown as aborted and never ran
     And it is not said to be denied, nor pinned on the user
 
+  # The agents' own decision source says who refused: Claude and Grok send "user_*",
+  # Codex "User"; "config", "hook", "classifier" or no source at all is a policy.
+  @integration
+  Scenario: A tool call a policy denied is not pinned on the user
+    Given a permission rule, hook or reviewer refused a tool call before it ran
+    When the Terminal tab renders the session
+    Then the call is shown as denied and never ran
+    And it is not said to be the user's denial
+
+  @integration
+  Scenario: A tool call the user answered instead of approving reads differently from a denial
+    Given the user typed a reply at a tool prompt instead of approving the call
+    When the Terminal tab renders the session
+    Then the call is shown as answered by the user and never ran
+    And it is not said to be denied
+
   Scenario: A tool call shows what actually ran, not just what the model was told
     Given a tool span carries real stdout, a real file's content, or a real structured patch
     When the Terminal tab renders that tool call
     Then the real output is shown in place of the model's capped echo
 
+  @integration
   Scenario: The top of the session identifies the agent, model, and repo
     Given the session was run by Claude Code version 2.1.207 against a repo
     When the Terminal tab renders the session

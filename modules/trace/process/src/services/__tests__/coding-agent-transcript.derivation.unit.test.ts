@@ -179,6 +179,7 @@ describe("buildCodingAgentTranscript", () => {
           name: "Bash",
           reason: "user_reject",
           outcome: "denied",
+          byUser: true,
         },
       ]);
     });

@@ -1206,7 +1206,7 @@ function EntryLine({ entry, toolSpans }: { entry: TranscriptEntry; toolSpans: To
     case "tool":
       return <ToolCall entry={entry} ran={toolSpans.get(entry.spanId) ?? null} />;
     case "tool_rejected":
-      return <RejectedLine name={entry.name} outcome={entry.outcome} />;
+      return <RejectedLine name={entry.name} outcome={entry.outcome} byUser={entry.byUser} />;
     case "note":
       return <NoteLine level={entry.level} text={entry.text} />;
     default:
@@ -1475,11 +1475,15 @@ function ToolResultBody({
 }
 
 /**
- * A tool that never ran: the human denied it, or it was aborted (cancelled or
- * timed out). An abort may not be the user's doing, so only a denial names them.
+ * A tool that never ran: denied, answered instead of approved, or aborted (cancelled or
+ * timed out). A denial names the user only when its source says they made it.
  */
-function RejectedLine({ name, outcome }: { name: string | null; outcome: "denied" | "aborted" }) {
-  const verdict = outcome === "denied" ? "denied by the user" : "aborted";
+function RejectedLine({
+  name,
+  outcome,
+  byUser,
+}: Pick<Extract<TranscriptEntry, { kind: "tool_rejected" }>, "name" | "outcome" | "byUser">) {
+  const verdict = rejectedVerdict({ outcome, byUser });
   return (
     <HStack align="flex-start" gap={2}>
       <Glyph char={GLYPH.denied} color={TERMINAL_TOKENS.red} />
@@ -1488,6 +1492,15 @@ function RejectedLine({ name, outcome }: { name: string | null; outcome: "denied
       </Text>
     </HStack>
   );
+}
+
+function rejectedVerdict({
+  outcome,
+  byUser,
+}: Pick<Extract<TranscriptEntry, { kind: "tool_rejected" }>, "outcome" | "byUser">): string {
+  if (outcome === "redirected") return "the user answered instead";
+  if (outcome === "aborted") return "aborted";
+  return byUser ? "denied by the user" : "denied";
 }
 
 /**

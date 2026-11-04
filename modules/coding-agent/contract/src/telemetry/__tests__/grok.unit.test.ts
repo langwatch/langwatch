@@ -179,19 +179,19 @@ describe("a Grok trace's transcript", () => {
           "event.name": "grok_code.tool_decision",
           tool_name: "read_file",
           decision: "allow",
-          source: "config",
+          source: "allowed",
         }),
         grokLog({
           "event.name": "grok_code.tool_decision",
           tool_name: "run_terminal_command",
           decision: "deny",
-          source: "user",
+          source: "user_reject",
         }),
         grokLog({
           "event.name": "grok_code.tool_decision",
           tool_name: "edit_file",
           decision: "cancelled",
-          source: "user",
+          source: "user_abort",
         }),
       ],
     });
@@ -203,6 +203,51 @@ describe("a Grok trace's transcript", () => {
         outcome: "denied",
       }),
       expect.objectContaining({ kind: "tool_rejected", name: "edit_file", outcome: "aborted" }),
+    ]);
+  });
+
+  /** @scenario "A Grok tool call the user answered instead of approving is its own outcome" */
+  it("reads a followup as redirected by the user, not denied", () => {
+    const transcript = buildCodingAgentTranscript({
+      spans: [],
+      logs: [
+        grokLog({
+          "event.name": "grok_code.tool_decision",
+          tool_name: "run_terminal_command",
+          decision: "followup",
+          source: "user_followup",
+        }),
+      ],
+    });
+
+    expect(transcript.entries).toEqual([
+      expect.objectContaining({ kind: "tool_rejected", outcome: "redirected", byUser: true }),
+    ]);
+  });
+
+  /** @scenario "A Grok tool call a deny rule refused is not pinned on the user" */
+  it("marks only the prompt's reject as the user's denial", () => {
+    const transcript = buildCodingAgentTranscript({
+      spans: [],
+      logs: [
+        grokLog({
+          "event.name": "grok_code.tool_decision",
+          tool_name: "run_terminal_command",
+          decision: "deny",
+          source: "config",
+        }),
+        grokLog({
+          "event.name": "grok_code.tool_decision",
+          tool_name: "edit_file",
+          decision: "deny",
+          source: "user_reject",
+        }),
+      ],
+    });
+
+    expect(transcript.entries).toEqual([
+      expect.objectContaining({ name: "run_terminal_command", outcome: "denied", byUser: false }),
+      expect.objectContaining({ name: "edit_file", outcome: "denied", byUser: true }),
     ]);
   });
 
