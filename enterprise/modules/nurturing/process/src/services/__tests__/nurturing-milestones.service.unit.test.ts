@@ -310,6 +310,7 @@ describe("NurturingMilestonesService", () => {
       let failuresLeft = 1;
       const projects: NurturingProjectDirectoryRepository = {
         getPlacement: (input) => directory.getPlacement(input),
+        findPersonalOwnerUserIds: (input) => directory.findPersonalOwnerUserIds(input),
         getFirstProjectCreatedAt: async (input) => {
           if (failuresLeft-- > 0) throw new Error("database unavailable");
           return directory.getFirstProjectCreatedAt(input);

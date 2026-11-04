@@ -13,6 +13,8 @@ import {
   codingAgentFirstSessionSignal,
   codingAgentTypesSignal,
   codingSessionStoredSignal,
+  ownCodingSessionRecipients,
+  ownCodingSessionStoredSignal,
 } from "../rules/nurturing-coding-signals.rules.ts";
 import { seededAtRead } from "../rules/nurturing-owner-signals.rules.ts";
 import { utcDayOf } from "../rules/nurturing-time.rules.ts";
@@ -30,6 +32,12 @@ type CodingDependencies = Readonly<{
 /** The fact that happened last; the earliest in order wins a tie. */
 function latestOf(facts: readonly Fact[]): Fact {
   return facts.reduce((latest, fact) => (fact.occurredAt > latest.occurredAt ? fact : latest));
+}
+
+function earliestOf(facts: readonly Fact[]): Fact {
+  return facts.reduce((earliest, fact) =>
+    fact.occurredAt < earliest.occurredAt ? fact : earliest,
+  );
 }
 
 /**
@@ -65,6 +73,7 @@ export class NurturingCodingMilestonesService {
     const common = { adminUserId, organizationId };
 
     await deliver(codingSessionStoredSignal({ data: latest, adminUserId }));
+    await this.deliverOwnSessions({ facts, latest, organizationId, deliver });
 
     // Every type first, so the first-session signal names them all; then first session, then day.
     const agentTypes = await this.addAgentTypes({ organizationId, facts });
@@ -117,6 +126,32 @@ export class NurturingCodingMilestonesService {
       occurredAt: first.occurredAt,
     });
     return isFirst;
+  }
+
+  /** The batch as the personal project owner's own sessions; a shared project reads no members. */
+  private async deliverOwnSessions({
+    facts,
+    latest,
+    organizationId,
+    deliver,
+  }: Readonly<{
+    facts: readonly Fact[];
+    latest: Fact;
+    organizationId: string;
+    deliver: Deliver;
+  }>): Promise<void> {
+    const personalOwnerUserIds = await this.dependencies.projects.findPersonalOwnerUserIds({
+      projectId: latest.projectId,
+    });
+    if (personalOwnerUserIds.length === 0) return;
+    const activeMemberUserIds = await this.memberUserIdsOf(organizationId);
+    const earliest = earliestOf(facts);
+    for (const userId of ownCodingSessionRecipients({
+      personalOwnerUserIds,
+      activeMemberUserIds,
+    })) {
+      await deliver(ownCodingSessionStoredSignal({ latest, earliest, userId }));
+    }
   }
 
   private async memberUserIdsOf(organizationId: string): Promise<string[]> {

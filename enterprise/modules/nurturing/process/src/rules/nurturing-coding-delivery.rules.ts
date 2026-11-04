@@ -9,6 +9,7 @@ import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
 
 const CODING_AND_APP_KINDS = [
   "coding_session_stored",
+  "own_coding_session_stored",
   "coding_active_days",
   "coding_agent_types",
   "coding_agent_first_session",
@@ -36,6 +37,14 @@ export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
     case "coding_session_stored":
     case "coding_agent_types":
       return [];
+    case "own_coding_session_stored":
+      return [
+        {
+          type: "identify",
+          userId,
+          traits: { own_coding_last_session_at: unixSecondsOf(signal.occurredAt) },
+        },
+      ];
     case "coding_active_days":
       return [
         { type: "identify", userId, traits: { coding_active_days: signal.codingActiveDays } },
@@ -86,4 +95,17 @@ export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
       return [];
     }
   }
+}
+
+/** own_coding_first_session_at, first recorded across orgs, set once: only the claim's winner. */
+export function fireOwnCodingFirstSession(
+  signal: NurturingSignalOf<"own_coding_session_stored">,
+): CioBatchCall[] {
+  return [
+    {
+      type: "identify",
+      userId: signal.userId,
+      traits: { own_coding_first_session_at: unixSecondsOf(signal.firstOccurredAt) },
+    },
+  ];
 }

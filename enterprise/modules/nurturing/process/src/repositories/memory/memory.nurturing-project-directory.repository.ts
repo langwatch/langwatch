@@ -10,22 +10,33 @@ export class MemoryNurturingProjectDirectoryRepository implements NurturingProje
     private readonly placed: ReadonlyMap<string, string>,
     private readonly created: ReadonlyMap<string, number>,
     private readonly traced: ReadonlySet<string>,
+    private readonly personalOwners: ReadonlyMap<string, string>,
   ) {}
 
   /**
    * `placed` maps each held project to its organization, `created` to its creation (epoch ms),
-   * and `traced` holds the projects that received their first message.
+   * `traced` holds the projects that received their first message, and `personalOwners` maps
+   * each personal project to its owner.
    */
   static create({
     placed = new Map<string, string>(),
     created = new Map<string, number>(),
     traced = new Set<string>(),
+    personalOwners = new Map<string, string>(),
   }: {
     placed?: ReadonlyMap<string, string>;
     created?: ReadonlyMap<string, number>;
     traced?: ReadonlySet<string>;
+    personalOwners?: ReadonlyMap<string, string>;
   } = {}): MemoryNurturingProjectDirectoryRepository {
-    return new MemoryNurturingProjectDirectoryRepository(placed, created, traced);
+    return new MemoryNurturingProjectDirectoryRepository(placed, created, traced, personalOwners);
+  }
+
+  async findPersonalOwnerUserIds({
+    projectId,
+  }: Readonly<{ projectId: string }>): Promise<string[]> {
+    const owner = this.personalOwners.get(projectId);
+    return owner === undefined ? [] : [owner];
   }
 
   async hasTracedProject({

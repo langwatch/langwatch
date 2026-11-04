@@ -13,9 +13,16 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
-import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
+import {
+  fireCodingOrApp,
+  fireOwnCodingFirstSession,
+  isCodingOrAppSignal,
+} from "../rules/nurturing-coding-delivery.rules.ts";
 import { selfHostedTraits, unixSecondsOf } from "../rules/nurturing-customer-io-timestamp.rules.ts";
-import { pickCustomerIoDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
+import {
+  ownCodingFirstSessionClaim,
+  pickCustomerIoDebounce,
+} from "../rules/nurturing-delivery-debounce.rules.ts";
 import {
   fireExperimentRan,
   fireScenarioCreated,
@@ -109,6 +116,7 @@ export class NurturingDeliveryService {
     this.toCustomerIo(signal);
     this.toPostHogSafely(signal);
     await this.identifyCodingAgentMembers(signal);
+    await this.identifyOwnCodingFirstSession(signal);
     if (memberBatch) this.identifyInBatches(memberBatch);
   }
 
@@ -171,6 +179,14 @@ export class NurturingDeliveryService {
       // Sent at once, so a later member's claim failing never strands one already claimed.
       this.sendCustomerIoCalls(fireUsesCodingAgent({ userId }));
     }
+  }
+
+  /** own_coding_first_session_at: first recorded across orgs, set once, by a per-person claim. */
+  private async identifyOwnCodingFirstSession(signal: NurturingSignal): Promise<void> {
+    if (signal.kind !== "own_coding_session_stored" || !this.deps.customerIo) return;
+    const { claimKey, seconds } = ownCodingFirstSessionClaim(signal);
+    if (!(await this.deps.claims.claim(claimKey, seconds))) return;
+    this.sendCustomerIoCalls(fireOwnCodingFirstSession(signal));
   }
 
   /** Langy's failed guided turn: PostHog only, once per source event, never failing the fact. */
