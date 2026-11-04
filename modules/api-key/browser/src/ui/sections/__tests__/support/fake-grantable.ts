@@ -30,7 +30,8 @@ export function fakeGrantable({
         .filter((binding) => covers(binding, scope, projectTeams))
         .flatMap((binding) => conferred(binding)),
     );
-    grantable = (grantable ?? categorizablePermissions()).filter(
+    const candidates: readonly string[] = grantable ?? categorizablePermissions();
+    grantable = candidates.filter(
       (permission) =>
         held.has(permission) &&
         bindingScopeCanGrantPermission({ scopeType: scope.scopeType, permission }),
