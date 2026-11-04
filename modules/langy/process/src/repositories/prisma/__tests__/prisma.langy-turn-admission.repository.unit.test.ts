@@ -54,6 +54,31 @@ function racedTransactionClient(status: "committed" | "preparing") {
   });
 }
 
+/** A transaction client where another turn won the race and holds the conversation. */
+function heldConversationTransactionClient() {
+  const deleteReceipt = vi.fn().mockResolvedValue({ count: 1 });
+  const tx = prismaDouble({
+    langyTurnRequest: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({
+        id: "receipt-1",
+        conversationId: CLAIM_INPUT.conversationId,
+        turnId: CLAIM_INPUT.turnId,
+      }),
+      deleteMany: deleteReceipt,
+    },
+    langyActiveTurn: {
+      findUnique: vi.fn().mockResolvedValue({
+        id: "active-other",
+        turnId: "turn-other",
+        status: "preparing",
+        leaseExpiresAt: new Date(Date.now() + 60_000),
+      }),
+    },
+  });
+  return { tx, deleteReceipt };
+}
+
 /**
  * A fake database whose transactions fail with the given errors, then run the
  * admission body against the given transaction client.
@@ -69,12 +94,6 @@ function fakeDatabase(failures: unknown[], tx = emptyTransactionClient()) {
   });
   return { database, calls: () => calls };
 }
-
-const CLAIMED = {
-  kind: "claimed",
-  conversationId: CLAIM_INPUT.conversationId,
-  turnId: CLAIM_INPUT.turnId,
-};
 
 /** A unique-key clash: two claims raced to create the same receipt row. */
 function uniqueKeyClash(): Error {
@@ -105,6 +124,7 @@ describe("PrismaLangyTurnAdmissionRepository.claim", () => {
     });
 
     describe("when the racing send is still preparing", () => {
+      /** @scenario A send that clashes with a copy still being prepared is refused as Langy unavailable */
       it("retries and answers pending", async () => {
         const { database, calls } = fakeDatabase(
           [uniqueKeyClash()],
@@ -124,16 +144,31 @@ describe("PrismaLangyTurnAdmissionRepository.claim", () => {
       const { database, calls } = fakeDatabase([driverAdapterWriteConflict()]);
       const repository = PrismaLangyTurnAdmissionRepository.create(database);
 
-      await expect(repository.claim(CLAIM_INPUT)).resolves.toMatchObject({
-        ...CLAIMED,
+      await expect(repository.claim(CLAIM_INPUT)).resolves.toEqual({
+        kind: "claimed",
         claimToken: expect.any(String),
+        conversationId: CLAIM_INPUT.conversationId,
+        turnId: CLAIM_INPUT.turnId,
       });
       expect(calls()).toBe(2);
     });
   });
 
+  describe("given the winner of a write conflict holds the conversation", () => {
+    /** @scenario A send that loses a write conflict to another turn on my conversation is answered busy */
+    it("retries, answers busy and drops its own receipt", async () => {
+      const { tx, deleteReceipt } = heldConversationTransactionClient();
+      const { database, calls } = fakeDatabase([driverAdapterWriteConflict()], tx);
+      const repository = PrismaLangyTurnAdmissionRepository.create(database);
+
+      await expect(repository.claim(CLAIM_INPUT)).resolves.toEqual({ kind: "busy" });
+      expect(calls()).toBe(2);
+      expect(deleteReceipt).toHaveBeenCalledOnce();
+    });
+  });
+
   describe("given every attempt loses a write conflict", () => {
-    /** @scenario A send that cannot get through a burst of sends is told Langy is unavailable */
+    /** @scenario A send that cannot get through a burst of sends fails as Langy unavailable */
     it("fails with LangyAgentUnavailableError after four attempts", async () => {
       const { database, calls } = fakeDatabase(
         Array.from({ length: 4 }, driverAdapterWriteConflict),

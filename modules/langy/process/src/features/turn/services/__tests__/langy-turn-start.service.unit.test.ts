@@ -4,7 +4,6 @@
  * ever touching the worker, session keys, or the acceptance command.
  */
 import {
-  LangyAgentUnavailableError,
   LangyEmptyMessageError,
   LangyIdempotencyMismatchError,
   LangyModelNotConfiguredError,
@@ -156,8 +155,8 @@ describe("LangyTurnStartService", () => {
   });
 
   describe("given a copy of the send is still being prepared", () => {
-    /** @scenario A send that clashes with a copy still being prepared is refused as being prepared */
-    it("refuses the turn start as already being prepared", async () => {
+    /** @scenario A send that clashes with a copy still being prepared is refused as Langy unavailable */
+    it("refuses before minting, accepting or dispatching", async () => {
       const fixture = makeFixture({
         admission: {
           claim: vi.fn(async () => ({ kind: "pending" as const })),
@@ -168,11 +167,13 @@ describe("LangyTurnStartService", () => {
         },
       });
 
-      const refusal = LangyTurnService.create(fixture.deps).startConversationTurn(input());
+      await expect(
+        LangyTurnService.create(fixture.deps).startConversationTurn(input()),
+      ).rejects.toMatchObject({ code: "langy_agent_unavailable" });
 
-      await expect(refusal).rejects.toBeInstanceOf(LangyAgentUnavailableError);
-      await expect(refusal).rejects.toThrow("already being prepared");
+      expect(fixture.mint).not.toHaveBeenCalled();
       expect(fixture.acceptTurn).not.toHaveBeenCalled();
+      expect(fixture.dispatch).not.toHaveBeenCalled();
     });
   });
 
