@@ -2,6 +2,7 @@
  * @vitest-environment node
  * @see modules/auth/specs/app-page-opened.feature
  */
+import type { AppPage } from "@langwatch/auth-contract";
 import { describe, expect, it } from "vitest";
 
 import { AppPageOpenedService } from "../app-page-opened.service.ts";
@@ -11,9 +12,9 @@ function serviceOver({
   appPageOpened = () => undefined,
 }: {
   memberships?: () => Promise<number>;
-  appPageOpened?: (input: { userId: string; page: "me_sessions" }) => void;
+  appPageOpened?: (input: { userId: string; page: AppPage }) => void;
 } = {}) {
-  const opened: { userId: string; page: "me_sessions" }[] = [];
+  const opened: { userId: string; page: AppPage }[] = [];
   const reported: unknown[] = [];
   const service = AppPageOpenedService.create({
     organizations: { countMembershipsForUser: memberships },
@@ -40,7 +41,7 @@ describe("AppPageOpenedService", () => {
         page: "me_sessions",
       });
 
-      expect(opened).toEqual([{ userId: "user_ada", page: "me_sessions" }]);
+      expect(opened).toEqual([{ userId: "user_ada", page: AppPage }]);
     });
   });
 
@@ -65,7 +66,7 @@ describe("AppPageOpenedService", () => {
     it("records nothing", async () => {
       const { service, opened } = serviceOver();
 
-      await service.record({ userId: "user_ada", browserSessionId: null, page: "me_sessions" });
+      await service.record({ userId: "user_ada", browserSessionId: null, page: AppPage });
 
       expect(opened).toEqual([]);
     });
@@ -96,7 +97,7 @@ describe("AppPageOpenedService", () => {
       });
 
       await expect(
-        service.record({ userId: "user_ada", browserSessionId: "session-1", page: "me_sessions" }),
+        service.record({ userId: "user_ada", browserSessionId: "session-1", page: AppPage }),
       ).resolves.toBeUndefined();
     });
 
@@ -108,7 +109,7 @@ describe("AppPageOpenedService", () => {
       });
 
       await expect(
-        service.record({ userId: "user_ada", browserSessionId: "session-1", page: "me_sessions" }),
+        service.record({ userId: "user_ada", browserSessionId: "session-1", page: AppPage }),
       ).resolves.toBeUndefined();
     });
 
