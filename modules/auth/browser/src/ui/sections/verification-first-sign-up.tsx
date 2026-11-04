@@ -12,7 +12,7 @@ import {
   forgetHeldAddressProof,
   type HeldAddressProof,
   holdAddressProof,
-  readHeldAddressProof,
+  takeHeldAddressProofOnReload,
 } from "../../behavior/held-address-proof.ts";
 import { usePasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
@@ -858,7 +858,7 @@ function useHeldProofRestore({
   verifyToken: string | null | undefined;
   restoreEnrollment: (held: HeldAddressProof) => Promise<void>;
 }): boolean {
-  const [held] = useState(() => (verifyToken ? null : readHeldAddressProof()));
+  const [held] = useState(() => (verifyToken ? null : takeHeldAddressProofOnReload()));
   const [isRestoring, setIsRestoring] = useState(held !== null);
   const asked = useRef(false);
 
