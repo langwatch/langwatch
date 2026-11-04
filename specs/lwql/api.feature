@@ -761,20 +761,23 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given an organization recorded as keeping its data on its own ClickHouse
     And this deployment has no route to that ClickHouse
     When a LangWatchQL query reads that organization's projects
-    Then it is refused with error code lwql_unavailable, saying LangWatchQL is not available for this organization's ClickHouse
+    Then the query layer refuses it with error code lwql_unavailable, saying LangWatchQL is not available for this organization's ClickHouse
+    And the REST API answers 503 internal_error with "An unknown error occurred", so that code and sentence do not reach a REST caller (ruling 2026-10-05: a 5xx the platform owns stays opaque)
     And no statement runs on the shared ClickHouse
 
   @unit
   Scenario: A LangWatchQL query spanning organizations is refused
     Given projects that belong to two organizations
     When one LangWatchQL query reads them together
-    Then it is refused with error code lwql_unavailable before any statement runs
+    Then the query layer refuses it with error code lwql_unavailable before any statement runs
+    And the REST API answers 503 internal_error with "An unknown error occurred", so that code does not reach a REST caller (ruling 2026-10-05)
 
   @unit
   Scenario: A LangWatchQL query on a private ClickHouse without LangWatchQL set up is refused
     Given an organization whose private ClickHouse does not know the LangWatchQL identity or has no LangWatchQL views
     When a LangWatchQL query reads that organization's projects
-    Then it is refused with error code lwql_unavailable, saying LangWatchQL is not set up on this organization's ClickHouse yet
+    Then the query layer refuses it with error code lwql_unavailable, saying LangWatchQL is not set up on this organization's ClickHouse yet
+    And the REST API answers 503 internal_error with "An unknown error occurred", so that code and sentence do not reach a REST caller (ruling 2026-10-05)
     And the refusal names no URL, user or password
 
   # ---------------------------------------------------------------------------
