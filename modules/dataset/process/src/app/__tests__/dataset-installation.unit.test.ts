@@ -14,6 +14,7 @@ import { testPeer } from "@langwatch/process/testing";
 import { ProjectApi } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { isMigrationStep } from "@langwatch/upgrade/step";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -92,6 +93,28 @@ describe("dataset app installation", () => {
       ).rejects.toBeInstanceOf(DatasetNotFoundError);
     } finally {
       await Promise.all([first.stop(), second.stop()]);
+    }
+  });
+});
+
+describe("dataset migration steps", () => {
+  /** @scenario "The first-version step runs after empty slugs are filled" */
+  it("runs the first-version step after the empty-slug step, both in the background", async () => {
+    const runtime = await process("worker");
+
+    try {
+      const steps = runtime.migrationSteps(isMigrationStep);
+      const byId = new Map(steps.map((step) => [step.id, step]));
+
+      expect(byId.get("dataset:fill-empty-slugs")).toMatchObject({
+        kind: "data",
+        mode: "background",
+      });
+      expect(byId.get("dataset:create-first-versions")?.after).toContain(
+        "dataset:fill-empty-slugs",
+      );
+    } finally {
+      await runtime.stop();
     }
   });
 });

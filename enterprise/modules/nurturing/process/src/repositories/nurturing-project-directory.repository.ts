@@ -17,4 +17,6 @@ export interface NurturingProjectDirectoryRepository {
   getFirstProjectCreatedAt(
     input: Readonly<{ organizationId: string }>,
   ): Promise<Pick<NurturingOrganizationState, "firstProjectCreatedAt">>;
+  /** True when any project of the organization, archived ones included, received a real trace. */
+  hasTracedProject(input: Readonly<{ organizationId: string }>): Promise<boolean>;
 }

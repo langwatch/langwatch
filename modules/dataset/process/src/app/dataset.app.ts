@@ -70,6 +70,7 @@ import {
   type ListDatasetVersionsInput,
   type SaveDatasetVersionInput,
   SYSTEM_DATASET_VERSION_AUTHOR,
+  type DatasetColumnRenames,
 } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
@@ -173,6 +174,7 @@ interface DatasetUpsertInput {
   name?: string;
   columnTypes?: DatasetColumns;
   datasetRecords?: UpsertDatasetInput["datasetRecords"];
+  columnRenames?: UpsertDatasetInput["columnRenames"];
 }
 
 export class DatasetModule implements DatasetApi {
@@ -357,6 +359,7 @@ export class DatasetModule implements DatasetApi {
       columnTypes: input.columnTypes ?? replacing?.columnTypes ?? [],
       datasetId: input.datasetId ?? replacing?.id,
       datasetRecords: input.datasetRecords,
+      columnRenames: input.columnRenames,
     });
   }
 
@@ -1042,6 +1045,7 @@ export abstract class DatasetContent {
     name: string;
     slug: string;
     columnTypes: Dataset["columnTypes"];
+    columnRenames?: DatasetColumnRenames;
   }): Promise<Dataset>;
 }
 

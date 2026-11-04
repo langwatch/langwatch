@@ -6,15 +6,15 @@ Signing in and staying signed in: the browser session, the signed-out front door
 
 ## At a glance
 
-|                |                                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------ |
-| Classification | core (`modules/catalogue.json`)                                                            |
-| Subjects       | auth, cli-bootstrap, cli-session, cli-token                                                |
-| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                   |
-| Api token      | `AuthApi` = `moduleApi<AuthApi>()("auth")`, `contract/src/auth.api.ts:425` (58 operations) |
-| Other token    | `AuthCliDeviceFlowApi`, `process/src/transport/auth-cli-device-flow.rest.ts:42`            |
-| Other token    | `AuthDoorApi`, `process/src/transport/auth.rest.ts:48`                                     |
-| Installed by   | api, worker, tasks (process); ui (browser)                                                 |
+|                |                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                             |
+| Subjects       | auth, cli-bootstrap, cli-session, cli-token                                                 |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client) |
+| Api token      | `AuthApi` = `moduleApi<AuthApi>()("auth")`, `contract/src/auth.api.ts:425` (58 operations)  |
+| Other token    | `AuthCliDeviceFlowApi`, `process/src/transport/auth-cli-device-flow.rest.ts:42`             |
+| Other token    | `AuthDoorApi`, `process/src/transport/auth.rest.ts:48`                                      |
+| Installed by   | api, worker, tasks (process); ui (browser)                                                  |
 
 ## What auth owns
 

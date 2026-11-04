@@ -155,3 +155,23 @@ export interface AgentArchivedEventDataSchema extends Named<
 export const agentArchivedEventDataSchema: AgentArchivedEventDataSchema =
   agentArchivedEventDataSchemaDefinition;
 export type AgentArchivedEventData = z.infer<typeof agentArchivedEventDataSchema>;
+
+/** An agent's row, versions or labels changed; its reads refetch on this fact (§10 read hints). */
+export const AGENT_CHANGED_EVENT_TYPE = "lw.agent.changed" as const;
+
+/** The reads every agent write makes stale, the archive included. */
+export const AGENT_READ_HINTS = [AGENT_CHANGED_EVENT_TYPE, AGENT_ARCHIVED_EVENT_TYPE] as const;
+
+const agentChangedEventDataSchemaDefinition = z.object({
+  agentId: z.string(),
+  projectId: z.string(),
+  /** One write's id: two writes in the same millisecond stay two facts, a redelivery stays one. */
+  changeId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export interface AgentChangedEventDataSchema extends Named<
+  typeof agentChangedEventDataSchemaDefinition
+> {}
+export const agentChangedEventDataSchema: AgentChangedEventDataSchema =
+  agentChangedEventDataSchemaDefinition;
+export type AgentChangedEventData = z.infer<typeof agentChangedEventDataSchema>;
