@@ -118,6 +118,21 @@ const pageViewed = (occurredAt: number, userId = "user-1"): NurturingSignal => (
   occurredAt,
   page: "me_sessions",
 });
+const usagePageOpened = (
+  occurredAt: number,
+  page = "settings_usage",
+): NurturingSignalOf<"usage_page_opened"> => ({
+  kind: "usage_page_opened",
+  sourceEventId: `user-1:${occurredAt}`,
+  tenantId: "user-1",
+  userId: "user-1",
+  occurredAt,
+  page,
+});
+const usagePageViewed = (occurredAt: number, page = "settings_usage"): NurturingSignal => ({
+  ...usagePageOpened(occurredAt, page),
+  kind: "usage_page_viewed",
+});
 
 const deliver = (delivery: NurturingDeliveryService, signal: NurturingSignal): Promise<void> =>
   delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
@@ -428,6 +443,130 @@ describe("NurturingDeliveryService app-open signals", () => {
       await settle();
 
       expect(cio.tracks()).toHaveLength(1);
+    });
+  });
+});
+
+describe("NurturingDeliveryService usage page signals", () => {
+  const openUsagePage = async (
+    delivery: NurturingDeliveryService,
+    occurredAt: number,
+    page?: string,
+  ) => {
+    await deliver(delivery, usagePageOpened(occurredAt, page));
+    await deliver(delivery, usagePageViewed(occurredAt, page));
+  };
+
+  describe("when a person opens a usage page for the first time", () => {
+    /** @scenario "A usage, cost or plan page open identifies usage_page_viewed_at on the opening user" */
+    it("identifies the opening user with the open time in Unix seconds", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await openUsagePage(delivery, T0 + 999);
+      await settle();
+
+      expect(cio.identifies()).toEqual([
+        expect.objectContaining({
+          userId: "user-1",
+          traits: { usage_page_viewed_at: 1_792_497_600 },
+        }),
+      ]);
+    });
+
+    /** @scenario "The first usage, cost or plan page open tracks one usage_page_viewed" */
+    it("tracks one usage_page_viewed on the opening user", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await openUsagePage(delivery, T0);
+      await settle();
+
+      expect(cio.tracks()).toEqual([
+        expect.objectContaining({
+          userId: "user-1",
+          event: "usage_page_viewed",
+          properties: { page: "settings_usage" },
+        }),
+      ]);
+    });
+  });
+
+  describe("when the person opens a usage page again long after the first open", () => {
+    /** @scenario "Later usage, cost or plan page opens only move the timestamp" */
+    it("moves the timestamp and tracks no second event", async () => {
+      const claims = new ClockedClaims();
+      const { delivery, cio } = deliveryOver(claims);
+      const yearLater = T0 + 366 * 24 * 3_600_000;
+
+      await openUsagePage(delivery, T0);
+      claims.now = yearLater;
+      await openUsagePage(delivery, yearLater);
+      await settle();
+
+      expect(cio.identifies().map((call) => call.traits)).toEqual([
+        { usage_page_viewed_at: unixSeconds(T0) },
+        { usage_page_viewed_at: unixSeconds(yearLater) },
+      ]);
+      expect(cio.tracks()).toHaveLength(1);
+    });
+  });
+
+  describe("when the person opens two different usage pages inside an hour", () => {
+    let claims: ClockedClaims;
+    let delivery: NurturingDeliveryService;
+    let cio: ReturnType<typeof customerIo>;
+
+    beforeEach(async () => {
+      claims = new ClockedClaims();
+      ({ delivery, cio } = deliveryOver(claims));
+      await openUsagePage(delivery, T0, "settings_usage");
+    });
+
+    /** @scenario "Opens of different usage, cost or plan pages inside an hour send one update" */
+    it("identifies once", async () => {
+      claims.now = T0 + 3_599_000;
+      await openUsagePage(delivery, T0 + 3_599_000, "settings_plans");
+      await settle();
+
+      expect(cio.identifies()).toHaveLength(1);
+    });
+
+    it("identifies again after the hour", async () => {
+      claims.now = T0 + 3_601_000;
+      await openUsagePage(delivery, T0 + 3_601_000, "settings_plans");
+      await settle();
+
+      expect(cio.identifies()).toHaveLength(2);
+    });
+  });
+
+  describe("when the sessions page is opened", () => {
+    /** @scenario "Other pages do not set usage_page_viewed_at" */
+    it("sends no usage page trait or event", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, appOpened(T0));
+      await deliver(delivery, pageViewed(T0));
+      await settle();
+
+      expect(cio.identifies().map((call) => call.traits)).toEqual([
+        { app_last_opened_at: unixSeconds(T0) },
+      ]);
+      expect(cio.tracks().map((call) => call.event)).toEqual(["sessions_page_viewed"]);
+    });
+  });
+
+  describe("when a usage page open is delivered", () => {
+    /** @scenario "A usage, cost or plan page open reaches Customer.io without PostHog" */
+    it.each([
+      ["usage_page_opened", usagePageOpened(T0)],
+      ["usage_page_viewed", usagePageViewed(T0)],
+    ] as const)("sends PostHog nothing for %s", async (_kind, signal) => {
+      const { delivery, posthog } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, signal);
+      await settle();
+
+      expect(posthog.tracked).toEqual([]);
     });
   });
 });

@@ -794,7 +794,12 @@ interface Output {
 // auth.recordPageOpened
 // Input: inline, ../contract/src/auth.trpc.ts:101
 interface Input {
-  page: "me_sessions";
+  page:
+    | "me_sessions"
+    | "settings_usage"
+    | "settings_plans"
+    | "settings_subscription"
+    | "governance_costs";
 }
 // Output: inline, ../contract/src/auth.trpc.ts:102
 type Output = unknown;

@@ -16,7 +16,11 @@ const PERSON_HOUR_SECONDS = 60 * 60;
 const PERSON_HOUR_KINDS: ReadonlySet<NurturingSignal["kind"]> = new Set([
   "app_opened",
   "sessions_page_viewed",
+  "usage_page_opened",
 ]);
+/** Sent for a person's first open only, so its claim outlives any account; Redis holds it. */
+const PERSON_ONCE_SECONDS = 10 * 365 * 24 * 60 * 60;
+const PERSON_ONCE_KINDS: ReadonlySet<NurturingSignal["kind"]> = new Set(["usage_page_viewed"]);
 
 /** The window a Customer.io update waits out, or null for a kind that is never debounced. */
 export function pickCustomerIoDebounce(signal: NurturingSignal): Debounce | null {
@@ -31,6 +35,12 @@ export function pickCustomerIoDebounce(signal: NurturingSignal): Debounce | null
     return {
       seconds: PERSON_HOUR_SECONDS,
       claimKey: `nurturing:debounce:${signal.kind}:${signal.tenantId}`,
+    };
+  }
+  if (PERSON_ONCE_KINDS.has(signal.kind)) {
+    return {
+      seconds: PERSON_ONCE_SECONDS,
+      claimKey: `nurturing:once:${signal.kind}:${signal.tenantId}`,
     };
   }
   return null;

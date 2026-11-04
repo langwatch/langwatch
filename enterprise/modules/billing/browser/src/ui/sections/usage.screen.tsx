@@ -3,6 +3,7 @@
  * (hosted plan / self-hosted license / open-source). No chrome.
  */
 
+import { useRecordPageOpened } from "@langwatch/auth-client";
 import { Link } from "@langwatch/browser-host/link";
 import { Banner } from "@langwatch/design-system/banner";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -102,6 +103,7 @@ function limitsReadState({
 }
 
 export default function UsageScreen() {
+  useRecordPageOpened({ page: "settings_usage" });
   const host = useBillingHost();
   const organization = host.organization();
   // The deployment is read as a settled pair: `isSaaS === false` selects the

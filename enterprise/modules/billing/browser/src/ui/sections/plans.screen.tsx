@@ -4,6 +4,7 @@
  * chrome — the settings frame is applied by whichever app serves the address.
  */
 
+import { useRecordPageOpened } from "@langwatch/auth-client";
 import { Skeleton } from "@langwatch/design-system/primitives";
 
 import { billingApi } from "../../behavior/billing-api.ts";
@@ -12,6 +13,7 @@ import { useBillingHost } from "../../model/billing-host.ts";
 import { PlansComparisonPage } from "./plans-comparison.tsx";
 
 export default function PlansScreen() {
+  useRecordPageOpened({ page: "settings_plans" });
   const organization = useBillingHost().organization();
   const pricing = useBillingPricingService();
   const activePlan = billingApi.plan.getActivePlan.useQuery(

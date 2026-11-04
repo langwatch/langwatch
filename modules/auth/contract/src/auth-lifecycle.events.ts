@@ -11,7 +11,13 @@ export const SIGNED_UP_EVENT_TYPE = "lw.auth.signed_up" as const;
 export const APP_PAGE_OPENED_EVENT_TYPE = "lw.auth.app_page_opened" as const;
 
 /** The pages whose opening is announced. */
-export const appPageSchema = z.enum(["me_sessions"]);
+export const appPageSchema = z.enum([
+  "me_sessions",
+  "settings_usage",
+  "settings_plans",
+  "settings_subscription",
+  "governance_costs",
+]);
 export type AppPage = z.infer<typeof appPageSchema>;
 
 /** A member of some organization minted a session; the tenant is the person. */
