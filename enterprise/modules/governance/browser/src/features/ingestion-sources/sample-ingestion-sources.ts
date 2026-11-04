@@ -47,18 +47,22 @@ const HOUR_MS = 60 * MINUTE_MS;
  * draw on screen at once: healthy sources at a range of arrival times, one
  * whose last runs all failed (three consecutive failures is what
  * `deriveSourceHealth` calls unhealthy, so that row reads "Pulls failing"), one
- * still waiting for its first event, and one an admin switched off.
+ * still waiting for its first event, one an admin switched off, and one holding a configuration
+ * its adapter refuses ("Connection needs fixing").
  *
- * The one exception the cycle cannot state is below: `errorCount` counts
- * consecutive PULL failures and nothing else writes it, so a push source
- * carrying one would be a state the product cannot produce.
+ * Two states the cycle cannot put on a push row, both zeroed below. `errorCount`
+ * counts consecutive PULL failures and nothing else writes it, and
+ * `configComplaints` is what a pull adapter refuses about its configuration, which
+ * a push source has no adapter to do. A push source carrying either would be a
+ * state the product cannot produce.
  *
  * INDEXED BY POSITION, so the cycle is coupled to the sampled list: holding a
  * type back or adding one shifts every state after it, and the shift is
- * silent. The badge it can cost is "Pulls failing", whose state has to land on a
- * PULL source or the exception above zeroes it away. Reorder or hold back
- * freely — a test asserts all four badges still reach the screen, and if one
- * goes missing the fix belongs in this cycle rather than in the catalog order.
+ * silent. The badges it can cost are "Pulls failing" and "Connection needs
+ * fixing", whose states have to land on a PULL source or the exceptions above
+ * zero them away. Reorder or hold back freely: a test asserts all five badges
+ * still reach the screen, and if one goes missing the fix belongs in this cycle
+ * rather than in the catalog order.
  */
 const SAMPLE_INSTANCE_STATES = [
   { status: "active", errorCount: 0, lastEventAgoMs: 3 * MINUTE_MS },
@@ -69,7 +73,18 @@ const SAMPLE_INSTANCE_STATES = [
   { status: "awaiting_first_event", errorCount: 0, lastEventAgoMs: null },
   { status: "active", errorCount: 0, lastEventAgoMs: 47 * MINUTE_MS },
   { status: "disabled", errorCount: 0, lastEventAgoMs: 4 * 24 * HOUR_MS },
-] as const;
+  {
+    status: "active",
+    errorCount: 3,
+    lastEventAgoMs: 5 * 24 * HOUR_MS,
+    configComplaints: ["Environment URL: Invalid URL"],
+  },
+] as const satisfies readonly {
+  status: string;
+  errorCount: number;
+  lastEventAgoMs: number | null;
+  configComplaints?: readonly string[];
+}[];
 
 /**
  * The cadence a scheduled row shows under its protocol chip.
@@ -96,6 +111,9 @@ export const SAMPLE_INGESTION_SOURCES: Source[] = sampleSourceTypeOptions().map(
   // always zero. Showing "Pulls failing" over a source nothing polls would be
   // the sample inventing a state the product cannot reach.
   const errorCount = mode === "push" ? 0 : state.errorCount;
+  // A push source has no adapter to refuse its configuration, so only a pull row can need fixing.
+  const configComplaints: string[] =
+    mode === "push" || !("configComplaints" in state) ? [] : [...state.configComplaints];
   const lastEventAt =
     state.lastEventAgoMs === null
       ? null
@@ -113,6 +131,7 @@ export const SAMPLE_INGESTION_SOURCES: Source[] = sampleSourceTypeOptions().map(
     parserConfig: {},
     status: state.status,
     errorCount,
+    configComplaints,
     lastSuccessAt: lastEventAt,
     // Unknown, which is what a connection nobody has made has read through
     // to. Naming either answer here would put a collection verdict on a

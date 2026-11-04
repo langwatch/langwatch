@@ -8,6 +8,7 @@ import {
   canonicalErrorResponse,
   recordProjectCredential,
 } from "@langwatch/api/rest";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
@@ -47,11 +48,27 @@ export async function buildAgentApps(
     seed?: readonly Agent[];
     viewerUserId?: string | null;
     denyPermission?: string;
+    /** What the service-side `agents:deploy` check answers; unset leaves it unconfigured. */
+    canDeploy?: boolean;
     relayMaxPayloadMb?: number;
   } = {},
 ) {
+  const { canDeploy } = options;
   const { app, repositories } = createAgentAppFixture({
     users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+    ...(canDeploy === void 0
+      ? {}
+      : {
+          permissions: createApiFixture<AuthzApi>({
+            getScope: async () => ({
+              type: "project",
+              id: PROJECT_ID,
+              teamId: "team_test",
+              organizationId: "organization_test",
+            }),
+            can: async ({ permission }) => permission === "agents:deploy" && canDeploy,
+          }),
+        }),
   });
   for (const agent of options.seed ?? []) {
     await repositories.agents.create({

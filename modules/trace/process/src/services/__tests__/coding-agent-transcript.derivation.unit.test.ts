@@ -178,6 +178,7 @@ describe("buildCodingAgentTranscript", () => {
           atMs: 1_000,
           name: "Bash",
           reason: "user_reject",
+          outcome: "denied",
         },
       ]);
     });

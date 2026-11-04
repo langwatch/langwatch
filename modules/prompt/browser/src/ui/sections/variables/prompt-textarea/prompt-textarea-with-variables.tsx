@@ -1,5 +1,6 @@
 import { Box, HStack } from "@langwatch/design-system/primitives";
 import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
+import type { AvailableSource } from "@langwatch/design-system/variable-mapping";
 import { extractLiquidVariables } from "@langwatch/prompt-contract";
 import {
   type ChangeEvent,
@@ -16,7 +17,6 @@ import { type CaretPosition, RichTextarea, type RichTextareaHandle } from "rich-
 
 import { useLayoutMode } from "../../../../model/layout-mode.ts";
 import { VariableInsertMenu } from "../variable-insert-menu.tsx";
-import type { AvailableSource } from "../variable-mapping-input.tsx";
 import type { Variable } from "../variables-section.tsx";
 import { AddLogicButton } from "./components/add-logic-button.tsx";
 import { AddVariableButton } from "./components/add-variable-button.tsx";

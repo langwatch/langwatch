@@ -23,6 +23,9 @@
 //     payload over a socket answered by the pid the kernel reports for the
 //     process connecting (see payloadchannel_linux.go).
 //
+// The one exception is visible-process mode, AWS Lambda only: the hide step is
+// skipped and /proc stays readable between invocations (contract.md §7).
+//
 // What this does not do is give an execution its own UID, PID namespace or
 // cgroup. All three would be stronger: a per-execution UID would make the
 // filesystem and /proc barriers kernel-enforced rather than a matter of
@@ -48,13 +51,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	_ "embed"
 
 	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/redact"
 )
 
 //go:embed runner.py
@@ -111,6 +118,10 @@ type Options struct {
 	// an endpoint with no key, gives agent code half a credential and one
 	// failure it cannot read.
 	SandboxEndpoint string
+	// AllowVisibleProcess lets code blocks run when the platform refuses to hide
+	// the engine's /proc files. The caller decides whether the platform is one
+	// that may ask for this (AWS Lambda); see cmd/root.go.
+	AllowVisibleProcess bool
 	// Logger reports what teardown could not finish. Optional: a nil logger
 	// discards those reports rather than failing an execution.
 	Logger *zap.Logger
@@ -171,6 +182,63 @@ type Executor struct {
 	// payload is how an execution's payload reaches its interpreter, nil
 	// where there is no channel and the payload goes on stdin.
 	payload *payloadChannel
+	// mode is decided once in New; see hideMode.
+	mode hideMode
+	// refusal is what the platform answered to PR_SET_DUMPABLE, kept so the
+	// disabled error can name it.
+	refusal syscall.Errno
+}
+
+// AllowVisibleProcessSetting is the operator variable that lets code blocks run
+// when the hide step is refused (AWS Lambda only).
+const AllowVisibleProcessSetting = "NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS"
+
+// hideMode says how the engine's own /proc files are protected.
+type hideMode string
+
+const (
+	// hideStrict: PR_SET_DUMPABLE took; the runner must hide itself too.
+	hideStrict hideMode = "strict"
+	// hideVisibleProcess: the platform refused it and the operator allowed that.
+	hideVisibleProcess hideMode = "visible-process"
+	// hideDisabled: refused and not allowed; code blocks are not served.
+	hideDisabled hideMode = "disabled"
+
+	hideModeEnvVar = "NLPGO_CODE_BLOCK_HIDE"
+)
+
+// hideModeFor is the one definition of a refusal: only EPERM, Lambda's, may be
+// overridden by the operator; any other errno disables code blocks. runner.py
+// mirrors the EPERM rule for its own prctl; both must stay in step.
+func hideModeFor(refusal syscall.Errno, allow bool) hideMode {
+	switch {
+	case refusal == 0:
+		return hideStrict
+	case refusal == syscall.EPERM && allow:
+		return hideVisibleProcess
+	}
+	return hideDisabled
+}
+
+// resolveHideMode decides the mode and logs it once. A refusal never fails New:
+// the other block types must keep working.
+func resolveHideMode(allow bool, logger *zap.Logger) hideMode {
+	mode := hideModeFor(hideRefusal, allow)
+	if mode == hideStrict {
+		logger.Info("nlpgo_code_block_hide_mode", zap.String("mode", string(mode)))
+	} else {
+		logger.Warn("nlpgo_code_block_hide_mode", zap.String("mode", string(mode)), zap.String("refusal", hideRefusal.Error()), zap.Int("errno", int(hideRefusal)))
+	}
+	return mode
+}
+
+// disabledMessage names the refusal, and offers the operator setting only
+// where it can help: a refusal other than EPERM is not overridable.
+func disabledMessage(refusal syscall.Errno) string {
+	if refusal != syscall.EPERM {
+		return "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE) (" + refusal.Error() + "), so the engine cannot hide its process files from user code"
+	}
+	return "code blocks are disabled: this platform refused prctl(PR_SET_DUMPABLE), so the engine cannot hide its process files from user code; on AWS Lambda only, " + AllowVisibleProcessSetting + "=true runs them anyway"
 }
 
 // New builds an Executor, reading the runner sources it holds in memory for
@@ -230,6 +298,8 @@ func New(opts Options) (*Executor, error) {
 		return nil, err
 	}
 	return &Executor{
+		mode:           resolveHideMode(opts.AllowVisibleProcess, opts.logger()),
+		refusal:        hideRefusal,
 		opts:           opts,
 		runnerSource:   runnerSource,
 		fakeDspySource: fakeDspySource,
@@ -431,6 +501,22 @@ func (e *Executor) childEnv() []string {
 	return env
 }
 
+// runEnv is the final environment of the interpreter. The hide flag is
+// stripped from everything else and added last, so only the engine's own
+// mode can ever tell the runner to skip its hide step.
+func runEnv(env []string, mode hideMode) []string {
+	out := make([]string, 0, len(env)+1)
+	for _, kv := range env {
+		if !strings.HasPrefix(kv, hideModeEnvVar+"=") {
+			out = append(out, kv)
+		}
+	}
+	if mode == hideVisibleProcess {
+		out = append(out, hideModeEnvVar+"=best-effort")
+	}
+	return out
+}
+
 // sandboxCredential names the LangWatch variables user code reads, or nothing.
 //
 // Both halves or neither: a key with no endpoint sends the call to the wrong
@@ -477,6 +563,9 @@ func runnerEnv(credential map[string]string, runDir, token string) map[string]st
 
 // Execute runs the request. Wall-clock timeout kills the subprocess.
 func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
+	if e.mode == hideDisabled {
+		return &Result{Error: &Error{Type: RunnerErrorType, Message: disabledMessage(e.refusal)}}, nil
+	}
 	// The operator's ceiling wins. A per-request value only ever shortens the
 	// budget: a workflow author must not be able to escape
 	// NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS by writing a bigger number into
@@ -549,7 +638,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	// see childEnv. What the run itself carries — secrets, its credential, its
 	// token, its directory — travels in the payload and is put into the
 	// environment by the runner, where another execution cannot read it.
-	cmd.Env = append(e.childEnv(), e.payload.channelEnv()...)
+	cmd.Env = runEnv(append(e.childEnv(), e.payload.channelEnv()...), e.mode)
 	// Started outside the run's directory, and the runner moves into it from
 	// the payload before any user code runs. A working directory is readable
 	// from /proc in the moment before the runner is hidden, so starting in the
@@ -607,7 +696,6 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	elapsed := time.Since(started)
 
 	timedOut := errors.Is(runCtx.Err(), context.DeadlineExceeded)
-	stderrText := readRunnerStderr(stderrFile)
 
 	if data, readErr := os.ReadFile(resultPath); readErr == nil && len(data) > 0 {
 		var parsed struct {
@@ -639,6 +727,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 
 	// No result file (most likely: timeout killed the process before
 	// it finished writing, or invalid runner). Synthesize a result.
+	stderrText := readRunnerStderr(stderrFile, redact.New(req.Secrets, req.SandboxAPIKey))
 	if timedOut {
 		return &Result{
 			DurationMS: elapsed.Milliseconds(),
@@ -653,22 +742,68 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 			Stderr:     stderrText,
 			Error: &Error{
 				Type:    RunnerErrorType,
-				Message: runErr.Error(),
+				Message: withStderrTail(runErr.Error(), stderrText),
 			},
 		}, nil
 	}
 	return &Result{
 		DurationMS: elapsed.Milliseconds(),
 		Stderr:     stderrText,
-		Error:      &Error{Type: RunnerErrorType, Message: "empty_result"},
+		Error:      &Error{Type: RunnerErrorType, Message: withStderrTail("empty_result", stderrText)},
 	}, nil
 }
 
-// maxRunnerStderr bounds what is read back from the subprocess's stderr. The
-// runner captures the user's own stderr into the result file, so this stream
-// carries interpreter-level diagnostics and a cap costs nothing — except to
-// code that writes gigabytes to its descriptor, which is why there is one.
+// maxRunnerStderr bounds what is kept of the subprocess's stderr: the last
+// maxRunnerStderr bytes, since the final traceback is what explains a failure.
 const maxRunnerStderr = 64 << 10
+
+// maxStderrInMessage bounds the stderr tail appended to a runner error.
+const maxStderrInMessage = 2 << 10
+
+// truncatedPrefix starts a stderr whose beginning was dropped at the cap.
+const truncatedPrefix = "[stderr truncated]\n"
+
+// withStderrTail appends the end of the redacted stderr to a runner failure,
+// so "exit status 1" says why. The tail is the last maxStderrInMessage bytes,
+// from a line start when the window has one; "… " marks a tail that does not
+// begin at the start of the stored text. Never pass raw text.
+func withStderrTail(message, stderr string) string {
+	text := strings.TrimSpace(stderr)
+	from := len(text) - maxStderrInMessage
+	if from <= 0 {
+		return appendTail(message, text, "")
+	}
+	tail := text[from:]
+	if text[from-1] != '\n' {
+		if _, rest, found := strings.Cut(tail, "\n"); found {
+			tail = rest
+		} else {
+			tail = skipMarkerFragment(text[:from], tail)
+		}
+	}
+	return appendTail(message, tail, "… ")
+}
+
+// appendTail adds tail to message, after prefix; a blank tail adds nothing.
+// A window cut can leave a partial rune at the tail start, which is dropped.
+func appendTail(message, tail, prefix string) string {
+	tail = strings.TrimSpace(strings.ToValidUTF8(tail, ""))
+	if tail == "" {
+		return message
+	}
+	return message + ": " + prefix + tail
+}
+
+// skipMarkerFragment drops the rest of a redact.Marker that the window start
+// cut in two: before is the text left of the window, tail the window.
+func skipMarkerFragment(before, tail string) string {
+	for n := 1; n < len(redact.Marker); n++ {
+		if strings.HasSuffix(before, redact.Marker[:n]) && strings.HasPrefix(tail, redact.Marker[n:]) {
+			return tail[len(redact.Marker)-n:]
+		}
+	}
+	return tail
+}
 
 // newRunnerStderr opens the file the interpreter's own stderr goes to, in the
 // engine's scratch root and unlinked at once.
@@ -690,19 +825,47 @@ func newRunnerStderr(scratchRoot string) (*os.File, error) {
 	return file, nil
 }
 
-// readRunnerStderr reads what the subprocess wrote to its stderr, for the
-// paths where the runner never produced a result file and that text is the
-// only account of why. The file has no name, so it is read back through the
-// descriptor the executor still holds.
-func readRunnerStderr(file *os.File) string {
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return ""
-	}
-	data, err := io.ReadAll(io.LimitReader(file, maxRunnerStderr))
+// readRunnerStderr reads the last maxRunnerStderr bytes the subprocess wrote
+// to its stderr, redacted, for the paths where it produced no result file.
+// It reads a lookback of one longest secret form before them, so a secret that
+// crosses the start is seen whole, and prefixes truncatedPrefix when it cut.
+func readRunnerStderr(file *os.File, redactor *redact.Redactor) string {
+	info, err := file.Stat()
 	if err != nil {
 		return ""
 	}
-	return string(data)
+	size := info.Size()
+	offset := max(0, size-maxRunnerStderr-int64(redactor.MaxFormLen()))
+	buf, err := io.ReadAll(io.NewSectionReader(file, offset, size-offset))
+	if err != nil {
+		return ""
+	}
+	capStart := max(0, len(buf)-maxRunnerStderr) // in buffer bytes
+	// Invalid bytes go before any matching: dropped later they would join the
+	// bytes around them into a secret the redactor never saw.
+	raw := strings.ToValidUTF8(string(dropCutRune(buf)), "\uFFFD")
+	raw = redactor.TrimPartialTail(raw)
+	if offset == 0 && capStart == 0 {
+		return redactor.Redact(raw)
+	}
+	// Every form containing capStart starts at most MaxFormLen before it,
+	// inside the buffer, so SafeStart sees it whole and the cut lands in none.
+	start := redactor.SafeStart(raw, min(capStart, len(raw)))
+	return truncatedPrefix + redactor.Redact(raw[start:])
+}
+
+// dropCutRune removes a rune the stream stopped in the middle of, so the
+// partial secret before it is still the end of the text TrimPartialTail sees.
+func dropCutRune(b []byte) []byte {
+	for i := len(b) - 1; i >= 0 && i >= len(b)-utf8.UTFMax; i-- {
+		if utf8.RuneStart(b[i]) {
+			if !utf8.FullRune(b[i:]) {
+				return b[:i]
+			}
+			break
+		}
+	}
+	return b
 }
 
 // newRunToken mints the value every process in one execution carries in its

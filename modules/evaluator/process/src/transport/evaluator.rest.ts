@@ -22,11 +22,21 @@ import {
   evaluatorWireSchema,
   EvaluatorNotFoundError,
   EvaluatorTypeImmutableError,
+  type EvaluatorCaller,
   type EvaluatorWithFields,
+  evaluatorLabelRemovedSchema,
+  evaluatorLabelResponseSchema,
+  evaluatorLabelRestBodySchema,
+  evaluatorLabelRestParamsSchema,
+  evaluatorRestGetQuerySchema,
+  evaluatorVersionListResponseSchema,
+  evaluatorVersionsRestParamsSchema,
   updateEvaluatorInputSchema,
 } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
+
+import { evaluatorCallerOf } from "../rules/evaluator-version-caller.rules.ts";
 
 const logger = createLogger("langwatch:api:evaluators");
 
@@ -58,10 +68,14 @@ async function readEvaluator(params: {
   app: EvaluatorApi;
   idOrSlug: string;
   projectId: string;
+  label?: string;
+  version?: number;
 }): Promise<EvaluatorWithFields> {
   const evaluator = await params.app.findByIdOrSlugWithFields({
     idOrSlug: params.idOrSlug,
     projectId: params.projectId,
+    label: params.label,
+    version: params.version,
   });
 
   if (!evaluator) throw new EvaluatorNotFoundError(params.idOrSlug);
@@ -78,6 +92,7 @@ async function createEvaluator(params: {
   input: z.infer<typeof createEvaluatorInputSchema>;
   project: ProjectContext;
   projectId: string;
+  caller: EvaluatorCaller;
 }): Promise<z.infer<typeof evaluatorWireSchema>> {
   const { app, projectId } = params;
   logger.info({ projectId, name: params.input.name }, "Creating evaluator");
@@ -86,8 +101,10 @@ async function createEvaluator(params: {
     projectId,
     name: params.input.name,
     config: params.input.config,
+    caller: params.caller,
   });
-  const enriched = await app.getByIdWithFields({ id: created.id, projectId });
+  const enriched = await app.findByIdOrSlugWithFields({ idOrSlug: created.id, projectId });
+  if (!enriched) throw new EvaluatorNotFoundError(created.id);
   logger.info({ projectId, evaluatorId: enriched.id }, "Successfully created evaluator");
 
   return evaluatorWire({
@@ -107,6 +124,7 @@ async function updateEvaluator(params: {
   input: z.infer<typeof evaluatorIdParamsSchema> & z.infer<typeof updateEvaluatorInputSchema>;
   project: ProjectContext;
   projectId: string;
+  caller: EvaluatorCaller;
 }): Promise<z.infer<typeof evaluatorWireSchema>> {
   const { app, input, projectId } = params;
   logger.info({ projectId, evaluatorId: input.id }, "Updating evaluator");
@@ -127,8 +145,15 @@ async function updateEvaluator(params: {
   if (input.name !== void 0) data.name = input.name;
   if (input.config !== void 0) data.config = { ...existingConfig, ...input.config };
 
-  const updated = await app.update({ id: input.id, projectId, data });
-  const enriched = await app.getByIdWithFields({ id: updated.id, projectId });
+  const updated = await app.update({
+    id: input.id,
+    projectId,
+    data,
+    commitMessage: input.commitMessage,
+    caller: params.caller,
+  });
+  const enriched = await app.findByIdOrSlugWithFields({ idOrSlug: updated.id, projectId });
+  if (!enriched) throw new EvaluatorNotFoundError(updated.id);
   logger.info({ projectId, evaluatorId: enriched.id }, "Successfully updated evaluator");
 
   return evaluatorWire({
@@ -143,6 +168,7 @@ async function archiveEvaluator(params: {
   app: EvaluatorApi;
   id: string;
   projectId: string;
+  caller: EvaluatorCaller;
 }): Promise<z.infer<typeof archivedEvaluatorResponseSchema>> {
   const { app, id, projectId } = params;
   logger.info({ projectId, evaluatorId: id }, "Archiving evaluator");
@@ -150,7 +176,7 @@ async function archiveEvaluator(params: {
   const existing = await app.findById({ id, projectId });
   if (!existing) throw new EvaluatorNotFoundError(id);
 
-  await app.archive({ id, projectId });
+  await app.archive({ id, projectId, caller: params.caller });
   logger.info({ projectId, evaluatorId: id }, "Successfully archived evaluator");
 
   return { success: true };
@@ -187,10 +213,12 @@ export function createEvaluatorRest(): Readonly<{
 
       .get("/:idOrSlug", "getApiEvaluatorsByIdOrSlug")
       .withParams(evaluatorIdOrSlugParamsSchema)
+      .withQuery(evaluatorRestGetQuerySchema)
       .withPermission("evaluations:view", { legacyKey: "legacy_project_key_evaluations" })
       .withOutput(evaluatorWireSchema)
       .withDocs({
-        description: "Get a specific evaluator by ID or slug",
+        description:
+          "Get a specific evaluator by ID or slug, at the latest version unless `label` or `version` is given. The address also takes a suffix: `toxicity:production`, `toxicity:2` or `toxicity:latest`.",
         responses: notFound,
       })
       .withMiddlewareContext(projectRequestContext)
@@ -200,7 +228,13 @@ export function createEvaluatorRest(): Readonly<{
         return evaluatorWire({
           app,
           projectSlug: project.projectSlug,
-          evaluator: await readEvaluator({ app, idOrSlug: input.idOrSlug, projectId: scope.id }),
+          evaluator: await readEvaluator({
+            app,
+            idOrSlug: input.idOrSlug,
+            projectId: scope.id,
+            label: input.label,
+            version: input.version,
+          }),
         });
       })
 
@@ -210,12 +244,19 @@ export function createEvaluatorRest(): Readonly<{
       .keepsRecords()
       .withAudit("evaluators.create")
       .withInput(createEvaluatorInputSchema)
+      .withCredential("project", { key: true })
       .withPermission("evaluations:create")
       .withOutput(evaluatorWireSchema)
       .withDocs({ description: "Create a new evaluator" })
       .withMiddlewareContext(projectRequestContext)
-      .handle(({ app, input, scope }, project) =>
-        createEvaluator({ app, input, project, projectId: scope.id }),
+      .handle(({ app, input, scope, actor, key }, project) =>
+        createEvaluator({
+          app,
+          input,
+          project,
+          projectId: scope.id,
+          caller: evaluatorCallerOf({ actor, key }),
+        }),
       )
 
       .put("/:id", "putApiEvaluatorsById")
@@ -223,6 +264,7 @@ export function createEvaluatorRest(): Readonly<{
       .withAudit("evaluators.update")
       .withParams(evaluatorIdParamsSchema)
       .withInput(updateEvaluatorInputSchema)
+      .withCredential("project", { key: true })
       .withPermission("evaluations:update")
       .withOutput(evaluatorWireSchema)
       .withDocs({
@@ -230,14 +272,21 @@ export function createEvaluatorRest(): Readonly<{
         responses: badRequest,
       })
       .withMiddlewareContext(projectRequestContext)
-      .handle(({ app, input, scope }, project) =>
-        updateEvaluator({ app, input, project, projectId: scope.id }),
+      .handle(({ app, input, scope, actor, key }, project) =>
+        updateEvaluator({
+          app,
+          input,
+          project,
+          projectId: scope.id,
+          caller: evaluatorCallerOf({ actor, key }),
+        }),
       )
 
       // Archiving deliberately stays at `:manage`.
       .delete("/:id", "deleteApiEvaluatorsById")
       .withAudit("evaluators.delete")
       .withParams(evaluatorIdParamsSchema)
+      .withCredential("project", { key: true })
       .withPermission("evaluations:manage")
       .withConfirmation({
         resource: "evaluator",
@@ -250,9 +299,80 @@ export function createEvaluatorRest(): Readonly<{
         description: "Archive (soft-delete) an evaluator",
         responses: notFound,
       })
-      .handle(({ app, input, scope }) =>
-        archiveEvaluator({ app, id: input.id, projectId: scope.id }),
+      .handle(({ app, input, scope, actor, key }) =>
+        archiveEvaluator({
+          app,
+          id: input.id,
+          projectId: scope.id,
+          caller: evaluatorCallerOf({ actor, key }),
+        }),
       )
+
+      .get("/:evaluatorId/versions", "getApiEvaluatorsVersions")
+      .withParams(evaluatorVersionsRestParamsSchema)
+      .withPermission("evaluations:view", { legacyKey: "legacy_project_key_evaluations" })
+      .withOutput(evaluatorVersionListResponseSchema)
+      .withDocs({
+        description: "List an evaluator's versions, newest first, with the labels on each",
+        responses: notFound,
+      })
+      .handle(async ({ app, input, scope }) => {
+        const versions = await app.listVersions({
+          evaluatorId: input.evaluatorId,
+          projectId: scope.id,
+        });
+
+        return {
+          data: versions.versions,
+          labels: versions.labels.map(({ label, version }) => ({ label, version })),
+        };
+      })
+
+      .put("/:evaluatorId/labels/:label", "putApiEvaluatorsLabel")
+      .keepsRecords()
+      .withAudit("evaluators.assignLabel")
+      .withParams(evaluatorLabelRestParamsSchema)
+      .withInput(evaluatorLabelRestBodySchema)
+      .withCredential("project", { key: true })
+      .withPermission("evaluators:deploy")
+      .withOutput(evaluatorLabelResponseSchema)
+      .withDocs({
+        description: "Point a deploy label, such as production, at one of the evaluator's versions",
+        responses: badRequest,
+      })
+      .handle(async ({ app, input, scope, actor, key }) => {
+        const label = await app.assignLabel({
+          projectId: scope.id,
+          evaluatorId: input.evaluatorId,
+          label: input.label,
+          version: input.version,
+          caller: evaluatorCallerOf({ actor, key }),
+        });
+
+        return { label: label.label, version: label.version, versionId: label.versionId };
+      })
+
+      .delete("/:evaluatorId/labels/:label", "deleteApiEvaluatorsLabel")
+      .withAudit("evaluators.removeLabel")
+      .withParams(evaluatorLabelRestParamsSchema)
+      .withPermission("evaluators:deploy")
+      .withConfirmation({
+        resource: "evaluator deploy label",
+        action: "delete",
+        idParam: "label",
+        name: async () => null,
+      })
+      .withOutput(evaluatorLabelRemovedSchema)
+      .withDocs({ description: "Remove a deploy label from an evaluator", responses: notFound })
+      .handle(async ({ app, input, scope }) => {
+        await app.removeLabel({
+          projectId: scope.id,
+          evaluatorId: input.evaluatorId,
+          label: input.label,
+        });
+
+        return { label: input.label, removed: true as const };
+      })
       .build()
   );
 }

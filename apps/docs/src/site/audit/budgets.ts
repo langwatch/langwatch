@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
-
 import { z } from "zod";
+
+import budgetsFile from "./budgets.json" with { type: "json" };
 
 export const CATEGORIES = ["performance", "accessibility", "best-practices", "seo"] as const;
 export const FORM_FACTORS = ["mobile", "desktop"] as const;
@@ -62,9 +62,23 @@ export type FormFactor = z.infer<typeof formFactor>;
 
 export const DEFAULT_BUDGETS_FILE = new URL("./budgets.json", import.meta.url);
 
-export function readBudgets({ file = DEFAULT_BUDGETS_FILE }: { file?: URL | string } = {}) {
-  return budgetsSchema.parse(JSON.parse(readFileSync(file, "utf8")));
+/**
+ * The committed budgets, validated. A snapshot of budgets.json as imported when this module
+ * loaded (the bundled prerender needs the static import), so a baseline that run.ts writes to
+ * DEFAULT_BUDGETS_FILE in the same process is not seen.
+ */
+export function readBudgets() {
+  return budgetsSchema.parse(budgetsFile);
 }
+
+/**
+ * The page token budget, read through a static import: the bundled prerender cannot read
+ * budgets.json beside its own module. Only this field is parsed, so an unrelated bad budget
+ * cannot break the build.
+ */
+export const PAGE_TOKENS = budgetsSchema.shape.agentReadiness.shape.pageTokens.parse(
+  budgetsFile.agentReadiness.pageTokens,
+);
 
 const failingAudit = z.object({ id: z.string(), category, title: z.string(), score: z.number() });
 
