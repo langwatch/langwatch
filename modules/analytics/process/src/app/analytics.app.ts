@@ -119,7 +119,10 @@ import {
   type LangWatchQLQueryScope,
 } from "../services/langwatch-ql-query-scope.service.ts";
 import { LangWatchQLReadableProjectsService } from "../services/langwatch-ql-readable-projects.service.ts";
-import { LangWatchQLRunScopeService } from "../services/langwatch-ql-run-scope.service.ts";
+import {
+  LangWatchQLRunScopeService,
+  type LangWatchQLRunScope,
+} from "../services/langwatch-ql-run-scope.service.ts";
 import { LangWatchQLValidationReportService } from "../services/langwatch-ql-validation-report.service.ts";
 import {
   DEFAULT_LWQL_DATABASE,
@@ -864,9 +867,32 @@ export class AnalyticsModule
   async executeLangWatchQL(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
-    const { authorization, project, projects: asked, userId, ...run } = input;
+    return this.#runInScope({ input, scope: await this.#resolveRunScope(input) });
+  }
+
+  /** Which projects the run reads, refused here when the request names ones it may not. */
+  #resolveRunScope(
+    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
+  ): Promise<LangWatchQLRunScope> {
+    const { authorization, project, projects: asked, userId } = input;
     const selection = this.#runScope.select({ projects: asked });
-    const scope = await this.#runScope.resolve({ authorization, project, selection, userId });
+    return this.#runScope.resolve({ authorization, project, selection, userId });
+  }
+
+  async #runInScope({
+    input,
+    scope,
+  }: {
+    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>;
+    scope: LangWatchQLRunScope;
+  }): Promise<LangWatchQLQueryResult> {
+    const {
+      authorization: _authorization,
+      project,
+      projects: _asked,
+      userId: _user,
+      ...run
+    } = input;
 
     if (scope.kind === "aggregate") {
       // A judged column is charged to one project, so an aggregate's statement may call none.
@@ -896,13 +922,15 @@ export class AnalyticsModule
     return this.#dependencies.langWatchQL.execute({ project, ...run, isInstantEvalsEnabled });
   }
 
-  executeWorkbenchQuery(
+  async executeWorkbenchQuery(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
+    // The scope is the request's own input: a refusal there is not the statement failing.
+    const scope = await this.#resolveRunScope(input);
     return this.#failureReport.reportingFailures({
       projectId: input.project.id,
       sql: input.sql,
-      run: () => this.executeLangWatchQL(input),
+      run: () => this.#runInScope({ input, scope }),
     });
   }
 

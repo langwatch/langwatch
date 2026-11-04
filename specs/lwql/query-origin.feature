@@ -36,10 +36,12 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
 
     @unit
     Scenario Outline: A built-in failure is an error whatever the code
-      Given a built-in statement fails with ClickHouse code <code>
+      Given a built-in statement fails with the error code <code>, a handled code such as
+        lwql_invalid_query where the executor translated it, or the engine's own where it did not
       When the failure is reported
       Then one error-level record is written
-      And it carries only the origin, the error code, the project id and the statement hash
+      And the call carries only the origin, the error code, the project id and the statement hash
+      And the logger's request context may add its own fields, such as the trace and organisation ids
 
       Examples:
         | code |
@@ -59,6 +61,27 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
       Given the source presence probe, whose statements are fixed constants
       When one of its statements fails
       Then the error line names the origin as built in and carries no statement hash
+
+  Rule: Only the statement failing is reported; a refused request input is not
+
+    A refusal of the request's own projects is not the statement failing, so it writes no
+    built-in line and is not counted. The statement's own failures (parse, policy, parameters
+    it declares, execution, busy, timeout) are reported. Parameter and time-window checks run
+    inside statement validation, after the statement is parsed, so they cannot be split off by
+    stage and count with the statement.
+
+    @unit
+    Scenario: A refused project scope writes no built-in failure
+      Given a stock statement is sent naming a project the caller may not read
+      When the workbench door refuses the projects
+      Then no error-level record is written
+      And the failure count does not rise
+
+    @unit
+    Scenario: A statement failure still writes the built-in failure
+      Given a stock statement is sent with an accepted project scope
+      When the statement fails
+      Then one built-in failure is reported
 
   Rule: A user-written failure is counted and writes no error line
 
