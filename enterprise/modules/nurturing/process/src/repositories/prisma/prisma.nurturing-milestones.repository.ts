@@ -80,7 +80,7 @@ export class PrismaNurturingMilestonesRepository
     ];
   }
 
-  // The three coding writes are one conditional updateMany each: Postgres re-checks the WHERE
+  // The coding writes are one conditional updateMany each: Postgres re-checks the WHERE
   // under the row lock, so concurrent writers change the row once.
   async recordCodingFirstSession({
     organizationId,
@@ -114,6 +114,38 @@ export class PrismaNurturingMilestonesRepository
       select: { codingAgentTypes: true },
     });
     return organization?.codingAgentTypes ?? [];
+  }
+
+  async addCodingTerminalType({
+    organizationId,
+    terminalType,
+  }: Parameters<NurturingCodingMilestonesRepository["addCodingTerminalType"]>[0]): Promise<
+    string[]
+  > {
+    await this.prisma.nurturingOrganization.updateMany({
+      where: { organizationId, NOT: { codingTerminalTypes: { has: terminalType } } },
+      data: { codingTerminalTypes: { push: terminalType } },
+    });
+    const organization = await this.prisma.nurturingOrganization.findUnique({
+      where: { organizationId },
+      select: { codingTerminalTypes: true },
+    });
+    return organization?.codingTerminalTypes ?? [];
+  }
+
+  async addCodingRepository({
+    organizationId,
+    repositoryKey,
+  }: Parameters<NurturingCodingMilestonesRepository["addCodingRepository"]>[0]): Promise<number> {
+    await this.prisma.nurturingOrganization.updateMany({
+      where: { organizationId, NOT: { codingRepositoryKeys: { has: repositoryKey } } },
+      data: { codingRepositoryKeys: { push: repositoryKey } },
+    });
+    const organization = await this.prisma.nurturingOrganization.findUnique({
+      where: { organizationId },
+      select: { codingRepositoryKeys: true },
+    });
+    return organization?.codingRepositoryKeys.length ?? 0;
   }
 
   async recordCodingActiveDay({

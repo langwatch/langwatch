@@ -69,6 +69,51 @@ export function codingAgentTypesSignal({
   };
 }
 
+/** A new terminal type: the full sorted list, keyed by it, so each list is sent once. */
+export function codingTerminalTypesSignal({
+  data,
+  adminUserId,
+  organizationId,
+  terminalTypes,
+}: AdminFact &
+  Readonly<{
+    organizationId: string;
+    terminalTypes: readonly string[];
+  }>): NurturingSignalOf<"coding_terminal_types"> {
+  const sorted = [...terminalTypes].toSorted();
+  return {
+    kind: "coding_terminal_types",
+    sourceEventId: `${organizationId}:${sorted.join(",")}`,
+    tenantId: data.tenantId,
+    occurredAt: data.occurredAt,
+    userId: adminUserId,
+    projectId: data.projectId,
+    terminalTypes: sorted,
+  };
+}
+
+/** A new repo: the count alone, keyed by it, so each count is sent once. */
+export function codingRepoCountSignal({
+  data,
+  adminUserId,
+  organizationId,
+  codingRepoCount,
+}: AdminFact &
+  Readonly<{
+    organizationId: string;
+    codingRepoCount: number;
+  }>): NurturingSignalOf<"coding_repo_count"> {
+  return {
+    kind: "coding_repo_count",
+    sourceEventId: `${organizationId}:${codingRepoCount}`,
+    tenantId: data.tenantId,
+    occurredAt: data.occurredAt,
+    userId: adminUserId,
+    projectId: data.projectId,
+    codingRepoCount,
+  };
+}
+
 /** The organization's first coding-agent session; keyed by the organization, so once, ever. */
 export function codingAgentFirstSessionSignal({
   data,

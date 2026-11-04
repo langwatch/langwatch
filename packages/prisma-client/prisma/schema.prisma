@@ -4972,6 +4972,9 @@ model NurturingOrganization {
   codingAgentTypes     String[]  @default([])
   codingActiveDays     Int       @default(0)
   codingLastActiveDay  String? // UTC `YYYY-MM-DD`; sorts lexically
+  codingTerminalTypes  String[]  @default([])
+  // Hashes standing for repos, only ever counted; no repo name is held here.
+  codingRepositoryKeys String[]  @default([])
   updatedAt            DateTime  @updatedAt
 }
 

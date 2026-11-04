@@ -16,6 +16,7 @@ import {
   type CodingAgentSessionRow,
   type CodingAgentSessionState,
 } from "../../eventing/coding-agent-session.projection.ts";
+import { repositoryKeyOf } from "../../rules/coding-agent-repository-key.rules.ts";
 import { toCodingAgentSessionRow } from "../../rules/coding-agent-session-row-mapper.rules.ts";
 import {
   EventingCodingAgentSessionStoreService,
@@ -238,6 +239,8 @@ describe("EventingCodingAgentSessionStoreService durable dedup", () => {
       occurredAt: 1_000,
       firstStoredAt: 1_000,
       auxiliary: false,
+      terminalType: null,
+      repositoryKey: null,
       ...over,
     });
 
@@ -257,6 +260,44 @@ describe("EventingCodingAgentSessionStoreService durable dedup", () => {
         await Promise.resolve();
 
         expect(seen).toEqual([[stored()]]);
+      });
+
+      /** @scenario "A stored session reports its terminal type and a key standing for its repo" */
+      it("reports the terminal type and the repo's key, never the repo itself", async () => {
+        const seen: StoredSession[][] = [];
+        const store = storeWith(new FakePersistence(), {
+          onSessionsStored: async (sessions) => void seen.push(sessions),
+        });
+        const repository = {
+          repositoryHost: "github.com",
+          repositoryOwner: "acme",
+          repositoryName: "payments",
+        };
+
+        await store.store(makeState({ terminalType: "vscode", ...repository }), context());
+        await Promise.resolve();
+
+        expect(seen[0]?.[0]).toMatchObject({
+          terminalType: "vscode",
+          repositoryKey: repositoryKeyOf(repository),
+        });
+        expect(JSON.stringify(seen)).not.toMatch(/acme|payments|github\.com/);
+      });
+
+      /** @scenario "A repo's key ignores case and differs per repo" */
+      it.each([
+        ["owner", { repositoryName: "payments" }],
+        ["name", { repositoryOwner: "acme" }],
+      ])("reports no repo key for a repo with no %s", async (_missing, repository) => {
+        const seen: StoredSession[][] = [];
+        const store = storeWith(new FakePersistence(), {
+          onSessionsStored: async (sessions) => void seen.push(sessions),
+        });
+
+        await store.store(makeState(repository), context());
+        await Promise.resolve();
+
+        expect(seen[0]?.[0]?.repositoryKey).toBeNull();
       });
 
       /** @scenario "A helper-thread session is reported as auxiliary" */

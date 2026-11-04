@@ -11,6 +11,7 @@ import {
   type CodingAgentSessionRow,
   type CodingAgentSessionState,
 } from "../eventing/coding-agent-session.projection.ts";
+import { repositoryKeyOf } from "../rules/coding-agent-repository-key.rules.ts";
 import { toCodingAgentSessionRow } from "../rules/coding-agent-session-row-mapper.rules.ts";
 import { codingAgentSessionStateFromRow } from "../rules/coding-agent-session-state-mapper.rules.ts";
 
@@ -39,6 +40,10 @@ export interface StoredSession {
   /** When the session was first folded (set at fold init, kept on read-back), epoch ms. */
   firstStoredAt: number;
   auxiliary: boolean;
+  /** Null until a log event names it. */
+  terminalType: string | null;
+  /** A hash standing for the session's repo; null until the session declares one. */
+  repositoryKey: string | null;
 }
 
 /** Store adapter; no agent gate (dispatchers gate upstream), read-back decoding per ADR-066. */
@@ -172,6 +177,16 @@ function toStoredSession(
     occurredAt: state.LastEventOccurredAt,
     firstStoredAt: state.createdAt,
     auxiliary: state.auxiliary,
+    terminalType: state.terminalType,
+    // The same bar extractWorkingContext sets for naming a repo: owner and name.
+    repositoryKey:
+      state.repositoryOwner && state.repositoryName
+        ? repositoryKeyOf({
+            repositoryHost: state.repositoryHost,
+            repositoryOwner: state.repositoryOwner,
+            repositoryName: state.repositoryName,
+          })
+        : null,
   };
 }
 

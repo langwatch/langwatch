@@ -90,6 +90,31 @@ describe.skipIf(!databaseUrl)("given nurturing's organizations table and coding 
     });
   });
 
+  describe("when the same terminal type and repo key are added at once", () => {
+    /** @scenario "Concurrent writes hold one terminal type and one repo key once" */
+    it("holds each once", async () => {
+      const organizationId = await learned("terminal-repo");
+
+      await Promise.all(
+        Array.from({ length: 5 }, () =>
+          repository.addCodingTerminalType({ organizationId, terminalType: "vscode" }),
+        ),
+      );
+      await Promise.all(
+        Array.from({ length: 5 }, () =>
+          repository.addCodingRepository({ organizationId, repositoryKey: "repo-a" }),
+        ),
+      );
+
+      await expect(
+        repository.addCodingTerminalType({ organizationId, terminalType: "vscode" }),
+      ).resolves.toEqual(["vscode"]);
+      await expect(
+        repository.addCodingRepository({ organizationId, repositoryKey: "repo-a" }),
+      ).resolves.toBe(1);
+    });
+  });
+
   describe("when the same day is recorded at once", () => {
     it("counts it once", async () => {
       const organizationId = await learned("days");

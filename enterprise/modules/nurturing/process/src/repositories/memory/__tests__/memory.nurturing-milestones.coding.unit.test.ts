@@ -127,4 +127,39 @@ describe("MemoryNurturingMilestonesRepository coding signals", () => {
       ).resolves.toEqual({ changed: false, codingActiveDays: 1 });
     });
   });
+
+  describe("when a terminal type is added twice", () => {
+    it("holds it once", async () => {
+      const repository = await learned();
+      const input = { organizationId: "org-1", terminalType: "vscode" };
+
+      await repository.addCodingTerminalType(input);
+
+      await expect(repository.addCodingTerminalType(input)).resolves.toEqual(["vscode"]);
+    });
+  });
+
+  describe("when a repo key is added twice", () => {
+    it("counts it once", async () => {
+      const repository = await learned();
+      const input = { organizationId: "org-1", repositoryKey: "repo-a" };
+
+      await repository.addCodingRepository(input);
+
+      await expect(repository.addCodingRepository(input)).resolves.toBe(1);
+    });
+  });
+
+  describe("when the organization is not learned", () => {
+    it("holds no terminal type and counts no repo", async () => {
+      const repository = MemoryNurturingMilestonesRepository.create();
+
+      await expect(
+        repository.addCodingTerminalType({ organizationId: "org-x", terminalType: "vscode" }),
+      ).resolves.toEqual([]);
+      await expect(
+        repository.addCodingRepository({ organizationId: "org-x", repositoryKey: "repo-a" }),
+      ).resolves.toBe(0);
+    });
+  });
 });

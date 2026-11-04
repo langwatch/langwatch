@@ -53,6 +53,8 @@ export interface CioPersonTraits {
   coding_last_session_at?: number;
   coding_active_days?: number;
   coding_agent_types?: string[];
+  coding_terminal_types?: string[];
+  coding_repo_count?: number;
   uses_coding_agent?: boolean;
 
   // The person's own last page open

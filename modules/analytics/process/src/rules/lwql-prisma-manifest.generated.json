@@ -20168,6 +20168,24 @@
           "documentation": ""
         },
         {
+          "name": "codingTerminalTypes",
+          "columnName": "codingTerminalTypes",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "codingRepositoryKeys",
+          "columnName": "codingRepositoryKeys",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
           "name": "updatedAt",
           "columnName": "updatedAt",
           "type": "DateTime",

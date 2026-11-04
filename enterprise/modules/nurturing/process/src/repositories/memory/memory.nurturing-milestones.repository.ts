@@ -6,11 +6,15 @@ import type {
   NurturingOrganizationRow,
 } from "../nurturing-milestones.repository.ts";
 
+/** A row plus the columns only their own writes read, as the Postgres table holds them. */
+type MemoryOrganization = NurturingOrganizationRow &
+  Readonly<{ codingTerminalTypes: string[]; codingRepositoryKeys: string[] }>;
+
 /** The Postgres twin's semantics over nurturing's own organizations. */
 export class MemoryNurturingMilestonesRepository
   implements NurturingMilestonesRepository, NurturingCodingMilestonesRepository
 {
-  readonly #organizations = new Map<string, NurturingOrganizationRow>();
+  readonly #organizations = new Map<string, MemoryOrganization>();
 
   static create(): MemoryNurturingMilestonesRepository {
     return new MemoryNurturingMilestonesRepository();
@@ -36,6 +40,8 @@ export class MemoryNurturingMilestonesRepository
             codingAgentTypes: [],
             codingActiveDays: 0,
             codingLastActiveDay: null,
+            codingTerminalTypes: [],
+            codingRepositoryKeys: [],
           },
     );
   }
@@ -97,6 +103,36 @@ export class MemoryNurturingMilestonesRepository
     const codingAgentTypes = [...organization.codingAgentTypes, agentType];
     this.#organizations.set(organizationId, { ...organization, codingAgentTypes });
     return [...codingAgentTypes];
+  }
+
+  async addCodingTerminalType({
+    organizationId,
+    terminalType,
+  }: Parameters<NurturingCodingMilestonesRepository["addCodingTerminalType"]>[0]): Promise<
+    string[]
+  > {
+    const organization = this.#organizations.get(organizationId);
+    if (!organization) return [];
+    if (organization.codingTerminalTypes.includes(terminalType)) {
+      return [...organization.codingTerminalTypes];
+    }
+    const codingTerminalTypes = [...organization.codingTerminalTypes, terminalType];
+    this.#organizations.set(organizationId, { ...organization, codingTerminalTypes });
+    return [...codingTerminalTypes];
+  }
+
+  async addCodingRepository({
+    organizationId,
+    repositoryKey,
+  }: Parameters<NurturingCodingMilestonesRepository["addCodingRepository"]>[0]): Promise<number> {
+    const organization = this.#organizations.get(organizationId);
+    if (!organization) return 0;
+    if (organization.codingRepositoryKeys.includes(repositoryKey)) {
+      return organization.codingRepositoryKeys.length;
+    }
+    const codingRepositoryKeys = [...organization.codingRepositoryKeys, repositoryKey];
+    this.#organizations.set(organizationId, { ...organization, codingRepositoryKeys });
+    return codingRepositoryKeys.length;
   }
 
   async recordCodingActiveDay({

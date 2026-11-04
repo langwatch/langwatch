@@ -4,7 +4,7 @@
  * @see enterprise/modules/nurturing/specs/coding-agent-signals.feature
  */
 import type { CodingAgentSessionStoredEventData } from "@langwatch/coding-agent-contract";
-import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
+import type { NurturingSignal, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,6 +13,9 @@ import { nurturingSignalKey } from "../../eventing/nurturing-signal.commands.ts"
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import { NurturingCodingMilestonesService } from "../nurturing-coding-milestones.service.ts";
+
+type Terminals = NurturingSignalOf<"coding_terminal_types">;
+type RepoCount = NurturingSignalOf<"coding_repo_count">;
 
 const DAY = Date.UTC(2026, 9, 20, 12);
 const HOUR = 60 * 60 * 1000;
@@ -356,6 +359,152 @@ describe("NurturingCodingMilestonesService", () => {
       await send([fact({ sessionId: "s-2", firstForProject: false, occurredAt: DAY + 48 * HOUR })]);
 
       expect(ofKind("coding_active_days")).toHaveLength(1);
+    });
+  });
+
+  describe("when sessions name terminal types", () => {
+    const terminalTypesOf = (ofKind: Awaited<ReturnType<typeof serviceOver>>["ofKind"]) =>
+      ofKind("coding_terminal_types").map((signal) => (signal as Terminals).terminalTypes);
+
+    /** @scenario "A new terminal type raises the full sorted list of terminal types" */
+    it("raises the full sorted list each time a new one appears", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([fact({ terminalType: "vscode" })]);
+      await send([fact({ sessionId: "s-2", terminalType: "ghostty" })]);
+
+      expect(terminalTypesOf(ofKind)).toEqual([["vscode"], ["ghostty", "vscode"]]);
+    });
+
+    it("raises one signal naming both for a batch of two", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([
+        fact({ terminalType: "vscode" }),
+        fact({ sessionId: "s-2", terminalType: "ghostty" }),
+      ]);
+
+      expect(terminalTypesOf(ofKind)).toEqual([["ghostty", "vscode"]]);
+    });
+
+    /** @scenario "A known terminal type raises no second terminal-types signal" */
+    it("raises no second signal for a known one", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([fact({ terminalType: "vscode" })]);
+      await send([fact({ sessionId: "s-2", terminalType: "vscode" })]);
+
+      expect(terminalTypesOf(ofKind)).toEqual([["vscode"]]);
+    });
+  });
+
+  describe("when sessions name repos", () => {
+    const countsOf = (ofKind: Awaited<ReturnType<typeof serviceOver>>["ofKind"]) =>
+      ofKind("coding_repo_count").map((signal) => (signal as RepoCount).codingRepoCount);
+
+    /** @scenario "A new repo grows the organization's repo count" */
+    it("counts the repos of every project of the organization", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([fact({ repositoryKey: "repo-a" })]);
+      await send([
+        fact({
+          tenantId: "project-2",
+          projectId: "project-2",
+          sessionId: "s-2",
+          repositoryKey: "repo-b",
+        }),
+      ]);
+
+      expect(countsOf(ofKind)).toEqual([1, 2]);
+    });
+
+    it("raises one signal with the count for a batch of two", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([
+        fact({ repositoryKey: "repo-a" }),
+        fact({ sessionId: "s-2", repositoryKey: "repo-b" }),
+      ]);
+
+      expect(countsOf(ofKind)).toEqual([2]);
+    });
+
+    /** @scenario "A repo seen again does not grow the repo count" */
+    it("raises no second signal for a repo seen in another project", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([fact({ repositoryKey: "repo-a" })]);
+      await send([
+        fact({
+          tenantId: "project-2",
+          projectId: "project-2",
+          sessionId: "s-2",
+          repositoryKey: "repo-a",
+        }),
+      ]);
+
+      expect(countsOf(ofKind)).toEqual([1]);
+    });
+
+    /** @scenario "A delivery of the new facts that fails is not lost when the fact is redelivered" */
+    it("sends the count once when its delivery fails and the fact is redelivered", async () => {
+      const { send, ofKind } = await serviceOver({ failFirstDeliveryOf: "coding_repo_count" });
+
+      await expect(send([fact({ repositoryKey: "repo-a" })])).rejects.toThrow("delivery failed");
+      await send([fact({ repositoryKey: "repo-a" })]);
+
+      expect(countsOf(ofKind)).toEqual([1]);
+    });
+
+    /** @scenario "The repo key never reaches a signal" */
+    it("holds the repo key in no signal", async () => {
+      const { send, delivered } = await serviceOver();
+
+      await send([fact({ repositoryKey: "repo-key-secret", terminalType: "vscode" })]);
+
+      expect(delivered.map((signal) => signal.kind)).toContain("coding_repo_count");
+      expect(JSON.stringify(delivered)).not.toContain("repo-key-secret");
+    });
+  });
+
+  describe("when a session names no terminal type and no repo", () => {
+    /** @scenario "A session with no terminal type or no repo changes neither value" */
+    it("raises neither signal for an organization with only such sessions", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([fact()]);
+
+      expect([ofKind("coding_terminal_types"), ofKind("coding_repo_count")]).toEqual([[], []]);
+    });
+
+    it("raises no further signal after one that named them", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([fact({ terminalType: "vscode", repositoryKey: "repo-a" })]);
+      await send([fact({ sessionId: "s-2" })]);
+
+      expect([ofKind("coding_terminal_types"), ofKind("coding_repo_count")]).toMatchObject([
+        [{ terminalTypes: ["vscode"] }],
+        [{ codingRepoCount: 1 }],
+      ]);
+    });
+  });
+
+  describe("when a session names a terminal type and a repo", () => {
+    /** @scenario "The terminal types and repo count go to whoever gets the agent types" */
+    it("raises both for the person the agent-types signal names", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([fact({ firstForProject: false, terminalType: "vscode", repositoryKey: "r" })]);
+
+      const [person] = ofKind("coding_agent_types").map((signal) => (signal as Terminals).userId);
+      expect(person).toBeDefined();
+      expect(
+        [...ofKind("coding_terminal_types"), ...ofKind("coding_repo_count")].map(
+          (signal) => (signal as Terminals).userId,
+        ),
+      ).toEqual([person, person]);
     });
   });
 

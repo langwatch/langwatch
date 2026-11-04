@@ -65,6 +65,14 @@ export interface NurturingCodingMilestonesRepository {
   addCodingAgentType(
     input: Readonly<{ organizationId: string; agentType: string }>,
   ): Promise<string[]>;
+  /** Adds the terminal type once; the list is always the current one. */
+  addCodingTerminalType(
+    input: Readonly<{ organizationId: string; terminalType: string }>,
+  ): Promise<string[]>;
+  /** Adds the repo's key once; answers how many distinct repos the organization holds. */
+  addCodingRepository(
+    input: Readonly<{ organizationId: string; repositoryKey: string }>,
+  ): Promise<number>;
   /** Counts the UTC `day` when later than the last one; `changed` stays true for that same day. */
   recordCodingActiveDay(
     input: Readonly<{ organizationId: string; day: string }>,

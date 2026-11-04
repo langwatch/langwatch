@@ -12,7 +12,9 @@ import {
   codingActiveDaysSignal,
   codingAgentFirstSessionSignal,
   codingAgentTypesSignal,
+  codingRepoCountSignal,
   codingSessionStoredSignal,
+  codingTerminalTypesSignal,
 } from "../rules/nurturing-coding-signals.rules.ts";
 import { seededAtRead } from "../rules/nurturing-owner-signals.rules.ts";
 import { utcDayOf } from "../rules/nurturing-time.rules.ts";
@@ -34,7 +36,7 @@ function latestOf(facts: readonly Fact[]): Fact {
 
 /**
  * What nurturing decides from coding-agent's session-stored fact (§9), per project: the last
- * session, first session, agent types and UTC active days. Each step is a guarded write that
+ * session, first session, agent types, terminal types, repo count and UTC active days. Each step is a guarded write that
  * answers a retry of the same fact again, and delivery's claims send each signal once.
  */
 export class NurturingCodingMilestonesService {
@@ -76,6 +78,15 @@ export class NurturingCodingMilestonesService {
       );
     } else {
       await deliver(codingAgentTypesSignal({ data: latest, agentTypes, ...common }));
+    }
+
+    const terminalTypes = await this.addTerminalTypes({ organizationId, facts });
+    if (terminalTypes.length > 0) {
+      await deliver(codingTerminalTypesSignal({ data: latest, terminalTypes, ...common }));
+    }
+    const codingRepoCount = await this.addRepositories({ organizationId, facts });
+    if (codingRepoCount > 0) {
+      await deliver(codingRepoCountSignal({ data: latest, codingRepoCount, ...common }));
     }
 
     // Each UTC day of the batch counts, oldest first: a batch over midnight loses none.
@@ -137,6 +148,36 @@ export class NurturingCodingMilestonesService {
       });
     }
     return agentTypes;
+  }
+
+  /** Adds each distinct terminal type once; empty when no fact of the batch names one. */
+  private async addTerminalTypes({
+    organizationId,
+    facts,
+  }: Readonly<{ organizationId: string; facts: readonly Fact[] }>): Promise<string[]> {
+    let terminalTypes: string[] = [];
+    for (const terminalType of new Set(facts.flatMap((fact) => fact.terminalType ?? []))) {
+      terminalTypes = await this.dependencies.milestones.addCodingTerminalType({
+        organizationId,
+        terminalType,
+      });
+    }
+    return terminalTypes;
+  }
+
+  /** Adds each distinct repo once; zero when no fact of the batch names one. */
+  private async addRepositories({
+    organizationId,
+    facts,
+  }: Readonly<{ organizationId: string; facts: readonly Fact[] }>): Promise<number> {
+    let count = 0;
+    for (const repositoryKey of new Set(facts.flatMap((fact) => fact.repositoryKey ?? []))) {
+      count = await this.dependencies.milestones.addCodingRepository({
+        organizationId,
+        repositoryKey,
+      });
+    }
+    return count;
   }
 
   /** Null when the owners hold no such project or nurturing never learned its organization. */

@@ -146,5 +146,73 @@ Feature: Coding-agent session signals reach Customer.io
 
   @unit
   Scenario: The new signals reach Customer.io only
-    When any of the six new signals is delivered
+    When any of the new signals is delivered
     Then PostHog receives nothing
+
+  @unit
+  Scenario: A new terminal type raises the full sorted list of terminal types
+    Given the organization's sessions ran in vscode
+    When a later session ran in ghostty
+    Then the terminal types raised are vscode, then ghostty and vscode
+
+  @unit
+  Scenario: A known terminal type raises no second terminal-types signal
+    Given the organization's sessions ran in vscode
+    When another session ran in vscode
+    Then one terminal-types signal has been raised
+
+  @unit
+  Scenario: A new repo grows the organization's repo count
+    When sessions of two projects of the organization name two repos
+    Then the repo counts raised are one and two
+
+  @unit
+  Scenario: A repo seen again does not grow the repo count
+    Given a project's session named a repo
+    When a session of another project of the organization names the same repo
+    Then one repo-count signal has been raised
+
+  @unit
+  Scenario: A session with no terminal type or no repo changes neither value
+    Given the organization's sessions named a terminal type and a repo
+    When a session names neither
+    Then no further terminal-types or repo-count signal is raised
+    And an organization with only such sessions gets neither signal
+
+  @unit
+  Scenario: A delivery of the new facts that fails is not lost when the fact is redelivered
+    Given delivering the repo-count signal fails once
+    When the same session-stored fact is delivered again
+    Then the repo-count signal is sent exactly once
+
+  @unit
+  Scenario: The repo key never reaches a signal
+    When a session-stored fact names a repo key
+    Then no raised signal holds the key
+
+  @unit
+  Scenario: The terminal types and repo count go to whoever gets the agent types
+    When a session-stored fact names a terminal type and a repo
+    Then the terminal-types and repo-count signals name the person the agent-types signal names
+
+  @unit
+  Scenario: A terminal-types signal identifies the full list without an event
+    When a coding_terminal_types signal is delivered
+    Then Customer.io identifies the full list
+    And no event is tracked
+
+  @unit
+  Scenario: A repo-count signal identifies the count and nothing else
+    When a coding_repo_count signal is delivered
+    Then Customer.io identifies coding_repo_count with the count as the only trait
+    And no event is tracked
+
+  @unit
+  Scenario: The terminal types and repo count are not debounced, like the agent types
+    When two signals of a kind with different values are delivered inside 300 seconds
+    Then Customer.io is identified with both
+
+  @integration
+  Scenario: Concurrent writes hold one terminal type and one repo key once
+    Given five writes of one terminal type and five of one repo key at once
+    Then the organization holds each once

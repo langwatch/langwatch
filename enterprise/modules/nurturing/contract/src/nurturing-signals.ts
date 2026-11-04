@@ -315,6 +315,24 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     agentTypes: z.array(id).min(1),
   }),
   z.object({
+    kind: z.literal("coding_terminal_types"),
+    ...signalSource,
+    /** The organization's admin. */
+    userId: id,
+    projectId: id,
+    /** Every terminal type the organization's sessions ran in, sorted. */
+    terminalTypes: z.array(id).min(1),
+  }),
+  z.object({
+    kind: z.literal("coding_repo_count"),
+    ...signalSource,
+    /** The organization's admin. */
+    userId: id,
+    projectId: id,
+    /** Distinct repos of the organization's sessions: the count alone, never a per-repo value. */
+    codingRepoCount: countIncludingThis,
+  }),
+  z.object({
     kind: z.literal("coding_agent_first_session"),
     ...signalSource,
     /** The organization's admin. `occurredAt` is the first session's. */

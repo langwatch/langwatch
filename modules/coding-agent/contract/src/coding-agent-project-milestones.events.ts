@@ -15,6 +15,10 @@ const codingAgentSessionStoredEventDataSchemaDefinition = z
     firstForProject: z.boolean(),
     /** The session's own last event time, epoch ms, never more than a day after it was recorded. */
     occurredAt: z.number().int().nonnegative(),
+    /** Absent until a log event names it, and on every fact recorded before it was added. */
+    terminalType: z.string().min(1).optional(),
+    /** A hash standing for the session's repo, so peers can count repos without learning any. */
+    repositoryKey: z.string().min(1).optional(),
   })
   .strict();
 export interface CodingAgentSessionStoredEventDataSchema extends Named<
