@@ -35853,7 +35853,9 @@ RESULT=$(langwatch run-plan run --test-suite Refunds --target connected:support-
 echo "$RESULT" | jq -es '.[0].outcome == "passed" or .[0].outcome == "failed"'
 ```
 
-The job then stays green on `failed`, so your team reads the pass bar on Results. `failed` also counts a run that ended with no verdict, such as one that errored or was cancelled, so read those there too. This form does not gate a release: for a plan such as `Refunds pre-release`, have the job check `results` in the JSON against your bar.
+The job then stays green on `failed`, so your team reads the pass bar on Results. `failed` also counts a run that ended without success and with no verdict, such as one that errored or was cancelled, so read those there too. A run that succeeded with no verdict counts as passed.
+
+This form does not gate a release. For a plan such as `Refunds pre-release`, have the job check `results` in the JSON against your bar. Each row gives the `scenarioId` and no labels, so match the rows to your labels yourself.
 
 ```bash
 # Critical: 5 repetitions and a strong judge.
@@ -37583,7 +37585,7 @@ langwatch run-plan run --label canary \
   --name "Canary: production vs local" --wait
 ```
 
-A run against `production` runs on real data, so scope it to scenarios that only read data, as a `canary` label does here. Setup and teardown hooks run for every scenario, so do not declare them in that process.
+A run against `production` runs on real data. Give the `canary` label only to scenarios that only read data: a label selects scenarios, and LangWatch does not check what they do. Setup and teardown hooks and per-conversation seeding run for every scenario, so leave them out of that process.
 
 The same shape compares two deployed environments, `staging` against `production`, or one environment against another model:
 

@@ -100,7 +100,7 @@ langwatch run-plan run --label canary \
   --name "Canary: production vs local" --wait
 ```
 
-A run against `production` runs on real data, so scope it to scenarios that only read data, as a `canary` label does here. Setup and teardown hooks run for every scenario, so do not declare them in that process.
+A run against `production` runs on real data. Give the `canary` label only to scenarios that only read data: a label selects scenarios, and LangWatch does not check what they do. Setup and teardown hooks and per-conversation seeding run for every scenario, so leave them out of that process.
 
 The same shape compares two deployed environments, `staging` against `production`, or one environment against another model:
 

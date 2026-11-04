@@ -63,7 +63,9 @@ RESULT=$(langwatch run-plan run --test-suite Refunds --target connected:support-
 echo "$RESULT" | jq -es '.[0].outcome == "passed" or .[0].outcome == "failed"'
 ```
 
-The job then stays green on `failed`, so your team reads the pass bar on Results. `failed` also counts a run that ended with no verdict, such as one that errored or was cancelled, so read those there too. This form does not gate a release: for a plan such as `Refunds pre-release`, have the job check `results` in the JSON against your bar.
+The job then stays green on `failed`, so your team reads the pass bar on Results. `failed` also counts a run that ended without success and with no verdict, such as one that errored or was cancelled, so read those there too. A run that succeeded with no verdict counts as passed.
+
+This form does not gate a release. For a plan such as `Refunds pre-release`, have the job check `results` in the JSON against your bar. Each row gives the `scenarioId` and no labels, so match the rows to your labels yourself.
 
 ```bash
 # Critical: 5 repetitions and a strong judge.
