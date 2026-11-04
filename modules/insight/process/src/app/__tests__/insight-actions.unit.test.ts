@@ -15,6 +15,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { InsightActionService } from "../../services/insight-action.service.ts";
 import {
   filing,
   installInsight,
@@ -36,6 +37,8 @@ const DRAFT_EVALUATOR: InsightActionInput = {
 };
 
 type HeldConversation = { isOwn: boolean; origin: LangyConversationOrigin };
+/** What one read of a fork answers: its row as far as it has landed, or nothing yet. */
+type ForkRead = { isOwn: boolean; messageCount: number } | null;
 type SentMessage = {
   via: "create" | "continue";
   conversationId: string | null;
@@ -44,11 +47,19 @@ type SentMessage = {
   text: string;
 };
 
-/** Langy as a click meets it: the conversations it holds, and one message per idempotency key. */
-function fakeLangy() {
+const FORK_COPIED_MESSAGES = 2;
+const LANDED: ForkRead = { isOwn: true, messageCount: FORK_COPIED_MESSAGES };
+const FORK_TITLE = "Checkout errors (fork)";
+
+/**
+ * Langy as a click meets it: the conversations it holds, and one message per idempotency key. A
+ * fork only sends commands, so each read of it answers the next of `forkReads`; the last holds.
+ */
+function fakeLangy({ forkReads = [LANDED] }: { forkReads?: ForkRead[] } = {}) {
   const conversations = new Map<string, HeldConversation>();
   const sent: SentMessage[] = [];
   const forked: string[] = [];
+  let forkReadsDone = 0;
   const turns = new Map<string, { conversationId: string; turnId: string }>();
 
   const start = ({
@@ -75,14 +86,14 @@ function fakeLangy() {
     return Promise.resolve(turn);
   };
 
-  const detail = (id: string, held: HeldConversation) => ({
+  const detail = (id: string, held: HeldConversation, messageCount = 2) => ({
     id,
     title: null,
     isShared: !held.isOwn,
     isOwn: held.isOwn,
     origin: held.origin,
     lastActivityAt: nowInstant(),
-    messageCount: 2,
+    messageCount,
     status: "idle",
     currentTurnId: null,
     lastError: null,
@@ -92,20 +103,25 @@ function fakeLangy() {
 
   const api = createApiFixture<LangyApi>({
     findByIdVisible: async ({ id }) => {
+      if (forked.length > 0 && id === `fork-${forked.length}`) {
+        const read = forkReads[Math.min(forkReadsDone, forkReads.length - 1)] ?? null;
+        forkReadsDone += 1;
+        if (!read) return null;
+        const row = { isOwn: read.isOwn, origin: LANGY_CONVERSATION_ORIGIN.INTERACTIVE };
+        return detail(id, row, read.messageCount);
+      }
       const held = conversations.get(id);
       return held ? detail(id, held) : null;
     },
     forkConversation: async ({ conversationId }) => {
       forked.push(conversationId);
-      const id = `fork-${forked.length}`;
-      conversations.set(id, { isOwn: true, origin: LANGY_CONVERSATION_ORIGIN.INTERACTIVE });
       return {
-        id,
-        title: null,
+        id: `fork-${forked.length}`,
+        title: FORK_TITLE,
         isShared: false,
         isOwn: true,
         origin: LANGY_CONVERSATION_ORIGIN.INTERACTIVE,
-        messageCount: 2,
+        messageCount: FORK_COPIED_MESSAGES,
         lastActivityAtMs: 0,
         status: "idle" as const,
       };
@@ -114,7 +130,19 @@ function fakeLangy() {
     continueConversationTurn: (input) => start({ via: "continue", input }),
   });
 
-  return { api, conversations, sent, forked };
+  return { api, conversations, sent, forked, forkReadCount: () => forkReadsDone };
+}
+
+/** Time that moves only when the service sleeps; each sleep notes what Langy was sent so far. */
+function fakeClock({ onSleep }: { onSleep: () => void }) {
+  let now = 0;
+  return {
+    now: () => now,
+    sleep: async (ms: number) => {
+      onSleep();
+      now += ms;
+    },
+  };
 }
 
 let installed: InstalledInsight | undefined;
@@ -128,11 +156,13 @@ afterEach(async () => {
 async function setUp({
   held = {},
   isEnabled = true,
+  forkReads,
 }: {
   held?: Record<string, HeldConversation>;
   isEnabled?: boolean | ((flag: string) => boolean);
+  forkReads?: ForkRead[];
 } = {}) {
-  const langy = fakeLangy();
+  const langy = fakeLangy(forkReads ? { forkReads } : {});
   for (const [id, conversation] of Object.entries(held)) langy.conversations.set(id, conversation);
   const insight = await installInsight({ isEnabled, peers: { langy: langy.api } });
   installed = insight;
@@ -183,6 +213,33 @@ async function setUp({
 const OWN = { isOwn: true, origin: LANGY_CONVERSATION_ORIGIN.INTERACTIVE };
 const SHARED = { isOwn: false, origin: LANGY_CONVERSATION_ORIGIN.INTERACTIVE };
 const RUN = { isOwn: true, origin: LANGY_CONVERSATION_ORIGIN.RUN };
+const IN_PLACE = { sourceGone: false, forkNotReady: false, forkTitle: null };
+
+/**
+ * A click on an insight saved from a shared conversation, on the service over a clock the test
+ * drives, so a fork landing late costs no real time.
+ */
+async function clickOnSharedOverFakeClock({ forkReads }: { forkReads: ForkRead[] }) {
+  const { langy, file } = await setUp({ held: { "conversation-shared": SHARED }, forkReads });
+  const entry = await file({ conversationId: "conversation-shared" });
+  const sentAtEachSleep: number[] = [];
+  const clock = fakeClock({ onSleep: () => sentAtEachSleep.push(langy.sent.length) });
+  const service = InsightActionService.create({
+    insights: { getForReader: async () => entry },
+    langy: langy.api,
+    clock,
+  });
+
+  const run = await service.run({
+    projectId: PROJECT,
+    insightId: entry.id,
+    actionId: "a0",
+    clickId: "click-0001",
+    caller: CALLER,
+  });
+
+  return { run, langy, sentAtEachSleep, elapsedMs: clock.now() };
+}
 
 describe("given a member saves a Langy answer with actions", () => {
   describe("when they read their inbox", () => {
@@ -197,6 +254,19 @@ describe("given a member saves a Langy answer with actions", () => {
         { id: "a0", ...FIND_TRACES },
         { id: "a1", ...DRAFT_EVALUATOR },
       ]);
+    });
+  });
+
+  describe("when the answer came from a conversation they cannot read", () => {
+    /** @scenario "An answer saved from a conversation that cannot be read keeps no actions" */
+    it("files the insight with no actions", async () => {
+      const { app, file } = await setUp();
+
+      const filed = await file({ conversationId: "conversation-unreadable" });
+
+      const [entry] = await app.findInsights({ projectId: PROJECT, userId: OWNER });
+      expect(filed.actions).toEqual([]);
+      expect(entry?.actions).toEqual([]);
     });
   });
 
@@ -224,7 +294,7 @@ describe("given an insight with an action, saved from its owner's conversation",
       await click({ insightId: id });
 
       expect(langy.sent.map((message) => message.text)).toEqual([
-        `You clicked this action on the insight "${TITLE}":\n\n${FIND_TRACES.prompt}`,
+        `I clicked this action on the insight "${TITLE}":\n\n${FIND_TRACES.prompt}`,
       ]);
     });
 
@@ -238,7 +308,7 @@ describe("given an insight with an action, saved from its owner's conversation",
       expect(run).toEqual({
         conversationId: "conversation-own",
         turnId: "turn-1",
-        sourceGone: false,
+        ...IN_PLACE,
       });
       expect(langy.sent).toEqual([
         expect.objectContaining({
@@ -281,7 +351,61 @@ describe("given an insight saved from a conversation another person shared", () 
       expect(langy.sent).toEqual([
         expect.objectContaining({ via: "continue", conversationId: "fork-1", userId: OWNER }),
       ]);
-      expect(run).toMatchObject({ conversationId: "fork-1", sourceGone: false });
+      expect(run).toEqual({ conversationId: "fork-1", turnId: "turn-1", ...IN_PLACE });
+    });
+
+    /** @scenario "A click waits until the fork reads as the clicker's, its history copied" */
+    it("sends Langy nothing until the fork lands, then continues the fork", async () => {
+      const { run, langy, sentAtEachSleep } = await clickOnSharedOverFakeClock({
+        forkReads: [null, null, LANDED],
+      });
+
+      expect(sentAtEachSleep).toEqual([0, 0]);
+      expect(langy.forkReadCount()).toBe(3);
+      expect(langy.sent).toEqual([
+        expect.objectContaining({ via: "continue", conversationId: "fork-1", userId: OWNER }),
+      ]);
+      expect(run).toEqual({ conversationId: "fork-1", turnId: "turn-1", ...IN_PLACE });
+    });
+
+    /** @scenario "A fork that reads as the clicker's before its history landed is not continued yet" */
+    it("does not continue a fork it owns until the copied messages have landed", async () => {
+      const { run, langy, sentAtEachSleep } = await clickOnSharedOverFakeClock({
+        forkReads: [
+          { isOwn: true, messageCount: 0 },
+          { isOwn: true, messageCount: FORK_COPIED_MESSAGES - 1 },
+          LANDED,
+        ],
+      });
+
+      expect(sentAtEachSleep).toEqual([0, 0]);
+      expect(langy.sent).toEqual([
+        expect.objectContaining({ via: "continue", conversationId: "fork-1" }),
+      ]);
+      expect(run).toMatchObject({ conversationId: "fork-1", forkNotReady: false });
+    });
+
+    /** @scenario "A fork that never gets ready starts a new seeded conversation, and does not say the original is gone" */
+    it("gives up after the wait and starts a seeded conversation, naming the unused copy", async () => {
+      const { run, langy, elapsedMs } = await clickOnSharedOverFakeClock({
+        forkReads: [{ isOwn: true, messageCount: FORK_COPIED_MESSAGES - 1 }],
+      });
+
+      expect(elapsedMs).toBe(5_000);
+      expect(langy.forked).toEqual(["conversation-shared"]);
+      expect(langy.sent).toEqual([
+        expect.objectContaining({ via: "create", conversationId: null, userId: OWNER }),
+      ]);
+      expect(langy.sent[0]?.text).toContain(
+        `This conversation starts from the insight "${TITLE}":`,
+      );
+      expect(run).toEqual({
+        conversationId: "conversation-new-1",
+        turnId: "turn-1",
+        sourceGone: false,
+        forkNotReady: true,
+        forkTitle: FORK_TITLE,
+      });
     });
   });
 });
@@ -290,8 +414,9 @@ describe("given an insight whose source conversation is gone", () => {
   describe("when its owner clicks an action", () => {
     /** @scenario "A click whose source conversation is gone starts a new seeded conversation" */
     it("starts a new conversation that opens with the insight, and says the source is gone", async () => {
-      const { langy, file, click } = await setUp();
+      const { langy, file, click } = await setUp({ held: { "conversation-archived": OWN } });
       const { id } = await file({ conversationId: "conversation-archived" });
+      langy.conversations.delete("conversation-archived");
 
       const run = await click({ insightId: id });
 
@@ -309,7 +434,7 @@ describe("given an insight whose source conversation is gone", () => {
           "Its query: SELECT count() FROM traces",
           "Its window: from 2026-10-27T00:00:00Z to 2026-10-28T00:00:00Z",
           "",
-          `You clicked this action on the insight "${TITLE}":`,
+          `I clicked this action on the insight "${TITLE}":`,
           "",
           FIND_TRACES.prompt,
         ].join("\n"),
@@ -369,8 +494,8 @@ describe("given an insight with actions whose source conversation a run started"
   describe("when its owner clicks an action", () => {
     /** @scenario "An action whose source conversation is a run's is refused" */
     it("refuses with insight_action_from_run, and sends Langy nothing", async () => {
-      // Not visible when the answer was saved, so the filing kept its actions.
-      const { langy, file, click } = await setUp();
+      // Read as a person's own when the answer was saved, so the filing kept its actions.
+      const { langy, file, click } = await setUp({ held: { "conversation-later": OWN } });
       const { id } = await file({ conversationId: "conversation-later" });
       langy.conversations.set("conversation-later", RUN);
 

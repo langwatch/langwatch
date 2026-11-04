@@ -28,6 +28,7 @@
     "@langwatch/insight-contract": "workspace:*",
     "@langwatch/langy-client": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "lucide-react": "catalog:"

@@ -89,39 +89,50 @@ export const MAX_INSIGHT_ACTIONS = 4;
 export const INSIGHT_ACTION_LINK_HOSTS = ["langwatch.ai", "app.langwatch.ai"] as const;
 
 const ALLOWED_LINK_HOSTS: ReadonlySet<string> = new Set(INSIGHT_ACTION_LINK_HOSTS);
-const WEB_ADDRESS = /(?:https?:\/\/|www\.)[^\s<>"'`]*/gi;
-
 /**
- * The host a browser would go to: after any `user@`, before any port, path or backslash, and
- * without the punctuation of the sentence the link ends.
+ * A scheme, `//`, `www.` or `host/path`, each running to the next whitespace. A bare `evil.com`
+ * is not one: words like "e.g." would match. The bounds keep a long filing's scan linear.
  */
+const WEB_ADDRESS =
+  /(?:[a-z][a-z0-9+.-]{0,31}:[/\\]|(?:https?|ftp|javascript|data|vbscript|file|mailto):\S|[/\\]{2}\S|\bwww\.|(?:[\p{L}\p{N}-]{1,63}\.){1,8}\p{L}[\p{L}\p{N}-]{1,62}(?::\d{1,5})?[/\\])\S*/giu;
+const SCHEME_AND_SLASHES = /^(?:(?:https?|ftp):|[a-z][a-z0-9+.-]{0,31}:(?=\/))?\/*/i;
+const SENTENCE_END = /[.,;:!?)\]}>"'`*]+$/;
+
+/** The host a browser would go to: after any `user@`, before any port, path, query or fragment. */
 function hostOf(address: string): string {
-  const authority = address.replace(/^https?:\/\//i, "").split(/[/?#\\]/, 1)[0] ?? "";
-  const host = authority.slice(authority.lastIndexOf("@") + 1).replace(/[.,;:!?)\]]+$/, "");
-  return host.replace(/:\d+$/, "").toLowerCase();
+  const authority = address.replace(SCHEME_AND_SLASHES, "").split(/[/?#]/, 1)[0] ?? "";
+  const host = authority.slice(authority.lastIndexOf("@") + 1);
+  return host.replace(/:\d*$/, "").toLowerCase();
+}
+
+/** A browser reads a backslash as a slash or inside a name, by scheme, so none is allowed. */
+function isAllowedLink(address: string): boolean {
+  const link = address.replace(SENTENCE_END, "");
+  return !link.includes("\\") && ALLOWED_LINK_HOSTS.has(hostOf(link));
 }
 
 /** Every web address the words name points at an allowed host. */
 function namesOnlyAllowedLinks(words: string): boolean {
-  return [...words.matchAll(WEB_ADDRESS)].every(([address]) =>
-    ALLOWED_LINK_HOSTS.has(hostOf(address)),
-  );
+  return [...words.matchAll(WEB_ADDRESS)].every(([address]) => isAllowedLink(address));
 }
 
 const NOT_ALLOWED_LINK = "A link in an action may only point at langwatch.ai";
 
 const insightActionLabelSchema = z
   .string()
-  .overwrite((label) => label.replaceAll(/\p{Cc}/gu, ""))
+  .overwrite((label) => label.replaceAll(/[\p{Cc}\p{Cf}]/gu, ""))
   .trim()
   .min(1)
   .max(40)
   .refine(namesOnlyAllowedLinks, { error: NOT_ALLOWED_LINK });
 
-/** A prompt keeps its line breaks and tabs; every other control character is dropped. */
+/**
+ * A prompt keeps its line breaks and tabs; every other control character is dropped, and every
+ * invisible format character, which could hide a link from this check and bidi-flip the card.
+ */
 const insightActionPromptSchema = z
   .string()
-  .overwrite((prompt) => prompt.replaceAll(/[^\P{Cc}\n\t]/gu, ""))
+  .overwrite((prompt) => prompt.replaceAll(/[^\P{Cc}\n\t]|\p{Cf}/gu, ""))
   .trim()
   .min(1)
   .max(1_000)
@@ -252,11 +263,16 @@ export const runInsightActionInputSchema: RunInsightActionInputSchema =
   runInsightActionInputSchemaDefinition;
 export type RunInsightActionInput = z.infer<typeof runInsightActionInputSchema>;
 
-/** The Langy turn a click started; `sourceGone` when it is a new conversation, not the source. */
+/** The Langy turn a click started, and why it is in a new conversation when it is one. */
 const insightActionRunSchemaDefinition = z.object({
   conversationId: z.string(),
   turnId: z.string(),
+  /** The source conversation can no longer be read. */
   sourceGone: z.boolean(),
+  /** The source still exists, but the clicker's copy of it did not get ready in time. */
+  forkNotReady: z.boolean(),
+  /** What that unused copy is called, as it may still appear in their list; null otherwise. */
+  forkTitle: z.string().nullable(),
 });
 export interface InsightActionRunSchema extends Named<typeof insightActionRunSchemaDefinition> {}
 export const insightActionRunSchema: InsightActionRunSchema = insightActionRunSchemaDefinition;

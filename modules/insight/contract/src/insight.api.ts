@@ -42,8 +42,8 @@ export interface InsightApi {
   keepInsight(input: { projectId: string; insightId: string } & Reader): Promise<void>;
   /**
    * Sends one stored action to Langy as the clicker, in their own conversation: the source, a
-   * fork of it, or a new one when it is gone. `insight_actions_not_enabled` while the flag is
-   * off; `insight_action_from_run` for an insight a run filed or saved from a run's conversation.
+   * fork of it, or a new one when it is gone or the fork is late. `insight_actions_not_enabled`
+   * while the flag is off; `insight_action_from_run` for an insight of a run or its conversation.
    */
   runInsightAction(input: RunInsightActionInput & Clicker): Promise<InsightActionRun>;
   /**

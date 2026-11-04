@@ -65,13 +65,15 @@ function renderInbox({
   permissions?: readonly string[];
 } = {}) {
   const inbox = project({ entries });
-  const { host } = renderWithInsightHost({
+  const { host, unmount } = renderWithInsightHost({
     element: <InsightsScreen />,
     answer: inbox.answer,
     host: new StubInsightHost({ actionsEnabled, permissions }),
   });
-  return { ...inbox, host };
+  return { ...inbox, host, unmount };
 }
+
+const IN_PLACE = { sourceGone: false, forkNotReady: false, forkTitle: null };
 
 describe("given an insight with actions in the inbox", () => {
   describe("when the page draws", () => {
@@ -127,7 +129,7 @@ describe("given an insight with actions in the inbox", () => {
       expect(waiting).toBeDisabled();
       expect(screen.getAllByText(ANOTHER_ACTION_SENDING)).toHaveLength(1);
 
-      answerRun({ conversationId: "conversation-1", turnId: "turn-1", sourceGone: false });
+      answerRun({ conversationId: "conversation-1", turnId: "turn-1", ...IN_PLACE });
       await waitFor(() => expect(waiting).toBeEnabled());
       expect(screen.queryByText(ANOTHER_ACTION_SENDING)).not.toBeInTheDocument();
     });
@@ -140,12 +142,57 @@ describe("given an insight with actions in the inbox", () => {
 
       await userEvent.click(await screen.findByRole("button", { name: FIND_TRACES.label }));
       await waitFor(() => expect(runs()).toHaveLength(1));
-      answerRun({ conversationId: "conversation-new", turnId: "turn-1", sourceGone: true });
+      answerRun({
+        conversationId: "conversation-new",
+        turnId: "turn-1",
+        ...IN_PLACE,
+        sourceGone: true,
+      });
 
       await waitFor(() => expect(host.openedConversations).toEqual(["conversation-new"]));
       expect(host.successes.map((notice) => notice.title)).toEqual([
         "The original conversation is gone",
       ]);
+    });
+  });
+
+  describe("when the click answers that the fork did not get ready in time", () => {
+    /** @scenario "A click whose fork was not ready says a new conversation started, and names the copy" */
+    it("opens Langy on the new conversation, says the copy was late, and not that the original is gone", async () => {
+      const { answerRun, host, runs } = renderInbox();
+
+      await userEvent.click(await screen.findByRole("button", { name: FIND_TRACES.label }));
+      await waitFor(() => expect(runs()).toHaveLength(1));
+      answerRun({
+        conversationId: "conversation-new",
+        turnId: "turn-1",
+        ...IN_PLACE,
+        forkNotReady: true,
+        forkTitle: "Checkout errors (fork)",
+      });
+
+      await waitFor(() => expect(host.openedConversations).toEqual(["conversation-new"]));
+      expect(host.successes).toEqual([
+        {
+          title: "Langy started a new conversation from this insight",
+          description: expect.stringContaining('"Checkout errors (fork)"'),
+        },
+      ]);
+      expect(host.successes[0]?.description).toContain("did not get ready in time");
+    });
+  });
+
+  describe("when the person leaves the page, and then the click answers", () => {
+    /** @scenario "A click that answers after the person left the page still opens the conversation" */
+    it("still opens Langy on the conversation", async () => {
+      const { answerRun, host, runs, unmount } = renderInbox();
+
+      await userEvent.click(await screen.findByRole("button", { name: FIND_TRACES.label }));
+      await waitFor(() => expect(runs()).toHaveLength(1));
+      unmount();
+      answerRun({ conversationId: "conversation-1", turnId: "turn-1", ...IN_PLACE });
+
+      await waitFor(() => expect(host.openedConversations).toEqual(["conversation-1"]));
     });
   });
 });

@@ -91,7 +91,7 @@ export class InsightService {
 
   /**
    * The filing's actions with their ids; none when it was saved from a run's conversation, whose
-   * history holds trace text nobody vetted.
+   * history holds trace text nobody vetted, nor from one that cannot be read, which may be a run's.
    */
   private async actionsOf({
     projectId,
@@ -108,7 +108,7 @@ export class InsightService {
         projectId,
         userId,
       });
-      if (conversation?.origin === LANGY_CONVERSATION_ORIGIN.RUN) return [];
+      if (conversation === null || conversation.origin === LANGY_CONVERSATION_ORIGIN.RUN) return [];
     }
     return mintInsightActions(actions);
   }

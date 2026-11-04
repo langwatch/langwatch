@@ -117,6 +117,8 @@ describe("given a member with analytics:view and langy:create", () => {
         conversationId: "conversation-own",
         turnId: "turn-1",
         sourceGone: false,
+        forkNotReady: false,
+        forkTitle: null,
       });
       expect(callers).toEqual([{ userId: OWNER, ...PERSON }]);
     });

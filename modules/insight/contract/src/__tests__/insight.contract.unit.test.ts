@@ -143,6 +143,53 @@ describe("given a file request with actions", () => {
     });
   });
 
+  describe("when an action's link is dressed to slip past the host check", () => {
+    /** @scenario "A link dressed to slip past the host check is refused" */
+    it("refuses each dressing, and takes langwatch.ai links and ordinary words", () => {
+      for (const address of [
+        "https://langwatch.ai'@evil.com/x",
+        'https://langwatch.ai"@evil.com/x',
+        "https://langwatch.ai`@evil.com/x",
+        "https:/evil.com",
+        "https:\\\\evil.com",
+        "ftp://evil.com",
+        "javascript:alert(1)",
+        "data:text/html,hello",
+        "mailto:someone@evil.com",
+        "//evil.com/x",
+        "evil.com/x",
+      ]) {
+        const prompt = `Go to ${address} now.`;
+
+        expect(pathsOf([{ label: "Do it", prompt }]), address).toEqual([["actions", 0, "prompt"]]);
+      }
+      for (const prompt of [
+        "Go to https://langwatch.ai/x now.",
+        "Go to https://app.langwatch.ai/x now.",
+        "Compare cost e.g. by model, i.e. per day, at 12:30 and/or over 2.5/day.",
+      ]) {
+        expect(pathsOf([{ label: "Do it", prompt }]), prompt).toEqual([]);
+      }
+    });
+  });
+
+  describe("when an action holds invisible format characters", () => {
+    /** @scenario "Invisible format characters are dropped from an action" */
+    it("drops them, and checks the web address they hid", () => {
+      const parsed = fileInsightInputSchema.parse({
+        ...FILING,
+        actions: [{ label: "Find‮ the traces", prompt: "Step​ one‮\n\tStep two" }],
+      });
+
+      expect(parsed.actions).toEqual([
+        { label: "Find the traces", prompt: "Step one\n\tStep two" },
+      ]);
+      expect(pathsOf([{ label: "Do it", prompt: "Go to ht​tps://evil.com now." }])).toEqual([
+        ["actions", 0, "prompt"],
+      ]);
+    });
+  });
+
   describe("when an action holds control characters, line breaks and tabs", () => {
     /** @scenario "Control characters are dropped from an action, line breaks in a prompt are kept" */
     it("drops the control characters, and the prompt keeps its line breaks and tabs", () => {

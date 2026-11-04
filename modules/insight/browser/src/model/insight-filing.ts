@@ -1,12 +1,14 @@
 /**
  * What "Save as insight" files from a Langy answer: a draft the person may still edit, and
- * the pointer, the query and the window the answer was about. Pure. A finding of an insights
+ * the pointer, the query and the window the answer was about. A finding of an insights
  * card is read as typed data; an answer with no card is read from its prose and its subject.
  */
 
 import {
   DEFAULT_INSIGHT_VALID_DAYS,
   type FileInsightInput,
+  type InsightActionInput,
+  insightActionInputSchema,
   type InsightTone,
   insightReplaySchema,
 } from "@langwatch/insight-contract";
@@ -15,8 +17,11 @@ import type {
   LangyDerivedInsightsCard,
   LangyInsightsCardFinding,
 } from "@langwatch/langy-contract";
+import { createLogger } from "@langwatch/observability/browser";
 
 import { titleFromAnswer } from "./insight-presentation.ts";
+
+const logger = createLogger("langwatch:insight:filing");
 
 /** The words the save form starts with. */
 export type InsightDraft = {
@@ -74,6 +79,22 @@ export function filedSubject(subject: LangyAnswerSubject | undefined): FiledOrig
 }
 
 /**
+ * The proposed actions a filing would take. One it would refuse is dropped rather than failing
+ * the whole save, and only the count is logged: a refused prompt is unvetted text.
+ */
+function fileableActions(
+  proposed: NonNullable<LangyInsightsCardFinding["actions"]>,
+): InsightActionInput[] {
+  const fileable = proposed.flatMap(({ label, prompt }) => {
+    const parsed = insightActionInputSchema.safeParse({ label, prompt });
+    return parsed.success ? [parsed.data] : [];
+  });
+  const droppedCount = proposed.length - fileable.length;
+  if (droppedCount > 0) logger.warn({ droppedCount }, "Dropped actions a filing would refuse");
+  return fileable;
+}
+
+/**
  * What a card's finding came from: the card's board with the finding's widget, the finding's
  * query, and the card's window when it is one a replay takes; and the actions it proposes.
  */
@@ -87,12 +108,11 @@ export function filedFinding({
   const { widgetId, widgetName, lwql, actions } = finding;
   const widget = widgetId && widgetName ? { id: widgetId, name: widgetName } : null;
   const replay = insightReplaySchema.safeParse({ ...card.window, period: null, parameters: {} });
+  const fileable = fileableActions(actions ?? []);
   return {
     ...(card.board ? { board: { ...card.board, widget } } : {}),
     ...(lwql ? { lwql } : {}),
     ...(lwql && replay.success ? { replay: replay.data } : {}),
-    ...(actions?.length
-      ? { actions: actions.map(({ label, prompt }) => ({ label, prompt })) }
-      : {}),
+    ...(fileable.length > 0 ? { actions: fileable } : {}),
   };
 }

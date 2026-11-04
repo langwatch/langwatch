@@ -58,7 +58,7 @@ keepInsight(input: { projectId: string; insightId: string } & Reader): Promise<v
 
 #### `runInsightAction`
 
-Sends one stored action to Langy as the clicker, in their own conversation: the source, a fork of it, or a new one when it is gone. `insight_actions_not_enabled` while the flag is off; `insight_action_from_run` for an insight a run filed or saved from a run's conversation.
+Sends one stored action to Langy as the clicker, in their own conversation: the source, a fork of it, or a new one when it is gone or the fork is late. `insight_actions_not_enabled` while the flag is off; `insight_action_from_run` for an insight of a run or its conversation.
 
 ```typescript
 runInsightAction(input: RunInsightActionInput & Clicker): Promise<InsightActionRun>;
@@ -136,7 +136,7 @@ Contract `../contract/src/insight.trpc.ts:30`, router `src/transport/insight.trp
 
 ```typescript
 // insights.getAll
-// Input: insightProjectScopeSchema, ../contract/src/insight.ts:194
+// Input: insightProjectScopeSchema, ../contract/src/insight.ts:204
 interface Input {
   projectId: string;
 }
@@ -147,7 +147,7 @@ type Input = z.infer<typeof fileInsightInputSchema>; // ../contract/src/insight.
 type Output = z.infer<typeof insightEntrySchema>; // ../contract/src/insight.ts:186
 
 // insights.markSeen
-// Input: markInsightsSeenInputSchema, ../contract/src/insight.ts:236
+// Input: markInsightsSeenInputSchema, ../contract/src/insight.ts:246
 interface Input {
   projectId: string;
   insightIds: string[];
@@ -156,7 +156,7 @@ interface Input {
 type Output = unknown;
 
 // insights.archive
-// Input: insightScopeSchema, ../contract/src/insight.ts:224
+// Input: insightScopeSchema, ../contract/src/insight.ts:235
 interface Input {
   projectId: string;
   insightId: string;
@@ -170,18 +170,20 @@ type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:2
 type Output = unknown;
 
 // insights.runAction
-// Input: runInsightActionInputSchema, ../contract/src/insight.ts:252
+// Input: runInsightActionInputSchema, ../contract/src/insight.ts:262
 interface Input {
   projectId: string;
   insightId: string;
   actionId: string;
   clickId: string;
 }
-// Output: insightActionRunSchema, ../contract/src/insight.ts:262
+// Output: insightActionRunSchema, ../contract/src/insight.ts:278
 interface Output {
   conversationId: string;
   turnId: string;
   sourceGone: boolean;
+  forkNotReady: boolean;
+  forkTitle: string | null;
 }
 
 // insights.getBoardDailyRun

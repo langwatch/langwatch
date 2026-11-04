@@ -27,7 +27,8 @@ operator asks for one run with the `insight-daily-run-request` task.
 
 An insight saved from a chat may carry up to four actions Langy proposed. A click sends the
 stored prompt to Langy as the clicker, continuing the conversation the insight came from, a
-fork of it, or a new seeded one when it is gone (ADR-005). Behind `release_insight_actions`.
+fork of it, or a new seeded one when it is gone or the fork is not ready in time (ADR-005).
+Behind `release_insight_actions`.
 
 Behind the `release_insights` flag. Requirements: [the inbox](./specs/insight-inbox.feature),
 [the daily run](./specs/insight-daily-run.feature) and [the actions](./specs/insight-actions.feature).

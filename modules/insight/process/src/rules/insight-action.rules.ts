@@ -27,7 +27,7 @@ export function insightActionIdempotencyKey({
 
 type ActionInsight = Pick<InsightEntry, "title" | "body" | "lwql" | "replay">;
 
-/** What a new conversation is told first, when the one the insight came from is gone. */
+/** What a new conversation is told first, when it holds none of the source's turns. */
 function seedOf({ title, body, lwql, replay }: ActionInsight): string {
   const lines = [`This conversation starts from the insight "${title}":`, "", body];
   if (lwql !== null) lines.push("", `Its query: ${lwql}`);
@@ -52,6 +52,6 @@ export function insightActionMessage({
   prompt: string;
   isSeeded: boolean;
 }): string {
-  const framed = `You clicked this action on the insight "${insight.title}":\n\n${prompt}`;
+  const framed = `I clicked this action on the insight "${insight.title}":\n\n${prompt}`;
   return isSeeded ? `${seedOf(insight)}\n\n${framed}` : framed;
 }

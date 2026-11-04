@@ -17,9 +17,12 @@ clicker's.
 
 **Langy proposes, the module stores.** A finding of an `insights` card may carry up to
 four `actions`, each `{ label, prompt }`. "Save as insight" passes them into the filing.
-The filing strips control characters (a prompt keeps line breaks and tabs), refuses a link
-to any host but `langwatch.ai` and `app.langwatch.ai`, and enforces the caps (label 40,
-prompt 1,000 characters). The module mints the ids `a0`..`a3` by position. The actions ride
+The filing strips control and invisible format characters (a prompt keeps line breaks and
+tabs), refuses a link to any host but `langwatch.ai` and `app.langwatch.ai`, and enforces the
+caps (label 40, prompt 1,000 characters). A link is any scheme, `//`, `www.` or `host/path`
+form, running to the next whitespace; a bare `evil.com` is not one, since words like "e.g."
+would match. "Save as insight" drops a proposed action the filing would refuse, rather than
+failing the whole save. The module mints the ids `a0`..`a3` by position. The actions ride
 on the filed event (`actions`, default `[]`) and the renewed event (`actions`, default
 `null`, which keeps them), and on `InsightProjection.actions`, a nullable JSON column
 filled by replay.
@@ -33,14 +36,17 @@ the prompt word for word. The browser mints a click id; Langy's idempotency key 
 **The turn is always the clicker's, in a conversation of theirs.** The door asks
 `analytics:view` and `langy:create`, and the turn runs as the person the session proved.
 The clicker owns the source conversation: Langy continues it. They do not: it is forked
-for them and the fork is continued. It is gone, archived or not visible: a new conversation
-starts, seeded with the insight's title, body, query and window, and the answer says
-`sourceGone` so the card can say so. Nobody else's conversation is written to, and nothing
-is unarchived.
+for them and the fork is continued once it reads as theirs and its copied messages have
+landed. A fork only sends commands the worker folds later, so a click waits about five seconds
+for that; if it is still not ready, a seeded conversation starts, the answer says
+`forkNotReady` and names the copy, and the copy is left in place. The source is gone, archived
+or not visible: a new conversation starts, seeded with the insight's title, body, query and
+window, and the answer says `sourceGone` so the card can say so. Nobody else's conversation is
+written to, and nothing is unarchived.
 
 **Nothing comes from a run.** A run's conversation holds trace text nobody vetted, so a run
-files and renews with no actions, a chat filing saved from a run's conversation keeps none,
-and `runAction` refuses (`insight_action_from_run`) an insight a run filed or one whose
+files and renews with no actions, a chat filing saved from a run's conversation, or from one
+it cannot read, keeps none, and `runAction` refuses (`insight_action_from_run`) an insight a run filed or one whose
 source is a run's conversation.
 
 **Behind its own flag.** `release_insight_actions`, default off and on top of
@@ -52,6 +58,8 @@ source is a run's conversation.
 - The prompt never gains rights the clicker lacks: Langy acts with their permissions.
 - A repeated request of one click on a forked source forks again, though Langy takes the
   message once. Accepted: a stray empty fork is harmless.
+- A click whose fork is late answers late: up to the wait, plus one read of a row that has not
+  landed. The fork it gave up on stays in the clicker's list.
 - Langy is taught the `actions` field only where a skill teaches the `insights` card. Today
   that is the daily-insights skill, whose runs keep no actions, so no interactive answer
   proposes actions until a chat skill teaches the card.

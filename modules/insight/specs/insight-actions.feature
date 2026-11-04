@@ -14,6 +14,30 @@ Feature: Action buttons on an insight
   Rule: An insight keeps the actions it was filed with
 
     @unit
+    Scenario: A link dressed to slip past the host check is refused
+      Given a file request whose action names another host with quoted credentials, one slash, backslashes, another scheme, two leading slashes, or as host and path
+      When the request is validated
+      Then it is refused, and links to langwatch.ai and a sentence of ordinary words are accepted
+
+    @unit
+    Scenario: Invisible format characters are dropped from an action
+      Given a file request whose action holds a zero-width character inside a web address and a direction override
+      When the request is validated
+      Then they are gone, and the web address they hid is checked and refused
+
+    @unit
+    Scenario: Saving a card's finding drops an action a filing would refuse, and keeps the rest
+      Given a finding of an answer's insights card with one action that links to another host and one that does not
+      When the person saves it as an insight
+      Then the filing carries only the second, and the log says how many were dropped and none of their words
+
+    @unit
+    Scenario: An answer saved from a conversation that cannot be read keeps no actions
+      Given a member saves an answer with actions from a conversation they cannot read
+      When the insight is filed
+      Then it holds no actions
+
+    @unit
     Scenario: A filing keeps up to four actions, each a label and a prompt
       Given a file request with four actions
       When the request is validated
@@ -112,6 +136,25 @@ Feature: Action buttons on an insight
       Then the conversation is forked for them, and Langy continues the fork
 
     @unit
+    Scenario: A click waits until the fork reads as the clicker's, its history copied
+      Given an insight saved from a conversation another person shared, whose fork lands a few reads later
+      When its owner clicks an action
+      Then Langy is sent nothing until the fork lands, and then continues the fork
+
+    @unit
+    Scenario: A fork that reads as the clicker's before its history landed is not continued yet
+      Given a fork that reads as the clicker's while its copied messages have not all landed
+      When its owner clicks an action
+      Then Langy is sent nothing until the messages have landed, and then continues the fork
+
+    @unit
+    Scenario: A fork that never gets ready starts a new seeded conversation, and does not say the original is gone
+      Given a fork that has not landed when the wait ends
+      When its owner clicks an action
+      Then Langy starts a new conversation that begins with the insight, and the fork is not continued
+      And the answer says the fork was not ready, names the copy, and does not say the original is gone
+
+    @unit
     Scenario: A click whose source conversation is gone starts a new seeded conversation
       Given an insight whose source conversation is archived or no longer visible
       When its owner clicks an action
@@ -195,6 +238,26 @@ Feature: Action buttons on an insight
       When its owner clicks an action
       Then Langy opens on the new conversation
       And they are told the original conversation is gone
+
+    @integration
+    Scenario: A click whose fork was not ready says a new conversation started, and names the copy
+      Given an insight saved from a conversation another person shared, whose fork did not get ready in time
+      When its owner clicks an action
+      Then Langy opens on the new conversation
+      And they are told the copy was not ready and may still appear under its name
+      And they are not told the original conversation is gone
+
+    @integration
+    Scenario: A click that answers after the person left the page still opens the conversation
+      Given an action on its way
+      When the person leaves the page, and then the click answers
+      Then Langy opens on the conversation
+
+    @integration
+    Scenario: Opening the conversation keeps the query the address holds now
+      Given an action on its way, and an address whose query has changed since the click
+      When the click answers and the conversation opens
+      Then the address keeps its query as it is now, and names the conversation
 
     @integration
     Scenario: No action shows while release_insight_actions is off
