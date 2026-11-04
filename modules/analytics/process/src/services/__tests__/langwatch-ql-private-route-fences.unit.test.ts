@@ -80,11 +80,14 @@ function run({
   answers,
   sql,
   timeWindow,
+  memberWindows,
   pass,
 }: {
   answers: RouteAnswers;
   sql: string;
   timeWindow?: typeof WINDOW;
+  /** Makes the run an aggregate's, scoped by window when any member opens after the start. */
+  memberWindows?: readonly { projectId: string; from: number }[];
   /** Runs the statement as this pass instead of as a query. */
   pass?: LangWatchQLPass;
 }) {
@@ -111,6 +114,7 @@ function run({
         protections: PROTECTIONS,
         sql,
         ...(timeWindow ? { timeWindow } : {}),
+        ...(memberWindows ? { memberWindows } : {}),
       });
 
   return {
@@ -179,6 +183,17 @@ describe("given a private organization whose route database is acme_db and a sha
 });
 
 describe("given a shared organization", () => {
+  it("admits an unqualified statement in a pass and runs it on the shared server", async () => {
+    const attempt = run({
+      answers: [SHARED_ROUTE],
+      sql: "SELECT count() AS n FROM trace_metrics WHERE TraceId IN (SELECT TraceId FROM traces) LIMIT 1",
+      pass: { kind: "probe" },
+    });
+
+    expect((await outcomeOf(attempt.done)).code).toBe("ok");
+    expect(attempt.databasesDialled()).toEqual(new Set(["analytics"]));
+  });
+
   /** @scenario "A statement on a private route names the route's database, never the shared one" */
   it("refuses a statement naming another organization's database, and runs nothing", async () => {
     const attempt = run({ answers: [SHARED_ROUTE], sql: countFrom("acme_db.trace_metrics") });
@@ -269,6 +284,20 @@ describe("given FINAL on a table qualified with the route's database", () => {
 });
 
 describe("given a pass for a private organization", () => {
+  /** @scenario "A pass on a private route validates against the route's database" */
+  it("admits an unqualified statement, as a shorthand writes it, and runs it on the route", async () => {
+    const attempt = run({
+      answers: [PRIVATE],
+      sql: "SELECT count() AS n FROM trace_metrics WHERE TraceId IN (SELECT TraceId FROM traces) LIMIT 1",
+      pass: { kind: "probe" },
+    });
+
+    expect((await outcomeOf(attempt.done)).code).toBe("ok");
+    expect(attempt.databasesDialled()).toEqual(new Set(["acme_db"]));
+    expect(attempt.onTarget("shared")).toEqual([]);
+    expect(qualifiersOf(attempt.requests())).toEqual([]);
+  });
+
   /** @scenario "A pass on a private route validates against the route's database" */
   it("runs a statement naming the route database, asking the route once", async () => {
     const attempt = run({

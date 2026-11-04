@@ -368,7 +368,6 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
 
             return { name: plan.name, isFree: plan.free };
           },
-          database: () => analytics.langWatchQLDatabase(),
         },
       }),
       dispatcher,

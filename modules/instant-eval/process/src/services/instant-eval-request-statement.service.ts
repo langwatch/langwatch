@@ -25,8 +25,6 @@ import type { InstantEvalTraceProofService } from "./instant-eval-trace-proof.se
 
 /** The peers a request's statement is built through. */
 export interface InstantEvalRequestStatementPeers {
-  /** The database the LangWatchQL views live in. */
-  database(): string;
   /**
    * A target's filter compiled against the LangWatchQL trace view, so the
    * statement carries it and can be rerun. Absent where none is wired, and the
@@ -77,7 +75,7 @@ export class InstantEvalRequestStatementService {
     input: InstantEvalRunInput;
     rowLimit: number;
   }): Promise<InstantEvalStatement> {
-    const base = { input, database: this.peers.database(), now: this.now() };
+    const base = { input, now: this.now() };
     const filter = this.#shorthandFilterOf(input);
     if (filter === undefined) return instantEvalStatementFor(base);
     const peers = this.peers;
