@@ -13,9 +13,9 @@ This page covers how to organise, run and maintain that set. For which cases to 
 
 ## How to organise scenarios
 
-Use test suites for one area of the agent and labels for the cuts that cross them. A scenario belongs to exactly one test suite, and it can have any number of labels, so a test suite works as the folder and a label as the tag.
+Use test suites for the areas of the agent and labels for the cuts that cross them. A scenario belongs to exactly one test suite, and it can have any number of labels, so a test suite works as the folder and a label as the tag.
 
-Start with one suite per agent, and split by area only when the fields or the owners differ. Never copy a suite per environment or per cadence, because copies drift: point a run plan at another target, or scope it by label, instead.
+A small agent can start with one suite. Split by area when the fields or the owners differ. Never copy a suite per environment or per cadence, because copies drift: point a run plan at another target, or scope it by label, instead.
 
 | Use               | For                                                            | Example                                   |
 | ----------------- | -------------------------------------------------------------- | ----------------------------------------- |
@@ -31,14 +31,14 @@ A run plan scoped by labels is dynamic: a scenario that gets the `smoke` label i
 
 ## Run a smoke set on every change and the full suite on a schedule
 
-Split the suite into two run plans. The smoke plan runs a handful of fast, high-risk scenarios on every pull request, so a broken change fails the check before review. The full plan runs every scenario, often with a repeat count above one to catch flaky behaviour, on a schedule or before a release.
+Split the suite into two run plans. The smoke plan runs a handful of fast, high-risk scenarios on every pull request, so a broken change fails the check before review. The full plan runs every scenario of a test suite, often with a repeat count above one to catch flaky behaviour, on a schedule or before a release.
 
 ```bash
 # On every pull request: the scenarios labelled smoke
 langwatch run-plan run --label smoke --target connected:support-agent@staging \
   --name "PR smoke" --wait
 
-# On a schedule: every scenario of the suite, three times each
+# On a schedule: every scenario of one suite, three times each
 langwatch run-plan run --test-suite Refunds --target connected:support-agent@staging \
   --name "Refunds nightly" --repeat 3 --wait
 ```
@@ -53,7 +53,9 @@ A run plan is a name and a configuration: the scope (test suites, labels or spec
 | **Refunds pre-release** | Suite `Refunds` | Staging | 3 | Before a release. | Happy paths and critical scenarios pass every repetition, the rest a majority. |
 | **Production canary** | Label `canary` | Production | 1 | After each deploy. | All pass. |
 
-LangWatch does not apply a pass threshold for you. `--wait` exits non-zero when any run failed, so use the exit code as a gate only on a plan whose bar is all pass. For any other bar, have the job report the run, and your team reads the pass bar on Results.
+Give every other test suite its own scheduled plan, such as `Order lookup nightly`, or name several with a repeated `--test-suite`. A suite that no plan scopes runs only through its labels.
+
+LangWatch does not apply a pass threshold for you. `--wait` exits non-zero when any run failed, so use the exit code as a gate only on a plan whose bar is all pass. For any other bar, such as `Refunds nightly`, add `--format json` and have the job read `outcome` instead of the exit code. On `failed`, your team reads the pass bar on Results. On `timeout` or `poll_failure` the run has no verdict, so fail the job.
 
 ```bash
 # Critical: 5 repetitions and a strong judge.
@@ -65,7 +67,7 @@ langwatch run-plan run --label canary --target connected:support-agent@productio
   --name "Production canary" --wait
 ```
 
-Give the `canary` label only to scenarios that only read data, because a canary runs on real data. A refund scenario must never run in production. The production process must also be connected for the canary to reach it.
+Give the `canary` label only to scenarios that only read data, because a canary runs on real data. A refund scenario must never run in production. Turn off setup hooks and per-conversation seeding in the production process too, because they run for every scenario, whatever its label. The production process must also be connected for the canary to reach it.
 
 Add a plan evaluator with `--evaluator <id-or-slug>`, repeated for each one. The commands above leave it out to stay short.
 
@@ -106,7 +108,9 @@ A scenario goes through three stages: a candidate someone proposed, a scenario t
 
 Keep the stages apart by where you store the scenario file. If your scenarios are files in your repository that a script syncs to LangWatch, keep proposals outside the synced directory until a person reviews them, and promote a scenario by moving its file in, in a reviewed pull request. A label such as `candidate` does not stop a sync: any scope that includes the scenario runs it.
 
-If you write scenarios on the platform, keep proposals in a test suite of their own, such as `Candidates`, that no run plan scopes, and promote one with **Move to suite**.
+If you write scenarios on the platform, keep proposals in a test suite of their own, such as `Candidates`, and promote one with **Move to suite**. Run plans still reach a candidate through a label or `--all`, so give it no label and scope no plan with `--all`.
+
+Declare the fields and evaluators of the destination suite on `Candidates` too, so the runs below exercise the real check. After the move, confirm the field values and run the scenario again: a blank value skips the evaluator that reads it.
 
 Promote a scenario when all of these hold:
 
@@ -127,7 +131,7 @@ Scenarios run from three places, and every run reports to the same project, so y
 | The platform    | Let product and domain experts write, run and read scenarios           | [Test from the platform](/agent-testing/test-from-the-platform) |
 | CI              | Run the smoke plan on each pull request and the full plan on a schedule | [Run from CI](/agent-testing/run-from-ci)                   |
 
-A connected agent can be online in several environments at once, so one plan can run against `development` on your machine and the same scenarios against `production` in CI. See [Environments](/agent-testing/environments).
+A connected agent can be online in several environments at once, so one plan can run against `development` on your machine and against `staging` in CI. Against `production`, run only read-only scenarios. See [Environments](/agent-testing/environments).
 
 ## Turn production failures into regression scenarios
 

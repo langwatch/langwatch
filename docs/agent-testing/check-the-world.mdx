@@ -152,9 +152,9 @@ Call it after the turn, next to `state_of_world`. Then attach an Exact Match eva
 2. Map `output` to source **Trace**, tool call `refund_total`, `output`.
 3. Set `expected_output` to the literal `49.95`. Type `49.95`, then click **Use "49.95" as value**.
 
-A suite evaluator runs on every scenario in the suite, so this literal fits only a suite where every case refunds 49.95. For a suite with other amounts, or a scenario that must not refund, declare a suite field such as `expected_amount`, map `expected_output` to it, and leave it blank where the check does not apply: see [Scenario Suite Design](/agent-testing/designing-a-suite#how-to-check-numbers-and-actions-exactly).
+A suite evaluator runs on every scenario in the suite, so this literal fits only a suite where every case refunds 49.95. For a suite with other amounts, declare a suite field such as `expected_amount` and map `expected_output` to it. Set it to `0` on a scenario that must not refund, because a blank value skips the evaluator and a wrong refund then goes unchecked. Leave it blank only where the check does not apply: see [Scenario Suite Design](/agent-testing/designing-a-suite#how-to-check-numbers-and-actions-exactly).
 
-The run plan editor lists no tool names. On a run plan, set this mapping through the [run plans API](/api-reference/run-plans/create-run).
+The run plan editor lists no tool names. On a run plan, set the tool call mapping through the [run plans API](/api-reference/run-plans/create-run). A plan evaluator cannot read scenario fields, so compare against a literal there.
 
 When you attach the evaluator, `output` defaults to the agent's last message. Change it to the tool call, or the check compares the wrong text.
 
