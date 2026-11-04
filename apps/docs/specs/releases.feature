@@ -12,6 +12,15 @@ Feature: Useful release updates in the documentation
     And missing or invalid notes produce no announcement
 
   @unit
+  Scenario: Keep the changelog Markdown export within the page token budget
+    Given the newest published releases are together longer than the agent readiness page token budget
+    When the changelog's Markdown export is built
+    Then it keeps the newest releases only while the built export stays within the budget
+    And when even the newest release alone is over the budget, it keeps no release
+    And a short headed note under the kept releases says the others are left out and links to every release
+    But the changelog page still shows every published release
+
+  @unit
   Scenario: Show what is new on the home page
     Given the repository changelog has published releases
     When the introduction page is built
@@ -45,4 +54,3 @@ Feature: Useful release updates in the documentation
     When the changelog page and its Markdown export are built
     Then the note keeps the pull request link and drops the commit link beside it
     But a note whose only link is its commit keeps that link
-    And the changelog's Markdown export fits the page token budget agents read within

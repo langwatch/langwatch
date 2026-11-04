@@ -310,6 +310,17 @@ export interface ModelDefaultInheritedValuesTrpcInputSchema extends Named<
 export const modelDefaultInheritedValuesTrpcInputSchema: ModelDefaultInheritedValuesTrpcInputSchema =
   modelDefaultInheritedValuesTrpcInputSchemaDefinition;
 
+const decisionModelsForScopesTrpcInputSchemaDefinition = z.object({
+  projectId: z.string(),
+  scopes: modelDefaultScopedConfigInputSchema,
+});
+export interface DecisionModelsForScopesTrpcInputSchema extends Named<
+  typeof decisionModelsForScopesTrpcInputSchemaDefinition
+> {}
+/** The scopes a Default models config is being written for, anchored on the page's project. */
+export const decisionModelsForScopesTrpcInputSchema: DecisionModelsForScopesTrpcInputSchema =
+  decisionModelsForScopesTrpcInputSchemaDefinition;
+
 /**
  * What the two reads the studio and the dock borrow answer, both this contract's own
  * zod-inferred shapes. `getResolvedDefault` answers `null` when nothing resolves and the
