@@ -85,6 +85,8 @@ LangWatch computes TTFT as `first_token_at - started_at`. You don't need to set 
 When your code measures the elapsed time instead of the wall-clock timestamp, report it through either of these equivalents:
 
 ```python
+import langwatch
+
 span = langwatch.get_current_span()
 
 # Option A: OTel GenAI semconv attribute, duration in milliseconds

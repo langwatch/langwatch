@@ -43,7 +43,7 @@ const SHARED = [shared("s-2", "Spend by team"), shared("s-1", "Quality")];
 
 describe("sidebarGroups", () => {
   describe("given no stars", () => {
-    /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name" */
+    /** @scenario "AC161b Your dashboards: My dashboard first, then the team's unpinned boards by name" */
     it("puts My dashboard first and the team's boards by name, a widened My dashboard of another member among them", () => {
       const groups = sidebarGroups({
         boards: BOARDS,
@@ -64,8 +64,8 @@ describe("sidebarGroups", () => {
   });
 
   describe("given stars on a board and on a From LangWatch board", () => {
-    /** @scenario "AC161c Starred shows only when the member has stars, in their own order" */
-    it("lists them once, under Starred, in the member's order", () => {
+    /** @scenario "AC161c Pinned shows only when the member has pins, in their own order" */
+    it("lists them once, under Pinned, in the member's order", () => {
       const groups = sidebarGroups({
         boards: BOARDS,
         stars: [
@@ -114,7 +114,7 @@ describe("sidebarGroups with the organization's boards", () => {
     });
 
     /** @scenario "AC181 Sidebar: scope marks and the organization's group" */
-    it("moves one the member starred to Starred, keeping the name of the project that owns it", () => {
+    it("moves one the member starred to Pinned, keeping the name of the project that owns it", () => {
       const [spend] = SHARED;
       const groups = sidebarGroups({
         boards: BOARDS,
@@ -165,7 +165,7 @@ describe("sidebarGroups with the organization's boards", () => {
 });
 
 describe("sameStar", () => {
-  /** @scenario "AC165 A star can point at a From LangWatch board" */
+  /** @scenario "AC165 A pin can point at a From LangWatch board" */
   it("tells a board star from a template star with the same id", () => {
     expect(
       sameStar({ kind: "template", templateId: "x" }, { kind: "template", templateId: "x" }),
@@ -207,14 +207,14 @@ describe("swapShownStars", () => {
   const fresh = { kind: "board", dashboardId: "new" } as const;
 
   describe("given a star the section does not show", () => {
-    /** @scenario "AC155b Stars the section does not show keep their place in the star order" */
+    /** @scenario "AC155b Pins the section does not show keep their place in the pin order" */
     it("keeps it at its index while the two shown stars swap", () => {
       expect(
         swapShownStars({ all: [mine, shop, fresh], shown: [shop, fresh], from: 1, to: 0 }),
       ).toEqual([mine, fresh, shop]);
     });
 
-    /** @scenario "AC155b Stars the section does not show keep their place in the star order" */
+    /** @scenario "AC155b Pins the section does not show keep their place in the pin order" */
     it("keeps it between the two shown stars that swap", () => {
       expect(
         swapShownStars({ all: [shop, mine, fresh], shown: [shop, fresh], from: 0, to: 1 }),
@@ -222,7 +222,7 @@ describe("swapShownStars", () => {
     });
   });
 
-  /** @scenario "AC155 Move up and Move down reorder the member's stars" */
+  /** @scenario "AC155 Move up and Move down reorder the member's pins" */
   it("answers null past either end", () => {
     expect(
       swapShownStars({ all: [shop, fresh], shown: [shop, fresh], from: 0, to: -1 }),

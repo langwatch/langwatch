@@ -64,7 +64,28 @@ curl http://0.0.0.0:4000/v1/chat/completions \
   }'
 ```
 
-The trace appears in your LangWatch project within a few seconds, with the model, tokens, cost and latency of the call.
+Or from Python, with the OpenAI SDK pointed at the proxy:
+
+```bash
+pip install openai
+```
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://0.0.0.0:4000", api_key="sk-your-litellm-key")
+
+response = client.chat.completions.create(
+    model="gpt-5-mini",
+    messages=[{"role": "user", "content": "Hello from the LiteLLM Proxy"}],
+)
+print(response.choices[0].message.content)
+```
+
+</Step>
+<Step title="Check it worked">
+
+Open your project in LangWatch: the trace appears in the traces list within a few seconds, with the model, tokens, cost and latency of the call. If it does not, see [Troubleshooting](#troubleshooting).
 
 </Step>
 </Steps>

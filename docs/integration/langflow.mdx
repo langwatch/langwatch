@@ -43,6 +43,12 @@ You can customize what LangWatch captures as the final input and output of your 
 
 To do this, you can add this two lines of code in the execution function of any Langflow component:
 
+If `langwatch` is not installed in the Python environment Langflow runs in, install it there first:
+
+```bash
+pip install langwatch
+```
+
 ```python
 import langwatch
 langwatch.get_current_trace().update(input="The user input", output="My bot output")

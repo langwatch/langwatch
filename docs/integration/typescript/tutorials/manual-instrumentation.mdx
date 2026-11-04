@@ -267,6 +267,8 @@ async function processWithContext(userId: string) {
 Implement error handling for manual span management:
 
 ```typescript
+import { getLangWatchTracer } from "langwatch";
+
 class SpanManager {
   private tracer = getLangWatchTracer("my-service");
 

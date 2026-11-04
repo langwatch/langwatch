@@ -129,6 +129,7 @@ type selectionFields struct {
 	// leaving them off rather than reading as a deliberate choice.
 	DesignSystem *bool `json:"design-system"`
 	MailRoom     *bool `json:"mail-room"`
+	Docs         *bool `json:"docs"`
 	Langevals    *bool `json:"langevals"`
 	Storage      *bool `json:"storage"`
 	Voice        *bool `json:"voice"`
@@ -164,6 +165,7 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.Mail, nil, &sel.Mail},
 		{f.DesignSystem, f.LegacyDesignSystem, &sel.DesignSystem},
 		{f.MailRoom, nil, &sel.MailRoom},
+		{f.Docs, nil, &sel.Docs},
 		{f.Langevals, nil, &sel.Langevals},
 		{f.Storage, nil, &sel.Storage},
 		{f.Voice, nil, &sel.Voice},
@@ -227,6 +229,7 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		Mail:         &sel.Mail,
 		DesignSystem: &sel.DesignSystem,
 		MailRoom:     &sel.MailRoom,
+		Docs:         &sel.Docs,
 		Langevals:    &sel.Langevals,
 		Storage:      &sel.Storage,
 		Voice:        &sel.Voice,

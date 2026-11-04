@@ -156,16 +156,16 @@ describe("given a member with analytics:view and a board they can open", () => {
     });
   });
 
-  describe("when they say no thanks to the offer", () => {
-    /** @scenario "No thanks from the offer stores off" */
+  describe("when they turn its daily run off", () => {
+    /** @scenario "Turning off a board never decided on stores off" */
     it("reads off with nothing chosen, and can still be turned on", async () => {
       const member = (await project()).as({ userId: MEMBER });
 
       await member.turnOffBoardDailyRun(OFF);
-      const declined = await member.getBoardDailyRun(SCOPE);
+      const turnedOff = await member.getBoardDailyRun(SCOPE);
       await member.configureBoardDailyRun({ ...ON, maxInsights: 5 });
 
-      expect(declined).toEqual({ state: "off", settings: null, lastRun: null, offReason: null });
+      expect(turnedOff).toEqual({ state: "off", settings: null, lastRun: null, offReason: null });
       expect(await member.getBoardDailyRun(SCOPE)).toMatchObject({ state: "on" });
     });
   });

@@ -81,6 +81,12 @@ export type UiUploadCsvDrawerProps = {
   enableDirectUpload?: boolean;
 };
 
+/** What a caller hands dataset's history drawer: the dataset whose versions it lists. */
+export type UiDatasetHistoryDrawerProps = {
+  datasetId: string;
+  onClose?: () => void;
+};
+
 const tokens = uiTokens("dataset");
 
 export const AddOrEditDatasetDrawerToken =
@@ -95,3 +101,5 @@ export const AddOrEditDatasetRoutedDrawerToken =
   tokens.drawer<AddOrEditDatasetDrawerProps>("addOrEditDataset");
 export const SelectDatasetDrawerToken = tokens.drawer<UiSelectDatasetDrawerProps>("selectDataset");
 export const UploadCsvDrawerToken = tokens.drawer<UiUploadCsvDrawerProps>("uploadCSV");
+export const DatasetHistoryDrawerToken =
+  tokens.drawer<UiDatasetHistoryDrawerProps>("datasetHistory");

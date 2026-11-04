@@ -725,6 +725,9 @@
                 "agent test",
                 "agent tunnel",
                 "agent update",
+                "agent versions",
+                "agent deploy",
+                "agent undeploy",
                 "agent delete"
               ],
               "skill": "connect-agent",
@@ -814,6 +817,9 @@
                 "evaluator types",
                 "evaluator create",
                 "evaluator update",
+                "evaluator versions",
+                "evaluator deploy",
+                "evaluator undeploy",
                 "evaluator delete"
               ],
               "hints": {
@@ -822,6 +828,9 @@
                 "evaluator types": "langwatch evaluator types -o json",
                 "evaluator create": "langwatch evaluator create \"my judge\" --type langevals/llm_boolean",
                 "evaluator update": "langwatch evaluator update <idOrSlug> --settings '{\"model\":\"openai/gpt-6-luna\"}'",
+                "evaluator versions": "langwatch evaluator versions <idOrSlug> -o json",
+                "evaluator deploy": "langwatch evaluator deploy <idOrSlug> production --version 2",
+                "evaluator undeploy": "langwatch evaluator undeploy <idOrSlug> staging",
                 "evaluator delete": "langwatch evaluator delete <idOrSlug>"
               },
               "skill": "evaluations",

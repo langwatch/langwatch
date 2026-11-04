@@ -49,6 +49,8 @@ def handle_message(user_id: str, message: str):
 You can call `.update()` multiple times throughout your function as more context becomes available:
 
 ```python
+import langwatch
+
 @langwatch.trace()
 def handle_message(user_id: str, message: str):
     trace = langwatch.get_current_trace()
@@ -71,6 +73,8 @@ def handle_message(user_id: str, message: str):
 Labels are a special type of trace metadata that allows you to organize, filter, and categorize your traces in the LangWatch dashboard:
 
 ```python
+import langwatch
+
 @langwatch.trace()
 def handle_message(user_id: str, request_type: str):
     trace = langwatch.get_current_trace()

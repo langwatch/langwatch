@@ -115,6 +115,13 @@ export class ApiKeyService {
     return this.lifecycle.update(input);
   }
 
+  /** Retires a key the platform minted for itself; false for one already gone. */
+  async revokeSystemManaged(
+    input: Parameters<ApiKeyLifecycleService["revokeSystemManaged"]>[0],
+  ): Promise<boolean> {
+    return this.lifecycle.revokeSystemManaged(input);
+  }
+
   async updateAsCaller(input: UpdateApiKeyInput): Promise<ApiKey> {
     try {
       return await this.lifecycle.update(input);

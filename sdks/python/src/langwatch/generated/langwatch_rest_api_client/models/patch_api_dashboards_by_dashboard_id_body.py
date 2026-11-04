@@ -17,12 +17,10 @@ class PatchApiDashboardsByDashboardIdBody:
     Attributes:
         name (str | Unset):
         description (None | str | Unset):
-        excluded_origins (list[str] | None | Unset):
     """
 
     name: str | Unset = UNSET
     description: None | str | Unset = UNSET
-    excluded_origins: list[str] | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -34,15 +32,6 @@ class PatchApiDashboardsByDashboardIdBody:
         else:
             description = self.description
 
-        excluded_origins: list[str] | None | Unset
-        if isinstance(self.excluded_origins, Unset):
-            excluded_origins = UNSET
-        elif isinstance(self.excluded_origins, list):
-            excluded_origins = self.excluded_origins
-
-        else:
-            excluded_origins = self.excluded_origins
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
@@ -50,8 +39,6 @@ class PatchApiDashboardsByDashboardIdBody:
             field_dict["name"] = name
         if description is not UNSET:
             field_dict["description"] = description
-        if excluded_origins is not UNSET:
-            field_dict["excludedOrigins"] = excluded_origins
 
         return field_dict
 
@@ -69,27 +56,9 @@ class PatchApiDashboardsByDashboardIdBody:
 
         description = _parse_description(d.pop("description", UNSET))
 
-        def _parse_excluded_origins(data: object) -> list[str] | None | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, list):
-                    raise TypeError()
-                excluded_origins_type_0 = cast(list[str], data)
-
-                return excluded_origins_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(list[str] | None | Unset, data)
-
-        excluded_origins = _parse_excluded_origins(d.pop("excludedOrigins", UNSET))
-
         patch_api_dashboards_by_dashboard_id_body = cls(
             name=name,
             description=description,
-            excluded_origins=excluded_origins,
         )
 
         patch_api_dashboards_by_dashboard_id_body.additional_properties = d

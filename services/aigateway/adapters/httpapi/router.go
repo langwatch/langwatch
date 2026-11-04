@@ -188,6 +188,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 			v1.Post("/messages", messagesHandler(deps))
 			v1.Post("/responses", responsesHandler(deps))
 			v1.Post("/embeddings", embeddingsHandler(deps))
+			v1.Post("/decisions", decisionsHandler(deps))
 			v1.Post("/audio/speech", speechHandler(deps))
 			v1.Post("/audio/transcriptions", transcriptionsHandler(deps))
 			v1.Post("/images/generations", imageGenerationsHandler(deps))
@@ -430,6 +431,32 @@ func embeddingsHandler(deps RouterDeps) http.HandlerFunc {
 
 		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.EmbeddingResult, error) {
 			return deps.App.HandleEmbeddings(r.Context(), bundle, body, app.PeekModel(peek))
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// decisionsHandler terminates POST /v1/decisions (OpenAI Decisions API). The
+// body is small JSON and the answer is the provider's JSON, relayed as it
+// came. Never streams. The full body is read because the model field may sit
+// after a long input.
+func decisionsHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		body, ok := readFullBody(deps.Logger, w, r, deps.MaxRequestBodyBytes)
+		if !ok {
+			return
+		}
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleDecisions(r.Context(), bundle, body, app.PeekModel(body))
 		})
 		if err != nil {
 			writeError(deps.Logger, hw, r.Context(), err)

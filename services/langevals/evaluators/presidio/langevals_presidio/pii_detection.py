@@ -2,20 +2,26 @@ import json
 import logging
 import os
 from typing import Any, Literal, Optional
+
+import spacy
+import spacy.cli
 from langevals_core.base_evaluator import (
     BaseEvaluator,
+    EvaluationResult,
+    EvaluationResultSkipped,
     EvaluatorEntry,
     EvaluatorSettings,
     SingleEvaluationResult,
-    EvaluationResult,
-    EvaluationResultSkipped,
 )
-from pydantic import BaseModel, Field
-import spacy
-import spacy.cli
+from langevals_presidio.allcaps_names import (
+    could_hold_a_rewritten_name,
+    normalisation_justifies_span,
+    normalise_allcaps_runs,
+)
 from presidio_analyzer import AnalyzerEngine
-from presidio_anonymizer import AnonymizerEngine
 from presidio_analyzer.nlp_engine import SpacyNlpEngine
+from presidio_anonymizer import AnonymizerEngine
+from pydantic import BaseModel, Field
 
 # Presidio's analyzer emits a WARNING for every requested entity that has
 # no recognizer in the active language. Our entity list intentionally
@@ -25,6 +31,18 @@ from presidio_analyzer.nlp_engine import SpacyNlpEngine
 # CloudWatch noise with no signal value: the "missing recognizer" facts
 # are static, not per-request, and known at configuration time.
 logging.getLogger("presidio-analyzer").setLevel(logging.ERROR)
+
+
+PERSON_ENTITY = "PERSON"
+LOCATION_ENTITY = "LOCATION"
+
+# The entities spaCy's NER finds, and so the ones that read capitals as a cue.
+# LOCATION is here because the model splits a name across both: in Titlecase
+# it reads Maria Fernanda as a person and Costa Pereira as a place.
+CASE_SENSITIVE_ENTITIES = (PERSON_ENTITY, LOCATION_ENTITY)
+
+def _covers(outer: Any, inner: Any) -> bool:
+    return outer.start <= inner.start and outer.end >= inner.end
 
 
 class PresidioPIIDetectionEntry(EvaluatorEntry):
@@ -127,13 +145,76 @@ class PresidioPIIDetectionEvaluator(
             nlp = spacy.load("en_core_web_lg")
             nlp.to_disk(os.path.join(cache_dir, "en_core_web_lg"))
 
-        cls.analyzer = AnalyzerEngine(
-            nlp_engine=SpacyNlpEngine(
-                models=[{"lang_code": "en", "model_name": "en_core_web_lg"}]
-            )
+        nlp_engine = SpacyNlpEngine(
+            models=[{"lang_code": "en", "model_name": "en_core_web_lg"}]
         )
+        cls.analyzer = AnalyzerEngine(nlp_engine=nlp_engine)
+        cls.word_vectors = nlp_engine.nlp["en"].vocab.vectors
 
         super().preload()
+
+    def _results_from_normalised_casing(
+        self, *, content: str, entities: list[str]
+    ) -> list[Any]:
+        """The `entities` spans only a case-normalised copy of `content` sees.
+
+        `entities` is case-sensitive only: the code, currency and identifier
+        recognisers need the capitals. Skipped when no rewritten word sits
+        beside another, since no span could pass without one.
+        """
+        normalised = normalise_allcaps_runs(content)
+        if not could_hold_a_rewritten_name(original=content, normalised=normalised):
+            return []
+
+        return [
+            result
+            for result in self.analyzer.analyze(
+                text=normalised, entities=entities, language="en"
+            )
+            if result.score >= self.settings.min_threshold
+            and result.entity_type in entities
+            and normalisation_justifies_span(
+                original=content,
+                normalised=normalised,
+                start=result.start,
+                end=result.end,
+                vectors=self.word_vectors,
+            )
+        ]
+
+    def _merge_normalised_results(
+        self, *, content: str, entities: list[str], results: list[Any]
+    ) -> list[Any]:
+        """`results` with the normalised copy's case-sensitive spans folded in.
+
+        Where two case-sensitive spans overlap by cover, only the wider
+        survives, so `score` counts each name or place once and redaction
+        reaches the whole of it.
+        """
+        additions = self._results_from_normalised_casing(
+            content=content, entities=entities
+        )
+        if not additions:
+            return results
+
+        case_sensitive = [
+            result
+            for result in results
+            if result.entity_type in CASE_SENSITIVE_ENTITIES
+        ]
+        kept_additions = [
+            addition
+            for addition in additions
+            if not any(_covers(result, addition) for result in case_sensitive)
+        ]
+        superseded = {
+            id(result)
+            for result in case_sensitive
+            if any(_covers(addition, result) for addition in kept_additions)
+        }
+        return [
+            result for result in results if id(result) not in superseded
+        ] + kept_additions
 
     def evaluate(self, entry: PresidioPIIDetectionEntry) -> SingleEvaluationResult:
         content = "\n\n".join([entry.input or "", entry.output or ""]).strip()
@@ -165,6 +246,14 @@ class PresidioPIIDetectionEvaluator(
         results = [
             result for result in results if result.score >= self.settings.min_threshold
         ]
+
+        case_sensitive = [
+            entity for entity in CASE_SENSITIVE_ENTITIES if entity in entities
+        ]
+        if case_sensitive:
+            results = self._merge_normalised_results(
+                content=content, entities=case_sensitive, results=results
+            )
 
         findings = [
             f"{result.entity_type} (likelihood: {result.score})" for result in results

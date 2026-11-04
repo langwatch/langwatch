@@ -286,6 +286,8 @@ const handle = setupObservability({
 
 <CodeGroup>
 ```typescript Development
+import { setupObservability } from "langwatch/observability/node";
+
 const handle = setupObservability({
   serviceName: "my-laundry-startup",
   dataCapture: "all", // Capture everything in dev
@@ -296,6 +298,8 @@ const handle = setupObservability({
 ```
 
 ```typescript Production
+import { setupObservability } from "langwatch/observability/node";
+
 const handle = setupObservability({
   serviceName: "my-laundry-startup",
   dataCapture: "output", // Capture only output data in production
@@ -316,6 +320,8 @@ The `setupObservability` function returns an `ObservabilityHandle` that provides
 By default, LangWatch flushes pending traces when your application receives `SIGINT` or `SIGTERM`, or when the event loop drains:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 // Automatic shutdown is enabled by default
 const handle = setupObservability({
   serviceName: "my-service",
@@ -353,6 +359,8 @@ not installed.
 For environments where you can't listen to `SIGTERM` or need custom shutdown logic, you can manually call the shutdown method:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 const handle = setupObservability({
   serviceName: "my-service",
   langwatch: {
@@ -422,6 +430,8 @@ npm run dev
 Enable console logging for local development:
 
 ```typescript
+import { setupObservability } from "langwatch/observability/node";
+
 const handle = setupObservability({
   serviceName: "my-service",
   langwatch: {

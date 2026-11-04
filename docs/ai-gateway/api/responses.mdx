@@ -6,7 +6,7 @@ sidebarTitle: Responses
 
 ## Endpoint
 
-```
+```http
 POST /v1/responses
 Authorization: Bearer vk-lw-<ULID>
 Content-Type: application/json
@@ -77,7 +77,7 @@ The same set as [Chat Completions](/ai-gateway/api/chat-completions#response-hea
 
 Set `"stream": true`. On OpenAI and Azure the response is `text/event-stream` with one `data:` frame per Responses event and a `data: [DONE]` trailer:
 
-```
+```text
 data: {"type":"response.created","response":{"id":"resp_abc123","status":"in_progress"}}
 
 data: {"type":"response.output_text.delta","delta":"Hello"}

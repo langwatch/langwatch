@@ -1,0 +1,416 @@
+import { spawn } from "node:child_process";
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
+
+import { nowInstant } from "@langwatch/time";
+import { z } from "zod";
+
+import { DOCS_URL } from "../../lib/site-path.ts";
+import { docsRoot } from "../../paths.ts";
+import { startPreview } from "../preview-server.ts";
+import { agentReadinessMarkdown, agentReadinessReport } from "./agent-readiness-report.ts";
+import { checkAgentReadiness } from "./agent-readiness.ts";
+import {
+  auditRunSchema,
+  DEFAULT_BUDGETS_FILE,
+  evaluateBudgets,
+  FORM_FACTORS,
+  readBudgets,
+  type AuditRun,
+  type FormFactor,
+  type PageBudget,
+} from "./budgets.ts";
+import { pageMedians, recheckPasses, type LighthouseTask } from "./recheck.ts";
+import { summaryMarkdown } from "./report.ts";
+import {
+  applyKnownIssues,
+  builtBasePath,
+  checkSeo,
+  knownIssuesOf,
+  sitemapPages,
+} from "./seo-check.ts";
+
+const RUNNER = fileURLToPath(new URL("./lighthouse-run.ts", import.meta.url));
+const list = z.string().transform((value) =>
+  value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean),
+);
+
+const shard = z
+  .string()
+  .regex(/^\d+\/\d+$/, "use --shard <index>/<count>, counting from 1")
+  .transform((value) => {
+    const [index = 0, count = 0] = value.split("/").map(Number);
+    return { index, count };
+  })
+  .refine(({ index, count }) => index >= 1 && index <= count, "the shard index runs 1..count");
+
+const optionsSchema = z.object({
+  "out-dir": z.string().default("dist"),
+  "base-path": z.string().default("/docs"),
+  "report-dir": z.string().optional(),
+  summary: z.string().optional(),
+  pages: list.optional(),
+  "all-pages": z.boolean().default(false),
+  shard: shard.optional(),
+  "report-only": z.boolean().default(false),
+  "form-factors": list.pipe(z.array(z.enum(FORM_FACTORS))).default([...FORM_FACTORS]),
+  concurrency: z.coerce.number().int().min(1).optional(),
+  runs: z.coerce.number().int().min(1).default(1),
+  "recheck-below": z
+    .string()
+    .trim()
+    .min(1, "use --recheck-below <score>, a performance score from 0 to 1")
+    .transform(Number)
+    .pipe(z.number().min(0).max(1))
+    .optional(),
+  json: z.boolean().default(false),
+  lhr: z.boolean().default(false),
+  "static-only": z.boolean().default(false),
+  "skip-static": z.boolean().default(false),
+  "write-seo-baseline": z.boolean().default(false),
+  "write-agent-baseline": z.boolean().default(false),
+});
+
+function readOptions() {
+  const { values } = parseArgs({
+    options: {
+      "out-dir": { type: "string" },
+      "base-path": { type: "string" },
+      "report-dir": { type: "string" },
+      summary: { type: "string" },
+      pages: { type: "string" },
+      "all-pages": { type: "boolean" },
+      shard: { type: "string" },
+      "report-only": { type: "boolean" },
+      "form-factors": { type: "string" },
+      concurrency: { type: "string" },
+      runs: { type: "string" },
+      "recheck-below": { type: "string" },
+      json: { type: "boolean" },
+      lhr: { type: "boolean" },
+      "static-only": { type: "boolean" },
+      "skip-static": { type: "boolean" },
+      "write-seo-baseline": { type: "boolean" },
+      "write-agent-baseline": { type: "boolean" },
+    },
+  });
+  return optionsSchema.parse(values);
+}
+
+function log({ json, message }: { json: boolean; message: string }) {
+  (json ? process.stderr : process.stdout).write(`[docs-audit] ${message}\n`);
+}
+
+/** A page by budget id, or an ad hoc site path held to the default budgets. */
+function selectPage({ pages, entry }: { pages: PageBudget[]; entry: string }): PageBudget {
+  const page = pages.find((candidate) => candidate.id === entry || candidate.path === entry);
+  if (page) return page;
+  if (!entry.startsWith("/"))
+    throw new Error(`unknown page ${entry}; use a budget id or a /site/path`);
+  return { id: entry, path: entry, why: "ad hoc", categories: {}, knownFailures: {} };
+}
+
+/**
+ * The pages to audit: the named ones, every sitemap page (`--all-pages`), or the representative
+ * budget pages. `--shard i/n` keeps every n-th, so each shard gets a mix of sections.
+ */
+function selectPages({
+  options,
+  pages,
+  outDir,
+}: {
+  options: ReturnType<typeof readOptions>;
+  pages: PageBudget[];
+  outDir: string;
+}) {
+  const sitemap = options["all-pages"]
+    ? sitemapPages({ outDir })
+        .filter((url) => url === DOCS_URL || url.startsWith(`${DOCS_URL}/`))
+        .map((url) => url.slice(DOCS_URL.length) || "/")
+    : undefined;
+  const selected = options.pages ?? sitemap;
+  const chosen = selected ? selected.map((entry) => selectPage({ pages, entry })) : pages;
+  const { shard } = options;
+  if (!shard) return chosen;
+  return chosen.filter((_, index) => index % shard.count === shard.index - 1);
+}
+
+function parseRun({ stdout }: { stdout: string }) {
+  try {
+    const parsed = auditRunSchema.safeParse(JSON.parse(stdout.trim().split("\n").at(-1) ?? ""));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function runLighthouse({
+  url,
+  page,
+  formFactor,
+  lhr,
+}: {
+  url: string;
+  page: PageBudget;
+  formFactor: FormFactor;
+  lhr?: string;
+}): Promise<AuditRun> {
+  const args = [RUNNER, "--url", url, "--page", page.id, "--path", page.path];
+  args.push("--form-factor", formFactor, ...(lhr ? ["--lhr", lhr] : []));
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => (stdout += chunk));
+    child.stderr.on("data", (chunk) => (stderr += chunk));
+    child.on("close", (code) => {
+      const parsed = code === 0 ? parseRun({ stdout }) : null;
+      if (parsed) return resolve(parsed);
+      resolve({
+        page: page.id,
+        path: page.path,
+        formFactor,
+        runtimeError: `runner exited ${code}: ${stderr.trim().split("\n").slice(-3).join(" ")}`,
+        scores: {},
+        metrics: {
+          firstContentfulPaint: null,
+          largestContentfulPaint: null,
+          totalBlockingTime: null,
+          cumulativeLayoutShift: null,
+          speedIndex: null,
+        },
+        transferBytes: null,
+        requests: null,
+        agentic: null,
+        failingAudits: [],
+        opportunities: [],
+        durationMs: 0,
+      });
+    });
+  });
+}
+
+async function pool<T, R>({
+  items,
+  limit,
+  work,
+}: {
+  items: T[];
+  limit: number;
+  work: (item: T) => Promise<R>;
+}) {
+  const results = Array.from<R>({ length: items.length });
+  const queue = items.entries();
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      for (const [index, item] of queue) results[index] = await work(item);
+    }),
+  );
+  return results;
+}
+
+async function checkExportTypes({ origin, exports }: { origin: string; exports: string[] }) {
+  const wrong = await pool({
+    items: exports,
+    limit: 16,
+    work: async (href) => {
+      const response = await fetch(`${origin}${href}`, { method: "HEAD" });
+      const type = response.headers.get("content-type") ?? "";
+      return response.status === 200 && type.startsWith("text/markdown")
+        ? null
+        : {
+            page: href,
+            code: "markdown-content-type",
+            detail: `${response.status} ${type || "no type"}`,
+          };
+    },
+  });
+  return wrong.filter((issue) => issue !== null);
+}
+
+/** Agent readiness against its known gaps; `write` replaces them with today's. */
+function agentReadiness({
+  outDir,
+  budgets,
+  json,
+  write,
+}: {
+  outDir: string;
+  budgets: ReturnType<typeof readBudgets>;
+  json: boolean;
+  write: boolean;
+}) {
+  const result = checkAgentReadiness({ outDir, docsRoot, budget: budgets.agentReadiness });
+  let known = budgets.agentReadiness.known;
+  if (write) {
+    known = knownIssuesOf({ issues: result.issues });
+    const raw = JSON.parse(readFileSync(DEFAULT_BUDGETS_FILE, "utf8"));
+    raw.agentReadiness.known = known;
+    writeFileSync(DEFAULT_BUDGETS_FILE, `${JSON.stringify(raw, null, 2)}\n`);
+    log({
+      json,
+      message: `wrote ${result.issues.length} known agent readiness gaps to budgets.json`,
+    });
+  }
+  const gate = applyKnownIssues({ issues: result.issues, known });
+  log({
+    json,
+    message: `agent readiness: ${result.score}/100, ${gate.failures.length} new gaps, ${gate.known} known`,
+  });
+  return { result, gate };
+}
+
+/**
+ * Lighthouse over the selected pages and form factors, the median of each page's runs. A page
+ * under `--recheck-below` runs again: shared CI cores swing its TBT from 0 to over a second.
+ */
+async function lighthouseRuns({
+  options,
+  pages,
+  origin,
+  basePath,
+  reportDir,
+  json,
+}: {
+  options: ReturnType<typeof readOptions>;
+  pages: PageBudget[];
+  origin: string;
+  basePath: string;
+  reportDir: string;
+  json: boolean;
+}): Promise<AuditRun[]> {
+  const tasks = pages.flatMap((page) =>
+    options["form-factors"].flatMap((formFactor) =>
+      Array.from({ length: options.runs }, (_, attempt) => ({ page, formFactor, attempt })),
+    ),
+  );
+  const limit =
+    options.concurrency ?? Math.max(1, Math.min(4, Math.floor(os.availableParallelism() / 2)));
+  const lhrDir = path.join(reportDir, "lighthouse");
+  if (options.lhr) mkdirSync(lhrDir, { recursive: true });
+  const measure = (items: LighthouseTask[]) =>
+    pool({
+      items,
+      limit,
+      work: async ({ page, formFactor, attempt }) => {
+        const run = await runLighthouse({
+          url: `${origin}${basePath}${page.path}`,
+          page,
+          formFactor,
+          lhr: options.lhr
+            ? path.join(
+                lhrDir,
+                `${page.id.replace(/[^a-z0-9-]+/gi, "_")}-${formFactor}-${attempt}.json`,
+              )
+            : undefined,
+        });
+        log({
+          json,
+          message: `${page.id} ${formFactor}: ${run.runtimeError ?? `${Math.round(run.durationMs / 1000)} s`}`,
+        });
+        return run;
+      },
+    });
+  const medians = (runs: AuditRun[]) =>
+    pageMedians({ pages, formFactors: options["form-factors"], runs });
+  log({ json, message: `lighthouse: ${tasks.length} runs, ${limit} at a time` });
+  const all = await measure(tasks);
+  const first = medians(all);
+  const threshold = options["recheck-below"];
+  const passes =
+    threshold === undefined
+      ? []
+      : recheckPasses({ medians: first, threshold, firstAttempt: options.runs });
+  if (passes.length === 0) return first.map(({ run }) => run);
+  log({
+    json,
+    message: `lighthouse: ${passes[0]?.length} pages under ${threshold}, ${passes.length} more runs each`,
+  });
+  for (const pass of passes) all.push(...(await measure(pass)));
+  return medians(all).map(({ run }) => run);
+}
+
+/** Stops before any check when the build was made for another mount: every URL would be wrong. */
+function assertBuiltFor({ outDir, basePath }: { outDir: string; basePath: string }) {
+  const built = builtBasePath({ outDir });
+  if (built === null || built === basePath) return;
+  throw new Error(
+    `${outDir} was built for base path "${built || "/"}", not "${basePath || "/"}": ` +
+      `build it with --base-path ${basePath || "/"} (CI audits a /docs build), or pass --base-path ${built || "/"}`,
+  );
+}
+
+async function main() {
+  const started = nowInstant().epochMilliseconds;
+  const options = readOptions();
+  const json = options.json;
+  const outDir = path.resolve(options["out-dir"]);
+  const basePath = options["base-path"].replace(/\/$/, "");
+  const reportDir = path.resolve(options["report-dir"] ?? outDir);
+  const budgets = readBudgets();
+  assertBuiltFor({ outDir, basePath });
+  const pages = selectPages({ options, pages: budgets.pages, outDir });
+
+  const seoResult = options["skip-static"]
+    ? { pages: 0, issues: [], exports: [] }
+    : checkSeo({ outDir, basePath, seo: budgets.seo });
+  let known = options["skip-static"] ? {} : budgets.seo.known;
+  if (options["write-seo-baseline"]) {
+    known = knownIssuesOf({ issues: seoResult.issues });
+    const raw = JSON.parse(readFileSync(DEFAULT_BUDGETS_FILE, "utf8"));
+    raw.seo.known = known;
+    writeFileSync(DEFAULT_BUDGETS_FILE, `${JSON.stringify(raw, null, 2)}\n`);
+    log({ json, message: `wrote ${seoResult.issues.length} known issues to budgets.json` });
+  }
+  const seo = applyKnownIssues({ issues: seoResult.issues, known });
+  const agent = options["skip-static"]
+    ? null
+    : agentReadiness({ outDir, budgets, json, write: options["write-agent-baseline"] });
+  log({
+    json,
+    message: `static: ${seoResult.pages} pages, ${seo.failures.length} new issues, ${seo.known} known`,
+  });
+
+  const server = await startPreview({ outDir, port: 0, basePath });
+  let runs: AuditRun[] = [];
+  try {
+    const origin = new URL(server.resolvedUrls?.local[0] ?? "http://127.0.0.1").origin;
+    seo.failures.push(...(await checkExportTypes({ origin, exports: seoResult.exports })));
+    if (!options["static-only"])
+      runs = await lighthouseRuns({ options, pages, origin, basePath, reportDir, json });
+  } finally {
+    await new Promise((resolve) => server.httpServer.close(resolve));
+  }
+
+  const { failures, notes } = evaluateBudgets({
+    runs,
+    budgets: { ...budgets, pages },
+  });
+  const wallClockMs = nowInstant().epochMilliseconds - started;
+  const report = { wallClockMs, runs, failures, notes, seo: { pages: seoResult.pages, ...seo } };
+  mkdirSync(reportDir, { recursive: true });
+  writeFileSync(path.join(reportDir, "audit-report.json"), JSON.stringify(report, null, 2));
+  const agentFailures = agent?.gate.failures.length ?? 0;
+  if (agent)
+    writeFileSync(
+      path.join(reportDir, "agent-readiness.json"),
+      JSON.stringify(agentReadinessReport(agent), null, 2),
+    );
+  const markdown =
+    summaryMarkdown({ runs, failures, notes, seo: report.seo, wallClockMs, agentFailures }) +
+    (agent ? agentReadinessMarkdown(agent) : "");
+  if (options.summary) appendFileSync(options.summary, markdown);
+  if (json) process.stdout.write(`${JSON.stringify(report)}\n`);
+  else process.stdout.write(markdown);
+  const failed = failures.length > 0 || seo.failures.length > 0 || agentFailures > 0;
+  // `--report-only` measures without judging: the every-page report is informational.
+  if (failed && !options["report-only"]) process.exitCode = 1;
+}
+
+await main();

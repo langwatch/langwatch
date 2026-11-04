@@ -12,7 +12,7 @@ import {
   BOARD_GRID_ROW_HEIGHT_PX,
   BOARD_MIN_ROW_SPAN,
 } from "../../model/board-grid.ts";
-import type { BoardQueryContext } from "../../model/board-period.ts";
+import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardTemplateWidget } from "../../templates/index.ts";
 import { CuratedWidgetCard } from "./curated-widget-card.tsx";
 
@@ -24,17 +24,20 @@ export function CuratedWidgetsGrid({
   widgets,
   period,
   onAskLangy,
+  onEmptyChange,
 }: {
   projectId: string;
   projectSlug: string;
   templateId: string;
   boardName: string;
   widgets: readonly BoardTemplateWidget[];
-  period: BoardQueryContext;
+  period: BoardPeriod;
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
   onAskLangy?: (widget: BoardTemplateWidget) => void;
+  /** Told whether each widget shows none of its data. */
+  onEmptyChange?: (input: { widget: BoardTemplateWidget; empty: boolean }) => void;
 }) {
-  const { periodStart, periodEnd, granularitySeconds, excludeOrigins } = period;
+  const { periodStart, periodEnd, granularitySeconds } = period;
   const timeWindow = useMemo(
     () => ({ start: periodStart, end: periodEnd }),
     [periodStart, periodEnd],
@@ -62,8 +65,8 @@ export function CuratedWidgetsGrid({
             rowSpan={rowSpan}
             timeWindow={timeWindow}
             granularitySeconds={granularitySeconds}
-            excludeOrigins={excludeOrigins}
             onAskLangy={onAskLangy && (() => onAskLangy(widget))}
+            onEmptyChange={onEmptyChange && ((empty) => onEmptyChange({ widget, empty }))}
           />
         );
       }}
