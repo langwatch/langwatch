@@ -1,7 +1,10 @@
 import {
   convertValueToColumnType,
+  datasetColumnsSchema,
+  DatasetStaleColumnsError,
   InvalidColumnError,
   renameReservedColumns,
+  type DatasetColumnRenames,
   type DatasetColumns,
   type DatasetConfirmColumns,
 } from "@langwatch/dataset-contract";
@@ -30,6 +33,83 @@ export function assertKnownColumns({
       throw new InvalidColumnError({ columnName: key, datasetName, validColumns: columns });
     }
   }
+}
+
+/**
+ * A write keyed by columns the dataset no longer has in that order is refused: a column edit
+ * landed after the caller read them. Order catches a swap, where the names stay but their
+ * values trade places. Callers that name no columns are not checked.
+ */
+export function assertColumnsCurrent({
+  columns,
+  columnTypes,
+}: {
+  columns: readonly string[] | undefined;
+  columnTypes: unknown;
+}): void {
+  if (!columns) return;
+  const parsed = datasetColumnsSchema.safeParse(columnTypes);
+  if (!parsed.success) return;
+  const position = new Map(parsed.data.map((column, index) => [column.name, index]));
+  let previous = -1;
+  for (const column of columns) {
+    const at = position.get(column);
+    if (at === undefined || at <= previous) throw new DatasetStaleColumnsError();
+    previous = at;
+  }
+}
+
+/**
+ * Why a column edit's renames are invalid; empty when they are fine. A rename must name a column
+ * the dataset has and one the edit keeps, each once: a rename that misses would leave the renamed
+ * column empty and drop the old one's values.
+ */
+export function columnRenameProblems({
+  previousColumns,
+  newColumns,
+  renames,
+}: {
+  previousColumns: DatasetColumns;
+  newColumns: DatasetColumns;
+  renames: DatasetColumnRenames | undefined;
+}): string[] {
+  const previous = new Set(previousColumns.map((column) => column.name));
+  const next = new Set(newColumns.map((column) => column.name));
+  const list = renames ?? [];
+  const repeated = (names: string[]) => [
+    ...new Set(names.filter((name, index) => names.indexOf(name) !== index)),
+  ];
+  return [
+    ...list
+      .filter(({ from }) => !previous.has(from))
+      .map(({ from }) => `"${from}" is not a column of this dataset`),
+    ...list
+      .filter(({ to }) => !next.has(to))
+      .map(({ to }) => `"${to}" is not one of the new columns`),
+    ...repeated(list.map(({ from }) => from)).map((name) => `"${name}" is renamed more than once`),
+    ...repeated(list.map(({ to }) => to)).map(
+      (name) => `"${name}" is the target of more than one rename`,
+    ),
+  ];
+}
+
+/**
+ * Whether a column edit moves record values: a rename to another name, or an old column the new
+ * list lacks.
+ * A type change, a reorder or an added column leaves every stored value where it is.
+ */
+export function columnEditMovesValues({
+  previousColumns,
+  newColumns,
+  renames,
+}: {
+  previousColumns: DatasetColumns;
+  newColumns: DatasetColumns;
+  renames: DatasetColumnRenames | undefined;
+}): boolean {
+  if (renames?.some(({ from, to }) => from !== to)) return true;
+  const next = new Set(newColumns.map((column) => column.name));
+  return previousColumns.some((column) => !next.has(column.name));
 }
 
 /**

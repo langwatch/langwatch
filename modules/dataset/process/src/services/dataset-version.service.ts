@@ -475,8 +475,10 @@ export class DatasetVersionService {
     }
 
     const entries = rows.map((row) => ({ ...row.entry, id: row.id }));
-    await this.deps.records.replaceAll({ datasetId, projectId, entries });
-    await this.deps.content.update({ id: datasetId, projectId, data: { columnTypes: columns } });
+    await this.deps.records.withDatasetLock({ datasetId, projectId }, async (records) => {
+      await records.replaceAll({ datasetId, projectId, entries });
+      await records.setColumnTypes(columns);
+    });
     logger.info({ projectId, datasetId, rows: rows.length }, "Restored a dataset version in place");
   }
 

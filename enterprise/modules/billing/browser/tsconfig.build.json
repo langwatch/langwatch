@@ -51,6 +51,9 @@
       "path": "../../../../packages/browser/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/auth/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/api/tsconfig.build.json"
     }
   ],
