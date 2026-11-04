@@ -8,7 +8,7 @@ import {
   DASHBOARDS_FLAG,
   DASHBOARDS_PERMISSION,
   dashboardsAccess,
-} from "../../model/dashboards-access.ts";
+} from "../../../../model/dashboards-access.ts";
 
 export function DashboardsGate({ children }: { children: ReactNode }) {
   const host = useAnalyticsHost();

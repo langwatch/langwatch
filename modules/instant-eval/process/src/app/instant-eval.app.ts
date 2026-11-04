@@ -302,7 +302,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       rows: InstantEvalJudgeRowsService.create({ judge }),
       budget,
       spend: judgedSpend,
-      pricing: judge.pricing,
+      holdPricing: () => setup.channels.judges.queryHoldPricing(),
       queryTokenBudget: setup.config.queryTokenBudget,
     });
 
@@ -515,6 +515,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
         pages.discardReadAhead({ runId: input.runId });
         return finishes.finish(input);
       },
+      billLatePage: (input) => finishes.billLatePage(input),
     };
   }
 

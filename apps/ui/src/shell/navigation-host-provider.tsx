@@ -75,6 +75,7 @@ function rememberScope({
       ...(write.organizationId !== void 0
         ? [{ key: "organizationId" as const, value: write.organizationId }]
         : []),
+      ...(write.teamId !== void 0 ? [{ key: "teamId" as const, value: write.teamId }] : []),
       ...(write.projectSlug !== void 0
         ? [{ key: "projectSlug" as const, value: write.projectSlug }]
         : []),

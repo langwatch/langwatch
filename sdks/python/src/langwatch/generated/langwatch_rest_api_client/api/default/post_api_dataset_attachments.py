@@ -83,7 +83,7 @@ def sync_detailed(
     """Upload a file for an image or file column and get the reference a cell holds. The project is named
     by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional
     `datasetId` field. create the upload, send the file to the address it answers, confirm it as a
-    stored object, then put its reference in the cell
+    stored object, then put its reference in the cell.
 
     Args:
         project_id (str):
@@ -118,7 +118,7 @@ def sync(
     """Upload a file for an image or file column and get the reference a cell holds. The project is named
     by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional
     `datasetId` field. create the upload, send the file to the address it answers, confirm it as a
-    stored object, then put its reference in the cell
+    stored object, then put its reference in the cell.
 
     Args:
         project_id (str):
@@ -148,7 +148,7 @@ async def asyncio_detailed(
     """Upload a file for an image or file column and get the reference a cell holds. The project is named
     by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional
     `datasetId` field. create the upload, send the file to the address it answers, confirm it as a
-    stored object, then put its reference in the cell
+    stored object, then put its reference in the cell.
 
     Args:
         project_id (str):
@@ -181,7 +181,7 @@ async def asyncio(
     """Upload a file for an image or file column and get the reference a cell holds. The project is named
     by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional
     `datasetId` field. create the upload, send the file to the address it answers, confirm it as a
-    stored object, then put its reference in the cell
+    stored object, then put its reference in the cell.
 
     Args:
         project_id (str):

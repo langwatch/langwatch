@@ -13,7 +13,7 @@ This API is designed for service-to-service automation (e.g. an internal tool th
 
 The Projects API requires an **organization-level API key** (created in Settings > API Keys). Pass it as a Bearer token:
 
-```
+```http
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
@@ -31,16 +31,16 @@ Project API keys (`X-Auth-Token`) cannot be used here, because they lack organiz
 | `GET`    | `/api/v1/projects/{id}/api-key`            | Get the project's API key                                    |
 | `POST`   | `/api/v1/projects/{id}/regenerate-api-key` | Regenerate the project API key                               |
 
-## Dashboards boards
+## Dashboards
 
-These routes read the boards of the Dashboards area in one project. Unlike the routes above, they take the project API key in the `X-Auth-Token` header, not an organization key.
+These routes read the dashboards of the Dashboards area in one project. Unlike the routes above, they take the project API key in the `X-Auth-Token` header, not an organization key.
 
-| Method | Path                                                      | Description                                            |
-| ------ | --------------------------------------------------------- | ------------------------------------------------------ |
-| `GET`  | `/api/v1/projects/{projectId}/analytics/boards`           | List the project's boards, each with its `widgetCount` |
-| `GET`  | `/api/v1/projects/{projectId}/analytics/boards/{boardId}` | Get one board                                          |
+| Method | Path                                                              | Description                                                |
+| ------ | ----------------------------------------------------------------- | ---------------------------------------------------------- |
+| `GET`  | `/api/v1/projects/{projectId}/analytics/dashboards`               | List the project's dashboards, each with its `widgetCount` |
+| `GET`  | `/api/v1/projects/{projectId}/analytics/dashboards/{dashboardId}` | Get one dashboard                                          |
 
-A board in another project answers `404`.
+A dashboard in another project answers `404`. The older `/analytics/boards` paths answer the same, but are deprecated: each answer carries `Deprecation: true` and a `Link` to the `/analytics/dashboards` path.
 
 ## Moving a Project to Another Team
 

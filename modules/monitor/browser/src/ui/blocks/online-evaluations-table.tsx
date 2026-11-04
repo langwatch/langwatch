@@ -30,6 +30,8 @@ export type OnlineEvaluationRow = {
   /** Why the monitor paused itself, while it stays paused. */
   autoPausedReason?: string | null;
   executionMode: string;
+  /** Who created the monitor; null for monitors created before creators were recorded. */
+  createdByName?: string | null;
   performance?: OnlineEvaluationPerformance;
   hasPerformanceError?: boolean;
 };
@@ -79,7 +81,12 @@ export const OnlineEvaluationsTable = ({
               <VStack align="start" gap={0.5}>
                 <Text fontWeight="medium">{row.name}</Text>
                 <Text textStyle="xs" color="fg.muted">
-                  {definition?.name ?? row.checkType}
+                  {[
+                    definition?.name ?? row.checkType,
+                    row.createdByName && `Created by ${row.createdByName}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" • ")}
                 </Text>
               </VStack>
             </ListTable.Cell>

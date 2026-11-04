@@ -87,7 +87,7 @@ We follow the [Conventional Commits](https://www.conventionalcommits.org) specif
 
 The repo publishes eight independently versioned components: the product itself, the four SDKs, the MCP server, langevals and the skills package. release-please decides which of them a commit affects by path, then applies the whole commit message to every one of them. A `!` marker or a `BREAKING CHANGE:` footer on a commit that touches three components therefore releases three majors, whether or not the break means anything to all three.
 
-So keep a breaking change inside one component. If the work has to touch another one, land the incidental part as a separate non-breaking PR. The `release-scope-guard` check fails a PR that breaks this rule, and tells you what to do about it. See [dev/docs/RELEASES.md](./dev/docs/RELEASES.md) for the full procedure, including how to pin a version release-please got wrong.
+So keep a breaking change inside one component. If the work has to touch another one, land the incidental part as a separate non-breaking PR. The `pr-conventions` check fails a PR that breaks this rule, and tells you what to do about it. See [dev/docs/RELEASES.md](./dev/docs/RELEASES.md) for the full procedure, including how to pin a version release-please got wrong.
 
 ## Additional Notes
 

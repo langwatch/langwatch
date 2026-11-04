@@ -368,7 +368,40 @@ export const reservedSpanParamsSchema: ReservedSpanParamsSchema =
 
 export type ReservedSpanParams = z.infer<typeof reservedSpanParamsSchema>;
 
-const spanParamsSchemaDefinition = reservedSpanParamsSchema.and(z.record(z.string(), z.any()));
+type AnyValueAlso<Shape extends z.ZodRawShape> = {
+  [Key in keyof Shape]: z.ZodOptional<z.ZodUnion<[z.ZodType, z.ZodNull, z.ZodUnknown]>>;
+};
+
+/**
+ * Each param keeps its declared type, for the docs and the generated clients, and also takes any
+ * value. The declared type stays the union's first arm and `null` its second, as the plain
+ * nullable had them, so the clients' generated names for the param's models do not move.
+ */
+function anyValueAlso<Shape extends z.ZodRawShape>(shape: Shape): AnyValueAlso<Shape> {
+  return Object.fromEntries(
+    Object.entries(shape).map(([key, schema]) => {
+      let declared = schema as z.ZodType;
+      while (declared instanceof z.ZodOptional || declared instanceof z.ZodNullable) {
+        declared = declared.unwrap() as z.ZodType;
+      }
+      return [key, orAnyValue(declared)];
+    }),
+  ) as AnyValueAlso<Shape>;
+}
+
+/** One param's schema: its declared type first, `null` second, then any value. */
+function orAnyValue(declared: z.ZodType) {
+  return z.union([declared, z.null(), z.unknown()]).optional();
+}
+
+/**
+ * A span's attributes, unflattened by dot. A sender's own namespace can share a name with a
+ * {@link reservedSpanParamsSchema} param (`user.id`: OTel semconv) at another type, so the
+ * reserved types are documented but not enforced: a span read never fails on its own attributes.
+ */
+const spanParamsSchemaDefinition = z
+  .object(anyValueAlso(reservedSpanParamsSchemaDefinition.shape))
+  .catchall(z.any());
 export interface SpanParamsSchema extends Named<typeof spanParamsSchemaDefinition> {}
 export const spanParamsSchema: SpanParamsSchema = spanParamsSchemaDefinition;
 

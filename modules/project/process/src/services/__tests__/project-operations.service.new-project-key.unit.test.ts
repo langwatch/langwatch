@@ -21,6 +21,7 @@ class NewProjectDirectory implements ProjectOperationsDirectory {
   rotateLegacyApiKey: ProjectOperationsDirectory["rotateLegacyApiKey"] = () => this.refuse();
   findLegacyApiKeyLastUsedAt: ProjectOperationsDirectory["findLegacyApiKeyLastUsedAt"] = () =>
     this.refuse();
+  findLiveLegacyKeys: ProjectOperationsDirectory["findLiveLegacyKeys"] = () => this.refuse();
 
   private refuse(): Promise<never> {
     return Promise.reject(new Error("only the status read is under test"));
