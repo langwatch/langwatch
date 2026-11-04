@@ -938,6 +938,20 @@
                 "pages": [
                   "coding-agents/opencode"
                 ]
+              },
+              {
+                "group": "Grok CLI",
+                "icon": "/images/logos/grok.svg",
+                "pages": [
+                  "coding-agents/grok-cli"
+                ]
+              },
+              {
+                "group": "pi",
+                "icon": "terminal",
+                "pages": [
+                  "coding-agents/pi"
+                ]
               }
             ]
           },
