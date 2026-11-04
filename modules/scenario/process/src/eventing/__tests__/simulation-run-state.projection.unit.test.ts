@@ -559,10 +559,10 @@ describe("simulationRunStateFoldProjection", () => {
     });
 
     /** @scenario "Two re-drives at the same end time each keep their own refresh" */
-    it("keeps the later re-drive's refresh on a refold when both share the call's end time", () => {
+    it("keeps the later re-drive's refresh on a refold when both share the call's end time", async () => {
       // Built through the real command so the idempotency key is the one the log dedupes on.
       const CALL_ENDED_AT = 2000;
-      const refreshFrom = ({
+      const refreshFrom = async ({
         attemptId,
         writtenAt,
         audioUrl,
@@ -572,7 +572,7 @@ describe("simulationRunStateFoldProjection", () => {
         audioUrl: string | null;
       }) => {
         vi.setSystemTime(writtenAt);
-        const [event] = new RefreshMetadataCommand().handle(
+        const [event] = await new RefreshMetadataCommand().handle(
           refreshMetadataCommand({
             occurredAt: CALL_ENDED_AT,
             attemptId,
@@ -583,12 +583,12 @@ describe("simulationRunStateFoldProjection", () => {
       };
       // The first re-drive found no recording; its finish then failed, and a
       // second re-drive found the provider recording.
-      const firstRedrive = refreshFrom({
+      const firstRedrive = await refreshFrom({
         attemptId: "attempt-a",
         writtenAt: 5000,
         audioUrl: null,
       });
-      const secondRedrive = refreshFrom({
+      const secondRedrive = await refreshFrom({
         attemptId: "attempt-b",
         writtenAt: 6000,
         audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
@@ -621,17 +621,19 @@ describe("simulationRunStateFoldProjection", () => {
       expect(metadata.audioUrl).toBe("/api/voice/session/conv_1/audio?projectId=p1");
     });
 
-    it("still dedupes a retry of the same attempt", () => {
-      const handleOnce = () =>
-        new RefreshMetadataCommand().handle(
+    it("still dedupes a retry of the same attempt", async () => {
+      const handleOnce = async () => {
+        const [event] = await new RefreshMetadataCommand().handle(
           refreshMetadataCommand({
             occurredAt: 2000,
             attemptId: "attempt-a",
             metadata: { source: "provider" },
           }),
-        )[0]!;
+        );
+        return event!;
+      };
 
-      const [original, retried] = [handleOnce(), handleOnce()];
+      const [original, retried] = [await handleOnce(), await handleOnce()];
 
       expect(retried.idempotencyKey).toBe(original.idempotencyKey);
       expect(deduplicateEvents([original, retried])).toHaveLength(1);

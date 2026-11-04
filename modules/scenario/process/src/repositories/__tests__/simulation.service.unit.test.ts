@@ -36,6 +36,7 @@ class RecordingExecution extends SimulationExecutionRepository {
   async recordAgentInstance(): Promise<void> {}
 
   async recordCutAtLimit(): Promise<void> {}
+  async refreshMetadata(): Promise<void> {}
 
   async recordHooks(): Promise<void> {}
 }
