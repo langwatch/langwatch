@@ -44,6 +44,12 @@ const mutations = vi.hoisted(() => ({
   invalidateLegacy: vi.fn(),
 }));
 
+// The ceiling is the server's answer; faked here over the seeded bindings.
+vi.mock("../../../behavior/use-grantable-permissions.ts", async () => {
+  const { fakeGrantableHook } = await import("./support/fake-grantable.ts");
+  return { useGrantablePermissions: fakeGrantableHook({ bindings: () => state.myBindings as { scopeType: string; scopeId: string; role: string }[] | undefined, projectTeams: { "proj-1": "team-1", "proj-2": "team-1" } }) };
+});
+
 vi.mock("../../../behavior/api-key-api.ts", () => ({
   apiKeyApi: {
     useUtils: () => ({

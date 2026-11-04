@@ -24,6 +24,12 @@ const { state } = vi.hoisted(() => ({
   },
 }));
 
+// The ceiling is the server's answer; faked here over the seeded bindings.
+vi.mock("../../../behavior/use-grantable-permissions.ts", async () => {
+  const { fakeGrantableHook } = await import("./support/fake-grantable.ts");
+  return { useGrantablePermissions: fakeGrantableHook({ bindings: () => state.bindings, projectTeams: { "proj-1": "team-1", "proj-2": "team-2", "proj-personal": "team-personal" } }) };
+});
+
 vi.mock("../../../behavior/api-key-api.ts", () => ({
   apiKeyApi: {
     useUtils: () => ({ apiKey: { list: { invalidate: vi.fn() } } }),

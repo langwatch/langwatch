@@ -266,6 +266,20 @@ export interface ApiKeyApi {
     by: ApiKeyManagementCaller,
   ): Promise<NamedApiKeyBinding[]>;
   /**
+   * The categorizable permissions a restricted key bound to every one of these scopes may
+   * carry: what the key's ceiling holder (the owner, else the caller) holds at each, by the
+   * resolver the mint's ceiling check uses, so group grants count. Another owner's ceiling
+   * is an organization admin's question only.
+   */
+  listGrantablePermissions(
+    input: {
+      organizationId: string;
+      scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+      ownerUserId?: string;
+    },
+    by: ApiKeyManagementCaller,
+  ): Promise<string[]>;
+  /**
    * One key id resolved to a display name. Answers null identically for an id
    * that does not exist and one in another organization, so it cannot enumerate.
    */

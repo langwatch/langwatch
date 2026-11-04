@@ -11,9 +11,11 @@
 // / `orgMembers` feed the pickers the drawers render.
 
 import { defineTrpcContract } from "@langwatch/module";
+import { z } from "zod";
 
 import {
   apiKeyTrpcCreateInputSchema,
+  apiKeyTrpcGrantableInputSchema,
   apiKeyTrpcNameByIdInputSchema,
   apiKeyTrpcOrganizationScopeSchema,
   apiKeyTrpcRevokeInputSchema,
@@ -38,6 +40,11 @@ export const apiKeyTrpc = defineTrpcContract("apiKey")
   .query("myBindings")
   .withInput(apiKeyTrpcOrganizationScopeSchema)
   .withOutput(namedApiKeyBindingSchema.array())
+
+  // What a restricted key's rows may offer: read off the same resolver the mint checks with.
+  .query("grantablePermissions")
+  .withInput(apiKeyTrpcGrantableInputSchema)
+  .withOutput(z.string().array())
 
   .query("nameById")
   .withInput(apiKeyTrpcNameByIdInputSchema)

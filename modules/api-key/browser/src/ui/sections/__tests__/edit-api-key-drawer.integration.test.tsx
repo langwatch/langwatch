@@ -13,6 +13,12 @@ import { renderWithApiKeyHost } from "../../../testing.tsx";
 import { EditApiKeyDrawer } from "../edit-api-key-drawer.tsx";
 
 // The picker has its own suite in authz; this file pins what the drawer sends.
+// The ceiling is the server's answer; faked here over the seeded bindings.
+vi.mock("../../../behavior/use-grantable-permissions.ts", async () => {
+  const { fakeGrantableHook } = await import("./support/fake-grantable.ts");
+  return { useGrantablePermissions: fakeGrantableHook({ bindings: () => [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" }] }) };
+});
+
 vi.mock("@langwatch/design-system/scope-chip-picker", () => ({ ScopeChipPicker: () => null }));
 
 vi.mock("@langwatch/design-system/provider-scope-chips", () => ({

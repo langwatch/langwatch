@@ -9,11 +9,9 @@ import {
 import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { useEffect, useMemo, useState } from "react";
 
-import {
-  clampSelectionsToAvailability,
-  getUserPermissionsAcrossScopes,
-} from "../model/api-key-permissions.ts";
+import { clampSelectionsToAvailability } from "../model/api-key-permissions.ts";
 import { defaultCliKeyScopes } from "../model/cli-key-scope-defaults.ts";
+import { useGrantablePermissions } from "./use-grantable-permissions.ts";
 
 type Binding = { scopeType: string; scopeId: string; role: string };
 type OfferedProject = { id: string; teamId: string };
@@ -89,14 +87,10 @@ export function useCliKeyScopes({
 export function useCliKeyPermissions({
   organizationId,
   selectedScopes,
-  bindings,
-  offeredProjects,
   management,
 }: {
   organizationId: string | null;
   selectedScopes: ScopeTriadEntry[];
-  bindings: Binding[] | undefined;
-  offeredProjects: OfferedProject[];
   /** Whether the CLI asked for management access (`langwatch login --management`). */
   management: boolean;
 }) {
@@ -108,16 +102,14 @@ export function useCliKeyPermissions({
     setSelections({});
   }, [organizationId]);
 
-  const userPermissions = useMemo(() => {
-    if (selectedScopes.length === 0 || !organizationId) return [];
-    return getUserPermissionsAcrossScopes({
-      myBindings: bindings,
-      scopes: selectedScopes,
-      organizationId,
-      orgProjects: offeredProjects.map((p) => ({ id: p.id, teamId: p.teamId })),
-      isServiceKey: false,
-    });
-  }, [selectedScopes, organizationId, bindings, offeredProjects]);
+  // The mint's own ceiling, so access held through a group or an inherited role counts.
+  const grantable = useGrantablePermissions({
+    organizationId: organizationId ?? "",
+    scopes: selectedScopes,
+    isServiceKey: false,
+    enabled: !!organizationId,
+  });
+  const userPermissions = grantable.permissions;
 
   const defaultPermissionsHeld = useMemo<string[]>(() => {
     const held = new Set(userPermissions);
@@ -144,6 +136,8 @@ export function useCliKeyPermissions({
     isCustomized,
     toggleCustomized,
     userPermissions,
+    isLoadingCeiling: grantable.isLoading,
+    isCeilingFailed: grantable.isError,
     effectiveSelections,
     setSelections,
     permissions,

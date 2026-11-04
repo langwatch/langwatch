@@ -17,6 +17,8 @@ import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
 type Fakes = {
   can?: boolean;
   allow?: (permission: string) => boolean;
+  /** What the resolver holds at one scope, when it differs by scope. */
+  allowAt?: (scopeId: string, permission: string) => boolean;
   permissionsAsked?: string[];
   userBindings?: { scopeType: string; scopeId: string; role: string; expiresAt?: Date | null }[];
   scopeBindings?: { apiKeyId: string; role: string; expiresAt?: Date | null }[];
@@ -48,9 +50,15 @@ function policyWith(fakes: Fakes = {}) {
         scope: unknown;
       }) => {
         calls.push({ method: "beyondCaller", scope: input.scope });
+        const scopeId = (input.scope as { id: string }).id;
         return input.permissions.filter((permission) => {
           calls.push({ method: "can", permission, principal: input.caller });
-          return !(fakes.allow?.(permission) ?? fakes.can ?? true);
+          return !(
+            fakes.allowAt?.(scopeId, permission) ??
+            fakes.allow?.(permission) ??
+            fakes.can ??
+            true
+          );
         });
       },
       listUserBindings: async () => fakes.userBindings ?? [],
@@ -287,6 +295,100 @@ describe("ApiKeyGrantPolicyService", () => {
             organizationId: ORG,
             bindings: [scope({ role: "CUSTOM", customRoleId: "role-1" })],
             permissions: [],
+          }),
+        ).rejects.toBeInstanceOf(ApiKeyScopeViolationError);
+      });
+    });
+  });
+
+  describe("grantablePermissions()", () => {
+    // The drawers offer what this returns, so it must be what the mint's ceiling accepts.
+    const groupViewer = {
+      // No direct grant at all: the resolver holds read on traces and annotations only
+      // through a group bound to the project.
+      userBindings: [],
+      allow: (permission: string) =>
+        permission === "traces:view" || permission === "annotations:view",
+    };
+
+    describe("given a user whose only access to the project comes through a group", () => {
+      it("offers what the group grants there", async () => {
+        const { service } = policyWith(groupViewer);
+
+        const offered = await service.grantablePermissions({
+          principal: { type: "user", id: "user-1" },
+          organizationId: ORG,
+          scopes: [{ scopeType: "PROJECT", scopeId: "project-1" }],
+        });
+
+        expect(offered.toSorted()).toEqual(["annotations:view", "traces:view"]);
+      });
+
+      it("offers only what the mint then accepts", async () => {
+        const { service } = policyWith(groupViewer);
+        const principal = { type: "user" as const, id: "user-1" };
+        const offered = await service.grantablePermissions({
+          principal,
+          organizationId: ORG,
+          scopes: [{ scopeType: "PROJECT", scopeId: "project-1" }],
+        });
+
+        await expect(
+          service.assertCeiling({
+            principal,
+            organizationId: ORG,
+            bindings: [scope({ role: "CUSTOM" })],
+            permissions: offered,
+          }),
+        ).resolves.toBeUndefined();
+      });
+    });
+
+    describe("given an organization admin binding on a project", () => {
+      it("never offers a permission a project binding cannot carry", async () => {
+        const { service } = policyWith({ can: true });
+
+        const offered = await service.grantablePermissions({
+          principal: { type: "user", id: "user-1" },
+          organizationId: ORG,
+          scopes: [{ scopeType: "PROJECT", scopeId: "project-1" }],
+        });
+
+        expect(offered).toContain("traces:view");
+        expect(offered).not.toContain("organization:view");
+      });
+    });
+
+    describe("given several scopes", () => {
+      it("offers only what the user holds at every one of them", async () => {
+        const { service } = policyWith({
+          allowAt: (scopeId, permission) =>
+            permission === "traces:view" ||
+            (scopeId === "project-1" && permission === "annotations:view"),
+        });
+
+        const offered = await service.grantablePermissions({
+          principal: { type: "user", id: "user-1" },
+          organizationId: ORG,
+          scopes: [
+            { scopeType: "PROJECT", scopeId: "project-1" },
+            { scopeType: "TEAM", scopeId: "team-1" },
+          ],
+        });
+
+        expect(offered).toEqual(["traces:view"]);
+      });
+    });
+
+    describe("given a team outside this organization", () => {
+      it("refuses rather than answering", async () => {
+        const { service } = policyWith({ team: "missing" });
+
+        await expect(
+          service.grantablePermissions({
+            principal: { type: "user", id: "user-1" },
+            organizationId: ORG,
+            scopes: [{ scopeType: "TEAM", scopeId: "team-x" }],
           }),
         ).rejects.toBeInstanceOf(ApiKeyScopeViolationError);
       });

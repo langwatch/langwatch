@@ -25,6 +25,7 @@ import { TriangleAlert } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
+import { useGrantablePermissions } from "../../behavior/use-grantable-permissions.ts";
 import {
   earliestCustomExpiration,
   EXPIRATION_NEVER,
@@ -37,7 +38,6 @@ import {
 import { useApiKeyHost } from "../../model/api-key-host.ts";
 import {
   deriveBindingRole,
-  getUserPermissionsAtScope,
   type PermissionMode,
 } from "../../model/api-key-permissions.ts";
 import {
@@ -436,25 +436,16 @@ export function CreateApiKeyDrawer({
     scopeId: currentProjectId ?? "",
   };
 
-  const userPermissions = useMemo(
-    () =>
-      getUserPermissionsAtScope({
-        myBindings: myBindings.data,
-        scopeType: primaryScope.scopeType,
-        scopeId: primaryScope.scopeId,
-        organizationId,
-        orgProjects,
-        isServiceKey: keyType === "service",
-      }),
-    [
-      myBindings.data,
-      primaryScope.scopeType,
-      primaryScope.scopeId,
-      organizationId,
-      orgProjects,
-      keyType,
-    ],
-  );
+  // The ceiling the mint checks: every selected scope, for the key's owner.
+  const grantable = useGrantablePermissions({
+    organizationId,
+    scopes: selectedScopes.length > 0 ? selectedScopes : [primaryScope],
+    ownerUserId:
+      isAdmin && selectedUserId && selectedUserId !== currentUserId ? selectedUserId : void 0,
+    isServiceKey: keyType === "service",
+    enabled: isOpen,
+  });
+  const userPermissions = grantable.permissions;
 
   const [attempted, setAttempted] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -527,7 +518,13 @@ export function CreateApiKeyDrawer({
   });
   const showError = (field: Exclude<KeyField, "expiration">) =>
     attempted && missing.includes(field) ? FIELD_ERROR[field] : undefined;
-  const accessBlocked = myBindings.isLoading || myBindings.isError;
+  const access: MyBindings = {
+    data: myBindings.data,
+    isLoading: myBindings.isLoading || grantable.isLoading,
+    isError: myBindings.isError || grantable.isError,
+    refetch: () => Promise.all([myBindings.refetch(), grantable.refetch()]),
+  };
+  const accessBlocked = access.isLoading || access.isError;
 
   return (
     <Drawer
@@ -545,13 +542,13 @@ export function CreateApiKeyDrawer({
           label: "Create secret key",
           onClick: handleCreate,
           loading: isCreating,
-          disabledReason: accessBlocked ? accessReason(myBindings) : void 0,
+          disabledReason: accessBlocked ? accessReason(access) : void 0,
           "data-testid": "api-key-create-submit",
         },
       }}
     >
       <VStack gap={5} align="start">
-        {accessBlocked && <AccessNote myBindings={myBindings} />}
+        {accessBlocked && <AccessNote myBindings={access} />}
         {notice}
         {/* Key type — only admins can create service keys */}
         {isAdmin && (

@@ -27,10 +27,10 @@ import {
   categoryAccessAvailability,
   clampSelectionsToAvailability,
   deriveBindingRole,
-  getUserPermissionsAcrossScopes,
   teamRolePermissions,
   type PermissionMode,
 } from "../../model/api-key-permissions.ts";
+import { useGrantablePermissions } from "../../behavior/use-grantable-permissions.ts";
 import {
   PermissionCategoryList,
   PermissionCounter,
@@ -214,18 +214,16 @@ export function EditApiKeyDrawer({
   );
   const primaryScope = ceilingScopes[0]!;
 
-  // Same ceiling as the create drawer: team-role bags carry no org, gateway,
-  // governance or playground permissions, so reading them directly would
-  // lock rows a service/admin key can grant. Checked across every scope.
-  const userPermissions = useMemo(() => {
-    return getUserPermissionsAcrossScopes({
-      myBindings: myBindings.data,
-      scopes: ceilingScopes,
-      organizationId,
-      orgProjects,
-      isServiceKey,
-    });
-  }, [myBindings.data, ceilingScopes, organizationId, orgProjects, isServiceKey]);
+  // The ceiling the update checks, read off the same resolver: every scope, for the owner.
+  const grantable = useGrantablePermissions({
+    organizationId,
+    scopes: ceilingScopes,
+    ownerUserId: apiKey?.userId ?? void 0,
+    isServiceKey,
+    enabled: !!apiKey,
+  });
+  const userPermissions = grantable.permissions;
+  const accessUnreadable = myBindings.isError || grantable.isError;
 
   useEffect(() => {
     if (apiKey) {
@@ -300,12 +298,12 @@ export function EditApiKeyDrawer({
           label: "Save",
           onClick: handleSave,
           loading: isUpdating,
-          disabledReason: myBindings.isError ? ACCESS_UNREADABLE : void 0,
+          disabledReason: accessUnreadable ? ACCESS_UNREADABLE : void 0,
         },
       }}
     >
       <VStack gap={5} align="start">
-        {myBindings.isError && (
+        {accessUnreadable && (
           <StatusCard palette="red" icon={TriangleAlert} title="Couldn't read your access">
             A key can only carry the access you hold, so it can't be saved until it loads. Close
             this drawer and try again.

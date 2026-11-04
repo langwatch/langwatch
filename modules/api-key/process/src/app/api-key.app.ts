@@ -540,6 +540,32 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
    * identically for an id that does not exist and one that belongs to another organization, so
    * it cannot be used to enumerate.
    */
+  /**
+   * What a restricted key's permission rows may offer, read off the mint's own resolver so a
+   * group grant counts. Another owner's ceiling is asked only by an organization admin, the
+   * one who may assign a key to someone else; anyone else is answered for themselves.
+   */
+  async listGrantablePermissions(
+    input: Readonly<{
+      organizationId: string;
+      scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+      ownerUserId?: string;
+    }>,
+    by: ApiKeyCaller,
+  ): Promise<string[]> {
+    await this.#ensureMember(input.organizationId, by);
+    const ownerUserId = input.ownerUserId ?? by.id;
+    if (ownerUserId !== by.id && !(await this.#isOrganizationAdmin(input.organizationId, by))) {
+      throw new ApiKeyAdminRequiredError("assign-to-another-user");
+    }
+
+    return this.#service.grantablePermissions({
+      principal: { type: "user", id: ownerUserId },
+      organizationId: input.organizationId,
+      scopes: input.scopes,
+    });
+  }
+
   async findKeyName(
     input: Readonly<{ organizationId: string; apiKeyId: string }>,
     by: ApiKeyCaller,

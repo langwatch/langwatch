@@ -341,8 +341,6 @@ export default function CliAuthScreen() {
   const keyPermissions = useCliKeyPermissions({
     organizationId: selectedOrgId,
     selectedScopes: keyScopes.selectedScopes,
-    bindings: myBindings.data,
-    offeredProjects,
     management: requestsManagement,
   });
   const management = managementRequestFor({
@@ -356,8 +354,8 @@ export default function CliAuthScreen() {
     selectedOrgId,
     requiresProject,
     selectedProjectId,
-    isLoadingBindings: myBindings.isLoading,
-    isBindingsFailed: myBindings.isError,
+    isLoadingBindings: myBindings.isLoading || keyPermissions.isLoadingCeiling,
+    isBindingsFailed: myBindings.isError || keyPermissions.isCeilingFailed,
     scopeCount: keyScopes.selectedScopes.length,
     permissionCount: keyPermissions.permissions.length,
     isManagementBlocked: management.cannotGrant || management.needsOrganization,
