@@ -7,3 +7,10 @@ openapi: "PATCH /api/v1/dataset/{slugOrId}"
 Renaming a dataset keeps its slug, so the old slug still resolves. A new name
 whose slug another dataset in the project already holds is refused with 409.
 </Note>
+
+<Note>
+New `columnTypes` re-key every record. To rename a column in the same request
+that deletes another, send `columnRenames` with `{ from, to }` for each renamed
+column, so each value stays with the column it came from. Without it, columns
+left over after matching names pair by position.
+</Note>

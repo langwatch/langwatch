@@ -86,7 +86,9 @@ export class AgentCopyService {
     };
   }
 
-  async pushToCopies(input: PushAgentCopiesInput): Promise<AgentPushToCopies> {
+  async pushToCopies(
+    input: PushAgentCopiesInput,
+  ): Promise<AgentPushToCopies & { written: { id: string; projectId: string }[] }> {
     const source = await this.#repository.getById({
       id: input.sourceAgentId,
       projectId: input.sourceProjectId,
@@ -117,7 +119,11 @@ export class AgentCopyService {
       });
     }
 
-    return { pushedTo: selected.length, selectedCopies: input.copyIds?.length ?? copies.length };
+    return {
+      pushedTo: selected.length,
+      selectedCopies: input.copyIds?.length ?? copies.length,
+      written: selected.map(({ id, projectId }) => ({ id, projectId })),
+    };
   }
 
   async getSourceOfCopy(input: AgentReferenceInput): Promise<Agent> {
@@ -127,7 +133,9 @@ export class AgentCopyService {
     return this.#repository.getByIdOnly(copy.copiedFromAgentId);
   }
 
-  async syncFromSource(input: AgentReferenceInput): Promise<AgentSyncFromSource> {
+  async syncFromSource(
+    input: AgentReferenceInput,
+  ): Promise<AgentSyncFromSource & { source: { id: string; projectId: string } }> {
     const source = await this.getSourceOfCopy(input);
     await this.#voiceRelease.assertWritable({ type: source.type, projectIds: [input.projectId] });
     const current = await this.#repository.getById({
@@ -142,6 +150,6 @@ export class AgentCopyService {
       commitMessage: "Synced from the source agent",
     });
 
-    return { ok: true as const };
+    return { ok: true as const, source: { id: source.id, projectId: source.projectId } };
   }
 }
