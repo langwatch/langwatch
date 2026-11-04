@@ -186,6 +186,17 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Then the question card's options can no longer be chosen
     And a question card a newer turn raised stays open
 
+  # The server ends a waiting command's permission card on Stop and tells the command
+  # line no answer is coming. The live tab must close the card too, or a click on it
+  # is refused with a red line under buttons that still look answerable.
+  @integration
+  Scenario: The permission card closes as soon as Stop is answered, without a reload
+    Given Langy asked permission to run a command and I clicked Stop before answering
+    And no conversation update reaches this tab afterwards
+    When the backend confirms the stop
+    Then the permission card offers no answers any more
+    And it says it was cancelled with the turn
+
   # The server leaves a confirmation card the platform raised answerable after Stop,
   # since its click is read in a later turn; the live tab must not lock it either.
   @integration
