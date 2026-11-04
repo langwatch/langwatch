@@ -123,6 +123,28 @@ describe("given a file request with actions", () => {
     });
   });
 
+  describe("when an oversize action also names a link the check would refuse", () => {
+    /** @scenario "An oversize action is refused for its length, and its words are never checked" */
+    it("reports only the length, so the link check, which would add its own issue, never ran", () => {
+      const link = "https://evil.example/";
+      const issuesOf = (oversize: { label: string; prompt: string }) =>
+        fileInsightInputSchema
+          .safeParse({ ...FILING, actions: [oversize] })
+          .error?.issues.map(({ code, path }) => ({ code, path }));
+
+      expect(issuesOf({ label: link.repeat(2), prompt: "Do it." })).toEqual([
+        { code: "too_big", path: ["actions", 0, "label"] },
+      ]);
+      expect(issuesOf({ label: "Do it", prompt: link.repeat(50) })).toEqual([
+        { code: "too_big", path: ["actions", 0, "prompt"] },
+      ]);
+      // Under the cap the same words do raise the link issue, so the absence above means something.
+      expect(issuesOf({ label: "Do it", prompt: link })).toEqual([
+        { code: "custom", path: ["actions", 0, "prompt"] },
+      ]);
+    });
+  });
+
   describe("when an action names a web address", () => {
     /** @scenario "An action that links anywhere but langwatch.ai is refused" */
     it("refuses one on another host, however it is dressed, and takes app.langwatch.ai", () => {
@@ -174,6 +196,16 @@ describe("given a file request with actions", () => {
         "java\tscript:alert(1)",
         "[a](https://langwatch.ai/x)[b](https://evil.com)",
         "[a](https://langwatch.ai/x)[b](javascript://evil.com)",
+        "[x](//evil.com)",
+        "<//evil.com>",
+        '"//evil.com"',
+        "'//evil.com'",
+        "`//evil.com`",
+        "\\\\evil.com",
+        "_https://evil.com",
+        "1https://evil.com",
+        "[x](javascript:alert(1))",
+        "<javascript:alert(1)>",
       ]) {
         const prompt = `Go to ${address} now.`;
 
@@ -192,6 +224,48 @@ describe("given a file request with actions", () => {
         "Compare usage.total/tokens.total.",
         // Accepted cost: an ending off the short list reads as ordinary words.
         "Go to evil.biz/x now.",
+      ]) {
+        expect(pathsOf([{ label: "Do it", prompt }]), prompt).toEqual([]);
+      }
+    });
+
+    /** @scenario "A named scheme is refused wherever a word can start, in any case and split by a tab" */
+    it("refuses each named scheme after every wrapper, in mixed case and split by a tab", () => {
+      const mixedCase = (scheme: string) =>
+        Array.from(scheme, (letter, at) => (at % 2 ? letter.toUpperCase() : letter)).join("");
+      const tabSplit = (scheme: string) => `${scheme.slice(0, 2)}\t${scheme.slice(2)}`;
+
+      for (const scheme of ["javascript", "data", "vbscript", "file", "mailto", "ftp"]) {
+        for (const before of [" ", " (", " <", " [", ' "', " '", " `", "\t", "\n"]) {
+          for (const spelling of [scheme, mixedCase(scheme), tabSplit(scheme)]) {
+            const prompt = `Go to${before}${spelling}:x now.`;
+
+            expect(pathsOf([{ label: "Do it", prompt }]), prompt).toEqual([
+              ["actions", 0, "prompt"],
+            ]);
+          }
+        }
+      }
+    });
+
+    /** @scenario "Product words that only look like a scheme or a double slash are accepted" */
+    it("takes a colon before one slash, a scheme word inside a longer name, and a//b", () => {
+      for (const prompt of [
+        "Filter path:/api/v1/chat",
+        "route:/checkout failing",
+        "Show endpoint:/health",
+        "service:/api/v1",
+        "span.name:/api/chat",
+        "C:/Users/x",
+        "trace.data:value",
+        "span.file:name",
+        "user.data:value",
+        "user_data:value",
+        "meta-data:x",
+        "Use span/data:x",
+        "input//output",
+        "Rate is 10//2",
+        "and/or//but",
       ]) {
         expect(pathsOf([{ label: "Do it", prompt }]), prompt).toEqual([]);
       }

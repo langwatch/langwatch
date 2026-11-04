@@ -44,7 +44,11 @@ function noticeOf({
   return null;
 }
 
-export function useRunInsightAction({ projectId }: { projectId: string }) {
+/**
+ * For the screen to call, above whatever a read swaps out: a failed read, the skeleton and the
+ * empty page all remove the list, and this hook's unmount is what says the person left the page.
+ */
+export function useRunInsightAction() {
   const host = useInsightHost();
   const isSending = useRef(false);
   const isOnPage = useRef(true);
@@ -78,7 +82,15 @@ export function useRunInsightAction({ projectId }: { projectId: string }) {
       runAction.isPending && runAction.variables?.insightId === insightId
         ? runAction.variables.actionId
         : null,
-    run({ insightId, actionId }: { insightId: string; actionId: string }) {
+    run({
+      projectId,
+      insightId,
+      actionId,
+    }: {
+      projectId: string;
+      insightId: string;
+      actionId: string;
+    }) {
       if (isSending.current) return;
       isSending.current = true;
       runAction.mutate({ projectId, insightId, actionId, clickId: mintClickId() });

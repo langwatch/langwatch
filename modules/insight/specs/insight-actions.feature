@@ -16,11 +16,24 @@ Feature: Action buttons on an insight
     @unit
     Scenario: A link dressed to slip past the host check is refused
       Given a file request whose action names another host with quoted credentials, one slash, backslashes, two leading slashes, or as host and path with a common ending
-      And one whose action names any scheme but http or https before a slash, whatever the host, or javascript, data, vbscript, file, mailto or ftp at all
+      And one whose action names any scheme but http or https before two slashes, whatever the host, or javascript, data, vbscript, file, mailto or ftp at a word's start
       And one whose allowed link is followed in the same word by a link to another host
       When the request is validated
       Then it is refused, and links to langwatch.ai are accepted
       And so are words that only look like a link: metadata:user_id, profile:enterprise, slack:x, trace.cost/day, cost.total/1000
+
+    @unit
+    Scenario: A named scheme is refused wherever a word can start, in any case and split by a tab
+      Given a file request whose action names javascript, data, vbscript, file, mailto or ftp at a word's start, or right after a bracket or a quote
+      And the same in mixed case, or with a tab inside the scheme
+      When the request is validated
+      Then each is refused
+
+    @unit
+    Scenario: Product words that only look like a scheme or a double slash are accepted
+      Given a file request whose action says path:/api/v1/chat, span.name:/api/chat, C:/Users/x, trace.data:value, meta-data:x, span/data:x or input//output
+      When the request is validated
+      Then it is accepted
 
     @unit
     Scenario: A tab or a line break that could carry a link on to another host is refused
@@ -63,6 +76,12 @@ Feature: Action buttons on an insight
       Given a file request whose action has a 41-character label, or a 1,001-character prompt
       When the request is validated
       Then it is refused with a field error on that action
+
+    @unit
+    Scenario: An oversize action is refused for its length, and its words are never checked
+      Given a file request whose oversize action also names a link to another host
+      When the request is validated
+      Then the only issue is its length, since the check of its words never ran
 
     @unit
     Scenario: An action that links anywhere but langwatch.ai is refused
@@ -175,6 +194,7 @@ Feature: Action buttons on an insight
       When its owner clicks an action
       Then Langy starts a new conversation once the wait ends
       And the answer says the fork was not ready, and does not say the original is gone
+      And the log warns once for that wait, naming the fork and none of the prompt's words
 
     @unit
     Scenario: A click whose source conversation is gone starts a new seeded conversation
@@ -281,6 +301,42 @@ Feature: Action buttons on an insight
       Given an action on its way, and a folder switched since the click
       When the click answers and the conversation opens
       Then the address keeps the folder switched to, and names the conversation
+
+    @integration
+    Scenario: A click that answers while the inbox shows its load failure still opens the conversation
+      Given an action on its way, and an inbox read that has failed
+      When the click answers
+      Then Langy opens on the conversation, and no toast says they left the page
+
+    @integration
+    Scenario: The actions keep waiting after a failed inbox read comes back
+      Given an action on its way, and an inbox read that has failed
+      When a later read brings the list back, before the click answers
+      Then the actions are still disabled, and a click sends nothing
+
+    @integration
+    Scenario: A click that answers while the inbox shows its skeleton still opens the conversation
+      Given an action on its way, and an inbox read that has to start over
+      When the click answers while the skeleton shows
+      Then Langy opens on the conversation, and no toast says they left the page
+
+    @integration
+    Scenario: The actions keep waiting after the skeleton gives way to the list
+      Given an action on its way, and an inbox read that has to start over
+      When the read brings the list back, before the click answers
+      Then the actions are still disabled, and a click sends nothing
+
+    @integration
+    Scenario: A click that answers once no insight is left still opens the conversation
+      Given an action on its way, and an inbox read that holds no insights any more
+      When the click answers while the empty page shows
+      Then Langy opens on the conversation, and no toast says they left the page
+
+    @integration
+    Scenario: The actions keep waiting when an insight lands on the empty page
+      Given an action on its way, and an inbox read that holds no insights any more
+      When a later read brings an insight back, before the click answers
+      Then the actions are still disabled, and a click sends nothing
 
     @integration
     Scenario: No action shows while release_insight_actions is off

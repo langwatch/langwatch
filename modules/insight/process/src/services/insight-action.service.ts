@@ -11,6 +11,7 @@ import {
   type LangyApi,
   type LangyPanelCaller,
 } from "@langwatch/langy-contract";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { InsightRepository } from "../repositories/insight.repository.ts";
@@ -30,6 +31,8 @@ export type InsightActionClock = Readonly<{
   sleep: (ms: number) => Promise<void>;
 }>;
 
+const MODULE_LOGGER = createLogger("langwatch:insight:action");
+
 const REAL_CLOCK: InsightActionClock = {
   now: () => nowInstant().epochMilliseconds,
   sleep: (ms) => wait(ms),
@@ -37,6 +40,13 @@ const REAL_CLOCK: InsightActionClock = {
 
 const FORK_READY_TIMEOUT_MS = 5_000;
 const FORK_READY_POLL_MS = 200;
+
+type InsightActionDependencies = Readonly<{
+  insights: Pick<InsightRepository, "getForReader">;
+  langy: ActionLangy;
+  clock: InsightActionClock;
+  logger: Pick<Logger, "warn">;
+}>;
 
 type ForkToAwait = Readonly<{
   id: string;
@@ -52,22 +62,25 @@ type ForkToAwait = Readonly<{
  * @see modules/insight/adrs/005-insight-actions.md
  */
 export class InsightActionService {
-  private constructor(
-    private readonly insights: Pick<InsightRepository, "getForReader">,
-    private readonly langy: ActionLangy,
-    private readonly clock: InsightActionClock,
-  ) {}
+  private readonly insights: InsightActionDependencies["insights"];
+  private readonly langy: ActionLangy;
+  private readonly clock: InsightActionClock;
+  private readonly logger: InsightActionDependencies["logger"];
+
+  private constructor(dependencies: InsightActionDependencies) {
+    this.insights = dependencies.insights;
+    this.langy = dependencies.langy;
+    this.clock = dependencies.clock;
+    this.logger = dependencies.logger;
+  }
 
   static create({
-    insights,
-    langy,
     clock = REAL_CLOCK,
-  }: {
-    insights: Pick<InsightRepository, "getForReader">;
-    langy: ActionLangy;
-    clock?: InsightActionClock;
-  }): InsightActionService {
-    return new InsightActionService(insights, langy, clock);
+    logger = MODULE_LOGGER,
+    ...peers
+  }: Omit<InsightActionDependencies, "clock" | "logger"> &
+    Partial<Pick<InsightActionDependencies, "clock" | "logger">>): InsightActionService {
+    return new InsightActionService({ ...peers, clock, logger });
   }
 
   async run({
@@ -156,21 +169,35 @@ export class InsightActionService {
    */
   private async isForkReady(fork: ForkToAwait): Promise<boolean> {
     const deadline = this.clock.now() + FORK_READY_TIMEOUT_MS;
+    const wait = { hasWarned: false };
     while (this.clock.now() < deadline) {
-      if (await this.hasForkLanded(fork)) return true;
+      if (await this.hasForkLanded({ fork, wait })) return true;
       const left = Math.max(0, deadline - this.clock.now());
       await this.clock.sleep(Math.min(FORK_READY_POLL_MS, left));
     }
     // The last sleep ended at the deadline, and the fork may have landed during it.
-    return this.hasForkLanded(fork);
+    return this.hasForkLanded({ fork, wait });
   }
 
-  /** A read that fails is not a verdict on the fork: it is not ready, and the seeded path runs. */
-  private async hasForkLanded({ id, messageCount, projectId, userId }: ForkToAwait) {
+  /**
+   * A read that fails is not a verdict on the fork: it is not ready, and the seeded path runs. It
+   * is logged once per wait, since a wait reads about 25 times, naming the fork, never its words.
+   */
+  private async hasForkLanded({
+    fork: { id, messageCount, projectId, userId },
+    wait,
+  }: {
+    fork: ForkToAwait;
+    wait: { hasWarned: boolean };
+  }) {
     try {
       const fork = await this.langy.findByIdVisible({ id, projectId, userId });
       return fork?.isOwn === true && fork.messageCount >= messageCount;
-    } catch {
+    } catch (error) {
+      if (!wait.hasWarned) {
+        this.logger.warn({ error, forkId: id }, "could not read a fork a click is waiting for");
+      }
+      wait.hasWarned = true;
       return false;
     }
   }

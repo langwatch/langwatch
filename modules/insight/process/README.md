@@ -136,18 +136,18 @@ Contract `../contract/src/insight.trpc.ts:30`, router `src/transport/insight.trp
 
 ```typescript
 // insights.getAll
-// Input: insightProjectScopeSchema, ../contract/src/insight.ts:226
+// Input: insightProjectScopeSchema, ../contract/src/insight.ts:237
 interface Input {
   projectId: string;
 }
 // Output: insightEntrySchema.array() (inline, ../contract/src/insight.trpc.ts:33)
 
 // insights.file
-type Input = z.infer<typeof fileInsightInputSchema>; // ../contract/src/insight.ts:248
-type Output = z.infer<typeof insightEntrySchema>; // ../contract/src/insight.ts:218
+type Input = z.infer<typeof fileInsightInputSchema>; // ../contract/src/insight.ts:259
+type Output = z.infer<typeof insightEntrySchema>; // ../contract/src/insight.ts:229
 
 // insights.markSeen
-// Input: markInsightsSeenInputSchema, ../contract/src/insight.ts:268
+// Input: markInsightsSeenInputSchema, ../contract/src/insight.ts:279
 interface Input {
   projectId: string;
   insightIds: string[];
@@ -156,7 +156,7 @@ interface Input {
 type Output = unknown;
 
 // insights.archive
-// Input: insightScopeSchema, ../contract/src/insight.ts:256
+// Input: insightScopeSchema, ../contract/src/insight.ts:267
 interface Input {
   projectId: string;
   insightId: string;
@@ -165,19 +165,19 @@ interface Input {
 type Output = unknown;
 
 // insights.keep
-type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:256
+type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:267
 // Output: inline, ../contract/src/insight.trpc.ts:49
 type Output = unknown;
 
 // insights.runAction
-// Input: runInsightActionInputSchema, ../contract/src/insight.ts:284
+// Input: runInsightActionInputSchema, ../contract/src/insight.ts:295
 interface Input {
   projectId: string;
   insightId: string;
   actionId: string;
   clickId: string;
 }
-// Output: insightActionRunSchema, ../contract/src/insight.ts:299
+// Output: insightActionRunSchema, ../contract/src/insight.ts:310
 interface Output {
   conversationId: string;
   turnId: string;

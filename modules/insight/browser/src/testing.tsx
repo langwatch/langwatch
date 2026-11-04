@@ -119,7 +119,10 @@ export function renderWithInsightHost({
   answer: UiProcedureAnswer;
   host?: StubInsightHost;
   lends?: readonly UiLend[];
-}): RenderResult & { host: StubInsightHost } {
+}): RenderResult & {
+  host: StubInsightHost;
+  queryClient: ReturnType<typeof createUiQueryClient>;
+} {
   const queryClient = createUiQueryClient({ onMutationError: () => void 0 });
   const capabilities = {
     ...createUiHostServicesFromHost({
@@ -141,6 +144,7 @@ export function renderWithInsightHost({
       </DesignSystemProvider>,
     ),
     host,
+    queryClient,
   };
 }
 

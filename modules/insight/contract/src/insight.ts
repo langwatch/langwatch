@@ -91,26 +91,35 @@ export const INSIGHT_ACTION_LINK_HOSTS = ["langwatch.ai", "app.langwatch.ai"] as
 const ALLOWED_LINK_HOSTS: ReadonlySet<string> = new Set(INSIGHT_ACTION_LINK_HOSTS);
 const WEB_SCHEMES: ReadonlySet<string> = new Set(["http", "https"]);
 
-/** Refused whatever follows. From a word's start, so `metadata:x` and `profile:x` stay words. */
-const REFUSED_SCHEME = /\b(?:javascript|data|vbscript|file|mailto|ftp):\S/i;
-/** Any scheme before a slash. No word start: a scheme past the bound still matches by its tail. */
-const SCHEME_BEFORE_SLASH = /([a-z][a-z0-9+.-]{0,31}):[/\\]/gi;
+const REFUSED_SCHEME_NAMES = ["javascript", "data", "vbscript", "file", "mailto", "ftp"];
 /**
- * `http(s):`, `//`, `www.` or `host/path` with a common ending, to the next whitespace or the next
- * `http(s):`. A browser drops a tab or line break inside an address, so `continued` catches what
- * would carry on past one. Other host/path words read as ordinary: `trace.cost/day`, `evil.biz/x`.
+ * Refused whatever follows, from a word's start: `metadata:x`, `trace.data:x`, `meta-data:x`,
+ * `span/data:x` and `user_data:x` stay words. A browser drops a tab, so one may split the scheme.
+ */
+const REFUSED_SCHEME = new RegExp(
+  `(?<![\\p{L}\\p{N}._/-])(?:${REFUSED_SCHEME_NAMES.map((name) => name.split("").join("\\t*")).join("|")})\\t*:\\t*\\S`,
+  "iu",
+);
+/**
+ * Any scheme before two slashes. No word start: a scheme past the bound still matches by its tail.
+ * One slash is words: `path:/api/v1`, `C:/Users/x`. `http(s):/x` is left to the address scan.
+ */
+const SCHEME_BEFORE_SLASH = /([a-z][a-z0-9+.-]{0,31}):[/\\]{2}/gi;
+/**
+ * `http(s):`, `www.`, `host/path` with a common ending, or `//` at a word's start or after `(<[:`
+ * or a quote (`:` catches `_https://x`, which `\b` misses), to the next whitespace or `http(s):`. A
+ * tab or line break a browser would drop goes to `continued`. `trace.cost/day`, `a//b` are words.
  */
 const WEB_ADDRESS =
-  /(?:\bhttps?:(?=[\S\t])|[/\\]{2}\S|\bwww\.|(?:[\p{L}\p{N}-]{1,63}\.){1,8}(?:com|net|org|io|ai|co|dev|app|xyz|info)(?::\d{1,5})?[/\\])(?:(?!https?:)\S)*(?<continued>\t|\n[\t\n]*(?:[.@/\\:]|[\p{L}\p{N}-]{1,63}\.\p{L}))?/giu;
+  /(?:\bhttps?:(?=[\S\t])|(?<![^\s(<["'`:])[/\\]{2}\S|\bwww\.|(?:[\p{L}\p{N}-]{1,63}\.){1,8}(?:com|net|org|io|ai|co|dev|app|xyz|info)(?::\d{1,5})?[/\\])(?:(?!https?:)\S)*(?<continued>\t|\n[\t\n]*(?:[.@/\\:]|[\p{L}\p{N}-]{1,63}\.\p{L}))?/giu;
 const HTTP_AND_SLASHES = /^(?:https?:)?\/*/i;
 const SENTENCE_END = /[.,;:!?)\]}>"'`*]{1,32}$/;
 
-/** Read without tabs, which a browser drops: `java<TAB>script:` is `javascript:`. */
+/** Read without tabs, which a browser drops: `evil<TAB>scheme://x` is `evilscheme://x`. */
 function namesRefusedScheme(words: string): boolean {
-  const text = words.replaceAll("\t", "");
   return (
-    REFUSED_SCHEME.test(text) ||
-    [...text.matchAll(SCHEME_BEFORE_SLASH)].some(
+    REFUSED_SCHEME.test(words) ||
+    [...words.replaceAll("\t", "").matchAll(SCHEME_BEFORE_SLASH)].some(
       ([, scheme = ""]) => !WEB_SCHEMES.has(scheme.toLowerCase()),
     )
   );
@@ -138,13 +147,15 @@ function namesOnlyAllowedLinks(words: string): boolean {
 }
 
 const NOT_ALLOWED_LINK = "A link in an action may only point at langwatch.ai";
+/** `.max()` alone does not stop a later `.refine()`, which would scan the whole oversize field. */
+const STOP_AT_THE_CAP = { abort: true };
 
 const insightActionLabelSchema = z
   .string()
   .overwrite((label) => label.replaceAll(/[\p{Cc}\p{Cf}]/gu, ""))
   .trim()
   .min(1)
-  .max(40)
+  .max(40, STOP_AT_THE_CAP)
   .refine(namesOnlyAllowedLinks, { error: NOT_ALLOWED_LINK });
 
 /**
@@ -156,7 +167,7 @@ const insightActionPromptSchema = z
   .overwrite((prompt) => prompt.replaceAll(/[^\P{Cc}\n\t]|\p{Cf}/gu, ""))
   .trim()
   .min(1)
-  .max(1_000)
+  .max(1_000, STOP_AT_THE_CAP)
   .refine(namesOnlyAllowedLinks, { error: NOT_ALLOWED_LINK });
 
 /**

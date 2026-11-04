@@ -5,7 +5,7 @@
  * @see modules/insight/specs/insight-actions.feature
  */
 
-import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
+import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import type { InsightActionRun } from "@langwatch/insight-contract";
 import { nowInstant } from "@langwatch/time";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
@@ -35,13 +35,17 @@ const CHECK_LATENCY = {
 const WITH_ACTIONS = insightEntry({ seenAt: NOW, actions: [FIND_TRACES, DRAFT_EVALUATOR] });
 const MAY_USE_LANGY = ["analytics:view", "langy:create"];
 
+type InboxEntries = ReturnType<typeof insightEntry>[];
+
 /** Answers the inbox read; each action run waits until the test answers it. */
-function project({ entries }: { entries: ReturnType<typeof insightEntry>[] }) {
+function project({ entries }: { entries: InboxEntries }) {
   const calls: UiProcedureCall[] = [];
   const pending: ((run: InsightActionRun) => void)[] = [];
+  const heldReads: ((held: InboxEntries) => void)[] = [];
+  let read = (): Promise<InboxEntries> => Promise.resolve(entries);
   const answer = (call: UiProcedureCall) => {
     calls.push(call);
-    if (call.path === "insights.getAll") return Promise.resolve(entries);
+    if (call.path === "insights.getAll") return read();
     if (call.path === "insights.markSeen") return Promise.resolve(null);
     if (call.path === "insights.runAction") {
       return new Promise<InsightActionRun>((resolve) => pending.push(resolve));
@@ -52,6 +56,17 @@ function project({ entries }: { entries: ReturnType<typeof insightEntry>[] }) {
     answer,
     runs: () => calls.filter((call) => call.path === "insights.runAction"),
     answerRun: (run: InsightActionRun) => pending.shift()?.(run),
+    /** What every read from now on answers. */
+    answerReadsWith: (next: () => Promise<InboxEntries>) => {
+      read = next;
+    },
+    /** Reads from now on wait for `answerHeldReads`. */
+    holdReads: () => {
+      read = () => new Promise<InboxEntries>((resolve) => heldReads.push(resolve));
+    },
+    answerHeldReads: (held: InboxEntries) => {
+      for (const answerRead of heldReads.splice(0)) answerRead(held);
+    },
   };
 }
 
@@ -60,20 +75,73 @@ function renderInbox({
   actionsEnabled = true,
   permissions = MAY_USE_LANGY,
 }: {
-  entries?: ReturnType<typeof insightEntry>[];
+  entries?: InboxEntries;
   actionsEnabled?: boolean;
   permissions?: readonly string[];
 } = {}) {
   const inbox = project({ entries });
-  const { host, unmount } = renderWithInsightHost({
+  const { host, unmount, queryClient } = renderWithInsightHost({
     element: <InsightsScreen />,
     answer: inbox.answer,
     host: new StubInsightHost({ actionsEnabled, permissions }),
   });
-  return { ...inbox, host, unmount };
+  return { ...inbox, host, unmount, queryClient };
 }
 
 const IN_PLACE = { sourceGone: false, forkNotReady: false, forkTitle: null };
+const ANSWERED = { conversationId: "conversation-1", turnId: "turn-1", ...IN_PLACE };
+
+/** A click on its way, on the inbox the test then moves through the read's other states. */
+async function renderWithClickOnItsWay() {
+  const inbox = renderInbox();
+  await userEvent.click(await screen.findByRole("button", { name: FIND_TRACES.label }));
+  await waitFor(() => expect(inbox.runs()).toHaveLength(1));
+  return inbox;
+}
+
+type InboxWithClick = Awaited<ReturnType<typeof renderWithClickOnItsWay>>;
+
+async function failTheRead({ answerReadsWith, queryClient }: InboxWithClick) {
+  // A 400, which the read does not retry: the page swaps as soon as it answers.
+  answerReadsWith(() => Promise.reject(new UiProcedureRefusal("validation_error", 400)));
+  void queryClient.invalidateQueries();
+  expect(await screen.findByText("The inbox didn't load.")).toBeInTheDocument();
+}
+
+async function startTheReadOver({ holdReads, queryClient }: InboxWithClick) {
+  holdReads();
+  void queryClient.resetQueries();
+  expect(await screen.findByTestId("insights-loading")).toBeInTheDocument();
+}
+
+async function emptyTheRead({ answerReadsWith, queryClient }: InboxWithClick) {
+  answerReadsWith(() => Promise.resolve([]));
+  void queryClient.invalidateQueries();
+  expect(await screen.findByTestId("insights-day-zero")).toBeInTheDocument();
+}
+
+/** Brings the list back; the click's other action stands in for it, since it shows no spinner. */
+async function bringTheListBack(inbox: InboxWithClick) {
+  inbox.answerReadsWith(() => Promise.resolve([WITH_ACTIONS]));
+  inbox.answerHeldReads([WITH_ACTIONS]);
+  void inbox.queryClient.invalidateQueries();
+  return screen.findByRole("button", { name: DRAFT_EVALUATOR.label });
+}
+
+async function expectTheConversationOpened({ answerRun, host }: InboxWithClick) {
+  answerRun(ANSWERED);
+  await waitFor(() => expect(host.openedConversations).toEqual(["conversation-1"]));
+  expect(host.successes).toEqual([]);
+}
+
+async function expectTheActionsStillWait(inbox: InboxWithClick) {
+  const other = await bringTheListBack(inbox);
+  expect(other).toBeDisabled();
+  fireEvent.click(other);
+  expect(inbox.runs()).toHaveLength(1);
+  inbox.answerRun(ANSWERED);
+  await waitFor(() => expect(other).toBeEnabled());
+}
 
 describe("given an insight with actions in the inbox", () => {
   describe("when the page draws", () => {
@@ -203,6 +271,72 @@ describe("given an insight with actions in the inbox", () => {
       expect(host.openedConversations).toEqual([]);
       expect(host.queries).toEqual([]);
       expect(host.navigations).toEqual([]);
+    });
+  });
+});
+
+describe("given an action on its way, and an inbox read that has failed", () => {
+  describe("when the click answers", () => {
+    /** @scenario "A click that answers while the inbox shows its load failure still opens the conversation" */
+    it("opens the conversation, and does not say they left the page", async () => {
+      const inbox = await renderWithClickOnItsWay();
+      await failTheRead(inbox);
+
+      await expectTheConversationOpened(inbox);
+    });
+  });
+
+  describe("when a later read brings the list back, before the click answers", () => {
+    /** @scenario "The actions keep waiting after a failed inbox read comes back" */
+    it("keeps the actions disabled until the click answers", async () => {
+      const inbox = await renderWithClickOnItsWay();
+      await failTheRead(inbox);
+
+      await expectTheActionsStillWait(inbox);
+    });
+  });
+});
+
+describe("given an action on its way, and an inbox read that has to start over", () => {
+  describe("when the click answers while the skeleton shows", () => {
+    /** @scenario "A click that answers while the inbox shows its skeleton still opens the conversation" */
+    it("opens the conversation, and does not say they left the page", async () => {
+      const inbox = await renderWithClickOnItsWay();
+      await startTheReadOver(inbox);
+
+      await expectTheConversationOpened(inbox);
+    });
+  });
+
+  describe("when the read brings the list back, before the click answers", () => {
+    /** @scenario "The actions keep waiting after the skeleton gives way to the list" */
+    it("keeps the actions disabled until the click answers", async () => {
+      const inbox = await renderWithClickOnItsWay();
+      await startTheReadOver(inbox);
+
+      await expectTheActionsStillWait(inbox);
+    });
+  });
+});
+
+describe("given an action on its way, and an inbox read that holds no insights any more", () => {
+  describe("when the click answers while the empty page shows", () => {
+    /** @scenario "A click that answers once no insight is left still opens the conversation" */
+    it("opens the conversation, and does not say they left the page", async () => {
+      const inbox = await renderWithClickOnItsWay();
+      await emptyTheRead(inbox);
+
+      await expectTheConversationOpened(inbox);
+    });
+  });
+
+  describe("when a later read brings an insight back, before the click answers", () => {
+    /** @scenario "The actions keep waiting when an insight lands on the empty page" */
+    it("keeps the actions disabled until the click answers", async () => {
+      const inbox = await renderWithClickOnItsWay();
+      await emptyTheRead(inbox);
+
+      await expectTheActionsStillWait(inbox);
     });
   });
 });

@@ -57,6 +57,7 @@ function folderOf(value: string | undefined): InsightFolder {
 export default function InsightsScreen() {
   const host = useInsightHost();
   const reading = useInsightInbox();
+  const runAction = useRunInsightAction();
   const [folder, setFolder] = useState<InsightFolder>(() => folderOf(host.query().folder));
   const [density, setDensity] = useState<InsightDensity>("expanded");
 
@@ -94,6 +95,7 @@ export default function InsightsScreen() {
           reading={reading}
           folder={folder}
           density={density}
+          runAction={runAction}
           onSelectFolder={selectFolder}
         />
       </PageLayout.Container>
@@ -105,11 +107,13 @@ function InboxBody({
   reading,
   folder,
   density,
+  runAction,
   onSelectFolder,
 }: {
   reading: ReturnType<typeof useInsightInbox>;
   folder: InsightFolder;
   density: InsightDensity;
+  runAction: ReturnType<typeof useRunInsightAction>;
   onSelectFolder: (folder: InsightFolder) => void;
 }) {
   const host = useInsightHost();
@@ -148,6 +152,7 @@ function InboxBody({
       now={reading.now}
       folder={folder}
       density={density}
+      runAction={runAction}
       onSelectFolder={onSelectFolder}
     />
   );
@@ -159,6 +164,7 @@ function FolderView({
   now,
   folder,
   density,
+  runAction,
   onSelectFolder,
 }: {
   inbox: InsightInbox;
@@ -166,11 +172,11 @@ function FolderView({
   now: number;
   folder: InsightFolder;
   density: InsightDensity;
+  runAction: ReturnType<typeof useRunInsightAction>;
   onSelectFolder: (folder: InsightFolder) => void;
 }) {
   const host = useInsightHost();
   const actions = useInsightActions({ projectId });
-  const runAction = useRunInsightAction({ projectId });
   const isActionsEnabled = host.isActionsEnabled() === true;
   const actionsDisabledReason = host.hasPermission("langy:create") ? null : ACTIONS_NEED_LANGY;
   // The dots you came to see stay for this visit, even after the visit marks them seen.
@@ -223,7 +229,9 @@ function FolderView({
                         runAction.isSending && runAction.pendingActionId(entry.id) === null,
                     })}
                     pendingActionId={runAction.pendingActionId(entry.id)}
-                    onRun={(actionId) => runAction.run({ insightId: entry.id, actionId })}
+                    onRun={(actionId) =>
+                      runAction.run({ projectId, insightId: entry.id, actionId })
+                    }
                   />
                 }
                 actions={{

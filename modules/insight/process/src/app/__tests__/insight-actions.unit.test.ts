@@ -11,6 +11,7 @@ import {
   type LangyApi,
   type LangyConversationOrigin,
 } from "@langwatch/langy-contract";
+import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { afterEach, describe, expect, it } from "vitest";
@@ -226,10 +227,12 @@ async function clickOnSharedOverFakeClock({ forkReads }: { forkReads: ForkRead[]
   const entry = await file({ conversationId: "conversation-shared" });
   const sentAtEachSleep: number[] = [];
   const clock = fakeClock({ onSleep: () => sentAtEachSleep.push(langy.sent.length) });
+  const { logger, lines } = createTestLogger();
   const service = InsightActionService.create({
     insights: { getForReader: async () => entry },
     langy: langy.api,
     clock,
+    logger,
   });
 
   const run = await service.run({
@@ -240,7 +243,7 @@ async function clickOnSharedOverFakeClock({ forkReads }: { forkReads: ForkRead[]
     caller: CALLER,
   });
 
-  return { run, langy, sentAtEachSleep, elapsedMs: clock.now() };
+  return { run, langy, sentAtEachSleep, elapsedMs: clock.now(), lines };
 }
 
 describe("given a member saves a Langy answer with actions", () => {
@@ -426,12 +429,16 @@ describe("given an insight saved from a conversation another person shared", () 
     });
 
     /** @scenario "A fork that cannot be read counts as not ready" */
-    it("keeps waiting through failed reads, then starts a seeded conversation", async () => {
-      const { run, langy, elapsedMs } = await clickOnSharedOverFakeClock({
+    it("keeps waiting through failed reads, logs once, then starts a seeded conversation", async () => {
+      const { run, langy, elapsedMs, lines } = await clickOnSharedOverFakeClock({
         forkReads: [READ_FAILS],
       });
 
       expect(elapsedMs).toBe(5_000);
+      expect(lines.map(({ forkId, msg }) => ({ forkId, msg }))).toEqual([
+        { forkId: "fork-1", msg: "could not read a fork a click is waiting for" },
+      ]);
+      expect(JSON.stringify(lines)).not.toContain(FIND_TRACES.prompt);
       expect(langy.sent).toEqual([
         expect.objectContaining({ via: "create", conversationId: null, userId: OWNER }),
       ]);

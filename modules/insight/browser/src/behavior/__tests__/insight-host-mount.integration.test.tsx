@@ -84,7 +84,7 @@ function renderOnAddress({ query }: { query: Query }) {
   const { result } = renderHook(
     () => ({
       host: useInsightHost(),
-      clicks: useRunInsightAction({ projectId: "project-1" }),
+      clicks: useRunInsightAction(),
     }),
     { wrapper: Address },
   );
@@ -97,7 +97,13 @@ describe("given an action on its way, and a folder switched since the click", ()
     it("keeps the folder switched to, and names the conversation", async () => {
       const { result, written, pendingRuns } = renderOnAddress({ query: { folder: "inbox" } });
 
-      act(() => result.current.clicks.run({ insightId: "insight-1", actionId: "a0" }));
+      act(() =>
+        result.current.clicks.run({
+          projectId: "project-1",
+          insightId: "insight-1",
+          actionId: "a0",
+        }),
+      );
       await waitFor(() => expect(pendingRuns).toHaveLength(1));
       act(() => result.current.host.setQuery({ folder: "archived" }));
       act(() =>
