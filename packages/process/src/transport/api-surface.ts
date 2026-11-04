@@ -13,6 +13,7 @@ import {
 import {
   type ApiDoor,
   BrowserBundle,
+  EmbeddedDocument,
   FramedDocument,
   type HttpFailureAnswer,
   HttpMux,
@@ -53,6 +54,7 @@ import { z } from "zod";
 
 import type { ExposedSurface } from "../process-supply.ts";
 import type { ApiUiBundle } from "./bundle-config.ts";
+import { docsCrossOrigin } from "./docs-cross-origin.ts";
 
 export type ApiSurfaceComposition = Readonly<{
   members: ProcessMemberSource;
@@ -66,6 +68,8 @@ export type ApiSurfaceComposition = Readonly<{
   executionProxyBaseUrl: string | undefined;
   /** The deployment's public address, which a proxy in front of the API may hide from it. */
   publicBaseUrl: string | undefined;
+  /** The documentation sites whose playground may call REST cross-origin (ADR-185). */
+  docsOrigins: readonly string[];
   production: boolean;
   selection: TransportSelection;
   /** The process's one upgrade router, where every declared socket protocol mounts. */
@@ -206,7 +210,10 @@ class ApiSurface {
         : {}),
     });
     this.#rest?.assertEveryRouteDeclared();
-    const api = composeApiApplication({ rest: this.#rest, trpc: this.#trpc }, selected);
+    const api = composeApiApplication(
+      { rest: this.#rest, trpc: this.#trpc, docsOrigins: composition.docsOrigins },
+      selected,
+    );
     const clientAddress = ClientAddress.fromTrustedProxies({
       addresses: composition.trustedProxies,
       trustCloudflare: composition.trustCloudflare,
@@ -219,6 +226,11 @@ class ApiSurface {
       mux.route(path, api, { onFailure: answerApiFailure, exact: true });
     for (const document of selected.documents)
       mux.route(document.path, FramedDocument.create(document));
+    for (const selection of selected.embedded)
+      mux.route(
+        selection.path,
+        EmbeddedDocument.create({ selection, embedders: composition.docsOrigins }),
+      );
     const listener = composition.doors.ahead(mux.route("/", page).handler);
     // A raw door (hosted MCP) answers ahead of the mux, so it reads the same resolved address.
     return (request, response) => {
@@ -357,10 +369,12 @@ export function composeApiApplication(
   hosts: {
     rest?: RestHost | undefined;
     trpc?: TrpcHost | undefined;
+    docsOrigins?: readonly string[] | undefined;
   },
   policies: { trpc?: SecurityHeaders; rest?: SecurityHeaders } = {},
 ): Hono {
   const root = new Hono();
+  root.use("*", docsCrossOrigin({ origins: hosts.docsOrigins ?? [] }));
 
   root.use("*", async (context, next) => {
     await next();

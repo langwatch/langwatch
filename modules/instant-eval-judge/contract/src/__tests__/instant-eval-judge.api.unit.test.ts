@@ -16,6 +16,7 @@ const UNUSABLE_PROVIDER_REASONS: InstantEvalUnavailableDecisionModelReason[] = [
   "provider_missing",
   "provider_disabled",
   "key_missing",
+  "endpoint_invalid",
 ];
 
 describe("given a resolved own decision model", () => {
@@ -37,6 +38,19 @@ describe("given a resolved own decision model", () => {
         endpoint: "https://api.openai.com/v1/decisions",
         apiKey: "sk-test",
       });
+    });
+
+    it("keeps an Azure model's api-key header, so its key is never sent as a bearer token", () => {
+      const resolved: InstantEvalOwnDecisionModel = {
+        model: "azure/decisions:gpt-6-luna",
+        wire: "openai_decisions",
+        providerModel: "my-deployment",
+        endpoint: "https://acme.openai.azure.com/openai/v1/decisions",
+        authHeader: "api_key",
+        apiKey: "azure-key",
+      };
+
+      expect(instantEvalOwnDecisionModelOf(resolved).authHeader).toBe("api_key");
     });
   });
 });

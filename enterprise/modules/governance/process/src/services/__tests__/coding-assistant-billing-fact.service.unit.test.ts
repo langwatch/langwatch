@@ -65,10 +65,25 @@ describe("CodingAssistantBillingFactService", () => {
         opencode: false,
         cursor: false,
         github_copilot: false,
+        grok: false,
+        pi: false,
+        pi_cli: false,
         custom: false,
       });
       expect(sent.every((command) => command.tenantId === "org-1")).toBe(true);
       expect(sent.every((command) => command.data.recordedAtMs === AT)).toBe(true);
+    });
+
+    /** @scenario "A pi tile off a bundled plan bills the traces pi's ingest key sends" */
+    it("bills pi's ingest source type as well as its kind when the pi config is off a bundled plan", async () => {
+      const { facts, sent } = world({
+        seed: [{ organizationId: "org-1", config: { assistantKind: "pi", bundledPlan: false } }],
+      });
+
+      await facts.recordForOrganization({ organizationId: "org-1" });
+
+      const billed = billedBySource(sent, "org-1");
+      expect([billed.pi, billed.pi_cli, billed.codex]).toEqual([true, true, false]);
     });
 
     it("records the source as not billed when no config exists", async () => {
@@ -114,7 +129,7 @@ describe("CodingAssistantBillingFactService", () => {
 
       const totals = await facts.backfill();
 
-      expect(totals).toEqual({ afterOrganizationId: "org-3", organizations: 3, recorded: 21 });
+      expect(totals).toEqual({ afterOrganizationId: "org-3", organizations: 3, recorded: 30 });
       expect(billedBySource(sent, "org-1").codex).toBe(true);
       expect(billedBySource(sent, "org-2").cursor).toBe(false);
     });

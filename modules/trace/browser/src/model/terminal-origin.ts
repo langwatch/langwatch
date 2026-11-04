@@ -23,6 +23,7 @@ const CODING_AGENT_SERVICE_MARKERS = [
   "gemini-cli",
   "gemini_cli",
   "copilot",
+  "grok-cli",
 ] as const;
 
 /**

@@ -21,10 +21,12 @@ class PutApiEvaluatorsByIdBody:
     Attributes:
         name (str | Unset):
         config (PutApiEvaluatorsByIdBodyConfig | Unset):
+        commit_message (str | Unset): A note kept on the version this update appends.
     """
 
     name: str | Unset = UNSET
     config: PutApiEvaluatorsByIdBodyConfig | Unset = UNSET
+    commit_message: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -34,6 +36,8 @@ class PutApiEvaluatorsByIdBody:
         if not isinstance(self.config, Unset):
             config = self.config.to_dict()
 
+        commit_message = self.commit_message
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
@@ -41,6 +45,8 @@ class PutApiEvaluatorsByIdBody:
             field_dict["name"] = name
         if config is not UNSET:
             field_dict["config"] = config
+        if commit_message is not UNSET:
+            field_dict["commitMessage"] = commit_message
 
         return field_dict
 
@@ -58,9 +64,12 @@ class PutApiEvaluatorsByIdBody:
         else:
             config = PutApiEvaluatorsByIdBodyConfig.from_dict(_config)
 
+        commit_message = d.pop("commitMessage", UNSET)
+
         put_api_evaluators_by_id_body = cls(
             name=name,
             config=config,
+            commit_message=commit_message,
         )
 
         put_api_evaluators_by_id_body.additional_properties = d

@@ -138,6 +138,28 @@ export const projectAggregateRuleUpdatedSchema: ProjectAggregateRuleUpdatedSchem
   projectAggregateRuleUpdatedSchemaDefinition;
 export type ProjectAggregateRuleUpdated = z.infer<typeof projectAggregateRuleUpdatedSchema>;
 
+/**
+ * One organisation project that still holds a live legacy key, for the screen
+ * that offers to revoke it. Never the key, nor any part of it.
+ */
+const projectLegacyKeySchemaDefinition = z
+  .object({
+    projectId: z.string(),
+    projectName: z.string(),
+    projectSlug: z.string(),
+    lastUsedAt: z.date().nullable(),
+  })
+  .strict();
+export interface ProjectLegacyKeySchema extends Named<typeof projectLegacyKeySchemaDefinition> {}
+export const projectLegacyKeySchema: ProjectLegacyKeySchema = projectLegacyKeySchemaDefinition;
+export type ProjectLegacyKey = z.infer<typeof projectLegacyKeySchema>;
+
+/** Every project the caller can manage that still holds a live legacy key, ordered by name. */
+const projectLegacyKeysSchemaDefinition = z.array(projectLegacyKeySchema);
+export interface ProjectLegacyKeysSchema extends Named<typeof projectLegacyKeysSchemaDefinition> {}
+export const projectLegacyKeysSchema: ProjectLegacyKeysSchema = projectLegacyKeysSchemaDefinition;
+export type ProjectLegacyKeys = z.infer<typeof projectLegacyKeysSchema>;
+
 /** Every project an explicit aggregate rule may name, ordered by name. */
 const projectAggregateMemberCandidatesSchemaDefinition = z.array(aggregateMemberCandidateSchema);
 export interface ProjectAggregateMemberCandidatesSchema extends Named<

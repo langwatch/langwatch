@@ -11,9 +11,8 @@ const logger = createLogger("langwatch:better-auth:generic-oauth");
 
 type GenericOAuthPlugin = ReturnType<typeof genericOAuth>;
 type AuthContext = Parameters<GenericOAuthPlugin["init"]>[0];
-type GenericProvider = Awaited<
-  ReturnType<GenericOAuthPlugin["init"]>
->["context"]["socialProviders"][number];
+type GenericOAuthContext = Awaited<ReturnType<GenericOAuthPlugin["init"]>>["context"];
+type GenericProvider = GenericOAuthContext["socialProviders"][number];
 
 /** Waits between attempts to mount a provider that failed at startup. */
 const DEFAULT_RETRY_DELAYS_MS = [5_000, 10_000, 30_000, 60_000, 120_000, 300_000] as const;
@@ -61,7 +60,11 @@ export function resilientGenericOAuth({
         retryUntilMounted({ ctx, providerConfig, socialProviders, retryDelaysMs });
       }
 
-      return { context: { socialProviders } };
+      // Left empty so the plugin's own request-time retry never mounts a provider without the
+      // `iat` check below; the background retry here is the only one.
+      const genericOAuthPendingDiscovery: GenericOAuthContext["genericOAuthPendingDiscovery"] =
+        new Map();
+      return { context: { socialProviders, genericOAuthPendingDiscovery } };
     },
   };
 }
@@ -112,7 +115,7 @@ async function initProvider({
 
 /**
  * The real plugin checks `iat` only under a maximum age it never sets, so the claim is checked
- * here; `exp` and `nbf` get the same clock tolerance (patches/@better-auth__core@1.7.1.patch).
+ * here; `exp` and `nbf` get the same clock tolerance (patches/@better-auth__core@1.7.11.patch).
  */
 function withIssuedAtCheck(provider: GenericProvider): GenericProvider {
   const idToken = provider.idToken;

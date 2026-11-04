@@ -46,6 +46,7 @@ export function installTempHomeAndCwd(): TempHomeAndCwd {
   const origUserprofile = process.env.USERPROFILE;
   const origCodexHome = process.env.CODEX_HOME;
   const origCopilotHome = process.env.COPILOT_HOME;
+  const origGrokHome = process.env.GROK_HOME;
   const origCliConfig = process.env.LANGWATCH_CLI_CONFIG;
 
   beforeEach(() => {
@@ -57,6 +58,7 @@ export function installTempHomeAndCwd(): TempHomeAndCwd {
     // Copilot's hook folder follows COPILOT_HOME first, so a developer who
     // relocated theirs must not have a suite write into it.
     delete process.env.COPILOT_HOME;
+    delete process.env.GROK_HOME;
     // A config of its own switches the login-time refresh off; the suites
     // that want that set it themselves.
     delete process.env.LANGWATCH_CLI_CONFIG;
@@ -71,6 +73,8 @@ export function installTempHomeAndCwd(): TempHomeAndCwd {
     else process.env.CODEX_HOME = origCodexHome;
     if (origCopilotHome === undefined) delete process.env.COPILOT_HOME;
     else process.env.COPILOT_HOME = origCopilotHome;
+    if (origGrokHome === undefined) delete process.env.GROK_HOME;
+    else process.env.GROK_HOME = origGrokHome;
     if (origCliConfig === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
     else process.env.LANGWATCH_CLI_CONFIG = origCliConfig;
     fs.rmSync(state.home, { recursive: true, force: true });

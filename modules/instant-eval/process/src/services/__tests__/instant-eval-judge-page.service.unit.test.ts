@@ -192,6 +192,7 @@ async function judging({
   now = () => AT.epochMilliseconds,
   assertWithinBudget = async () => undefined,
   onInsert,
+  runCostUsd = 0,
 }: {
   keyPage?: InstantEvalKeyPage;
   keySource?: Pick<InstantEvalRowSourceService, "keys">;
@@ -201,8 +202,10 @@ async function judging({
   questions?: readonly (typeof QUESTION)[];
   concurrency?: number;
   now?: () => number;
-  assertWithinBudget?: () => Promise<undefined>;
+  assertWithinBudget?: (input: { inFlightUsd?: number | undefined }) => Promise<undefined>;
   onInsert?: () => void;
+  /** The running row's routed cost so far; zero on an unrouted run, as on main. */
+  runCostUsd?: number;
 }): Promise<{
   service: InstantEvalJudgePageService;
   judge: ScriptedJudge;
@@ -222,6 +225,7 @@ async function judging({
         options: [],
       })),
       tokens: 0,
+      costUsd: runCostUsd,
     }),
   );
   const judge = new ScriptedJudge(answer);
@@ -446,6 +450,29 @@ describe("given a run whose organization has spent its allowance", () => {
       await expect(service.judgePage(INPUT)).rejects.toThrow(InstantEvalFreeBudgetExhaustedError);
       expect(texts.asked).toEqual([]);
       expect(judge.requests).toEqual([]);
+    });
+  });
+});
+
+describe("given a routed run whose cost so far came with no input tokens", () => {
+  describe("when the next page checks the budget", () => {
+    /** @scenario "A routed cost with no input tokens is still billed" */
+    it("counts that cost at the markup, never as nothing spent", async () => {
+      const checked: number[] = [];
+      const { service } = await judging({
+        keyPage: { keys: [], hasMore: false },
+        rows: [],
+        runCostUsd: 0.002,
+        assertWithinBudget: async ({ inFlightUsd }) => {
+          checked.push(inFlightUsd ?? 0);
+          return undefined;
+        },
+      });
+
+      await service.judgePage(INPUT);
+
+      // $0.002 of routed cost at the 1.3 markup.
+      expect(checked).toEqual([0.0026]);
     });
   });
 });

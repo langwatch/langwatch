@@ -357,6 +357,7 @@ export class EvaluationExecutionService {
       return this.instantEvals.answer({
         ...params,
         judge: dispatch.judge,
+        ...(dispatch.decisionModel === undefined ? {} : { decisionModel: dispatch.decisionModel }),
         data,
         droppedCategories,
       });

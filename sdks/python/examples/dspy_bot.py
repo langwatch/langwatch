@@ -10,7 +10,7 @@ import langwatch
 import dspy
 
 
-lm = dspy.LM("openai/gpt-4o-mini", api_key=os.environ["OPENAI_API_KEY"])
+lm = dspy.LM("openai/gpt-6-luna", api_key=os.environ["OPENAI_API_KEY"])
 
 dspy.settings.configure(lm=lm)
 

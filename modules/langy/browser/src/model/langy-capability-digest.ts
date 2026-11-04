@@ -5,6 +5,8 @@ import {
   type CliResultDigest,
   cliResultDigestSchema,
   extractDigest,
+  type LangwatchCommand,
+  parseAllLangwatchCommands,
   parseLangwatchCommand,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
@@ -33,6 +35,30 @@ export interface CapabilityCommand {
   resource: string;
   verb: string;
   query: Record<string, unknown>;
+}
+
+/**
+ * Every `langwatch <resource> <verb>` a tool call ran: each invocation a shell command chained,
+ * or the one a typed CLI tool name records. Empty when the call ran no CLI command.
+ */
+export function commandsOfToolCall({
+  name,
+  input,
+}: {
+  name: string;
+  input: unknown;
+}): LangwatchCommand[] {
+  const command = readCommandString(input);
+  if (command) {
+    const parsed = parseAllLangwatchCommands(command);
+    if (parsed.length > 0) return parsed;
+  }
+  const typed = CLI_TOOL_NAME.exec(name);
+  if (!typed?.[1] || !typed[2]) return [];
+  const parsedInput = unknownRecordSchema.safeParse(input);
+  return [
+    { resource: typed[1], verb: typed[2], args: parsedInput.success ? parsedInput.data : {} },
+  ];
 }
 
 /**
