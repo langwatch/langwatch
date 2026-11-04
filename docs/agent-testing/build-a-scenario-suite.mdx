@@ -65,7 +65,7 @@ langwatch run-plan run --label canary --target connected:support-agent@productio
   --name "Production canary" --wait
 ```
 
-Give the `canary` label only to scenarios that read data and change nothing, because a canary runs on real data. A refund scenario must never run in production. The production process must also be connected for the canary to reach it.
+Give the `canary` label only to scenarios that only read data, because a canary runs on real data. A refund scenario must never run in production. The production process must also be connected for the canary to reach it.
 
 Add a plan evaluator with `--evaluator <id-or-slug>`, repeated for each one. The commands above leave it out to stay short.
 
