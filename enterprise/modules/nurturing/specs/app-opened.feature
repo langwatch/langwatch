@@ -1,7 +1,7 @@
 Feature: App opens reach Customer.io on the opening user
 
   Auth records an app-opened fact when a person with a browser login session
-  opens the sessions page, or a usage, cost or plan page. Nurturing tells
+  opens the sessions page, the personal overview, or a usage, cost or plan page. Nurturing tells
   Customer.io about that person's own profile, at most once an hour per user
   across every pod. PostHog plays no part, so an ad blocker does not hide it.
 
@@ -30,7 +30,7 @@ Feature: App opens reach Customer.io on the opening user
 
   @unit
   Scenario: A usage, cost or plan page open identifies usage_page_viewed_at on the opening user
-    When auth records an open of a usage, cost or plan page for user-1
+    When auth records an open of the personal overview, or of a usage, cost or plan page, for user-1
     Then Customer.io identifies user-1 with usage_page_viewed_at in Unix seconds
 
   @unit
@@ -66,3 +66,14 @@ Feature: App opens reach Customer.io on the opening user
   Scenario: Each usage, cost or plan screen announces its open through the page-opened mutation
     When a person opens the usage, plans, subscription or costs screen
     Then that screen records its own page opened
+
+  @integration
+  Scenario: The personal overview announces its open as a usage page
+    When a person opens /me
+    Then the screen records me_overview
+
+  @integration
+  Scenario: A billing screen announces nothing until the deployment is known to be hosted
+    Given a self-hosted deployment, or one that has not answered yet
+    When a person opens the usage, plans or subscription screen
+    Then no page opened is recorded

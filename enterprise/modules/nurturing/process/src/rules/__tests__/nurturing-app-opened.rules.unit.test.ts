@@ -22,6 +22,7 @@ describe("appOpenedSignals", () => {
 
   /** @scenario "A usage, cost or plan page open identifies usage_page_viewed_at on the opening user" */
   it.each([
+    "me_overview",
     "settings_usage",
     "settings_plans",
     "settings_subscription",

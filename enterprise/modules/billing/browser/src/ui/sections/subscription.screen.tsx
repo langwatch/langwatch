@@ -3,7 +3,6 @@
  * picks. Waits for deployment answer before rendering.
  */
 
-import { useRecordPageOpened } from "@langwatch/auth-client";
 import { Link } from "@langwatch/browser-host/link";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -11,14 +10,21 @@ import { Skeleton, SkeletonText, Text, VStack } from "@langwatch/design-system/p
 import { Server } from "lucide-react";
 
 import { useBillingHost } from "../../model/billing-host.ts";
+import { SaasPageOpened } from "./saas-page-opened.tsx";
 import { SubscriptionPage } from "./subscription-page.tsx";
 
 export default function SubscriptionScreen() {
-  useRecordPageOpened({ page: "settings_subscription" });
   const host = useBillingHost();
 
   const isSettled = host.isDeploymentSettled();
-  if (isSettled && host.isSaaS()) return <SubscriptionPage />;
+  if (isSettled && host.isSaaS()) {
+    return (
+      <>
+        <SaasPageOpened page="settings_subscription" />
+        <SubscriptionPage />
+      </>
+    );
+  }
 
   return (
     <>

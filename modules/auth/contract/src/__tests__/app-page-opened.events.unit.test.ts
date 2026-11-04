@@ -26,12 +26,15 @@ describe("the app-page-opened fact", () => {
     expect(appPageOpenedEventDataSchema.validate(data)).toBe(true);
   });
 
-  it.each(["settings_usage", "settings_plans", "settings_subscription", "governance_costs"])(
-    "accepts the %s page",
-    (page) => {
-      expect(appPageOpenedEventDataSchema.validate({ ...data, page })).toBe(true);
-    },
-  );
+  it.each([
+    "me_overview",
+    "settings_usage",
+    "settings_plans",
+    "settings_subscription",
+    "governance_costs",
+  ])("accepts the %s page", (page) => {
+    expect(appPageOpenedEventDataSchema.validate({ ...data, page })).toBe(true);
+  });
 
   it("rejects a page it does not name", () => {
     expect(appPageOpenedEventDataSchema.validate({ ...data, page: "elsewhere" })).toBe(false);

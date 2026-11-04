@@ -13,6 +13,7 @@ export const APP_PAGE_OPENED_EVENT_TYPE = "lw.auth.app_page_opened" as const;
 /** The pages whose opening is announced. */
 export const appPageSchema = z.enum([
   "me_sessions",
+  "me_overview",
   "settings_usage",
   "settings_plans",
   "settings_subscription",

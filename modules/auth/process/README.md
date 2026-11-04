@@ -796,6 +796,7 @@ interface Output {
 interface Input {
   page:
     | "me_sessions"
+    | "me_overview"
     | "settings_usage"
     | "settings_plans"
     | "settings_subscription"

@@ -17,6 +17,7 @@ export function appOpenedSignals({
         { kind: "app_opened", ...base },
         { kind: "sessions_page_viewed", ...base },
       ];
+    case "me_overview":
     case "settings_usage":
     case "settings_plans":
     case "settings_subscription":

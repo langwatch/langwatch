@@ -3,7 +3,6 @@
  * (hosted plan / self-hosted license / open-source). No chrome.
  */
 
-import { useRecordPageOpened } from "@langwatch/auth-client";
 import { Link } from "@langwatch/browser-host/link";
 import { Banner } from "@langwatch/design-system/banner";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -27,6 +26,7 @@ import {
   RESOURCE_LABELS,
   ResourceLimitsDisplay,
 } from "./resource-limits/resource-limits-display.tsx";
+import { SaasPageOpened } from "./saas-page-opened.tsx";
 
 /** The plan the limits belong to, as the first tile of the row. */
 function PlanTile({ planLabel, chipLabel }: { planLabel: string; chipLabel?: string }) {
@@ -103,7 +103,6 @@ function limitsReadState({
 }
 
 export default function UsageScreen() {
-  useRecordPageOpened({ page: "settings_usage" });
   const host = useBillingHost();
   const organization = host.organization();
   // The deployment is read as a settled pair: `isSaaS === false` selects the
@@ -178,6 +177,7 @@ export default function UsageScreen() {
 
   return (
     <>
+      <SaasPageOpened page="settings_usage" />
       <PageLayout.Header>
         <PageLayout.Heading>Usage and billing</PageLayout.Heading>
         <Spacer />
