@@ -2,6 +2,7 @@ import type { AgentBrowser } from "../model/agent-client.ts";
 import { useAgentManagementHost } from "../model/agent-management-host.ts";
 import { agentApi } from "./agent-api.ts";
 import type { AgentCodeEditorOptions } from "./use-agent-code-editor.ts";
+import { useRefreshSavedAgent } from "./use-refresh-saved-agent.ts";
 
 /** What the code agent editor reads and writes when the address opened it (main's editor). */
 export function useRoutedCodeAgent({
@@ -15,7 +16,7 @@ export function useRoutedCodeAgent({
 }) {
   const host = useAgentManagementHost();
   const projectId = host.project()?.id ?? "";
-  const utils = agentApi.useUtils();
+  const refreshSavedAgent = useRefreshSavedAgent({ projectId });
   const agentQuery = agentApi.agents.getById.useQuery(
     { id: agentId ?? "", projectId },
     { enabled: Boolean(agentId && projectId) },
@@ -32,12 +33,12 @@ export function useRoutedCodeAgent({
     ...(onSave ? { onSave } : {}),
     onCreate: async (input) => {
       const agent = await create.mutateAsync({ ...input, type: "code" });
-      await utils.agents.getAll.invalidate({ projectId });
+      await refreshSavedAgent({ agentId: agent.id });
       return agent;
     },
     onUpdate: async (input) => {
       const agent = await update.mutateAsync(input);
-      await utils.agents.getAll.invalidate({ projectId });
+      await refreshSavedAgent({ agentId: agent.id });
       return agent;
     },
     onError: (error) => host.failed({ error, fallbackTitle: "Couldn't save the code agent" }),

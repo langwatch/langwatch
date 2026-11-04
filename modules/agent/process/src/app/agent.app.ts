@@ -67,6 +67,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
@@ -103,6 +104,11 @@ import { ConnectedAgentService } from "../services/connected-agent.service.ts";
  * the id format already written to the store, so it belongs with the writer.
  */
 const THREAD_KSUID_RESOURCE = "thread";
+
+/** The KSUID resource for one agent write's change id, minted once per write. */
+const AGENT_CHANGE_KSUID_RESOURCE = "agentchange";
+
+const logger = createLogger("langwatch:agent:read-hints");
 
 /**
  * The relay behind connected agents runs on the live tier's Redis state and
@@ -217,12 +223,15 @@ export class AgentModule implements AgentApi {
     return this.#versions.listVersions(input);
   }
 
-  assignLabel(input: AssignAgentLabelInput & { caller?: AgentCaller }): Promise<AgentLabel> {
-    return this.#versions.assignLabel(input);
+  async assignLabel(input: AssignAgentLabelInput & { caller?: AgentCaller }): Promise<AgentLabel> {
+    const label = await this.#versions.assignLabel(input);
+    await this.#recordChanged({ id: input.agentId, projectId: input.projectId });
+    return label;
   }
 
-  removeLabel(input: RemoveAgentLabelInput): Promise<void> {
-    return this.#versions.removeLabel(input);
+  async removeLabel(input: RemoveAgentLabelInput): Promise<void> {
+    await this.#versions.removeLabel(input);
+    await this.#recordChanged({ id: input.agentId, projectId: input.projectId });
   }
 
   list(input: ListAgentsInput): Promise<AgentPage> {
@@ -238,12 +247,12 @@ export class AgentModule implements AgentApi {
 
   async create(input: CreateAgentCommand & { caller?: AgentCaller }): Promise<AgentWithFields> {
     await this.#voiceRelease.assertWritable({ type: input.type, projectIds: [input.projectId] });
-    return agentWithResolvedFields(
-      await this.#agents.create({
-        ...(await this.#httpSecrets.forCreate(input)),
-        caller: input.caller,
-      }),
-    );
+    const created = await this.#agents.create({
+      ...(await this.#httpSecrets.forCreate(input)),
+      caller: input.caller,
+    });
+    await this.#recordChanged(created);
+    return agentWithResolvedFields(created);
   }
 
   async update(input: UpdateAgentCommand & { caller?: AgentCaller }): Promise<AgentWithFields> {
@@ -253,12 +262,12 @@ export class AgentModule implements AgentApi {
         ? input.type
         : (await this.#agents.getById({ id: input.id, projectId: input.projectId })).type;
     await this.#voiceRelease.assertWritable({ type, projectIds: [input.projectId] });
-    return agentWithResolvedFields(
-      await this.#agents.update({
-        ...(await this.#httpSecrets.forUpdate(input)),
-        caller: input.caller,
-      }),
-    );
+    const updated = await this.#agents.update({
+      ...(await this.#httpSecrets.forUpdate(input)),
+      caller: input.caller,
+    });
+    await this.#recordChanged(updated);
+    return agentWithResolvedFields(updated);
   }
 
   async archive(input: GetAgentInput & { caller?: AgentCaller }): Promise<Agent> {
@@ -357,15 +366,40 @@ export class AgentModule implements AgentApi {
   /** Keeps linked graphs' fields from workflow's facts, from agent's own side (§9). */
   workflowFieldsPipeline(): AgentWorkflowFieldsPipeline {
     return buildAgentWorkflowFieldsPipeline({
-      fields: AgentWorkflowFieldsService.create({ agents: this.#agents }),
+      fields: AgentWorkflowFieldsService.create({
+        agents: this.#agents,
+        recordChanged: (agent) => this.#recordChanged(agent),
+      }),
     });
   }
 
-  async #recordArchived(input: { agent: Agent; cascadedWorkflowId: string | null }): Promise<void> {
+  /** Every write says so, so each read refetches; the write already committed, so a miss logs. */
+  async #recordChanged(agent: { id: string; projectId: string }): Promise<void> {
+    try {
+      await this.#connectedLifecycle().recordAgentChanged.send({
+        tenantId: agent.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        agentId: agent.id,
+        projectId: agent.projectId,
+        changeId: generate(AGENT_CHANGE_KSUID_RESOURCE).toString(),
+      });
+    } catch (error) {
+      logger.warn(
+        { error, agentId: agent.id, projectId: agent.projectId },
+        "agent changed read hint was not recorded",
+      );
+    }
+  }
+
+  #connectedLifecycle(): EventingCommands<AgentLifecyclePipeline> {
     if (!this.#lifecycleCommands) {
       throw new Error("agent_lifecycle pipeline senders are not connected yet");
     }
-    await this.#lifecycleCommands.recordAgentArchived.send({
+    return this.#lifecycleCommands;
+  }
+
+  async #recordArchived(input: { agent: Agent; cascadedWorkflowId: string | null }): Promise<void> {
+    await this.#connectedLifecycle().recordAgentArchived.send({
       tenantId: input.agent.projectId,
       occurredAt: nowInstant().epochMilliseconds,
       agentId: input.agent.id,
@@ -392,22 +426,31 @@ export class AgentModule implements AgentApi {
     });
   }
 
-  createCopy(input: CopyAgentCommand): Promise<AgentCopyCreated> {
-    return this.#copies.createCopy(input);
+  async createCopy(input: CopyAgentCommand): Promise<AgentCopyCreated> {
+    const copy = await this.#copies.createCopy(input);
+    await this.#recordChanged(copy);
+    await this.#recordChanged({ id: input.sourceAgentId, projectId: input.sourceProjectId });
+    return copy;
   }
-  pushToCopies(input: PushAgentCopiesInput): Promise<{
+  async pushToCopies(input: PushAgentCopiesInput): Promise<{
     pushedTo: number;
     selectedCopies: number;
   }> {
-    return this.#copies.pushToCopies(input);
+    const { written, ...pushed } = await this.#copies.pushToCopies(input);
+    for (const copy of written) await this.#recordChanged(copy);
+    await this.#recordChanged({ id: input.sourceAgentId, projectId: input.sourceProjectId });
+    return pushed;
   }
   getSourceOfCopy(input: AgentReferenceInput): Promise<Agent> {
     return this.#copies.getSourceOfCopy(input);
   }
-  syncFromSource(input: AgentReferenceInput): Promise<{
+  async syncFromSource(input: AgentReferenceInput): Promise<{
     ok: true;
   }> {
-    return this.#copies.syncFromSource(input);
+    const { source, ...synced } = await this.#copies.syncFromSource(input);
+    await this.#recordChanged({ id: input.agentId, projectId: input.projectId });
+    await this.#recordChanged(source);
+    return synced;
   }
 
   async getCopiesForActor(input: AgentReferenceInput & { actorId: string }): Promise<AgentCopy[]> {

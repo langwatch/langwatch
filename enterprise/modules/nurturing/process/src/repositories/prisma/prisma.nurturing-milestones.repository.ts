@@ -6,6 +6,7 @@ import type {
   NurturingMilestonesRepository,
   NurturingOrganizationCounts,
   NurturingOrganizationRow,
+  NurturingTraceMilestonesRepository,
 } from "../nurturing-milestones.repository.ts";
 
 const ORGANIZATION_STATE = {
@@ -27,11 +28,35 @@ const ORGANIZATION_ROW = {
 /** Nurturing's organizations, the one table it claims; the owners' rows are read elsewhere (R40). */
 export class PrismaNurturingMilestonesRepository
   extends PrismaRepository.for("NurturingOrganization")
-  implements NurturingMilestonesRepository, NurturingCodingMilestonesRepository
+  implements
+    NurturingMilestonesRepository,
+    NurturingCodingMilestonesRepository,
+    NurturingTraceMilestonesRepository
 {
   static readonly create = this.factory(
     (prisma) => new PrismaNurturingMilestonesRepository(prisma),
   );
+
+  async recordLastTrace({
+    organizationId,
+    occurredAt,
+  }: Readonly<{ organizationId: string; occurredAt: number }>): Promise<void> {
+    const at = new Date(occurredAt);
+    await this.prisma.nurturingOrganization.updateMany({
+      where: { organizationId, OR: [{ lastTraceAt: null }, { lastTraceAt: { lt: at } }] },
+      data: { lastTraceAt: at },
+    });
+  }
+
+  async findLastTraceAt({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<number | null> {
+    const organization = await this.prisma.nurturingOrganization.findUnique({
+      where: { organizationId },
+      select: { lastTraceAt: true },
+    });
+    return organization?.lastTraceAt?.getTime() ?? null;
+  }
 
   async recordOrganization({
     organizationId,

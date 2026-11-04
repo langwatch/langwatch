@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 
 import { agentApi } from "../../../behavior/agent-api.ts";
+import { useRefreshSavedAgent } from "../../../behavior/use-refresh-saved-agent.ts";
 import type { AgentBrowser } from "../../../model/agent-client.ts";
 import type { AgentFailureNotice } from "../../../model/agent-management-host.ts";
 import { isVoiceFormValid, voiceConfigOf, type VoiceForm } from "../model/voice-form.ts";
@@ -21,8 +22,9 @@ export function useSaveVoiceAgent(input: {
 }) {
   const { projectId, agentId, createdAgentRowId, form, onSave, onClose, onFailure } = input;
   const utils = agentApi.useUtils();
+  const refreshSavedAgent = useRefreshSavedAgent({ projectId });
   const saved = (agent: AgentBrowser) => {
-    void utils.agents.getAll.invalidate({ projectId });
+    void refreshSavedAgent({ agentId: agent.id });
     onSave?.(agent);
     onClose();
   };
@@ -34,10 +36,7 @@ export function useSaveVoiceAgent(input: {
     onError: (error) => onFailure({ error, fallbackTitle: "Couldn't create agent" }),
   });
   const update = agentApi.agents.update.useMutation({
-    onSuccess: (agent) => {
-      void utils.agents.getById.invalidate({ id: agent.id, projectId });
-      saved(agent);
-    },
+    onSuccess: saved,
     onError: (error) => onFailure({ error, fallbackTitle: "Couldn't save agent" }),
   });
   // Save is never disabled by validity: a failed submit reveals the inline errors.
