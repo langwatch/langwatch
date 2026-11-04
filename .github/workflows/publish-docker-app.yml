@@ -69,7 +69,7 @@ jobs:
           - image: langwatch
             dockerfile: infra/docker/Dockerfile
             platform: linux/arm64/v8
-            runner: arm64-runner-32gb
+            runner: ubuntu-24.04-arm
             arch: arm64
           - image: langwatch_nlp
             dockerfile: infra/docker/Dockerfile.langwatch_nlp

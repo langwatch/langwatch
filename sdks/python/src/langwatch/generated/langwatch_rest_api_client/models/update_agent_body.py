@@ -24,12 +24,14 @@ class UpdateAgentBody:
         type_ (UpdateAgentBodyType | Unset):
         config (UpdateAgentBodyConfig | Unset):
         workflow_id (None | str | Unset):
+        commit_message (str | Unset): What changed, kept on the version this write creates.
     """
 
     name: str | Unset = UNSET
     type_: UpdateAgentBodyType | Unset = UNSET
     config: UpdateAgentBodyConfig | Unset = UNSET
     workflow_id: None | str | Unset = UNSET
+    commit_message: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -49,6 +51,8 @@ class UpdateAgentBody:
         else:
             workflow_id = self.workflow_id
 
+        commit_message = self.commit_message
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
@@ -60,6 +64,8 @@ class UpdateAgentBody:
             field_dict["config"] = config
         if workflow_id is not UNSET:
             field_dict["workflowId"] = workflow_id
+        if commit_message is not UNSET:
+            field_dict["commitMessage"] = commit_message
 
         return field_dict
 
@@ -93,11 +99,14 @@ class UpdateAgentBody:
 
         workflow_id = _parse_workflow_id(d.pop("workflowId", UNSET))
 
+        commit_message = d.pop("commitMessage", UNSET)
+
         update_agent_body = cls(
             name=name,
             type_=type_,
             config=config,
             workflow_id=workflow_id,
+            commit_message=commit_message,
         )
 
         update_agent_body.additional_properties = d

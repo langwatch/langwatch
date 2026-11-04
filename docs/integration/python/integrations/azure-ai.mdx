@@ -88,6 +88,12 @@ if __name__ == "__main__":
   `AIInferenceInstrumentor` will work with both synchronous and asynchronous clients.
 </Note>
 
+## Check it worked
+
+Run the example. Then open your project in LangWatch: a new trace named "Azure AI Inference Chat" appears in the traces list within a few seconds. Open it to see the `complete` call recorded by `AIInferenceInstrumentor` nested inside it.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the script runs in.
+
 ## How it Works
 
 1.  `langwatch.setup()`: Initializes the LangWatch SDK, which includes setting up an OpenTelemetry trace exporter. This exporter is ready to receive spans from any OpenTelemetry-instrumented library in your application.

@@ -1,13 +1,14 @@
 /**
  * One stored widget on a board, in the card chrome, with the drag handle, Ask Langy and menu
- * as its controls. Drawn over the board's period and grain; the menu opens the board's editor
- * on it, copies its id or API call, and drafts Langy actions on it.
+ * as its controls, and its queries' sources underneath (AC200). Drawn over the board's period
+ * and grain; the menu opens the editor, copies its id or API call, and drafts Langy actions.
  */
 
 import { Box } from "@langwatch/design-system/primitives";
 import { GripVertical } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { useReadableProjects } from "../../../../behavior/use-readable-projects.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import type { WidgetFace } from "../../../../model/dashboard-widget/widget-completeness.ts";
 import { CHART_GRID_DRAG_HANDLE_CLASS } from "../../../../ui/sections/chart-grid.tsx";
@@ -15,10 +16,17 @@ import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sec
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import type { WidgetSetup } from "../../langy/model/board-langy.ts";
-import type { BoardQueryContext } from "../../model/board-period.ts";
+import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
+import {
+  picksNoSources,
+  widgetCardFooter,
+  widgetProjectsLine,
+  widgetSourcesLine,
+} from "../../model/widget-sources.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
+import { NoSourcesPicked } from "../blocks/no-sources-picked.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
 
@@ -44,6 +52,7 @@ export function BoardWidgetCard({
   onEdit,
   onDuplicate,
   onDelete,
+  onEmptyChange,
 }: {
   widget: BoardWidget;
   projectId: string;
@@ -51,7 +60,7 @@ export function BoardWidgetCard({
   dashboardId: string;
   /** The board's name, which an exported file is named for. */
   boardName: string;
-  period: BoardQueryContext;
+  period: BoardPeriod;
   isWriting: boolean;
   langy?: WidgetCardLangy;
   /**
@@ -61,15 +70,19 @@ export function BoardWidgetCard({
   onEdit?: (input: { withLangy: boolean }) => void;
   onDuplicate?: () => void;
   onDelete?: () => void;
+  /** Told whether the card shows none of the widget's data. */
+  onEmptyChange?: (empty: boolean) => void;
 }) {
   const host = useAnalyticsHost();
+  const readable = useReadableProjects({ projectId: host.project()?.id ?? "" });
   const clipboard = useWidgetClipboard({ dashboardId });
   const csvExport = useWidgetCsvExport({ board: boardName, widget: widget.name });
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
+  const [limits, setLimits] = useState("");
   // A widget the reader may not see offers nothing that reads its data: no Langy, alert or report.
   const langyOnData = face === "no_access" ? undefined : langy;
   const canEditCode = face !== "no_access" || host.hasPermission(WIDGET_EDIT_PERMISSION);
-  const { periodStart, periodEnd, granularitySeconds, excludeOrigins } = period;
+  const { periodStart, periodEnd, granularitySeconds } = period;
   const timeWindow = useMemo(
     () => ({ start: periodStart, end: periodEnd }),
     [periodStart, periodEnd],
@@ -79,6 +92,15 @@ export function BoardWidgetCard({
     <WidgetCardShell
       name={widget.name}
       description={widget.definition.description}
+      footer={widgetCardFooter({
+        sourcesLine: widgetSourcesLine(widget.definition.queries),
+        projectsLine: widgetProjectsLine({
+          queries: widget.definition.queries,
+          boardProjectName: host.project()?.name ?? "",
+          readable,
+        }),
+        limits,
+      })}
       controls={
         <>
           {onEdit && (
@@ -114,21 +136,26 @@ export function BoardWidgetCard({
         </>
       }
     >
-      <DashboardWidgetFrameOverWindow
-        id={widget.id}
-        graph={widget.definition}
-        projectId={projectId}
-        projectSlug={projectSlug}
-        dashboardId={dashboardId}
-        widgetName={widget.name}
-        maxHeight={widgetBodyHeightPx(widget.placement.rowSpan)}
-        timeWindow={timeWindow}
-        granularitySeconds={granularitySeconds}
-        excludeOrigins={excludeOrigins}
-        onFaceChange={setFace}
-        onExportChange={csvExport.onExportChange}
-        {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
-      />
+      {picksNoSources(widget.definition.queries) ? (
+        <NoSourcesPicked />
+      ) : (
+        <DashboardWidgetFrameOverWindow
+          id={widget.id}
+          graph={widget.definition}
+          projectId={projectId}
+          projectSlug={projectSlug}
+          dashboardId={dashboardId}
+          widgetName={widget.name}
+          maxHeight={widgetBodyHeightPx(widget.placement.rowSpan)}
+          timeWindow={timeWindow}
+          granularitySeconds={granularitySeconds}
+          onFaceChange={setFace}
+          onLimitsChange={setLimits}
+          onExportChange={csvExport.onExportChange}
+          onEmptyChange={onEmptyChange}
+          {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
+        />
+      )}
     </WidgetCardShell>
   );
 }

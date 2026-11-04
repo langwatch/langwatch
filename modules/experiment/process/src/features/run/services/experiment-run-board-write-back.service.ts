@@ -6,7 +6,10 @@
 import {
   applyRunEvent,
   emptyRunResultsDraft,
+  type ExecutionScope,
   type ExperimentRunPlan,
+  remapRunResultsDraft,
+  type RunResultsDraft,
   type WorkbenchActor,
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
@@ -101,10 +104,25 @@ export class ExperimentRunBoardWriteBackService {
       projectId: progress.projectId,
       experimentId,
       runId,
-      scope: plan.scope,
-      draft,
+      ...boardWriteOf({ plan, draft }),
     });
   }
+}
+
+/**
+ * A run over another dataset version lands on the board rows with the same ids. It covers only
+ * those rows, so a full run merges into them and keeps the board rows the version lacks.
+ */
+function boardWriteOf({ plan, draft }: { plan: ExperimentRunPlan; draft: RunResultsDraft }): {
+  scope: ExecutionScope;
+  draft: RunResultsDraft;
+} {
+  const { boardRowIndices } = plan;
+  if (!boardRowIndices) return { scope: plan.scope, draft };
+  const remapped = remapRunResultsDraft({ draft, boardRowIndices });
+  if (plan.scope.type !== "full") return { scope: plan.scope, draft: remapped };
+  const rowIndices = boardRowIndices.filter((index): index is number => index !== null);
+  return { scope: { type: "rows", rowIndices }, draft: remapped };
 }
 
 /** Who the board write is attributed to: whoever the plan credits, else the API. */

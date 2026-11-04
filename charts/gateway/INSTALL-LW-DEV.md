@@ -23,7 +23,7 @@ kubectl -n langwatch get svc langwatch-app -o wide
 
 ## 1 — Publish an image (first-time only)
 
-The `gateway-ci` docker job only pushes to GHCR on merge to main (see `.github/workflows/gateway-ci.yaml`). Until the epic branch merges, you need to push a pre-release tag by hand.
+CI publishes no public image from main: main builds of the gateway go only to the project's private ECR (`publish-docker-ecr.yml`, image `langwatch-gateway`). Released versions are on Docker Hub (`docker.io/langwatch/ai-gateway`), published from the release commit. To run a commit that is not on main, push your own tag by hand.
 
 Option A — **ECR** (preferred on this cluster; EKS nodes already have IRSA for pull access):
 
@@ -46,7 +46,7 @@ docker build -t 381491922238.dkr.ecr.eu-central-1.amazonaws.com/ai-gateway:${SHA
 docker push 381491922238.dkr.ecr.eu-central-1.amazonaws.com/ai-gateway:${SHA}
 ```
 
-Option B — **GHCR** (same as CI on main; requires `gh auth token` with `write:packages`):
+Option B — **GHCR** (requires `gh auth token` with `write:packages`):
 
 ```bash
 echo $(gh auth token) | docker login ghcr.io -u $(gh api user --jq .login) --password-stdin

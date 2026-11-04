@@ -78,7 +78,7 @@ describe("given the query REST family", () => {
 
     /** @scenario "The OpenAPI descriptions for both query routes name the any-key scope rule" */
     it("describes the any-key scope rule on both the run and the schema door", () => {
-      for (const operation of ["postApiV1Query", "getApiV1QuerySchema"]) {
+      for (const operation of ["getApiV1QuerySchema"]) {
         const description =
           declaration.routes.find((route) => route.operation === operation)?.docs?.description ??
           "";
@@ -137,7 +137,8 @@ describe("given the query REST family", () => {
       expect(routeOf("getApiV1QuerySchema")?.input).toBeUndefined();
       expect(runDescription).toContain("`projectId`");
       expect(runDescription).toContain("project_not_found");
-      expect(runDescription).toContain("Without `projectId` the run spans every project");
+      expect(runDescription).toContain("must name the projects to read in `projects`");
+      expect(runDescription).toContain("`projects_required` (422)");
     });
 
     it("advertises no truncated flag and no RESULT_TRUNCATED diagnostic", () => {

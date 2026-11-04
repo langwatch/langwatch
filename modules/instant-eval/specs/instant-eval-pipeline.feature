@@ -32,11 +32,11 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     And the run finishes with its progress equal to its total
 
   @unit
-  Scenario: The worker mounts one run projection, five commands and the process manager
+  Scenario: The worker mounts one run projection, six commands and the process manager
     Given the Instant Eval pipeline
     When the worker builds it
     Then the run's counters are projected on a row keyed by the run
-    And the five commands and the run's process manager are mounted
+    And the six commands and the run's process manager are mounted
     And no map projection or subscriber is mounted, because a page writes its own rows
 
   @unit

@@ -25,6 +25,12 @@ Feature: Coding agent terminal view
     When the Terminal tab renders the session
     Then the denied call is shown as rejected, not silently missing
 
+  Scenario: A tool call that was aborted reads differently from one the user denied
+    Given a tool call was cancelled or timed out before it ran
+    When the Terminal tab renders the session
+    Then the call is shown as aborted and never ran
+    And it is not said to be denied, nor pinned on the user
+
   Scenario: A tool call shows what actually ran, not just what the model was told
     Given a tool span carries real stdout, a real file's content, or a real structured patch
     When the Terminal tab renders that tool call
@@ -86,6 +92,42 @@ Feature: Coding agent terminal view
     Given a stored Copilot execute_tool span that names its tool, arguments and result in GenAI attributes
     When the trace read hands it to the transcript with those attributes nested by their dots
     Then the Terminal tab shows the tool run with its name, what it ran and its result
+
+  # pi's spans are in pi's own namespace, so the transcript is told by name that
+  # `pi.ai.request` is a model call (MODEL_CALL_SPAN_NAMES); anything else falls
+  # through to the tool branch.
+
+  # pi declares no arguments and no result on pi.harness.tool, only the tool's
+  # name, its call id and whether it errored. A pi tool run therefore shows
+  # less than a Claude or Copilot one, and the transcript has to render that
+  # honestly rather than leave empty argument and result panes behind.
+
+  # Parked: a pi tool run is dropped from the transcript, not shown. The tool-name
+  # reader (deriveToolName) reads gen_ai.tool.name only on an execute_tool span.
+  # becomes @unit
+  @unimplemented
+  Scenario: A pi session reads back as a transcript, not as a span tree
+    Given a pi session whose run, turns and tool executions were captured
+    When the Terminal tab renders the session
+    Then its spans and logs read in timestamp order, not in parent order
+    And each tool execution shows its name and whether it errored
+    And no empty arguments or result pane is shown for it
+
+  @unit
+  Scenario: A pi model call is shown as a model call, not as a tool run
+    Given a pi session whose model calls are pi.ai.request spans
+    When the Terminal tab renders the session
+    Then each model call appears once with the tokens it used
+    And none of them appears among the tool runs
+
+  # Parked: the model half holds, but the banner's agent list in
+  # modules/trace/browser has no pi, so the top of the session reads unknown.
+  # becomes @unit
+  @unimplemented
+  Scenario: The banner of a pi session names the model pi called
+    Given a pi session whose model calls name their model
+    When the Terminal tab renders the session
+    Then the top of the session shows pi and the model it called
 
   # The system prompt is the context the user pays for on every call - CLAUDE.md,
   # MCP tool definitions, skills. It rides the first request body of the session.

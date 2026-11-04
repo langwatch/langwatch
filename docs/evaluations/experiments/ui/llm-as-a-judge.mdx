@@ -1,5 +1,5 @@
 ---
-title: "LLM-as-a-Judge: score outputs on criteria without expected answers"
+title: "LLM-as-a-Judge: score outputs without expected answers"
 sidebarTitle: LLM-as-a-Judge
 description: Score outputs against written criteria with an LLM-as-a-Judge evaluator when your dataset has inputs but no expected answers, and read the reason behind each verdict.
 ---
@@ -41,7 +41,7 @@ On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the 
 
 Name it, pick the judge model, and replace the default prompt with your criteria. Write the criteria as a checklist the judge can apply to one answer at a time. For example:
 
-```
+```text
 You are evaluating a business coaching assistant.
 The output passes only if all of these are true:
 1. It answers the question the user asked, not a different one.
