@@ -77,10 +77,10 @@ const PAYLOAD = {
   features: [],
 };
 
-const HOSTED = { value: "langwatch/instant-evals", label: "LangWatch Instant Preview" };
+const HOSTED = { value: "langwatch/instant-evals", label: "Instant Preview" };
 const OPENAI_DECISIONS = {
   value: "openai/decisions:gpt-6-luna",
-  label: "OpenAI Decisions API",
+  label: "gpt-6-luna",
 };
 
 function instantEvalsOptions() {
@@ -119,17 +119,17 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
 
       const options = instantEvalsOptions();
       expect(options).toHaveLength(1);
-      expect(options[0]).toHaveTextContent("LangWatch Instant Preview");
+      expect(options[0]).toHaveTextContent("Instant Preview");
       const listbox = instantEvalsListbox();
       expect(within(listbox).queryByText(/gpt-5\.5/)).not.toBeInTheDocument();
-      expect(within(listbox).queryByText("Inception Mercury Decide")).not.toBeInTheDocument();
+      expect(within(listbox).queryByText("Mercury Decide")).not.toBeInTheDocument();
     });
 
     it("reads LangWatch Instant Preview as the value when nothing is set", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
-      expect(trigger).toHaveTextContent("LangWatch Instant Preview");
+      expect(trigger).toHaveTextContent("Instant Preview");
       expect(trigger).not.toHaveTextContent("Not configured");
     });
   });
@@ -148,10 +148,10 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
 
       const labels = instantEvalsOptions().map((option) => option.textContent ?? "");
       expect(labels).toHaveLength(2);
-      expect(labels[0]).toContain("LangWatch Instant Preview");
-      expect(labels[1]).toContain("OpenAI Decisions API");
+      expect(labels[0]).toContain("Instant Preview");
+      expect(labels[1]).toContain("gpt-6-luna");
       expect(
-        within(instantEvalsListbox()).getByText("gpt-6-luna, on your OpenAI key."),
+        within(instantEvalsListbox()).getByText("OpenAI Decisions API, on your OpenAI key."),
       ).toBeInTheDocument();
     });
 
@@ -159,7 +159,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const listbox = instantEvalsListbox();
-      expect(within(listbox).queryByText("Inception Mercury Decide")).not.toBeInTheDocument();
+      expect(within(listbox).queryByText("Mercury Decide")).not.toBeInTheDocument();
       expect(within(listbox).queryByText(/key in Model Providers first/)).not.toBeInTheDocument();
     });
   });
@@ -186,7 +186,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       expect(options).toMatchObject({ enabled: false });
       const offered = instantEvalsOptions();
       expect(offered).toHaveLength(1);
-      expect(offered[0]).toHaveTextContent("LangWatch Instant Preview");
+      expect(offered[0]).toHaveTextContent("Instant Preview");
     });
   });
 });

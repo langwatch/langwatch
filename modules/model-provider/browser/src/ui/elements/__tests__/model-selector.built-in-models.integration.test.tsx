@@ -38,9 +38,9 @@ import { ModelSelector } from "../model-selector.tsx";
 const BUILT_IN = { value: "langwatch/instant-evals", label: "Instant Evals" };
 const OWN_DECISION_BUILT_IN = {
   value: "openai/decisions:gpt-6-luna",
-  label: "OpenAI Decisions API",
+  label: "gpt-6-luna",
 };
-const UNSTORED_PROVIDER_BUILT_IN = { value: "cloudflare/decisions:clef", label: "Cloudflare Clef" };
+const UNSTORED_PROVIDER_BUILT_IN = { value: "cloudflare/decisions:clef", label: "Clef" };
 
 afterEach(() => {
   cleanup();
@@ -107,7 +107,7 @@ describe("<ModelSelector/>", () => {
       );
 
       const listbox = screen.getByRole("listbox", { hidden: true });
-      expect(within(listbox).getAllByText("LangWatch")).toHaveLength(1);
+      expect(within(listbox).getAllByText("Decision models")).toHaveLength(1);
       expect(within(listbox).getByText("OpenAI")).toBeInTheDocument();
     });
   });
