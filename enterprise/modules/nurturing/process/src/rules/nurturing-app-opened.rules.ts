@@ -17,6 +17,15 @@ export function appOpenedSignals({
         { kind: "app_opened", ...base },
         { kind: "sessions_page_viewed", ...base },
       ];
+    case "me_overview":
+    case "settings_usage":
+    case "settings_plans":
+    case "settings_subscription":
+    case "governance_costs":
+      return [
+        { kind: "usage_page_opened", ...base },
+        { kind: "usage_page_viewed", ...base },
+      ];
     default:
       return page satisfies never;
   }
