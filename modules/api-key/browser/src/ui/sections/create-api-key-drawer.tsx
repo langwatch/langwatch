@@ -362,6 +362,47 @@ function PermissionsField({
   );
 }
 
+/**
+ * The ceiling the mint checks (every selected scope, for the key's owner), and the reader's
+ * access as one load: the form is judged only once both the bindings and the ceiling land.
+ */
+function useKeyCeiling({
+  organizationId,
+  selectedScopes,
+  primaryScope,
+  owner,
+  isServiceKey,
+  enabled,
+  myBindings,
+}: {
+  organizationId: string;
+  selectedScopes: ScopeTriadEntry[];
+  primaryScope: ScopeTriadEntry;
+  owner: { isAdmin: boolean; selectedUserId: string; currentUserId: string };
+  isServiceKey: boolean;
+  enabled: boolean;
+  myBindings: MyBindings;
+}): { userPermissions: string[]; access: MyBindings } {
+  const assignsOther =
+    owner.isAdmin && !!owner.selectedUserId && owner.selectedUserId !== owner.currentUserId;
+  const grantable = useGrantablePermissions({
+    organizationId,
+    scopes: selectedScopes.length > 0 ? selectedScopes : [primaryScope],
+    ownerUserId: assignsOther ? owner.selectedUserId : void 0,
+    isServiceKey,
+    enabled,
+  });
+  return {
+    userPermissions: grantable.permissions,
+    access: {
+      data: myBindings.data,
+      isLoading: myBindings.isLoading || grantable.isLoading,
+      isError: myBindings.isError || grantable.isError,
+      refetch: () => Promise.all([myBindings.refetch(), grantable.refetch()]),
+    },
+  };
+}
+
 export function CreateApiKeyDrawer({
   isOpen,
   isCreating,
@@ -433,16 +474,15 @@ export function CreateApiKeyDrawer({
     scopeId: currentProjectId ?? "",
   };
 
-  // The ceiling the mint checks: every selected scope, for the key's owner.
-  const grantable = useGrantablePermissions({
+  const { userPermissions, access } = useKeyCeiling({
     organizationId,
-    scopes: selectedScopes.length > 0 ? selectedScopes : [primaryScope],
-    ownerUserId:
-      isAdmin && selectedUserId && selectedUserId !== currentUserId ? selectedUserId : void 0,
+    selectedScopes,
+    primaryScope,
+    owner: { isAdmin, selectedUserId, currentUserId },
     isServiceKey: keyType === "service",
     enabled: isOpen,
+    myBindings,
   });
-  const userPermissions = grantable.permissions;
 
   const [attempted, setAttempted] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -515,12 +555,6 @@ export function CreateApiKeyDrawer({
   });
   const showError = (field: Exclude<KeyField, "expiration">) =>
     attempted && missing.includes(field) ? FIELD_ERROR[field] : undefined;
-  const access: MyBindings = {
-    data: myBindings.data,
-    isLoading: myBindings.isLoading || grantable.isLoading,
-    isError: myBindings.isError || grantable.isError,
-    refetch: () => Promise.all([myBindings.refetch(), grantable.refetch()]),
-  };
   const accessBlocked = access.isLoading || access.isError;
 
   return (

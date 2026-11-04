@@ -84,6 +84,29 @@ function highestSelections(userPermissions: string[]): Record<string, Permission
 const ACCESS_UNREADABLE = "Your access couldn't be read. Close this drawer and try again.";
 const ACCESS_LOADING = "Loading your access…";
 
+function saveBlockedReason({
+  accessUnreadable,
+  accessLoading,
+}: {
+  accessUnreadable: boolean;
+  accessLoading: boolean;
+}): string | undefined {
+  if (accessUnreadable) return ACCESS_UNREADABLE;
+  if (accessLoading) return ACCESS_LOADING;
+  return void 0;
+}
+
+function ceilingScopesFor({
+  selectedScopes,
+  currentProjectId,
+}: {
+  selectedScopes: ScopeTriadEntry[];
+  currentProjectId: string | undefined;
+}): ScopeTriadEntry[] {
+  if (selectedScopes.length > 0) return selectedScopes;
+  return [{ scopeType: "PROJECT", scopeId: currentProjectId ?? "" }];
+}
+
 function storedSelections({
   apiKey,
   mode,
@@ -162,6 +185,44 @@ function updateKeyInput({
   };
 }
 
+/**
+ * The ceiling the update checks, read off the mint's resolver: every scope, for the owner.
+ * Until it lands every row clamps to none, and a save would send no permissions.
+ */
+function useKeyCeiling({
+  apiKey,
+  selectedScopes,
+  currentProjectId,
+  organizationId,
+  isServiceKey,
+  myBindings,
+}: {
+  apiKey: ApiKeyRow | null;
+  selectedScopes: ScopeTriadEntry[];
+  currentProjectId: string | undefined;
+  organizationId: string;
+  isServiceKey: boolean;
+  myBindings: MyBindings;
+}) {
+  const ceilingScopes = useMemo(
+    () => ceilingScopesFor({ selectedScopes, currentProjectId }),
+    [selectedScopes, currentProjectId],
+  );
+  const grantable = useGrantablePermissions({
+    organizationId,
+    scopes: ceilingScopes,
+    ownerUserId: apiKey?.userId ?? void 0,
+    isServiceKey,
+    enabled: !!apiKey,
+  });
+  return {
+    primaryScope: ceilingScopes[0]!,
+    userPermissions: grantable.permissions,
+    accessUnreadable: myBindings.isError || grantable.isError,
+    accessLoading: myBindings.isLoading || grantable.isLoading,
+  };
+}
+
 export function EditApiKeyDrawer({
   apiKey,
   isUpdating,
@@ -201,32 +262,14 @@ export function EditApiKeyDrawer({
 
   const isServiceKey = apiKey ? !apiKey.userId : false;
 
-  const ceilingScopes = useMemo(
-    () =>
-      selectedScopes.length > 0
-        ? selectedScopes
-        : [
-            {
-              scopeType: "PROJECT" as const,
-              scopeId: currentProjectId ?? "",
-            },
-          ],
-    [selectedScopes, currentProjectId],
-  );
-  const primaryScope = ceilingScopes[0]!;
-
-  // The ceiling the update checks, read off the same resolver: every scope, for the owner.
-  const grantable = useGrantablePermissions({
+  const { primaryScope, userPermissions, accessUnreadable, accessLoading } = useKeyCeiling({
+    apiKey,
+    selectedScopes,
+    currentProjectId,
     organizationId,
-    scopes: ceilingScopes,
-    ownerUserId: apiKey?.userId ?? void 0,
     isServiceKey,
-    enabled: !!apiKey,
+    myBindings,
   });
-  const userPermissions = grantable.permissions;
-  const accessUnreadable = myBindings.isError || grantable.isError;
-  // Until the ceiling lands every row clamps to none, and a save would send no permissions.
-  const accessLoading = myBindings.isLoading || grantable.isLoading;
 
   useEffect(() => {
     if (apiKey) {
@@ -301,11 +344,7 @@ export function EditApiKeyDrawer({
           label: "Save",
           onClick: handleSave,
           loading: isUpdating,
-          disabledReason: accessUnreadable
-            ? ACCESS_UNREADABLE
-            : accessLoading
-              ? ACCESS_LOADING
-              : void 0,
+          disabledReason: saveBlockedReason({ accessUnreadable, accessLoading }),
         },
       }}
     >

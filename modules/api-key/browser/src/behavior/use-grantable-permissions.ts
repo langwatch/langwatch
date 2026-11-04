@@ -1,8 +1,7 @@
 /**
- * What a restricted key's permission rows may offer, asked of the server that mints it: the
- * same resolver the mint's ceiling check runs, so access held through a group, a team or an
- * inherited role unlocks exactly the rows the mint will accept. A service key's ceiling is
- * every categorizable permission, its mint being an organization admin's.
+ * What a restricted key's rows may offer, asked of the resolver the mint's ceiling check runs,
+ * so group, team and inherited access unlock exactly what the mint accepts. A service key's
+ * ceiling is every categorizable permission: only an organization admin mints one.
  */
 
 import { categorizablePermissions } from "@langwatch/api-key-contract";

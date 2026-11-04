@@ -1,8 +1,7 @@
 /**
- * A stand-in for the server's `apiKey.grantablePermissions`: what a reader holding these
- * direct bindings may put on a key bound to every one of these scopes. The real answer comes
- * from the authz resolver; this mirrors it for direct grants so a screen test can seed
- * bindings and see the rows they open.
+ * A stand-in for the server's `apiKey.grantablePermissions`, mirroring the authz resolver
+ * for direct grants: what these bindings may put on a key bound to every one of these
+ * scopes, so a screen test can seed bindings and see the rows they open.
  */
 
 import { categorizablePermissions } from "@langwatch/api-key-contract";

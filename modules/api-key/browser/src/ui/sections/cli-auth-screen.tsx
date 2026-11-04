@@ -283,6 +283,23 @@ function approvalGates({
   };
 }
 
+/**
+ * The reader's access as one load: the ceiling is the server's answer, so until it lands no
+ * row is held, and nothing may be judged ungrantable yet.
+ */
+function accessLoadState({
+  bindings,
+  ceiling,
+}: {
+  bindings: { isLoading: boolean; isError: boolean };
+  ceiling: { isLoadingCeiling: boolean; isCeilingFailed: boolean };
+}): { isLoading: boolean; isFailed: boolean } {
+  return {
+    isLoading: bindings.isLoading || ceiling.isLoadingCeiling,
+    isFailed: bindings.isError || ceiling.isCeilingFailed,
+  };
+}
+
 export default function CliAuthScreen() {
   const host = useApiKeyHost();
   const reading = host.route();
@@ -343,12 +360,10 @@ export default function CliAuthScreen() {
     selectedScopes: keyScopes.selectedScopes,
     management: requestsManagement,
   });
-  // The ceiling is the server's answer now: until it lands, no row is held, so nothing may be
-  // judged ungrantable yet.
-  const isLoadingAccess = myBindings.isLoading || keyPermissions.isLoadingCeiling;
+  const access = accessLoadState({ bindings: myBindings, ceiling: keyPermissions });
   const management = managementRequestFor({
     requestsManagement,
-    isLoadingBindings: isLoadingAccess,
+    isLoadingBindings: access.isLoading,
     selectedScopes: keyScopes.selectedScopes,
     userPermissions: keyPermissions.userPermissions,
   });
@@ -357,8 +372,8 @@ export default function CliAuthScreen() {
     selectedOrgId,
     requiresProject,
     selectedProjectId,
-    isLoadingBindings: isLoadingAccess,
-    isBindingsFailed: myBindings.isError || keyPermissions.isCeilingFailed,
+    isLoadingBindings: access.isLoading,
+    isBindingsFailed: access.isFailed,
     scopeCount: keyScopes.selectedScopes.length,
     permissionCount: keyPermissions.permissions.length,
     isManagementBlocked: management.cannotGrant || management.needsOrganization,
