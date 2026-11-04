@@ -96,6 +96,8 @@ go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
   Set up the LangWatch exporter in your application initialization. `NewExporter` reads `LANGWATCH_API_KEY` from the environment, builds an OTLP exporter pointed at LangWatch, and you register it as your global tracer provider:
 
   ```go
+  import langwatch "github.com/langwatch/langwatch/sdks/go"
+
   func setupLangWatch(ctx context.Context) func(context.Context) {
   	// Create the LangWatch exporter (reads LANGWATCH_API_KEY from the environment).
   	exporter, err := langwatch.NewExporter(ctx)
@@ -146,6 +148,8 @@ go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
   Start a root span to capture your LLM interaction. Any instrumented call made with the returned `ctx` is nested under it:
 
 ```go
+import langwatch "github.com/langwatch/langwatch/sdks/go"
+
 tracer := langwatch.Tracer("my-app")
 ctx, span := tracer.Start(ctx, "ChatWithUser")
 defer span.End()
@@ -369,6 +373,8 @@ For detailed configuration options and the full attribute list, see the [Automat
 `LangWatchSpan` embeds the standard OpenTelemetry span and adds LangWatch helper methods. All setters return the span, so they can be chained:
 
 ```go
+import langwatch "github.com/langwatch/langwatch/sdks/go"
+
 span.
 	SetType(langwatch.SpanTypeLLM).
 	SetInput("What is the capital of France?").
@@ -383,6 +389,8 @@ span.
 `SetInput` / `SetOutput` infer a value type (text, json, chat_messages, list, …) from the Go value, or you can force one with a typed variant such as `SetInputJSON` or `SetOutputChatMessages`. Token usage is recorded with `SetGenAIUsage`; cost (only) is recorded with `SetMetrics`:
 
 ```go
+import langwatch "github.com/langwatch/langwatch/sdks/go"
+
 span.SetGenAIUsage(langwatch.GenAIUsage{
 	InputTokens:  langwatch.Int(120),
 	OutputTokens: langwatch.Int(48),
@@ -403,6 +411,8 @@ For the complete list of span helper methods (RAG contexts, multimodal/binary co
 Data capture controls whether span **input/output content** leaves the process. It is enforced at export time, so one setting governs every instrumentation (the provider middlewares and your manual spans alike). Span structure, metrics, metadata, models and identity are always kept; only the content attributes are stripped. The default, unconfigured, captures everything.
 
 ```go
+import langwatch "github.com/langwatch/langwatch/sdks/go"
+
 // Fixed mode for all spans across every instrumentation.
 exporter, _ := langwatch.NewExporter(ctx, langwatch.WithDataCapture(langwatch.DataCaptureNone))
 
@@ -463,6 +473,8 @@ The LangWatch SDK filters which spans are exported. Use filtering to reduce nois
 The SDK includes convenient preset filters for common use cases:
 
 ```go
+import langwatch "github.com/langwatch/langwatch/sdks/go"
+
 // NewDefaultExporter automatically excludes HTTP request spans.
 exporter, err := langwatch.NewDefaultExporter(ctx)
 
@@ -480,6 +492,8 @@ exporter, err := langwatch.NewExporter(ctx,
 Create custom filters using `Include()` or `Exclude()` with matching criteria:
 
 ```go
+import langwatch "github.com/langwatch/langwatch/sdks/go"
+
 exporter, err := langwatch.NewExporter(ctx,
 	langwatch.WithFilters(
 		// Only include spans from specific scopes.

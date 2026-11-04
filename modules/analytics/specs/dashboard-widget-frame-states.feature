@@ -52,6 +52,109 @@ Feature: A dashboard widget frame shows what its queries report
       When a later run of it fails
       Then the card still shows the widget's own face
 
+  Rule: A widget says it is loading until its data arrives
+
+    A board opens with every widget's queries in flight. A card that stays blank reads as
+    broken, so the frame covers it with a skeleton until the first answer, and says so when
+    that takes long.
+
+    @integration
+    Scenario: A widget shows a loading skeleton while its first query runs
+      Given a widget on a board
+      When none of its queries has answered yet
+      Then the card shows a loading skeleton in place of the chart
+      And the skeleton is gone once a query answers
+
+    @integration
+    Scenario: A widget that loads for long says it is still loading
+      Given a widget on a board
+      When none of its queries has answered after 5 seconds
+      Then the skeleton says "Still loading…"
+
+    @integration
+    Scenario: A refresh keeps the chart, with no skeleton
+      Given a widget whose query answered once
+      When the board refreshes and the query runs again
+      Then the card shows no loading skeleton
+
+    @integration
+    Scenario: A widget with nothing to wait for shows no skeleton
+      Given a widget with no queries, whose code reported an error, or whose code has loaded and has no query open or waiting to retry
+      Then the card shows no loading skeleton
+
+    @integration
+    Scenario: A widget whose code is still loading keeps its skeleton
+      Given a widget on a board whose code has not loaded yet
+      When the frame is up with no query open
+      Then the card still shows the loading skeleton
+
+    @integration
+    Scenario: A widget waiting to retry a busy query keeps its skeleton
+      Given a widget on a board whose first query was refused as busy
+      When the frame waits to retry it with no query open
+      Then the card still shows the loading skeleton
+
+    @integration
+    Scenario: A member's Retry after a code error brings the skeleton back
+      Given a widget whose code reported an error and which shows no skeleton
+      When the member presses Retry
+      Then the card shows the loading skeleton while the next load is pending
+
+    @integration
+    Scenario: A query that starts after the frame was idle brings the skeleton back
+      Given a widget whose frame had nothing to wait for and whose queries never answered
+      When a query starts
+      Then the card shows the loading skeleton again
+
+    @integration
+    Scenario: The loading skeleton covers a running frame, never its restart notice
+      Given a widget whose frame is given a loading skeleton to draw over itself
+      When the frame is running
+      Then the skeleton is drawn over the chart frame
+      And when the frame stops responding and is restarting, the restart notice shows and the skeleton does not
+
+  Rule: An empty widget says how to get its data
+
+    An empty card says what is not there and what sends it: the SDK call, the setting or the
+    integration. A quiet period in a project that sends data is not a setup step, so it
+    offers none.
+
+    @integration
+    Scenario: A widget in a project that never sent a trace says how to send one
+      Given a widget on a board in a project that has never received a trace
+      When its query answers with completeness state "no_traffic" over traces
+      Then the card says "No traces in this period" and "Send traces with the LangWatch SDK to fill this widget."
+      And "Set up tracing" opens the traces page
+
+    @integration
+    Scenario: A quiet period offers no setup
+      Given a widget on a board in a project that has received traces
+      When its query answers with completeness state "no_traffic" over traces
+      Then the card says "No traces in this period" and offers no "Set up tracing"
+
+    @unit
+    Scenario: An empty widget names what sends its data
+      Given a field or a unit a widget's query found none of
+      When the guidance is written
+      Then UserId reads "Send user_id in the trace metadata with the LangWatch SDK."
+      And TotalCost names the model, the token counts and a model price in Settings
+      And evaluations read "Evaluations come from the evaluators you run on your traces."
+      And a trace field with no words of its own reads "Send <field> on your traces with the LangWatch SDK."
+      And a field of another unit with no words of its own gets no line, never the unit's no-traffic line
+
+    @integration
+    Scenario: The setup view says how to send the field it needs
+      Given a widget on a board
+      When its query answers with completeness state "missing" for the field UserId
+      Then the card names the field and says "Send user_id in the trace metadata with the LangWatch SDK."
+
+    @integration
+    Scenario: The frame tells its card when the widget shows no data
+      Given a widget on a board
+      When it shows no traffic, the setup view, or every query returned no rows
+      Then the frame tells its card the widget is empty
+      And a widget with rows, or still loading, is not empty
+
   Rule: Partial data keeps a clean face and goes in the (i)
 
     @integration

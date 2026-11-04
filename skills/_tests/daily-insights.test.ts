@@ -76,7 +76,9 @@ describe("the daily-insights skill", () => {
     /** @scenario "The skill names the commands that read a widget and run its query over a window" */
     it("names both commands, the flags that fill the window, and that the brief's step stands in for the step", () => {
       expect(rendered).toContain("`langwatch dashboard widget get <dashboard id> <widget id>`");
-      expect(rendered).toContain('`langwatch query "<query>" --start <start> --end <end>`');
+      expect(rendered).toContain(
+        '`langwatch query "<query>" --projects <the brief\'s project id> --start <start> --end <end>`',
+      );
       expect(rendered).toContain(
         "The two flags fill `{dashboard_context_period_start:DateTime}` and `{dashboard_context_period_end:DateTime}`",
       );

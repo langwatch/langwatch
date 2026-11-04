@@ -27,6 +27,7 @@ import {
   type LangWatchQLKeyReach,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
+  LangWatchQLProjectNotFoundError,
   type LangWatchQLRunCaller,
   type LangWatchQLAcceptedStatement,
   type LangWatchQLAppFunctionCall,
@@ -44,20 +45,17 @@ import {
   type AnalyticsEvaluationRow,
   type LangWatchQLTimeWindow,
   type LangWatchQLValidationResult,
+  type LangWatchQLReadableProject,
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import {
-  type Authorization,
-  type RestCredentialPrincipal,
-  sharedWindowsReadBy,
-} from "@langwatch/authorization";
+import { type Authorization, type RestCredentialPrincipal } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { ValidationError } from "@langwatch/handled-error";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
@@ -118,6 +116,8 @@ import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,
 } from "../services/langwatch-ql-query-scope.service.ts";
+import { LangWatchQLReadableProjectsService } from "../services/langwatch-ql-readable-projects.service.ts";
+import { LangWatchQLRunScopeService } from "../services/langwatch-ql-run-scope.service.ts";
 import { LangWatchQLValidationReportService } from "../services/langwatch-ql-validation-report.service.ts";
 import {
   DEFAULT_LWQL_DATABASE,
@@ -535,18 +535,27 @@ export class AnalyticsModule
   #widgetAccess: DashboardWidgetAccessService;
   #hydration: LangWatchQLHydrationService;
   #queryScope: LangWatchQLQueryScopeService;
+  #readableProjects: LangWatchQLReadableProjectsService;
   #aggregateScope: LangWatchQLAggregateScopeService;
+  #runScope: LangWatchQLRunScopeService;
   #protections: WorkbenchProtectionsService;
   #validationReport: LangWatchQLValidationReportService;
 
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
     this.#queryScope = LangWatchQLQueryScopeService.create(dependencies);
+    this.#readableProjects = LangWatchQLReadableProjectsService.create(dependencies);
     this.#aggregateScope = LangWatchQLAggregateScopeService.create({
       projects: dependencies.projects,
       ...(dependencies.lwqlAggregateMaxMembers === undefined
         ? {}
         : { maxMembers: dependencies.lwqlAggregateMaxMembers }),
+    });
+    this.#runScope = LangWatchQLRunScopeService.create({
+      queryScope: this.#queryScope,
+      aggregateScope: this.#aggregateScope,
+      readable: this.#readableProjects,
+      bounds: dependencies.lwqlBounds,
     });
     this.#protections = WorkbenchProtectionsService.create(dependencies);
     this.#validationReport = LangWatchQLValidationReportService.create({
@@ -739,11 +748,16 @@ export class AnalyticsModule
       { reach: LangWatchQLKeyReach; signal?: AbortSignal } & LangWatchQLKeyStatementRequest
     >,
   ): Promise<LangWatchQLQueryResult> {
-    const { reach, projectId, sql, parameters, timeWindow, granularitySeconds, signal } = input;
-    const { projects, protections } = await this.#queryScope.resolve({
-      reach,
-      ...(projectId === undefined ? {} : { projectId }),
-    });
+    const { reach, projectId, projects: asked, sql, parameters, timeWindow } = input;
+    const { granularitySeconds, sources, signal } = input;
+    const { named: wanted, all } = this.#runScope.select({ projectId, projects: asked });
+    const { projects, protections } = all
+      ? await this.#queryScope.resolveAll({ reach })
+      : await this.#queryScope.resolve({
+          reach,
+          requireProjects: true,
+          ...(wanted === undefined ? {} : { projects: wanted }),
+        });
     for (const project of projects) {
       await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
     }
@@ -755,6 +769,7 @@ export class AnalyticsModule
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
       ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
+      ...(sources ? { sources } : {}),
       ...(signal ? { signal } : {}),
       isInstantEvalsEnabled:
         statementMightCallEvalFunction(sql) && (await this.#isInstantEvalsEnabledFor({ projects })),
@@ -836,20 +851,24 @@ export class AnalyticsModule
   async executeLangWatchQL(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
-    const { authorization, project, ...run } = input;
-    const shared = authorization
-      ? sharedWindowsReadBy({ authorization, permission: "analytics:view", condition: "trace" })
-      : [];
-    await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
-    const aggregate =
-      shared.length > 0 ? await this.#aggregateScope.getMemberScope({ shared }) : undefined;
+    const { authorization, project, projects: asked, userId, ...run } = input;
+    const selection = this.#runScope.select({ projects: asked });
+    const scope = await this.#runScope.resolve({ authorization, project, selection, userId });
 
-    if (aggregate) {
+    if (scope.kind === "aggregate") {
       // A judged column is charged to one project, so an aggregate's statement may call none.
       return this.#dependencies.langWatchQL.executeForProjects({
         ...run,
-        projects: aggregate.projects,
-        memberWindows: aggregate.memberWindows,
+        projects: scope.projects,
+        memberWindows: scope.memberWindows,
+        isInstantEvalsEnabled: false,
+      });
+    }
+    if (scope.kind === "named") {
+      return this.#dependencies.langWatchQL.executeForProjects({
+        ...run,
+        projects: scope.projects,
+        protections: scope.protections,
         isInstantEvalsEnabled: false,
       });
     }
@@ -862,6 +881,22 @@ export class AnalyticsModule
       (await this.#isInstantEvalsEnabled(input.project.id));
 
     return this.#dependencies.langWatchQL.execute({ project, ...run, isInstantEvalsEnabled });
+  }
+
+  async assertProjectsReadable(input: {
+    userId?: string;
+    reach?: LangWatchQLKeyReach;
+    projectIds: readonly string[];
+    anchorProjectId: string;
+  }): Promise<void> {
+    const { userId, reach, projectIds, anchorProjectId } = input;
+    if (reach !== undefined) {
+      await this.#queryScope.assertReadableByKey({ reach, projectIds });
+    } else if (userId !== undefined) {
+      await this.#queryScope.readableByMember({ userId, projectIds, anchorProjectId });
+    } else {
+      throw new LangWatchQLProjectNotFoundError();
+    }
   }
 
   /**
@@ -918,6 +953,14 @@ export class AnalyticsModule
 
   validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement {
     return this.#dependencies.langWatchQL.validate(input);
+  }
+
+  /** The projects a card's editor may offer this member. */
+  listReadableProjects(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<LangWatchQLReadableProject[]> {
+    return this.#readableProjects.listFor(input);
   }
 
   /** A member's statement judged for the editor's markers; never executed. */
@@ -1073,7 +1116,7 @@ export class AnalyticsModule
   async resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatchQLCaller> {
     const project = await this.#dependencies.projects.findById(input.projectId);
     if (!project) {
-      throw new NotFoundError("project_not_found", { resource: "Project", id: input.projectId });
+      throw new LangWatchQLProjectNotFoundError();
     }
 
     return { id: project.id, lwqlKey: project.lwqlKey };

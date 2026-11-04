@@ -79,16 +79,18 @@ import langwatch
 import os
 
 # Assume we have already setup LangWatch
-
 # langwatch.setup()
 
 @langwatch.trace(
-name="UserIntentProcessing",
-input={"user_query": "Book a flight to London"}, # Output can be set later via update() if determined by function logic
+    name="UserIntentProcessing",
+    input={"user_query": "Book a flight to London"},
+    # Output can be set later via update() if determined by function logic
 )
-def process_user_intent(raw_query_data: dict): # raw_query_data might be large or contain sensitive info # The 'input' parameter above provides a clean version.
-intent = "book_flight"
-entities = {"destination": "London"}
+def process_user_intent(raw_query_data: dict):
+    # raw_query_data might be large or contain sensitive info
+    # The 'input' parameter above provides a clean version.
+    intent = "book_flight"
+    entities = {"destination": "London"}
 
     # Explicitly set the output for the root span of the trace
     current_trace = langwatch.get_current_trace()
@@ -98,8 +100,7 @@ entities = {"destination": "London"}
     return {"status": "success", "intent": intent} # Actual function return
 
 process_user_intent({"query": "Book a flight to London", "user_id": "123"})
-
-````
+```
 
 ```python Span with explicit input/output
 import langwatch
@@ -129,7 +130,7 @@ def handle_chat():
     print("Chat finished.")
 
 handle_chat()
-````
+```
 
 </CodeGroup>
 
