@@ -372,6 +372,10 @@ describe("given a private route whose path is not a plain ClickHouse database na
     ["a path with a second segment", "/acme_db/extra", /extra/],
     ["a name starting with a digit", "/1acme", /1acme/],
     ["a trailing slash", "/acme_db/", /acme_db/],
+    ["a reserved database", "/system", /system/i],
+    ["the other reserved database", "/information_schema", /information_schema/i],
+    ["a reserved database in capitals", "/SYSTEM", /system/i],
+    ["a name with capitals", "/AcmeDB", /acmedb/i],
   ])(
     "refuses %s, naming no part of the URL, and builds no private executor",
     async (_, path, leak) => {
