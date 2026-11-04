@@ -321,6 +321,7 @@ describe("EvaluationExecutionService with a judge on an own decision model", () 
     wire: "jev",
     providerModel: "mercury-decide",
     endpoint: "https://api.inceptionlabs.ai/v1/decisions",
+    authHeader: "bearer",
     apiKey: "customer-key",
   } as const satisfies DecisionModelResolution;
 

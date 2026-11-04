@@ -4,6 +4,7 @@
  * Moved from platform, widened scope.
  */
 
+import { DatasetHistoryDrawerToken } from "@langwatch/dataset-client";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -11,7 +12,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithDatasetHost } from "../../../testing.tsx";
 
-const { datasetQuery } = vi.hoisted(() => ({
+const { datasetQuery, openDrawer } = vi.hoisted(() => ({
+  openDrawer: vi.fn(),
   datasetQuery: {
     current: {
       data: undefined as unknown,
@@ -25,7 +27,12 @@ const { datasetQuery } = vi.hoisted(() => ({
 vi.mock("../../../behavior/dataset-api.ts", () => ({
   datasetApi: {},
 }));
-vi.mock("@langwatch/dataset-client", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDrawer: () => ({ openDrawer }),
+}));
+vi.mock("@langwatch/dataset-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   datasetClient: {
     dataset: {
       getById: { useQuery: () => datasetQuery.current },
@@ -68,6 +75,17 @@ describe("Dataset editor screen", () => {
         await user.click(screen.getByTestId("run-experiment-from-dataset"));
 
         expect(host.navigations).toEqual(["/test-project/experiments/workbench?datasetId=ds-1"]);
+      });
+    });
+
+    describe("when the reader opens the history", () => {
+      it("opens the history drawer for this dataset", async () => {
+        const user = userEvent.setup();
+        renderWithDatasetHost(<DatasetEditorScreen />, { route: ROUTE });
+
+        await user.click(screen.getByRole("button", { name: "History" }));
+
+        expect(openDrawer).toHaveBeenCalledWith(DatasetHistoryDrawerToken, { datasetId: "ds-1" });
       });
     });
 

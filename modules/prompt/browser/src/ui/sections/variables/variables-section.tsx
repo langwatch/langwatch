@@ -7,17 +7,17 @@ import {
 import { Menu } from "@langwatch/design-system/menu";
 import { Button, chakra, HStack, Text, Textarea } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
-import { Info, Plus } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-
 import {
   type AvailableSource,
   type FieldMapping,
   type FieldType,
   type RenderSourceIcon,
   VariableMappingInput,
-} from "./variable-mapping-input.tsx";
+} from "@langwatch/design-system/variable-mapping";
+import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
+import { Info, Plus } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+
 import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "./variable-type/index.ts";
 
 // ============================================================================

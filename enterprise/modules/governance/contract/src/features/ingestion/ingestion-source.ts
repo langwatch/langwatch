@@ -59,6 +59,11 @@ const ingestionSourceDtoSchemaDefinition = z
     lastReadThroughAt: z.date().nullable(),
     lastRunCompleteness: z.string().nullable(),
     pullStatus: ingestionSourcePullStatusSchema,
+    /**
+     * What the source's adapter refuses about its stored configuration, in words an admin can
+     * act on. Empty for a configuration the adapter reads; a pull cannot succeed until it is.
+     */
+    configComplaints: z.array(z.string()),
     traceProjectId: z.string().nullable(),
     /** The destination it points at is gone: archived, deleted, or never ours. */
     traceProjectArchived: z.boolean(),

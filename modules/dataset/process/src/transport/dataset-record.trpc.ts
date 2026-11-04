@@ -7,28 +7,32 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DatasetApi, datasetRecordTrpc } from "@langwatch/dataset-contract";
 
+import { datasetAuthorOf } from "../rules/dataset-version-author.rules.ts";
+
 export const datasetRecordTrpcTransport: TrpcRouterDeclaration<
   DatasetApi,
   typeof datasetRecordTrpc
 > = defineTrpcRouter(DatasetApi, datasetRecordTrpc)
   .procedure("create")
   .withPermission("datasets:create")
-  .handle(async ({ app, input }) =>
+  .handle(async ({ app, input, actor }) =>
     app.batchCreateRecords({
       slugOrId: input.datasetId,
       projectId: input.projectId,
       entries: input.entries,
+      editedBy: datasetAuthorOf({ actor }),
     }),
   )
 
   .procedure("update")
   .withPermission("datasets:update")
-  .handle(async ({ app, input }) =>
+  .handle(async ({ app, input, actor }) =>
     app.upsertRecord({
       recordId: input.recordId,
       updatedRecord: input.updatedRecord,
       slugOrId: input.datasetId,
       projectId: input.projectId,
+      editedBy: datasetAuthorOf({ actor }),
     }),
   )
 
@@ -97,11 +101,12 @@ export const datasetRecordTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("deleteMany")
   .withPermission("datasets:delete")
-  .handle(async ({ app, input }) =>
+  .handle(async ({ app, input, actor }) =>
     app.deleteRecords({
       recordIds: input.recordIds,
       slugOrId: input.datasetId,
       projectId: input.projectId,
+      editedBy: datasetAuthorOf({ actor }),
     }),
   )
   .build();
