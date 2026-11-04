@@ -41,7 +41,7 @@ describe("AppPageOpenedService", () => {
         page: "me_sessions",
       });
 
-      expect(opened).toEqual([{ userId: "user_ada", page: AppPage }]);
+      expect(opened).toEqual([{ userId: "user_ada", page: "me_sessions" }]);
     });
   });
 
@@ -66,7 +66,7 @@ describe("AppPageOpenedService", () => {
     it("records nothing", async () => {
       const { service, opened } = serviceOver();
 
-      await service.record({ userId: "user_ada", browserSessionId: null, page: AppPage });
+      await service.record({ userId: "user_ada", browserSessionId: null, page: "me_sessions" });
 
       expect(opened).toEqual([]);
     });
@@ -97,7 +97,7 @@ describe("AppPageOpenedService", () => {
       });
 
       await expect(
-        service.record({ userId: "user_ada", browserSessionId: "session-1", page: AppPage }),
+        service.record({ userId: "user_ada", browserSessionId: "session-1", page: "me_sessions" }),
       ).resolves.toBeUndefined();
     });
 
@@ -109,7 +109,7 @@ describe("AppPageOpenedService", () => {
       });
 
       await expect(
-        service.record({ userId: "user_ada", browserSessionId: "session-1", page: AppPage }),
+        service.record({ userId: "user_ada", browserSessionId: "session-1", page: "me_sessions" }),
       ).resolves.toBeUndefined();
     });
 
