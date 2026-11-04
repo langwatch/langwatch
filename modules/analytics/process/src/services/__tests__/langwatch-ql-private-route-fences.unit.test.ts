@@ -108,7 +108,13 @@ function run({
   });
   const service = LangWatchQLService.create({ executor: routed, database: SHARED.database });
   const done = pass
-    ? service.executePass({ project: PROJECT, protections: PROTECTIONS, sql, pass })
+    ? service.executePass({
+        project: PROJECT,
+        protections: PROTECTIONS,
+        sql,
+        pass,
+        isInstantEvalsEnabled: true,
+      })
     : service.executeForProjects({
         projects: [PROJECT],
         protections: PROTECTIONS,
@@ -304,7 +310,7 @@ describe("given FINAL on a route-qualified table of a windowed aggregate", () =>
 });
 
 describe("given a pass for a private organization", () => {
-  /** @scenario "A pass on a private route validates against the route's database" */
+  /** @scenario "A pass on a private route validates against the route's database and asks the route once" */
   it("admits an unqualified statement, as a shorthand writes it, and runs it on the route", async () => {
     const attempt = run({
       answers: [PRIVATE],
@@ -318,7 +324,7 @@ describe("given a pass for a private organization", () => {
     expect(qualifiersOf(attempt.requests())).toEqual([]);
   });
 
-  /** @scenario "A pass on a private route validates against the route's database" */
+  /** @scenario "A pass on a private route validates against the route's database and asks the route once" */
   it("runs a statement naming the route database, asking the route once", async () => {
     const attempt = run({
       answers: [PRIVATE],
