@@ -10,6 +10,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -64,6 +65,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       }),
       "audit-log": createApiFixture<AuditLogApi>(),
       trace: createApiFixture<TraceApi>(),
+      dataset: createApiFixture<DatasetApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({
         getResolvedForProject: async () => RETAINED,
       }),
