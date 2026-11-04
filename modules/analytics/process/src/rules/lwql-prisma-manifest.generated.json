@@ -20195,6 +20195,15 @@
           "documentation": ""
         },
         {
+          "name": "lastTraceAt",
+          "columnName": "lastTraceAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "updatedAt",
           "columnName": "updatedAt",
           "type": "DateTime",

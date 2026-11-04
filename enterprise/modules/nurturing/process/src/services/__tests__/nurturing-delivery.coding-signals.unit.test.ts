@@ -15,6 +15,7 @@ import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
+import { unplacedMemberFacts } from "./nurturing-member-facts.test-helpers.ts";
 
 const T0 = Date.UTC(2026, 9, 20, 12);
 const unixSeconds = (ms: number) => Math.floor(ms / 1000);
@@ -34,7 +35,14 @@ function customerIo() {
   });
   return {
     service,
-    identifies: () => sent.filter((call) => call.path === "/v1/identify").map((call) => call.body),
+    identifies: () =>
+      sent.flatMap(({ path, body }) => {
+        if (path === "/v1/identify") return [body];
+        if (path !== "/v1/batch") return [];
+        return (body.batch as { type: string; traits: unknown; userId: string }[]).filter(
+          (item) => item.type === "identify",
+        );
+      }),
     tracks: () => sent.filter((call) => call.path === "/v1/track").map((call) => call.body),
   };
 }
@@ -59,6 +67,7 @@ function deliveryOver(claims: NurturingClaimRepository, cio = customerIo()) {
   const delivery = NurturingDeliveryService.create({
     claims,
     users: createApiFixture<UserApi>({}),
+    memberFacts: unplacedMemberFacts(),
     customerIo: cio.service,
     posthog,
   });
@@ -407,7 +416,11 @@ describe("NurturingDeliveryService coding-agent signals", () => {
           .identifies()
           .filter((call) => call.userId === "member-2")
           .map((call) => call.traits),
-      ).toEqual([{ integration_method: "platform" }, { uses_coding_agent: true }]);
+      ).toEqual([
+        { integration_method: "platform" },
+        { coding_first_session_at: unixSeconds(T0), coding_agent_types: ["claude_code"] },
+        { uses_coding_agent: true },
+      ]);
     });
 
     /** @scenario "A member claim that fails never strands a member already claimed" */

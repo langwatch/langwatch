@@ -1,6 +1,8 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { codingTerminalSchema } from "./telemetry/index.ts";
+
 /** A stored session, recorded by coding-agent; peers react from their side (§9). */
 export const CODING_AGENT_SESSION_STORED_EVENT_TYPE = "lw.coding_agent.session_stored" as const;
 
@@ -16,8 +18,11 @@ const codingAgentSessionStoredEventDataSchemaDefinition = z
     /** The session's own last event time, epoch ms, never more than a day after it was recorded. */
     occurredAt: z.number().int().nonnegative(),
     /** Absent until a log event names it, and on every fact recorded before it was added. */
-    terminalType: z.string().min(1).optional(),
-    /** A hash standing for the session's repo, so peers can count repos without learning any. */
+    terminalType: codingTerminalSchema.optional(),
+    /**
+     * An HMAC under a server secret standing for the session's repo: peers can count repos without
+     * learning any, and nobody reading this can test a guessed name without the secret.
+     */
     repositoryKey: z.string().min(1).optional(),
   })
   .strict();

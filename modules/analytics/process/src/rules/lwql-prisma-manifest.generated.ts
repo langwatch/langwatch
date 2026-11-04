@@ -1871,6 +1871,7 @@ export interface LwqlPrismaRows {
     readonly codingTerminalTypes: "String[]";
     readonly codingRepositoryKeys: "String[]";
     readonly codingFirstDays: "Int[]";
+    readonly lastTraceAt: "DateTime?";
     readonly updatedAt: "DateTime";
   };
   readonly BillingMeterCheckpoint: {

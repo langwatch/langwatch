@@ -2,7 +2,7 @@ Feature: Coding-agent records a session-stored fact
 
   When a coding-agent session row is stored, coding-agent records one fact for
   peers to react to: ids, the product agent, the session's own time, whether
-  it is the project's first, its terminal type and a hash standing for its repo.
+  it is the project's first, its terminal type from a closed set and a keyed hash standing for its repo.
   It never names a consumer and carries no personal field and no repo name.
 
   @unit
@@ -23,6 +23,28 @@ Feature: Coding-agent records a session-stored fact
     Given two spellings of one repo that differ only by case, and a second repo
     Then both spellings have one key and the second repo has another
     And a repo with no owner or no name has no key
+
+  @unit
+  Scenario: A repo with no host named is the same repo as on the deployment's host
+    Given one repo named with no host and with the deployment's host
+    Then both have one key
+
+  @unit
+  Scenario: A guessed repo name cannot be tested without the server's secret
+    Given a repo's key
+    Then a plain hash of the repo's host, owner and name does not match it
+    And another secret gives another key
+
+  @unit
+  Scenario: A deployment with no secret reports no repo key
+    Given a deployment holding no secret to key a repo with
+    Then a stored session names no repo key, never an unkeyed hash
+
+  @unit
+  Scenario: A client's terminal string reaches peers only as one of a closed set
+    Given a session whose terminal.type is any string the client chose
+    Then the sessions-stored hook receives its closed name, or other when it is unknown
+    And the session-stored fact schema rejects any other value
 
   @unit
   Scenario: A stored session's fact carries its terminal type and repo key

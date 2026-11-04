@@ -2342,6 +2342,7 @@ export const prismaModelFieldCatalogue = {
     "codingTerminalTypes",
     "codingRepositoryKeys",
     "codingFirstDays",
+    "lastTraceAt",
     "updatedAt"
   ],
   "BillingMeterCheckpoint": [

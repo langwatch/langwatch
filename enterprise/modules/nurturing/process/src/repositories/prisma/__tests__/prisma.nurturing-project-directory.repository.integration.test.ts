@@ -131,4 +131,18 @@ describe.skipIf(!databaseUrl)("given project's and organization's tables", () =>
       });
     });
   });
+
+  describe("when no project of the organization received a first message, then one did", () => {
+    /** @scenario "A member who joins an organization whose traces predate the stored time gets has_traces alone" */
+    it("answers from the first-message flag", async () => {
+      await expect(repository.hasTracedProject({ organizationId })).resolves.toBe(false);
+
+      await connection.client.project.update({
+        where: { id: archivedProjectId },
+        data: { firstMessage: true },
+      });
+
+      await expect(repository.hasTracedProject({ organizationId })).resolves.toBe(true);
+    });
+  });
 });

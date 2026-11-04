@@ -54,6 +54,13 @@ describe("the coding-agent session-stored fact", () => {
       ).toBe(true);
     });
 
+    /** @scenario "A client's terminal string reaches peers only as one of a closed set" */
+    it("rejects a terminal type outside the closed set", () => {
+      expect(
+        codingAgentSessionStoredEventDataSchema.validate({ ...fact, terminalType: "my-terminal" }),
+      ).toBe(false);
+    });
+
     it("accepts a fact recorded before those two existed", () => {
       expect(codingAgentSessionStoredEventDataSchema.validate(fact)).toBe(true);
     });

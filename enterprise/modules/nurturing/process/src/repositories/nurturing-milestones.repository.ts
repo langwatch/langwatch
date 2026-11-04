@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * How many repo keys an organization's row holds, so its size stays bounded; the count stops here.
+ * Far past what nurturing segments on, and a few tens of KB at most.
+ */
+export const MAX_CODING_REPOSITORY_KEYS = 500;
+
 /** An organization as nurturing knows it from project's created events and its own counts. */
 export type NurturingOrganizationState = Readonly<{
   organizationId: string;
@@ -48,6 +54,14 @@ export interface NurturingMilestonesRepository {
   ): Promise<NurturingOrganizationCounts[]>;
 }
 
+/** The organization's latest trace, the one fact of it a person joining later must be told. */
+export interface NurturingTraceMilestonesRepository {
+  /** Moves the time forward only; a late trace or an organization never learned changes nothing. */
+  recordLastTrace(input: Readonly<{ organizationId: string; occurredAt: number }>): Promise<void>;
+  /** Epoch ms of the latest recorded trace; null when none was recorded. */
+  findLastTraceAt(input: Readonly<{ organizationId: string }>): Promise<number | null>;
+}
+
 /** The coding-agent signals of the same organizations table, written one conditional update each. */
 export interface NurturingCodingMilestonesRepository {
   /** The organization's row; empty when nurturing never learned it. */
@@ -69,7 +83,7 @@ export interface NurturingCodingMilestonesRepository {
   addCodingTerminalType(
     input: Readonly<{ organizationId: string; terminalType: string }>,
   ): Promise<string[]>;
-  /** Adds the repo's key once; answers how many distinct repos the organization holds. */
+  /** Adds the repo's key once, up to the cap; answers how many distinct repos it holds. */
   addCodingRepository(
     input: Readonly<{ organizationId: string; repositoryKey: string }>,
   ): Promise<number>;

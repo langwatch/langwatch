@@ -32,6 +32,9 @@ type CodingDependencies = Readonly<{
   clock: Readonly<{ nowMs(): number }>;
 }>;
 
+/** How many creation times one service holds; at it, it starts over rather than track idleness. */
+const MAX_REMEMBERED_CREATIONS = 10_000;
+
 /** The fact that happened last; the earliest in order wins a tie. */
 function latestOf(facts: readonly Fact[]): Fact {
   return facts.reduce((latest, fact) => (fact.occurredAt > latest.occurredAt ? fact : latest));
@@ -47,6 +50,9 @@ export class NurturingCodingMilestonesService {
   static create(dependencies: CodingDependencies): NurturingCodingMilestonesService {
     return new NurturingCodingMilestonesService(dependencies);
   }
+
+  /** An organization's creation never moves, and every session batch of it needs the time. */
+  private readonly creations = new Map<string, number>();
 
   private constructor(private readonly dependencies: CodingDependencies) {}
 
@@ -196,9 +202,7 @@ export class NurturingCodingMilestonesService {
     organizationId,
     facts,
   }: Readonly<{ organizationId: string; facts: readonly Fact[] }>): Promise<number> {
-    const { organizationCreatedAt } = await this.dependencies.projects.getOrganizationCreatedAt({
-      organizationId,
-    });
+    const organizationCreatedAt = await this.creationOf(organizationId);
     if (organizationCreatedAt === null) return 0;
     let count = 0;
     const offsets = codingSessionDayOffsets({
@@ -213,6 +217,19 @@ export class NurturingCodingMilestonesService {
       });
     }
     return count;
+  }
+
+  /** Null, and asked again next time, when the owners hold no creation time for it. */
+  private async creationOf(organizationId: string): Promise<number | null> {
+    const known = this.creations.get(organizationId);
+    if (known !== undefined) return known;
+    const { organizationCreatedAt } = await this.dependencies.projects.getOrganizationCreatedAt({
+      organizationId,
+    });
+    if (organizationCreatedAt === null) return null;
+    if (this.creations.size >= MAX_REMEMBERED_CREATIONS) this.creations.clear();
+    this.creations.set(organizationId, organizationCreatedAt);
+    return organizationCreatedAt;
   }
 
   /** Null when the owners hold no such project or nurturing never learned its organization. */

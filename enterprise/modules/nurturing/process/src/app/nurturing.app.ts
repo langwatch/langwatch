@@ -17,6 +17,7 @@ import { buildNurturingPipeline, type NurturingPipeline } from "../eventing/nurt
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import { NurturingCodingMilestonesService } from "../services/nurturing-coding-milestones.service.ts";
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
+import { NurturingMemberFactsService } from "../services/nurturing-member-facts.service.ts";
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingService } from "../services/nurturing.service.ts";
 
@@ -58,6 +59,12 @@ export class NurturingModule implements NurturingApi {
       customerIo,
       posthog,
       users: dependencies.users,
+      memberFacts: NurturingMemberFactsService.create({
+        claims: repositories.claims,
+        milestones: repositories.milestones,
+        projects: repositories.projects,
+        organizations: dependencies.organizations,
+      }),
     });
     const milestones = NurturingMilestonesService.create({
       milestones: repositories.milestones,

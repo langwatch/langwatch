@@ -18,6 +18,32 @@ const PERSON_HOUR_KINDS: ReadonlySet<NurturingSignal["kind"]> = new Set([
   "sessions_page_viewed",
 ]);
 
+/**
+ * One organization's window over its members, whichever project raised the fact: without it a busy
+ * organization would send one member batch per project. A first trace shares the traces' window, as
+ * they tell the same traits. A list or a count needs none: its claim is keyed by the value.
+ */
+export function pickOrganizationDebounce({
+  signal,
+  organizationId,
+}: Readonly<{ signal: NurturingSignal; organizationId: string }>): Debounce | null {
+  switch (signal.kind) {
+    case "trace_received":
+    case "first_trace_integrated":
+      return {
+        seconds: TENANT_UPDATE_SECONDS,
+        claimKey: `nurturing:cio-sync-organization:traces:${organizationId}`,
+      };
+    case "coding_session_stored":
+      return {
+        seconds: TENANT_UPDATE_SECONDS,
+        claimKey: `nurturing:cio-sync-organization:coding_session_stored:${organizationId}`,
+      };
+    default:
+      return null;
+  }
+}
+
 /** The window a Customer.io update waits out, or null for a kind that is never debounced. */
 export function pickCustomerIoDebounce(signal: NurturingSignal): Debounce | null {
   if (TENANT_UPDATE_KINDS.has(signal.kind)) {

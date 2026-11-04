@@ -10,22 +10,39 @@ export class MemoryNurturingProjectDirectoryRepository implements NurturingProje
     private readonly placed: ReadonlyMap<string, string>,
     private readonly created: ReadonlyMap<string, number>,
     private readonly organizationsCreated: ReadonlyMap<string, number>,
+    private readonly traced: ReadonlySet<string>,
   ) {}
 
   /**
    * `placed` maps each held project to its organization, `created` to its creation (epoch ms),
-   * `organizationsCreated` each held organization to its own.
+   * `organizationsCreated` each held organization to its own, and `traced` holds the projects
+   * that received their first message.
    */
   static create({
     placed = new Map<string, string>(),
     created = new Map<string, number>(),
     organizationsCreated = new Map<string, number>(),
+    traced = new Set<string>(),
   }: {
     placed?: ReadonlyMap<string, string>;
     created?: ReadonlyMap<string, number>;
     organizationsCreated?: ReadonlyMap<string, number>;
+    traced?: ReadonlySet<string>;
   } = {}): MemoryNurturingProjectDirectoryRepository {
-    return new MemoryNurturingProjectDirectoryRepository(placed, created, organizationsCreated);
+    return new MemoryNurturingProjectDirectoryRepository(
+      placed,
+      created,
+      organizationsCreated,
+      traced,
+    );
+  }
+
+  async hasTracedProject({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<boolean> {
+    return [...this.placed].some(
+      ([projectId, placedIn]) => placedIn === organizationId && this.traced.has(projectId),
+    );
   }
 
   async getPlacement({

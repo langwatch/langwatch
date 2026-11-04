@@ -33,33 +33,16 @@ export function isCodingOrAppSignal(signal: NurturingSignal): signal is CodingOr
 export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
   const { userId } = signal;
   switch (signal.kind) {
+    // Every active member hears these, the admin among them: memberFactTraits.
     case "coding_session_stored":
-      return [
-        {
-          type: "identify",
-          userId,
-          traits: { coding_last_session_at: unixSecondsOf(signal.occurredAt) },
-        },
-      ];
+    case "coding_agent_types":
+    case "coding_terminal_types":
+    case "coding_repo_count":
+    case "coding_session_days_first_3":
+      return [];
     case "coding_active_days":
       return [
         { type: "identify", userId, traits: { coding_active_days: signal.codingActiveDays } },
-      ];
-    case "coding_agent_types":
-      return [{ type: "identify", userId, traits: { coding_agent_types: signal.agentTypes } }];
-    case "coding_terminal_types":
-      return [
-        { type: "identify", userId, traits: { coding_terminal_types: signal.terminalTypes } },
-      ];
-    case "coding_repo_count":
-      return [{ type: "identify", userId, traits: { coding_repo_count: signal.codingRepoCount } }];
-    case "coding_session_days_first_3":
-      return [
-        {
-          type: "identify",
-          userId,
-          traits: { coding_session_days_first_3: signal.codingSessionDaysFirst3 },
-        },
       ];
     case "coding_agent_first_session":
       return [

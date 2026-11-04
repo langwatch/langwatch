@@ -2,8 +2,10 @@ Feature: Coding-agent session signals reach Customer.io
 
   Coding-agent records one session-stored fact per stored session. Nurturing
   reacts to it from its own side and tells Customer.io about the organization's
-  admin: the last session time, the active-day count, the agent types and the
-  first session. Nurturing alone keeps this state, on its own organization row.
+  admin: the active-day count and the first session's event. The last session
+  time, the agent types and the first session's time reach every active member:
+  see organization-member-facts.feature. Nurturing alone keeps this state, on its
+  own organization row.
 
   Background:
     Given nurturing knows organization org-1 with admin admin-1 and project project-1
@@ -118,11 +120,13 @@ Feature: Coding-agent session signals reach Customer.io
 
   @unit
   Scenario: A stored session identifies coding_last_session_at on the admin
+    Given the owners hold no organization for the project
     When a coding_session_stored signal is delivered
     Then Customer.io identifies the admin with coding_last_session_at in Unix seconds
 
   @unit
   Scenario: Session updates to Customer.io are debounced per project for 300 seconds
+    Given the owners hold no organization for the project
     When sessions of one project are delivered inside 300 seconds
     Then Customer.io is identified once
     And after 301 seconds it is identified again with the later time
@@ -171,6 +175,12 @@ Feature: Coding-agent session signals reach Customer.io
     Given a project's session named a repo
     When a session of another project of the organization names the same repo
     Then one repo-count signal has been raised
+
+  @unit
+  Scenario: The repo keys an organization holds stop at the cap
+    Given an organization holding the most repo keys it may
+    When a session names one more repo
+    Then no further key is held and the count stays at the cap
 
   @unit
   Scenario: A session with no terminal type or no repo changes neither value
@@ -282,6 +292,13 @@ Feature: Coding-agent session signals reach Customer.io
   Scenario: The first-three-days count goes to whoever gets the agent types
     When a session-stored fact arrives on day 0
     Then the first-three-days signal names the person the agent-types signal names
+
+  @unit
+  Scenario: An organization's creation is read once while the service holds it
+    Given a batch of sessions read the organization's creation
+    When later batches of the organization arrive
+    Then the creation is not read again
+    And a session past day 2 still raises no first-three-days count
 
   @unit
   Scenario: A first-three-days signal identifies the count without an event

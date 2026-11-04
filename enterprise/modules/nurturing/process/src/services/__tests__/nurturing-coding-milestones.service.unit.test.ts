@@ -58,6 +58,7 @@ async function serviceOver({
     ),
   });
   const firstProjectRead = vi.spyOn(projects, "getFirstProjectCreatedAt");
+  const creationRead = vi.spyOn(projects, "getOrganizationCreatedAt");
   const service = NurturingCodingMilestonesService.create({
     milestones,
     projects,
@@ -84,7 +85,7 @@ async function serviceOver({
     service.sessionsStored({ sessions, deliver });
   const ofKind = (kind: NurturingSignal["kind"]) =>
     delivered.filter((signal) => signal.kind === kind);
-  return { send, delivered, ofKind, firstProjectRead };
+  return { send, delivered, ofKind, firstProjectRead, creationRead };
 }
 
 describe("NurturingCodingMilestonesService", () => {
@@ -633,6 +634,18 @@ describe("NurturingCodingMilestonesService", () => {
       await send([session("s-1", onDay(1))]);
 
       expect(countsOf(ofKind)).toEqual([1]);
+    });
+
+    /** @scenario "An organization's creation is read once while the service holds it" */
+    it("reads the creation once across batches, and still drops what is past day 2", async () => {
+      const { send, ofKind, creationRead } = await serviceOver(onDay2);
+
+      await send([session("s-1", onDay(1))]);
+      await send([session("s-2", onDay(2))]);
+      await send([session("s-3", onDay(3))]);
+
+      expect(creationRead).toHaveBeenCalledTimes(1);
+      expect(countsOf(ofKind)).toEqual([1, 2]);
     });
 
     /** @scenario "The first-three-days count goes to whoever gets the agent types" */

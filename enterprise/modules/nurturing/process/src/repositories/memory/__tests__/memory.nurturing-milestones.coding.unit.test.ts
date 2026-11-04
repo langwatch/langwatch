@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { MAX_CODING_REPOSITORY_KEYS } from "../../nurturing-milestones.repository.ts";
 import { MemoryNurturingMilestonesRepository } from "../memory.nurturing-milestones.repository.ts";
 
 async function learned() {
@@ -168,6 +169,23 @@ describe("MemoryNurturingMilestonesRepository coding signals", () => {
       await repository.addCodingRepository(input);
 
       await expect(repository.addCodingRepository(input)).resolves.toBe(1);
+    });
+  });
+
+  describe("when the organization already holds the most repo keys it may", () => {
+    /** @scenario "The repo keys an organization holds stop at the cap" */
+    it("holds no further key and keeps answering the count", async () => {
+      const repository = await learned();
+      for (let index = 0; index < MAX_CODING_REPOSITORY_KEYS; index++) {
+        await repository.addCodingRepository({
+          organizationId: "org-1",
+          repositoryKey: `repo-${index}`,
+        });
+      }
+
+      await expect(
+        repository.addCodingRepository({ organizationId: "org-1", repositoryKey: "one-too-many" }),
+      ).resolves.toBe(MAX_CODING_REPOSITORY_KEYS);
     });
   });
 

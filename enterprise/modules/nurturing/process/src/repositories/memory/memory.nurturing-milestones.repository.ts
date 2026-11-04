@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type {
-  NurturingCodingMilestonesRepository,
-  NurturingMilestonesRepository,
-  NurturingOrganizationCounts,
-  NurturingOrganizationRow,
+import {
+  MAX_CODING_REPOSITORY_KEYS,
+  type NurturingCodingMilestonesRepository,
+  type NurturingMilestonesRepository,
+  type NurturingOrganizationCounts,
+  type NurturingOrganizationRow,
+  type NurturingTraceMilestonesRepository,
 } from "../nurturing-milestones.repository.ts";
 
 /** A row plus the columns only their own writes read, as the Postgres table holds them. */
@@ -16,12 +18,33 @@ type MemoryOrganization = NurturingOrganizationRow &
 
 /** The Postgres twin's semantics over nurturing's own organizations. */
 export class MemoryNurturingMilestonesRepository
-  implements NurturingMilestonesRepository, NurturingCodingMilestonesRepository
+  implements
+    NurturingMilestonesRepository,
+    NurturingCodingMilestonesRepository,
+    NurturingTraceMilestonesRepository
 {
   readonly #organizations = new Map<string, MemoryOrganization>();
+  readonly #lastTraceAt = new Map<string, number>();
 
   static create(): MemoryNurturingMilestonesRepository {
     return new MemoryNurturingMilestonesRepository();
+  }
+
+  async recordLastTrace({
+    organizationId,
+    occurredAt,
+  }: Readonly<{ organizationId: string; occurredAt: number }>): Promise<void> {
+    if (!this.#organizations.has(organizationId)) return;
+    const known = this.#lastTraceAt.get(organizationId);
+    if (known === undefined || known < occurredAt) {
+      this.#lastTraceAt.set(organizationId, occurredAt);
+    }
+  }
+
+  async findLastTraceAt({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<number | null> {
+    return this.#lastTraceAt.get(organizationId) ?? null;
   }
 
   async recordOrganization({
@@ -132,7 +155,10 @@ export class MemoryNurturingMilestonesRepository
   }: Parameters<NurturingCodingMilestonesRepository["addCodingRepository"]>[0]): Promise<number> {
     const organization = this.#organizations.get(organizationId);
     if (!organization) return 0;
-    if (organization.codingRepositoryKeys.includes(repositoryKey)) {
+    if (
+      organization.codingRepositoryKeys.includes(repositoryKey) ||
+      organization.codingRepositoryKeys.length >= MAX_CODING_REPOSITORY_KEYS
+    ) {
       return organization.codingRepositoryKeys.length;
     }
     const codingRepositoryKeys = [...organization.codingRepositoryKeys, repositoryKey];
