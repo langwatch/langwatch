@@ -114,7 +114,7 @@ export class MigrationError extends Error {
 export const UNVERSIONED_TABLES_CODE = "clickhouse_migrations.unversioned_tables";
 
 /** The bootstrap refusal a database restored without its version history earns, by that code. */
-export class UnversionedTablesError extends MigrationError {
+class UnversionedTablesError extends MigrationError {
   readonly code = UNVERSIONED_TABLES_CODE;
 
   constructor(message: string) {
