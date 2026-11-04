@@ -1,25 +1,26 @@
 /**
- * The class "the caller's access refused" is a `lwql_not_permitted` that names what the caller
- * lacks; nothing else, whatever else it carries.
+ * The class "the caller's access refused": every violation is a gate the caller lacks or a view
+ * their gates hide but a full grant would show. The view lists decide the second, never a code.
  * @see specs/lwql/query-origin.feature
  * @vitest-environment node
  */
 import type { LangWatchQLViolation } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
-import type { RefusedView } from "../langwatch-ql-validation-shape.rules.ts";
+import { MAX_VIOLATIONS, type RefusedView } from "../langwatch-ql-validation-shape.rules.ts";
 import {
-  isCallerAccessRefusal,
+  hiddenViewTables,
   isCallerAccessRejection,
+  isGatedAccessRefusal,
 } from "../lwql-caller-access-refusal.rules.ts";
 
 const gated = { code: "GATED_COLUMN", missingGates: ["cost:view"] };
 
-describe("isCallerAccessRefusal", () => {
+describe("isGatedAccessRefusal", () => {
   /** @scenario "A caller's own access refusal is neither reported nor counted" */
   it("is true for a not-permitted refusal whose violations all name their gates", () => {
     expect(
-      isCallerAccessRefusal({
+      isGatedAccessRefusal({
         error: { code: "lwql_not_permitted", meta: { violations: [gated] } },
       }),
     ).toBe(true);
@@ -36,7 +37,7 @@ describe("isCallerAccessRefusal", () => {
     ["a plain error", new Error("boom")],
     ["nothing", null],
   ])("is false for %s", (_label, error) => {
-    expect(isCallerAccessRefusal({ error })).toBe(false);
+    expect(isGatedAccessRefusal({ error })).toBe(false);
   });
 });
 
@@ -70,5 +71,39 @@ describe("isCallerAccessRejection", () => {
     expect(check([missingView], [refusedMissing])).toBe(false);
     expect(check([boundParameterTable])).toBe(false);
     expect(check([hiddenView, missingView], [refusedHidden, refusedMissing])).toBe(false);
+  });
+
+  /** @scenario "A refusal cut off at the violation cap is reported" */
+  it("is false once the violations reach the cap, and true one below it", () => {
+    const gatedViolations = (count: number) =>
+      Array.from({ length: count }, () =>
+        violation({ code: "GATED_COLUMN", missingGates: ["cost:view"] }),
+      );
+
+    expect(check(gatedViolations(MAX_VIOLATIONS - 1))).toBe(true);
+    expect(check(gatedViolations(MAX_VIOLATIONS))).toBe(false);
+  });
+});
+
+describe("isGatedAccessRefusal at the cap", () => {
+  /** @scenario "A refusal cut off at the violation cap is reported" */
+  it("is false when the error carries as many gated violations as the cap", () => {
+    const violations = Array.from({ length: MAX_VIOLATIONS }, () => gated);
+
+    expect(
+      isGatedAccessRefusal({ error: { code: "lwql_not_permitted", meta: { violations } } }),
+    ).toBe(false);
+  });
+});
+
+describe("hiddenViewTables", () => {
+  /** @scenario "A view no caller could see is reported" */
+  it("holds what a full grant shows and the caller does not, never a view nobody sees", () => {
+    const showable = [{ name: "gateway_request_spend" }, { name: "traces" }];
+    const visible = [{ name: "traces" }];
+
+    expect(hiddenViewTables({ database: "analytics", showable, visible })).toEqual(
+      new Set(["analytics.gateway_request_spend"]),
+    );
   });
 });

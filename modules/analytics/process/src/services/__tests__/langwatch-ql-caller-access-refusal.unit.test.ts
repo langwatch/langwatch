@@ -13,10 +13,11 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { isCallerAccessRefusal } from "../../rules/lwql-caller-access-refusal.rules.ts";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { langWatchQLAccessRefusals } from "../langwatch-ql-access-refusal.service.ts";
 import { LangWatchQLFailureReportService } from "../langwatch-ql-failure-report.service.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
-import { catalogueWithout } from "./lwql-catalogue-access.fixture.ts";
+import { catalogueWithout, EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
 
 const FAILURE_METRIC = "lwql_query_failure_total";
 const GATEWAY_PROBE = "SELECT 1 AS present FROM gateway_request_spend LIMIT 1";
@@ -58,7 +59,7 @@ describe("given a view the catalogue holds but the caller's protections hide", (
     service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
     service.reportFailure({ projectId: "project-1", sql: GATEWAY_PROBE, error });
 
-    expect(isCallerAccessRefusal({ error })).toBe(true);
+    expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error })).toBe(true);
     expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(0);
   });
@@ -85,7 +86,7 @@ describe("given a view the catalogue does not hold", () => {
       "SELECT 1 FROM gateway_request_spend, removed_view LIMIT 1",
     ]) {
       const error = refusalOf(sql);
-      expect(isCallerAccessRefusal({ error })).toBe(false);
+      expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error })).toBe(false);
       service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
     }
 
@@ -103,13 +104,45 @@ describe("given a caller's access refusal wrapped as the cause of another error"
 
     service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error: marked });
     service.reportFailure({ projectId: "project-1", sql: GATEWAY_PROBE, error: marked });
-    expect(isCallerAccessRefusal({ error: marked })).toBe(true);
+    expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error: marked })).toBe(true);
     expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(0);
 
     service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error: wrapped });
     service.reportFailure({ projectId: "project-1", sql: GATEWAY_PROBE, error: wrapped });
-    expect(isCallerAccessRefusal({ error: wrapped })).toBe(false);
+    expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error: wrapped })).toBe(false);
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(2);
+    expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(2);
+  });
+});
+
+// An access nobody can satisfy cannot be declared: every access names at least one permission.
+describe("given a view no caller could see", () => {
+  const gateway = LWQL_VIEW_CATALOG.find((view) => view.name === "gateway_request_spend")!;
+  const service = LangWatchQLService.create({
+    executor: null,
+    database: "analytics",
+    views: [...LWQL_VIEW_CATALOG, { ...gateway, name: "orphan_view" }],
+  });
+  const everyGrant = { catalogue: EVERY_CATALOGUE_PERMISSION };
+
+  /** @scenario "A view no caller could see is reported" */
+  it.each(["orphan_view"])("reports %s on both paths, as no access of the caller's", (view) => {
+    const sql = `SELECT 1 FROM ${view} LIMIT 1`;
+    const error = (() => {
+      try {
+        service.validate({ projectId: "project-1", protections: everyGrant, sql });
+      } catch (caught) {
+        return caught;
+      }
+      throw new Error(`expected "${sql}" to be refused`);
+    })();
+    const { lines, service: report } = reporter();
+
+    report.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
+    report.reportFailure({ projectId: "project-1", sql, error });
+
+    expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error })).toBe(false);
     expect(lines.filter((line) => line.level === 50)).toHaveLength(2);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(2);
   });

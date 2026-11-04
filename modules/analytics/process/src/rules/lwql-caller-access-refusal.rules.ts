@@ -1,36 +1,45 @@
 /**
  * "The caller's access refused": a refusal in which every violation is the caller's own access,
- * either a gated field (the violation names the gates lacked) or a view the full catalogue holds
- * that their protections hide. A view the catalogue lacks, or a bound-parameter table, is not.
+ * a gated field (the violation names the gates lacked) or a view some gate the caller lacks would
+ * show. A view nobody could see, a bound-parameter table, or a refusal at the violation cap is not.
  * @see specs/lwql/query-origin.feature
  */
-import { findLangWatchQLMissingGates } from "@langwatch/analytics-contract";
+import {
+  findLangWatchQLMissingGates,
+  type LangWatchQLProtections,
+} from "@langwatch/analytics-contract";
 
-import type { RejectedLangWatchQL } from "./langwatch-ql-validation-shape.rules.ts";
+import { MAX_VIOLATIONS, type RejectedLangWatchQL } from "./langwatch-ql-validation-shape.rules.ts";
+import { cataloguePermissions, type LwqlCatalogue } from "./lwql-catalogue.rules.ts";
 
-/** Marked in memory so the member's response never carries the verdict. */
-const MARKED = new WeakSet<object>();
-
-/**
- * Marks the error about to be thrown when its rejection is the caller's access. Hidden is
- * decided here, where the full catalogue and the caller's visible views are both known.
- */
-export function markIfCallerAccessRefusal({
-  error,
-  rejection,
-  database,
-  views,
+/** A caller holding every permission and content gate the catalogue names. */
+export function fullGrantProtections({
+  catalog,
 }: {
-  error: object;
-  rejection: RejectedLangWatchQL;
+  catalog: LwqlCatalogue;
+}): LangWatchQLProtections {
+  return {
+    catalogue: { permissions: cataloguePermissions({ catalog }) },
+    canSeeCosts: true,
+    canSeeCapturedInput: true,
+    canSeeCapturedOutput: true,
+  };
+}
+
+/** The qualified, lowercased tables of views a caller's gates hide but a full grant would show. */
+export function hiddenViewTables({
+  database,
+  showable,
+  visible,
+}: {
   database: string;
-  views: { all: readonly { name: string }[]; visible: readonly { name: string }[] };
-}): void {
+  showable: readonly { name: string }[];
+  visible: readonly { name: string }[];
+}): ReadonlySet<string> {
   const qualified = (list: readonly { name: string }[]) =>
     list.map(({ name }) => `${database}.${name}`.toLowerCase());
-  const visible = new Set(qualified(views.visible));
-  const hiddenTables = new Set(qualified(views.all).filter((table) => !visible.has(table)));
-  if (isCallerAccessRejection({ rejection, hiddenTables })) MARKED.add(error);
+  const seen = new Set(qualified(visible));
+  return new Set(qualified(showable).filter((table) => !seen.has(table)));
 }
 
 /** Whether every violation of a rejection is the caller's access: a gate lacked, a hidden view. */
@@ -48,6 +57,7 @@ export function isCallerAccessRejection({
   );
   return (
     rejection.violations.length > 0 &&
+    rejection.violations.length < MAX_VIOLATIONS &&
     rejection.violations.every(
       (violation) =>
         hiddenViewRefusals.has(violation) || findLangWatchQLMissingGates([violation]).length > 0,
@@ -55,8 +65,14 @@ export function isCallerAccessRejection({
   );
 }
 
-export function isCallerAccessRefusal({ error }: { error: unknown }): boolean {
-  if (typeof error === "object" && error !== null && MARKED.has(error)) return true;
+/** Whether a handled error's own violations all name the gates the caller lacks, under the cap. */
+export function isGatedAccessRefusal({ error }: { error: unknown }): boolean {
   const { code, meta } = (error ?? {}) as { code?: unknown; meta?: { violations?: unknown } };
-  return code === "lwql_not_permitted" && findLangWatchQLMissingGates(meta?.violations).length > 0;
+  const violations = meta?.violations;
+  return (
+    code === "lwql_not_permitted" &&
+    Array.isArray(violations) &&
+    violations.length < MAX_VIOLATIONS &&
+    findLangWatchQLMissingGates(violations).length > 0
+  );
 }

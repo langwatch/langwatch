@@ -1,12 +1,12 @@
 import type { Logger } from "@langwatch/observability";
 import type { CounterHandle } from "@langwatch/observability/metrics";
 
-import { isCallerAccessRefusal } from "../rules/lwql-caller-access-refusal.rules.ts";
 import {
   hashStatement,
   originOfStatement,
   type LangWatchQLOrigin,
 } from "../rules/lwql-statement-origin.rules.ts";
+import { langWatchQLAccessRefusals } from "./langwatch-ql-access-refusal.service.ts";
 
 /** One message for every built-in failure, so the log pipeline keys them all to one signature. */
 const BUILT_IN_FAILURE_MESSAGE = "built-in LangWatchQL statement failed";
@@ -73,7 +73,7 @@ export class LangWatchQLFailureReportService {
     sql: string;
     error: unknown;
   }): void {
-    if (isCallerAccessRefusal({ error })) return;
+    if (langWatchQLAccessRefusals.isCallerAccessRefusal({ error })) return;
     const origin = this.originOf({ sql });
     this.failures.inc({ origin }, 1);
     if (origin === "user_written") return;
@@ -94,7 +94,7 @@ export class LangWatchQLFailureReportService {
     source: string;
     error: unknown;
   }): void {
-    if (isCallerAccessRefusal({ error })) return;
+    if (langWatchQLAccessRefusals.isCallerAccessRefusal({ error })) return;
     this.failures.inc({ origin: "built_in" }, 1);
     this.logger.error(
       { origin: "built_in", errorCode: errorCodeOf(error), projectId, source },

@@ -6,8 +6,9 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
 
   A statement is built in when its sha256 hash is on the generated, grow-only list of stock
   statements. The origin is never sent by a caller and never decided by the error code.
-  The one thing the error code does decide is whether a statement failed at all: a refusal of
-  the caller's own access is not a failure of the statement (see its rule below).
+  The one thing that is decided apart from the text is whether a statement failed at all: a
+  refusal of the caller's own access is not a failure of the statement (see its rule below).
+  That is read from the violations and the view lists, never from the error code alone.
 
   Rule: The built-in list is generated from the stock statements and only ever grows
 
@@ -82,7 +83,7 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
   Rule: Only the statement failing is reported; a refused request input is not
 
     A refusal of the caller's own access (every violation names a permission the caller lacks,
-    or a view their protections hide) is about the caller, not the statement text: it is decided
+    or a view a gate they lack would show) is about the caller, not the statement text: it is decided
     from the parsed statement but writes no built-in line and is not counted, on either path.
     A refusal of the request's own projects, or of a reserved parameter name it supplies, is
     not the statement failing: it is refused before the report, writes no built-in line and is
@@ -109,6 +110,19 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
       And the member receives exactly the refusal they received before, with no extra field
       # Every violation must be of that kind. A view the catalogue lacks, or a table chosen by a
       # bound parameter, is refused for anyone: it stays reported, alone or beside a hidden view.
+
+    @unit
+    Scenario: A view no caller could see is reported
+      Given a built-in statement names a view the catalogue has no entry for
+      When the failure reaches either report path
+      Then one built-in failure is reported and counted, because no gate the caller lacks would
+        show that view
+
+    @unit
+    Scenario: A refusal cut off at the violation cap is reported
+      Given a refusal holds as many access violations as the cap
+      When the failure reaches either report path
+      Then one built-in failure is reported and counted, because the list may hide other reasons
 
     @unit
     Scenario: A built-in failure that is not an access refusal is still reported

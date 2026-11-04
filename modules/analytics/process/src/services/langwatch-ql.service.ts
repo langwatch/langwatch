@@ -39,13 +39,13 @@ import {
   langWatchQLMissingParameters,
   type ValidatedLangWatchQL,
 } from "../rules/langwatch-ql-validation-shape.rules.ts";
-import { markIfCallerAccessRefusal } from "../rules/lwql-caller-access-refusal.rules.ts";
 import type { LwqlCatalogue } from "../rules/lwql-catalogue.rules.ts";
 import { LWQL_CATALOG, LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
+import { langWatchQLAccessRefusals } from "./langwatch-ql-access-refusal.service.ts";
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLExecutionService } from "./langwatch-ql-execution.service.ts";
@@ -233,11 +233,6 @@ export class LangWatchQLService {
     readonly sql: string;
     readonly isInstantEvalsEnabled: boolean;
   }) {
-    const visible = catalogShapes.visibleViews({
-      protections,
-      views: this.views,
-      catalog: this.catalog,
-    });
     const validation = this.validation.validate({
       sql,
       // The datasets this caller can reach, not every dataset the catalog has. A dataset gated
@@ -247,7 +242,11 @@ export class LangWatchQLService {
       // permissions that dataset requires.
       allowedTables: catalogShapes.allowedTables({
         database: this.deps.database,
-        views: visible,
+        views: catalogShapes.visibleViews({
+          protections,
+          views: this.views,
+          catalog: this.catalog,
+        }),
       }),
       // Derived from the *full* catalog on purpose: a column of a hidden
       // dataset must stay gated so that naming it unqualified — where no table
@@ -273,11 +272,13 @@ export class LangWatchQLService {
       );
 
       const error = lwqlValidationErrors.forRejection(validation);
-      markIfCallerAccessRefusal({
+      langWatchQLAccessRefusals.markIfCallerAccess({
         error,
         rejection: validation,
         database: this.deps.database,
-        views: { all: this.views, visible },
+        protections,
+        views: this.views,
+        catalog: this.catalog,
       });
       throw error;
     }
