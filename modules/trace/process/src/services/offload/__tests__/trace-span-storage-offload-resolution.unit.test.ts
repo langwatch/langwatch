@@ -45,6 +45,7 @@ import { SpanStorageService } from "../../../features/read/services/trace-span-s
 import type { SpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
 import { NullSpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
 import {
+  eventLogReads,
   blobStoreReading,
   blobStoreResolving,
 } from "../../__tests__/support/trace-blob-store.support.ts";
@@ -227,7 +228,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
       it("returns the span with the output value unchanged", async () => {
         const repo = makeStubRepository([cleanSpan]);
         const blobStore = blobStoreResolving({});
-        const getFromEventLogSpy = blobStore.getFromEventLog;
+        const readFieldsSpy = eventLogReads(blobStore);
         const service = SpanStorageService.create({
           repository: repo,
           blobResolutionDeps: {
@@ -250,7 +251,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
           outputValue?.type === "text" ? outputValue.value : JSON.stringify(outputValue);
         expect(outputStr).toBe("A short non-offloaded output value");
         // Fast-path: TraceBlobStoreService is never called when there are no eventref attrs.
-        expect(getFromEventLogSpy).not.toHaveBeenCalled();
+        expect(readFieldsSpy).not.toHaveBeenCalled();
       });
     });
   });
@@ -391,7 +392,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         });
 
         expect(outputOf(spans[0])).toBe(FULL_OUTPUT);
-        expect(blobStore.getFromEventLog).toHaveBeenCalledWith(
+        expect(eventLogReads(blobStore)).toHaveBeenCalledWith(
           expect.objectContaining({ tenantId: MEMBER }),
         );
       });
@@ -437,7 +438,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         });
 
         expect(outputOf(spans[0])).toBe(PREVIEW_OUTPUT);
-        expect(blobStore.getFromEventLog).not.toHaveBeenCalled();
+        expect(eventLogReads(blobStore)).not.toHaveBeenCalled();
         expect(JSON.stringify(spans[0]?.params ?? {})).not.toContain(EVENTREF_ATTR_PREFIX);
       });
     });

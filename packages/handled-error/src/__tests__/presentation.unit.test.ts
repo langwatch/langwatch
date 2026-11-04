@@ -132,6 +132,24 @@ describe("explainHandledError", () => {
       expect(description).toContain("Remove them");
     });
 
+    /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
+    it("points a supplied sources or projects name at the request field", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_supplied",
+          meta: { parameters: ["dashboard_context_sources", "dashboard_context_projects"] },
+        }),
+      );
+
+      expect(description).toContain("`sources` and `projects` fields");
+    });
+
+    it("does not promise that a reload brings a missing project back", () => {
+      const { description } = explainHandledError(shape({ code: "project_not_found" }));
+
+      expect(description).not.toContain("Reload");
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("still says something useful when the supplied names are absent", () => {
       const { title, description } = explainHandledError(
@@ -1231,5 +1249,39 @@ describe("provider_usage_limit_reached", () => {
     expect(title).toBe("That plan is over its usage limit");
     expect(description).toContain("allowance resets");
     expect(description).not.toContain("copied the whole key");
+  });
+});
+
+describe("budget_exceeded", () => {
+  const budget = (meta: Record<string, unknown>) =>
+    explainHandledError(shape({ code: "budget_exceeded", httpStatus: 402, meta }));
+
+  describe("when the gateway names the scope and the window", () => {
+    it("names whose limit ran out and when it resets", () => {
+      const copy = budget({ budget_scope: "team", budget_window: "month" });
+
+      expect(copy.title).toBe("Your team's monthly AI spending limit is reached");
+      expect(copy.description).toBe(
+        "Requests are blocked until its monthly window resets. An admin can raise it in AI Gateway budgets.",
+      );
+    });
+
+    it("drops the period word for a limit that never resets", () => {
+      const copy = budget({ budget_scope: "virtual_key", budget_window: "total" });
+
+      expect(copy.title).toBe("This key's AI spending limit is reached");
+      expect(copy.description).toContain("never resets");
+    });
+  });
+
+  describe("when the meta names nothing the registry knows", () => {
+    it("keeps the plain headline and never echoes the value", () => {
+      const copy = budget({ budget_scope: "toString", budget_window: "<b>" });
+
+      expect(copy.title).toBe("Your AI spending limit is reached");
+      expect(copy.description).toBe(
+        "Requests are blocked until the limit is raised. An admin can raise it in AI Gateway budgets.",
+      );
+    });
   });
 });

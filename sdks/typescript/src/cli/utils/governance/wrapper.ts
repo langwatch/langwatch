@@ -20,8 +20,13 @@ import type { GovernanceConfig } from "./config";
 import { isLoggedIn, loadConfig, saveConfig } from "./config";
 import { copilotGatewayModelPreflight, copilotPrespawnWarnings } from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
+import { ensurePiTelemetryExtension } from "./pi-plugin";
 import { clearToolProjectPin, pinToolToProject } from "./project-scope";
-import { maybeOfferIngestionShellRcPersist, SHELL_FUNCTION_TOOLS } from "./shell-rc";
+import {
+  assertLaunchHookFile,
+  maybeOfferIngestionShellRcPersist,
+  SHELL_FUNCTION_TOOLS,
+} from "./shell-rc";
 import { envForTool } from "./tool-env";
 import { aliasShellFor, infoRunKind, runInfoRun, toolNotFoundMessage } from "./wrapper-info-run";
 import { resolveWrapperMode } from "./wrapper-mode";
@@ -563,11 +568,15 @@ async function reportIngestionSetup({
       `${lwTag()} wrote [otel] activation block to ${modeResult.codexConfigPath}.\n`,
     );
   }
+  if (tool === "pi") {
+    ensurePiTelemetryExtension({ notify: (line) => process.stderr.write(`${lwTag()} ${line}\n`) });
+  }
 
   // Path B only: offer to persist the OTLP telemetry exports so a future
   // plain `<tool>` (without the langwatch wrapper) captures
   // automatically. Gated on ingestion mode + opt-out remembered. Runs
   // BEFORE spawn so the prompt still owns stdin.
+  assertLaunchHookFile({ tool });
   await maybeOfferIngestionShellRcPersist({
     cfg,
     tool,

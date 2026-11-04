@@ -3,7 +3,7 @@
 **Date:** 2026-08-27
 
 **Status:** Accepted, amended 2026-09-04 (`v1` is not public-REST-only) and 2026-10-26
-(the header is served; a family can be superseded at a later date)
+(the header is served)
 
 **Behavioural contract:**
 [../specs/public-rest.feature](../specs/public-rest.feature)
@@ -65,7 +65,7 @@ the same resolved endpoint pipeline, including auth, capabilities, error
 mapping and response validation. Errors remain centrally derived from thrown
 errors; endpoints do not register error catalogues.
 
-### Amendment 2026-10-26: the header is served, and a family can hand over a path
+### Amendment 2026-10-26: the header is served
 
 The REST host reads `X-API-Version` on a request a dated family's route answers (method and
 path) and answers it again at its dated address, so a header and a dated URL select through
@@ -76,10 +76,9 @@ there, since the SDK's management calls address `latest` while every request nam
 date. The version guards mount ahead of a family's routes, so a date no route names is read as
 the version and never as a `/:id`.
 
-A dated family declared `.withSupersededAt(date)` answers only its own dates up to the day
-before `date`, and leaves `latest` and the bare path to the newer family of its namespace
-registered at `date`. `/api/v1/dashboards` uses it: the Reports boards before 2026-10-26,
-the Dashboards API from then on.
+This amendment also let a dated family hand its path to a newer one by date
+(`.withSupersededAt`). That was removed on 2026-10-27: one path must not serve two products by
+date. `/api/v1/dashboards` is the Dashboards API only; an earlier date there is 404.
 
 ## Consequences
 
