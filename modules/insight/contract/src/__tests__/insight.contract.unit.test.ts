@@ -156,6 +156,8 @@ describe("given a file request with actions", () => {
         "javascript:alert(1)",
         "data:text/html,hello",
         "mailto:someone@evil.com",
+        "vbscript:msgbox(1)",
+        "file:///etc/hosts",
         "//evil.com/x",
         "evil.com/x",
       ]) {
