@@ -451,8 +451,7 @@ describe("NurturingDeliveryService organization facts", () => {
   });
 
   describe("when a read fails before the members are told", () => {
-    /** @scenario "A read that fails before the members are told loses nothing on the retry" */
-    it.each<[string, (organization: Organization) => void]>([
+    const failingReads: [string, (organization: Organization) => void][] = [
       [
         "getPlacement",
         ({ projects }) => vi.spyOn(projects, "getPlacement").mockRejectedValueOnce(down),
@@ -462,23 +461,29 @@ describe("NurturingDeliveryService organization facts", () => {
         ({ milestones }) => vi.spyOn(milestones, "recordLastTrace").mockRejectedValueOnce(down),
       ],
       ["getAllMembers", ({ getAllMembers }) => getAllMembers.mockRejectedValueOnce(down)],
-    ])("sends the fact once on the retry after %s fails", async (_read, failOnce) => {
-      const organization = await organizationWithMembers();
-      const { cio, deliver } = organization;
-      failOnce(organization);
+    ];
 
-      await expect(deliver(firstTrace)).rejects.toThrow(down);
-      await settle();
-      expect(cio.calls).toEqual([]);
+    /** @scenario "A read that fails before the members are told loses nothing on the retry" */
+    it.each(failingReads)(
+      "sends the fact once on the retry after %s fails",
+      async (_read, failOnce) => {
+        const organization = await organizationWithMembers();
+        const { cio, deliver } = organization;
+        failOnce(organization);
 
-      await deliver(firstTrace);
-      await settle();
+        await expect(deliver(firstTrace)).rejects.toThrow(down);
+        await settle();
+        expect(cio.calls).toEqual([]);
 
-      const fact = { has_traces: true, last_trace_at: seconds(T0) };
-      expect(traitsOf(cio.identifies(), "member-2")).toEqual([fact]);
-      expect(traitsOf(cio.identifies(), "admin-1")).toEqual([expect.anything(), fact]);
-      expect(cio.tracks().map(({ event }) => event)).toEqual(["first_trace_integrated"]);
-    });
+        await deliver(firstTrace);
+        await settle();
+
+        const fact = { has_traces: true, last_trace_at: seconds(T0) };
+        expect(traitsOf(cio.identifies(), "member-2")).toEqual([fact]);
+        expect(traitsOf(cio.identifies(), "admin-1")).toEqual([expect.anything(), fact]);
+        expect(cio.tracks().map(({ event }) => event)).toEqual(["first_trace_integrated"]);
+      },
+    );
 
     /** @scenario "A later trace whose member read fails gives back its windows" */
     it("gives back the project's and the organization's windows", async () => {
