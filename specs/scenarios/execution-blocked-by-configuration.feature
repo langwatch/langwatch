@@ -42,6 +42,22 @@ Feature: A simulation blocked by the project's own configuration says so
     And nothing is logged at error level
 
   @unit @scenario-prefetch
+  Scenario: A project whose only models are restricted for a scenario feature gets the run refused, logged as a warning
+    Given a project whose only configured models are restricted for a scenario feature
+    When the run's models are resolved
+    Then the run is refused with the restriction message
+    And the record names the reason "model_not_configured"
+    And the record is logged at warn level
+    And nothing is logged at error level
+
+  @unit @scenario-child
+  Scenario: A child the processor released is logged at info, a child that dies by itself still at error
+    Given a scenario child process the processor has released on purpose
+    When the child closes without an exit code
+    Then the close is logged at info level and not at error level
+    But a child that closes without an exit code and was not released is logged at error level
+
+  @unit @scenario-prefetch
   Scenario: A failure we do not recognise stays ours
     Given a prefetch that fails while preparing the run
     When the run's data is prefetched
