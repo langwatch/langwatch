@@ -295,7 +295,7 @@ export const AI_TOOL_STARTER_TILES: readonly AiToolStarterTile[] = [
     config: {
       assistantKind: "pi",
       setupCommand: "langwatch pi",
-      setupDocsUrl: "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+      setupDocsUrl: "https://docs.langwatch.ai/coding-agents/pi",
       allowVk: false,
       // pi has no flat plan: every call is paid at the model provider.
       bundledPlan: false,

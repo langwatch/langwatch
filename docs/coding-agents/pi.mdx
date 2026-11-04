@@ -1,0 +1,163 @@
+---
+title: pi Monitoring with OpenTelemetry
+sidebarTitle: pi
+description: Monitor the pi coding agent with OpenTelemetry. Send sessions, cost and traces to LangWatch with the LangWatch command-line tool.
+keywords:
+  - pi coding agent monitoring
+  - pi usage tracking
+  - pi telemetry
+  - pi opentelemetry
+  - pi cost
+---
+
+[pi](https://pi.dev) is a terminal coding agent with its own extension system. pi describes every session as a tree of spans but ships no exporter, so on its own it sends no telemetry. The LangWatch command-line tool installs a small pi extension that exports those spans to your workspace, so you can read the cost of each session, the model calls of each turn and every tool call.
+
+There are two ways to set it up:
+
+- `langwatch pi` starts pi and sets up the connection on the first run. Use it on a machine you work on.
+- `langwatch instrument pi` writes the same setup and exits. Use it on a machine where people start pi from a terminal, or when the telemetry must go to a team project.
+
+## Before you start
+
+- Install pi: `npm install -g @earendil-works/pi-coding-agent`
+- Install the LangWatch command-line tool: `npm install -g langwatch`
+- Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
+
+## Run pi through the wrapper
+
+```bash
+langwatch login --device
+langwatch pi
+```
+
+The first run asks no question. pi fixes the address of every model provider in its own build, so its model calls cannot go through the LangWatch AI Gateway: LangWatch receives telemetry only, and pi keeps your own provider keys.
+
+On that run the wrapper writes the telemetry extension to `~/.pi/agent/extensions/langwatch-pi-telemetry.ts` and says so in the terminal. Later runs find it in place and leave it alone. Everything else is unchanged: `langwatch pi` accepts the same flags as `pi` and returns the same exit code.
+
+<Note>
+  If `PI_CODING_AGENT_DIR` is set, the extension goes to the `extensions` folder inside that
+  directory instead, which is where pi looks for it.
+</Note>
+
+## Set up a machine without starting pi
+
+`langwatch instrument pi` writes the connection and exits. A plain `pi` run on that machine then sends its telemetry to LangWatch. This is the setup for a shared machine where people start pi from a terminal, for a machine image, or for a configuration management run.
+
+```bash
+langwatch instrument pi
+```
+
+The command writes two files:
+
+- A `pi` function in your shell start file, which applies the LangWatch settings to `pi` runs and to no other command. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`.
+- The telemetry extension in pi's extension folder, `~/.pi/agent/extensions/`. It reads the endpoint and the key from the function's environment, since pi has no configuration file that holds either.
+
+Open a new terminal after the command, or read the start file again, so the function is in place.
+
+Only a shell that reads the start file has the function. A service, a scheduled job or a script that starts `pi` without it gets no LangWatch settings and sends no telemetry. For those, set the variables from [Manual setup](#manual-setup) in that process's environment.
+
+<Note>
+  The shell function needs zsh, bash or fish. On Windows, start pi with `langwatch pi` each time
+  instead.
+</Note>
+
+### Choose where the telemetry goes
+
+Pass one scope flag, and one only:
+
+| Command                                          | Destination                                                                                                   |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `langwatch instrument pi`                        | Your personal workspace                                                                                       |
+| `langwatch instrument pi --project <id-or-slug>` | A team project. See [Team projects](/coding-agents/team-projects).                                            |
+| `langwatch instrument pi --key <ingest-key>`     | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
+| `langwatch instrument pi --personal`             | Back to your personal workspace                                                                               |
+
+The wrapper accepts the same flags: `langwatch pi --project acme-app` pins the project and then starts pi. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before pi reads it.
+
+### Remove the setup
+
+```bash
+langwatch logout
+```
+
+This deletes every connection the command-line tool wrote, for every tool, the pi extension included.
+
+## What you get in LangWatch
+
+Open your personal page at `/me`, or open the project you pinned pi to.
+
+- **[Sessions](/coding-agents/sessions)**: one row per pi session, with the repository, branch and worktree it ran in.
+- **Traces**: one trace per run, with each model call and each tool call in order.
+- **[Cost](/coding-agents/usage-analytics)**: the amount per session and per turn, from the cost pi reports for each model call.
+
+<Frame caption="pi sessions in the sessions list. Each row shows the repository and branch the session ran in, the context it carried and its cost.">
+  ![pi sessions list](/images/coding-agents/pi-sessions-list.png)
+</Frame>
+
+<Frame caption="One pi run in the trace view. Each turn holds its model calls, with the cost of each, and its tool calls, such as bash, read and edit.">
+  ![pi session trace](/images/coding-agents/pi-session-trace.png)
+</Frame>
+
+Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+## Content and privacy
+
+The extension exports what pi's own span tree describes: model, provider, token counts, cost, timing, and the name and outcome of each tool call. It sends no prompt text, no model response and no tool arguments or results. To control who can open a stored session, see [Privacy](/coding-agents/privacy).
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No telemetry arrives in LangWatch">
+    Open a new terminal. The `pi` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
+
+    Then check that the extension exists at `~/.pi/agent/extensions/langwatch-pi-telemetry.ts`, or in the `extensions` folder inside `PI_CODING_AGENT_DIR` when that is set. Run `langwatch pi` or `langwatch instrument pi` once to write it again.
+
+  </Accordion>
+
+  <Accordion title="The wrapper reports that the extension file is not a LangWatch file">
+    A file of your own named `langwatch-pi-telemetry.ts` already sits in pi's extension folder: `~/.pi/agent/extensions/`, or `extensions` inside `PI_CODING_AGENT_DIR` when that is set. LangWatch never overwrites it, and pi sessions send no telemetry while it is there. Rename or remove your file, then run `langwatch pi` again.
+  </Accordion>
+
+<Accordion title="The command reports that it could not write the shell start file">
+  The shell is not zsh, bash or fish. Start pi with `langwatch pi` each time, which needs no start
+  file.
+</Accordion>
+
+  <Accordion title="The telemetry goes to the wrong workspace">
+    Run `langwatch instrument pi --project <id-or-slug>` to move it to a team project, or `langwatch instrument pi --personal` to move it back to your own.
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
+
+    On a machine with a login, run `langwatch login --device` again to refresh the session.
+
+  </Accordion>
+</AccordionGroup>
+
+For more failure modes see [CLI debug](/ai-governance/cli-debug).
+
+## Manual setup
+
+The extension is required: pi exports no telemetry without it. Run `langwatch instrument pi --key <ingest-key>` once to write it with no login (it writes the shell function too), or `langwatch ingest install pi_cli` on a machine where you are signed in. Then set the variables below before you start pi. They are the ones the shell function sets.
+
+```bash
+export OTEL_TRACES_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=none
+export OTEL_METRICS_EXPORTER=none
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
+export OTEL_RESOURCE_ATTRIBUTES="service.name=pi"
+pi
+```
+
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+
+For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`.
+
+<Warning>
+  A plain `export` applies the key to every program the shell starts, not to pi alone. To keep it
+  to pi, use the shell function `langwatch instrument pi` writes, or put the variables in a
+  function of your own that ends with `command pi "$@"`.
+</Warning>

@@ -709,6 +709,14 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 		if errors.Is(err, httpblock.ErrSSRFBlocked) {
 			return nil, &NodeError{Type: "ssrf_blocked", Message: msg}
 		}
+		// The upstream answered; its reply has nothing at the output path.
+		if errors.Is(err, httpblock.ErrNoMatch) {
+			// The author fixes the path by reading the reply it missed.
+			if ns.HTTP != nil {
+				ns.HTTP.ResponseBody = redactSecrets(string(res.UpstreamBody), secrets)
+			}
+			return nil, &NodeError{Type: "jsonpath_no_match", Message: msg}
+		}
 		return nil, &NodeError{Type: "http_error", Message: msg}
 	}
 	out := make(map[string]any, 1)
