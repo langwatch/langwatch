@@ -61,6 +61,7 @@ export type PersonalContext = {
   fullName: string;
   joinedOn: string;
   organizationName: string;
+  /** Empty until the organisation resolves. */
   organizationId: string;
   routingPolicyName: string | null;
   summary: PersonalSummary;
@@ -103,7 +104,8 @@ export function usePersonalContext(): PersonalContext {
   const userEmail = currentUser?.email ?? "you@example.com";
   const userName = currentUser?.name ?? "You";
   const orgName = organization?.name ?? "Your organization";
-  const orgId = organization?.id ?? "org_unknown";
+  // Empty, never a placeholder id, until the org resolves: callers gate on `!!organizationId`.
+  const orgId = organization?.id ?? "";
 
   const personalContextQuery = api.routingPolicy.personalContext.useQuery(
     { organizationId: orgId },
