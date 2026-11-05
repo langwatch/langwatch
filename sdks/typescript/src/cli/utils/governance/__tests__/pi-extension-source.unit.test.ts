@@ -474,12 +474,58 @@ describe("the extension's message content", () => {
       const reply = "x".repeat(300 * 1024);
       await contentRun({ prompt: "Add a greeting", reply });
 
-      const output = JSON.parse(
-        String(named("pi.harness.run")[0]!.attributes["gen_ai.output.messages"]),
-      ) as { parts: { content: string }[] }[];
+      const raw = String(named("pi.harness.run")[0]!.attributes["gen_ai.output.messages"]);
+      expect(Buffer.byteLength(raw, "utf8")).toBeLessThanOrEqual(256 * 1024);
+      const output = JSON.parse(raw) as { finish_reason: string; parts: { content: string }[] }[];
       const text = output[0]!.parts[0]!.content;
-      expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(256 * 1024);
-      expect(text.endsWith(`…[langwatch: truncated, ${300 * 1024} bytes total]`)).toBe(true);
+      const fullSize = Buffer.byteLength(
+        JSON.stringify([{ role: "assistant", parts: [{ type: "text", content: reply }] }]),
+      );
+      expect(text.startsWith("xxxx")).toBe(true);
+      expect(text).toMatch(/…\[langwatch: truncated, \d+ bytes total\]$/);
+      expect(Number(/truncated, (\d+) bytes/.exec(text)![1])).toBeGreaterThan(fullSize);
+      expect(output[0]!.finish_reason).toBe("stop");
+    });
+
+    /** @scenario "A message whose escaping takes it past the limit is cut too" */
+    it("bounds a prompt that only JSON escaping takes past 256 KiB", async () => {
+      const prompt = '"'.repeat(150 * 1024);
+      await contentRun({ prompt, reply: "Done." });
+
+      const raw = String(named("pi.harness.run")[0]!.attributes["gen_ai.input.messages"]);
+      expect(Buffer.byteLength(raw, "utf8")).toBeLessThanOrEqual(256 * 1024);
+      const input = JSON.parse(raw) as { parts: { content: string }[] }[];
+      expect(input[0]!.parts[0]!.content).toMatch(/^"+…\[langwatch: truncated, \d+ bytes total\]$/);
+    });
+
+    /** @scenario "Oversized tool arguments stay valid JSON and keep the file path" */
+    it("keeps an oversized write call's arguments valid JSON with its path", async () => {
+      const ctx = piContext({ sessionId: "s-1" });
+      const args = { path: "src/big.ts", content: "y".repeat(400 * 1024) };
+      await pi.emit("before_agent_start", { prompt: "Write it" }, ctx);
+      await pi.emit("agent_start", {}, ctx);
+      await pi.emit("turn_start", { turnIndex: 0 }, ctx);
+      const toolCall = { type: "toolCall", id: "call-1", name: "write", arguments: args };
+      await pi.emit(
+        "message_end",
+        { message: assistant({ stopReason: "toolUse", content: [toolCall] }) },
+        ctx,
+      );
+      await pi.emit("tool_execution_start", { toolCallId: "call-1", toolName: "write", args }, ctx);
+      await pi.emit("tool_execution_end", { toolCallId: "call-1", toolName: "write" }, ctx);
+      await pi.emit("turn_end", { turnIndex: 0 }, ctx);
+      await pi.emit("agent_end", { messages: [assistant()] }, ctx);
+
+      const argsRaw = String(named("pi.harness.tool")[0]!.attributes["gen_ai.tool.call.arguments"]);
+      const outputRaw = String(named("pi.ai.request")[0]!.attributes["gen_ai.output.messages"]);
+      for (const raw of [argsRaw, outputRaw]) {
+        expect(Buffer.byteLength(raw, "utf8")).toBeLessThanOrEqual(256 * 1024);
+      }
+      const parsedArgs = JSON.parse(argsRaw) as { path: string; content: string };
+      expect(parsedArgs.path).toBe("src/big.ts");
+      expect(parsedArgs.content).toMatch(/^y+…\[langwatch: truncated, \d+ bytes total\]$/);
+      const output = JSON.parse(outputRaw) as { parts: { arguments: { path: string } }[] }[];
+      expect(output[0]!.parts[0]!.arguments.path).toBe("src/big.ts");
     });
 
     it("writes no input on a run no prompt opened", async () => {
@@ -599,6 +645,7 @@ describe("the extension's session context seam", () => {
 
     /** @scenario "The hook is handed the name the user gave the session in pi" */
     it("hands over pi's own session name as the session title", async () => {
+      process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = "true";
       const langwatch = plantLangwatch();
 
       await pi.emit("agent_start", {}, piContext({ sessionId: "s-1", sessionName: "widget fix" }));
@@ -606,6 +653,15 @@ describe("the extension's session context seam", () => {
       expect(JSON.parse((await langwatch.read()).stdin)).toMatchObject({
         session_title: "widget fix",
       });
+    });
+
+    /** @scenario "Without the content switch the hook is handed no session name" */
+    it("hands over no session title while the content switch is not set", async () => {
+      const langwatch = plantLangwatch();
+
+      await pi.emit("agent_start", {}, piContext({ sessionId: "s-1", sessionName: "widget fix" }));
+
+      expect(JSON.parse((await langwatch.read()).stdin)).not.toHaveProperty("session_title");
     });
   });
 

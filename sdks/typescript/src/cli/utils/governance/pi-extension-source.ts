@@ -323,13 +323,48 @@ const toJson = (value) => {
 // The server keeps 256 KiB of any one value (DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES). Cut here too, so
 // one huge tool result cannot push a run's single POST past the body limit and lose the run.
 const MAX_CONTENT_BYTES = 256 * 1024;
+const truncationMarker = (total) => "…[langwatch: truncated, " + total + " bytes total]";
+const cutTo = (bytes, keep) => new TextDecoder().decode(bytes.subarray(0, Math.max(0, keep)));
 const capped = (value) => {
   if (typeof value !== "string") return value;
   const bytes = utf8(value);
   if (bytes.length <= MAX_CONTENT_BYTES) return value;
-  const marker = "…[langwatch: truncated, " + bytes.length + " bytes total]";
-  const budget = MAX_CONTENT_BYTES - utf8(marker).length;
-  return new TextDecoder().decode(bytes.subarray(0, budget)) + marker;
+  const marker = truncationMarker(bytes.length);
+  return cutTo(bytes, MAX_CONTENT_BYTES - utf8(marker).length) + marker;
+};
+
+// The longest string anywhere in a parsed JSON value, as its holder and key.
+const longestString = (holder, key, best = null) => {
+  const value = holder[key];
+  if (typeof value === "string") {
+    return best === null || value.length > best.holder[best.key].length ? { holder, key } : best;
+  }
+  if (value === null || typeof value !== "object") return best;
+  let found = best;
+  for (const child of Object.keys(value)) found = longestString(value, child, found);
+  return found;
+};
+
+// JSON of a value, kept within the limit as JSON is measured, escaping included. The longest
+// strings are cut first, so the shape survives: a write call still names its path.
+const boundedJson = (value) => {
+  let json = toJson(value);
+  if (json === undefined) return undefined;
+  const total = utf8(json).length;
+  if (total <= MAX_CONTENT_BYTES) return json;
+  const marker = truncationMarker(total);
+  const root = { value: JSON.parse(json) };
+  for (let attempt = 0; attempt < 64; attempt++) {
+    const over = utf8(json).length - MAX_CONTENT_BYTES;
+    if (over <= 0) return json;
+    const leaf = longestString(root, "value");
+    if (leaf === null) return undefined;
+    const current = leaf.holder[leaf.key];
+    const bytes = utf8(current.endsWith(marker) ? current.slice(0, -marker.length) : current);
+    leaf.holder[leaf.key] = cutTo(bytes, bytes.length - over - utf8(marker).length) + marker;
+    json = JSON.stringify(root.value);
+  }
+  return utf8(json).length <= MAX_CONTENT_BYTES ? json : undefined;
 };
 
 // GenAI semantic-convention message parts: text, and a requested tool call.
@@ -337,7 +372,7 @@ const assistantParts = (message, withToolCalls) => {
   const content = Array.isArray(message?.content) ? message.content : [];
   return content.flatMap((part) => {
     if (part?.type === "text" && typeof part.text === "string" && part.text !== "") {
-      return [{ type: "text", content: capped(part.text) }];
+      return [{ type: "text", content: part.text }];
     }
     if (withToolCalls && part?.type === "toolCall") {
       return [{ type: "tool_call", id: part.id, name: part.name, arguments: part.arguments }];
@@ -350,14 +385,14 @@ const outputMessages = (message, withToolCalls) => {
   const parts = assistantParts(message, withToolCalls);
   if (parts.length === 0) return undefined;
   const finishReason = STOP_REASONS[message?.stopReason];
-  return toJson([
+  return boundedJson([
     { role: "assistant", parts, ...(finishReason ? { finish_reason: finishReason } : {}) },
   ]);
 };
 
 const inputMessages = (prompt) =>
   typeof prompt === "string" && prompt !== ""
-    ? toJson([{ role: "user", parts: [{ type: "text", content: capped(prompt) }] }])
+    ? boundedJson([{ role: "user", parts: [{ type: "text", content: prompt }] }])
     : undefined;
 
 // What the model read back from the tool: its text parts, as pi returned them.
@@ -461,7 +496,8 @@ export default async (pi) => {
     sessionId = id;
     operationId = nextOperationId("run");
     run = { spanId: spanId(), startNano: nowNano(), prompt };
-    runHook(cwdFrom(ctx), "SessionStart", sessionNameFrom(ctx));
+    // The name is the user's own words: it leaves the machine only with content.
+    runHook(cwdFrom(ctx), "SessionStart", captureContent() ? sessionNameFrom(ctx) : undefined);
   });
 
   pi.on("turn_start", (event) => {
@@ -528,7 +564,7 @@ export default async (pi) => {
         "pi.tool.replay": TOOL_REPLAY,
         "pi.tool.recovery": TOOL_RECOVERY,
         "pi.tool.is_error": isError,
-        "gen_ai.tool.call.arguments": content ? capped(toJson(pending.args)) : undefined,
+        "gen_ai.tool.call.arguments": content ? boundedJson(pending.args) : undefined,
         "gen_ai.tool.call.result": content ? toolResultText(event?.result) : undefined,
       },
     });

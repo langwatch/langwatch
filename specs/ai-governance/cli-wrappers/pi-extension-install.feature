@@ -267,9 +267,19 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
 
     @unit
     Scenario: The hook is handed the name the user gave the session in pi
-      Given a pi agent start in a session the user named with /name
+      Given the content switch is on
+      And a pi agent start in a session the user named with /name
       When the extension runs the hook command
       Then the payload carries that name as the session title
+
+    # The name is the user's own words, so it leaves the machine only with content.
+
+    @unit
+    Scenario: Without the content switch the hook is handed no session name
+      Given the content switch is not set
+      And a pi agent start in a session the user named with /name
+      When the extension runs the hook command
+      Then the payload carries no session title
 
     @unit
     Scenario: The name the user gave a pi session rides the context record
@@ -323,13 +333,28 @@ Feature: `langwatch ingest install pi_cli` writes a first-party extension that s
       Then its span carries the call's arguments and the text the tool returned
 
     # A run posts as one batch, so one huge value could push it past the body
-    # limit and lose the whole run. The server keeps 256 KiB of any one value.
+    # limit and lose the whole run. The server keeps 256 KiB of any one value,
+    # so each value is bounded as written, JSON escaping included.
 
     @unit
     Scenario: A message too large for the server is cut as the server cuts it
       Given the content switch is on
       When a run's reply is larger than 256 KiB
-      Then the span carries its first 256 KiB, marked with the reply's full size
+      Then the span's output messages stay within 256 KiB as valid JSON
+      And the reply is cut, marked with the full size
+
+    @unit
+    Scenario: A message whose escaping takes it past the limit is cut too
+      Given the content switch is on
+      When a run's prompt is under 256 KiB as text but over it as JSON
+      Then the span's input messages stay within 256 KiB as valid JSON
+
+    @unit
+    Scenario: Oversized tool arguments stay valid JSON and keep the file path
+      Given the content switch is on
+      When a write call's arguments are larger than 256 KiB
+      Then the tool span's arguments and the call's output messages stay within 256 KiB
+      And both are valid JSON that still name the file path
 
   Rule: The resource names pi's version
 
