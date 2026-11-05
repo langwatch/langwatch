@@ -297,6 +297,16 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     projectId: id,
   }),
   z.object({
+    /** A session from a personal project: its owner's own profile, never the organization's. */
+    kind: z.literal("own_coding_session_stored"),
+    ...signalSource,
+    /** The personal project's owner. `occurredAt` is the batch's latest session. */
+    userId: id,
+    projectId: id,
+    /** The batch's earliest session, epoch ms: own_coding_first_session_at if none is set yet. */
+    firstOccurredAt: z.number().int().nonnegative(),
+  }),
+  z.object({
     kind: z.literal("coding_active_days"),
     ...signalSource,
     /** The organization's admin. */

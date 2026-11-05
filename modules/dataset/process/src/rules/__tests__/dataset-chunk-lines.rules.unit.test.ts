@@ -126,11 +126,11 @@ describe("mapPreviousColumnsToNewColumns", () => {
   describe("when a column keeps its name", () => {
     it("carries its values across unchanged", () => {
       expect(
-        mapPreviousColumnsToNewColumns(
-          [{ input: "a", output: "b" }],
-          [column("input"), column("output")],
-          [column("input"), column("output")],
-        ),
+        mapPreviousColumnsToNewColumns({
+          records: [{ input: "a", output: "b" }],
+          previousColumns: [column("input"), column("output")],
+          newColumns: [column("input"), column("output")],
+        }),
       ).toEqual([{ input: "a", output: "b" }]);
     });
   });
@@ -138,23 +138,79 @@ describe("mapPreviousColumnsToNewColumns", () => {
   describe("when a column was renamed", () => {
     it("moves its values onto the new name by position among the unmatched columns", () => {
       expect(
-        mapPreviousColumnsToNewColumns(
-          [{ input: "a", old: "b" }],
-          [column("input"), column("old")],
-          [column("input"), column("renamed")],
-        ),
+        mapPreviousColumnsToNewColumns({
+          records: [{ input: "a", old: "b" }],
+          previousColumns: [column("input"), column("old")],
+          newColumns: [column("input"), column("renamed")],
+        }),
       ).toEqual([{ input: "a", renamed: "b" }]);
+    });
+  });
+
+  describe("when one column is deleted and another renamed in the same save", () => {
+    const previous = [column("first"), column("second")];
+    const next = [column("renamed")];
+    const rows = [{ id: "record-1", first: "deleted value", second: "kept value" }];
+
+    /** @scenario "A save that deletes one column and renames another keeps the renamed column's values" */
+    it("pairs by position without renames, moving the deleted column's values", () => {
+      expect(
+        mapPreviousColumnsToNewColumns({
+          records: rows,
+          previousColumns: previous,
+          newColumns: next,
+        }),
+      ).toEqual([{ id: "record-1", renamed: "deleted value" }]);
+    });
+
+    /** @scenario "A save that deletes one column and renames another keeps the renamed column's values" */
+    it("follows the renames the save names, and drops the deleted column", () => {
+      expect(
+        mapPreviousColumnsToNewColumns({
+          records: rows,
+          previousColumns: previous,
+          newColumns: next,
+          renames: [{ from: "second", to: "renamed" }],
+        }),
+      ).toEqual([{ id: "record-1", renamed: "kept value" }]);
+    });
+
+    /** @scenario "A save that deletes one column and renames another keeps the renamed column's values" */
+    it("does not hand a deleted column's values to a renamed column that took its name", () => {
+      expect(
+        mapPreviousColumnsToNewColumns({
+          records: rows,
+          previousColumns: previous,
+          newColumns: [column("first")],
+          renames: [{ from: "second", to: "first" }],
+        }),
+      ).toEqual([{ id: "record-1", first: "kept value" }]);
+    });
+
+    /** @scenario "A save that deletes one column and renames another keeps the renamed column's values" */
+    it("swaps two columns' names without swapping their values", () => {
+      expect(
+        mapPreviousColumnsToNewColumns({
+          records: rows,
+          previousColumns: previous,
+          newColumns: [column("second"), column("first")],
+          renames: [
+            { from: "first", to: "second" },
+            { from: "second", to: "first" },
+          ],
+        }),
+      ).toEqual([{ id: "record-1", second: "deleted value", first: "kept value" }]);
     });
   });
 
   describe("when a column was dropped", () => {
     it("leaves its values out of the remapped row", () => {
       expect(
-        mapPreviousColumnsToNewColumns(
-          [{ id: "record-1", input: "a", gone: "b" }],
-          [column("input"), column("gone")],
-          [column("input")],
-        ),
+        mapPreviousColumnsToNewColumns({
+          records: [{ id: "record-1", input: "a", gone: "b" }],
+          previousColumns: [column("input"), column("gone")],
+          newColumns: [column("input")],
+        }),
       ).toEqual([{ id: "record-1", input: "a" }]);
     });
   });

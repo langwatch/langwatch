@@ -41,6 +41,16 @@ export class PrismaNurturingProjectDirectoryRepository implements NurturingProje
       : { outcome: "unknown" };
   }
 
+  async findPersonalOwnerUserIds({
+    projectId,
+  }: Readonly<{ projectId: string }>): Promise<string[]> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { isPersonal: true, ownerUserId: true },
+    });
+    return project?.isPersonal && project.ownerUserId ? [project.ownerUserId] : [];
+  }
+
   async getFirstProjectCreatedAt({
     organizationId,
   }: Readonly<{ organizationId: string }>): Promise<{ firstProjectCreatedAt: number | null }> {

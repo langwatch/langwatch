@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
+import type { NurturingSignal, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 
 export type Debounce = Readonly<{ seconds: number; claimKey: string }>;
 
@@ -48,8 +48,25 @@ export function pickOrganizationDebounce({
   }
 }
 
+/** own_coding_first_session_at: first recorded across orgs, set once; claimed on the person. */
+export function ownCodingFirstSessionClaim(
+  signal: NurturingSignalOf<"own_coding_session_stored">,
+): Debounce {
+  return {
+    seconds: PERSON_ONCE_SECONDS,
+    claimKey: `nurturing:own_coding_first_session:${signal.userId}`,
+  };
+}
+
 /** The window a Customer.io update waits out, or null for a kind that is never debounced. */
 export function pickCustomerIoDebounce(signal: NurturingSignal): Debounce | null {
+  if (signal.kind === "own_coding_session_stored") {
+    // Keyed by the person, so their sessions from every organization share one window.
+    return {
+      seconds: TENANT_UPDATE_SECONDS,
+      claimKey: `nurturing:cio-sync-person:own_coding_session_stored:${signal.userId}`,
+    };
+  }
   if (TENANT_UPDATE_KINDS.has(signal.kind)) {
     // Main's key, unchanged for the kinds that existed before.
     return {

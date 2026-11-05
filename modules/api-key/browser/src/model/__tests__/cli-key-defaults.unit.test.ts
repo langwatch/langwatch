@@ -7,7 +7,7 @@ import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { builtinRolePermissions } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
-import { getUserPermissionsAcrossScopes } from "../api-key-permissions.ts";
+import { teamRolePermissions } from "../api-key-permissions.ts";
 import { defaultCliKeyScopes } from "../cli-key-scope-defaults.ts";
 
 const ORG = "org-1";
@@ -83,14 +83,8 @@ describe("given a member of two shared teams", () => {
 });
 
 describe("given the ceiling the default permission list is narrowed to", () => {
-  const ceiling = (role: string) =>
-    getUserPermissionsAcrossScopes({
-      myBindings: [{ scopeType: "TEAM", scopeId: "team-1", role }],
-      scopes: [{ scopeType: "TEAM", scopeId: "team-1" }],
-      organizationId: ORG,
-      orgProjects: [{ id: "proj-1", teamId: "team-1" }],
-      isServiceKey: false,
-    });
+  // A team binding at its own team: the role's bag, as the mint's resolver reads it.
+  const ceiling = (role: string) => teamRolePermissions(role);
 
   const held = (role: string) => {
     const bag = new Set(ceiling(role));

@@ -85,6 +85,7 @@ function service(overrides: { columnTypes?: DatasetColumns } = {}) {
   );
 
   const database = MemoryDatasetDatabase.create();
+  database.putDataset({ ...row, sourceStoredObjectId: null });
   const repository = Object.assign(MemoryDatasetRepository.create({ database }), {
     findById: async ({ id }: { id: string; projectId: string }) => (id === row.id ? row : null),
     findBySlug: async ({ slug }: { slug: string; projectId: string }) =>

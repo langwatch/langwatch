@@ -711,3 +711,78 @@ describe("NurturingDeliveryService PostHog for the new kinds", () => {
     });
   });
 });
+
+describe("NurturingDeliveryService own coding sessions", () => {
+  const ownSession = ({
+    projectId,
+    occurredAt,
+  }: {
+    projectId: string;
+    occurredAt: number;
+  }): NurturingSignalOf<"own_coding_session_stored"> => ({
+    kind: "own_coding_session_stored",
+    sourceEventId: `owner-1:${projectId}:${occurredAt}`,
+    tenantId: projectId,
+    userId: "owner-1",
+    projectId,
+    occurredAt,
+    firstOccurredAt: occurredAt,
+  });
+  const traitsOf = (cio: ReturnType<typeof customerIo>, trait: string) =>
+    cio
+      .identifies()
+      .map((call) => call.traits as Record<string, unknown>)
+      .filter((traits) => trait in traits);
+
+  describe("when a second organization's session follows the person's first", () => {
+    /** @scenario "A person's own first session is set once across organizations" */
+    it("keeps own_coding_first_session_at and moves own_coding_last_session_at", async () => {
+      const claims = new ClockedClaims();
+      const { delivery, cio } = deliveryOver(claims);
+
+      await deliver(delivery, ownSession({ projectId: "project-1", occurredAt: T0 }));
+      claims.now += 301_000;
+      await deliver(delivery, ownSession({ projectId: "project-9", occurredAt: T0 + 301_000 }));
+      await settle();
+
+      expect(traitsOf(cio, "own_coding_first_session_at")).toEqual([
+        { own_coding_first_session_at: unixSeconds(T0) },
+      ]);
+      expect(traitsOf(cio, "own_coding_last_session_at")).toEqual([
+        { own_coding_last_session_at: unixSeconds(T0) },
+        { own_coding_last_session_at: unixSeconds(T0 + 301_000) },
+      ]);
+      expect(cio.identifies().map((call) => call.userId)).toEqual([
+        "owner-1",
+        "owner-1",
+        "owner-1",
+      ]);
+    });
+  });
+
+  describe("when the person's sessions arrive inside 300 seconds", () => {
+    /** @scenario "Own session updates are debounced per person for 300 seconds" */
+    it("identifies the person once, whichever project the sessions came from", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, ownSession({ projectId: "project-1", occurredAt: T0 }));
+      await deliver(delivery, ownSession({ projectId: "project-9", occurredAt: T0 + 1_000 }));
+      await settle();
+
+      expect(traitsOf(cio, "own_coding_last_session_at")).toHaveLength(1);
+    });
+  });
+
+  describe("when an own coding session is delivered", () => {
+    /** @scenario "Own coding traits reach Customer.io only, with no event" */
+    it("sends PostHog nothing and tracks no Customer.io event", async () => {
+      const { delivery, cio, posthog } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, ownSession({ projectId: "project-1", occurredAt: T0 }));
+      await settle();
+
+      expect(posthog.tracked).toEqual([]);
+      expect(cio.tracks()).toEqual([]);
+    });
+  });
+});

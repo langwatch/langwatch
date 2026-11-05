@@ -39,12 +39,14 @@ async function serviceOver({
   failFirstDeliveryOf,
   organizationCreatedAt,
   now = DAY,
+  personalOwners = new Map<string, string>(),
 }: {
   adminUserId?: string | null;
   seeded?: boolean;
   failFirstDeliveryOf?: NurturingSignal["kind"];
   organizationCreatedAt?: number;
   now?: number;
+  personalOwners?: ReadonlyMap<string, string>;
 } = {}) {
   const milestones = MemoryNurturingMilestonesRepository.create();
   await milestones.recordOrganization({ organizationId: "org-1", adminUserId, seeded });
@@ -56,6 +58,7 @@ async function serviceOver({
     organizationsCreated: new Map(
       organizationCreatedAt === undefined ? [] : [["org-1", organizationCreatedAt]],
     ),
+    personalOwners,
   });
   const firstProjectRead = vi.spyOn(projects, "getFirstProjectCreatedAt");
   const creationRead = vi.spyOn(projects, "getOrganizationCreatedAt");
@@ -83,8 +86,8 @@ async function serviceOver({
   };
   const send = (sessions: CodingAgentSessionStoredEventData[]) =>
     service.sessionsStored({ sessions, deliver });
-  const ofKind = (kind: NurturingSignal["kind"]) =>
-    delivered.filter((signal) => signal.kind === kind);
+  const ofKind = <Kind extends NurturingSignal["kind"]>(kind: Kind) =>
+    delivered.filter((signal): signal is NurturingSignalOf<Kind> => signal.kind === kind);
   return { send, delivered, ofKind, firstProjectRead, creationRead };
 }
 
@@ -689,6 +692,66 @@ describe("NurturingCodingMilestonesService", () => {
       await send([fact({ tenantId: "project-x", projectId: "project-x" })]);
 
       expect(delivered).toEqual([]);
+    });
+  });
+  describe("when a personal project stores a session", () => {
+    /** @scenario "A personal project's session tells only its owner own_coding_last_session_at" */
+    it("raises the own-session signal for its owner alone of two members", async () => {
+      const { send, ofKind } = await serviceOver({
+        personalOwners: new Map([["project-1", "member-2"]]),
+      });
+
+      await send([
+        fact({ firstForProject: false, occurredAt: DAY + HOUR }),
+        fact({ sessionId: "session-0", firstForProject: false }),
+      ]);
+
+      expect(ofKind("own_coding_session_stored")).toMatchObject([
+        {
+          userId: "member-2",
+          projectId: "project-1",
+          occurredAt: DAY + HOUR,
+          firstOccurredAt: DAY,
+        },
+      ]);
+    });
+
+    /** @scenario "A session in another member's personal project sets only that member's own traits" */
+    it("names that project's owner, not the owner of another personal project", async () => {
+      const { send, ofKind } = await serviceOver({
+        personalOwners: new Map([
+          ["project-1", "admin-1"],
+          ["project-2", "member-2"],
+        ]),
+      });
+
+      await send([fact({ tenantId: "project-2", projectId: "project-2" })]);
+
+      expect(ofKind("own_coding_session_stored").map((signal) => signal.userId)).toEqual([
+        "member-2",
+      ]);
+    });
+
+    /** @scenario "A deactivated owner gets no own coding trait" */
+    it("raises nothing for an owner who is not an active member", async () => {
+      const { send, ofKind } = await serviceOver({
+        personalOwners: new Map([["project-1", "gone-3"]]),
+      });
+
+      await send([fact()]);
+
+      expect(ofKind("own_coding_session_stored")).toEqual([]);
+    });
+  });
+
+  describe("when a shared project stores a session", () => {
+    /** @scenario "A shared project's session sets no own coding trait" */
+    it("raises no own-session signal", async () => {
+      const { send, ofKind } = await serviceOver();
+
+      await send([fact()]);
+
+      expect(ofKind("own_coding_session_stored")).toEqual([]);
     });
   });
 });
