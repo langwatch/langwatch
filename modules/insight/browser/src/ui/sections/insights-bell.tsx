@@ -22,7 +22,7 @@ export function InsightsBell(_props: InsightsBellProps) {
   const host = useInsightHost();
   const reading = useInsightInbox();
   const [open, setOpen] = useState(false);
-  if (!reading.available || !reading.project) return null;
+  if (reading.unavailable !== undefined || !reading.project) return null;
   const inboxHref = `/${reading.project.slug}/insights`;
   const unseen = reading.inbox?.unseen ?? [];
   // The bell counts only unseen insights; seen ones still wait in the inbox.

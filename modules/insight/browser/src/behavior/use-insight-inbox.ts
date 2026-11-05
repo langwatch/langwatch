@@ -13,8 +13,6 @@ import { insightApi } from "./insight-api.ts";
 import { useInsightsUnavailable } from "./use-insights-shown.ts";
 
 export type InsightInboxReading = Readonly<{
-  /** The one `useInsightsShown` rule: false means draw nothing and read nothing. */
-  available: boolean;
   /** Why nothing is available: the page names an aggregate project; "off" is left to the route. */
   unavailable: "aggregate" | "off" | undefined;
   project: InsightHostProject | undefined;
@@ -44,13 +42,15 @@ export function useInsightInbox(): InsightInboxReading {
   }, [available, query.data]);
 
   return {
-    available,
     unavailable,
     project,
     inbox: derived.inbox,
     now: derived.now,
     isLoading: available && query.isLoading,
-    error: query.error,
-    retry: () => void query.refetch(),
+    error: available ? query.error : null,
+    // refetch ignores `enabled`, so a closed rule must not read through it.
+    retry: () => {
+      if (available) void query.refetch();
+    },
   };
 }

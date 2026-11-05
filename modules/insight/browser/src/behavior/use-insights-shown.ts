@@ -21,6 +21,7 @@ export function useInsightsUnavailable(): "aggregate" | "off" | undefined {
   return shown ? undefined : "off";
 }
 
+/** Equals `useInsightsUnavailable() === undefined`. */
 export function useInsightsShown(): boolean {
   return useInsightsUnavailable() === undefined;
 }

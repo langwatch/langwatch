@@ -460,6 +460,13 @@ Feature: The insights inbox
       When they look at any product's side menu
       Then it holds no Insights entry
 
+    @integration
+    Scenario: The top bar holds no insights bell while a release flag has not answered yet
+      Given a member with analytics:view
+      And a release flag has not answered yet
+      When they look at the top bar
+      Then it holds no insights bell, and nothing is read
+
     # The bell and the entry share one rule, so they never disagree on an aggregate.
     @integration
     Scenario: An aggregate project's top bar holds no insights bell

@@ -9,6 +9,7 @@ import type { UiProcedureAnswer, UiProcedureCall } from "@langwatch/browser/test
 import { nowInstant } from "@langwatch/time";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useReducer } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -44,12 +45,15 @@ describe("given a project with no insights", () => {
   describe("when a member opens Insights", () => {
     /** @scenario "A project with no insights shows how to get the first one" */
     it("says Langy writes the brief here from a board's daily run, for them alone, and opens Dashboards", async () => {
+      const answer = vi.fn(project({ entries: [] }).answer);
       const { host } = renderWithInsightHost({
         element: <InsightsScreen />,
-        answer: project({ entries: [] }).answer,
+        answer,
       });
 
       expect(await screen.findByText("Langy writes your brief here")).toBeInTheDocument();
+      await flushReads();
+      expect(answer).toHaveBeenCalled();
       expect(screen.getByText(/Daily insights/)).toBeInTheDocument();
       expect(screen.getByText(/It is yours alone; copy one to share it\./)).toBeInTheDocument();
 
@@ -57,6 +61,49 @@ describe("given a project with no insights", () => {
 
       expect(host.navigations).toEqual(["/acme/dashboards"]);
       expect(host.langyAsks).toEqual([]);
+    });
+  });
+});
+
+describe("given a rejected inbox read", () => {
+  describe("when the rule turns false afterwards", () => {
+    /** @scenario "Insights shows nothing while release_dashboards is off" */
+    it("shows no error or Retry and reads no more", async () => {
+      class FlippableHost extends StubInsightHost {
+        on = true;
+        override isEnabled() {
+          return this.on;
+        }
+      }
+      const host = new FlippableHost();
+      const read = vi.fn<UiProcedureAnswer>(() => Promise.reject(new Error("down")));
+      function Switch() {
+        const [, redraw] = useReducer((count: number) => count + 1, 0);
+        return (
+          <>
+            <InsightsScreen />
+            <button
+              type="button"
+              onClick={() => {
+                host.on = false;
+                redraw();
+              }}
+            >
+              Turn flag off
+            </button>
+          </>
+        );
+      }
+      renderWithInsightHost({ element: <Switch />, host, answer: read });
+      expect(await screen.findByRole("button", { name: "Retry" })).toBeInTheDocument();
+      const reads = read.mock.calls.length;
+
+      await userEvent.click(screen.getByRole("button", { name: "Turn flag off" }));
+      await flushReads();
+
+      expect(screen.queryByText("The inbox didn't load.")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+      expect(read).toHaveBeenCalledTimes(reads);
     });
   });
 });

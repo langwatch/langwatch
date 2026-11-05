@@ -112,8 +112,8 @@ describe("given 2 unseen insights in the inbox", () => {
   });
 
   describe("when a release flag has not answered yet", () => {
-    /** @scenario "The side menu shows no Insights entry while the flag is off" */
-    it("shows no bell and reads nothing, as the side menu shows no entry", async () => {
+    /** @scenario "The top bar holds no insights bell while a release flag has not answered yet" */
+    it("shows no bell and reads nothing", async () => {
       const read = vi.fn<UiProcedureAnswer>(() => Promise.resolve(UNSEEN.slice(0, 2)));
       const { host } = renderWithInsightHost({
         element: <InsightsBell />,
