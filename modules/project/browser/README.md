@@ -1,6 +1,6 @@
 # @langwatch/project-browser
 
-The browser half of [project](../README.md). What a browser installs when it installs project: the home a member lands on, and the project settings page. 
+The browser half of [project](../README.md). What a browser installs when it installs project: the home a member lands on, and the project settings page.
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
