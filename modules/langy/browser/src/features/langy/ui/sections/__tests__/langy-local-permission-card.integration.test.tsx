@@ -33,7 +33,7 @@ const workspaceCache = {
 const workspaceInvalidate = vi.fn();
 
 type PolicyHooks = {
-  onMutate?: (input: { skipPermissions: boolean }) => Promise<unknown> | unknown;
+  onMutate?: (input: { skipPermissions: boolean }) => unknown;
   onSuccess?: (data: unknown, input: unknown, context: unknown) => void;
   onError?: (error: unknown, input: unknown, context: unknown) => void;
   onSettled?: () => void;
