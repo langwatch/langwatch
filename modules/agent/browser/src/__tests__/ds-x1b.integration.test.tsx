@@ -44,6 +44,18 @@ function Harness({ showVariablesTab = false }: { showVariablesTab?: boolean }) {
       renderScenarioMappings={() => null}
       renderVariables={() => <p>variables editor</p>}
       explainTestError={() => ({ title: "Request failed" })}
+      hooks={{
+        hooksUrl: "",
+        onHooksUrlChange: () => void 0,
+        hooks: { setup: true, teardown: true },
+        onHooksChange: () => void 0,
+        newSigningSecret: null,
+        hasStoredSigningSecret: false,
+        onRotateSigningSecret: () => void 0,
+        moveNotice: null,
+        previousSigningSecretValidUntil: null,
+        hooksUrlError: null,
+      }}
     />
   );
 }

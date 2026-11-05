@@ -71,3 +71,8 @@ f483fe302e7c3dfb100e1d6fa9c99b6d9a049c20:specs/server/feature-configuration.feat
 # fixture now uses a low-entropy marker, so only this pull request's history
 # still carries the literal.
 1a9993210beeb0dbe75b66591570721e16d484b1:modules/evaluation/process/src/rules/__tests__/monitor-error-rate.rules.unit.test.ts:generic-api-key:18
+# The HTTP agent hooks move test used a realistic `whsec_` signing secret
+# beside a `hooksSigningSecret:` key. It was never a credential; the fixture now
+# uses a low-entropy marker, so only this pull request's history still carries
+# the literal.
+0cf992b12977c3628a0ff69250fbfe39ee3a8c36:modules/agent/process/src/services/__tests__/agent-http-hooks-move.integration.test.ts:generic-api-key:33

@@ -45,6 +45,12 @@ export const previousSigningSecretSchema: PreviousSigningSecretSchema =
 export type PreviousSigningSecret = z.infer<typeof previousSigningSecretSchema>;
 
 /**
+ * How long a replaced hooks signing secret keeps signing: 24 hours (ADR-188). A unit test in
+ * agent/process pins it to `WEBHOOK_PREVIOUS_SECRET_TTL_MS`, as this package cannot import it.
+ */
+export const HOOKS_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
  * Whether a replaced signing secret still signs at `now`. Open only strictly before `expiresAt`;
  * an expiry that cannot be parsed counts as closed.
  */

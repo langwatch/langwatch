@@ -457,7 +457,7 @@ Feature: Scenario run hooks: setup and teardown
       Given a setup that answers an object holding a secret value of the agent
       Then the state it records holds the placeholder in place of the value
 
-    @unit
+    @integration
     Scenario: A new hooks URL on another origin is refused when the form sends the stored references back
       Given a saved HTTP agent whose authentication and signing secret are "{{ secrets.NAME }}" references
       When an update moves the hooks URL to another origin and sends one of those references back
@@ -560,9 +560,61 @@ Feature: Scenario run hooks: setup and teardown
       Then the config still holds the same reference
       And no new project secret is created
 
-    @unimplemented
+    @integration
     Scenario: The agent form shows a new signing secret once and can rotate it
       Given an HTTP agent form with no hooks URL
       When the person types a hooks URL
       Then the form shows a new signing secret to copy before saving
       And after the agent is saved, the form shows only that a secret is set, with a Rotate button
+      And Rotate saves a new secret in place of the stored reference
+      And clearing the hooks URL again drops the unsaved secret
+      And Rotate is disabled while the hooks URL is empty
+      And once the drawer is closed and opened again, the secret is hidden
+
+    @integration
+    Scenario: The agent form explains a hooks URL on another origin than the stored credentials
+      Given a saved HTTP agent with a stored auth token and signing secret
+      When the person changes the hooks URL to another origin
+      Then the Hooks tab says to type the auth token again on the Auth tab
+      And it says the stored signing secret stops working when the agent is saved, as a move keeps no old secret
+      And the form makes a new signing secret by itself
+      And back on the saved origin, the stored signing secret stands again
+      And a refused save names the Auth tab and says to type the stored value again
+
+    @integration
+    Scenario: Clearing the hooks URL in the agent form removes the signing secret
+      Given a saved HTTP agent with a hooks URL and a stored signing secret
+      When the person clears the hooks URL
+      Then the Hooks tab says saving deletes the signing secret
+      And the save sends no signing secret
+
+    @integration
+    Scenario: The agent form says the old signing secret stays valid for 24 hours after a rotation
+      Given a saved HTTP agent with a hooks URL and a stored signing secret
+      When the person rotates the signing secret
+      Then the Hooks tab says the old secret stays valid for 24 hours after saving, so the receiver can switch
+      And once saved, the Hooks tab says until when the previous secret stays valid
+      And the save never sends the previous signing secret back
+
+    @integration
+    Scenario: The agent form states the hooks URL https rule
+      Given an HTTP agent form on the Hooks tab
+      Then it says the hooks URL needs https
+      And that plain http reaches only a local address, on deployments that allow local addresses, checked when the hook runs
+
+    @integration
+    Scenario: The agent form says templates are allowed only in the path or query
+      Given an HTTP agent form on the Hooks tab
+      Then it says a template is allowed only in the path or the query of the hooks URL
+
+    @integration
+    Scenario: The agent form warns at the hooks URL field about a template in its scheme or host
+      Given an HTTP agent form on the Hooks tab
+      When the person types a hooks URL with a template before its path
+      Then the hooks URL field says the scheme and host must be fixed, before any save
+
+    @integration
+    Scenario: The agent form shows a refused hooks URL template at the hooks URL field
+      Given an HTTP agent form on the Hooks tab
+      When the save is refused for a template in the hooks URL origin
+      Then the refusal is shown at the hooks URL field

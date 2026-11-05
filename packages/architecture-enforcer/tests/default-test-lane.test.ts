@@ -82,6 +82,246 @@ describe("default test lanes", () => {
     });
   });
 
+  describe("when the default lane collects a file that starts a container", () => {
+    /** @scenario "A shared test lane that starts a container is reported" */
+    it.each([
+      [
+        "a testcontainers class",
+        'import { RedisContainer } from "@testcontainers/redis";\nawait new RedisContainer("redis").start();',
+      ],
+      [
+        "the ClickHouse endpoint starter",
+        'import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";\nawait startTestClickHouseEndpoints({ suite: "s", names: ["a"], environment: {} });',
+      ],
+      [
+        "a helper module that calls the starter",
+        'import { startStore } from "./support/store.harness.ts";\nawait startStore();',
+      ],
+      [
+        "a namespace import of the helper module",
+        'import * as store from "./support/store.harness.ts";\nawait store.startStore();',
+      ],
+      [
+        "a renamed `export { x } from` re-export",
+        'import { boot } from "./support/named-barrel.ts";\nawait boot();',
+      ],
+      [
+        "an `export * from` re-export",
+        'import { startStore } from "./support/star-barrel.ts";\nawait startStore();',
+      ],
+      [
+        "a namespace import of the ClickHouse endpoint starter",
+        'import * as ch from "@langwatch/clickhouse-client/testing";\nawait ch.startTestClickHouseEndpoints({ suite: "s", names: ["a"], environment: {} });',
+      ],
+      [
+        "a namespace import of testcontainers",
+        'import * as tc from "testcontainers";\nawait new tc.GenericContainer("redis").start();',
+      ],
+      [
+        "a namespace import of a scoped testcontainers module",
+        'import * as tc from "@testcontainers/redis";\nawait new tc.RedisContainer("redis").start();',
+      ],
+    ])("reports the file when it starts one through %s", (_name, test) => {
+      workspace({
+        "tools/probe/package.json": manifest("vitest run"),
+        "tools/probe/src/support/store.harness.ts": [
+          'import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";',
+          "export const startStore = () => startTestClickHouseEndpoints({ suite: 's', names: [], environment: {} });",
+        ].join("\n"),
+        "tools/probe/src/support/named-barrel.ts":
+          'export { startStore as boot } from "./store.harness.ts";',
+        "tools/probe/src/support/star-barrel.ts": 'export * from "./store.harness.ts";',
+        "tools/probe/src/store.integration.test.ts": test,
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("src/store.integration.test.ts"),
+      ]);
+    });
+  });
+
+  describe("when test and test:unit split the lanes", () => {
+    const starter =
+      'import { RedisContainer } from "@testcontainers/redis";\nawait new RedisContainer("redis").start();';
+    const clean =
+      'vitest run --exclude "**/*.integration.test.ts" --exclude "**/*.scenario.test.ts"';
+
+    /** @scenario "A split test and test:unit are each checked for what they run" */
+    it("reports a scenario suite in test while test:unit stays clean", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "vitest run", "test:unit": clean },
+        }),
+        "tools/probe/_tests/live.scenario.test.ts": "",
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("_tests/live.scenario.test.ts"),
+      ]);
+    });
+
+    /** @scenario "A split test and test:unit are each checked for what they run" */
+    it("reports a test:unit lane that collects a container starter, naming test:unit", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: {
+            test: 'vitest run --exclude "**/*.integration.test.ts"',
+            "test:unit": "vitest run",
+          },
+        }),
+        "tools/probe/src/store.integration.test.ts": starter,
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("`test:unit` lane collects src/store.integration.test.ts"),
+      ]);
+    });
+
+    /** @scenario "A split test and test:unit are each checked for what they run" */
+    it("falls back to test when test:unit is empty", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "vitest run", "test:unit": "" },
+        }),
+        "tools/probe/src/store.integration.test.ts": starter,
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("`test` lane collects src/store.integration.test.ts"),
+      ]);
+    });
+
+    /** @scenario "A test:unit lane that collects a scenario suite is reported" */
+    it("reports a scenario suite that test:unit collects while test stays clean", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: clean, "test:unit": "vitest run" },
+        }),
+        "tools/probe/_tests/live.scenario.test.ts": "",
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("`test:unit` lane collects _tests/live.scenario.test.ts"),
+      ]);
+    });
+
+    /** @scenario "A test:unit lane that collects a scenario suite is reported" */
+    it("reports a timeout that test:unit sets above two minutes", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "vitest run", "test:unit": "vitest run --config vitest.unit.config.ts" },
+        }),
+        "tools/probe/vitest.unit.config.ts": "export default { test: { testTimeout: 3_600_000 } };",
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("`test:unit` lane waits 3600000"),
+      ]);
+    });
+
+    /** @scenario "A test:unit lane that collects a scenario suite is reported" */
+    it("reports a scenario suite once when test and test:unit run the same lane", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "vitest run", "test:unit": "vitest run" },
+        }),
+        "tools/probe/_tests/live.scenario.test.ts": "",
+      });
+
+      expect(lint()).toHaveLength(1);
+    });
+
+    /** @scenario "A script that only hands off to another is read as that script" */
+    it("reads a test script that hands off to a vitest test:unit as test:unit", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "pnpm run test:unit", "test:unit": "vitest run" },
+        }),
+        "tools/probe/_tests/live.scenario.test.ts": "",
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("`test:unit` lane collects _tests/live.scenario.test.ts"),
+      ]);
+    });
+
+    /** @scenario "A script that only hands off to another is read as that script" */
+    it("checks the test lane for containers when test:unit hands off to it", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "vitest run", "test:unit": "pnpm test" },
+        }),
+        "tools/probe/src/store.integration.test.ts": starter,
+      });
+
+      expect(lint().map((violation) => violation.message)).toEqual([
+        expect.stringContaining("`test` lane collects src/store.integration.test.ts"),
+      ]);
+    });
+
+    /** @scenario "A CI lane that is not vitest is not checked for containers" */
+    it("reports no container when test:unit runs another runner, even if test is vitest", () => {
+      workspace({
+        "tools/probe/package.json": JSON.stringify({
+          name: "@langwatch/probe",
+          scripts: { test: "vitest run", "test:unit": "node --test" },
+        }),
+        "tools/probe/src/store.integration.test.ts": starter,
+      });
+
+      expect(lint()).toEqual([]);
+    });
+  });
+
+  describe("when no file in the default lane starts a container", () => {
+    /** @scenario "A shared test lane that leaves its container suites to test:integration passes" */
+    it.each([
+      [
+        "the starters live only in files the lane excludes",
+        'vitest run --exclude "**/*.integration.test.ts"',
+        'import { startStore } from "./support/store.harness.ts";\nawait startStore();',
+      ],
+      [
+        "a file imports a constant from a module that also starts containers",
+        "vitest run",
+        'import { STORE_IMAGE } from "./support/store.harness.ts";\nexport const image = STORE_IMAGE;',
+      ],
+    ])("passes when %s", (_name, test, source) => {
+      workspace({
+        "tools/probe/package.json": manifest(test),
+        "tools/probe/src/support/store.harness.ts": [
+          'import { RedisContainer } from "@testcontainers/redis";',
+          'export const STORE_IMAGE = "redis:alpine";',
+          "export async function startStore() {",
+          "  return new RedisContainer(STORE_IMAGE).start();",
+          "}",
+        ].join("\n"),
+        "tools/probe/src/store.integration.test.ts": source,
+      });
+
+      expect(lint()).toEqual([]);
+    });
+
+    it("passes when the package-suites job leaves the package to a job of its own", () => {
+      workspace({
+        ".github/package-suites.excluded": "# header\n@langwatch/probe  # runs in its own job\n",
+        "tools/probe/package.json": manifest("vitest run"),
+        "tools/probe/src/store.integration.test.ts":
+          'import { RedisContainer } from "@testcontainers/redis";\nawait new RedisContainer("redis").start();',
+      });
+
+      expect(lint()).toEqual([]);
+    });
+  });
+
   describe("when the default lane waits longer than two minutes per test", () => {
     /** @scenario "A default test lane with a timeout above two minutes is reported" */
     it("reports the evaluated timeout", () => {
