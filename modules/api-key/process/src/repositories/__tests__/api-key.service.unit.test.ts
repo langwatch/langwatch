@@ -182,9 +182,9 @@ class MemoryApiKeys extends ApiKeyRepository {
     organizationId: string;
     lookupId: string;
     hashedSecret: string;
-  }): Promise<ApiKeyRow | null> {
+  }): Promise<ApiKeyRow> {
     const row = await this.findByIdInOrganization(input);
-    if (!row || row.revokedAt) return null;
+    if (!row || row.revokedAt) throw new Error("not live");
     return this.update({
       id: input.id,
       lookupId: input.lookupId,

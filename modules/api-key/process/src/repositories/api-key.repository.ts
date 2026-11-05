@@ -67,14 +67,14 @@ export abstract class ApiKeyRepository {
   }): Promise<ApiKeyRow>;
   /**
    * Swaps a live key's secret for a new lookup id and hash, fenced on `revokedAt` like
-   * `revoke`. Null when no live key of that id is in the organization.
+   * `revoke`. Throws `ApiKeyAlreadyRevokedError` when no live key of that id is in the org.
    */
   abstract rotateSecret(input: {
     id: string;
     organizationId: string;
     lookupId: string;
     hashedSecret: string;
-  }): Promise<ApiKeyRow | null>;
+  }): Promise<ApiKeyRow>;
   abstract updateLastUsedAt(input: { id: string }): Promise<void>;
   abstract upgradeHash(input: { id: string; hashedSecret: string }): Promise<void>;
   /** The newest live ingest key of this source among keys the caller named. */

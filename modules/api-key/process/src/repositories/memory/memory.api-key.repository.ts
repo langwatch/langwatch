@@ -1,4 +1,5 @@
 import {
+  ApiKeyAlreadyRevokedError,
   CLI_LOGIN_KEY_NAME_PREFIX,
   isSystemApiKey,
   type ApiKeyRevocationCause,
@@ -120,11 +121,11 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     organizationId: string;
     lookupId: string;
     hashedSecret: string;
-  }): Promise<ApiKeyRow | null> {
+  }): Promise<ApiKeyRow> {
     const live = await this.#find(
       (key) => key.id === input.id && key.organizationId === input.organizationId && !key.revokedAt,
     );
-    if (!live) return null;
+    if (!live) throw new ApiKeyAlreadyRevokedError(input.id);
     return this.update({
       id: input.id,
       hashedSecret: input.hashedSecret,

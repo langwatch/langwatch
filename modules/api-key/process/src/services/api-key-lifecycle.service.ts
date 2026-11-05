@@ -1,6 +1,5 @@
 import {
   ApiKeyAlreadyRevokedError,
-  ApiKeyExpiredError,
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
   ApiKeyReservedNameError,
@@ -11,7 +10,6 @@ import {
   type ApiKeyScope,
   type CreateApiKeyInput,
   type RevokeApiKeyInput,
-  type RotateApiKeyInput,
   type UpdateApiKeyInput,
   API_KEY_PREFIX,
   INGEST_KEY_PREFIX,
@@ -20,7 +18,6 @@ import {
 } from "@langwatch/api-key-contract";
 import type { AuthzGrantCaller } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { z } from "zod";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
@@ -327,52 +324,6 @@ export class ApiKeyLifecycleService {
     }
 
     return this.retire({ existing, input });
-  }
-
-  /**
-   * A new secret for the same key: a new lookup id and hash on the same row, so its id, settings,
-   * grants and usage stay. The old lookup id's shared answer becomes a refusal, as on revoke.
-   */
-  async rotate(input: RotateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
-    const existing = await this.getInOrganization(input.id, input.organizationId);
-    if (isSystemApiKey(existing)) {
-      throw new ApiKeyNotFoundError(input.id);
-    }
-
-    if (
-      !input.callerIsAdmin &&
-      (existing.userId === null || existing.userId !== input.callerUserId)
-    ) {
-      throw new ApiKeyNotOwnedError(input.id);
-    }
-
-    if (existing.revokedAt) {
-      throw new ApiKeyAlreadyRevokedError(input.id);
-    }
-
-    if (existing.expiresAt && toEpochMs(existing.expiresAt) <= nowInstant().epochMilliseconds) {
-      throw new ApiKeyExpiredError(input.id);
-    }
-
-    const generated = this.options.tokens.generate({
-      prefix: existing.ingestSourceType ? INGEST_KEY_PREFIX : API_KEY_PREFIX,
-    });
-    const rotated = await this.repository.rotateSecret({
-      id: input.id,
-      organizationId: input.organizationId,
-      lookupId: generated.lookupId,
-      hashedSecret: generated.hashedSecret,
-    });
-    if (!rotated) {
-      throw new ApiKeyAlreadyRevokedError(input.id);
-    }
-
-    await this.answers.forget({ lookupId: existing.lookupId, revoked: true });
-
-    return {
-      token: generated.token,
-      apiKey: publicApiKey({ ...rotated, grants: existing.grants }),
-    };
   }
 
   /**
