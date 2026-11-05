@@ -29,12 +29,15 @@ function prompt(atMs: number, text: string | null): TranscriptEntry {
   return { kind: "user_prompt", atMs, text, chars: text?.length ?? 0 };
 }
 
+const TRACE_ID = "52a4e6ca13a6add98e17294539567017";
+
 describe("promptLineText", () => {
   describe("given a trace named after its own root span", () => {
     /** @scenario "The prompt line never shows a span name as if the user had typed it" */
     it("shows the session's first prompt instead of the span name", () => {
       expect(
         promptLineText({
+          traceId: TRACE_ID,
           sessionName: "pi.harness.run",
           spans: [rootSpan("pi.harness.run")],
           entries: [prompt(1, null), prompt(2, "fix the flaky test"), prompt(3, "and lint it")],
@@ -45,6 +48,7 @@ describe("promptLineText", () => {
     it("shows nothing rather than the span name when no prompt carries text", () => {
       expect(
         promptLineText({
+          traceId: TRACE_ID,
           sessionName: "pi.harness.run",
           spans: [rootSpan("pi.harness.run")],
           entries: [modelCall(1, 10, 0), prompt(2, "   ")],
@@ -53,10 +57,25 @@ describe("promptLineText", () => {
     });
   });
 
+  describe("given a logs-only trace named after its own id", () => {
+    /** @scenario "The prompt line never shows a trace id as if the user had typed it" */
+    it("shows the session's first prompt instead of the id", () => {
+      expect(
+        promptLineText({
+          traceId: TRACE_ID,
+          sessionName: TRACE_ID.slice(0, 8),
+          spans: [],
+          entries: [prompt(1, "Reply with just hi")],
+        }),
+      ).toBe("Reply with just hi");
+    });
+  });
+
   describe("given a trace with a name of its own", () => {
     it("keeps the name", () => {
       expect(
         promptLineText({
+          traceId: TRACE_ID,
           sessionName: "Fix the flaky CI job",
           spans: [rootSpan("claude_code.interaction")],
           entries: [prompt(1, "something else")],

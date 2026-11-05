@@ -3,20 +3,23 @@ import type { SpanDetail } from "@langwatch/trace-contract";
 
 /**
  * What the bottom bar's prompt line reads. A trace with no name of its own is named after one
- * of its spans, which the user never typed, so the session's first prompt stands in for it;
- * null when there is none, never the span name.
+ * of its spans, or after its own id on a logs-only trace. The user typed neither, so the
+ * session's first prompt stands in; null when there is none, never the stand-in.
  */
 export function promptLineText({
   sessionName,
+  traceId,
   spans,
   entries,
 }: {
   sessionName: string | null | undefined;
+  traceId: string;
   spans: SpanDetail[];
   entries: TranscriptEntry[];
 }): string | null {
   const name = sessionName?.trim() ?? "";
-  if (name.length > 0 && !spans.some((span) => span.name === name)) return name;
+  const isStandIn = spans.some((span) => span.name === name) || traceId.startsWith(name);
+  if (name.length > 0 && !isStandIn) return name;
 
   for (const entry of entries) {
     if (entry.kind !== "user_prompt" || entry.text === null) continue;

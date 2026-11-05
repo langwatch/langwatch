@@ -144,6 +144,14 @@ Feature: Coding agent terminal view
     Then the bottom bar's prompt line shows the session's first prompt
     And when the session has no prompt text it shows the untitled placeholder, not the span name
 
+  # A logs-only trace (Grok) has no span to name it, so it is named after its own id.
+
+  @unit
+  Scenario: The prompt line never shows a trace id as if the user had typed it
+    Given a logs-only session whose trace is named after its own id
+    When the Terminal tab renders the session
+    Then the bottom bar's prompt line shows the session's first prompt
+
   # The system prompt is the context the user pays for on every call - CLAUDE.md,
   # MCP tool definitions, skills. It rides the first request body of the session.
 

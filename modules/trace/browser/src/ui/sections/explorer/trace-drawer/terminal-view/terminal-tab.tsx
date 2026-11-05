@@ -11,6 +11,7 @@ import {
   useResourceInfoRead,
   useSpansFullRead,
   useTraceEventsRead,
+  useTraceLogsRead,
 } from "../../../../../behavior/reads/use-trace-detail-reads.ts";
 import { TERMINAL_TOKENS } from "../../../../../model/coding-agent/trace/terminal-palette.ts";
 import { deriveSessionBanner } from "../../../../../model/coding-agent/trace/terminal-session-banner.ts";
@@ -59,6 +60,11 @@ export function TerminalTab({
   // off the resource attributes (the session fold deliberately carries no
   // identity strings, ADR-041).
   const resourceQuery = useResourceInfoRead(turn);
+  // A logs-only agent (Grok, ADR-192) names itself only on its log records.
+  const logsQuery = useTraceLogsRead({
+    ...turn,
+    enabled: spansQuery.isSuccess && spansQuery.data.length === 0,
+  });
   const sessionCostUsd = useSessionCostUsd({ projectId, traceId });
 
   const toolSpans = useMemo(
@@ -75,8 +81,9 @@ export function TerminalTab({
       deriveSessionBanner({
         resourceAttributes: resourceQuery.data?.resourceAttributes ?? {},
         spans: spansQuery.data ?? [],
+        logs: logsQuery.data ?? [],
       }),
-    [resourceQuery.data, spansQuery.data],
+    [resourceQuery.data, spansQuery.data, logsQuery.data],
   );
 
   const session = useSessionScrollback({
@@ -98,8 +105,14 @@ export function TerminalTab({
   );
 
   const promptLine = useMemo(
-    () => promptLineText({ sessionName, spans: spansQuery.data ?? [], entries: session.entries }),
-    [sessionName, spansQuery.data, session.entries],
+    () =>
+      promptLineText({
+        sessionName,
+        traceId,
+        spans: spansQuery.data ?? [],
+        entries: session.entries,
+      }),
+    [sessionName, traceId, spansQuery.data, session.entries],
   );
 
   // The loading state has to look like a terminal too — see TerminalSkeleton.
