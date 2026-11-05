@@ -450,7 +450,9 @@ Feature: The CLI decides what Langy may run on the developer's machine
     Scenario: Skipping records my consent and stops the cards
       Given a permission card
       When I choose to skip all permission checks for this session
-      Then the choice is recorded in the conversation
+      Then the switch shows my choice from the first click and keeps it
+      And a refused choice puts the switch back and says why
+      And the choice is recorded in the conversation
       And the terminal reads that permission checks are off for this session
       And later commands run without a card
 

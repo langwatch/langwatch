@@ -5,14 +5,39 @@
  * reaches the right mutation and a settled card never re-offers the buttons.
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const answerPermission = vi.fn();
 const setLocalPolicy = vi.fn();
 /** What the answer mutation does, so one test can make the server refuse it. */
 const answerOutcome: { refusal: unknown } = { refusal: null };
+/** What the policy mutation does: a refusal, or a reply held until the test lets it go. */
+const policyOutcome: { refusal: unknown; held: Promise<void> | null } = {
+  refusal: null,
+  held: null,
+};
+
+type WorkspaceRead = { skipPermissions: boolean };
+/** The cached `getLocalWorkspace` read, the one source the panel feeds the switch from. */
+const workspaceCache = {
+  value: undefined as WorkspaceRead | undefined,
+  listeners: new Set<() => void>(),
+  write(next: WorkspaceRead | undefined) {
+    workspaceCache.value = next;
+    for (const listener of workspaceCache.listeners) listener();
+  },
+};
+const workspaceInvalidate = vi.fn();
+
+type PolicyHooks = {
+  onMutate?: (input: { skipPermissions: boolean }) => Promise<unknown> | unknown;
+  onSuccess?: (data: unknown, input: unknown, context: unknown) => void;
+  onError?: (error: unknown, input: unknown, context: unknown) => void;
+  onSettled?: () => void;
+};
 
 vi.mock("../../../../../behavior/langy-api.ts", () => ({
   api: {
@@ -31,9 +56,32 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
         }),
       },
       setLocalPolicy: {
-        useMutation: () => ({ mutate: setLocalPolicy, isPending: false }),
+        useMutation: (hooks: PolicyHooks = {}) => ({
+          mutate: async (input: { skipPermissions: boolean }) => {
+            setLocalPolicy(input);
+            const context = await hooks.onMutate?.(input);
+            await policyOutcome.held;
+            if (policyOutcome.refusal) hooks.onError?.(policyOutcome.refusal, input, context);
+            else hooks.onSuccess?.(input, input, context);
+            hooks.onSettled?.();
+          },
+          isPending: false,
+        }),
       },
     },
+    useUtils: () => ({
+      langy: {
+        getLocalWorkspace: {
+          cancel: async () => undefined,
+          getData: () => workspaceCache.value,
+          setData: (
+            _input: unknown,
+            next: WorkspaceRead | ((old: WorkspaceRead | undefined) => WorkspaceRead | undefined),
+          ) => workspaceCache.write(typeof next === "function" ? next(workspaceCache.value) : next),
+          invalidate: workspaceInvalidate,
+        },
+      },
+    }),
   },
 }));
 
@@ -49,6 +97,10 @@ beforeEach(() => {
   answerPermission.mockClear();
   setLocalPolicy.mockClear();
   answerOutcome.refusal = null;
+  policyOutcome.refusal = null;
+  policyOutcome.held = null;
+  workspaceCache.write({ skipPermissions: false });
+  workspaceInvalidate.mockClear();
   useLangyLocalControlStore.setState({ waits: {} });
 });
 
@@ -143,6 +195,63 @@ describe("given the conversation runs on a model allowed to skip", () => {
       conversationId: "c_1",
       skipPermissions: true,
     });
+  });
+});
+
+/** The card fed from the cached workspace read, as the panel's waiting cards feed it. */
+function CardOnCachedWorkspace() {
+  const workspace = useSyncExternalStore(
+    (listener) => {
+      workspaceCache.listeners.add(listener);
+      return () => workspaceCache.listeners.delete(listener);
+    },
+    () => workspaceCache.value,
+  );
+  return (
+    <DesignSystemProvider forcedTheme="light">
+      <LangyLocalPermissionCard
+        projectId="p_1"
+        conversationId="c_1"
+        card={PENDING}
+        skipAllowed
+        skipPermissions={workspace?.skipPermissions ?? false}
+      />
+    </DesignSystemProvider>
+  );
+}
+
+describe("when I turn the skip switch on while a command waits", () => {
+  const switchState = () =>
+    screen.getByTestId("langy-skip-permissions-switch").getAttribute("data-state");
+
+  /** @scenario "Skipping records my consent and stops the cards" */
+  it("shows on from the one click, and stays on once the choice is recorded", async () => {
+    let release = () => {};
+    policyOutcome.held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    render(<CardOnCachedWorkspace />);
+    expect(switchState()).toBe("unchecked");
+
+    await userEvent.click(screen.getByTestId("langy-skip-permissions-switch"));
+    await waitFor(() => expect(switchState()).toBe("checked"));
+
+    release();
+    await waitFor(() => expect(workspaceInvalidate).toHaveBeenCalled());
+    expect(switchState()).toBe("checked");
+    expect(setLocalPolicy).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "Skipping records my consent and stops the cards" */
+  it("puts the switch back and says why when the platform refuses the choice", async () => {
+    policyOutcome.refusal = new Error("the provider no longer allows this model");
+    render(<CardOnCachedWorkspace />);
+
+    await userEvent.click(screen.getByTestId("langy-skip-permissions-switch"));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeDefined());
+    expect(switchState()).toBe("unchecked");
+    expect(workspaceCache.value?.skipPermissions).toBe(false);
   });
 });
 
