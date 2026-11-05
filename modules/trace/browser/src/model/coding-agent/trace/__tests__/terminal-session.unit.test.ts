@@ -82,6 +82,17 @@ describe("promptLineText", () => {
         }),
       ).toBe("Fix the flaky CI job");
     });
+
+    it("keeps a name shorter than an abbreviated id that the id happens to start with", () => {
+      expect(
+        promptLineText({
+          traceId: TRACE_ID,
+          sessionName: TRACE_ID.slice(0, 3),
+          spans: [],
+          entries: [prompt(1, "something else")],
+        }),
+      ).toBe(TRACE_ID.slice(0, 3));
+    });
   });
 });
 

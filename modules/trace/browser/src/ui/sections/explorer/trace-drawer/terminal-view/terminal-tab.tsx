@@ -76,15 +76,11 @@ export function TerminalTab({
     [spansQuery.data, eventsQuery.data],
   );
 
-  const banner = useMemo(
-    () =>
-      deriveSessionBanner({
-        resourceAttributes: resourceQuery.data?.resourceAttributes ?? {},
-        spans: spansQuery.data ?? [],
-        logs: logsQuery.data ?? [],
-      }),
-    [resourceQuery.data, spansQuery.data, logsQuery.data],
-  );
+  const banner = deriveSessionBanner({
+    resourceAttributes: resourceQuery.data?.resourceAttributes ?? {},
+    spans: spansQuery.data ?? [],
+    logs: logsQuery.data ?? [],
+  });
 
   const session = useSessionScrollback({
     projectId,
@@ -104,16 +100,12 @@ export function TerminalTab({
     [session.status, session.earlierCount, session.loadEarlier],
   );
 
-  const promptLine = useMemo(
-    () =>
-      promptLineText({
-        sessionName,
-        traceId,
-        spans: spansQuery.data ?? [],
-        entries: session.entries,
-      }),
-    [sessionName, traceId, spansQuery.data, session.entries],
-  );
+  const promptLine = promptLineText({
+    sessionName,
+    traceId,
+    spans: spansQuery.data ?? [],
+    entries: session.entries,
+  });
 
   // The loading state has to look like a terminal too — see TerminalSkeleton.
   if (transcriptQuery.isLoading) {
