@@ -121,6 +121,25 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       where: { id: input.id },
     });
   }
+  /** SQL for the same reason as `revoke`: the fence must be re-checked under the row lock. */
+  async rotateSecret(input: {
+    id: string;
+    organizationId: string;
+    lookupId: string;
+    hashedSecret: string;
+  }): Promise<ApiKeyRow | null> {
+    const rotated = await this.database.$executeRaw`
+      UPDATE "ApiKey"
+         SET "lookupId" = ${input.lookupId},
+             "hashedSecret" = ${input.hashedSecret},
+             "updatedAt" = now()
+       WHERE "id" = ${input.id}
+         AND "organizationId" = ${input.organizationId}
+         AND "revokedAt" IS NULL
+    `;
+    if (rotated === 0) return null;
+    return this.database.apiKey.findUniqueOrThrow({ where: { id: input.id } });
+  }
   async updateLastUsedAt(input: { id: string }): Promise<void> {
     await this.update({ id: input.id, lastUsedAt: nowInstant() });
   }

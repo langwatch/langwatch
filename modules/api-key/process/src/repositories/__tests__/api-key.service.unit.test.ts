@@ -177,6 +177,20 @@ class MemoryApiKeys extends ApiKeyRepository {
   async upgradeHash({ id, hashedSecret }: { id: string; hashedSecret: string }): Promise<void> {
     await this.update({ id, hashedSecret });
   }
+  async rotateSecret(input: {
+    id: string;
+    organizationId: string;
+    lookupId: string;
+    hashedSecret: string;
+  }): Promise<ApiKeyRow | null> {
+    const row = await this.findByIdInOrganization(input);
+    if (!row || row.revokedAt) return null;
+    return this.update({
+      id: input.id,
+      lookupId: input.lookupId,
+      hashedSecret: input.hashedSecret,
+    });
+  }
   get(id: string): ApiKeyRow | undefined {
     return this.rows.find((row) => row.id === id);
   }

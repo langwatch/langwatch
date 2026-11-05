@@ -98,6 +98,23 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
       return { success: true };
     })
 
+    .procedure("rotate")
+    .mintsCredential("organization:view")
+    .noPermission({
+      reason: OWN_KEYS_REASON,
+      allow: MEMBER_ONLY,
+    })
+    // The second answer that carries a plaintext token: the new secret, once, with the same
+    // identity `create` answers beside it.
+    .handle(async ({ app, input, actor }) => {
+      const { token, apiKey } = await app.rotateKey(input, actor);
+
+      return {
+        token,
+        apiKey: { id: apiKey.id, name: apiKey.name, createdAt: apiKey.createdAt },
+      };
+    })
+
     .procedure("orgProjects")
     .noPermission({
       reason: KEY_ASSIGNMENT_REASON,

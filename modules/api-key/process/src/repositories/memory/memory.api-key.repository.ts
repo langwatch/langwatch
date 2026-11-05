@@ -115,6 +115,23 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     );
   }
 
+  async rotateSecret(input: {
+    id: string;
+    organizationId: string;
+    lookupId: string;
+    hashedSecret: string;
+  }): Promise<ApiKeyRow | null> {
+    const live = await this.#find(
+      (key) => key.id === input.id && key.organizationId === input.organizationId && !key.revokedAt,
+    );
+    if (!live) return null;
+    return this.update({
+      id: input.id,
+      hashedSecret: input.hashedSecret,
+      lookupId: input.lookupId,
+    });
+  }
+
   async updateLastUsedAt(input: { id: string }): Promise<void> {
     await this.update({ id: input.id, lastUsedAt: nowInstant() });
   }

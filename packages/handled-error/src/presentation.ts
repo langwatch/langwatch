@@ -1407,6 +1407,9 @@ const presentations = {
   api_key_already_revoked: {
     title: "This API key is already revoked",
   },
+  api_key_expired: {
+    title: "This API key has expired",
+  },
   /**
    * The caller is signed in and simply may not do this.
    *

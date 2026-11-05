@@ -20,6 +20,7 @@ import {
   type OrganizationApiKeyResolution,
   type ResolvedApiKeyCredential,
   type RevokeApiKeyInput,
+  type RotateApiKeyInput,
   type UpdateApiKeyInput,
   type CliSessionKeyRevocation,
   type CliSessionRevocationCause,
@@ -173,6 +174,10 @@ export class ApiKeyService {
 
   async revoke(input: RevokeApiKeyInput): Promise<ApiKey> {
     return this.lifecycle.revoke(input);
+  }
+
+  async rotate(input: RotateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
+    return this.lifecycle.rotate(input);
   }
 
   async ensureCallerIsOrgMember(input: { userId: string; organizationId: string }): Promise<void> {
