@@ -1,6 +1,6 @@
 /**
  * What a browser installs when it installs project: the home a member
- * lands on, and the project settings page. 
+ * lands on, and the project settings page.
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
