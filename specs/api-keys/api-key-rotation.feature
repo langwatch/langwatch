@@ -16,7 +16,8 @@ Feature: Reopen an API key and rotate its secret
     @integration
     Scenario: Clicking a key opens its details
       When "max" clicks the key "ci" in the API keys list
-      Then a details view opens with its name, owner, scopes, permissions, expiry, creation date and last use
+      Then a details view opens with its name, owner, scopes and permissions
+      And it shows the key's expiry, creation date and last use
       And the details show the masked prefix of the secret and never the secret itself
 
     @integration
@@ -49,7 +50,7 @@ Feature: Reopen an API key and rotate its secret
 
     @unit
     Scenario: A revoked, expired, system or foreign key cannot be rotated
-      When a member rotates a key that is revoked, expired, minted by the platform or in another organization
+      When a member rotates a key that is revoked, expired, platform-minted or in another organization
       Then the rotation is refused and nothing is changed
 
     @unit
