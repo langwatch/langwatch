@@ -1868,6 +1868,9 @@ export interface LwqlPrismaRows {
     readonly codingAgentTypes: "String[]";
     readonly codingActiveDays: "Int";
     readonly codingLastActiveDay: "String?";
+    readonly codingTerminalTypes: "String[]";
+    readonly codingRepositoryKeys: "String[]";
+    readonly codingFirstDays: "Int[]";
     readonly lastTraceAt: "DateTime?";
     readonly updatedAt: "DateTime";
   };

@@ -11,6 +11,9 @@ const CODING_AND_APP_KINDS = [
   "coding_session_stored",
   "coding_active_days",
   "coding_agent_types",
+  "coding_terminal_types",
+  "coding_repo_count",
+  "coding_session_days_first_3",
   "coding_agent_first_session",
   "app_opened",
   "sessions_page_viewed",
@@ -35,6 +38,9 @@ export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
     // Every active member hears these, the admin among them: memberFactTraits.
     case "coding_session_stored":
     case "coding_agent_types":
+    case "coding_terminal_types":
+    case "coding_repo_count":
+    case "coding_session_days_first_3":
       return [];
     case "coding_active_days":
       return [

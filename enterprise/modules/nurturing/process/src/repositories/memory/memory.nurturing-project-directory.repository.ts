@@ -4,12 +4,13 @@ import type {
   NurturingProjectPlacement,
 } from "../nurturing-project-directory.repository.ts";
 
-/** The Postgres twin's semantics; `placed` and `created` stand in for the owners' tables. */
+/** The Postgres twin's semantics; the maps stand in for the owners' tables. */
 export class MemoryNurturingProjectDirectoryRepository implements NurturingProjectDirectoryRepository {
   private constructor(
     private readonly state: Readonly<{
       placed: ReadonlyMap<string, string>;
       created: ReadonlyMap<string, number>;
+      organizationsCreated: ReadonlyMap<string, number>;
       traced: ReadonlySet<string>;
       personalOwners: ReadonlyMap<string, string>;
     }>,
@@ -17,23 +18,26 @@ export class MemoryNurturingProjectDirectoryRepository implements NurturingProje
 
   /**
    * `placed` maps each held project to its organization, `created` to its creation (epoch ms),
-   * `traced` holds the projects that received their first message, and `personalOwners` maps
-   * each personal project to its owner.
+   * `organizationsCreated` each held organization to its own, `traced` holds the projects that
+   * received their first message, and `personalOwners` maps each personal project to its owner.
    */
   static create({
     placed = new Map<string, string>(),
     created = new Map<string, number>(),
+    organizationsCreated = new Map<string, number>(),
     traced = new Set<string>(),
     personalOwners = new Map<string, string>(),
   }: {
     placed?: ReadonlyMap<string, string>;
     created?: ReadonlyMap<string, number>;
+    organizationsCreated?: ReadonlyMap<string, number>;
     traced?: ReadonlySet<string>;
     personalOwners?: ReadonlyMap<string, string>;
   } = {}): MemoryNurturingProjectDirectoryRepository {
     return new MemoryNurturingProjectDirectoryRepository({
       placed,
       created,
+      organizationsCreated,
       traced,
       personalOwners,
     });
@@ -70,5 +74,11 @@ export class MemoryNurturingProjectDirectoryRepository implements NurturingProje
       .filter(([, placedIn]) => placedIn === organizationId)
       .flatMap(([projectId]) => this.state.created.get(projectId) ?? []);
     return { firstProjectCreatedAt: createdAts.length > 0 ? Math.min(...createdAts) : null };
+  }
+
+  async getOrganizationCreatedAt({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<{ organizationCreatedAt: number | null }> {
+    return { organizationCreatedAt: this.state.organizationsCreated.get(organizationId) ?? null };
   }
 }

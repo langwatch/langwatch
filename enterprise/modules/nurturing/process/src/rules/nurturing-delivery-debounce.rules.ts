@@ -25,7 +25,7 @@ const PERSON_ONCE_KINDS: ReadonlySet<NurturingSignal["kind"]> = new Set(["usage_
 /**
  * One organization's window over its members, whichever project raised the fact: without it a busy
  * organization would send one member batch per project. A first trace shares the traces' window, as
- * they tell the same traits. Agent types need none: their claim is keyed by the list.
+ * they tell the same traits. A list or a count needs none: its claim is keyed by the value.
  */
 export function pickOrganizationDebounce({
   signal,

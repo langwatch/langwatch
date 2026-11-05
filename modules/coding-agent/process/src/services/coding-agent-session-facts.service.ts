@@ -62,7 +62,11 @@ export class CodingAgentSessionFactsService {
     }
   }
 
-  /** One per session and UTC day within the hold, so a 23:59 and a 00:01 fold both emit. */
+  /**
+   * One per session, UTC day and terminal type and repo within the hold, so a 23:59 and a 00:01
+   * fold both emit, and a session that names its repo after its first fold is not lost when it
+   * ends inside the hold.
+   */
   private claimDue({ sessions, now }: { sessions: StoredSession[]; now: number }): NamedSession[] {
     const due = new Map<string, NamedSession>();
     for (const session of sessions) {
@@ -99,6 +103,8 @@ export class CodingAgentSessionFactsService {
         agentType: session.agent,
         firstForProject: await this.isFirstForProject({ session, now, projectStates, claims }),
         occurredAt: session.occurredAt,
+        terminalType: session.terminalType ?? undefined,
+        repositoryKey: session.repositoryKey ?? undefined,
       });
     } catch (error) {
       this.holds.release(holdKey(session), holdSetTo);
@@ -164,7 +170,9 @@ export class CodingAgentSessionFactsService {
 }
 
 function holdKey(session: StoredSession): string {
-  return `${session.tenantId}:${session.sessionId}:${Math.floor(session.occurredAt / DAY_MS)}`;
+  const day = Math.floor(session.occurredAt / DAY_MS);
+  const named = `${session.terminalType ?? ""}:${session.repositoryKey ?? ""}`;
+  return `${session.tenantId}:${session.sessionId}:${day}:${named}`;
 }
 
 function claimsByProject(sessions: NamedSession[]): Map<string, ProjectClaim> {
