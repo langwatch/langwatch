@@ -4,6 +4,8 @@ import {
   deriveSessionTitleFromPrompt,
   detectCodingAgent,
   extractCodingAgentLogFacts,
+  LOG_COST_USD_MICROS_ATTRIBUTE_BY_AGENT_ID,
+  LOG_INPUT_INCLUDES_CACHE_READ_AGENT_IDS,
   LOGS_REQUIRE_SESSION_KEY_AGENT_IDS,
   normalizeEventName,
   pickDeclaredCodingAgent,
@@ -20,6 +22,13 @@ const RESPONSE_BODY_EVENT_NAME = "api_response_body";
 
 /** The utility call that generates it, apart from every conversational turn. */
 const TITLE_QUERY_SOURCE = "generate_session_title";
+
+/**
+ * Dropped before contributing, so each also forfeits its identity stamp, its `startedAtMs`
+ * input and its trace-to-session row. Worth it: the completion carries what the session
+ * folds (blocked, cancelled, duration), and the timeline declines both ends anyway.
+ */
+const DROPPED_EVENT_NAMES: readonly string[] = ["hook_execution_start"];
 
 const logger = createLogger("langwatch:coding-agent:log-facts");
 const flatAttributesSchema = z.record(z.string(), z.unknown());
@@ -51,9 +60,10 @@ export function liftLogContribution({
   // A cheap name/scope gate first; Cowork passes as claude_code and the resource parse relabels it.
   const facts = extractCodingAgentLogFacts({ scopeName: record.scopeName, attributes });
   if (facts === null) return IGNORED;
+  if (isDroppedEvent(facts["event.name"])) return IGNORED;
 
   const resourceAttributes = parseFlatAttributes(record.resourceAttributesFlatJson);
-  stampServiceVersion({ facts, resourceAttributes });
+  stampResourceIdentity({ facts, resourceAttributes });
   stampSessionTitle({ facts, attributes, traces });
   stampPromptTitleFallback({ facts, attributes });
 
@@ -64,7 +74,42 @@ export function liftLogContribution({
     facts,
   });
   if (agent === null) return IGNORED;
+  restateModelCallFigures({ agent, attributes, facts });
   return keyContribution({ record, attributes, agent, facts });
+}
+
+/**
+ * Restates an agent's declared token and cost quirks in Claude's shape, which the fold reads:
+ * input disjoint from cache reads, and cost in dollars (ADR-192).
+ */
+function restateModelCallFigures({
+  agent,
+  attributes,
+  facts,
+}: {
+  agent: string;
+  attributes: Record<string, unknown>;
+  facts: LogFacts;
+}): void {
+  if (LOG_INPUT_INCLUDES_CACHE_READ_AGENT_IDS.has(agent) && facts.input_tokens !== undefined) {
+    const input = Number(facts.input_tokens);
+    const cacheRead = Number(facts.cache_read_tokens ?? 0);
+    if (Number.isFinite(input) && Number.isFinite(cacheRead)) {
+      facts.input_tokens = Math.max(0, input - cacheRead);
+    }
+  }
+  const microsAttribute = LOG_COST_USD_MICROS_ATTRIBUTE_BY_AGENT_ID.get(agent);
+  if (microsAttribute === undefined || facts.cost_usd !== undefined) return;
+  const micros = Number(attributes[microsAttribute]);
+  if (attributes[microsAttribute] !== undefined && Number.isFinite(micros)) {
+    facts.cost_usd = micros / 1_000_000;
+  }
+}
+
+/** Bare (`hook_execution_start`) or agent-namespaced (`claude_code.hook_execution_start`). */
+function isDroppedEvent(eventName: unknown): boolean {
+  if (typeof eventName !== "string") return false;
+  return DROPPED_EVENT_NAMES.some((name) => eventName === name || eventName.endsWith(`.${name}`));
 }
 
 function keyContribution({
@@ -106,7 +151,8 @@ function keyContribution({
   return { outcome: "contributes", contribution };
 }
 
-function stampServiceVersion({
+/** The version always rides the resource; the entrypoint does for Grok, not for Claude. */
+function stampResourceIdentity({
   facts,
   resourceAttributes,
 }: {
@@ -116,6 +162,10 @@ function stampServiceVersion({
   const serviceVersion = resourceAttributes?.["service.version"];
   if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
     facts["service.version"] = serviceVersion;
+  }
+  const entrypoint = resourceAttributes?.["app.entrypoint"];
+  if (facts["app.entrypoint"] === undefined && typeof entrypoint === "string" && entrypoint) {
+    facts["app.entrypoint"] = entrypoint;
   }
 }
 

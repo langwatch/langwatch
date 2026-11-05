@@ -4,28 +4,6 @@ import { SIGNED_UP_EVENT_TYPE } from "@langwatch/auth-contract";
  * auto-join looks at the email; nurturing derives PostHog signed_up from it (its pipeline test).
  * @see specs/analytics/posthog-product-milestones.feature
  */
-import {
-  type AuthzAttachBindingsInput,
-  type AuthzAttachBindingsOutput,
-  AuthzGrantsService,
-  type AuthzAttachResourceGrantInput,
-  type AuthzApplyMemberBindingsInput,
-  type AuthzChangeBindingRoleInput,
-  type AuthzCreateBindingInput,
-  type AuthzDefineRoleInput,
-  type AuthzDeleteBindingInput,
-  type AuthzDeleteRoleInput,
-  type AuthzOffboardInput,
-  type AuthzOffboardMemberInput,
-  type AuthzOffboardOutput,
-  type AuthzReplaceGrantInput,
-  type AuthzRevokeBindingsInput,
-  type AuthzRevokeBindingsWhereInput,
-  type AuthzRevokeGrantInput,
-  type AuthzRevokeResourceGrantsInput,
-  type AuthzUpdateBindingInput,
-  type AuthzUpdateGrantInput,
-} from "@langwatch/authz-contract";
 import { createTenantId } from "@langwatch/eventing";
 import type {
   SsoArrivalApi,
@@ -51,54 +29,6 @@ import type { SignedUpEvent } from "../../eventing/auth-lifecycle.events.ts";
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import { AuthLifecycleNoticeService } from "../../services/auth-lifecycle-notice.service.ts";
 import { SignupAnnouncementService } from "../../services/signup-announcement.service.ts";
-
-/** Minimal grants ledger double: nothing in these scenarios reads its output. */
-class StubAuthzGrantsService extends AuthzGrantsService {
-  attach = vi.fn();
-  update = vi.fn((_args: AuthzUpdateGrantInput) => Promise.resolve());
-  revoke = vi.fn((_args: AuthzRevokeGrantInput) => Promise.resolve());
-  replace = vi.fn((_args: AuthzReplaceGrantInput) => Promise.reject(new Error("unused")));
-  offboard = vi.fn((_args: AuthzOffboardInput): Promise<AuthzOffboardOutput> =>
-    Promise.reject(new Error("unused")),
-  );
-  invalidateOrganization = vi.fn(() => Promise.resolve());
-  attachBindings = vi.fn((_args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput> =>
-    Promise.resolve({ attached: [], duplicates: [] }),
-  );
-  attachResourceGrant = vi.fn((_args: AuthzAttachResourceGrantInput) =>
-    Promise.reject(new Error("unused")),
-  );
-  revokeResourceGrants = vi.fn((_args: AuthzRevokeResourceGrantsInput) =>
-    Promise.reject(new Error("unused")),
-  );
-  changeBindingRole = vi.fn((_args: AuthzChangeBindingRoleInput) =>
-    Promise.reject(new Error("unused")),
-  );
-  revokeBindings = vi.fn((_args: AuthzRevokeBindingsInput) => Promise.resolve());
-  retireDirectoryGrants = vi.fn(() => Promise.resolve(0));
-  findDirectoryCausedChanges = vi.fn(() => Promise.resolve([]));
-  revokeBindingsWhere = vi.fn((_args: AuthzRevokeBindingsWhereInput) =>
-    Promise.reject(new Error("unused")),
-  );
-  offboardMember = vi.fn((_args: AuthzOffboardMemberInput) => Promise.reject(new Error("unused")));
-  defineRole = vi.fn((_args: AuthzDefineRoleInput) => Promise.reject(new Error("unused")));
-  deleteRole = vi.fn((_args: AuthzDeleteRoleInput) => Promise.reject(new Error("unused")));
-  createBinding = vi.fn((_args: AuthzCreateBindingInput) => Promise.reject(new Error("unused")));
-  updateBinding = vi.fn((_args: AuthzUpdateBindingInput) => Promise.reject(new Error("unused")));
-  deleteBinding = vi.fn((_args: AuthzDeleteBindingInput) => Promise.reject(new Error("unused")));
-  applyMemberBindings = vi.fn((_args: AuthzApplyMemberBindingsInput) =>
-    Promise.reject(new Error("unused")),
-  );
-  listGrants = vi.fn(() => Promise.reject(new Error("unused")));
-  getGrant = vi.fn(() => Promise.reject(new Error("unused")));
-  createGrant = vi.fn(() => Promise.reject(new Error("unused")));
-  changeGrantRole = vi.fn(() => Promise.reject(new Error("unused")));
-  revokeGrant = vi.fn(() => Promise.reject(new Error("unused")));
-  findLiveSharedProjectGrants = vi.fn(() => Promise.reject(new Error("unused")));
-  attachSharedProjectGrant = vi.fn(() => Promise.reject(new Error("unused")));
-  awaitSharedProjectGrants = vi.fn(() => Promise.reject(new Error("unused")));
-  revokeSharedProjectGrants = vi.fn(() => Promise.reject(new Error("unused")));
-}
 
 class StubFederation implements BetterAuthFederation {
   constructor(private readonly ssoAllowed: boolean) {}
@@ -136,6 +66,7 @@ function composedAnnouncements() {
     },
     recordSessionStarted: { send: async () => undefined },
     recordSsoAutoAdded: { send: async () => undefined },
+    recordAppPageOpened: { send: async () => undefined },
   });
   const { logger } = createTestLogger();
   const signups = SignupAnnouncementService.create({
@@ -178,6 +109,7 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
     flagPendingSsoSetup: unused,
     reconcileSsoAccounts: unused,
     recordLastLogin: unused,
+    clearPasswordResetRequirement: unused,
     ...members,
   };
 }
@@ -193,9 +125,9 @@ function domainOrganizations(organization: SsoDomainOrganization | null): SsoDom
     findBySsoDomain: vi
       .fn<SsoDomainOrganizations["findBySsoDomain"]>()
       .mockResolvedValue(organization),
-    createSsoDomainMembership: vi
-      .fn<SsoDomainOrganizations["createSsoDomainMembership"]>()
-      .mockResolvedValue("created"),
+    createMembership: vi
+      .fn<SsoDomainOrganizations["createMembership"]>()
+      .mockResolvedValue({ outcome: "created", seat: "MEMBER", pending: false }),
   });
 }
 
@@ -214,7 +146,6 @@ describe("afterUserCreate", () => {
       federation: new StubFederation(true),
       invites: new StubInvites(),
       announcements,
-      authzGrants: new StubAuthzGrantsService(),
       arrivals: createApiFixture<SsoArrivalApi>({ admit }),
       ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
         record: async () => undefined,
@@ -251,6 +182,7 @@ describe("afterUserCreate", () => {
           deactivatedAt: null,
           pendingSsoSetup: false,
           signupConfirmationPending: false,
+          passwordResetRequiredAt: null,
           lastLoginAt: null,
           emailVerified: true,
         }),
@@ -286,12 +218,12 @@ describe("afterUserCreate", () => {
     /** @scenario PostHog signed_up still fires when the signup is unverified */
     it("records the sign-up fact even when the verified-email gate skips org admission", async () => {
       const { announcements, facts } = composedAnnouncements();
-      const createSsoDomainMembership = vi
-        .fn<SsoDomainOrganizations["createSsoDomainMembership"]>()
-        .mockResolvedValue("created");
+      const createMembership = vi
+        .fn<SsoDomainOrganizations["createMembership"]>()
+        .mockResolvedValue({ outcome: "created", seat: "MEMBER", pending: false });
       const organizations = organizationsOver({
         findBySsoDomain: async () => ({ id: "org_1", name: "Acme", ssoProvider: null }),
-        createSsoDomainMembership,
+        createMembership,
       });
 
       await afterUserCreate({
@@ -300,7 +232,7 @@ describe("afterUserCreate", () => {
       });
 
       expectSignUpOf(await onlySignUpFact(facts), "user_4");
-      expect(createSsoDomainMembership).not.toHaveBeenCalled();
+      expect(createMembership).not.toHaveBeenCalled();
     });
   });
 });

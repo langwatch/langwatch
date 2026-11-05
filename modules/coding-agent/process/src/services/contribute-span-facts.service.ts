@@ -11,7 +11,7 @@ import {
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 
-import { MODEL_CALL_SPAN_NAMES } from "../eventing/coding-agent-session-span.projection.ts";
+import { isFoldedModelCall } from "../eventing/coding-agent-session-span.projection.ts";
 import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
 
 /**
@@ -70,7 +70,7 @@ export class EventingContributeSpanFactsService implements CommandHandler<
   private async stamped(
     data: ContributeSpanFactsCommandData,
   ): Promise<ContributeSpanFactsCommandData> {
-    if (!MODEL_CALL_SPAN_NAMES.has(data.name)) return data;
+    if (!isFoldedModelCall({ name: data.name, agent: data.agent })) return data;
 
     const context = await this.stampableContext(data);
     if (context === null) return data;

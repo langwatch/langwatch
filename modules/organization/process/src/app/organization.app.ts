@@ -871,17 +871,11 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.signInPolicies.findBySsoDomain(input);
   }
 
-  createSsoDomainMembership(
-    input: Readonly<{ organizationId: string; userId: string }>,
-  ): Promise<"created" | "already-present"> {
-    return this.#dependencies.membership.createSsoDomainMembership(input);
-  }
-
   countMembershipsForUser(input: Readonly<{ userId: string }>): Promise<number> {
     return this.#dependencies.membership.countMembershipsForUser(input);
   }
 
-  organizationIdsForMember(input: { userId: string }): Promise<string[]> {
+  organizationIdsForMember(input: { userId: string; activeOnly?: boolean }): Promise<string[]> {
     return this.#dependencies.organizations.organizationIdsForMember(input);
   }
 

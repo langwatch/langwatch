@@ -270,10 +270,15 @@ export function findMissingObjects(error: unknown): string[] {
 
 const POSTGRES_ENGINE_COLLECTION = /^PostgreSQL\(\s*`?([A-Za-z0-9_]+)`?\s*,/;
 
-/** The named collection a PostgreSQL engine table reads through (`system.tables.engine_full`). */
-export function postgresEngineCollections(engineFull: string): string[] {
+/** A PostgreSQL engine table's binding, read from `system.tables.engine_full`. */
+export type PostgresEngineBinding =
+  | { readonly bound: true; readonly collection: string }
+  | { readonly bound: false };
+
+/** The named collection a PostgreSQL engine table reads through, when it names one. */
+export function postgresEngineCollection(engineFull: string): PostgresEngineBinding {
   const collection = POSTGRES_ENGINE_COLLECTION.exec(engineFull)?.[1];
-  return collection === undefined ? [] : [collection];
+  return collection === undefined ? { bound: false } : { bound: true, collection };
 }
 
 type ConfigStoreTolerance = { tolerated: true; code: number } | { tolerated: false };

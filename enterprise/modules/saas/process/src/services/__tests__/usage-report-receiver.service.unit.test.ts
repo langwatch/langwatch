@@ -33,7 +33,9 @@ function setup({
   },
   release = {},
   failFacts = false,
+  findPublishedSelfHostedNotices = () => Promise.resolve([]),
 }: {
+  findPublishedSelfHostedNotices?: LicensingApi["findPublishedSelfHostedNotices"];
   failFacts?: boolean;
   isSaas?: boolean;
   release?: Partial<Parameters<typeof UsageReportReceiverService.create>[0]["release"]>;
@@ -45,7 +47,10 @@ function setup({
   const receiver = UsageReportReceiverService.create({
     cloud: LangWatchCloudService.create({ isSaas }),
     rateLimits,
-    registry: createApiFixture<LicensingApi>({ recordUsageReport }),
+    registry: createApiFixture<LicensingApi>({
+      recordUsageReport,
+      findPublishedSelfHostedNotices,
+    }),
     logger,
     release: {
       latestRelease: void 0,
@@ -68,7 +73,7 @@ function setup({
 function report(extra: Record<string, unknown> = {}) {
   return {
     report: { event: "daily_usage_stats", instance_id: "install-1", version: "3.1.0", ...extra },
-    addressHeaders: { "x-forwarded-for": "203.0.113.7" },
+    callerAddress: "203.0.113.7",
   };
 }
 
@@ -179,6 +184,52 @@ describe("UsageReportReceiverService", () => {
     });
   });
 
+  describe("given one published notice with severity security fixed in 3.4.2", () => {
+    const notice = {
+      id: "shnotice_1",
+      severity: "security" as const,
+      title: "Upgrade to 3.4.2",
+      body: "A vulnerability in trace sharing is fixed in 3.4.2.",
+      url: "https://langwatch.ai/security/2026-10",
+      fixed_in: "3.4.2",
+      published_at: "2026-10-21T10:00:00.000Z",
+    };
+
+    describe("when Cloud answers a usage report", () => {
+      /** @scenario "The usage report reply carries published notices beside the latest release" */
+      it("names the latest release and lists the notice in the install's wire", async () => {
+        const { receiver } = setup({
+          release: { latestRelease: "3.4.2", latestReleaseCommit: "0a1b2c3d" },
+          findPublishedSelfHostedNotices: () => Promise.resolve([notice]),
+        });
+
+        await expect(receiver.receive(report())).resolves.toEqual({
+          message: "Event captured",
+          latest_release: { release: "3.4.2", commit: "0a1b2c3d" },
+          notices: [notice],
+        });
+      });
+    });
+  });
+
+  describe("given reading the notices fails", () => {
+    describe("when Cloud answers a usage report", () => {
+      /** @scenario "A notice that cannot be read does not refuse the report" */
+      it("accepts the report, names the latest release with no notices, and logs the failure", async () => {
+        const { receiver, lines } = setup({
+          release: { latestRelease: "3.4.2" },
+          findPublishedSelfHostedNotices: () => Promise.reject(new Error("database down")),
+        });
+
+        await expect(receiver.receive(report())).resolves.toEqual({
+          message: "Event captured",
+          latest_release: { release: "3.4.2", commit: null },
+        });
+        expect(lines.findLine("error", "carries no notices")).toBeDefined();
+      });
+    });
+  });
+
   describe("when the receiver is past a limit", () => {
     /** @scenario "Reports past the global, per-address or per-install limit are refused" */
     it.each([
@@ -194,11 +245,21 @@ describe("UsageReportReceiverService", () => {
       expect(facts).toEqual([]);
     });
 
-    it("counts no per-address bucket where the sender named no address", async () => {
+    /** @scenario "A sender's IPv6 address is limited like any other" */
+    it("counts the per-address bucket on the address the door resolved", async () => {
       const limiter = limiterRefusing();
       const { receiver } = setup({ rateLimits: limiter });
 
-      await receiver.receive({ ...report(), addressHeaders: {} });
+      await receiver.receive({ ...report(), callerAddress: "2001:db8::1" });
+
+      expect(limiter.asked).toContain("track_usage:ip:2001:db8::1");
+    });
+
+    it("counts no per-address bucket where the door resolved no address", async () => {
+      const limiter = limiterRefusing();
+      const { receiver } = setup({ rateLimits: limiter });
+
+      await receiver.receive({ ...report(), callerAddress: null });
 
       expect(limiter.asked).toEqual(["track_usage:global", "track_usage:instance:install-1"]);
     });

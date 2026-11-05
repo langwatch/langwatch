@@ -38,6 +38,14 @@ import {
   type CliSessionRevocationCause,
   type OrganizationProvisioningRequest,
   type ProvisionedOrganization,
+  apiKeyBrowserConfig,
+  apiKeyServerConfig,
+  docsOriginsOf,
+  type ApiKeyServerConfig,
+  type DocsSessionKeyMinted,
+  type DocsSessionRevoked,
+  type MintDocsSessionKeyInput,
+  type RevokeDocsSessionKeysInput,
 } from "@langwatch/api-key-contract";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi, newAuthzGrantId } from "@langwatch/authz-contract";
@@ -58,6 +66,7 @@ import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts
 import { AgentSandboxKeyService } from "../services/agent-sandbox-key.service.ts";
 import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
+import { DocsSessionKeyService } from "../services/docs-session-key.service.ts";
 import { IngestionKeyMintService } from "../services/ingestion-key-mint.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
 import { OrganizationProvisioningService } from "../services/organization-provisioning.service.ts";
@@ -93,8 +102,8 @@ type ApiKeySetup = Readonly<{
     projects: ProjectApi;
   }>;
   secrets: ScopedSecrets;
-  /** API-key declares no config slice. */
-  config?: undefined;
+  /** The docs origins a docs session key may be handed to (ADR-185); absent registers none. */
+  config?: ApiKeyServerConfig | undefined;
 }>;
 
 /** What a key may create: the caller's own personal key, or an admin's key. */
@@ -162,6 +171,8 @@ async function apiKeyPeppers(
 
 export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrganizationsDoorApi {
   static readonly contract = ApiKeyApi;
+  static readonly config = apiKeyServerConfig;
+  static readonly publicConfig = apiKeyBrowserConfig.project;
   static readonly dependencies: ApiKeyDependencies = {
     authorization: AuthzApi,
     organizations: OrganizationApi,
@@ -211,6 +222,15 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       held: setup.repositories.sandboxKeys,
     });
 
+    const docsSessionKeys = DocsSessionKeyService.create({
+      apiKeys: service,
+      lifecycle: service,
+      repository: setup.repositories.apiKeys,
+      authz: authorization,
+      organizations: setup.dependencies.organizations,
+      projects: setup.dependencies.projects,
+      docsOrigins: docsOriginsOf(setup.config),
+    });
     const ingestionKeys = IngestionKeyMintService.create({ apiKeys: service });
     const provisioning = ProjectProvisioningService.create({
       apiKeys: service,
@@ -227,6 +247,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
       authorization,
       runKeys,
       sandboxKeys,
+      docsSessionKeys,
       ingestionKeys,
       provisioning,
       organizationProvisioning,
@@ -238,6 +259,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     authorization: AuthzApi;
     runKeys: RunKeyMintService;
     sandboxKeys: AgentSandboxKeyService;
+    docsSessionKeys: DocsSessionKeyService;
     ingestionKeys: IngestionKeyMintService;
     provisioning: ProjectProvisioningService;
     organizationProvisioning: OrganizationProvisioningService;
@@ -246,6 +268,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     this.#authorization = deps.authorization;
     this.#runKeys = deps.runKeys;
     this.#sandboxKeys = deps.sandboxKeys;
+    this.#docsSessionKeys = deps.docsSessionKeys;
     this.#ingestionKeys = deps.ingestionKeys;
     this.#provisioning = deps.provisioning;
     this.#organizationProvisioning = deps.organizationProvisioning;
@@ -255,6 +278,7 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   readonly #authorization: AuthzApi;
   readonly #runKeys: RunKeyMintService;
   readonly #sandboxKeys: AgentSandboxKeyService;
+  readonly #docsSessionKeys: DocsSessionKeyService;
   readonly #ingestionKeys: IngestionKeyMintService;
   readonly #provisioning: ProjectProvisioningService;
   readonly #organizationProvisioning: OrganizationProvisioningService;
@@ -289,6 +313,12 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   }
   mintAgentSandboxKey(input: MintAgentSandboxKeyInput): Promise<string> {
     return this.#sandboxKeys.mintAgentSandboxKey(input);
+  }
+  mintDocsSessionKey(input: MintDocsSessionKeyInput): Promise<DocsSessionKeyMinted> {
+    return this.#docsSessionKeys.mint(input);
+  }
+  revokeDocsSessionKeys(input: RevokeDocsSessionKeysInput): Promise<DocsSessionRevoked> {
+    return this.#docsSessionKeys.revoke(input);
   }
   async resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,
@@ -503,6 +533,32 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
           scopeNames(b.scopeType, { orgName, teamName, projectName }).get(b.scopeId) ?? null,
         customRoleName: b.customRoleId ? (customRoleName.get(b.customRoleId) ?? null) : null,
       }));
+  }
+
+  /**
+   * What a restricted key's permission rows may offer, read off the mint's own resolver so a
+   * group grant counts. Another owner's ceiling is asked only by an organization admin, the
+   * one who may assign a key to someone else; anyone else is answered for themselves.
+   */
+  async listGrantablePermissions(
+    input: Readonly<{
+      organizationId: string;
+      scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+      ownerUserId?: string;
+    }>,
+    by: ApiKeyCaller,
+  ): Promise<string[]> {
+    await this.#ensureMember(input.organizationId, by);
+    const ownerUserId = input.ownerUserId ?? by.id;
+    if (ownerUserId !== by.id && !(await this.#isOrganizationAdmin(input.organizationId, by))) {
+      throw new ApiKeyAdminRequiredError("assign-to-another-user");
+    }
+
+    return this.#service.grantablePermissions({
+      principal: { type: "user", id: ownerUserId },
+      organizationId: input.organizationId,
+      scopes: input.scopes,
+    });
   }
 
   /**

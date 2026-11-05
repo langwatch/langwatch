@@ -9,6 +9,7 @@ import {
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
   type SessionWorkingContext,
+  toolDecisionOutcome,
 } from "@langwatch/coding-agent-contract";
 
 import {
@@ -48,7 +49,6 @@ const LANGWATCH = {
   },
 } as const;
 const RATE_LIMIT_STATUS = "429";
-const ABORTED_SOURCES = new Set(["user_abort"]);
 
 interface CodingAgentSessionLogProjectionInput {
   state: CodingAgentSessionData;
@@ -260,11 +260,11 @@ export class CodingAgentSessionLogProjection {
     return isLogsOnly
       ? this.stateProjection.chargeContextUsage({
           before: withReported,
-          after: this.stateProjection.foldModelCall(
-            { ...withReported, costUsd: withReported.costUsd + reported },
+          after: this.stateProjection.foldModelCall({
+            state: { ...withReported, costUsd: withReported.costUsd + reported },
             attrs,
-            0,
-          ),
+            fallbackDurationMs: 0,
+          }),
           context,
         })
       : withReported;
@@ -328,7 +328,7 @@ export class CodingAgentSessionLogProjection {
       toolInputBytes:
         base.toolInputBytes + this.stateProjection.number(attrs.tool_input_size_bytes),
       errorTypes:
-        errorType !== null && this.stateProjection.coerceScalarString(attrs.success) === "false"
+        errorType !== null && this.stateProjection.isFalse(attrs.success)
           ? this.stateProjection.incrementCounter(base.errorTypes, errorType)
           : base.errorTypes,
     };
@@ -348,7 +348,7 @@ export class CodingAgentSessionLogProjection {
     return !wrapped && agent !== undefined && EVENTS_FOLD_TOOL_RUNS_AGENT_IDS.has(agent)
       ? this.stateProjection.foldToolInvocation(withBytes, {
           attrs,
-          failed: this.stateProjection.coerceScalarString(attrs.success) === "false",
+          failed: this.stateProjection.isFalse(attrs.success),
           toolMs: this.stateProjection.number(attrs.duration_ms),
           startedAtMs: occurredAtMs ?? 0,
         })
@@ -356,21 +356,16 @@ export class CodingAgentSessionLogProjection {
   }
 
   private foldToolDecision({ base, attrs }: LogFoldStep): CodingAgentSessionData {
-    // Claude spells a refusal `reject`; codex spells it `denied` (and
-    // `denied_with_network_policy_deny`). Codex also puts the walk-away on
-    // the DECISION itself — `abort`, or `timed_out` for a prompt left to
-    // expire — where claude reports it as `reject` + `source: user_abort`.
-    const decision = this.stateProjection.coerceString(attrs.decision) ?? "";
-    const rejected = decision === "reject" || decision.startsWith("denied");
-    const walkedAway =
-      decision === "abort" ||
-      decision === "timed_out" ||
-      ABORTED_SOURCES.has(this.stateProjection.coerceString(attrs.source) ?? "");
-    if (!rejected && !walkedAway) return base;
+    // Each agent spells its decisions differently; toolDecisionOutcome reads them all.
+    const outcome = toolDecisionOutcome({
+      decision: this.stateProjection.coerceString(attrs.decision),
+      source: this.stateProjection.coerceString(attrs.source),
+    });
+    if (outcome !== "denied" && outcome !== "aborted") return base;
     // An ABORT (the human walked away from the prompt) is a different act from
     // a refusal, and NEITHER is a tool that broke. Counting them as failures
     // would report the human's judgement as the agent's fault.
-    return walkedAway
+    return outcome === "aborted"
       ? { ...base, toolsAborted: base.toolsAborted + 1 }
       : { ...base, toolsDenied: base.toolsDenied + 1 };
   }

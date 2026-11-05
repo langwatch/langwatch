@@ -67,6 +67,8 @@ function buildService(langevalsEvaluate: Mock<LangevalsEvaluatorService["evaluat
         throw new Error("no judge here is on Instant Evals");
       },
     },
+    decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
+    judgeRouting: { isRouted: async () => false },
     installEnvironment: {},
   };
 

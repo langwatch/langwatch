@@ -36,7 +36,7 @@ function renderDialog(initialRules: FeatureFlagRules) {
 function ruleFieldLabels(): string[] {
   return screen
     .getAllByText(
-      /Organization id|Project id|Applies to every context|Organization created on or after/,
+      /Organization id|Project ids|Applies to every context|Organization created on or after/,
     )
     .map((element) => element.textContent ?? "");
 }
@@ -179,7 +179,7 @@ describe("given a flag whose rules an operator wants in a different order", () =
         await waitFor(() => expect(announcement()).not.toBe(pickedUp));
 
         press({ element: firstGrip, code: "Space" });
-        await waitFor(() => expect(ruleFieldLabels()).toEqual(["Project id", "Organization id"]));
+        await waitFor(() => expect(ruleFieldLabels()).toEqual(["Project ids", "Organization id"]));
       } finally {
         restoreLayout();
       }

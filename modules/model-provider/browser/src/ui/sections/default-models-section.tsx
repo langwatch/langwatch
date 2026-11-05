@@ -17,10 +17,14 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SectionTitle } from "@langwatch/design-system/typography";
-import type {
-  ModelDefaultConfigSnapshot,
-  ModelDefaultFeature,
-  ModelProviderScopeType,
+import {
+  isOwnDecisionModelId,
+  LANGWATCH_DECISION_MODEL_ID,
+  MODEL_ROLES,
+  type ModelDefaultConfigSnapshot,
+  type ModelDefaultFeature,
+  type ModelProviderScopeType,
+  type ModelRole,
 } from "@langwatch/model-provider-contract";
 import {
   Building2,
@@ -34,17 +38,18 @@ import {
   Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import {
+  DECISION_MODEL_DISPLAY_NAMES,
+  isShownDecisionModel,
+} from "../../model/decision-model-options.ts";
 import {
   compareConfigsByScopeThenName,
   mostSpecificScope,
   resolveAtScope,
-  MODEL_ROLES,
   MODEL_ROLE_LABEL,
   type AnchorScope,
-  type ModelRoleKey,
 } from "../../model/default-model-cascade.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
 import type { ScopeFilterValue, ScopeHierarchy } from "../../model/provider-scope-filter.ts";
@@ -102,7 +107,7 @@ export function DefaultModelsSection({
     }
   };
 
-  const visibleConfigs = useMemo(() => {
+  const visibleConfigs = (() => {
     const all = dataQuery.data?.configs ?? [];
     // The row's scopes spell the pair `{ type, id }` rather than
     // `{ scopeType, scopeId }`, so they are renamed on the way into the shared
@@ -122,7 +127,7 @@ export function DefaultModelsSection({
     // and by scope name within a tier, so the same order the Model Providers
     // table above and the virtual-key picker use.
     return [...filtered].toSorted(compareConfigsByScopeThenName);
-  }, [dataQuery.data?.configs, filter, teamId, projectId, hierarchy]);
+  })();
 
   if (dataQuery.isLoading || !dataQuery.data) {
     return (
@@ -339,7 +344,7 @@ function ConfigCell({
   enabledProviderKeys,
   displayNames,
 }: {
-  role: ModelRoleKey;
+  role: ModelRole;
   config: Record<string, string>;
   features: readonly ModelDefaultFeature[];
   configs: readonly ConfigRow[];
@@ -372,21 +377,19 @@ function ConfigCell({
   const featureOverrides = features
     .filter((feature) => feature.role === role && config[feature.key])
     .filter((feature) => config[feature.key] !== resolvedRoleModel);
+  const chipNames = { ...displayNames, ...DECISION_MODEL_DISPLAY_NAMES };
 
   return (
     <VStack align="start" gap={1}>
       <ChipWithEdit onEdit={onEdit}>
-        {resolvedRoleModel ? (
-          <ModelChip
+        {role === "INSTANT_EVALS" ? (
+          <DecisionModelChip model={resolvedRoleModel} isInvalid={isInvalid} />
+        ) : (
+          <RoleModelChip
             model={resolvedRoleModel}
-            size="sm"
-            invalid={isInvalid(resolvedRoleModel)}
+            isInvalid={isInvalid}
             displayNames={displayNames}
           />
-        ) : (
-          <Badge colorPalette="orange" variant="subtle">
-            Not configured
-          </Badge>
         )}
       </ChipWithEdit>
       {featureOverrides.map((feature) => (
@@ -398,11 +401,57 @@ function ConfigCell({
             model={config[feature.key]!}
             size="sm"
             invalid={isInvalid(config[feature.key]!)}
-            displayNames={displayNames}
+            displayNames={chipNames}
           />
         </ChipWithEdit>
       ))}
     </VStack>
+  );
+}
+
+/**
+ * The Instant Evals cell: unset, or an id the catalogue no longer offers, reads as the
+ * LangWatch Instant Preview default (faded), never "Not configured" (ADR-182 decision 1).
+ * Only an own model can need an update: the hosted default has no provider row.
+ */
+function DecisionModelChip({
+  model,
+  isInvalid,
+}: {
+  model: string | null;
+  isInvalid: (model: string) => boolean;
+}) {
+  const shown = isShownDecisionModel(model) ? model : null;
+  return (
+    <ModelChip
+      model={shown ?? LANGWATCH_DECISION_MODEL_ID}
+      size="sm"
+      inherited={!shown}
+      invalid={!!shown && isOwnDecisionModelId(shown) && isInvalid(shown)}
+      displayNames={DECISION_MODEL_DISPLAY_NAMES}
+    />
+  );
+}
+
+/** Any other role's cell: its resolved model, or "Not configured" when the cascade has none. */
+function RoleModelChip({
+  model,
+  isInvalid,
+  displayNames,
+}: {
+  model: string | null;
+  isInvalid: (model: string) => boolean;
+  displayNames: Record<string, string>;
+}) {
+  if (!model) {
+    return (
+      <Badge colorPalette="orange" variant="subtle">
+        Not configured
+      </Badge>
+    );
+  }
+  return (
+    <ModelChip model={model} size="sm" invalid={isInvalid(model)} displayNames={displayNames} />
   );
 }
 

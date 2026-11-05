@@ -8,6 +8,7 @@ import {
   DatasetStaleColumnsError,
   DatasetTooLargeToEditColumnsError,
   convertRowsToColumnTypes,
+  type DatasetColumnRenames,
   type DatasetColumns,
   type DatasetRecordEntry,
 } from "@langwatch/dataset-contract";
@@ -112,6 +113,7 @@ export class DatasetChunkMaintenanceService {
     projectId,
     oldColumnTypes,
     newColumnTypes,
+    columnRenames,
     name,
     slug,
     storage,
@@ -120,6 +122,7 @@ export class DatasetChunkMaintenanceService {
     projectId: string;
     oldColumnTypes: DatasetColumns;
     newColumnTypes: DatasetColumns;
+    columnRenames?: DatasetColumnRenames;
     name: string;
     slug: string;
     storage: DatasetChunkRepository;
@@ -139,7 +142,12 @@ export class DatasetChunkMaintenanceService {
       });
 
       // Remap keys old→new, then convert each value to its new declared type.
-      const remapped = mapPreviousColumnsToNewColumns(entries, oldColumnTypes, newColumnTypes);
+      const remapped = mapPreviousColumnsToNewColumns({
+        records: entries,
+        previousColumns: oldColumnTypes,
+        newColumns: newColumnTypes,
+        renames: columnRenames,
+      });
       const converted = convertRowsToColumnTypes(
         remapped as Record<string, unknown>[],
         newColumnTypes,

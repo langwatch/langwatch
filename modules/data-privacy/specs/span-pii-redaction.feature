@@ -104,6 +104,28 @@ Feature: Redacting personal data out of a span at ingestion
     Then the oversized value is left out of the batch
     And the span records whether some or none of it was scanned
 
+  # The batch ceiling is cumulative over every value in one span, and what caps
+  # it is latency: one analysis request must answer before the gateway gives up.
+  # A process that injected no usable number falls back to the same default the
+  # service holds, so the wiring and the fallback cannot drift apart.
+  @unit
+  Scenario: A span at the budget is analysed and one character more is not
+    Given a process that injected no usable per-span analysis budget
+    When it redacts a span whose text exactly fills the default budget
+    Then the span is analysed
+    And a span one character larger has that value left out of the batch
+
+  # Fitting the per-span batch is not the same as fitting one analysis pass: a
+  # pass reads a bounded prefix of a single text and puts the remainder back
+  # untouched. Saying nothing would store that unread tail as if it were clean,
+  # so a value longer than one pass marks the span even though it was sent.
+  @unit
+  Scenario: A value longer than one analysis pass leaves the span partly scanned
+    Given a span carrying one value longer than a single analysis pass may read
+    When a process redacts it
+    Then the value is analysed and written back
+    And the span records that only part of it was scanned
+
   @unit
   Scenario: A batch answered with the wrong number of results is refused
     Given an analysis service that answers with fewer results than it was asked about

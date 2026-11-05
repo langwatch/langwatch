@@ -1353,7 +1353,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       expect(Number(result.rows[0].value)).toBeGreaterThan(0);
       expect(codes(result)).toEqual(["UNBOUNDED_TIME_RANGE"]);
       expect(diagnostic(result, "UNBOUNDED_TIME_RANGE").meta).toEqual({
-        view: `${database}.traces`,
+        view: "traces",
         timeColumn: "OccurredAt",
       });
 

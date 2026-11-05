@@ -26,6 +26,7 @@ import { useEffect, useLayoutEffect } from "react";
 import {
   keepAnsweredReaderOnFailedReread,
   readUiActor,
+  signOutUi,
   uiAuthClient,
   UI_SESSION_QUERY_KEY,
   type UiSessionReading as UiSessionResponse,
@@ -127,6 +128,11 @@ export class BrowserUiSession extends UiSession {
   override refresh(): Promise<void> {
     if (!this.state.refresh) return super.refresh();
     return this.state.refresh();
+  }
+
+  /** Auth owns sign-out, so every screen with the control asks this port for it. */
+  override signOut(): Promise<void> {
+    return signOutUi();
   }
 }
 

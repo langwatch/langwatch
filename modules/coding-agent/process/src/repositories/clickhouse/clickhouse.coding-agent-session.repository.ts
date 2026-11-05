@@ -23,6 +23,7 @@ import type {
   CodingAgentReadMetrics,
   CodingAgentSessionListReadOutcome,
   CodingAgentSessionRepository as SessionRepository,
+  OtherSessionKind,
 } from "../coding-agent-session.repository.ts";
 import {
   clickHouseMomentOf,
@@ -617,6 +618,42 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       row: fromRecord(record),
       appliedEventIds: asStringArray(record.AppliedEventIds),
     };
+  }
+
+  /**
+   * Two `LIMIT 1` existence probes. A row-level match can only mistake a helper for main,
+   * which reads as "not first": the safe side.
+   */
+  async findOtherSessionKind({
+    tenantId,
+    excludeSessionIds,
+  }: {
+    tenantId: string;
+    excludeSessionIds: string[];
+  }): Promise<OtherSessionKind> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "CodingAgentSessionClickHouseRepository.findOtherSessionKind",
+    );
+    const probe = async (extraCondition: string): Promise<boolean> => {
+      const { rows } = await this.clickhouse.query<Record<string, unknown>>({
+        tenantId,
+        table: TABLE_NAME,
+        kind: "read",
+        sql: `
+          SELECT SessionId
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND SessionId NOT IN {excludeSessionIds:Array(String)}
+            ${extraCondition}
+          LIMIT 1
+        `,
+        params: { tenantId, excludeSessionIds },
+      });
+      return rows.length > 0;
+    };
+    if (await probe("AND Auxiliary = 0")) return "main";
+    return (await probe("")) ? "helpers_only" : "none";
   }
 
   /**

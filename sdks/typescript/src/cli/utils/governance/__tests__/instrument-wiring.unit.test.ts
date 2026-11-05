@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { appSettingsTargetFor } from "../app-settings";
 import { installTelemetryWiring } from "../instrument-wiring";
+import { piExtensionSource } from "../pi-extension-source";
+import { PI_EXTENSION_FILE_NAME } from "../pi-plugin";
 import { runningCodeRestartNotice } from "../running-code";
 import { baseCfg, installTempHomeAndCwd } from "./telemetry-refresh-test-helpers";
 
@@ -33,6 +35,91 @@ afterEach(() => {
 });
 
 describe("installTelemetryWiring", () => {
+  describe("when a Copilot surface is wired", () => {
+    it.each(["copilot", "code"])(
+      "writes the one hook file both Copilot surfaces load, for %s",
+      (tool) => {
+        installTelemetryWiring({ cfg: baseCfg(), tool, endpoint: ENDPOINT, token: TOKEN });
+
+        const hookFile = path.join(temp.home, ".copilot", "hooks", "langwatch.json");
+        expect(JSON.parse(fs.readFileSync(hookFile, "utf8"))).toMatchObject({
+          hooks: {
+            sessionStart: [{ bash: "langwatch ingest hook copilot" }],
+            agentStop: [{ bash: "langwatch ingest hook copilot" }],
+          },
+        });
+      },
+    );
+
+    describe("given a langwatch.json the user wrote at the hook file's path", () => {
+      const theirs = JSON.stringify({ hooks: { preToolUse: [{ bash: "echo guard" }] } });
+      const hookFile = () => path.join(temp.home, ".copilot", "hooks", "langwatch.json");
+
+      beforeEach(() => {
+        fs.mkdirSync(path.dirname(hookFile()), { recursive: true });
+        fs.writeFileSync(hookFile(), theirs);
+      });
+
+      /** @scenario "Instrumenting Copilot over the user's langwatch.json says repository linking is off" */
+      it.each(["copilot", "code"])(
+        "leaves it alone and warns that repository linking is off, for %s",
+        (tool) => {
+          const result = installTelemetryWiring({
+            cfg: baseCfg(),
+            tool,
+            endpoint: ENDPOINT,
+            token: TOKEN,
+          });
+
+          expect(fs.readFileSync(hookFile(), "utf8")).toBe(theirs);
+          const warning = result.warnings.find((line) => line.includes("langwatch.json"));
+          expect(warning).toContain("~/.copilot/hooks/langwatch.json is not a LangWatch file");
+          expect(warning).toContain("will not report their repository or branch");
+          expect(warning).toContain(`langwatch instrument ${tool}`);
+        },
+      );
+    });
+
+    describe("given a langwatch.json the user wrote that runs the LangWatch hook", () => {
+      const theirs = JSON.stringify({
+        hooks: {
+          sessionStart: [{ bash: "langwatch ingest hook copilot" }, { bash: "echo mine" }],
+          preToolUse: [{ bash: "echo guard" }],
+        },
+      });
+      const hookFile = () => path.join(temp.home, ".copilot", "hooks", "langwatch.json");
+
+      beforeEach(() => {
+        fs.mkdirSync(path.dirname(hookFile()), { recursive: true });
+        fs.writeFileSync(hookFile(), theirs);
+      });
+
+      /** @scenario "A user's langwatch.json that runs the LangWatch hook is not reported as turning linking off" */
+      it("leaves it alone without saying repository linking is off", () => {
+        const result = installTelemetryWiring({
+          cfg: baseCfg(),
+          tool: "copilot",
+          endpoint: ENDPOINT,
+          token: TOKEN,
+        });
+
+        expect(fs.readFileSync(hookFile(), "utf8")).toBe(theirs);
+        expect(result.warnings.join("\n")).not.toContain("langwatch.json");
+      });
+    });
+
+    it("writes no Copilot hook file for another tool", () => {
+      installTelemetryWiring({
+        cfg: baseCfg(),
+        tool: "opencode",
+        endpoint: ENDPOINT,
+        token: TOKEN,
+      });
+
+      expect(fs.existsSync(path.join(temp.home, ".copilot"))).toBe(false);
+    });
+  });
+
   describe("when langwatch code is running", () => {
     const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
     const install = (token = TOKEN) =>
@@ -153,6 +240,57 @@ describe("installTelemetryWiring", () => {
       expect(rc).toContain("gemini()");
       expect(rc).toContain(ENDPOINT);
       expect(rc).toContain(TOKEN);
+    });
+  });
+
+  describe("when the tool is pi", () => {
+    const extensionFile = () =>
+      path.join(temp.home, ".pi", "agent", "extensions", PI_EXTENSION_FILE_NAME);
+    const install = () =>
+      installTelemetryWiring({ cfg: baseCfg(), tool: "pi", endpoint: ENDPOINT, token: TOKEN });
+
+    let origAgentDir: string | undefined;
+
+    beforeEach(() => {
+      origAgentDir = process.env.PI_CODING_AGENT_DIR;
+      delete process.env.PI_CODING_AGENT_DIR;
+    });
+
+    afterEach(() => {
+      if (origAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+      else process.env.PI_CODING_AGENT_DIR = origAgentDir;
+    });
+
+    /** @scenario "Instrumenting pi writes the extension beside the shell function" */
+    it("writes the scoped pi function and the extension pi needs to send anything", () => {
+      const result = install();
+
+      expect(result.requiredFailures).toEqual([]);
+      expect(fs.readFileSync(path.join(temp.home, ".zshrc"), "utf8")).toContain("pi()");
+      expect(fs.readFileSync(extensionFile(), "utf8")).toBe(piExtensionSource());
+      expect(result.labels).toEqual([
+        "~/.zshrc",
+        `~/.pi/agent/extensions/${PI_EXTENSION_FILE_NAME}`,
+      ]);
+    });
+
+    describe("given a file of the user's at the extension's path", () => {
+      const theirs = "// my own pi extension\n";
+
+      beforeEach(() => {
+        fs.mkdirSync(path.dirname(extensionFile()), { recursive: true });
+        fs.writeFileSync(extensionFile(), theirs);
+      });
+
+      /** @scenario "Instrumenting pi over a file of the user's says pi sends no telemetry" */
+      it("leaves it alone and reports that pi sessions send no telemetry", () => {
+        const result = install();
+
+        expect(fs.readFileSync(extensionFile(), "utf8")).toBe(theirs);
+        expect(result.requiredFailures).toHaveLength(1);
+        expect(result.requiredFailures[0]).toContain("pi sessions send no telemetry");
+        expect(result.requiredFailures[0]).toContain("langwatch instrument pi");
+      });
     });
   });
 

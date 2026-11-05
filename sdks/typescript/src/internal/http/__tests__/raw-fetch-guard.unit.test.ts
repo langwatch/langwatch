@@ -11,13 +11,15 @@ import { describe, expect, it } from "vitest";
 const SRC_ROOT = resolve(__dirname, "..", "..", "..");
 
 /**
- * Files that call another server, and how many raw calls each is allowed: a
- * tunnel probe, a user's own HTTP agent. A file is not exempt as a whole, so an
- * added call fails even here.
+ * Raw calls each file may make: a tunnel probe, a user's own HTTP agent, the
+ * cloudflared download, and pi's extension (runs inside pi, without this transport).
+ * A file is not exempt as a whole, so an added call fails even here.
  */
 const NOT_LANGWATCH = new Map([
   ["cli/commands/agents/tunnel.ts", 1],
   ["cli/commands/agents/run.ts", 1],
+  ["cli/commands/agents/tunnel/cloudflared-binary.ts", 1],
+  ["cli/utils/governance/pi-extension-source.ts", 1],
 ]);
 
 /** The shared transport itself: the one file that reaches the global fetch. */

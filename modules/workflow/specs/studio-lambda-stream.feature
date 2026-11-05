@@ -13,6 +13,25 @@ Feature: Optimization studio execution on a per-project Lambda
     Then studio graphs run on the project's own function
 
   @unit
+  Scenario: A fleet naming a credentials role signs through the web identity
+    Given the fleet configuration names a credentials role
+    When the studio's dispatch is composed
+    Then every fleet client assumes that role with the process's web-identity token
+    And a static key pair the configuration also names is not used
+
+  @unit
+  Scenario: A fleet naming only a static key pair signs with those keys
+    Given the fleet configuration names a static key pair and no credentials role
+    When the studio's dispatch is composed
+    Then every fleet client signs with that key pair
+
+  @unit
+  Scenario: A fleet naming no credentials refuses the boot
+    Given the fleet configuration names neither a credentials role nor a complete key pair
+    When the configuration is loaded
+    Then it is refused, naming both ways to supply credentials
+
+  @unit
   Scenario: An absent or unusable fleet configuration leaves the HTTP path
     Given the deployment names an engine address and no execution fleet
     When the studio's dispatch is composed

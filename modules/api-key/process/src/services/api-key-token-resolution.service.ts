@@ -11,11 +11,13 @@ import {
   type OrganizationApiKeyResolution,
   type ResolvedApiKeyCredential,
   API_KEY_PREFIX,
+  CLI_LOGIN_KEY_NAME_PREFIX,
   LANGY_SESSION_API_KEY_NAME,
   WORKFLOW_RUN_API_KEY_NAME,
 } from "@langwatch/api-key-contract";
 import type * as apiKeyContractModule from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
+import { noteRequestCredential } from "@langwatch/observability/credential-census";
 import { projectIdentitySchema, type ProjectIdentity } from "@langwatch/project-contract";
 import { Temporal, fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
@@ -28,6 +30,7 @@ import {
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import { bindingsReachProject, findGrantedProjectIds } from "../rules/api-key-grant-reach.rules.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
+import { ApiKeyLastUsedService } from "./api-key-last-used.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 const logger = createLogger("langwatch:api-key:answers");
@@ -68,6 +71,8 @@ export class ApiKeyTokenResolutionService {
   }
 
   private readonly bindings: ApiKeyGrantsService;
+  /** Legacy key uses, keyed by project id: one stamp a minute per project in this process. */
+  private readonly legacyUses: ApiKeyLastUsedService;
   private readonly answerReads = new Map<string, Promise<HeldAnswer | null>>();
   private readonly legacyReads = new Map<string, Promise<ProjectIdentity | null>>();
 
@@ -77,6 +82,15 @@ export class ApiKeyTokenResolutionService {
     private readonly options: ApiKeyDependencies & { now?: () => Instant },
   ) {
     this.bindings = ApiKeyGrantsService.create({ authz: options.authz });
+    this.legacyUses = ApiKeyLastUsedService.create({
+      repository: {
+        updateLastUsedAt: async ({ id }) => {
+          await options.projects.markLegacyApiKeyUsed({ projectId: id });
+        },
+      },
+      subject: "projectId",
+      now: options.now,
+    });
   }
 
   /**
@@ -225,29 +239,21 @@ export class ApiKeyTokenResolutionService {
     projectId?: string | null;
   }): Promise<ResolvedApiKeyCredential | null> {
     const parsed = apiKeyTokenResolutionInputSchema.parse(input);
-    const tokenType = getTokenType(parsed.token);
-
-    if (tokenType === "legacyProjectKey") {
-      return this.findLegacyProjectKeyResolution(parsed.token);
-    }
-
-    if (tokenType === "apiKey") {
+    if (getTokenType(parsed.token) === "apiKey") {
       const resolved = await this.findCurrentApiKeyResolution(
         parsed.token,
         parsed.projectId ?? null,
       );
-      if (resolved) {
-        return resolved;
-      }
-
-      if (parsed.token.startsWith(API_KEY_PREFIX)) {
-        return this.findLegacyProjectKeyResolution(parsed.token);
-      }
-
-      return null;
+      if (resolved) return resolved;
+      if (!parsed.token.startsWith(API_KEY_PREFIX)) return null;
     }
 
-    return this.findLegacyProjectKeyResolution(parsed.token);
+    // A legacy key that authenticates stamps its project's last legacy use
+    // (spec: modules/api-key/specs/request-credential-type.feature).
+    const legacy = await this.findLegacyProjectKeyResolution(parsed.token);
+    if (legacy?.type === "legacyProjectKey") this.legacyUses.markUsed({ id: legacy.project.id });
+
+    return legacy;
   }
 
   async resolveOrganizationToken(input: { token: string }): Promise<OrganizationApiKeyResolution> {
@@ -255,6 +261,11 @@ export class ApiKeyTokenResolutionService {
     if (getTokenType(parsed.token) === "apiKey") {
       const apiKey = await this.findVerifiedToken({ token: parsed.token });
       if (apiKey) {
+        noteRequestCredential({
+          credentialType: keyCredentialTypeOf(apiKey),
+          apiKeyId: apiKey.id,
+          organizationId: apiKey.organizationId,
+        });
         return organizationApiKeyResolutionSchema.parse({
           ok: true,
           resolved: {
@@ -296,8 +307,14 @@ export class ApiKeyTokenResolutionService {
     token: string,
   ): Promise<ResolvedApiKeyCredential | null> {
     const project = await this.findLegacyProject(token);
+    if (!project) return null;
+    noteRequestCredential({
+      credentialType: "legacy_project_key",
+      projectId: project.id,
+      organizationId: project.organizationId,
+    });
 
-    return project ? resolvedApiKeyTokenSchema.parse({ type: "legacyProjectKey", project }) : null;
+    return resolvedApiKeyTokenSchema.parse({ type: "legacyProjectKey", project });
   }
 
   private async findCurrentApiKeyResolution(
@@ -330,6 +347,12 @@ export class ApiKeyTokenResolutionService {
     if (projectId && !bindingsReachProject(apiKey.grants, project)) {
       return null;
     }
+    noteRequestCredential({
+      credentialType: keyCredentialTypeOf(apiKey),
+      apiKeyId: apiKey.id,
+      projectId: project.id,
+      organizationId: apiKey.organizationId,
+    });
 
     return resolvedApiKeyTokenSchema.parse({
       type: "apiKey",
@@ -426,6 +449,11 @@ export class ApiKeyTokenResolutionService {
   private nowMs(): number {
     return this.now().epochMilliseconds;
   }
+}
+
+/** A key a CLI login minted is a CLI token to the credential census; any other is an API key. */
+function keyCredentialTypeOf(key: { name: string }): "cli_token" | "api_key" {
+  return key.name.startsWith(CLI_LOGIN_KEY_NAME_PREFIX) ? "cli_token" : "api_key";
 }
 
 /** Concurrent reads of one token in this process share one promise, dropped once it settles. */

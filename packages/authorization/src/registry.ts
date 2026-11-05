@@ -184,6 +184,17 @@ export const AUTHZ_RESOURCES = {
     actions: ["view", "manage"],
     scopes: ["organization"],
   },
+  // Moving a deploy label ("production") of an agent or an evaluator, and
+  // archiving one that carries a label. Editing stays `evaluations:*`, so a
+  // custom role can edit without deciding what production runs.
+  agents: {
+    actions: ["deploy"],
+    scopes: ["project", "team", "organization"],
+  },
+  evaluators: {
+    actions: ["deploy"],
+    scopes: ["project", "team", "organization"],
+  },
 } as const satisfies Record<
   string,
   {
@@ -259,6 +270,13 @@ const MANAGE_IMPLIED_ACTIONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Never implied by `manage`: only a direct grant satisfies these. Deleting
+ * the organization is irreversible, so holding `organization:manage` (a CLI
+ * `--management` key, a key minted by one) must not reach it.
+ */
+const NEVER_IMPLIED_BY_MANAGE: ReadonlySet<string> = new Set(["organization:delete"]);
+
+/**
  * True when `requested` is satisfied by the `granted` set, applying the
  * manage-implication rule. `granted` may contain non-registry strings
  * (legacy custom-role rows) — membership is string-based on purpose.
@@ -271,6 +289,7 @@ export function permissionSatisfiedBy({
   requested: string;
 }): boolean {
   if (granted.has(requested)) return true;
+  if (NEVER_IMPLIED_BY_MANAGE.has(requested)) return false;
   const separator = requested.lastIndexOf(":");
   if (separator === -1) return false;
   const action = requested.slice(separator + 1);

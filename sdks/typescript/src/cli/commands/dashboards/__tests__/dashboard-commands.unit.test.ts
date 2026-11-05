@@ -1,190 +1,93 @@
-import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
+/**
+ * The `langwatch dashboard` and `langwatch analytics-report` command trees, read off the live
+ * commander program. Spec: specs/features/dashboard-cli.feature,
+ * modules/dashboard/specs/dashboards-v2.feature (AC199s, AC199x)
+ */
+import type { Command, CommanderError } from "commander";
+import { describe, expect, it, vi } from "vitest";
 
-import {
-  DashboardsApiError,
-  DashboardsApiService,
-} from "@/client-sdk/services/dashboards/dashboards-api.service";
+import { isOutputAware } from "../../../utils/output";
 
-vi.mock("@/client-sdk/services/dashboards/dashboards-api.service", async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    DashboardsApiService: vi.fn(),
-  };
-});
-
-vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({
-    apiKey: "test-key",
-    source: "env",
-    endpoint: "https://app.langwatch.ai",
-  })),
+vi.mock("../../../utils/apiKey", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  resolveCredentials: vi.fn(async () => ({ apiKey: "k", source: "env", endpoint: "e" })),
 }));
 
-vi.mock("ora", () => ({
-  default: () => ({
-    start: vi.fn().mockReturnThis(),
-    succeed: vi.fn(),
-    fail: vi.fn(),
-  }),
-}));
+// program.ts reads the tsup-injected __CLI_VERSION__ build constant, which vitest does not define.
+(globalThis as Record<string, unknown>).__CLI_VERSION__ ??= "0.0.0-test";
 
-import { createDashboardCommand } from "../create";
-import { deleteDashboardCommand } from "../delete";
-import { listDashboardsCommand } from "../list";
+const child = (parent: Command | undefined, name: string) =>
+  parent?.commands.find((command) => command.name() === name);
+const names = (parent: Command | undefined) => parent?.commands.map((command) => command.name());
 
-class ProcessExitError extends Error {
-  constructor(public code: number) {
-    super(`process.exit(${code})`);
-  }
-}
+describe("the langwatch dashboard command group", () => {
+  /** @scenario "AC199s Split: the CLI and MCP manage Dashboards boards at /api/v1/dashboards" */
+  /** @scenario "The dashboard group manages dashboards and the widgets on them" */
+  it("offers dashboard and widget verbs, each speaking the output contract", async () => {
+    const { buildProgram } = await import("../../../program.js");
+    const dashboard = child(buildProgram(), "dashboard");
+    const widget = child(dashboard, "widget");
+    const leaves = [
+      ...["list", "get", "create", "update", "delete"].map((verb) => child(dashboard, verb)),
+      ...["schema", "list", "get", "add", "update", "delete"].map((verb) => child(widget, verb)),
+    ];
 
-const noop = () => {
-  // intentionally empty — suppresses output during tests
-};
-
-let exitSpy: MockInstance<typeof process.exit>;
-
-const mockProcessExit = () => {
-  exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
-    throw new ProcessExitError(code as number);
-  });
-};
-
-describe("listDashboardsCommand()", () => {
-  let mockList: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockList = vi.fn();
-    vi.mocked(DashboardsApiService).mockImplementation(function () {
-      return {
-        list: mockList,
-        get: vi.fn(),
-        create: vi.fn(),
-        rename: vi.fn(),
-        delete: vi.fn(),
-      } as unknown as DashboardsApiService;
-    });
-    vi.spyOn(console, "log").mockImplementation(noop);
-    vi.spyOn(console, "error").mockImplementation(noop);
-    mockProcessExit();
-  });
-
-  describe("when dashboards exist", () => {
-    it("calls list and prints output", async () => {
-      mockList.mockResolvedValue({
-        data: [
-          {
-            id: "d1",
-            name: "My Dashboard",
-            order: 0,
-            graphCount: 3,
-            createdAt: "2026-01-01",
-            updatedAt: "2026-01-02",
-          },
-        ],
-      });
-
-      await listDashboardsCommand();
-
-      expect(mockList).toHaveBeenCalledOnce();
+    expect({
+      dashboard: names(dashboard),
+      widget: names(widget),
+      get: child(dashboard, "get")?.registeredArguments.map((arg) => arg.name()),
+      add: child(widget, "add")?.registeredArguments.map((arg) => arg.name()),
+      outputAware: leaves.every((leaf) => leaf !== undefined && isOutputAware(leaf)),
+    }).toEqual({
+      dashboard: ["list", "get", "create", "update", "delete", "widget"],
+      widget: ["schema", "list", "get", "add", "update", "delete"],
+      get: ["dashboardId"],
+      add: ["dashboardId"],
+      outputAware: true,
     });
   });
 
-  describe("when no dashboards exist", () => {
-    it("prints empty-state message", async () => {
-      mockList.mockResolvedValue({ data: [] });
+  /** @scenario "A dashboard update refuses a new description and clearing it at once" */
+  it("refuses --description together with --clear-description before any request", async () => {
+    const { buildProgram } = await import("../../../program.js");
+    const program = buildProgram();
+    const update = child(child(program, "dashboard"), "update")!;
+    update.exitOverride().configureOutput({ writeErr: () => undefined });
 
-      await listDashboardsCommand();
+    const failure = await program
+      .parseAsync([
+        "node",
+        "langwatch",
+        "dashboard",
+        "update",
+        "d_1",
+        "--description",
+        "x",
+        "--clear-description",
+      ])
+      .then(
+        () => undefined,
+        (error: CommanderError) => error.code,
+      );
 
-      expect(exitSpy).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the API call fails", () => {
-    it("exits with code 1", async () => {
-      mockList.mockRejectedValue(new DashboardsApiError("Network error", "list dashboards"));
-
-      await expect(listDashboardsCommand()).rejects.toThrow(ProcessExitError);
-    });
+    expect(failure).toBe("commander.conflictingOption");
   });
 });
 
-describe("createDashboardCommand()", () => {
-  let mockCreate: ReturnType<typeof vi.fn>;
+describe("the old command names", () => {
+  /** @scenario "AC199x Names: the CLI has one dashboard tree and no old command names" */
+  it("has no dashboards, dashboard-widget or analytics-reports group, and analytics-report", async () => {
+    const { buildProgram } = await import("../../../program.js");
+    const program = buildProgram();
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockCreate = vi.fn();
-    vi.mocked(DashboardsApiService).mockImplementation(function () {
-      return {
-        list: vi.fn(),
-        get: vi.fn(),
-        create: mockCreate,
-        rename: vi.fn(),
-        delete: vi.fn(),
-      } as unknown as DashboardsApiService;
-    });
-    vi.spyOn(console, "log").mockImplementation(noop);
-    vi.spyOn(console, "error").mockImplementation(noop);
-    mockProcessExit();
-  });
-
-  describe("when creation succeeds", () => {
-    it("calls create with the name", async () => {
-      mockCreate.mockResolvedValue({ id: "d1", name: "My Dashboard" });
-
-      await createDashboardCommand("My Dashboard");
-
-      expect(mockCreate).toHaveBeenCalledWith({ name: "My Dashboard" });
-    });
-  });
-
-  describe("when creation fails", () => {
-    it("exits with code 1", async () => {
-      mockCreate.mockRejectedValue(new DashboardsApiError("Limit reached", "create dashboard"));
-
-      await expect(createDashboardCommand("My Dashboard")).rejects.toThrow(ProcessExitError);
-    });
-  });
-});
-
-describe("deleteDashboardCommand()", () => {
-  let mockDelete: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockDelete = vi.fn();
-    vi.mocked(DashboardsApiService).mockImplementation(function () {
-      return {
-        list: vi.fn(),
-        get: vi.fn(),
-        create: vi.fn(),
-        rename: vi.fn(),
-        delete: mockDelete,
-      } as unknown as DashboardsApiService;
-    });
-    vi.spyOn(console, "log").mockImplementation(noop);
-    vi.spyOn(console, "error").mockImplementation(noop);
-    mockProcessExit();
-  });
-
-  describe("when deletion succeeds", () => {
-    it("calls delete with the ID", async () => {
-      mockDelete.mockResolvedValue({ id: "d1", name: "My Dashboard" });
-
-      await deleteDashboardCommand("d1");
-
-      expect(mockDelete).toHaveBeenCalledWith("d1");
-    });
-  });
-
-  describe("when deletion fails", () => {
-    it("exits with code 1", async () => {
-      mockDelete.mockRejectedValue(new DashboardsApiError("Not found", "delete dashboard"));
-
-      await expect(deleteDashboardCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+    expect({
+      old: ["dashboards", "dashboard-widget", "analytics-reports"].filter((name) =>
+        child(program, name),
+      ),
+      reports: names(child(program, "analytics-report")),
+    }).toEqual({
+      old: [],
+      reports: ["list", "get", "update", "create", "delete"],
     });
   });
 });

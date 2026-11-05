@@ -9,6 +9,7 @@ import { nowInstant } from "@langwatch/time";
 import type { CheckupProbeChannel } from "../../../channels/checkup-probe.channel.ts";
 import type { UsageReportChannel } from "../../../channels/usage-report.channel.ts";
 import type { CloudLatestReleaseRepository } from "../../../repositories/cloud-latest-release.repository.ts";
+import type { CloudNoticeRepository } from "../../../repositories/cloud-notice.repository.ts";
 import type {
   ClickHouseHealthRepository,
   PostgresHealthRepository,
@@ -57,6 +58,8 @@ interface OpsCheckupDependencies {
     readonly upgradeLedger: Pick<UpgradeLedgerRepository, "findStatus" | "findSteps">;
     /** Where the usage report keeps the latest release cloud's reply named. */
     readonly cloudLatestRelease: CloudLatestReleaseRepository;
+    /** Where it keeps the notices the same reply named. */
+    readonly cloudNotices: CloudNoticeRepository;
   };
   readonly channels: { usageReport: UsageReportChannel; probes: CheckupProbeChannel };
   /** The ops health the usage report carries; left out where the process composes none. */
@@ -108,14 +111,15 @@ export class OpsCheckupService {
     };
   }
 
-  static create({
+  /** The usage report this install sends, built over the checkup's own dependencies. */
+  private static usageReportsOf({
     facts,
     config,
     peers,
     repositories,
     channels,
     opsHealth,
-  }: OpsCheckupDependencies): OpsCheckupService {
+  }: OpsCheckupDependencies): UsageReportService {
     const collection = UsageReportCollectionService.create({
       peers,
       opsHealth,
@@ -128,18 +132,37 @@ export class OpsCheckupService {
         gatewayConfigured: Boolean(peers.gateway.getDeploymentAddresses().baseUrl),
       }),
     });
-    const usageReports = UsageReportService.create({
+    return UsageReportService.create({
       collection,
       organizations: peers.organizationDirectory,
       channel: channels.usageReport,
       install: peers.licensing,
       latestReleases: repositories.cloudLatestRelease,
+      notices: repositories.cloudNotices,
       disabled: config.usageStats.disabled,
+      noticesDisabled: config.noticesDisabled,
       isSaas: facts.isSaas,
       now: nowInstant,
     });
-    const { postgres, clickhouse, redis, upgradeLedger } = repositories;
+  }
 
+  static create({
+    facts,
+    config,
+    peers,
+    repositories,
+    channels,
+    opsHealth,
+  }: OpsCheckupDependencies): OpsCheckupService {
+    const usageReports = OpsCheckupService.usageReportsOf({
+      facts,
+      config,
+      peers,
+      repositories,
+      channels,
+      opsHealth,
+    });
+    const { postgres, clickhouse, redis, upgradeLedger } = repositories;
     const factsFor = ({
       organizationId,
       requestedBy,

@@ -11,7 +11,7 @@ Organisations and who is in them: membership, invites, teams, groups and persona
 | Classification | core (`modules/catalogue.json`)                                                                                             |
 | Subjects       | group, invite, membership, organization, personal-workspace, personal-workspace-features, team                              |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                                 |
-| Api token      | `OrganizationApi` = `moduleApi<OrganizationApi>()("organization")`, `contract/src/organization.api.ts:856` (143 operations) |
+| Api token      | `OrganizationApi` = `moduleApi<OrganizationApi>()("organization")`, `contract/src/organization.api.ts:851` (142 operations) |
 | Other token    | `TeamManagementApi`, `process/src/transport/team.rest.ts:60`                                                                |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                                  |
 
@@ -45,6 +45,6 @@ Anything else organization needs belongs to another module and is reached throug
 
 ## Who depends on organization
 
-[annotation](../annotation/README.md), [api-key](../api-key/README.md), [auth](../auth/README.md), [coding-agent](../coding-agent/README.md), [demo-data](../../enterprise/modules/demo-data/README.md), [enterprise-gateway](../../enterprise/modules/enterprise-gateway/README.md), [feature-flag](../feature-flag/README.md), [gateway](../gateway/README.md), [github](../github/README.md), [governance](../../enterprise/modules/governance/README.md), [identity](../identity/README.md), [instant-eval](../instant-eval/README.md), [model-provider](../model-provider/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [project](../project/README.md), [slack](../slack/README.md) (as a peer).
+[annotation](../annotation/README.md), [api-key](../api-key/README.md), [auth](../auth/README.md), [coding-agent](../coding-agent/README.md), [demo-data](../../enterprise/modules/demo-data/README.md), [enterprise-gateway](../../enterprise/modules/enterprise-gateway/README.md), [feature-flag](../feature-flag/README.md), [gateway](../gateway/README.md), [github](../github/README.md), [governance](../../enterprise/modules/governance/README.md), [identity](../identity/README.md), [instant-eval](../instant-eval/README.md), [model-provider](../model-provider/README.md), [nurturing](../../enterprise/modules/nurturing/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [project](../project/README.md), [slack](../slack/README.md) (as a peer).
 
 <!-- readme:generated:end -->

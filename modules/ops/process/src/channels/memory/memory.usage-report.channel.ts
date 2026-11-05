@@ -2,13 +2,14 @@ import type { UsageReportChannel, UsageReportPostAnswer } from "../usage-report.
 
 /**
  * The report's destination in memory: every post is kept, and a host answers 200 naming no
- * latest release unless a test stated otherwise. `unreachable` makes the next post throw the way
- * a closed port does.
+ * latest release and no notices unless a test stated otherwise. `unreachable` makes the next
+ * post throw the way a closed port does.
  */
 export class MemoryUsageReportChannel implements UsageReportChannel {
   readonly posts: { endpoint: string; body: Record<string, unknown> }[] = [];
   status = 200;
   latestRelease: UsageReportPostAnswer["latestRelease"] = null;
+  notices: UsageReportPostAnswer["notices"] = [];
   unreachable = false;
 
   private constructor() {}
@@ -23,6 +24,6 @@ export class MemoryUsageReportChannel implements UsageReportChannel {
   }): Promise<UsageReportPostAnswer> {
     if (this.unreachable) throw new Error(`connect ECONNREFUSED ${input.endpoint}`);
     this.posts.push(input);
-    return { status: this.status, latestRelease: this.latestRelease };
+    return { status: this.status, latestRelease: this.latestRelease, notices: this.notices };
   }
 }

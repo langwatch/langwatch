@@ -42,6 +42,8 @@ export function instantEvalGuardrailCheckOver({
     evaluators: createApiFixture<EvaluatorApi>({ augmentResult: ({ result }) => result }),
     workflowExecutor: { run: unreachable("a workflow") },
     judges,
+    decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
+    judgeRouting: { isRouted: async () => false },
     installEnvironment: {},
   });
   const check = EvaluationGuardrailCheckService.create({

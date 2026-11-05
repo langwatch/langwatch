@@ -31,6 +31,7 @@ const (
 	ProviderGroq        = aitrace.ProviderGroq
 	ProviderCerebras    = aitrace.ProviderCerebras
 	ProviderDeepSeek    = aitrace.ProviderDeepSeek
+	ProviderDoubleword  = aitrace.ProviderDoubleword
 	ProviderVoyage      = aitrace.ProviderVoyage
 	ProviderCustom      = aitrace.ProviderCustom
 	ProviderElevenLabs  = aitrace.ProviderElevenLabs
@@ -50,4 +51,5 @@ const (
 	RequestTypeImageGeneration = aitrace.RequestTypeImageGeneration
 	RequestTypeImageEdit       = aitrace.RequestTypeImageEdit
 	RequestTypeRealtimeSession = aitrace.RequestTypeRealtimeSession
+	RequestTypeDecisions       = aitrace.RequestTypeDecisions
 )

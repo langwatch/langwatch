@@ -26,6 +26,7 @@ import {
   RESOURCE_LABELS,
   ResourceLimitsDisplay,
 } from "./resource-limits/resource-limits-display.tsx";
+import { SaasPageOpened } from "./saas-page-opened.tsx";
 
 /** The plan the limits belong to, as the first tile of the row. */
 function PlanTile({ planLabel, chipLabel }: { planLabel: string; chipLabel?: string }) {
@@ -176,6 +177,7 @@ export default function UsageScreen() {
 
   return (
     <>
+      <SaasPageOpened page="settings_usage" />
       <PageLayout.Header>
         <PageLayout.Heading>Usage and billing</PageLayout.Heading>
         <Spacer />

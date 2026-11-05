@@ -61,7 +61,7 @@ describe("the session context hook's self-heal", () => {
       });
 
       expect(healRevokedKey).toHaveBeenCalledWith({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: OLD,
       });
       expect(posted.map((request) => request.headers.Authorization)).toEqual([
@@ -271,7 +271,7 @@ describe("the session context hook's self-heal", () => {
       });
 
       expect(healRevokedKey).toHaveBeenCalledWith({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: undefined,
       });
       expect(hook.stdout).toEqual([]);
@@ -299,7 +299,7 @@ describe("the session context hook's self-heal", () => {
 
       expect(healRevokedKey).toHaveBeenCalledTimes(2);
       expect(healRevokedKey).toHaveBeenLastCalledWith({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: OLD,
       });
       expect(hook.stdout).toHaveLength(1);

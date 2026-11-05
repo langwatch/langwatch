@@ -575,6 +575,7 @@ func TestMapProvider_CustomAndBaseURLOverrides(t *testing.T) {
 		{"groq is bifrost-native", domain.Credential{ProviderID: domain.ProviderGroq}, bfschemas.Groq},
 		{"cerebras is bifrost-native", domain.Credential{ProviderID: domain.ProviderCerebras}, bfschemas.Cerebras},
 		{"deepseek maps to vllm (openai-compat)", domain.Credential{ProviderID: domain.ProviderDeepSeek}, bfschemas.VLLM},
+		{"doubleword maps to vllm (openai-compat)", domain.Credential{ProviderID: domain.ProviderDoubleword}, bfschemas.VLLM},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -631,6 +632,46 @@ func TestCredentialToBifrostKey_DeepSeekDefaultsBaseURL(t *testing.T) {
 	}
 	if key.Value.Val != "sk-ds" {
 		t.Fatalf("key.Value = %q, want api key", key.Value.Val)
+	}
+}
+
+// Doubleword is hosted like DeepSeek: the key carries only an API key, so
+// the vLLM key must default to Doubleword's public endpoint, with the /v1
+// left off because Bifrost's vLLM provider appends it.
+//
+// @scenario "The gateway sends Doubleword traffic to Doubleword's public endpoint"
+func TestCredentialToBifrostKey_DoublewordDefaultsBaseURL(t *testing.T) {
+	key := credentialToBifrostKey(domain.Credential{
+		ID:         "mp-dw",
+		ProviderID: domain.ProviderDoubleword,
+		APIKey:     "sk-dw",
+	}, bfschemas.VLLM, nil)
+
+	if key.VLLMKeyConfig == nil {
+		t.Fatal("VLLMKeyConfig is nil: vLLM keys require a per-key URL")
+	}
+	if got := key.VLLMKeyConfig.URL.Val; got != "https://api.doubleword.ai" {
+		t.Fatalf("VLLMKeyConfig.URL = %q, want Doubleword public endpoint", got)
+	}
+	if key.Value.Val != "sk-dw" {
+		t.Fatalf("key.Value = %q, want api key", key.Value.Val)
+	}
+}
+
+// A base URL on the credential still wins over the hosted default, so a
+// Doubleword key bound to another region reaches that region.
+//
+// @scenario "A configured base URL still wins over the public endpoint"
+func TestCredentialToBifrostKey_DoublewordKeepsExplicitBaseURL(t *testing.T) {
+	key := credentialToBifrostKey(domain.Credential{
+		ID:         "mp-dw-region",
+		ProviderID: domain.ProviderDoubleword,
+		APIKey:     "sk-dw",
+		Extra:      map[string]string{"base_url": "https://api.eu.doubleword.ai/v1"},
+	}, bfschemas.VLLM, nil)
+
+	if got := key.VLLMKeyConfig.URL.Val; got != "https://api.eu.doubleword.ai" {
+		t.Fatalf("VLLMKeyConfig.URL = %q, want the configured endpoint", got)
 	}
 }
 

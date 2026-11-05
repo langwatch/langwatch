@@ -25,6 +25,34 @@ export const PARK_RECONCILE_MAX_DRAIN = 1000;
 /** Reconcile cadence (ms); defines dynamic-cap TTL and claimant window multiples. */
 export const RECONCILE_INTERVAL_MS = 2000;
 
+/** Beacon refresh interval. Three refreshes fit inside {@link WORKER_LIVENESS_TTL_SECONDS}. */
+export const WORKER_LIVENESS_REFRESH_MS = 30_000;
+
+/** How often a worker refreshes the active key of a group it holds: three times per its TTL. */
+export function activeKeyHeartbeatMs({ activeTtlSec }: { activeTtlSec: number }): number {
+  return (activeTtlSec * 1000) / 3;
+}
+
+/**
+ * Milliseconds per second of active TTL a held group's ready score sits out: half the TTL, past
+ * {@link activeKeyHeartbeatMs}, so a live claim's heartbeat always re-scores it before it is due.
+ */
+export const HELD_RESCORE_MS_PER_TTL_SEC = 500;
+
+/**
+ * How soon dispatch looks again at a held group it found due: a heartbeat that ran late, or an
+ * owner whose beacon is missing. The claim and each heartbeat put a held group half its active
+ * TTL out, past the next heartbeat, so a running group stays out of the due window.
+ */
+export const CLAIM_RECHECK_MS = 30_000;
+
+/**
+ * A missing beacon is acted on only when seen again this long after it was first seen: twice the
+ * beacon refresh, so an owner back from a Redis outage republishes in between and keeps its claim
+ * (specs/claimed-job-recovery.feature).
+ */
+export const CLAIM_GONE_CONFIRM_MS = WORKER_LIVENESS_REFRESH_MS * 2;
+
 /** How far back a listed run's jobless group that stays (a failure, say) goes in its candidates. */
 const SETTLED_CANDIDATE_DELAY_MS = 3_600_000;
 
@@ -668,6 +696,31 @@ local function gqReleaseClaimMarker(claimKey, workerId, claimToken)
   end
   return redis.call("DEL", claimKey)
 end
+
+-- The held claim's owner is gone: the marker is this very claim's (its token is the claimed
+-- record's) and its owner has published no beacon at all at two looks CLAIM_GONE_CONFIRM_MS
+-- apart by Redis's clock, not the workers'. The first look only records the suspicion; an alive
+-- or retired owner, or the owner's heartbeat, clears it.
+local function gqClaimOwnerGone(keyPrefix, groupId, claimedKey)
+  local claimKey = keyPrefix .. "group:" .. groupId .. ":claim"
+  local marker = redis.call("HMGET", claimKey, "owner", "token")
+  if not marker[1] or not marker[2] or marker[2] == "" then return false end
+  if redis.call("HGET", claimedKey, "token") ~= marker[2] then return false end
+  local suspectKey = claimKey .. ":suspect"
+  if redis.call("EXISTS", keyPrefix .. "worker:" .. marker[1]) == 1 then
+    redis.call("DEL", suspectKey)
+    return false
+  end
+  local time = redis.call("TIME")
+  local nowMs = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
+  local seen = marker[2] .. "|"
+  local suspect = redis.call("GET", suspectKey)
+  if suspect and string.sub(suspect, 1, #seen) == seen then
+    return nowMs - (tonumber(string.sub(suspect, #seen + 1)) or nowMs) >= ${CLAIM_GONE_CONFIRM_MS}
+  end
+  redis.call("SET", suspectKey, seen .. nowMs, "PX", ${CLAIM_GONE_CONFIRM_MS * 3})
+  return false
+end
 `;
 
 /**
@@ -1130,6 +1183,10 @@ local guardTtlSec = tonumber(ARGV[13]) or 0
 if guardWorkerId ~= "" and (guardTtlSec <= 0 or redis.call("GET", keyPrefix .. "worker:" .. guardWorkerId) ~= "alive") then
   guardWorkerId = ""
 end
+-- The claiming worker: a group whose job it handed back is passed over (#9148). "" = none.
+local claimWorkerId = ARGV[14] or ""
+-- The soonest a group passed over for this worker comes due to it again; nil = none passed over.
+local passOverUntilMs = nil
 local claimedGroups = 0
 -- Open batches by tenant and handler, and how many more groups they can still take.
 local openBatches = {}
@@ -1250,6 +1307,23 @@ local function scanBatch(effCap, bypassPark, dispatched)
         end
         removedAllowed = removedAllowed + 1
       end
+      -- A held group that came due (a late heartbeat, a dead owner) is checked ahead of the cap
+      -- and pause checks, which must never park a running group. Its owner gone, the active key
+      -- and the dead claim's tenant slot go and the recovery below puts its jobs back; else it is
+      -- looked at again at the recheck or when the active key lapses (a retry's hold), if sooner.
+      local heldMs = groupDue and redis.call("PTTL", keyPrefix .. "group:" .. groupId .. ":active") or -2
+      if heldMs > 0 then
+        if gqClaimOwnerGone(keyPrefix, groupId, keyPrefix .. "group:" .. groupId .. ":claimed") then
+          redis.call("DEL", keyPrefix .. "group:" .. groupId .. ":active", keyPrefix .. "group:" .. groupId .. ":claim:suspect")
+          local heldTenant = parkTenantOf(groupId)
+          tenantActiveRemove(keyPrefix .. "tenant_active_z:", heldTenant, groupId)
+          tenantCapCache[heldTenant] = nil
+        else
+          redis.call("ZADD", readyKey, "XX", nowMs + math.min(heldMs, ${CLAIM_RECHECK_MS}), groupId)
+          removed = removed + 1
+          groupDue = false
+        end
+      end
       if groupDue then
 
       -- Tenant cap check (no-op when effCap == 0). capTenantId resolved
@@ -1292,8 +1366,18 @@ local function scanBatch(effCap, bypassPark, dispatched)
           -- Defensive activeKey check — covers legacy state during migration
           -- and the small race between ZADD ready and ZADD active.
           local activeJob = redis.call("GET", activeKey)
+          -- Each worker that handed this group's job back leaves it ready for a peer asleep in its
+          -- signal wait, until its own entry lapses; a completion clears them all (#9148).
+          local passedOver = false
+          if not activeJob and claimWorkerId ~= "" then
+            local handedBackUntil = tonumber(redis.call("ZSCORE", keyPrefix .. "group:" .. groupId .. ":handed-back-by", claimWorkerId))
+            if handedBackUntil and handedBackUntil > nowMs then
+              passedOver = true
+              if not passOverUntilMs or handedBackUntil < passOverUntilMs then passOverUntilMs = handedBackUntil end
+            end
+          end
 
-          if not activeJob then
+          if not activeJob and not passedOver then
           local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
           local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
           local claimedKey = keyPrefix .. "group:" .. groupId .. ":claimed"
@@ -1380,8 +1464,9 @@ local function scanBatch(effCap, bypassPark, dispatched)
               redis.call("DECR", totalPendingKey)
               redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
-              -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
-              redis.call("ZADD", readyKey, activeUntil, groupId)
+              -- Held: half the active TTL out, past the first heartbeat, so a live claim never comes
+              -- due while a dead owner's does, long before its active key lapses.
+              redis.call("ZADD", readyKey, nowMs + activeTtlSec * ${HELD_RESCORE_MS_PER_TTL_SEC}, groupId)
               if restrictedDispatch then
                 redis.call("ZADD", allowedGroupsKey, nowMs + ${IN_FLIGHT_CANDIDATE_DELAY_MS}, groupId)
               end
@@ -1488,7 +1573,7 @@ if not restrictedDispatch and globalBudget > 0 and tenantCap > 0 and dispatched 
   overrideDispatched = dispatched - beforeOverride
 end
 
-return {results, overrideDispatched, recoveredTotal}
+return {results, overrideDispatched, recoveredTotal, passOverUntilMs or 0}
 `;
 
 /**
@@ -1660,6 +1745,12 @@ gqReleaseClaimMarker(string.sub(activeKey, 1, #activeKey - 7) .. ":claim", ARGV[
 
 redis.call("DEL", claimedKey)
 redis.call("DEL", activeKey)
+-- The handed-back job is done with, so no worker that handed it back passes the group over any
+-- longer (#9148). A sibling that ran ahead of it leaves the record.
+local groupKeyPrefix = string.sub(activeKey, 1, #activeKey - 7)
+if redis.call("GET", groupKeyPrefix .. ":handed-back-job") == stagedJobId then
+  redis.call("DEL", groupKeyPrefix .. ":handed-back-by", groupKeyPrefix .. ":handed-back-job")
+end
 if endsRetryChain then
   redis.call("DEL", failStreakKey, attemptKey)
 end
@@ -1760,12 +1851,13 @@ if gqOwnsClaim(claimedKey, activeKey, stagedJobId, claimToken) then
   -- ":active" suffix) so no extra args are needed.
   local groupBase = string.sub(activeKey, 1, #activeKey - 7)
   refreshGroupKeyTtl(groupBase .. ":jobs", groupBase .. ":data", nowMs)
+  redis.call("DEL", groupBase .. ":claim:suspect")
   -- Refresh ready-zset score so it stays "active" until heartbeat stops or completion.
   -- Only update if the group is currently in ready — if RESTAGE_AND_BLOCK_LUA fired
   -- while this heartbeat was in flight, the group has been removed and we must not
   -- reinsert it (would violate "blocked => not in ready").
   if redis.call("ZSCORE", readyKey, groupId) then
-    redis.call("ZADD", readyKey, nowMs + activeTtlSec * 1000, groupId)
+    redis.call("ZADD", readyKey, nowMs + activeTtlSec * ${HELD_RESCORE_MS_PER_TTL_SEC}, groupId)
   end
   if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
     local slashPos = string.find(groupId, "/", 1, true)
@@ -1960,6 +2052,18 @@ if attempt ~= "" then
   redis.call("SET", attemptKey, attempt, "EX", attemptTtlSec)
 end
 
+-- 1c. A hand-back adds its worker to the group's record, scored by when that worker's pass-over
+--     lapses on its own clock, and names the job whose completion clears it. Both keys outlive the
+--     longest entry (#9148). A retry adds nobody.
+local handedBackBy = ARGV[15] or ""
+local passOverMs = tonumber(ARGV[16]) or 0
+if handedBackBy ~= "" and passOverMs > 0 then
+  local handedBackKey = keyPrefix .. "group:" .. groupId .. ":handed-back-by"
+  redis.call("ZADD", handedBackKey, nowMs + passOverMs, handedBackBy)
+  if redis.call("PTTL", handedBackKey) < passOverMs then redis.call("PEXPIRE", handedBackKey, passOverMs) end
+  redis.call("SET", keyPrefix .. "group:" .. groupId .. ":handed-back-job", newStagedJobId, "PX", redis.call("PTTL", handedBackKey))
+end
+
 -- 2. Re-stage job with future score (backoff delay)
 local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
 local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
@@ -2038,6 +2142,30 @@ export interface DispatchResult {
   claimGuard?: ClaimMarkerRecord;
 }
 
+/** One dispatch call: the clock, the slots to fill and who claims. */
+export interface DispatchBatchClaim {
+  nowMs: number;
+  activeTtlSec: number;
+  /** Worker slots to fill: claimed groups alone, or cross-group batches under `groupBatch`. */
+  maxJobs: number;
+  allowedGroupsKey?: string;
+  /** The listed run whose candidates these are: the scan forgets its settled groups. */
+  listKey?: string;
+  /** Up to `maxGroups` ready groups per slot, of one tenant and one of `routes`. */
+  groupBatch?: { maxGroups: number; routes: readonly string[]; maxClaims: number };
+  /** Writes this worker's poison-guard marker with each claim, while its beacon is alive. */
+  claimGuardWorkerId?: string;
+  /** The claiming worker: a group whose job it handed back is passed over meanwhile. */
+  workerId?: string;
+}
+
+/** A dispatch call's claims, and when the soonest group it passed over comes due to it again. */
+export interface ClaimedBatch {
+  claims: DispatchResult[];
+  /** On the claiming worker's clock; null when the call passed no group over. */
+  passedOverUntilMs: number | null;
+}
+
 /** One group's completion; its claim token fences it, as it fences every outcome. */
 export interface GroupCompletion {
   groupId: string;
@@ -2076,6 +2204,8 @@ export interface GroupRetryRestage {
   /** Recorded on the group's retry chain in the same atomic step. */
   attempt: number;
   attemptTtlSec: number;
+  /** A hand-back: `workerId` passes the group over for `ttlMs`, or until this job completes. */
+  passOver?: { workerId: string; ttlMs: number };
 }
 
 /**
@@ -2142,9 +2272,6 @@ export const CLAIM_MARKER_TTL_SECONDS = 60 * 60;
  * read as a death — the one piece of evidence that alone CAN park a group.
  */
 export const WORKER_LIVENESS_TTL_SECONDS = 90;
-
-/** Beacon refresh interval. Three refreshes fit inside the TTL above. */
-export const WORKER_LIVENESS_REFRESH_MS = 30_000;
 
 /**
  * How long a graceful shutdown's `retired` tombstone survives. Must outlive the
@@ -2747,7 +2874,15 @@ export class GroupStagingScripts {
    * Pick eligible groups and dispatch up to maxJobs in a single atomic Lua call.
    * Returns an array of dispatch results (may be empty).
    */
-  async dispatchBatch({
+  async dispatchBatch(claim: DispatchBatchClaim): Promise<DispatchResult[]> {
+    return (await this.claimBatch(claim)).claims;
+  }
+
+  /**
+   * {@link dispatchBatch}, with when the soonest group it passed over for `workerId` comes due to
+   * that worker again (#9148): the dispatcher waits that long rather than polling a group it skips.
+   */
+  async claimBatch({
     nowMs,
     activeTtlSec,
     maxJobs,
@@ -2755,19 +2890,8 @@ export class GroupStagingScripts {
     listKey,
     groupBatch,
     claimGuardWorkerId,
-  }: {
-    nowMs: number;
-    activeTtlSec: number;
-    /** Worker slots to fill: claimed groups alone, or cross-group batches under `groupBatch`. */
-    maxJobs: number;
-    allowedGroupsKey?: string;
-    /** The listed run whose candidates these are: the scan forgets its settled groups. */
-    listKey?: string;
-    /** Up to `maxGroups` ready groups per slot, of one tenant and one of `routes`. */
-    groupBatch?: { maxGroups: number; routes: readonly string[]; maxClaims: number };
-    /** Writes this worker's poison-guard marker with each claim, while its beacon is alive. */
-    claimGuardWorkerId?: string;
-  }): Promise<DispatchResult[]> {
+    workerId,
+  }: DispatchBatchClaim): Promise<ClaimedBatch> {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
     const pausedJobKey = `${this.keyPrefix}paused-jobs`;
@@ -2799,18 +2923,22 @@ export class GroupStagingScripts {
       String(groupBatch?.maxClaims ?? 0),
       claimGuardWorkerId ?? "",
       String(CLAIM_MARKER_TTL_SECONDS),
+      workerId ?? "",
     );
 
-    // The script returns [flatResults, overrideDispatched]. The count rides
+    // The script returns [flatResults, overrideDispatched, recovered, passOverUntil]. Counts ride
     // back with the results rather than living in a Redis key because a
     // Prometheus counter has to be per-process: one shared key reported by
     // every pod would multiply under sum(), the way the blocked-groups gauge
     // already does.
     if (!Array.isArray(result)) {
-      return [];
+      return { claims: [], passedOverUntilMs: null };
     }
 
-    const [rawResults, rawOverride, rawRecovered] = result as [unknown, unknown, unknown];
+    const [rawResults, rawOverride, rawRecovered, rawPassOver] = result as unknown[];
+    const passOverUntil = Number(rawPassOver);
+    const passedOverUntilMs =
+      Number.isSafeInteger(passOverUntil) && passOverUntil > 0 ? passOverUntil : null;
     const recovered = Number(rawRecovered);
     if (Number.isSafeInteger(recovered) && recovered > 0) {
       gqJobsRecoveredTotal.inc({ queue_name: this.queueName }, recovered);
@@ -2820,7 +2948,7 @@ export class GroupStagingScripts {
     // A layout the script cannot produce (partial tuples) means the reply is
     // corrupt: don't count anything from it, and dispatch nothing.
     if (flat.length % DISPATCH_TUPLE_SIZE !== 0) {
-      return [];
+      return { claims: [], passedOverUntilMs };
     }
 
     // Override dispatches are a subset of this batch's dispatches, so the
@@ -2835,7 +2963,7 @@ export class GroupStagingScripts {
     }
 
     if (flat.length === 0) {
-      return [];
+      return { claims: [], passedOverUntilMs };
     }
 
     const dispatched: DispatchResult[] = [];
@@ -2852,7 +2980,7 @@ export class GroupStagingScripts {
       });
     }
 
-    return dispatched;
+    return { claims: dispatched, passedOverUntilMs };
   }
 
   /**
@@ -3162,6 +3290,7 @@ export class GroupStagingScripts {
     attempt,
     attemptTtlSec,
     claimToken = "",
+    passOver,
   }: GroupRetryRestage): ScriptCall {
     // TTL = backoff + 2s buffer so the key expires just after the job becomes eligible
     const retryTtlSec = Math.ceil(backoffMs / 1000) + 2;
@@ -3185,6 +3314,8 @@ export class GroupStagingScripts {
         String(this.tenantConcurrencyCap),
         claimToken,
         this.claimMarkerOwner,
+        passOver?.workerId ?? "",
+        String(passOver?.ttlMs ?? 0),
       ],
     };
   }
@@ -3539,12 +3670,24 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Earliest dispatch-after score in the ready set, or null when empty. The
-   * dispatcher clamps its BRPOP fallback to this so a group staged with a
-   * dispatch delay still wakes when due, since nothing else re-signals it.
+   * Earliest dispatch-after score in the ready set (strictly after `afterMs`, if given), or null.
+   * The dispatcher clamps its BRPOP fallback to this so a group staged with a dispatch delay
+   * still wakes when due, since nothing else re-signals it.
    */
-  async getEarliestReadyScore(): Promise<number | null> {
-    const result = await this.redis.zrange(`${this.keyPrefix}ready`, 0, 0, "WITHSCORES");
+  async getEarliestReadyScore({ afterMs }: { afterMs?: number } = {}): Promise<number | null> {
+    const readyKey = `${this.keyPrefix}ready`;
+    const result =
+      afterMs === undefined
+        ? await this.redis.zrange(readyKey, 0, 0, "WITHSCORES")
+        : await this.redis.zrangebyscore(
+            readyKey,
+            `(${afterMs}`,
+            "+inf",
+            "WITHSCORES",
+            "LIMIT",
+            0,
+            1,
+          );
     if (result.length < 2) return null;
     const score = Number(result[1]);
     return Number.isFinite(score) ? score : null;

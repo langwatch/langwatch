@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   assertSerialWorkerSlot,
+  raiseWorkerCountInCI,
   withdrawWorkerCountOverride,
 } from "../integration-file-concurrency.ts";
 
@@ -31,6 +32,46 @@ describe("given the integration suite decides whether its files run concurrently
       withdrawWorkerCountOverride(processEnv);
 
       expect(processEnv.VITEST_MAX_WORKERS).toBe("2");
+    });
+  });
+
+  describe("when an isolated suite asks for more workers in CI", () => {
+    /** @scenario "A heavy integration suite whose files are isolated runs more of them at once in CI" */
+    it("sets the worker count and asks for concurrent files by name", () => {
+      const processEnv = env({ CI: "true", VITEST_MAX_WORKERS: "2" });
+
+      raiseWorkerCountInCI({ env: processEnv, workers: 3 });
+
+      expect(processEnv.VITEST_MAX_WORKERS).toBe("3");
+      expect(processEnv.VITEST_INTEGRATION_PARALLEL).toBe("1");
+      expect(() => assertSerialWorkerSlot({ ...processEnv, VITEST_POOL_ID: "3" })).not.toThrow();
+    });
+
+    /** @scenario "A heavy integration suite whose files are isolated runs more of them at once in CI" */
+    it("raises an unset count, and leaves one someone exported", () => {
+      const unset = env({ CI: "true" });
+      raiseWorkerCountInCI({ env: unset, workers: 3 });
+      expect(unset.VITEST_MAX_WORKERS).toBe("3");
+
+      const exported = env({ CI: "true", VITEST_MAX_WORKERS: "1" });
+      raiseWorkerCountInCI({ env: exported, workers: 3 });
+      expect(exported.VITEST_MAX_WORKERS).toBe("1");
+      expect(exported.VITEST_INTEGRATION_PARALLEL).toBeUndefined();
+    });
+
+    /** @scenario "A heavy integration suite whose files are isolated runs more of them at once in CI" */
+    it("leaves the launcher's count alone off CI", () => {
+      for (const ci of [undefined, "false", "0"]) {
+        const processEnv = env({
+          VITEST_MAX_WORKERS: "2",
+          ...(ci === undefined ? {} : { CI: ci }),
+        });
+
+        raiseWorkerCountInCI({ env: processEnv, workers: 3 });
+
+        expect(processEnv.VITEST_MAX_WORKERS).toBe("2");
+        expect(processEnv.VITEST_INTEGRATION_PARALLEL).toBeUndefined();
+      }
     });
   });
 

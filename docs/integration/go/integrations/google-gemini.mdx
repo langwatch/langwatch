@@ -1,6 +1,6 @@
 ---
 title: Google Gemini Integration
-sidebarTitle: Go
+sidebarTitle: Go SDK
 description: Instrument Google Gemini and Vertex AI calls in Go using the LangWatch SDK's native genai instrumentation.
 icon: golang
 keywords: go, golang, google, gemini, vertex ai, genai, instrumentation, langwatch, native
@@ -77,6 +77,12 @@ For the **Vertex AI** backend set `Backend: genai.BackendVertexAI`. If you build
   The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost
   when your application exits.
 </Warning>
+
+## Check it worked
+
+Run the program with `go run .`. The deferred `tp.Shutdown(ctx)` flushes the spans when `main` returns. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds, with the Gemini call as an LLM span carrying its input, output and token counts.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the program runs in.
 
 ## Related
 

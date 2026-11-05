@@ -8,7 +8,8 @@ import { DispatchError } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
-vi.mock("@langwatch/observability", () => ({
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() }),
 }));
 

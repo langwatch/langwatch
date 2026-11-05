@@ -6,10 +6,13 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { evaluatorSchema, EvaluatorApi } from "@langwatch/evaluator-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { MonitorApi, type MonitorCreateInput } from "@langwatch/monitor-contract";
+import { NotificationService } from "@langwatch/notification-contract";
 import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
@@ -54,6 +57,9 @@ function process(role: "api" | "worker") {
         instance: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
       }),
       testPeer({ token: WorkflowApi, instance: createApiFixture<WorkflowApi>() }),
+      testPeer({ token: ProjectApi, instance: createApiFixture<ProjectApi>() }),
+      testPeer({ token: UserApi, instance: createApiFixture<UserApi>() }),
+      testPeer({ token: NotificationService, instance: createApiFixture<NotificationService>() }),
     ],
   });
 }

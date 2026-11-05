@@ -9,6 +9,7 @@ import { parseImageCodeSteps } from "../src/gate/image-code-steps.ts";
 import { stampTreeRelease } from "../src/gate/image-tree.ts";
 import {
   compareReleases,
+  isPrismaMigrationFolder,
   manifestStepSchema,
   ownerFromTables,
   parseManifests,
@@ -103,7 +104,7 @@ function readTree(reader: TreeReader) {
   const prisma = { directory: reader.prismaDirectory, names: reader.list(reader.prismaDirectory) };
   const goose = { directory: reader.gooseDirectory, names: reader.list(reader.gooseDirectory) };
   const steps: ReleaseTreeSteps = {
-    prismaFolders: prisma.names.filter((name) => /^\d{14}_/.test(name)),
+    prismaFolders: prisma.names.filter((name) => isPrismaMigrationFolder({ name })),
     gooseFiles: goose.names.filter((name) => name.endsWith(".sql")),
     codeSteps: codeStepsOf(reader),
   };

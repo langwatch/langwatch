@@ -75,6 +75,7 @@ export interface LwqlPrismaRows {
     readonly passkeyNudgeDismissedAt: "DateTime?";
     readonly joinOfferDismissedDomains: "String[]";
     readonly notificationPreferences: "Json";
+    readonly passwordResetRequiredAt: "DateTime?";
   };
   readonly VerificationToken: {
     readonly id: "String";
@@ -578,6 +579,7 @@ export interface LwqlPrismaRows {
     readonly name: "String";
     readonly slug: "String";
     readonly apiKey: "String";
+    readonly legacyApiKeyLastUsedAt: "DateTime?";
     readonly lwqlKey: "String";
     readonly teamId: "String";
     readonly language: "String";
@@ -665,6 +667,11 @@ export interface LwqlPrismaRows {
     readonly threadIdleTimeout: "Int?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+    readonly autoPausedAt: "DateTime?";
+    readonly autoPausedReason: "String?";
+    readonly evaluatorLabel: "String?";
+    readonly createdById: "String?";
+    readonly updatedById: "String?";
   };
   readonly Cost: {
     readonly id: "String";
@@ -723,6 +730,33 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly DatasetVersion: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly datasetId: "String";
+    readonly version: "Int";
+    readonly name: "String?";
+    readonly trigger: "String";
+    readonly contentHash: "String";
+    readonly columnTypes: "Json";
+    readonly rowCount: "Int";
+    readonly sizeBytes: "BigInt";
+    readonly chunkCount: "Int";
+    readonly restoredFromVersion: "Int?";
+    readonly authorId: "String?";
+    readonly authorKind: "String?";
+    readonly pinnedAt: "DateTime?";
+    readonly createdAt: "DateTime";
+  };
+  readonly DatasetVersionRun: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly datasetId: "String";
+    readonly versionId: "String";
+    readonly runId: "String";
+    readonly experimentId: "String?";
+    readonly createdAt: "DateTime";
+  };
   readonly Dashboard: {
     readonly id: "String";
     readonly projectId: "String";
@@ -752,6 +786,7 @@ export interface LwqlPrismaRows {
     readonly createdById: "String?";
     readonly scope: "DashboardScope";
     readonly organizationId: "String?";
+    readonly excludedOrigins: "Json?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
@@ -1534,6 +1569,33 @@ export interface LwqlPrismaRows {
     readonly archivedAt: "DateTime?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+    readonly createdById: "String?";
+    readonly updatedById: "String?";
+  };
+  readonly AgentVersion: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly agentId: "String";
+    readonly version: "Int";
+    readonly name: "String";
+    readonly type: "String";
+    readonly config: "Json";
+    readonly workflowId: "String?";
+    readonly commitMessage: "String?";
+    readonly authorId: "String?";
+    readonly authorKind: "String?";
+    readonly createdAt: "DateTime";
+  };
+  readonly AgentVersionLabel: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly agentId: "String";
+    readonly label: "String";
+    readonly versionId: "String";
+    readonly createdById: "String?";
+    readonly updatedById: "String?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
   };
   readonly Evaluator: {
     readonly id: "String";
@@ -1545,6 +1607,33 @@ export interface LwqlPrismaRows {
     readonly workflowId: "String?";
     readonly copiedFromEvaluatorId: "String?";
     readonly archivedAt: "DateTime?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+    readonly createdById: "String?";
+    readonly updatedById: "String?";
+  };
+  readonly EvaluatorVersion: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly evaluatorId: "String";
+    readonly version: "Int";
+    readonly name: "String";
+    readonly type: "String";
+    readonly config: "Json";
+    readonly workflowId: "String?";
+    readonly commitMessage: "String?";
+    readonly authorId: "String?";
+    readonly authorKind: "String?";
+    readonly createdAt: "DateTime";
+  };
+  readonly EvaluatorVersionLabel: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly evaluatorId: "String";
+    readonly label: "String";
+    readonly versionId: "String";
+    readonly createdById: "String?";
+    readonly updatedById: "String?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
@@ -1755,6 +1844,7 @@ export interface LwqlPrismaRows {
     readonly ingestionTemplateId: "String?";
     readonly createdByDeviceLabel: "String?";
     readonly isSystemManaged: "Boolean";
+    readonly createdByBrowserSessionId: "String?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
@@ -1774,6 +1864,14 @@ export interface LwqlPrismaRows {
     readonly seeded: "Boolean";
     readonly evaluationCount: "Int";
     readonly simulationRunCount: "Int";
+    readonly codingFirstSessionAt: "DateTime?";
+    readonly codingAgentTypes: "String[]";
+    readonly codingActiveDays: "Int";
+    readonly codingLastActiveDay: "String?";
+    readonly codingTerminalTypes: "String[]";
+    readonly codingRepositoryKeys: "String[]";
+    readonly codingFirstDays: "Int[]";
+    readonly lastTraceAt: "DateTime?";
     readonly updatedAt: "DateTime";
   };
   readonly BillingMeterCheckpoint: {
@@ -2468,6 +2566,20 @@ export interface LwqlPrismaRows {
     readonly receivedAt: "DateTime";
     readonly expiresAt: "DateTime";
     readonly slackAnnouncedAt: "DateTime?";
+  };
+  readonly SelfHostedNotice: {
+    readonly id: "String";
+    readonly severity: "String";
+    readonly title: "String";
+    readonly body: "String";
+    readonly url: "String?";
+    readonly fixedIn: "String?";
+    readonly status: "String";
+    readonly expiresAt: "DateTime?";
+    readonly publishedAt: "DateTime?";
+    readonly publishedBy: "String?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
   };
   readonly SelfHostedInstanceReport: {
     readonly id: "String";

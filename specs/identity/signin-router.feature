@@ -216,9 +216,9 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the budget is spent against the address the caller connected from
 
   @unit
-  Scenario: An in-cluster ingress does not collapse every visitor into one bucket
-    Given no trusted proxy is configured
-    And the app is reached through an ingress on a private address
+  Scenario: An in-cluster ingress declared as a trusted proxy does not collapse every visitor into one bucket
+    Given the ingress's private range is configured as a trusted proxy
+    And the app is reached through that ingress
     When two visitors ask the sign-in router where an address should go
     Then the ingress is read as the deployment's own hop
     And each visitor spends a separate per-client budget

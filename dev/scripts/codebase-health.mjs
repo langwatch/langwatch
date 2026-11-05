@@ -27,6 +27,8 @@ export const DASHBOARD_LABEL = "codebase-health-dashboard";
 export const BUNDLE_GROWTH_RATIO = 0.1;
 export const LARGE_CHUNK_BYTES = 500 * 1024;
 export const TYPECHECK_ERROR_LINES = 5;
+export const HOT_SPOTS_KEPT = 5;
+export const TREND_PROGRAMS = 15;
 
 const SKIPPED_DIRECTORIES = new Set(["node_modules", ".git", ".worktrees", ".claude", ".nx"]);
 
@@ -175,13 +177,25 @@ export function buildHealth({
     instantiations: {
       total: programs.reduce((sum, program) => sum + (program.instantiations ?? 0), 0),
       programs: sorted.map(
-        ({ config, instantiations, types, checkTime, memoryUsed, hotFiles, hotGenerics }) => ({
+        ({
           config,
           instantiations,
           types,
+          symbols,
           checkTime,
           memoryUsed,
-          hotFiles: (hotFiles ?? []).slice(0, 3),
+          hotFiles,
+          hotRelations,
+          hotGenerics,
+        }) => ({
+          config,
+          instantiations,
+          types,
+          symbols,
+          checkTime,
+          memoryUsed,
+          hotFiles: (hotFiles ?? []).slice(0, HOT_SPOTS_KEPT),
+          hotRelations: (hotRelations ?? []).slice(0, HOT_SPOTS_KEPT),
           hotGenerics: (hotGenerics ?? []).slice(0, 3),
         }),
       ),
@@ -335,36 +349,100 @@ export function metricValues({ health }) {
   return values;
 }
 
-/** The body of the one pinned dashboard issue, rewritten each night. */
-export function renderDashboard({ current, previous, weekAgo, breachIssues }) {
+const change = (old, now) => (old == null || now == null ? "n/a" : percent(old, now));
+
+/** The per-program numbers the trend table compares, by config. */
+function programsByConfig({ health }) {
+  return new Map(
+    (health?.instantiations?.programs ?? []).map((program) => [program.config, program]),
+  );
+}
+
+const megabytes = (kilobytes) => (kilobytes == null ? null : Math.round(kilobytes / 1024));
+
+/**
+ * The heaviest programs tonight, each against itself 1, 7 and 30 days ago, and
+ * their hot spots: the slowest files to check and the slowest type relations.
+ */
+export function renderProgramTrends({
+  current,
+  previous,
+  weekAgo,
+  monthAgo,
+  limit = TREND_PROGRAMS,
+}) {
+  const older = [previous, weekAgo, monthAgo].map((health) => programsByConfig({ health }));
+  const programs = current.instantiations.programs.slice(0, limit);
+  const lines = [
+    "### Typecheck trends",
+    "",
+    `The ${programs.length} programs with the most type instantiations. Each change is against the same program 1, 7 and 30 days ago.`,
+    "",
+    "| program | instantiations | 1d | 7d | 30d | check s | 1d | 7d | 30d | memory MB | 30d | types | symbols |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+  ];
+  for (const program of programs) {
+    const then = older.map((byConfig) => byConfig.get(program.config));
+    const deltas = (field) => then.map((old) => change(old?.[field], program[field]));
+    lines.push(
+      `| ${program.config} | ${cell(program.instantiations)} | ${deltas("instantiations").join(" | ")} | ${cell(program.checkTime)} | ${deltas("checkTime").join(" | ")} | ${cell(megabytes(program.memoryUsed))} | ${change(then[2]?.memoryUsed, program.memoryUsed)} | ${cell(program.types)} | ${cell(program.symbols)} |`,
+    );
+  }
+  const spots = programs.filter(
+    (program) => program.hotFiles?.length > 0 || program.hotRelations?.length > 0,
+  );
+  if (spots.length > 0) {
+    lines.push("", "<details><summary>Hot spots per program</summary>", "");
+    for (const program of spots) {
+      lines.push(`**${program.config}**`, "");
+      for (const [file, ms] of program.hotFiles ?? []) lines.push(`- file \`${file}\` ${ms} ms`);
+      for (const relation of program.hotRelations ?? [])
+        lines.push(`- relation \`${relation.source}\` to \`${relation.target}\` ${relation.ms} ms`);
+      lines.push("");
+    }
+    lines.push("</details>");
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+
+/** Codebase health's section of the nightly dashboard, rewritten each night. */
+export function renderDashboard({ current, previous, weekAgo, monthAgo = null, breachIssues }) {
   const tonight = metricValues({ health: current });
   const last = metricValues({ health: previous });
   const week = metricValues({ health: weekAgo });
-  const change = (old, now) => (old == null || now == null ? "n/a" : percent(old, now));
+  const month = metricValues({ health: monthAgo });
   const lines = [
-    `## Codebase health dashboard`,
+    `## Codebase health`,
     "",
-    `Updated ${current.date} on commit \`${current.commit.slice(0, 10)}\`. Rewritten every night; no comments.`,
+    `Measured ${current.date} on commit \`${current.commit.slice(0, 10)}\`.`,
     "",
-    "| metric | tonight | change vs last night | change vs 7 days ago |",
-    "| --- | ---: | ---: | ---: |",
+    "| metric | tonight | change vs last night | change vs 7 days ago | change vs 30 days ago |",
+    "| --- | ---: | ---: | ---: | ---: |",
   ];
   for (const [metric, now] of Object.entries(tonight))
     lines.push(
-      `| ${metric} | ${cell(now)} | ${change(last[metric], now)} | ${change(week[metric], now)} |`,
+      `| ${metric} | ${cell(now)} | ${change(last[metric], now)} | ${change(week[metric], now)} | ${change(month[metric], now)} |`,
     );
-  lines.push("", "### Open breach issues", "");
+  lines.push("", renderProgramTrends({ current, previous, weekAgo, monthAgo }));
+  lines.push("### Open breach issues", "");
   if (breachIssues.length === 0) lines.push("None.");
   for (const issue of breachIssues) lines.push(`- ${issue.url} ${issue.title}`);
   lines.push("");
   return lines.join("\n");
 }
 
-/** Create the dashboard issue, or rewrite the body of the open one. */
+export const DASHBOARD_TITLE = "Nightly dashboard";
+
+/**
+ * Create the dashboard issue, or rewrite the body of the open one. Codebase
+ * health opened it; the nightly suite (.github/workflows/nightly.yml) now
+ * writes it, with this job's section among the others.
+ */
 export function planDashboard({ openIssues, body }) {
   if (openIssues.length === 0)
-    return { kind: "create", title: "Codebase health dashboard", label: DASHBOARD_LABEL, body };
-  return { kind: "edit", issue: openIssues[0], body };
+    return { kind: "create", title: DASHBOARD_TITLE, label: DASHBOARD_LABEL, body };
+  return { kind: "edit", issue: openIssues[0], title: DASHBOARD_TITLE, body };
 }
 
 function comparisonRows({ previous, current }) {
@@ -422,51 +500,57 @@ export function renderMarkdown({ previous, current, breaches }) {
 }
 
 /** What to do with the issue tracker: nothing, open an issue, or comment on the open one. */
-export function planIssue({ breaches, openIssues, date, body }) {
+export function planIssue({
+  breaches,
+  openIssues,
+  date,
+  body,
+  label = ISSUE_LABEL,
+  subject = "Codebase health",
+}) {
   if (breaches.length === 0) return { kind: "none" };
   if (openIssues.length > 0) return { kind: "comment", issue: openIssues[0], body };
-  return { kind: "open", title: `Codebase health: ${date} regressions`, label: ISSUE_LABEL, body };
+  return { kind: "open", title: `${subject}: ${date} regressions`, label, body };
 }
 
-function publishIssue({ breaches, date, body }) {
-  const gh = (args) => execFileSync("gh", args, { encoding: "utf8" });
+const gh = (args) => execFileSync("gh", args, { encoding: "utf8" });
+
+/** Open issues carrying a label, with the fields asked for. */
+export function listOpenIssues({ label, fields }) {
+  return JSON.parse(gh(["issue", "list", "--label", label, "--state", "open", "--json", fields]));
+}
+
+/** Open an issue for tonight's breaches, or comment on the open one with the label. */
+export function publishIssue({
+  breaches,
+  date,
+  body,
+  label = ISSUE_LABEL,
+  subject = "Codebase health",
+  description = "Nightly codebase health regressions",
+}) {
   const openIssues =
     breaches.length === 0
       ? []
-      : JSON.parse(
-          gh(["issue", "list", "--label", ISSUE_LABEL, "--state", "open", "--json", "number"]),
-        ).map((issue) => issue.number);
-  const plan = planIssue({ breaches, openIssues, date, body });
+      : listOpenIssues({ label, fields: "number" }).map((issue) => issue.number);
+  const plan = planIssue({ breaches, openIssues, date, body, label, subject });
   if (plan.kind === "comment") gh(["issue", "comment", String(plan.issue), "--body", plan.body]);
   if (plan.kind === "open") {
-    gh([
-      "label",
-      "create",
-      ISSUE_LABEL,
-      "--force",
-      "--description",
-      "Nightly codebase health regressions",
-    ]);
+    gh(["label", "create", label, "--force", "--description", description]);
     gh(["issue", "create", "--title", plan.title, "--label", plan.label, "--body", plan.body]);
   }
   return plan;
 }
 
-function publishDashboard({ current, previous, weekAgo }) {
-  const gh = (args) => execFileSync("gh", args, { encoding: "utf8" });
-  const list = (label, fields) =>
-    JSON.parse(gh(["issue", "list", "--label", label, "--state", "open", "--json", fields]));
-  const body = renderDashboard({
-    current,
-    previous,
-    weekAgo,
-    breachIssues: list(ISSUE_LABEL, "number,title,url"),
-  });
+/** Write the one pinned dashboard issue's body, creating and pinning it if it is absent. */
+export function publishDashboard({ body }) {
   const plan = planDashboard({
-    openIssues: list(DASHBOARD_LABEL, "number").map((issue) => issue.number),
+    openIssues: listOpenIssues({ label: DASHBOARD_LABEL, fields: "number" }).map(
+      (issue) => issue.number,
+    ),
     body,
   });
-  const file = "dashboard-body.md";
+  const file = "dashboard-issue-body.md";
   writeFileSync(file, plan.body);
   let number = plan.issue;
   if (plan.kind === "create") {
@@ -489,7 +573,7 @@ function publishDashboard({ current, previous, weekAgo }) {
       file,
     ]).trim();
     number = Number(url.split("/").pop());
-  } else gh(["issue", "edit", String(number), "--body-file", file]);
+  } else gh(["issue", "edit", String(number), "--title", plan.title, "--body-file", file]);
   try {
     const id = gh(["issue", "view", String(number), "--json", "id", "--jq", ".id"]).trim();
     gh([
@@ -543,6 +627,7 @@ function main() {
   const readJson = (path) => (read(path) ? JSON.parse(read(path)) : null);
   const previous = readJson(args.previous);
   const weekAgo = readJson(args.weekago);
+  const monthAgo = readJson(args.monthago);
   const breaches = compareHealth({ previous, current });
   const markdown = renderMarkdown({ previous, current, breaches });
   if ("dry-run" in args) {
@@ -553,12 +638,21 @@ function main() {
   }
   writeFileSync(args.out ?? "health.json", `${JSON.stringify(current, null, 2)}\n`);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown);
-  if ("publish" in args) {
+  // `--publish=false` is how a trial run from a branch keeps its hands off the issues.
+  const publishing = "publish" in args && args.publish !== "false";
+  if (publishing)
     process.stdout.write(
       `issue: ${publishIssue({ breaches, date: current.date, body: markdown }).kind}\n`,
     );
-    process.stdout.write(`dashboard: ${publishDashboard({ current, previous, weekAgo }).kind}\n`);
+  let breachIssues = [];
+  try {
+    breachIssues = listOpenIssues({ label: ISSUE_LABEL, fields: "number,title,url" });
+  } catch {
+    // Reading the issues is best effort: without a token the section lists none.
   }
+  // This job's section of the nightly dashboard; the nightly suite's last job publishes it.
+  const section = renderDashboard({ current, previous, weekAgo, monthAgo, breachIssues });
+  writeFileSync(args.dashboard ?? "dashboard-body.md", section);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

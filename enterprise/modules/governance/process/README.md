@@ -6,7 +6,7 @@ The server half of [governance](../README.md). AI governance: ingestion sources 
 
 ## Installation
 
-`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withMigrations(…)`, `src/governance.module.ts:45`.
+`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withMigrations(…)`, `src/governance.module.ts:49`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -847,14 +847,14 @@ interface Params {
 
 |             |                                              |
 | ----------- | -------------------------------------------- |
-| Declared at | `src/transport/governance-ingest.rest.ts:27` |
+| Declared at | `src/transport/governance-ingest.rest.ts:31` |
 | Base URL    | none: each route's path is its address       |
 | Addressing  | literal                                      |
 | Credential  | project                                      |
 
 #### `POST /api/ingest/otel/:sourceId` · `ingestSourceOtlpTraces`
 
-Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:32`.
+Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:36`.
 
 Answers at `/api/ingest/otel/:sourceId`, `/api/v1/ingest/otel/:sourceId`.
 
@@ -863,44 +863,44 @@ Answers at `/api/ingest/otel/:sourceId`, `/api/v1/ingest/otel/:sourceId`.
 interface Params {
   sourceId: string;
 }
-// Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:36)
-type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:49
+// Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:40)
+type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:47
 ```
 
 #### `POST /api/ingest/webhook/:sourceId` · `ingestSourceWebhook`
 
-Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:46`.
+Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:51`.
 
 Answers at `/api/ingest/webhook/:sourceId`, `/api/v1/ingest/webhook/:sourceId`.
 
 ```typescript
 type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:15
-// Rawbody: "text" (inline, src/transport/governance-ingest.rest.ts:50)
-type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:49
+// Rawbody: "text" (inline, src/transport/governance-ingest.rest.ts:55)
+type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:47
 ```
 
 #### `POST /api/ingest/otel/:sourceId/v1/logs` · `ingestSourceOtlpLogs`
 
-Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:60`.
+Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:66`.
 
 Answers at `/api/ingest/otel/:sourceId/v1/logs`.
 
 ```typescript
 type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:15
-// Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:64)
-type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:49
+// Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:70)
+type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:47
 ```
 
 #### `POST /api/ingest/otel/:sourceId/v1/metrics` · `ingestSourceOtlpMetrics`
 
-Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:74`.
+Public: an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body. Hidden from the OpenAPI document. Declared at `src/transport/governance-ingest.rest.ts:81`.
 
 Answers at `/api/ingest/otel/:sourceId/v1/metrics`.
 
 ```typescript
 type Params = z.infer<typeof governanceIngestSourceParamsSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:15
-// Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:78)
-type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:49
+// Rawbody: "bytes" (inline, src/transport/governance-ingest.rest.ts:85)
+type Headers = z.infer<typeof governanceIngestHeadersSchema>; // ../contract/src/features/ingestion/governance-ingest-rest.schemas.ts:47
 ```
 
 ### `governanceRest`
@@ -1221,14 +1221,14 @@ interface Input {
 
 // aiTools.providerAvailability
 type Input = z.infer<typeof organizationScope>; // ../contract/src/ai-tools.trpc.ts:18
-// Output: aiToolProviderAvailabilitySchema, ../contract/src/ai-tool-catalog.ts:353
+// Output: aiToolProviderAvailabilitySchema, ../contract/src/ai-tool-catalog.ts:371
 interface Output {
   configuredProviders: string[];
 }
 
 // aiTools.claudeCodeOtlpEndpoint
 type Input = z.infer<typeof organizationScope>; // ../contract/src/ai-tools.trpc.ts:18
-// Output: aiToolOtlpEndpointSchema, ../contract/src/ai-tool-catalog.ts:365
+// Output: aiToolOtlpEndpointSchema, ../contract/src/ai-tool-catalog.ts:383
 interface Output {
   endpoint: string | null;
 }
@@ -1243,7 +1243,7 @@ interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:121
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:125
 
 // aiTools.create
 // Input: aiToolCreateSchema, ../contract/src/ai-tools.trpc.ts:45
@@ -1256,7 +1256,7 @@ interface Input {
   order?: number;
   config: Record<string, unknown>;
 }
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:121
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:125
 
 // aiTools.update
 // Input: aiToolUpdateSchema, ../contract/src/ai-tools.trpc.ts:58
@@ -1271,11 +1271,11 @@ interface Input {
   type?: "coding_assistant" | "model_provider" | "external_tool";
   config?: Record<string, unknown>;
 }
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:121
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:125
 
 // aiTools.remove
 type Input = z.infer<typeof entryInOrganization>; // ../contract/src/ai-tools.trpc.ts:19
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:121
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:125
 
 // aiTools.setEnabled
 // Input: inline, ../contract/src/ai-tools.trpc.ts:94
@@ -1284,7 +1284,7 @@ interface Input {
   id: string;
   enabled: boolean;
 }
-type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:121
+type Output = z.infer<typeof aiToolEntrySchema>; // ../contract/src/ai-tool-catalog.ts:125
 
 // aiTools.importStarterPack
 // Input: inline, ../contract/src/ai-tools.trpc.ts:98
@@ -1292,7 +1292,7 @@ interface Input {
   organizationId: string;
   slugs?: string[];
 }
-// Output: aiToolStarterPackImportSchema, ../contract/src/ai-tool-catalog.ts:399
+// Output: aiToolStarterPackImportSchema, ../contract/src/ai-tool-catalog.ts:417
 interface Output {
   created: number;
   updated: number;
@@ -1773,7 +1773,7 @@ type Output = z.infer<typeof governanceBudgetOverviewForUserSchema>; // ../contr
 
 // governance.cliBootstrap
 type Input = z.infer<typeof organizationScope>; // ../contract/src/governance.trpc.ts:24
-type Output = z.infer<typeof cliBootstrapResultSchema>; // ../contract/src/features/cli/cli-bootstrap.ts:55
+type Output = z.infer<typeof cliBootstrapResultSchema>; // ../contract/src/features/cli/cli-bootstrap.ts:57
 ```
 
 ### `ingestionKey`
@@ -1874,7 +1874,7 @@ interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:76
+type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
 // ingestionSources.create
 type Input = z.infer<typeof ingestionSourceCreateInputSchema>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:32
@@ -1893,15 +1893,15 @@ interface Input {
   pullSchedule?: string | null;
   traceProjectId?: string | null;
 }
-type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:76
+type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
 // ingestionSources.rotateSecret
 type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:15
-type Output = z.infer<typeof ingestionSourceWithSecretSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:90
+type Output = z.infer<typeof ingestionSourceWithSecretSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:95
 
 // ingestionSources.archive
 type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:15
-type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:76
+type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
 // ingestionSources.validateOttl
 // Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:89
@@ -1917,7 +1917,7 @@ interface Input {
   organizationId: string;
   sourceType: string;
 }
-// Output: ottlStarterTemplateSchema, ../contract/src/features/ingestion/ingestion-source.ts:107
+// Output: ottlStarterTemplateSchema, ../contract/src/features/ingestion/ingestion-source.ts:112
 interface Output {
   enabled: boolean;
   statements: string[];

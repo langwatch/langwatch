@@ -132,8 +132,8 @@ evaluation.log("latency", { index, score: 150.5 });
 evaluation.log("accuracy", {
   index,
   passed: true,
-  target: "gpt-4",
-  metadata: { model: "openai/gpt-4" },
+  target: "gpt-6-luna",
+  metadata: { model: "openai/gpt-6-luna" },
 });
 
 // With additional data
@@ -151,8 +151,8 @@ The `withTarget()` method creates a target-scoped span with automatic latency ca
 ```typescript
 await evaluation.run(dataset, async ({ item, index }) => {
   // Run multiple targets in parallel
-  const [gpt4, claude] = await Promise.all([
-    evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
+  const [gptLuna, claude] = await Promise.all([
+    evaluation.withTarget("gpt-6-luna", { model: "openai/gpt-6-luna" }, async () => {
       const response = await openai.chat(item.question);
 
       // Target and index are auto-inferred inside withTarget()!
@@ -169,7 +169,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
   ]);
 
   // Latency is automatically captured from span duration
-  console.log(`GPT-4: ${gpt4.duration}ms, Claude: ${claude.duration}ms`);
+  console.log(`GPT-6 Luna: ${gptLuna.duration}ms, Claude: ${claude.duration}ms`);
 });
 ```
 

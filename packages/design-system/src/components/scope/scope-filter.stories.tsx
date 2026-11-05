@@ -26,7 +26,11 @@ function Demo({ initial }: { initial: ScopeFilterValue }) {
       available={{
         organization: { id: "org-1", name: "Acme" },
         teams: [{ id: "team-1", name: "Platform" }],
-        projects: [{ id: "project-1", name: "Support bot", teamId: "team-1" }],
+        projects: [
+          { id: "project-1", name: "Support bot", teamId: "team-1" },
+          { id: "project-2", name: "Billing API", teamId: "team-1" },
+          { id: "project-3", name: "Web app", teamId: "team-1" },
+        ],
       }}
       currentTeamId="team-1"
       currentProjectId="project-1"

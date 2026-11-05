@@ -13,6 +13,7 @@ function notices(send: (data: unknown) => Promise<void>) {
     recordSessionStarted: { send },
     recordSsoAutoAdded: { send },
     recordSignedUp: { send },
+    recordAppPageOpened: { send },
   });
   return { service, reportError };
 }
@@ -43,6 +44,7 @@ describe("auth's lifecycle notices", () => {
       userId: "user_ada",
       organizationId: "org_acme",
       organizationName: "Acme",
+      role: "MEMBER",
     });
     await vi.waitFor(() => expect(sent).toHaveLength(2));
 
@@ -53,6 +55,7 @@ describe("auth's lifecycle notices", () => {
         userId: "user_ada",
         organizationId: "org_acme",
         organizationName: "Acme",
+        role: "MEMBER",
         occurredAt: expect.any(Number),
       },
     ]);
@@ -78,6 +81,7 @@ describe("auth's lifecycle notices", () => {
         userId: "user_ada",
         organizationId: "org_acme",
         organizationName: "Acme",
+        role: "MEMBER",
       }),
     ).not.toThrow();
     expect(reportError).toHaveBeenCalledOnce();

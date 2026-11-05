@@ -368,7 +368,7 @@ describe("given the directory's people tab", () => {
       expect(cut(/^Members, 2 people/)).toBeInTheDocument();
     });
 
-    /** @scenario An invitation nobody has accepted still reads as invited */
+    /** @scenario An invitation not yet accepted still reads as invited */
     it("still marks the outstanding invitation as invited and counts only it", () => {
       renderPeople();
 

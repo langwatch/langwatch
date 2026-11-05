@@ -18,7 +18,7 @@ interface PartLike {
 }
 
 /** Is this part a call of the named tool, under either part shape? */
-function isToolPart(part: unknown, name: string): boolean {
+export function isToolPart(part: unknown, name: string): boolean {
   const p = part as PartLike;
   if (p?.type === `tool-${name}`) return true;
   return p?.type === "dynamic-tool" && p.toolName === name;

@@ -128,3 +128,20 @@ Feature: CLI Wrappers — `langwatch <tool>` mints and uses an ingestion key (Pa
       And no personal key is minted
       # Rerouting silently would move the project's telemetry, and its
       # billing, onto the personal gateway path.
+
+  Rule: `langwatch ingest install` says what it did with the key
+
+    @unit @cli-wrappers @ingest-key @install-report
+    Scenario: The install says it minted a key only when it minted one
+      Given no ingestion key is cached for "claude_code"
+      When the user runs `langwatch ingest install claude_code`
+      Then the run says it minted a new ingestion key
+      And the json report records the key as minted
+
+    @unit @cli-wrappers @ingest-key @install-report
+    Scenario: The install says it reused the key it already had
+      Given a live ingestion key is cached for "claude_code"
+      When the user runs `langwatch ingest install claude_code`
+      Then the run says it reused the existing ingestion key
+      And it never says it minted one
+      And the json report records the key as reused

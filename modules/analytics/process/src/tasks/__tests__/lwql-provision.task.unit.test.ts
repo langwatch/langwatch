@@ -2,6 +2,7 @@ import type * as Observability from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { lwqlAppFunctionNames } from "../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import { LangWatchQLPostgresMappingService } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,
@@ -12,6 +13,7 @@ import {
 } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
+import { LWQL_COLLECTION_UNCONFIRMED } from "../../rules/langwatch-ql-collection-probe.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import {
   convergeLwqlAccessModel,
@@ -74,21 +76,50 @@ function postgresThat({ refuses }: { refuses: boolean }) {
   return { ran, database };
 }
 
+/** The two reads showing ClickHouse holds the app's collection values, by what tells them apart. */
+const PROBES = {
+  collection: "table = {relation:String}",
+  appCredentials: "{password:String}",
+} as const;
+
 /**
- * A ClickHouse that records each DDL statement and fails the one that matches `failing`. With
- * `collections`, it holds only those named collections (an engine table on any other answers
- * 669) and reports each table in `bound` as an engine table on that collection.
+ * A ClickHouse that records DDL, fails `failing` and the named probe, holds `present` and runs as
+ * `cluster`. With `collections` it holds only those (any other answers 669), and `bound` maps
+ * each engine table to its collection.
  */
 function clickHouseThat({
   failing,
+  failingProbe,
+  present = [],
+  columns,
+  cluster,
+  mode = "rendered",
+  schema = "public",
   collections,
   bound = {},
-}: { failing?: RegExp; collections?: readonly string[]; bound?: Record<string, string> } = {}) {
+}: {
+  failing?: RegExp;
+  failingProbe?: keyof typeof PROBES;
+  present?: readonly string[];
+  /** When given, every present relation holds these columns and every app function exists. */
+  columns?: readonly string[];
+  cluster?: string;
+  mode?: "rendered" | "sql";
+  schema?: string;
+  collections?: readonly string[];
+  bound?: Record<string, string>;
+} = {}) {
   const ran: string[] = [];
+  const probed: Record<string, unknown>[] = [];
   const missingCollection = (statement: string) => {
-    const used = /ENGINE = PostgreSQL\((\w+),/.exec(statement)?.[1];
+    const used = /(?:ENGINE = PostgreSQL|postgresql)\((\w+),/.exec(statement)?.[1];
     return collections !== undefined && used !== undefined && !collections.includes(used);
   };
+  const noNamedCollection = () =>
+    Object.assign(new Error("Code: 669. DB::Exception: no named collection"), {
+      code: "669",
+      type: "NAMED_COLLECTION_DOESNT_EXIST",
+    });
   const plan: LwqlConvergencePlan = {
     request: {
       requested: true,
@@ -105,21 +136,18 @@ function clickHouseThat({
     },
     names: NAMES,
     sourceDatabase: () => NAMES.database,
-    schema: "public",
-    settings: { LWQL_ACCESS_MODEL_MODE: "rendered" },
+    schema,
+    settings: { LWQL_ACCESS_MODEL_MODE: mode, CLICKHOUSE_CLUSTER: cluster },
     openRepository: () =>
       ClickHouseLangWatchQLProvisioningRepository.create({
         statements: {
           async command(statement) {
             if (failing?.test(statement) || missingCollection(statement)) {
-              throw Object.assign(new Error("Code: 669. DB::Exception: no named collection"), {
-                code: "669",
-                type: "NAMED_COLLECTION_DOESNT_EXIST",
-              });
+              throw noNamedCollection();
             }
             ran.push(statement);
           },
-          rows: async (sql) => {
+          rows: async (sql, params) => {
             if (sql.includes("system.named_collections")) {
               return (collections ?? []).map((name) => ({ name }));
             }
@@ -129,13 +157,46 @@ function clickHouseThat({
                 engine_full: `PostgreSQL(${collection}, \`table\` = 'lwql_x') SETTINGS postgresql_connection_pool_size = 2`,
               }));
             }
+            if (sql.includes("postgresql(")) {
+              probed.push({ sql, ...params });
+              if (missingCollection(sql)) throw noNamedCollection();
+              if (failingProbe && sql.includes(PROBES[failingProbe])) {
+                throw Object.assign(
+                  new Error("Code: 614. DB::Exception: password authentication failed"),
+                  { code: "614", type: "POSTGRESQL_CONNECTION_FAILURE" },
+                );
+              }
+              return [{ name: "TenantId", type: "String" }];
+            }
+            if (columns && sql.includes("system.functions")) {
+              return lwqlAppFunctionNames().map((name) => ({ name }));
+            }
+            // As ClickHouse does: an inventory read returns only the relations it names.
+            const named = params?.relations;
+            const asked = present.filter((name) => !Array.isArray(named) || named.includes(name));
+            if (columns && sql.includes("system.columns")) {
+              return asked.map((table) => ({ table, columns }));
+            }
+            if (sql.includes("system.tables")) {
+              return asked.map((name) => ({ name, comment: "" }));
+            }
             return [];
           },
           insert: async () => undefined,
         },
       }),
   };
-  return { ran, plan };
+  /** Each engine table's comment as the statements that ran last left it. */
+  const comments = () =>
+    Object.fromEntries(
+      ran.flatMap((statement) => {
+        const stamped = /TABLE [^ .]+\.([^ ]+) .*ENGINE = PostgreSQL.* COMMENT '([^']*)'$/s.exec(
+          statement,
+        );
+        return stamped ? [[stamped[1], stamped[2]]] : [];
+      }),
+    );
+  return { ran, plan, probed, comments };
 }
 
 beforeEach(() => {
@@ -267,6 +328,328 @@ describe("convergeLwqlAccessModel", () => {
     });
   });
 
+  describe("when the reconvergence check names only the drift it found", () => {
+    const only = (drift: Partial<LwqlAppOwnedDrift>): LwqlAppOwnedDrift => ({
+      clickHouse: [],
+      postgres: [],
+      isKeyMapMissing: false,
+      ...drift,
+    });
+    const engineTable = selfProvisioning
+      .appOwnedRelations({ names: NAMES })
+      .find((name) => name.endsWith("_pg"));
+    const approvedViews = selfProvisioning.approvedPostgresViews();
+    const viewStatements = (view: string) =>
+      LangWatchQLProductionProvisioningService.create().postgresApprovedViewStatements({
+        schema: "public",
+        readerRole: LWQL_POSTGRES_READER_ROLE,
+        views: selfProvisioning.postgresDatasets({ approvedViews: [view] }),
+      });
+
+    /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
+    it("skips the PostgreSQL half when no approved view drifted, or PostgreSQL was unread", async () => {
+      for (const postgresDrift of [[], "unknown"] as const) {
+        const postgres = postgresThat({ refuses: false });
+        const clickHouse = clickHouseThat();
+
+        await convergeLwqlAccessModel({
+          database: postgres.database,
+          plan: clickHouse.plan,
+          failOnError: true,
+          only: only({ clickHouse: [engineTable ?? ""], postgres: postgresDrift }),
+        });
+
+        expect(postgres.ran).toEqual([]);
+        expect(clickHouse.ran.filter((s) => s.includes("ENGINE = PostgreSQL"))).toHaveLength(1);
+      }
+    });
+
+    /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
+    it("runs no ClickHouse DDL when only PostgreSQL drifted", async () => {
+      const postgres = postgresThat({ refuses: false });
+      const clickHouse = clickHouseThat();
+
+      await convergeLwqlAccessModel({
+        database: postgres.database,
+        plan: clickHouse.plan,
+        failOnError: true,
+        only: only({ postgres: [{ view: approvedViews[0] ?? "", absent: true }] }),
+      });
+
+      expect(postgres.ran.length).toBeGreaterThan(0);
+      expect(clickHouse.ran).toEqual([]);
+    });
+
+    /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
+    it("creates only the absent approved view, grants SELECT on each gap and never revokes", async () => {
+      const [absent, ungranted, untouched] = approvedViews;
+      if (!absent || !ungranted || !untouched) throw new Error("the catalog maps too few datasets");
+      const postgres = postgresThat({ refuses: false });
+      const ran = (statement: string) => postgres.ran.some((run) => run.endsWith(statement));
+
+      await convergeLwqlAccessModel({
+        database: postgres.database,
+        plan: clickHouseThat().plan,
+        failOnError: true,
+        only: only({
+          postgres: [
+            { view: absent, absent: true },
+            { view: ungranted, absent: false },
+          ],
+        }),
+      });
+
+      expect(viewStatements(absent).every(ran)).toBe(true);
+      expect(viewStatements(ungranted).some(ran)).toBe(false);
+      expect(viewStatements(untouched).some(ran)).toBe(false);
+      const grants = postgres.ran.join("\n");
+      expect(grants).toContain(`GRANT SELECT ON "public"."${absent}"`);
+      expect(grants).toContain(`GRANT SELECT ON "public"."${ungranted}"`);
+      expect(grants).not.toContain(`"${untouched}" TO`);
+      expect(grants).not.toMatch(/REVOKE|ALTER ROLE|CREATE ROLE/);
+    });
+
+    /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
+    it("keeps the revokes and the full grants on a deploy's converge", async () => {
+      const postgres = postgresThat({ refuses: false });
+
+      await convergeLwqlAccessModel({ database: postgres.database, plan: clickHouseThat().plan });
+
+      expect(postgres.ran.some((run) => run.includes("REVOKE ALL"))).toBe(true);
+    });
+
+    /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
+    it("logs its own failure at warn in other words than the alert, where a deploy logs the alert", async () => {
+      const failing = /ENGINE = PostgreSQL/;
+      const logsOf = async (drift: LwqlAppOwnedDrift | undefined, refuses: boolean) => {
+        logCalls.length = 0;
+        await convergeLwqlAccessModel({
+          database: postgresThat({ refuses }).database,
+          plan: clickHouseThat({ failing }).plan,
+          ...(drift ? { only: drift } : {}),
+        });
+        return logCalls;
+      };
+      const alerts = [
+        "lwql provisioning failed creating ClickHouse objects",
+        "lwql provisioning failed creating PostgreSQL objects",
+      ];
+      const gap = { view: approvedViews[0] ?? "", absent: true };
+
+      const check = await logsOf(only({ clickHouse: [engineTable ?? ""], postgres: [gap] }), true);
+      expect(check.filter((call) => call.level === "error")).toEqual([]);
+      expect(check.filter((call) => alerts.includes(String(call.message)))).toEqual([]);
+      expect(check).toContainEqual(
+        expect.objectContaining({
+          level: "warn",
+          fields: expect.objectContaining({ code: "P2010", sqlState: "42501" }),
+          message: "lwql reconvergence statement failed",
+        }),
+      );
+
+      const deploy = await logsOf(undefined, true);
+      const errors = deploy.filter((call) => call.level === "error").map((call) => call.message);
+      expect(errors).toEqual(expect.arrayContaining(alerts));
+    });
+  });
+
+  describe("when engine tables are to be rebuilt on the app's collection values", () => {
+    const engineTables = selfProvisioning.engineTablesIn({ only: undefined });
+    const [staleTable, absentTable] = engineTables;
+    const tables = () => {
+      if (!staleTable || !absentTable) {
+        throw new Error("the catalog maps too few PostgreSQL datasets");
+      }
+      return { stale: staleTable, absent: absentTable };
+    };
+    const fingerprint = selfProvisioning.credentialFingerprint({
+      postgres: {
+        endpoint: { host: "postgres", port: 5432, database: "langwatch" },
+        readerPassword: READER_PASSWORD,
+      },
+      schema: "public",
+    });
+    const check = (clickHouse: ReturnType<typeof clickHouseThat>) => {
+      const { stale, absent } = tables();
+      return convergeLwqlAccessModel({
+        database: postgresThat({ refuses: false }).database,
+        plan: clickHouse.plan,
+        failOnError: true,
+        only: { clickHouse: [stale, absent], postgres: [], isKeyMapMissing: false },
+      });
+    };
+    const rebuilt = (clickHouse: ReturnType<typeof clickHouseThat>, table: string) =>
+      clickHouse.ran.filter((s) => s.includes(`.${table} (`) && s.includes("ENGINE = PostgreSQL"));
+
+    /** @scenario "The collection probe reads the approved view in the app's PostgreSQL schema" */
+    it("binds the app's PostgreSQL schema into both probe reads", async () => {
+      const { stale } = tables();
+      const clickHouse = clickHouseThat({ present: [stale], schema: "langwatch_db" });
+
+      await check(clickHouse);
+
+      expect(clickHouse.probed.map((probe) => probe.schema)).toEqual([
+        "langwatch_db",
+        "langwatch_db",
+      ]);
+      expect(
+        clickHouse.probed.every((probe) => String(probe.sql).includes("{schema:String}")),
+      ).toBe(true);
+      expect(rebuilt(clickHouse, stale)).toEqual([
+        expect.stringContaining("schema='langwatch_db'"),
+      ]);
+    });
+
+    /** @scenario "The reconvergence check rebuilds an engine table built on other credentials" */
+    it("reads through the collection and with the app's own values, then rebuilds each stamped", async () => {
+      const { stale, absent } = tables();
+      const clickHouse = clickHouseThat({ present: [stale] });
+
+      await check(clickHouse);
+
+      expect(clickHouse.probed).toEqual([
+        expect.objectContaining({ sql: expect.stringContaining(PROBES.collection) }),
+        expect.objectContaining({ password: READER_PASSWORD, user: LWQL_POSTGRES_READER_ROLE }),
+      ]);
+      for (const probe of clickHouse.probed) {
+        expect(probe.sql).toMatch(/^DESCRIBE TABLE postgresql\(/);
+        expect(probe.sql).not.toContain(READER_PASSWORD);
+      }
+      for (const table of [stale, absent]) {
+        expect(rebuilt(clickHouse, table)).toEqual([expect.stringContaining(fingerprint)]);
+      }
+    });
+
+    /** @scenario "No engine table is rebuilt until ClickHouse holds the app's collection values" */
+    it.each(["collection", "appCredentials"] as const)(
+      "leaves a present engine table in place when the %s read fails, and still creates an absent one unstamped",
+      async (failingProbe) => {
+        const { stale, absent } = tables();
+        const clickHouse = clickHouseThat({ present: [stale], failingProbe });
+
+        await expect(check(clickHouse)).rejects.toMatchObject({
+          type: LWQL_COLLECTION_UNCONFIRMED,
+          read: failingProbe,
+        });
+
+        expect(rebuilt(clickHouse, stale)).toEqual([]);
+        expect(clickHouse.ran.some((s) => s.includes(`.${stale} AS`))).toBe(false);
+        expect(rebuilt(clickHouse, absent)).toEqual([expect.not.stringContaining("COMMENT")]);
+        expect(logCalls).toContainEqual(
+          expect.objectContaining({
+            level: "warn",
+            fields: expect.objectContaining({ read: failingProbe, clickhouseCode: 614 }),
+          }),
+        );
+        expect(JSON.stringify(logCalls)).not.toContain(READER_PASSWORD);
+      },
+    );
+
+    /** @scenario "No engine table is rebuilt until ClickHouse holds the app's collection values" */
+    it("replaces a deploy's engine tables unstamped when a read fails, so a later check rebuilds them", async () => {
+      const clickHouse = clickHouseThat({ present: engineTables, failingProbe: "collection" });
+
+      await convergeLwqlAccessModel({
+        database: postgresThat({ refuses: false }).database,
+        plan: clickHouse.plan,
+        failOnError: true,
+      });
+
+      const replaced = clickHouse.ran.filter((s) => s.includes("ENGINE = PostgreSQL"));
+      expect(replaced.length).toBe(engineTables.length);
+      for (const statement of replaced) expect(statement).not.toContain("COMMENT");
+    });
+
+    describe("when a sql-mode deploy converges", () => {
+      const deploy = async (clickHouse: ReturnType<typeof clickHouseThat>) => {
+        await convergeLwqlAccessModel({
+          database: postgresThat({ refuses: false }).database,
+          plan: clickHouse.plan,
+          failOnError: true,
+        });
+        return clickHouse.ran.filter((s) => s.includes("ENGINE = PostgreSQL"));
+      };
+
+      /** @scenario "An engine table carries a fingerprint of the named collection's values, never the password" */
+      it("stamps the engine tables unprobed once its own batch rewrote the collection", async () => {
+        const clickHouse = clickHouseThat({ present: engineTables, mode: "sql" });
+
+        const replaced = await deploy(clickHouse);
+
+        expect(replaced.length).toBe(engineTables.length);
+        for (const statement of replaced) expect(statement).toContain(fingerprint);
+        expect(clickHouse.probed).toEqual([]);
+      });
+
+      /** @scenario "No engine table is rebuilt until ClickHouse holds the app's collection values" */
+      it("probes when the collection statements were skipped, and leaves the tables unstamped when a read fails", async () => {
+        const clickHouse = clickHouseThat({
+          present: engineTables,
+          mode: "sql",
+          failing: /^(DROP|CREATE) NAMED COLLECTION/,
+          failingProbe: "collection",
+        });
+
+        const replaced = await deploy(clickHouse);
+
+        expect(clickHouse.probed).toHaveLength(1);
+        expect(replaced.length).toBe(engineTables.length);
+        for (const statement of replaced) expect(statement).not.toContain("COMMENT");
+      });
+    });
+
+    /** @scenario "The reconvergence check rebuilds an engine table built on other credentials" */
+    it("probes on a sql-mode check too, so the next check finds its rebuilt table converged", async () => {
+      const { stale } = tables();
+      const clickHouse = clickHouseThat({ present: [stale], mode: "sql" });
+
+      await check(clickHouse);
+
+      expect(clickHouse.probed).toHaveLength(2);
+      const next = selfProvisioning.findDrift({
+        names: NAMES,
+        relations: [stale],
+        functions: [],
+        found: { relations: [stale], functions: [], comments: clickHouse.comments(), columns: {} },
+        credentialFingerprint: fingerprint,
+      });
+      expect(next.objects).toEqual([]);
+    });
+
+    /** @scenario "The credential reads cover every replica of a cluster" */
+    it("runs each read on every replica of the named cluster, reading no row", async () => {
+      const { stale } = tables();
+      const clickHouse = clickHouseThat({ present: [stale], cluster: "langwatch" });
+
+      await check(clickHouse);
+
+      expect(clickHouse.probed).toHaveLength(2);
+      for (const probe of clickHouse.probed) {
+        expect(probe).toMatchObject({ cluster: "langwatch" });
+        expect(probe.sql).toMatch(
+          /^SELECT count\(\) FROM clusterAllReplicas\(\{cluster:String\}, postgresql\(.*\)\) WHERE TenantId = ''$/,
+        );
+        expect(probe.sql).not.toContain(READER_PASSWORD);
+      }
+      expect(rebuilt(clickHouse, stale)).toEqual([expect.stringContaining(fingerprint)]);
+    });
+
+    /** @scenario "The credential reads cover every replica of a cluster" */
+    it("leaves the tables in place when a replica fails either read", async () => {
+      const { stale } = tables();
+      const clickHouse = clickHouseThat({
+        present: [stale],
+        cluster: "langwatch",
+        failingProbe: "collection",
+      });
+
+      await expect(check(clickHouse)).rejects.toMatchObject({ type: LWQL_COLLECTION_UNCONFIRMED });
+      expect(rebuilt(clickHouse, stale)).toEqual([]);
+    });
+  });
+});
+
+describe("convergeLwqlAccessModel across the named collections a server holds", () => {
   describe("when an upgrade converges before the ClickHouse pods roll onto the new access config", () => {
     /** @scenario "Rendered mode keeps the named collection released chart installs bound their engine tables to" */
     it("succeeds against a server that still mounts only the released lwql_postgres collection", async () => {
@@ -381,130 +764,101 @@ describe("convergeLwqlAccessModel", () => {
       ).rejects.toMatchObject({ code: "669" });
     });
   });
+});
 
-  describe("when the reconvergence check names only the drift it found", () => {
-    const only = (drift: Partial<LwqlAppOwnedDrift>): LwqlAppOwnedDrift => ({
-      clickHouse: [],
-      postgres: [],
-      isKeyMapMissing: false,
-      ...drift,
+describe("when a PostgreSQL-backed view lacks a column over a current engine table", () => {
+  const view = LWQL_VIEW_CATALOG.find((entry) => entry.postgres !== undefined);
+  if (!view) throw new Error("the catalog maps no PostgreSQL dataset");
+  const present = [view.sourceTable, view.name];
+  const fingerprint = selfProvisioning.credentialFingerprint({
+    postgres: {
+      endpoint: { host: "postgres", port: 5432, database: "langwatch" },
+      readerPassword: READER_PASSWORD,
+    },
+    schema: "public",
+  });
+  const drift = selfProvisioning.findDrift({
+    names: NAMES,
+    relations: present,
+    functions: [],
+    found: {
+      relations: present,
+      functions: [],
+      comments: {
+        [view.sourceTable]: LangWatchQLPostgresMappingService.create().credentialComment({
+          fingerprint,
+        }),
+      },
+      columns: { [view.name]: view.columns.slice(1).map((column) => column.name) },
+    },
+    credentialFingerprint: fingerprint,
+  });
+  const converge = (clickHouse: ReturnType<typeof clickHouseThat>) =>
+    convergeLwqlAccessModel({
+      database: postgresThat({ refuses: false }).database,
+      plan: clickHouse.plan,
+      failOnError: true,
+      only: { clickHouse: drift.objects, postgres: [], isKeyMapMissing: false },
     });
-    const engineTable = selfProvisioning
-      .appOwnedRelations({ names: NAMES })
-      .find((name) => name.endsWith("_pg"));
-    const approvedViews = selfProvisioning.approvedPostgresViews();
-    const viewStatements = (view: string) =>
-      LangWatchQLProductionProvisioningService.create().postgresApprovedViewStatements({
-        schema: "public",
-        readerRole: LWQL_POSTGRES_READER_ROLE,
-        views: selfProvisioning.postgresDatasets({ approvedViews: [view] }),
-      });
+  const rebuilt = (clickHouse: ReturnType<typeof clickHouseThat>) =>
+    clickHouse.ran.findIndex(
+      (s) => s.includes(`.${view.sourceTable} (`) && s.includes("ENGINE = PostgreSQL"),
+    );
+  const replacesView = (statement: string) =>
+    new RegExp(`^CREATE OR REPLACE VIEW [^ .]+\\.${view.name}\\n`).test(statement);
 
-    /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
-    it("skips the PostgreSQL half when no approved view drifted, or PostgreSQL was unread", async () => {
-      for (const postgresDrift of [[], "unknown"] as const) {
-        const postgres = postgresThat({ refuses: false });
-        const clickHouse = clickHouseThat();
+  /** @scenario "The reconvergence check rebuilds the engine table under a PostgreSQL-backed view that lacks a column" */
+  it("names the engine table, then rebuilds it stamped before replacing the view", async () => {
+    expect(drift.objects).toEqual(present);
+    const clickHouse = clickHouseThat({ present });
 
-        await convergeLwqlAccessModel({
-          database: postgres.database,
-          plan: clickHouse.plan,
-          failOnError: true,
-          only: only({ clickHouse: [engineTable ?? ""], postgres: postgresDrift }),
-        });
+    await converge(clickHouse);
 
-        expect(postgres.ran).toEqual([]);
-        expect(clickHouse.ran.filter((s) => s.includes("ENGINE = PostgreSQL"))).toHaveLength(1);
-      }
+    const engineAt = rebuilt(clickHouse);
+    expect(clickHouse.ran[engineAt]).toContain(fingerprint);
+    expect(clickHouse.ran.findIndex(replacesView)).toBeGreaterThan(engineAt);
+  });
+
+  /** @scenario "The reconvergence check rebuilds the engine table under a PostgreSQL-backed view that lacks a column" */
+  it("leaves the engine table and its view in place while the named collection cannot be confirmed", async () => {
+    const clickHouse = clickHouseThat({ present, failingProbe: "collection" });
+
+    await expect(converge(clickHouse)).rejects.toMatchObject({ type: LWQL_COLLECTION_UNCONFIRMED });
+    expect(rebuilt(clickHouse)).toBe(-1);
+    expect(clickHouse.ran.some(replacesView)).toBe(false);
+  });
+});
+
+describe("when a view a deploy left stale drifts while the collection cannot be confirmed", () => {
+  const [engineTable] = selfProvisioning.engineTablesIn({ only: undefined });
+  if (!engineTable) throw new Error("the catalog maps no PostgreSQL engine table");
+
+  /** @scenario "The reconvergence check replaces a view a deploy left on an older definition" */
+  it("replaces the view over a fact table, then raises the unconfirmed collection", async () => {
+    const database = postgresThat({ refuses: false }).database;
+    const clickHouse = clickHouseThat({
+      present: selfProvisioning.appOwnedRelations({ names: NAMES }),
+      columns: LWQL_VIEW_CATALOG.flatMap((view) => view.columns.map((c) => c.name)).filter(
+        (name) => name !== "Source",
+      ),
+      failingProbe: "collection",
     });
+    const drift = await findLwqlAppOwnedDrift({ database, plan: clickHouse.plan });
+    expect(drift.clickHouse).toContain("trace_metrics");
 
-    /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
-    it("runs no ClickHouse DDL when only PostgreSQL drifted", async () => {
-      const postgres = postgresThat({ refuses: false });
-      const clickHouse = clickHouseThat();
-
-      await convergeLwqlAccessModel({
-        database: postgres.database,
+    await expect(
+      convergeLwqlAccessModel({
+        database,
         plan: clickHouse.plan,
         failOnError: true,
-        only: only({ postgres: [{ view: approvedViews[0] ?? "", absent: true }] }),
-      });
+        only: { clickHouse: drift.clickHouse, postgres: [], isKeyMapMissing: false },
+      }),
+    ).rejects.toMatchObject({ type: LWQL_COLLECTION_UNCONFIRMED });
 
-      expect(postgres.ran.length).toBeGreaterThan(0);
-      expect(clickHouse.ran).toEqual([]);
-    });
-
-    /** @scenario "An older worker never rewrites a newer view" */
-    it("creates only the absent approved view, grants SELECT on each gap and never revokes", async () => {
-      const [absent, ungranted, untouched] = approvedViews;
-      if (!absent || !ungranted || !untouched) throw new Error("the catalog maps too few datasets");
-      const postgres = postgresThat({ refuses: false });
-      const ran = (statement: string) => postgres.ran.some((run) => run.endsWith(statement));
-
-      await convergeLwqlAccessModel({
-        database: postgres.database,
-        plan: clickHouseThat().plan,
-        failOnError: true,
-        only: only({
-          postgres: [
-            { view: absent, absent: true },
-            { view: ungranted, absent: false },
-          ],
-        }),
-      });
-
-      expect(viewStatements(absent).every(ran)).toBe(true);
-      expect(viewStatements(ungranted).some(ran)).toBe(false);
-      expect(viewStatements(untouched).some(ran)).toBe(false);
-      const grants = postgres.ran.join("\n");
-      expect(grants).toContain(`GRANT SELECT ON "public"."${absent}"`);
-      expect(grants).toContain(`GRANT SELECT ON "public"."${ungranted}"`);
-      expect(grants).not.toContain(`"${untouched}" TO`);
-      expect(grants).not.toMatch(/REVOKE|ALTER ROLE|CREATE ROLE/);
-    });
-
-    /** @scenario "An older worker never rewrites a newer view" */
-    it("keeps the revokes and the full grants on a deploy's converge", async () => {
-      const postgres = postgresThat({ refuses: false });
-
-      await convergeLwqlAccessModel({ database: postgres.database, plan: clickHouseThat().plan });
-
-      expect(postgres.ran.some((run) => run.includes("REVOKE ALL"))).toBe(true);
-    });
-
-    /** @scenario "A failed converge is retried by the next check and alerts once per change of failure" */
-    it("logs its own failure at warn in other words than the alert, where a deploy logs the alert", async () => {
-      const failing = /ENGINE = PostgreSQL/;
-      const logsOf = async (drift: LwqlAppOwnedDrift | undefined, refuses: boolean) => {
-        logCalls.length = 0;
-        await convergeLwqlAccessModel({
-          database: postgresThat({ refuses }).database,
-          plan: clickHouseThat({ failing }).plan,
-          ...(drift ? { only: drift } : {}),
-        });
-        return logCalls;
-      };
-      const alerts = [
-        "lwql provisioning failed creating ClickHouse objects",
-        "lwql provisioning failed creating PostgreSQL objects",
-      ];
-      const gap = { view: approvedViews[0] ?? "", absent: true };
-
-      const check = await logsOf(only({ clickHouse: [engineTable ?? ""], postgres: [gap] }), true);
-      expect(check.filter((call) => call.level === "error")).toEqual([]);
-      expect(check.filter((call) => alerts.includes(String(call.message)))).toEqual([]);
-      expect(check).toContainEqual(
-        expect.objectContaining({
-          level: "warn",
-          fields: expect.objectContaining({ code: "P2010", sqlState: "42501" }),
-          message: "lwql reconvergence statement failed",
-        }),
-      );
-
-      const deploy = await logsOf(undefined, true);
-      const errors = deploy.filter((call) => call.level === "error").map((call) => call.message);
-      expect(errors).toEqual(expect.arrayContaining(alerts));
-    });
+    expect(clickHouse.ran.some((s) => s.includes(`.${engineTable} (`))).toBe(false);
+    expect(clickHouse.ran).toContainEqual(
+      expect.stringMatching(/^CREATE OR REPLACE VIEW [^ .]+\.trace_metrics\n[\s\S]* AS `Source`/),
+    );
   });
 });
 
@@ -513,14 +867,29 @@ describe("findLwqlAppOwnedDrift", () => {
   const approvedViews = selfProvisioning.approvedPostgresViews();
   const catalogColumns = LWQL_VIEW_CATALOG.flatMap((view) => view.columns.map((c) => c.name));
 
-  /** Every app-owned object present, each with `columns`; a read of columns is answered too. */
+  const { request } = clickHouseThat().plan;
+  const commentFor = (readerPassword: string) =>
+    LangWatchQLPostgresMappingService.create().credentialComment({
+      fingerprint: selfProvisioning.credentialFingerprint({
+        postgres: { endpoint: request.endpoint, readerPassword },
+        schema: "public",
+      }),
+    });
+
+  /**
+   * Every app-owned object present, each with `columns` and stamped with `readerPassword`'s
+   * fingerprint; a read of columns is answered too.
+   */
   function presentWith({
     columns,
     postgresRead = true,
+    readerPassword = READER_PASSWORD,
   }: {
     columns: string[];
     postgresRead?: boolean;
+    readerPassword?: string;
   }) {
+    const comment = commentFor(readerPassword);
     const database: LwqlProvisioningDatabase = {
       ...postgresThat({ refuses: false }).database,
       $queryRawUnsafe: async () => {
@@ -529,6 +898,7 @@ describe("findLwqlAppOwnedDrift", () => {
       },
     };
     const plan = {
+      request,
       names: NAMES,
       schema: "public",
       openRepository: () =>
@@ -542,7 +912,7 @@ describe("findLwqlAppOwnedDrift", () => {
               if (sql.includes("system.columns")) {
                 return relations.map((table) => ({ table, columns }));
               }
-              return relations.map((name) => ({ name }));
+              return relations.map((name) => ({ name, comment }));
             },
             insert: async () => undefined,
           },
@@ -551,19 +921,38 @@ describe("findLwqlAppOwnedDrift", () => {
     return findLwqlAppOwnedDrift({ database, plan });
   }
 
-  /** @scenario "An older worker never rewrites a newer view" */
-  it.each([
-    {
-      shape: "a newer deploy's extra columns",
-      columns: [...catalogColumns, "AddedByANewerDeploy"],
-    },
-    { shape: "fewer columns than this worker's catalog declares", columns: ["TenantId"] },
-  ])("finds no drift in objects holding $shape", async ({ columns }) => {
-    expect(await presentWith({ columns })).toEqual({
+  /** @scenario "An older worker never rewrites a newer view for columns it does not declare" */
+  it("finds no drift in objects holding a newer deploy's extra columns", async () => {
+    expect(await presentWith({ columns: [...catalogColumns, "AddedByANewerDeploy"] })).toEqual({
       clickHouse: [],
       postgres: [],
       isKeyMapMissing: false,
     });
+  });
+
+  /** @scenario "The reconvergence check replaces a view a deploy left on an older definition" */
+  it("names each view that lacks a column this worker's catalog declares, and the engine table under a PostgreSQL one", async () => {
+    const drift = await presentWith({ columns: catalogColumns.filter((c) => c !== "Source") });
+    const lacking = LWQL_VIEW_CATALOG.filter((view) =>
+      view.columns.some((c) => c.name === "Source"),
+    );
+
+    expect(drift.clickHouse).toEqual([
+      ...lacking.flatMap((view) => (view.postgres ? [view.sourceTable] : [])),
+      ...lacking.map((view) => view.name),
+    ]);
+    expect(drift.clickHouse).toContain("trace_metrics");
+  });
+
+  /** @scenario "The reconvergence check rebuilds an engine table built on other credentials" */
+  it("names every engine table once the reader password has changed, and nothing else", async () => {
+    const drift = await presentWith({
+      columns: catalogColumns,
+      readerPassword: "the-password-before-rotation",
+    });
+
+    expect(drift.clickHouse).toEqual(selfProvisioning.engineTablesIn({ only: undefined }));
+    expect(drift.postgres).toEqual([]);
   });
 
   /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */

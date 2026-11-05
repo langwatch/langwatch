@@ -29,6 +29,7 @@ import {
   type UngatedViewDefinition,
   withCatalogueGates,
 } from "./lwql-gate.rules.ts";
+import { sourceOfOrigin } from "./lwql-source-column.rules.ts";
 
 /**
  * How long after a write a row can be missing from these views. The projections are folded by
@@ -765,6 +766,14 @@ const TRACE_METRICS: UngatedViewDefinition = {
       sourceColumns: ["Origin"],
     },
     {
+      name: "Source",
+      type: "String",
+      description:
+        "The source the trace counts under: its Origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list. Filter it with {dashboard_context_sources:Array(String)}.",
+      sourceColumns: ["Origin"],
+      expression: (source) => sourceOfOrigin(source("Origin")),
+    },
+    {
       name: "Models",
       type: "Array(String)",
       description: "Every model used anywhere in the trace.",
@@ -1239,6 +1248,14 @@ const EVALUATION_METRICS: UngatedViewDefinition = {
       type: "Nullable(String)",
       description: "Which product surface produced the evaluated trace.",
       sourceColumns: ["Origin"],
+    },
+    {
+      name: "Source",
+      type: "String",
+      description:
+        "The source the evaluated trace counts under: its Origin when LangWatch lists it, application when the origin is missing or empty, other for any origin LangWatch does not list.",
+      sourceColumns: ["Origin"],
+      expression: (source) => sourceOfOrigin(source("Origin")),
     },
     {
       name: "DurationMs",
@@ -2560,6 +2577,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       ConversationId: "inherit",
       CustomerId: "inherit",
       Origin: "inherit",
+      Source: { source: "Origin" },
       Models: "inherit",
       Labels: "inherit",
       TotalCost: { access: { allOf: ["cost:view"] } },
@@ -2656,6 +2674,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       ConversationId: "inherit",
       CustomerId: "inherit",
       Origin: "inherit",
+      Source: { source: "Origin" },
       DurationMs: "inherit",
       TotalCost: { access: { allOf: ["cost:view"] } },
       NonBilledCost: { access: { allOf: ["cost:view"] } },
@@ -2844,6 +2863,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       RepositoryOwner: "inherit",
       RepositoryName: "inherit",
       Branch: "inherit",
+      AiUnits: "omit",
     },
   }),
   coding_tool_results: defineTableCatalogue({

@@ -1,3 +1,4 @@
+import { useRecordPageOpened } from "@langwatch/auth-client";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
@@ -15,6 +16,7 @@ import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
  */
 export function PersonalSessionsScreen() {
   const router = usePersonalRouter();
+  useRecordPageOpened({ page: "me_sessions" });
   const {
     ready,
     isPersonalProjectResolved,

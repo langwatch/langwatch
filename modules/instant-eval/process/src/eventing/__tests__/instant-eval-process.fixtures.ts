@@ -51,6 +51,7 @@ export function context(now = NOW): {
         plan: factory("plan"),
         judgePage: factory("judgePage"),
         finish: factory("finish"),
+        billLatePage: factory("billLatePage"),
       }),
     },
   };
@@ -85,6 +86,8 @@ export function view(
     skipped: 0,
     inputTokens: 0,
     requests: 0,
+    costNanoUsd: 0,
+    routedInputTokens: 0,
     cursor: null,
     cursorSpanId: null,
     hasNextPage: false,

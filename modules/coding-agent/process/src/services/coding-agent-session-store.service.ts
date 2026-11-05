@@ -1,4 +1,7 @@
-import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
+import type {
+  CodingAgentProjectionPersistence,
+  CodingTerminal,
+} from "@langwatch/coding-agent-contract";
 import type {
   FoldProjectionStore,
   ProjectionStoreContext,
@@ -11,8 +14,10 @@ import {
   type CodingAgentSessionRow,
   type CodingAgentSessionState,
 } from "../eventing/coding-agent-session.projection.ts";
+import type { RepositoryKeyOf } from "../rules/coding-agent-repository-key.rules.ts";
 import { toCodingAgentSessionRow } from "../rules/coding-agent-session-row-mapper.rules.ts";
 import { codingAgentSessionStateFromRow } from "../rules/coding-agent-session-state-mapper.rules.ts";
+import { classifyCodingTerminal } from "../rules/coding-agent-terminal-type.rules.ts";
 
 /**
  * Whether a committed row's read-back columns can be trusted. Projection
@@ -28,6 +33,23 @@ function carriesReadBackColumns(row: CodingAgentSessionRow): boolean {
   );
 }
 
+/** What a committed fold step tells the sessions-stored hook, one entry per session. */
+export interface StoredSession {
+  tenantId: string;
+  sessionId: string;
+  /** The product id (`claude_code`, `codex`); null until a span or log names it. */
+  agent: string | null;
+  /** The session's own last event time, epoch ms. */
+  occurredAt: number;
+  /** When the session was first folded (set at fold init, kept on read-back), epoch ms. */
+  firstStoredAt: number;
+  auxiliary: boolean;
+  /** The closed name of what a log event reported; null until one names it. */
+  terminalType: CodingTerminal | null;
+  /** An HMAC standing for the session's repo; null until the session declares one. */
+  repositoryKey: string | null;
+}
+
 /** Store adapter; no agent gate (dispatchers gate upstream), read-back decoding per ADR-066. */
 export class EventingCodingAgentSessionStoreService implements FoldProjectionStore<CodingAgentSessionState> {
   private constructor(
@@ -35,22 +57,26 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
     private readonly hooks: {
       defaultRetentionDays: () => number;
       /**
-       * Called after a commit with the distinct tenants whose sessions were
-       * stored — the seam `createCodingAgentSessionSeenTouch` rides. Fire-and-forget:
-       * the callback owns its own errors, never blocking the committed row.
+       * Called after a commit with the sessions stored: the seam the activity stamp
+       * and the session-stored fact ride. Fire-and-forget: the callback owns its own
+       * errors, never blocking the committed row.
        */
-      onSessionsStored?: (tenantIds: string[]) => Promise<void>;
+      onSessionsStored?: (sessions: StoredSession[]) => Promise<void>;
+      /** Absent, no stored session names a repo. */
+      repositoryKeyOf?: RepositoryKeyOf;
     },
   ) {}
 
   static create(input: {
     persistence: CodingAgentProjectionPersistence;
     defaultRetentionDays: () => number;
-    onSessionsStored?: (tenantIds: string[]) => Promise<void>;
+    onSessionsStored?: (sessions: StoredSession[]) => Promise<void>;
+    repositoryKeyOf?: RepositoryKeyOf;
   }): EventingCodingAgentSessionStoreService {
     return new EventingCodingAgentSessionStoreService(input.persistence, {
       defaultRetentionDays: input.defaultRetentionDays,
       onSessionsStored: input.onSessionsStored,
+      repositoryKeyOf: input.repositoryKeyOf,
     });
   }
 
@@ -58,7 +84,7 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
     if (!hasPersistableSignal(state)) return;
     const entry = this.toRow(state, context);
     await this.persistence.storeSession(entry);
-    this.reportSessionsStored([String(context.tenantId)]);
+    this.reportSessionsStored([toStoredSession(state, context, this.hooks.repositoryKeyOf)]);
   }
 
   async storeBatch(
@@ -71,18 +97,17 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
     const rows = persistable.map(({ state, context }) => this.toRow(state, context));
     if (rows.length === 0) return;
 
-    const tenantIds = [...new Set(persistable.map(({ context }) => String(context.tenantId)))];
     await this.persistence.storeSessionBatch(rows);
-    this.reportSessionsStored(tenantIds);
+    this.reportSessionsStored(
+      persistable.map(({ state, context }) =>
+        toStoredSession(state, context, this.hooks.repositoryKeyOf),
+      ),
+    );
   }
 
-  /**
-   * Fire-and-forget by contract: the callback swallows its own failures, and
-   * a hook that rejects anyway must surface as nothing worse than a dropped
-   * stamp, never an unhandled rejection in the worker.
-   */
-  private reportSessionsStored(tenantIds: string[]): void {
-    void this.hooks.onSessionsStored?.(tenantIds).catch(() => undefined);
+  /** Fire-and-forget: a rejecting hook costs a dropped stamp, never an unhandled rejection. */
+  private reportSessionsStored(sessions: StoredSession[]): void {
+    void this.hooks.onSessionsStored?.(sessions).catch(() => undefined);
   }
 
   private toRow(
@@ -149,6 +174,31 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
 
     return state === null ? { kind: "empty" } : { kind: "folded", state };
   }
+}
+
+function toStoredSession(
+  state: CodingAgentSessionState,
+  context: ProjectionStoreContext,
+  repositoryKeyOf: RepositoryKeyOf | undefined,
+): StoredSession {
+  return {
+    tenantId: String(context.tenantId),
+    sessionId: String(context.aggregateId),
+    agent: state.agent,
+    occurredAt: state.LastEventOccurredAt,
+    firstStoredAt: state.createdAt,
+    auxiliary: state.auxiliary,
+    terminalType: classifyCodingTerminal(state.terminalType) ?? null,
+    // The same bar extractWorkingContext sets for naming a repo: owner and name.
+    repositoryKey:
+      state.repositoryOwner && state.repositoryName
+        ? (repositoryKeyOf?.({
+            repositoryHost: state.repositoryHost,
+            repositoryOwner: state.repositoryOwner,
+            repositoryName: state.repositoryName,
+          }) ?? null)
+        : null,
+  };
 }
 
 /** Session worth a row once it signals: prompt, call, tokens, cost, name, or repo. */

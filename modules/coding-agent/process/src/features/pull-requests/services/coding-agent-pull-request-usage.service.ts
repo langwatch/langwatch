@@ -1,9 +1,12 @@
-import type {
-  CodingAgentContributorProject,
-  CodingAgentSessionBranchRecord,
+import {
+  type CodingAgentContributorProject,
+  type CodingAgentSessionBranchRecord,
+  SPAN_FED_MODEL_CALL_AGENT_IDS,
 } from "@langwatch/coding-agent-contract";
 
 import type { SessionModelTotalsRow } from "../../../repositories/coding-agent-session-event.repository.ts";
+import { isCostUnknown } from "../../../rules/coding-agent-pull-request.rules.ts";
+import type { CodingAgentCostEstimator } from "../../../services/model-catalog-cost-estimator.service.ts";
 
 export type CodingAgentUsageRow = {
   projectId: string;
@@ -39,7 +42,12 @@ export type CodingAgentModelUsage = {
   totalTokens: number;
   costUsd: number | null;
   tokensKnown: boolean;
+  /** Null when the model's figures are not known, as its tokens are. */
+  aiUnits: number | null;
 };
+
+/** One (session, model, context) per-call total the reads price; `priced` false is unknown cost. */
+export type PullRequestModelTotalsRow = SessionModelTotalsRow & { priced: boolean };
 
 type CodingAgentUsageTotals = {
   sessionsCount: number;
@@ -55,11 +63,13 @@ type CodingAgentUsageTotals = {
 
 /** Private value collaborator that keeps usage aggregation consistent across reads. */
 export class CodingAgentPullRequestUsageService {
-  static create(): CodingAgentPullRequestUsageService {
-    return new CodingAgentPullRequestUsageService();
+  static create(options: {
+    modelProviders: CodingAgentCostEstimator;
+  }): CodingAgentPullRequestUsageService {
+    return new CodingAgentPullRequestUsageService(options.modelProviders);
   }
 
-  private constructor() {}
+  private constructor(private readonly modelProviders: CodingAgentCostEstimator) {}
 
   ingestSourceType(agent: string): string {
     if (agent === "gemini_cli") {
@@ -152,21 +162,53 @@ export class CodingAgentPullRequestUsageService {
     }
   }
 
+  /** Whether the read may show a session's cost: its project is priced and a price was known. */
+  isSessionPriced({
+    session,
+    costProjects,
+    costUnknown,
+  }: {
+    session: CodingAgentSessionBranchRecord;
+    costProjects: ReadonlySet<string>;
+    costUnknown: ReadonlySet<string>;
+  }): boolean {
+    const pricedProject = costProjects.has(session.tenantId);
+    const knownPrice = !costUnknown.has(sessionKeyOf(session));
+    return pricedProject && knownPrice;
+  }
+
+  /** The sessions whose every model total on the pull request had no price: cost unknown. */
+  costUnknownSessions(totals: readonly PullRequestModelTotalsRow[]): ReadonlySet<string> {
+    const usageBySession = new Map<string, PullRequestModelTotalsRow[]>();
+    for (const total of totals) {
+      const sessionKey = sessionKeyOf(total);
+      usageBySession.set(sessionKey, [...(usageBySession.get(sessionKey) ?? []), total]);
+    }
+
+    return new Set(
+      [...usageBySession]
+        .filter(([, usage]) => isCostUnknown(usage))
+        .map(([sessionKey]) => sessionKey),
+    );
+  }
+
   groupedRows({
     sessions,
     costProjects,
+    costUnknown,
     nonBillableAgents,
     projects,
   }: {
     sessions: readonly CodingAgentSessionBranchRecord[];
     costProjects: ReadonlySet<string>;
+    costUnknown: ReadonlySet<string>;
     nonBillableAgents: ReadonlySet<string>;
     projects: Record<string, CodingAgentContributorProject>;
   }): CodingAgentUsageRow[] {
     const grouped = new Map<string, CodingAgentUsageRow & { modelSet: Set<string> }>();
     for (const session of sessions) {
       const key = `${session.tenantId}\0${session.agent}`;
-      const priced = costProjects.has(session.tenantId);
+      const priced = this.isSessionPriced({ session, costProjects, costUnknown });
       const nonBilled = nonBillableAgents.has(session.agent);
       const row = grouped.get(key);
       if (!row) {
@@ -218,47 +260,98 @@ export class CodingAgentPullRequestUsageService {
     );
   }
 
+  /**
+   * Each per-call total with whether its cost is known. A log-fed agent's cost is the one it
+   * reported, so it is; a span-fed agent's is computed from the catalogue, so a model no price
+   * covers reads as unknown, never as a confident zero.
+   */
+  modelTotalsOf({
+    sessions,
+    eventTotals,
+  }: {
+    sessions: readonly CodingAgentSessionBranchRecord[];
+    eventTotals: readonly SessionModelTotalsRow[];
+  }): PullRequestModelTotalsRow[] {
+    const agentOf = new Map(sessions.map((session) => [sessionKeyOf(session), session.agent]));
+    return eventTotals.map((total) => ({
+      ...total,
+      priced: this.isPricedAs({
+        agent: agentOf.get(sessionKeyOf(total)) ?? "",
+        model: total.model,
+      }),
+    }));
+  }
+
+  /** Whether an agent's cost on a model is known: see {@link modelTotalsOf}. */
+  isPricedAs({ agent, model }: { agent: string; model: string }): boolean {
+    return !SPAN_FED_MODEL_CALL_AGENT_IDS.has(agent) || this.modelProviders.isModelPriced(model);
+  }
+
   modelUsage(
     sessions: readonly CodingAgentSessionBranchRecord[],
-    totals: readonly SessionModelTotalsRow[],
+    totals: readonly PullRequestModelTotalsRow[],
     costProjects: ReadonlySet<string>,
   ): CodingAgentModelUsage[] {
     const attached = new Set(
       sessions.map((session) => `${session.tenantId}\0${session.sessionId}`),
     );
     const byModel = new Map<string, CodingAgentModelUsage>();
+    const unpriced = new Set<string>();
+    const withTotals = new Set<string>();
     for (const total of totals) {
-      if (!attached.has(`${total.tenantId}\0${total.sessionId}`) || total.model === "") {
+      const sessionKey = `${total.tenantId}\0${total.sessionId}`;
+      if (!attached.has(sessionKey) || total.model === "") {
         continue;
       }
 
-      const existing = byModel.get(total.model) ?? {
-        model: total.model,
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheReadTokens: 0,
-        cacheCreationTokens: 0,
-        totalTokens: 0,
-        costUsd: null,
-        tokensKnown: true,
-      };
-      existing.inputTokens += total.inputTokens;
-      existing.outputTokens += total.outputTokens;
-      existing.cacheReadTokens += total.cacheReadTokens;
-      existing.cacheCreationTokens += total.cacheCreationTokens;
-      existing.totalTokens += this.tokenTotal(total);
-      if (costProjects.has(total.tenantId)) {
-        existing.costUsd = (existing.costUsd ?? 0) + total.costUsd;
+      withTotals.add(sessionKey);
+      if (!total.priced) {
+        unpriced.add(total.model);
       }
-
-      byModel.set(total.model, existing);
+      byModel.set(
+        total.model,
+        this.addModelTotal({
+          usage: byModel.get(total.model) ?? emptyModelUsage(total.model),
+          total,
+          costed: costProjects.has(total.tenantId),
+        }),
+      );
     }
 
-    if (byModel.size > 0) {
-      return [...byModel.values()].toSorted((a, b) => b.totalTokens - a.totalTokens);
-    }
+    // A model a session without per-model figures also ran is not fully known: its line would
+    // otherwise count only the other sessions while the totals count them all.
+    const unrecorded = this.unknownModels(
+      sessions.filter((session) => !withTotals.has(`${session.tenantId}\0${session.sessionId}`)),
+    );
+    const unrecordedModels = new Set(unrecorded.map((usage) => usage.model));
+    const known = [...byModel.values()]
+      .filter((usage) => !unrecordedModels.has(usage.model))
+      .map((usage) => (unpriced.has(usage.model) ? { ...usage, costUsd: null } : usage))
+      .toSorted((a, b) => b.totalTokens - a.totalTokens);
 
-    return this.unknownModels(sessions);
+    return [...known, ...unrecorded];
+  }
+
+  /** One total added onto its model's running usage; AI units never touch the dollar figure. */
+  private addModelTotal({
+    usage,
+    total,
+    costed,
+  }: {
+    usage: CodingAgentModelUsage;
+    total: PullRequestModelTotalsRow;
+    costed: boolean;
+  }): CodingAgentModelUsage {
+    return {
+      ...usage,
+      inputTokens: usage.inputTokens + total.inputTokens,
+      outputTokens: usage.outputTokens + total.outputTokens,
+      cacheReadTokens: usage.cacheReadTokens + total.cacheReadTokens,
+      cacheCreationTokens: usage.cacheCreationTokens + total.cacheCreationTokens,
+      totalTokens: usage.totalTokens + this.tokenTotal(total),
+      costUsd: costed ? (usage.costUsd ?? 0) + total.costUsd : usage.costUsd,
+      aiUnits: (usage.aiUnits ?? 0) + total.aiUnits,
+    };
   }
 
   latestActivity(sessions: readonly CodingAgentSessionBranchRecord[]): number {
@@ -310,8 +403,27 @@ export class CodingAgentPullRequestUsageService {
       totalTokens: 0,
       costUsd: null,
       tokensKnown: false,
+      aiUnits: null,
     }));
   }
+}
+
+function emptyModelUsage(model: string): CodingAgentModelUsage {
+  return {
+    model,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    totalTokens: 0,
+    costUsd: null,
+    tokensKnown: true,
+    aiUnits: 0,
+  };
+}
+
+function sessionKeyOf(session: { tenantId: string; sessionId: string }): string {
+  return `${session.tenantId}\0${session.sessionId}`;
 }
 
 function billedShareOf(costUsd: number, applies: boolean): number {

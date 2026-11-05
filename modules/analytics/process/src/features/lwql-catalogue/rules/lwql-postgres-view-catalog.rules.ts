@@ -94,6 +94,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       identityKey: "omit", // secret
       LastSeenAt: { source: "lastSeenAt" },
       ArchivedAt: { source: "archivedAt" },
+      CreatedById: { source: "createdById" },
+      UpdatedById: { source: "updatedById" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -394,6 +396,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       CreatedById: { source: "createdById" },
       Scope: { source: "scope" },
       organizationId: "omit", // set only once a board is shared with the organization
+      excludedOrigins: "omit", // deprecated, unread since queries name their sources (AC200)
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -550,6 +553,8 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       WorkflowId: { source: "workflowId" },
       CopiedFromEvaluatorId: { source: "copiedFromEvaluatorId" },
       ArchivedAt: { source: "archivedAt" },
+      CreatedById: { source: "createdById" },
+      UpdatedById: { source: "updatedById" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -1124,6 +1129,11 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       ThreadIdleTimeout: { source: "threadIdleTimeout" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
+      AutoPausedAt: { source: "autoPausedAt" },
+      AutoPausedReason: { source: "autoPausedReason", content: "output" },
+      EvaluatorLabel: { source: "evaluatorLabel" },
+      CreatedById: { source: "createdById" },
+      UpdatedById: { source: "updatedById" },
     },
   }),
   notifications: defineTableCatalogue({
@@ -1161,6 +1171,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       ProjectName: { source: "name" },
       ProjectSlug: { source: "slug" },
       apiKey: "omit", // secret
+      legacyApiKeyLastUsedAt: "omit", // operator column for retiring legacy keys
       lwqlKey: "omit", // secret
       TeamId: { source: "teamId" },
       Language: { source: "language", content: "output" },

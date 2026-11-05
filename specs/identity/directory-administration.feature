@@ -71,7 +71,7 @@ Feature: Directory administration
       And his row does not read "Invited", the word an outstanding invitation carries
 
     @integration
-    Scenario: An invitation nobody has accepted still reads as invited
+    Scenario: An invitation not yet accepted still reads as invited
       Given "dana@acme.com" has an invitation she has not accepted
       When "ana" opens the members page
       Then the invitation's row reads "Invited"

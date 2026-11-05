@@ -78,6 +78,53 @@ const str = (error: HandledErrorShape, key: string, fallback: string): string =>
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+/** Whose limit a `budget_exceeded` names, by the gateway's `budget_scope`. */
+const BUDGET_SCOPE_OWNERS: Readonly<Record<string, string>> = {
+  organization: "Your organization's",
+  team: "Your team's",
+  project: "This project's",
+  virtual_key: "This key's",
+  principal: "Your personal",
+  group: "Your group's",
+  attributed_user: "This end user's",
+};
+
+/** The headline's period word, by the gateway's `budget_window`. */
+const BUDGET_WINDOW_ADJECTIVES: Readonly<Record<string, string>> = {
+  minute: "per-minute",
+  hour: "hourly",
+  day: "daily",
+  week: "weekly",
+  month: "monthly",
+};
+
+/** When a blocked window opens again. No calendar boundary: a budget can carry its own cycle anchor. */
+const BUDGET_WINDOW_RESETS: Readonly<Record<string, string>> = {
+  minute: "Requests are blocked until its per-minute window resets.",
+  hour: "Requests are blocked until its hourly window resets.",
+  day: "Requests are blocked until its daily window resets.",
+  week: "Requests are blocked until its weekly window resets.",
+  month: "Requests are blocked until its monthly window resets.",
+  total: "This limit never resets, so requests stay blocked until it is raised.",
+  manual: "Requests are blocked until an admin resets or raises it.",
+};
+
+/** One enumerated budget `meta` value mapped through a word table; unknown values map to nothing. */
+const budgetMetaWord = (
+  error: HandledErrorShape,
+  key: string,
+  words: Readonly<Record<string, string>>,
+): string | undefined => {
+  const value = str(error, key, "").toLowerCase();
+  return Object.hasOwn(words, value) ? words[value] : undefined;
+};
+
+/** The request field that sets each list name, which the supplied-parameter copy points at. */
+const LIST_REQUEST_FIELDS: Readonly<Record<string, string>> = {
+  dashboard_context_sources: "sources",
+  dashboard_context_projects: "projects",
+};
+
 /**
  * Reads a list of short identifiers out of `meta` without trusting it.
  *
@@ -532,7 +579,7 @@ const presentations = {
   lwql_table_modifier_unsupported: {
     title: "FINAL and SAMPLE can't be used here",
     describe: () =>
-      "This read keeps each project to its own dates, and that can't be combined with FINAL or SAMPLE. The datasets already keep one row per item, so remove them and run it again.",
+      "FINAL and SAMPLE can't be used on this read or on a subquery. The datasets already keep one row per item, so remove them and run it again.",
   },
   lwql_view_shadowed: {
     title: "A WITH name repeats a view's name",
@@ -557,13 +604,29 @@ const presentations = {
         return "Some of these parameters come from the page showing this chart. Remove them from your parameters and change the page's settings instead.";
       }
       const plural = supplied.length > 1;
-      return `${listLabels(supplied)} ${plural ? "come" : "comes"} from the page showing this chart. Remove ${plural ? "them" : "it"} from your parameters and change the page's settings instead.`;
+      const fields = supplied.flatMap((name) => LIST_REQUEST_FIELDS[name] ?? []);
+      const instead =
+        fields.length > 0
+          ? ` Send the ${listLabels(fields.map((field) => `\`${field}\``))} ${fields.length > 1 ? "fields" : "field"} of the request instead.`
+          : "";
+      return `${listLabels(supplied)} ${plural ? "come" : "comes"} from the page showing this chart. Remove ${plural ? "them" : "it"} from your parameters and change the page's settings instead.${instead}`;
     },
   },
   lwql_reserved_parameter_type: {
-    title: "The time window has to be a date and time",
-    describe: () =>
-      "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
+    title: "A dashboard parameter has the wrong type",
+    describe: (error) => {
+      const names = strList(error, "parameters");
+      const lists = names.filter(
+        (name) => name === "dashboard_context_sources" || name === "dashboard_context_projects",
+      );
+      const listRule = `Declare ${listLabels(lists)} as Array(String), for example {dashboard_context_sources:Array(String)}`;
+      const windowRule =
+        "Declare period_start and period_end as DateTime, for example {period_start:DateTime}";
+      if (lists.length === 0) return `${windowRule}, and run the query again.`;
+      if (lists.length === names.length) return `${listRule}, and run the query again.`;
+
+      return `${listRule}. ${windowRule}. Then run the query again.`;
+    },
   },
   lwql_result_too_large: {
     title: "This result is too large to return",
@@ -664,6 +727,11 @@ const presentations = {
   dashboards_not_enabled: {
     title: "Dashboards aren't switched on here",
     describe: () => "This project doesn't have Dashboards enabled yet.",
+  },
+  dashboards_not_released: {
+    title: "The Dashboards API isn't available here",
+    describe: () =>
+      "Dashboards isn't switched on for this project yet. Analytics Reports are at /api/v1/analytics/reports.",
   },
   insight_not_found: {
     title: "Insight not found",
@@ -855,6 +923,33 @@ const presentations = {
       return `No process running ${name} is connected.${where} Start the process, or name the environment as connected:${name}@<environment>.`;
     },
   },
+  agent_deployed_label_protected: {
+    title: "This agent is deployed",
+    describe: (error) => {
+      const labels = strList(error, "labels").join(", ") || "a label";
+      return `A deploy label (${labels}) points at this agent, so archiving it needs the deploy permission. Remove the labels first, or ask someone who can deploy agents.`;
+    },
+  },
+  agent_label_invalid: {
+    title: "That label name can't be used",
+    describe: () =>
+      'A label starts with a lowercase letter, holds only lowercase letters, digits, hyphens or underscores, is not a number and is not "latest".',
+  },
+  agent_version_not_found: {
+    title: "That agent version doesn't exist",
+    describe: () =>
+      "No version of this agent matches that label or number. The label may have been removed, or the version belongs to another agent.",
+  },
+  agent_version_selector_conflict: {
+    title: "Pick a label or a version, not both",
+    describe: () =>
+      "Ask for the agent by one label, one version number, or neither for the latest.",
+  },
+  agent_version_unsupported: {
+    title: "Connected agents have no versions here",
+    describe: () =>
+      "A connected agent is versioned by the code that registers it, so it carries no versions or deploy labels in LangWatch.",
+  },
   agent_not_found: {
     title: "Agent not found",
     describe: () =>
@@ -985,6 +1080,28 @@ const presentations = {
       "Copying an online evaluation needs permission to manage evaluations in the project it comes from. Ask an administrator there for access.",
   },
   evaluator_not_found: { title: "Evaluator not found" },
+  evaluator_deployed_label_protected: {
+    title: "This evaluator is deployed",
+    describe: (error) => {
+      const labels = strList(error, "labels").join(", ") || "a label";
+      return `A deploy label (${labels}) points at this evaluator, so deleting it needs the deploy permission. Remove the labels first, or ask someone who can deploy evaluators.`;
+    },
+  },
+  evaluator_label_invalid: {
+    title: "That label name can't be used",
+    describe: () =>
+      'A label starts with a lowercase letter, holds only lowercase letters, digits, hyphens or underscores, is not a number and is not "latest".',
+  },
+  evaluator_version_not_found: {
+    title: "That evaluator version doesn't exist",
+    describe: () =>
+      "No version of this evaluator matches that label or number. The label may have been removed, or the version belongs to another evaluator.",
+  },
+  evaluator_version_selector_conflict: {
+    title: "Pick a label or a version, not both",
+    describe: () =>
+      "Ask for the evaluator by one label, one version number, or neither for the latest.",
+  },
   evaluator_source_permission_denied: {
     title: "You can't copy from that project",
     describe: () =>
@@ -1325,6 +1442,11 @@ const presentations = {
   api_key_reserved_name: {
     title: "That name is reserved",
     describe: () => "Pick a different name for this key.",
+  },
+  docs_origin_not_registered: {
+    title: "This site can't connect to LangWatch",
+    describe: () =>
+      "The documentation site that opened this page is not registered with this LangWatch installation. Paste an API key into the playground instead.",
   },
   api_key_scope_violation: {
     title: "You don't have access for this",
@@ -1691,7 +1813,17 @@ const presentations = {
   project_not_found: {
     title: "Project not found",
     describe: () =>
-      "It may have been deleted, or it isn't shared with you. Reload to see the projects you can open.",
+      "It may have been deleted, or it isn't shared with you. Choose another project, or ask for access to this one.",
+  },
+  projects_required: {
+    title: "Name the projects to query",
+    describe: () =>
+      'This key reads more than one project, so it must say which. Send `projects`, a list of project ids, or the string "all" for every project the key can read, and try again.',
+  },
+  projects_unreadable: {
+    title: "This key reads no project",
+    describe: () =>
+      "This key holds `analytics:view` on no project, so there is nothing to query. Ask an admin to grant it `analytics:view` on a project, and try again.",
   },
   organization_not_found_for_team: {
     title: "Organization not found",
@@ -3228,6 +3360,11 @@ const presentations = {
     describe: () =>
       "Choose one of at least 8 characters, with at least one character that is not a space.",
   },
+  identity_password_reset_required: {
+    title: "Choose a new password to sign in",
+    describe: () =>
+      "Your password needs to be replaced before you can use it again. We will email you a link to set a new one.",
+  },
   identity_reset_link_invalid: {
     // Expired, already spent and never issued collapse to one answer on purpose.
     title: "That password reset link no longer works",
@@ -3989,6 +4126,20 @@ const presentations = {
     title: "That dataset is gone",
     describe: () =>
       "It was archived, or it belongs to another project. Reload the list and pick one that is still there.",
+  },
+  dataset_version_not_found: {
+    title: "That dataset version is gone",
+    describe: () =>
+      "The dataset has no version with that number, or retention removed it. Open the history and pick one that is listed.",
+  },
+  dataset_version_restore_unsupported: {
+    title: "This dataset can't be restored here",
+    describe: () =>
+      "It is kept in the older single-file layout. Copy the dataset to a new one first, then restore there.",
+  },
+  dataset_version_too_large: {
+    title: "That version is too large to read at once",
+    describe: () => "Page through the version's rows instead, or ask for a larger dataset limit.",
   },
   dataset_chunk_too_large: {
     title: "That value is too large to save",
@@ -5141,8 +5292,21 @@ const presentations = {
       "Codex runs on your OpenAI account, and its sign-in has expired. Sign in again to keep using it.",
   },
   budget_exceeded: {
-    title: "You've reached your spending limit",
-    describe: () => "Raise the limit in settings to keep going.",
+    // The gateway's 402. `budget_scope` and `budget_window` are enumerated, so
+    // the headline names whose limit ran out and the body says when it resets.
+    title: "Your AI spending limit is reached",
+    titleFor: (error) => {
+      const owner = budgetMetaWord(error, "budget_scope", BUDGET_SCOPE_OWNERS);
+      if (!owner) return undefined;
+      const period = budgetMetaWord(error, "budget_window", BUDGET_WINDOW_ADJECTIVES);
+      return `${owner} ${period ? `${period} ` : ""}AI spending limit is reached`;
+    },
+    describe: (error) => {
+      const reset =
+        budgetMetaWord(error, "budget_window", BUDGET_WINDOW_RESETS) ??
+        "Requests are blocked until the limit is raised.";
+      return `${reset} An admin can raise it in AI Gateway budgets.`;
+    },
   },
   end_user_required: {
     title: "This key needs a user on every request",
@@ -5447,8 +5611,9 @@ const presentations = {
     describe: () => "Remove or replace it to run the workflow.",
   },
   jsonpath_no_match: {
-    title: "A field didn't match anything",
-    describe: () => "Check the field path against your data.",
+    // The endpoint answered; only the output path missed. Copy about reaching it would be wrong.
+    title: "The reply has no value at the output path",
+    describe: () => "The request went through. Check the output path against the response.",
   },
   code_block_timeout: {
     title: "A code step took too long",
@@ -6281,6 +6446,11 @@ const presentations = {
     title: "License not found",
     describe: () => "No license with that identity exists in the registry. Check the license id.",
   },
+  legacy_project_key_ingestion_only: {
+    title: "Legacy project key is limited",
+    describe: () =>
+      "This legacy project key is limited to ingestion and the scopes enabled for its project. Create an API key in Settings > API Keys and use it here instead.",
+  },
   license_already_registered: {
     title: "License already registered",
     describe: () => "This license is already in the registry, so it cannot be registered again.",
@@ -6487,6 +6657,14 @@ function listLabels(labels: string[]): string {
 }
 
 /**
+ * What to do about an HTTP 402. The status comes from a provider whose account
+ * ran out of credit and also from the AI gateway when an organization budget is
+ * spent, so the advice names both. Shared so every surface says the same thing.
+ */
+export const OUT_OF_CREDIT_ADVICE =
+  "Check the provider's billing and your gateway budget, then try again.";
+
+/**
  * Body copy for a node failure that carries the upstream's HTTP status.
  *
  * `meta.upstreamStatus` is attached by Workflow's node-error contract mapper
@@ -6514,6 +6692,9 @@ function describeUpstreamStatus({
   const status = error.meta.upstreamStatus;
   if (typeof status !== "number") return whenAbsent;
   if (status === 401 || status === 403) return whenRejected;
+  if (status === 402) {
+    return `Its account has no credit or budget left. ${OUT_OF_CREDIT_ADVICE}`;
+  }
   if (status === 429) return "It's rate limiting us. Try again shortly.";
   if (status >= 500) return "It's having trouble. Try again in a moment.";
   return whenOther;

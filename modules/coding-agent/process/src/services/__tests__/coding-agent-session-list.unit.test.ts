@@ -21,6 +21,7 @@ import {
   SESSIONS_LIST_WINDOW_MS,
 } from "../../features/pull-requests/services/coding-agent-pull-request-read.service.ts";
 import { CodingAgentFeatureService } from "../coding-agent.service.ts";
+import { ModelCatalogCostEstimatorService } from "../model-catalog-cost-estimator.service.ts";
 
 const PROJECT = "project-1";
 const HOUR_MS = 60 * 60 * 1000;
@@ -39,6 +40,7 @@ function serviceWith(input: {
     projects: input.projects ?? createTestProjects(),
     billing: new TestBillingPolicy(),
     clock: new TestClock(),
+    modelProviders: ModelCatalogCostEstimatorService.create(),
   });
 }
 

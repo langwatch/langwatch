@@ -76,7 +76,7 @@ Feature: Release manifests order every migration step release by release
   Scenario: The shipped manifests chain from the backfill start
     When the manifests shipped in the package are loaded
     Then the first manifest's previous release is the 3.18.1 baseline
-    And every release from 3.19.0 to 3.21.0 has a manifest whose previous release is the one before it
+    And every release from 3.19.0 to 3.23.0 has a manifest whose previous release is the one before it
 
   @unit
   Scenario: An upgrade across several releases steps release by release

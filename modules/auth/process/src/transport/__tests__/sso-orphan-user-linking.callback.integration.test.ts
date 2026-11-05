@@ -125,6 +125,7 @@ function hooksRepositoryOver({ db }: { db: MemoryDb }): BetterAuthHooksRepositor
         deactivatedAt: null,
         pendingSsoSetup: false,
         signupConfirmationPending: false,
+        passwordResetRequiredAt: null,
         lastLoginAt: null,
         emailVerified: row.emailVerified === true,
       };
@@ -139,6 +140,7 @@ function hooksRepositoryOver({ db }: { db: MemoryDb }): BetterAuthHooksRepositor
     flagPendingSsoSetup: unused,
     reconcileSsoAccounts: async () => undefined,
     recordLastLogin: async () => undefined,
+    clearPasswordResetRequirement: async () => undefined,
   };
 }
 
@@ -159,7 +161,7 @@ async function completeSignIn({ db, email }: { db: MemoryDb; email: string }) {
       database: hooksRepositoryOver({ db }),
       organizations: {
         findBySsoDomain: async () => ({ id: "org_example", name: "Example", ssoProvider: "okta" }),
-        createSsoDomainMembership: async () => "created",
+        createMembership: async () => ({ outcome: "created", seat: "MEMBER", pending: false }),
         countMembershipsForUser: async () => 1,
       },
       ssoMigration: createApiFixture<SsoMigrationCallbackApi>({

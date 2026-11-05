@@ -104,6 +104,7 @@ describe("the connected agents' socket", () => {
     expect(asked[0]).toMatchObject({
       permission: "scenarios:manage",
       keyKinds: ["api_key", "legacy_project_key"],
+      legacyKeyScopes: ["legacy_project_key_connected_agents"],
     });
     expect(asked[0]?.request.headers.get("authorization")).toBe("Bearer sk-lw-key");
     expect(admissions).toEqual([

@@ -47,6 +47,10 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  // The clipboard case installs its own `navigator.clipboard`. jsdom has none,
+  // and the window outlives this file when files share a worker, so leaving it
+  // would turn every later error toast's "Error ID" text into a copy button.
+  Reflect.deleteProperty(navigator, "clipboard");
 });
 
 describe("given a module host mount that throws while rendering", () => {

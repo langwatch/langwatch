@@ -6,6 +6,7 @@ import { loadReleaseBaseline, type ReleaseBaseline } from "../manifest/baseline.
 import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
 import {
   gooseStepId,
+  isPrismaMigrationFolder,
   prismaStepId,
   type ReleaseTreeSteps,
   stampRelease,
@@ -27,7 +28,9 @@ export function readImageTree({
   codeSteps?: readonly ManifestStep[];
 } = {}): ReleaseTreeSteps {
   return {
-    prismaFolders: readdirSync(directories.prisma).filter((name) => /^\d{14}_/.test(name)),
+    prismaFolders: readdirSync(directories.prisma).filter((name) =>
+      isPrismaMigrationFolder({ name }),
+    ),
     gooseFiles: readdirSync(directories.goose).filter((name) => name.endsWith(".sql")),
     codeSteps,
   };
