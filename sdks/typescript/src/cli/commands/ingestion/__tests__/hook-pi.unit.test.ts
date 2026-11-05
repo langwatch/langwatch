@@ -38,6 +38,21 @@ describe("the session context hook for pi", () => {
     });
   });
 
+  describe("when the user named the session in pi", () => {
+    /** @scenario "The name the user gave a pi session rides the context record" */
+    it("carries pi's session name on the record", async () => {
+      await hook.runHook({
+        tool: "pi",
+        input: { ...extensionPayload("/repo/worktrees/review"), session_title: "widget fix" },
+      });
+
+      expect(attributesOf(posted[0]!)).toMatchObject({
+        "coding_agent.name": "pi",
+        "langwatch.session.name": "widget fix",
+      });
+    });
+  });
+
   describe("when pi starts a run outside any git repository", () => {
     /** @scenario "A pi run outside a git repository posts no context rather than an empty one" */
     it("posts nothing and exits cleanly", async () => {

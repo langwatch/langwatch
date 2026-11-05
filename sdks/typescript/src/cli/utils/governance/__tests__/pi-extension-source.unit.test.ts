@@ -27,6 +27,7 @@ const ENV_NAMES = [
   "OTEL_EXPORTER_OTLP_TRACES_TIMEOUT",
   "OTEL_TRACES_EXPORTER",
   "OTEL_RESOURCE_ATTRIBUTES",
+  "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT",
   "PATH",
 ] as const;
 
@@ -333,6 +334,193 @@ describe("the generated pi extension", () => {
       expect(collector.requests).toEqual([]);
     });
   });
+
+  describe("when pi compacts or moves in the tree before any run named a session", () => {
+    /** @scenario "A compaction or tree move with no session id emits nothing" */
+    it("emits no span with an empty pi.session.id", async () => {
+      await pi.emit("session_before_compact", { reason: "manual" }, {});
+      await pi.emit("session_compact", { reason: "manual" }, {});
+      await pi.emit("session_before_tree", {}, {});
+      await pi.emit("session_tree", {}, {});
+      await pi.emit("session_shutdown", {}, {});
+
+      expect(exported()).toEqual([]);
+    });
+
+    it("takes the session id from the handler's context when it carries one", async () => {
+      await pi.emit(
+        "session_before_compact",
+        { reason: "manual" },
+        piContext({ sessionId: "s-9" }),
+      );
+      await pi.emit("session_compact", { reason: "manual" }, piContext({ sessionId: "s-9" }));
+      await pi.emit("session_shutdown", {}, {});
+
+      expect(named("pi.harness.compaction")[0]!.attributes["pi.session.id"]).toBe("s-9");
+    });
+  });
+});
+
+/** One run answering `prompt`, calling `write` once, then replying `reply`. */
+async function contentRun({ prompt, reply }: { prompt: string; reply: string }) {
+  const ctx = piContext({ sessionId: "s-1" });
+  const args = { path: "src/greet.ts", content: "export const hi = 1;\n" };
+  await pi.emit("before_agent_start", { prompt, systemPrompt: "You are pi." }, ctx);
+  await pi.emit("agent_start", {}, ctx);
+  await pi.emit("turn_start", { turnIndex: 0 }, ctx);
+  await pi.emit(
+    "message_end",
+    {
+      message: assistant({
+        stopReason: "toolUse",
+        content: [
+          { type: "text", text: "Writing it." },
+          { type: "toolCall", id: "call-1", name: "write", arguments: args },
+        ],
+      }),
+    },
+    ctx,
+  );
+  await pi.emit("tool_execution_start", { toolCallId: "call-1", toolName: "write", args }, ctx);
+  await pi.emit(
+    "tool_execution_end",
+    {
+      toolCallId: "call-1",
+      toolName: "write",
+      isError: false,
+      result: { content: [{ type: "text", text: "Wrote src/greet.ts" }] },
+    },
+    ctx,
+  );
+  await pi.emit("turn_end", { turnIndex: 0 }, ctx);
+  const last = assistant({ content: [{ type: "text", text: reply }] });
+  await pi.emit("agent_end", { messages: [last] }, ctx);
+}
+
+const CONTENT_KEYS = [
+  "gen_ai.input.messages",
+  "gen_ai.output.messages",
+  "gen_ai.tool.call.arguments",
+  "gen_ai.tool.call.result",
+];
+
+describe("the extension's message content", () => {
+  describe("when the GenAI content switch is not set", () => {
+    /** @scenario "Without the content switch the spans carry no prompt, reply or tool arguments" */
+    it("writes no message, argument or result key on any span", async () => {
+      await contentRun({ prompt: "Add a greeting", reply: "Done." });
+
+      for (const span of exported()) {
+        for (const key of CONTENT_KEYS) expect(span.attributes).not.toHaveProperty(key);
+      }
+    });
+  });
+
+  describe("when the GenAI content switch is on", () => {
+    beforeEach(() => {
+      process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = "true";
+    });
+
+    /** @scenario "The run carries the prompt that opened it and the reply that closed it" */
+    it("writes the prompt and the final reply on the run as GenAI messages", async () => {
+      await contentRun({ prompt: "Add a greeting\nto greet.ts", reply: "Done." });
+
+      const runSpan = named("pi.harness.run")[0]!;
+      expect(JSON.parse(String(runSpan.attributes["gen_ai.input.messages"]))).toEqual([
+        { role: "user", parts: [{ type: "text", content: "Add a greeting\nto greet.ts" }] },
+      ]);
+      expect(JSON.parse(String(runSpan.attributes["gen_ai.output.messages"]))).toEqual([
+        { role: "assistant", parts: [{ type: "text", content: "Done." }], finish_reason: "stop" },
+      ]);
+    });
+
+    /** @scenario "Each model call carries the reply it produced, tool calls included" */
+    it("writes each call's text and tool calls as its GenAI output", async () => {
+      await contentRun({ prompt: "Add a greeting", reply: "Done." });
+
+      const call = named("pi.ai.request")[0]!;
+      expect(call.attributes).not.toHaveProperty("gen_ai.input.messages");
+      expect(JSON.parse(String(call.attributes["gen_ai.output.messages"]))).toEqual([
+        {
+          role: "assistant",
+          parts: [
+            { type: "text", content: "Writing it." },
+            {
+              type: "tool_call",
+              id: "call-1",
+              name: "write",
+              arguments: { path: "src/greet.ts", content: "export const hi = 1;\n" },
+            },
+          ],
+          finish_reason: "tool_use",
+        },
+      ]);
+    });
+
+    /** @scenario "Each tool run carries its arguments and the text it returned" */
+    it("writes the tool's arguments and returned text on its span", async () => {
+      await contentRun({ prompt: "Add a greeting", reply: "Done." });
+
+      const tool = named("pi.harness.tool")[0]!;
+      expect(JSON.parse(String(tool.attributes["gen_ai.tool.call.arguments"]))).toEqual({
+        path: "src/greet.ts",
+        content: "export const hi = 1;\n",
+      });
+      expect(tool.attributes["gen_ai.tool.call.result"]).toBe("Wrote src/greet.ts");
+    });
+
+    /** @scenario "A message too large for the server is cut as the server cuts it" */
+    it("cuts a reply past 256 KiB to 256 KiB, marked with its full size", async () => {
+      const reply = "x".repeat(300 * 1024);
+      await contentRun({ prompt: "Add a greeting", reply });
+
+      const output = JSON.parse(
+        String(named("pi.harness.run")[0]!.attributes["gen_ai.output.messages"]),
+      ) as { parts: { content: string }[] }[];
+      const text = output[0]!.parts[0]!.content;
+      expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(256 * 1024);
+      expect(text.endsWith(`…[langwatch: truncated, ${300 * 1024} bytes total]`)).toBe(true);
+    });
+
+    it("writes no input on a run no prompt opened", async () => {
+      await runSession();
+
+      expect(named("pi.harness.run")[0]!.attributes).not.toHaveProperty("gen_ai.input.messages");
+    });
+  });
+});
+
+describe("the extension's resource", () => {
+  // Unresolvable first: the module runner keeps a resolved package for the rest of the file.
+  describe("when pi's package cannot be resolved", () => {
+    it("sends the resource without a version", async () => {
+      await runSession();
+
+      expect(collector.requests[0]!.decoded.resource).not.toHaveProperty("service.version");
+    });
+  });
+
+  describe("when pi's own package is resolvable", () => {
+    /** @scenario "The resource carries pi's version as service.version" */
+    it("names pi's version as service.version", async () => {
+      const pkg = path.join(tmpDir, "node_modules", "@earendil-works", "pi-coding-agent");
+      fs.mkdirSync(pkg, { recursive: true });
+      fs.writeFileSync(
+        path.join(pkg, "package.json"),
+        JSON.stringify({
+          name: "@earendil-works/pi-coding-agent",
+          type: "module",
+          main: "index.js",
+        }),
+      );
+      fs.writeFileSync(path.join(pkg, "index.js"), 'export const VERSION = "0.84.2";\n');
+      pi = await loadPiExtension({ dir: tmpDir });
+
+      await runSession();
+
+      expect(collector.requests[0]!.decoded.resource["service.version"]).toBe("0.84.2");
+    });
+  });
 });
 
 /** A stand-in `langwatch` recording its arguments and stdin, after `delaySeconds`. */
@@ -392,6 +580,32 @@ describe("the extension's session context seam", () => {
       const handedOver = (JSON.parse((await langwatch.read()).stdin) as { session_id: string })
         .session_id;
       expect(handedOver).toBe(named("pi.harness.run")[0]!.attributes["pi.session.id"]);
+    });
+
+    /** @scenario "The hook is handed the session's own directory before pi's process directory" */
+    it("hands over the session manager's directory when it reports one", async () => {
+      const langwatch = plantLangwatch();
+
+      await pi.emit(
+        "agent_start",
+        {},
+        piContext({ sessionId: "s-1", cwd: "/repo", sessionCwd: "/repo/.worktrees/feat" }),
+      );
+
+      expect(JSON.parse((await langwatch.read()).stdin)).toMatchObject({
+        cwd: "/repo/.worktrees/feat",
+      });
+    });
+
+    /** @scenario "The hook is handed the name the user gave the session in pi" */
+    it("hands over pi's own session name as the session title", async () => {
+      const langwatch = plantLangwatch();
+
+      await pi.emit("agent_start", {}, piContext({ sessionId: "s-1", sessionName: "widget fix" }));
+
+      expect(JSON.parse((await langwatch.read()).stdin)).toMatchObject({
+        session_title: "widget fix",
+      });
     });
   });
 
