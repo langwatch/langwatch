@@ -316,11 +316,7 @@ describe("NurturingCodingMilestonesService", () => {
       await send([fact({ sessionId: "s-3", firstForProject: false, occurredAt: DAY + 24 * HOUR })]);
       await send([fact({ sessionId: "s-4", firstForProject: false, occurredAt: DAY + 72 * HOUR })]);
 
-      expect(
-        ofKind("coding_active_days").map(
-          (s) => s.codingActiveDays,
-        ),
-      ).toEqual([1, 2, 3]);
+      expect(ofKind("coding_active_days").map((s) => s.codingActiveDays)).toEqual([1, 2, 3]);
     });
 
     /** @scenario "A session just before and just after UTC midnight counts as two days" */
@@ -332,11 +328,7 @@ describe("NurturingCodingMilestonesService", () => {
         fact({ sessionId: "s-2", firstForProject: false, occurredAt: Date.UTC(2026, 9, 21, 0, 1) }),
       ]);
 
-      expect(
-        ofKind("coding_active_days").map(
-          (s) => s.codingActiveDays,
-        ),
-      ).toEqual([1, 2]);
+      expect(ofKind("coding_active_days").map((s) => s.codingActiveDays)).toEqual([1, 2]);
     });
 
     /** @scenario "One batch over midnight counts both of its days" */
@@ -353,11 +345,7 @@ describe("NurturingCodingMilestonesService", () => {
         fact({ sessionId: "s-3", firstForProject: false, occurredAt: Date.UTC(2026, 9, 21, 0, 1) }),
       ]);
 
-      expect(
-        ofKind("coding_active_days").map(
-          (s) => s.codingActiveDays,
-        ),
-      ).toEqual([1, 3]);
+      expect(ofKind("coding_active_days").map((s) => s.codingActiveDays)).toEqual([1, 3]);
     });
 
     /** @scenario "A late session of an earlier day changes nothing" */
@@ -524,9 +512,7 @@ describe("NurturingCodingMilestonesService", () => {
     const session = (sessionId: string, occurredAt: number) =>
       fact({ sessionId, firstForProject: false, occurredAt });
     const countsOf = (ofKind: Awaited<ReturnType<typeof serviceOver>>["ofKind"]) =>
-      ofKind("coding_session_days_first_3").map(
-        (signal) => signal.codingSessionDaysFirst3,
-      );
+      ofKind("coding_session_days_first_3").map((signal) => signal.codingSessionDaysFirst3);
     const onDay2 = { organizationCreatedAt: CREATED, now: onDay(2) };
 
     /** @scenario "Sessions on days 0, 1 and 2 count as one, two and three" */

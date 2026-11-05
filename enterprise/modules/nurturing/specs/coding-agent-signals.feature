@@ -3,8 +3,9 @@ Feature: Coding-agent session signals reach Customer.io
   Coding-agent records one session-stored fact per stored session. Nurturing
   reacts to it from its own side and tells Customer.io about the organization's
   admin: the active-day count and the first session's event. The last session
-  time, the agent types and the first session's time reach every active member:
-  see organization-member-facts.feature. Nurturing alone keeps this state, on its
+  time, the agent types, the terminal types, the repo count, the first session's
+  time and the first-three-days count reach every active member: see
+  organization-member-facts.feature. Nurturing alone keeps this state, on its
   own organization row.
 
   Background:

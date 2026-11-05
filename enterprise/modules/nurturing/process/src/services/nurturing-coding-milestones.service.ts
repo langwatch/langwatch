@@ -16,9 +16,9 @@ import {
   codingSessionDayOffsets,
   codingSessionDaysFirst3Signal,
   codingSessionStoredSignal,
+  codingTerminalTypesSignal,
   ownCodingSessionRecipients,
   ownCodingSessionStoredSignal,
-  codingTerminalTypesSignal,
 } from "../rules/nurturing-coding-signals.rules.ts";
 import { seededAtRead } from "../rules/nurturing-owner-signals.rules.ts";
 import { utcDayOf } from "../rules/nurturing-time.rules.ts";

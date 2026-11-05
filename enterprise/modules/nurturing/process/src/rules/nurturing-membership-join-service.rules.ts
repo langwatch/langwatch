@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { OrganizationUserRole } from "@langwatch/organization-contract";
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
+import type { OrganizationUserRole } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
 import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
@@ -19,12 +19,14 @@ const SEAT_BY_ROLE: Readonly<Record<OrganizationUserRole, string>> = {
   DEVELOPER: "developer",
 };
 
-/**
- * The Customer.io seat name for a stored role. The stored field stays a plain string so old or
- * unknown events still parse; a role we cannot name is left out rather than guessed.
- */
-function seatFor(role: string | undefined): string | undefined {
-  return role ? (SEAT_BY_ROLE as Readonly<Record<string, string>>)[role] : undefined;
+/** The stored role is a plain string so old or unknown events parse; this narrows it. */
+function isOrganizationUserRole(role: string): role is OrganizationUserRole {
+  return Object.hasOwn(SEAT_BY_ROLE, role);
+}
+
+/** The Customer.io seat name for a role. */
+function seatFor(role: OrganizationUserRole): string {
+  return SEAT_BY_ROLE[role];
 }
 
 /** Groups the person into the organization they joined and tracks how they came in. */
@@ -36,7 +38,8 @@ function joinedCalls({
   event: "joined_via_invite" | "joined_via_sso";
 }): CioBatchCall[] {
   const { userId, organizationId, organizationName, role } = joined;
-  const seat = seatFor(role);
+  // A role we cannot name is left out rather than guessed.
+  const seat = role && isOrganizationUserRole(role) ? seatFor(role) : undefined;
   return [
     { type: "group", userId, groupId: organizationId, traits: { name: organizationName } },
     {

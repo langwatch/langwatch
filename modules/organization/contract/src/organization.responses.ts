@@ -2,8 +2,8 @@ import type { Named } from "@langwatch/module";
 /** Contract schemas for the organization feature's tRPC responses. */
 import { z } from "zod";
 
-import { auditChannelSchema } from "./organization.ts";
 import type { OrganizationUserRole } from "./organization.rows.ts";
+import { auditChannelSchema } from "./organization.ts";
 
 /** A write with nothing else to report. */
 const organizationWriteAckSchemaDefinition = z.object({ success: z.literal(true) }).strict();
