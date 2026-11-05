@@ -535,7 +535,7 @@ describe("given a stopped turn with two cards waiting on commands", () => {
       reason: "The command is not on the read-only list.",
       skipOffered: true,
       workspaceName: "acme-app",
-      hostname: "rogerio-mbp",
+      hostname: "dev-laptop",
     });
     return { first, second };
   }
