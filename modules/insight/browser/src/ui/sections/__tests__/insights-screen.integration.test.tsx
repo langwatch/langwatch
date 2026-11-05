@@ -5,7 +5,11 @@
  * @see modules/insight/specs/insight-inbox.feature
  */
 
-import type { UiProcedureAnswer, UiProcedureCall } from "@langwatch/browser/testing-transport";
+import {
+  type UiProcedureAnswer,
+  type UiProcedureCall,
+  UiProcedureRefusal,
+} from "@langwatch/browser/testing-transport";
 import { nowInstant } from "@langwatch/time";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -76,7 +80,10 @@ describe("given a rejected inbox read", () => {
         }
       }
       const host = new FlippableHost();
-      const read = vi.fn<UiProcedureAnswer>(() => Promise.reject(new Error("down")));
+      const read = vi.fn<UiProcedureAnswer>(() =>
+        // A 403 is not retried, so the error shows at once.
+        Promise.reject(new UiProcedureRefusal("FORBIDDEN", 403)),
+      );
       function Switch() {
         const [, redraw] = useReducer((count: number) => count + 1, 0);
         return (
