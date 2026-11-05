@@ -10,6 +10,7 @@ import { ClickHouseSimulationSession } from "../clickhouse/clickhouse.simulation
 import { ClickHouseStalledSimulationRunRepository } from "../clickhouse/clickhouse.stalled-simulation-run.repository.ts";
 import { SimulationClickHouseRepository } from "../clickhouse/simulation-clickhouse.repository.ts";
 import { PostgresScenarioRepositories } from "../prisma/prisma.scenario.repositories.ts";
+import { RedisPendingVoiceCallRepository } from "../redis/redis.pending-voice-call.repository.ts";
 import { RedisScenarioCancellationRepository } from "../redis/redis.scenario-cancellation.repository.ts";
 import { RedisScenarioRateLimitRepository } from "../redis/redis.scenario-rate-limit.repository.ts";
 import { RedisScenarioTabStoreRepository } from "../redis/redis.scenario-tab-store.repository.ts";
@@ -49,6 +50,7 @@ export class LiveScenarioRepositories {
       resultAtoms: ResultAtomsClickHouseRepository.create(sessions),
       runConfigurations: RunConfigurationsClickHouseRepository.create(sessions),
       voiceNonces: RedisVoiceNonceRepository.create(redis),
+      pendingVoiceCalls: RedisPendingVoiceCallRepository.create(redis),
       simulations: SimulationClickHouseRepository.create(
         ClickHouseScenarioSession.resolverOver(clickhouse),
       ),

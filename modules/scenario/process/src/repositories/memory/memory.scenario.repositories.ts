@@ -1,4 +1,5 @@
 import type { ScenarioRepositories } from "../scenario.repositories.ts";
+import { MemoryPendingVoiceCallRepository } from "./memory.pending-voice-call.repository.ts";
 import { MemoryResultAtomsRepository } from "./memory.result-atoms.repository.ts";
 import { MemoryRunConfigurationsRepository } from "./memory.run-configurations.repository.ts";
 import { MemoryScenarioCancellationRepository } from "./memory.scenario-cancellation.repository.ts";
@@ -26,6 +27,7 @@ export class MemoryScenarioRepositories {
       resultAtoms: MemoryResultAtomsRepository.create({ runs }),
       runConfigurations: MemoryRunConfigurationsRepository.create({ runs }),
       voiceNonces: MemoryVoiceNonceRepository.create(),
+      pendingVoiceCalls: MemoryPendingVoiceCallRepository.create(),
       simulations: MemorySimulationRepository.create({ runs }),
       rateLimits: MemoryScenarioRateLimitRepository.create(),
       cancellations: MemoryScenarioCancellationRepository.create(),

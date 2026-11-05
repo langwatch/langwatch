@@ -348,7 +348,8 @@ Feature: Voice agents: reach an agent by phone
   # ---------------------------------------------------------------------------
   # Nonces live in Redis, single-use and 60 seconds long; the child stays on the worker
   # that spawned it, which is the only one Twilio dials back. The X-Twilio-Signature
-  # check is deferred (Alex, 2026-09-28).
+  # check was deferred (Alex, 2026-09-28) and returns with the claim-then-spawn door:
+  # see specs/features/agents/voice-media-claim.feature (tasks#1002).
 
   @unit
   Scenario: The media door refuses a plain request on the media path
