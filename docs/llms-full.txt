@@ -19176,7 +19176,9 @@ For CI jobs that use the LangWatch SDK or CLI itself rather than a coding agent,
 
 `--env-only` also skips the hooks that report each session's repository and branch. For `copilot_cli`, that is the file `~/.copilot/hooks/langwatch.json`, and without it Copilot sessions reach no pull request. Run the command without `--env-only` to write it. See [GitHub Copilot](/coding-agents/github-copilot-cli#link-sessions-to-their-pull-requests).
 
-For `grok_cli`, the skipped hook file is `~/.grok/hooks/langwatch.json`, so Grok sessions report no repository or branch. For `pi_cli`, the skipped file is pi's telemetry extension, and without it pi sends no telemetry at all. Write it when the container starts, not while the image builds: run `langwatch instrument pi` with `LANGWATCH_INGEST_KEY` supplied as a runtime secret. Both commands that write the extension also save the ingest key to the CLI's config file, so running either in a build step leaves the key in an image layer.
+For `grok_cli`, the skipped hook file is `~/.grok/hooks/langwatch.json`, so Grok sessions report no repository or branch. For `pi_cli`, the skipped file is pi's telemetry extension, and without it pi sends no telemetry at all.
+
+Write pi's extension when the container starts, not while the image builds: run `langwatch instrument pi` with `LANGWATCH_INGEST_KEY` supplied as a runtime secret. Both commands that write the extension also save the ingest key to the CLI's config file, so running either in a build step leaves the key in an image layer.
 
 ## Roll out to a managed fleet
 
