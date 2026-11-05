@@ -18,7 +18,42 @@ Feature: The runtime-dependencies policy
     Given the process package's service value-imports "@langwatch/handled-error"
     And the process package lists "@langwatch/handled-error" only in devDependencies
     When the runtime-dependencies policy runs over the workspace
-    Then it reports the service file with the fix "move it to dependencies"
+    Then it reports the service file and its import of "@langwatch/handled-error"
+    And the fix says to move "@langwatch/handled-error" to dependencies in "@langwatch/dataset-process"
+
+  @unit
+  Scenario: A dev-only package the start script preloads is reported
+    Given the worker's start script runs `node --import @langwatch/preload/register`
+    And the preload file value-imports a package "@langwatch/preload" lists only in devDependencies
+    When the runtime-dependencies policy runs over the workspace
+    Then it reports the preload file
+
+  @unit
+  Scenario: A peer the image install strips is not installed at runtime
+    Given the image pnpmfile deletes the "typescript" peer
+    And the process package lists "typescript" only in peerDependencies
+    And the process package's service value-imports "typescript"
+    When the runtime-dependencies policy runs over the workspace
+    Then it reports the service file and its import of "typescript"
+
+  @unit
+  Scenario: A recipe that names no workspace package fails loudly
+    Given the runtime recipe's `--filter-prod` names a package the workspace does not have
+    When the runtime-dependencies policy runs over the workspace
+    Then it reports the recipe file, naming the missing package
+
+  @unit
+  Scenario: A missing recipe fails loudly while the image is still built
+    Given the workspace has infra/docker/Dockerfile
+    And it has no infra/docker/prune-runtime-tree.sh
+    When the runtime-dependencies policy runs over the workspace
+    Then it reports the Dockerfile, saying the recipe is gone
+
+  @unit
+  Scenario: A workspace that builds no image is not judged
+    Given the workspace has neither infra/docker/Dockerfile nor the runtime recipe
+    When the runtime-dependencies policy runs over the workspace
+    Then it reports nothing
 
   @unit
   Scenario: A dev-only package only a type import names passes

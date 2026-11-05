@@ -97,6 +97,93 @@ describe("lintRuntimeDependencies", () => {
         specifier: "@langwatch/handled-error",
       },
     ]);
+    expect(lintRuntimeDependencies(snapshotOf({ root }))[0]?.allowed).toContain(
+      "Move @langwatch/handled-error to dependencies in @langwatch/dataset-process's package.json",
+    );
+  });
+
+  /** @scenario "A dev-only package the start script preloads is reported" */
+  it("reports a dev-only import in a start-script preload", () => {
+    datasetProcess({ section: "dependencies", service: "export const fail = () => 1;\n" });
+    write(
+      "apps/worker/package.json",
+      JSON.stringify({
+        name: "@langwatch/worker",
+        type: "module",
+        scripts: { start: "node --import @langwatch/preload/register src/main.ts" },
+        dependencies: {
+          "@langwatch/dataset-process": "workspace:*",
+          "@langwatch/preload": "workspace:*",
+        },
+      }),
+    );
+    write(
+      "packages/preload/package.json",
+      JSON.stringify({
+        name: "@langwatch/preload",
+        type: "module",
+        exports: { "./register": "./src/register.ts" },
+        devDependencies: { "@langwatch/handled-error": "workspace:*" },
+      }),
+    );
+    write("packages/preload/src/register.ts", 'import "@langwatch/handled-error";\n');
+
+    expect(findings()).toEqual([
+      { file: "packages/preload/src/register.ts", specifier: "@langwatch/handled-error" },
+    ]);
+  });
+
+  /** @scenario "A peer the image install strips is not installed at runtime" */
+  it("reports a value import of a peer the image pnpmfile strips", () => {
+    write(
+      "infra/docker/image.pnpmfile.cjs",
+      'const DEV_TOOL_PEERS = [\n  "vite",\n  "typescript",\n];\n',
+    );
+    write(
+      "modules/dataset/process/package.json",
+      JSON.stringify({
+        name: "@langwatch/dataset-process",
+        type: "module",
+        exports: { ".": "./src/index.ts" },
+        peerDependencies: { typescript: "*" },
+      }),
+    );
+    write("modules/dataset/process/src/index.ts", 'import ts from "typescript";\nexport { ts };\n');
+
+    expect(findings()).toEqual([
+      { file: "modules/dataset/process/src/index.ts", specifier: "typescript" },
+    ]);
+  });
+
+  /** @scenario "A recipe that names no workspace package fails loudly" */
+  it("fails when --filter-prod names a package the workspace lacks", () => {
+    write(
+      "infra/docker/prune-runtime-tree.sh",
+      'pnpm install --frozen-lockfile --prod --filter-prod "@langwatch/renamed-worker..."\n',
+    );
+    const [violation, ...rest] = lintRuntimeDependencies(snapshotOf({ root }));
+
+    expect(rest).toEqual([]);
+    expect(violation?.file).toBe(join(root, "infra/docker/prune-runtime-tree.sh"));
+    expect(violation?.message).toContain("@langwatch/renamed-worker");
+  });
+
+  /** @scenario "A missing recipe fails loudly while the image is still built" */
+  it("fails when the Dockerfile stays but the runtime recipe is gone", () => {
+    write("infra/docker/Dockerfile", "FROM node\n");
+    rmSync(join(root, "infra/docker/prune-runtime-tree.sh"));
+    const [violation, ...rest] = lintRuntimeDependencies(snapshotOf({ root }));
+
+    expect(rest).toEqual([]);
+    expect(violation?.file).toBe(join(root, "infra/docker/Dockerfile"));
+    expect(violation?.message).toContain("is gone");
+  });
+
+  /** @scenario "A workspace that builds no image is not judged" */
+  it("ignores a workspace with neither a Dockerfile nor a runtime recipe", () => {
+    rmSync(join(root, "infra/docker/prune-runtime-tree.sh"));
+
+    expect(lintRuntimeDependencies(snapshotOf({ root }))).toEqual([]);
   });
 
   /** @scenario "A dev-only package only a type import names passes" */
