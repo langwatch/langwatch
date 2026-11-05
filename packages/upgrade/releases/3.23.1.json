@@ -1,0 +1,65 @@
+{
+  "release": "3.23.1",
+  "previous": "3.23.0",
+  "cutAt": "2026-11-05T17:35:17+00:00",
+  "steps": [
+    {
+      "id": "prisma:20261104120000_nurturing_organization_last_trace_at",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: nurturing organization last trace at"
+    },
+    {
+      "id": "prisma:20261104120100_nurturing_organization_coding_first_days",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: nurturing organization coding first days"
+    },
+    {
+      "id": "prisma:20261104120101_nurturing_organization_coding_terminal_and_repositories",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: nurturing organization coding terminal and repositories"
+    },
+    {
+      "id": "prisma:20261105120000_user_erasure",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: user erasure"
+    },
+    {
+      "id": "agent:backfill-versions",
+      "kind": "data",
+      "mode": "background",
+      "owner": "agent",
+      "description": "Records version 1 of every agent written before versions existed, with its creator from the audit log.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "dataset:fill-empty-slugs",
+      "kind": "data",
+      "mode": "background",
+      "owner": "dataset",
+      "description": "Gives each dataset stored without a slug one made from its name."
+    },
+    {
+      "id": "dataset:create-first-versions",
+      "kind": "data",
+      "mode": "background",
+      "owner": "dataset",
+      "description": "Saves version 1 of every dataset that has no version history yet."
+    },
+    {
+      "id": "evaluator:backfill-versions",
+      "kind": "data",
+      "mode": "background",
+      "owner": "evaluator",
+      "description": "Records version 1 of every evaluator written before versions existed, with its creator from the audit log.",
+      "needsOldWritersGone": true
+    }
+  ]
+}
