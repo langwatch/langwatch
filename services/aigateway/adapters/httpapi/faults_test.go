@@ -359,6 +359,23 @@ func TestFaultForCodeAttributesEveryCodeTheGatewayAuthors(t *testing.T) {
 		"and our own bug must still be ours")
 }
 
+func TestFaultForCodeAttributesInternalChannelSignatureFailuresToPlatform(t *testing.T) {
+	// InternalAuthMiddleware raises these only on /internal/* control-plane and
+	// relay-hop traffic between our own pods — no customer holds that secret or
+	// can reach that route, so a rejection there is a secret-rotation mismatch
+	// or clock drift on our side, not a customer mistake.
+	internalChannel := []herr.Code{
+		domain.ErrMissingSignature, domain.ErrInvalidSignature,
+		domain.ErrInvalidTimestamp, domain.ErrTimestampOutOfWindow,
+	}
+	for _, code := range internalChannel {
+		t.Run(string(code), func(t *testing.T) {
+			assert.Equal(t, FaultPlatform, faultForCode(code),
+				"no customer can sign for the internal channel, so a rejection there is ours")
+		})
+	}
+}
+
 // @scenario "A provider or platform failure is not counted as a client rejection"
 func TestWriteErrorDoesNotCountProviderOrPlatformFaults(t *testing.T) {
 	cases := []struct {

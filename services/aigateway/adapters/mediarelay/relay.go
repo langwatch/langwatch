@@ -104,7 +104,11 @@ func (rl *relay) serve(worker *websocket.Conn, id string) {
 
 func (rl *relay) run(id string) ending {
 	if err := rl.sendReady(id); err != nil {
-		return ending{}
+		// The worker's own write just failed, so its socket is already dead;
+		// finish()'s zero-value close frame CloseNow()s it. The outcome still
+		// has to be set, or finish() skips RecordVoiceMediaRelay entirely and
+		// this failure mode is invisible in gateway_voice_media_relay_total.
+		return ending{outcome: OutcomeDropped}
 	}
 	go rl.pump(sideWorker)
 	twilio, end, joined := rl.awaitTwilio()
@@ -226,10 +230,13 @@ func endingOf(end pumpEnd) ending {
 		}
 		return ending{outcome: OutcomeDropped, worker: closeFrame{ClosePeerLost, "relay_peer_lost"}}
 	}
-	if graceful {
+	switch {
+	case tooBig:
+		return ending{outcome: OutcomeDropped, twilio: closeFrame{websocket.StatusMessageTooBig, "frame_too_big"}}
+	case graceful:
 		return ending{outcome: OutcomeCompleted, twilio: normal}
 	}
-	return ending{outcome: OutcomeDropped, twilio: normal}
+	return ending{outcome: OutcomeDropped, twilio: closeFrame{ClosePeerLost, "relay_peer_lost"}}
 }
 
 func isNormalClose(err error) bool {

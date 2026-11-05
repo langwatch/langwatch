@@ -87,9 +87,6 @@ func faultForCode(code herr.Code) Fault {
 		// A relay open with the wrong kind of key, or Twilio's socket with an
 		// id that is not joinable: both are the caller's to fix.
 		domain.ErrVoiceRelayLicenseRequired, domain.ErrVoiceRelayForbidden,
-		// A request to the signed internal channel the caller signed wrongly.
-		domain.ErrMissingSignature, domain.ErrInvalidSignature,
-		domain.ErrInvalidTimestamp, domain.ErrTimestampOutOfWindow,
 		domain.ErrNoProviderConfigured,
 		domain.ErrEndUserRequired,
 		// The customer's own OpenAI sign-in died and only they can restore it,
@@ -117,7 +114,15 @@ func faultForCode(code herr.Code) Fault {
 		// client rejection — see recordClientReject.
 		return FaultCustomer
 	default:
-		// internal_error, auth_upstream_unavailable, anything unrecognized.
+		// internal_error, auth_upstream_unavailable, anything unrecognized, and
+		// the signed internal-channel failures (domain.ErrMissingSignature,
+		// ErrInvalidSignature, ErrInvalidTimestamp, ErrTimestampOutOfWindow) —
+		// InternalAuthMiddleware raises those only on /internal/* control-plane
+		// and relay-hop traffic between our own pods, which no customer can
+		// reach or sign for. A rejection there is a secret-rotation mismatch or
+		// clock drift between pods, i.e. our bug, not theirs; attributing it to
+		// FaultCustomer logged it at info and kept a real platform incident off
+		// the error-level line operators alert on.
 		return FaultPlatform
 	}
 }
