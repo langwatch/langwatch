@@ -61,6 +61,7 @@ type prFile struct {
 }
 
 type prJob struct {
+	Needs   any               `yaml:"needs"` // a string or a list
 	If      string            `yaml:"if"`
 	Uses    string            `yaml:"uses"`
 	Outputs map[string]string `yaml:"outputs"`

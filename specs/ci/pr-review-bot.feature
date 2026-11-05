@@ -3,11 +3,15 @@ Feature: PR Review Bot workflow
   I want the PR Review Bot to selectively run code reviews on pull requests
   So that reviews are accurate, timely, and respect repository permissions
 
-  # The workflow gates on three conditions to determine whether the review
-  # job runs at all:
+  # The review is the job `review` in pr.yml, the last job, so it spends tokens
+  # only on a change CI passed. The ruleset requires a check of that name.
+  #
+  # The job gates on these conditions to determine whether it runs at all:
   # (1) The PR is not from dependabot (Dependabot has separate secret management)
   # (2) The PR is from the same repository (forks cannot access repo secrets)
   # (3) The PR is not a draft (drafts are not ready for review)
+  # (4) ci-complete succeeded
+  # (5) The event is a pull request (the bot reads github.event.pull_request)
   # Additionally, concurrency ensures only one review per PR runs at a time.
   #
   # Whether a job that runs actually POSTS a review is decided inside
@@ -17,7 +21,30 @@ Feature: PR Review Bot workflow
 
   Background:
     Given a pull request is created in the langwatch/langwatch repository
-    And the PR Review Bot workflow is triggered
+    And the pr workflow is triggered
+
+  # ============================================================================
+  # Gating: CI
+  # ============================================================================
+
+  @unit
+  Scenario: The review starts only after CI passed
+    Given a check pr.yml calls failed for the pull request
+    When ci-complete fails
+    Then the review job is skipped
+    And no review is posted to the PR
+
+  @unit
+  Scenario: The review still starts when CI skipped checks the change does not reach
+    Given pr.yml skipped the checks the change does not reach
+    When ci-complete succeeds
+    Then the review job executes
+
+  @unit
+  Scenario: The merge queue gets no review
+    Given a merge queue run of pr.yml
+    When ci-complete succeeds
+    Then the review job is skipped
 
   # ============================================================================
   # Gating: Dependabot PRs
