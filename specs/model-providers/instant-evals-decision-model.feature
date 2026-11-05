@@ -5,10 +5,17 @@ Feature: Instant Evals decision model column in Default models
 
   # ADR-182. LangWatch Instant Preview is the hosted, metered default. An own decision model
   # runs on the organization's key, unmetered and uncapped, behind the
-  # release_instant_evals_own_decision_model flag. A broken own key never falls back.
+  # release_instant_evals_own_decision_model flag, on by default. A broken own key never falls back.
 
   Background:
     Given an organization with a project
+
+  # --- The flag ---
+
+  @unit
+  Scenario: Own decision models are on by default
+    When the flag registry is read
+    Then the own decision model flag is a product flag, on unless switched off
 
   # --- Resolving the column ---
 
@@ -347,7 +354,13 @@ Feature: Instant Evals decision model column in Default models
   Scenario: The Default models table shows an Instant Evals column defaulting to LangWatch Instant Preview
     When I open Settings > Model Providers > Default models
     Then I see an "Instant Evals" column
-    And it reads "LangWatch Instant Preview" where nothing is set
+    And it reads "Instant Preview" with the LangWatch mark where nothing is set
+
+  @unit
+  Scenario: A decision model reads as its model name, as a chat model does
+    When a decision model is listed in a picker
+    Then its label is the model name only, such as "gpt-6-luna" or "Microsoft Decision 1"
+    And its provider is shown by the provider heading and icon, never written in the label
 
   @integration
   Scenario: The drawer offers only decision models for the Instant Evals column

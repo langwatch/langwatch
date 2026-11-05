@@ -107,6 +107,32 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Then the "can't run right now" popover names connect.langwatch.ai and gateway.langwatch.ai
       And it still offers to contact us
 
+  Rule: A project on its own decision model is released by that model, whatever the release says
+
+    # ADR-182. Its key, its bill: `release_instant_evals` and the license govern LangWatch's model
+    # only. The resolver answers "own" only under the own-model flag with a usable key.
+
+    @unit
+    Scenario: An own decision model releases Instant Evals without the flag or a license
+      Given a self-hosted install with no license, no classifier and the release flag off
+      And a project whose Instant Evals column is its own decision model, ready to run
+      When the project asks whether it may judge
+      Then it may, and neither the flag, the license nor the classifier is read
+      And LangWatch's own model is still not released
+
+    @unit
+    Scenario: An own decision model that cannot run releases nothing
+      Given a self-hosted install with no license and the release flag off
+      And a project whose own decision model has no usable key
+      When the project asks whether it may judge
+      Then it may not
+
+    @unit
+    Scenario: The popover reports LangWatch's model apart from an own one
+      Given a project released by its own decision model alone
+      When the explorer asks for its Instant Evals access
+      Then it is released, and LangWatch's own model is not
+
   Rule: The switch is the organization's, and the first click is the one that counts
 
     @integration
