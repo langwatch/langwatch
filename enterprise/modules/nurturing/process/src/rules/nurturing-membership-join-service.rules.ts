@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
+import type { OrganizationUserRole } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
 import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
@@ -7,8 +8,26 @@ import { type KnownTraces, knownTraceTraits } from "./nurturing-member-facts.rul
 
 type Joined = Pick<
   NurturingSignalOf<"invite_accepted">,
-  "userId" | "organizationId" | "organizationName"
+  "userId" | "organizationId" | "organizationName" | "role"
 >;
+
+/** Keyed by every role, so a new OrganizationUserRole fails the compile until it is named here. */
+const SEAT_BY_ROLE: Readonly<Record<OrganizationUserRole, string>> = {
+  ADMIN: "admin",
+  MEMBER: "member",
+  EXTERNAL: "lite_member",
+  DEVELOPER: "developer",
+};
+
+/** The stored role is a plain string so old or unknown events parse; this narrows it. */
+function isOrganizationUserRole(role: string): role is OrganizationUserRole {
+  return Object.hasOwn(SEAT_BY_ROLE, role);
+}
+
+/** The Customer.io seat name for a role. */
+function seatFor(role: OrganizationUserRole): string {
+  return SEAT_BY_ROLE[role];
+}
 
 /** Groups the person into the organization they joined and tracks how they came in. */
 function joinedCalls({
@@ -18,14 +37,20 @@ function joinedCalls({
   joined: Joined;
   event: "joined_via_invite" | "joined_via_sso";
 }): CioBatchCall[] {
-  const { userId, organizationId, organizationName } = joined;
+  const { userId, organizationId, organizationName, role } = joined;
+  // A role we cannot name is left out rather than guessed.
+  const seat = role && isOrganizationUserRole(role) ? seatFor(role) : undefined;
   return [
     { type: "group", userId, groupId: organizationId, traits: { name: organizationName } },
     {
       type: "track",
       userId,
       event,
-      properties: { organization_id: organizationId, organization_name: organizationName },
+      properties: {
+        organization_id: organizationId,
+        organization_name: organizationName,
+        ...(seat ? { seat } : {}),
+      },
     },
   ];
 }

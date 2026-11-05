@@ -270,6 +270,50 @@ describe("NurturingDeliveryService organization facts", () => {
     });
   });
 
+  describe("when another coding fact of the organization is delivered", () => {
+    const source = {
+      sourceEventId: "org-1:1",
+      tenantId: "project-1",
+      occurredAt: T0,
+      userId: "admin-1",
+      projectId: "project-1",
+    };
+
+    /** @scenario "The terminal types, repo count and first-three-days count tell every active member" */
+    it.each([
+      [
+        { ...source, kind: "coding_terminal_types", terminalTypes: ["vscode"] },
+        { coding_terminal_types: ["vscode"] },
+      ],
+      [{ ...source, kind: "coding_repo_count", codingRepoCount: 2 }, { coding_repo_count: 2 }],
+      [
+        { ...source, kind: "coding_session_days_first_3", codingSessionDaysFirst3: 2 },
+        { coding_session_days_first_3: 2 },
+      ],
+    ] satisfies [NurturingSignal, object][])(
+      "identifies every active member with %j",
+      async (signal, traits) => {
+        const { cio, deliver } = await organizationWithMembers();
+
+        await deliver(signal);
+        await settle();
+
+        expect(traitsOf(cio.identifies(), "admin-1")).toEqual([traits]);
+        expect(traitsOf(cio.identifies(), "member-2")).toEqual([traits]);
+      },
+    );
+
+    /** @scenario "The active days stay the admin's" */
+    it("tells only the admin the active days", async () => {
+      const { cio, deliver } = await organizationWithMembers();
+
+      await deliver({ ...source, kind: "coding_active_days", codingActiveDays: 3 });
+      await settle();
+
+      expect(cio.identifies().map(({ userId }) => userId)).toEqual(["admin-1"]);
+    });
+  });
+
   describe("when the first coding session is delivered twice", () => {
     /** @scenario "The first coding session tells every member coding_first_session_at once" */
     it("tells member-2 the first session once and tracks only the admin", async () => {

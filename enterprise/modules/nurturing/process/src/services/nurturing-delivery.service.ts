@@ -48,6 +48,7 @@ import { fireSignup } from "../rules/nurturing-signup-identification-service.rul
 import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
+import { NurturingOwnCodingDeliveryService } from "./nurturing-own-coding-delivery.service.ts";
 import { NurturingPostHogDeliveryService } from "./nurturing-posthog-delivery.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
@@ -90,12 +91,18 @@ export class NurturingDeliveryService {
       memberFacts: NurturingMemberFactsService;
     }>,
     private readonly postHogDelivery: NurturingPostHogDeliveryService | undefined,
+    private readonly ownCodingDelivery: NurturingOwnCodingDeliveryService | undefined,
   ) {}
 
   static create(deps: NurturingDeliveryService["deps"]): NurturingDeliveryService {
     return new NurturingDeliveryService(
       deps,
       deps.posthog && NurturingPostHogDeliveryService.create(deps.posthog),
+      deps.customerIo &&
+        NurturingOwnCodingDeliveryService.create({
+          claims: deps.claims,
+          customerIo: deps.customerIo,
+        }),
     );
   }
 
@@ -109,6 +116,7 @@ export class NurturingDeliveryService {
     this.toCustomerIo(signal);
     this.toPostHogSafely(signal);
     await this.identifyCodingAgentMembers(signal);
+    await this.ownCodingDelivery?.deliver(signal);
     if (memberBatch) this.identifyInBatches(memberBatch);
   }
 

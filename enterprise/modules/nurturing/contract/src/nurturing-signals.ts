@@ -183,6 +183,8 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     userId: id,
     organizationId: id,
     organizationName: z.string(),
+    /** The OrganizationUserRole joined with; absent on events stored before it was recorded. */
+    role: z.string().optional(),
   }),
   z.object({
     kind: z.literal("sso_auto_added"),
@@ -190,6 +192,8 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     userId: id,
     organizationId: id,
     organizationName: z.string(),
+    /** The OrganizationUserRole joined with; absent on events stored before it was recorded. */
+    role: z.string().optional(),
   }),
   z.object({
     /** A person's own sign-up, from user's or auth's fact: PostHog's signed_up, never Customer.io's. */
@@ -303,6 +307,16 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     projectId: id,
   }),
   z.object({
+    /** A session from a personal project: its owner's own profile, never the organization's. */
+    kind: z.literal("own_coding_session_stored"),
+    ...signalSource,
+    /** The personal project's owner. `occurredAt` is the batch's latest session. */
+    userId: id,
+    projectId: id,
+    /** The batch's earliest session, epoch ms: own_coding_first_session_at if none is set yet. */
+    firstOccurredAt: z.number().int().nonnegative(),
+  }),
+  z.object({
     kind: z.literal("coding_active_days"),
     ...signalSource,
     /** The organization's admin. */
@@ -319,6 +333,33 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     projectId: id,
     /** Every agent the organization has used, sorted. */
     agentTypes: z.array(id).min(1),
+  }),
+  z.object({
+    kind: z.literal("coding_terminal_types"),
+    ...signalSource,
+    /** The organization's admin. */
+    userId: id,
+    projectId: id,
+    /** Every terminal type the organization's sessions ran in, sorted. */
+    terminalTypes: z.array(id).min(1),
+  }),
+  z.object({
+    kind: z.literal("coding_repo_count"),
+    ...signalSource,
+    /** The organization's admin. */
+    userId: id,
+    projectId: id,
+    /** Distinct repos of the organization's sessions: the count alone, never a per-repo value. */
+    codingRepoCount: countIncludingThis,
+  }),
+  z.object({
+    kind: z.literal("coding_session_days_first_3"),
+    ...signalSource,
+    /** The organization's admin. */
+    userId: id,
+    projectId: id,
+    /** Distinct UTC days among days 0, 1 and 2 from the organization's creation with a session. */
+    codingSessionDaysFirst3: z.number().int().min(1).max(3),
   }),
   z.object({
     kind: z.literal("coding_agent_first_session"),

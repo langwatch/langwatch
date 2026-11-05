@@ -102,6 +102,27 @@ const agentTypes: NurturingSignal = {
   ...codingSource,
   agentTypes: ["claude_code", "codex"],
 };
+const terminalTypes = (list: string[]): NurturingSignal => ({
+  kind: "coding_terminal_types",
+  sourceEventId: `org-1:${list.join(",")}`,
+  occurredAt: T0,
+  ...codingSource,
+  terminalTypes: list,
+});
+const repoCount = (codingRepoCount: number): NurturingSignal => ({
+  kind: "coding_repo_count",
+  sourceEventId: `org-1:${codingRepoCount}`,
+  occurredAt: T0,
+  ...codingSource,
+  codingRepoCount,
+});
+const firstDays: NurturingSignal = {
+  kind: "coding_session_days_first_3",
+  sourceEventId: "org-1:2",
+  occurredAt: T0,
+  ...codingSource,
+  codingSessionDaysFirst3: 2,
+};
 const firstSession: NurturingSignal = {
   kind: "coding_agent_first_session",
   sourceEventId: "org-1",
@@ -240,6 +261,87 @@ describe("NurturingDeliveryService coding-agent signals", () => {
         expect.objectContaining({
           traits: { coding_agent_types: ["claude_code", "codex"] },
         }),
+      ]);
+      expect(cio.tracks()).toEqual([]);
+    });
+  });
+
+  describe("when terminal types are delivered", () => {
+    /** @scenario "A terminal-types signal identifies the full list without an event" */
+    it("identifies the full list and tracks nothing", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, terminalTypes(["ghostty", "vscode"]));
+      await settle();
+
+      expect(cio.identifies()).toEqual([
+        expect.objectContaining({
+          userId: "admin-1",
+          traits: { coding_terminal_types: ["ghostty", "vscode"] },
+        }),
+      ]);
+      expect(cio.tracks()).toEqual([]);
+    });
+  });
+
+  describe("when the repo count is delivered", () => {
+    /** @scenario "A repo-count signal identifies the count and nothing else" */
+    it("identifies the count as the only trait and tracks nothing", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, repoCount(2));
+      await settle();
+
+      expect(cio.identifies()).toEqual([
+        expect.objectContaining({ userId: "admin-1", traits: { coding_repo_count: 2 } }),
+      ]);
+      expect(cio.tracks()).toEqual([]);
+    });
+  });
+
+  describe("when two values of a kind are delivered inside 300 seconds", () => {
+    /** @scenario "The terminal types and repo count are not debounced, like the agent types" */
+    it("identifies both terminal-type lists", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, terminalTypes(["vscode"]));
+      await deliver(delivery, terminalTypes(["ghostty", "vscode"]));
+      await settle();
+
+      expect(cio.identifies()).toHaveLength(2);
+    });
+
+    it("identifies both repo counts", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, repoCount(1));
+      await deliver(delivery, repoCount(2));
+      await settle();
+
+      expect(cio.identifies()).toHaveLength(2);
+    });
+
+    it("sends a redelivered repo count once", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, repoCount(1));
+      await deliver(delivery, repoCount(1));
+      await settle();
+
+      expect(cio.identifies()).toHaveLength(1);
+    });
+  });
+
+  describe("when the first-three-days count is delivered", () => {
+    /** @scenario "A first-three-days signal identifies the count without an event" */
+    it("identifies the count and tracks nothing", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, firstDays);
+      await settle();
+
+      expect(cio.identifies()).toEqual([
+        expect.objectContaining({ userId: "admin-1", traits: { coding_session_days_first_3: 2 } }),
       ]);
       expect(cio.tracks()).toEqual([]);
     });
@@ -590,6 +692,9 @@ describe("NurturingDeliveryService PostHog for the new kinds", () => {
     ["coding_active_days", activeDays],
     ["coding_agent_types", agentTypes],
     ["coding_agent_first_session", firstSession],
+    ["coding_terminal_types", terminalTypes(["vscode"])],
+    ["coding_repo_count", repoCount(1)],
+    ["coding_session_days_first_3", firstDays],
     ["app_opened", appOpened(T0)],
     ["sessions_page_viewed", pageViewed(T0)],
   ];
@@ -603,6 +708,81 @@ describe("NurturingDeliveryService PostHog for the new kinds", () => {
       await settle();
 
       expect(posthog.tracked).toEqual([]);
+    });
+  });
+});
+
+describe("NurturingDeliveryService own coding sessions", () => {
+  const ownSession = ({
+    projectId,
+    occurredAt,
+  }: {
+    projectId: string;
+    occurredAt: number;
+  }): NurturingSignalOf<"own_coding_session_stored"> => ({
+    kind: "own_coding_session_stored",
+    sourceEventId: `owner-1:${projectId}:${occurredAt}`,
+    tenantId: projectId,
+    userId: "owner-1",
+    projectId,
+    occurredAt,
+    firstOccurredAt: occurredAt,
+  });
+  const traitsOf = (cio: ReturnType<typeof customerIo>, trait: string) =>
+    cio
+      .identifies()
+      .map((call) => call.traits as Record<string, unknown>)
+      .filter((traits) => trait in traits);
+
+  describe("when a second organization's session follows the person's first", () => {
+    /** @scenario "A person's own first session is set once across organizations" */
+    it("keeps own_coding_first_session_at and moves own_coding_last_session_at", async () => {
+      const claims = new ClockedClaims();
+      const { delivery, cio } = deliveryOver(claims);
+
+      await deliver(delivery, ownSession({ projectId: "project-1", occurredAt: T0 }));
+      claims.now += 301_000;
+      await deliver(delivery, ownSession({ projectId: "project-9", occurredAt: T0 + 301_000 }));
+      await settle();
+
+      expect(traitsOf(cio, "own_coding_first_session_at")).toEqual([
+        { own_coding_first_session_at: unixSeconds(T0) },
+      ]);
+      expect(traitsOf(cio, "own_coding_last_session_at")).toEqual([
+        { own_coding_last_session_at: unixSeconds(T0) },
+        { own_coding_last_session_at: unixSeconds(T0 + 301_000) },
+      ]);
+      expect(cio.identifies().map((call) => call.userId)).toEqual([
+        "owner-1",
+        "owner-1",
+        "owner-1",
+      ]);
+    });
+  });
+
+  describe("when the person's sessions arrive inside 300 seconds", () => {
+    /** @scenario "Own session updates are debounced per person for 300 seconds" */
+    it("identifies the person once, whichever project the sessions came from", async () => {
+      const { delivery, cio } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, ownSession({ projectId: "project-1", occurredAt: T0 }));
+      await deliver(delivery, ownSession({ projectId: "project-9", occurredAt: T0 + 1_000 }));
+      await settle();
+
+      expect(traitsOf(cio, "own_coding_last_session_at")).toHaveLength(1);
+    });
+  });
+
+  describe("when an own coding session is delivered", () => {
+    /** @scenario "Own coding traits reach Customer.io only, with no event" */
+    it("sends PostHog nothing and tracks no Customer.io event", async () => {
+      const { delivery, cio, posthog } = deliveryOver(new ClockedClaims());
+
+      await deliver(delivery, ownSession({ projectId: "project-1", occurredAt: T0 }));
+      await settle();
+
+      expect(posthog.tracked).toEqual([]);
+      expect(cio.tracks()).toEqual([]);
     });
   });
 });

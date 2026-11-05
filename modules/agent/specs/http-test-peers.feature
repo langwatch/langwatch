@@ -48,3 +48,10 @@ Feature: HTTP agent credentials on read and write
     When the test panel shows the failure
     Then its title is the registry's words, as on main's test panel, with the engine's message beneath
     And a failure with no known code keeps the title "The test request failed"
+
+  @unit
+  Scenario: An HTTP agent test whose reply misses the output path points at the output path
+    Given an HTTP agent test where the agent replied but the output path matched nothing
+    When the test panel shows the failure
+    Then it says the reply has no value at the output path and to check the output path
+    And it never says the agent could not be reached

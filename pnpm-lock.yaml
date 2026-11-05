@@ -6974,6 +6974,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -7011,9 +7014,6 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
-      '@langwatch/secrets':
-        specifier: workspace:*
-        version: link:../../../packages/secrets
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
