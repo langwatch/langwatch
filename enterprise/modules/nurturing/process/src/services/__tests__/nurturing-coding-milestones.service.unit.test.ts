@@ -14,10 +14,6 @@ import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/m
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import { NurturingCodingMilestonesService } from "../nurturing-coding-milestones.service.ts";
 
-type Terminals = NurturingSignalOf<"coding_terminal_types">;
-type RepoCount = NurturingSignalOf<"coding_repo_count">;
-type FirstDays = NurturingSignalOf<"coding_session_days_first_3">;
-
 const DAY = Date.UTC(2026, 9, 20, 12);
 const HOUR = 60 * 60 * 1000;
 
@@ -322,7 +318,7 @@ describe("NurturingCodingMilestonesService", () => {
 
       expect(
         ofKind("coding_active_days").map(
-          (s) => (s as { codingActiveDays: number }).codingActiveDays,
+          (s) => s.codingActiveDays,
         ),
       ).toEqual([1, 2, 3]);
     });
@@ -338,7 +334,7 @@ describe("NurturingCodingMilestonesService", () => {
 
       expect(
         ofKind("coding_active_days").map(
-          (s) => (s as { codingActiveDays: number }).codingActiveDays,
+          (s) => s.codingActiveDays,
         ),
       ).toEqual([1, 2]);
     });
@@ -359,7 +355,7 @@ describe("NurturingCodingMilestonesService", () => {
 
       expect(
         ofKind("coding_active_days").map(
-          (s) => (s as { codingActiveDays: number }).codingActiveDays,
+          (s) => s.codingActiveDays,
         ),
       ).toEqual([1, 3]);
     });
@@ -377,7 +373,7 @@ describe("NurturingCodingMilestonesService", () => {
 
   describe("when sessions name terminal types", () => {
     const terminalTypesOf = (ofKind: Awaited<ReturnType<typeof serviceOver>>["ofKind"]) =>
-      ofKind("coding_terminal_types").map((signal) => (signal as Terminals).terminalTypes);
+      ofKind("coding_terminal_types").map((signal) => signal.terminalTypes);
 
     /** @scenario "A new terminal type raises the full sorted list of terminal types" */
     it("raises the full sorted list each time a new one appears", async () => {
@@ -413,7 +409,7 @@ describe("NurturingCodingMilestonesService", () => {
 
   describe("when sessions name repos", () => {
     const countsOf = (ofKind: Awaited<ReturnType<typeof serviceOver>>["ofKind"]) =>
-      ofKind("coding_repo_count").map((signal) => (signal as RepoCount).codingRepoCount);
+      ofKind("coding_repo_count").map((signal) => signal.codingRepoCount);
 
     /** @scenario "A new repo grows the organization's repo count" */
     it("counts the repos of every project of the organization", async () => {
@@ -511,11 +507,11 @@ describe("NurturingCodingMilestonesService", () => {
 
       await send([fact({ firstForProject: false, terminalType: "vscode", repositoryKey: "r" })]);
 
-      const [person] = ofKind("coding_agent_types").map((signal) => (signal as Terminals).userId);
+      const [person] = ofKind("coding_agent_types").map((signal) => signal.userId);
       expect(person).toBeDefined();
       expect(
         [...ofKind("coding_terminal_types"), ...ofKind("coding_repo_count")].map(
-          (signal) => (signal as Terminals).userId,
+          (signal) => signal.userId,
         ),
       ).toEqual([person, person]);
     });
@@ -529,7 +525,7 @@ describe("NurturingCodingMilestonesService", () => {
       fact({ sessionId, firstForProject: false, occurredAt });
     const countsOf = (ofKind: Awaited<ReturnType<typeof serviceOver>>["ofKind"]) =>
       ofKind("coding_session_days_first_3").map(
-        (signal) => (signal as FirstDays).codingSessionDaysFirst3,
+        (signal) => signal.codingSessionDaysFirst3,
       );
     const onDay2 = { organizationCreatedAt: CREATED, now: onDay(2) };
 
@@ -657,7 +653,7 @@ describe("NurturingCodingMilestonesService", () => {
 
       await send([session("s-1", onDay(1))]);
 
-      const [person] = ofKind("coding_agent_types").map((signal) => (signal as FirstDays).userId);
+      const [person] = ofKind("coding_agent_types").map((signal) => signal.userId);
       expect(person).toBeDefined();
       expect(ofKind("coding_session_days_first_3")).toMatchObject([{ userId: person }]);
     });
