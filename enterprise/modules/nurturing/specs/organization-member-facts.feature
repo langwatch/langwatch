@@ -150,6 +150,18 @@ Feature: An organization's session facts reach every active member in Customer.i
     And the person is tracked joined_via_sso
 
   @unit
+  Scenario: A join event carries the seat the person joined with
+    Given an invite_accepted or sso_auto_added signal for org-1 holding the role ADMIN, MEMBER, EXTERNAL or DEVELOPER
+    When the signal is delivered
+    Then the joined_via_invite or joined_via_sso event carries seat admin, member, lite_member or developer
+
+  @unit
+  Scenario: A join event with no known role carries no seat
+    Given an invite_accepted or sso_auto_added signal for org-1 with no role, or one nurturing cannot name
+    When the signal is delivered
+    Then the joined_via_invite or joined_via_sso event carries no seat property
+
+  @unit
   Scenario: A large organization's members go out in batches of one hundred
     Given org-1 has 250 active members
     When a trace_received signal of project-1 is delivered
