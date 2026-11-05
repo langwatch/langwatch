@@ -604,9 +604,12 @@ A service key has no owner. Its permissions come from its scope and permission m
 
 **Settings > API Keys** lists every key with **Name**, **Status**, **Secret Key** (the prefix only), **Created**, **Last Used**, **Type** (the owner's email, or **Service**), **Scope** and **Permissions**. A scope filter above the table narrows the list to one project, team or the organization.
 
+Click a key to open its details: owner, scope, permissions, expiry, creation date and last use. The secret is never shown again after it is created.
+
 The key's owner and organization admins can:
 
 - **Edit** the name, description, permission mode, categories and scope
+- **Rotate** the key to get a new secret with the same settings. After you confirm, the new secret is shown once and the old secret is refused at once; there is no overlap period. The key keeps its name, owner, scope, permissions, expiry and usage history. An expired or revoked key cannot be rotated
 - **Revoke** the key. A revoked key is refused at once and cannot be restored
 
 The **Ingestion keys** table on the same page lists ingestion keys; organization admins revoke them.
