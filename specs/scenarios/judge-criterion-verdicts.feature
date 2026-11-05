@@ -75,6 +75,7 @@ Feature: Per-criterion judge verdicts on scenario runs
     Given a finished run with per-criterion verdicts
     When the run view opens
     Then each criterion shows under its status with the judge's reasoning for it
+    And the judge's restatement of the criterion does not show
 
   @integration
   Scenario: A criterion the test could not check reads apart from a failed one
