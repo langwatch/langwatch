@@ -14,6 +14,7 @@ class KeyMap extends LangWatchQLProvisioningRepository {
   probeOwner = vi.fn();
   queryRows = vi.fn();
   readInventory = vi.fn();
+  readCollectionState = vi.fn();
   probePostgresCollection = vi.fn();
   probePostgresCredentials = vi.fn();
   close = vi.fn(async () => undefined);

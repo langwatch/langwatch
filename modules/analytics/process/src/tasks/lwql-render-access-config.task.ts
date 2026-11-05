@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
+import { LangWatchQLCollectionBindingService } from "../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
 import { LangWatchQLProductionProvisioningService } from "../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLSelfProvisioningService,
@@ -26,6 +27,7 @@ const logger = createLogger("langwatch:tasks:lwql-render-access-config");
 const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 const production = LangWatchQLProductionProvisioningService.create();
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+const collectionBinding = LangWatchQLCollectionBindingService.create();
 
 /** The definition the app would converge, from the same environment the app reads. */
 export function lwqlAccessModelDefinitionFromSource(
@@ -44,13 +46,14 @@ export function lwqlAccessModelDefinitionFromSource(
     names,
     passwordSha256Hex: createHash("sha256").update(request.connection.password).digest("hex"),
     namedCollection: {
-      collection: selfProvisioning.namedCollection({ names }),
+      collection: collectionBinding.namedCollection({ names, mode: "rendered" }),
       host: request.endpoint.host,
       port: request.endpoint.port,
       database: request.endpoint.database,
       user: LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole,
       password: request.postgresReaderPassword,
     },
+    namedCollectionAliases: collectionBinding.renderedCollectionAliases({ names }),
     sourceDatabase: names.database,
   });
 }

@@ -31,6 +31,10 @@ export {
   imageGateSteps,
   imageRelease,
   readImageTree,
+  type ReleaseIdentityRefusal,
+  releaseIdentityRefusal,
+  STAMP_RELEASE_COMMAND,
+  stampTreeRelease,
 } from "./image-tree.ts";
 export {
   IMAGE_CODE_STEPS_COMMAND,

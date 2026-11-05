@@ -15,6 +15,7 @@ import {
 } from "@langwatch/prisma-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
 import { LWQL_POSTGRES_READER_ROLE } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import { LangWatchQLSelfProvisioningService } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import {
@@ -41,6 +42,8 @@ class AllowTestQueries extends PrismaQueryGuard {
 }
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+
+const collectionBinding = LangWatchQLCollectionBindingService.create();
 const SERVER_LOG = "/var/log/clickhouse-server/clickhouse-server.log";
 
 type LogMark = { at: string; bytes: number };
@@ -230,7 +233,7 @@ describe("given a rendered install whose engine tables were built on the reader'
       }),
     );
     names = { ...harness.names, database: harness.factDatabase };
-    collection = selfProvisioning.namedCollection({ names });
+    collection = collectionBinding.namedCollection({ names, mode: "rendered" });
     // A reused container keeps the facts database, so the app-owned objects go first.
     await harness.applyAsAdmin([
       ...LWQL_VIEW_CATALOG.map((view) => `DROP VIEW IF EXISTS ${names.database}.${view.name}`),
