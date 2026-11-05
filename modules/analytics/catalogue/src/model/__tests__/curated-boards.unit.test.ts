@@ -71,10 +71,15 @@ describe("curatedBoardWidgetById", () => {
 });
 
 describe("curatedBoardPointerId", () => {
-  it("round-trips every template id", () => {
-    for (const { templateId } of CURATED_BOARD_DEFINITIONS) {
+  it.each(CURATED_BOARD_DEFINITIONS.map(({ templateId }) => templateId))(
+    "round-trips the template id %s",
+    (templateId) => {
       expect(templateIdOfCuratedBoardPointer(curatedBoardPointerId(templateId))).toBe(templateId);
-    }
+    },
+  );
+
+  it.each(["curated/", "curated/unknown"])("names no template for the unknown pointer %s", (id) => {
+    expect(templateIdOfCuratedBoardPointer(id)).toBeUndefined();
   });
 
   it("names no template for a stored board's id or a bare template id", () => {

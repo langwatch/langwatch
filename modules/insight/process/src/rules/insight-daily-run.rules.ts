@@ -142,14 +142,16 @@ export function insightBoardPointerId({ kind, id }: Pick<InsightRunBoard, "kind"
  */
 export function runFindingPointer({
   board,
+  boardPointerId: id,
   name,
   widget,
 }: {
   board: Pick<InsightRunBoard, "kind" | "id">;
+  /** The run's `insightBoardPointerId(board)`, computed once. */
+  boardPointerId: string;
   name: string;
   widget: { id: string; name: string } | null;
 }): { id: string; name: string; widget: { id: string; name: string } | null } {
-  const id = insightBoardPointerId(board);
   if (board.kind === "dashboard" || widget === null) return { id, name, widget };
   // A widget of another template is no widget of this board.
   const found = curatedBoardWidgetById(widget.id);

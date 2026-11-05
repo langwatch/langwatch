@@ -77,7 +77,8 @@ function Board({
   witness?: boolean;
 }) {
   const [added, setAdded] = useState(0);
-  // A From LangWatch board's pointer id is its address segment, as analytics hands it over.
+  // The wire value of the catalogue's pointer id, `curated/<templateId>`; this package
+  // does not import the catalogue.
   const boardPointerId = kind === "template" ? `curated/${id}` : id;
   return (
     <>
@@ -415,25 +416,25 @@ describe("given a member turned a board's daily run on", () => {
     });
   });
 
-  describe("when a From LangWatch board has 1 unseen insight filed under its pointer id", () => {
+  describe("when a From LangWatch board has 2 unseen insights filed under its pointer id and 1 under its bare template id", () => {
     /** @scenario "The control counts the board's unseen insights" */
-    it("says 1 new", async () => {
+    it("says 2 new", async () => {
+      // The wire value of the catalogue's pointer id; the browser does not import the catalogue.
+      const pointer = { id: "curated/release", name: "Release", widget: null };
       openBoard({
         kind: "template",
         id: "release",
         setting: ON,
         entries: [
-          insightEntry({
-            id: "i-1",
-            board: { id: "curated/release", name: "Release", widget: null },
-          }),
-          insightEntry({ id: "i-2", board: { id: "release", name: "Other", widget: null } }),
+          insightEntry({ id: "i-1", board: pointer }),
+          insightEntry({ id: "i-2", board: pointer }),
+          insightEntry({ id: "i-3", board: { id: "release", name: "Other", widget: null } }),
         ],
       });
 
       expect(
-        await screen.findByRole("button", { name: "Daily insights: on, 1 new" }),
-      ).toHaveTextContent("1 new");
+        await screen.findByRole("button", { name: "Daily insights: on, 2 new" }),
+      ).toHaveTextContent("2 new");
     });
   });
 

@@ -657,12 +657,12 @@ describe("given a Langy session key deleting at /api/v1/dashboards", () => {
     });
 
     /** @scenario "A From LangWatch widget cannot be changed under its own board's path" */
-    it("answers a From LangWatch widget under a stored board's path as not found", async () => {
+    it("answers a From LangWatch widget under a stored board's path as not found, with no card", async () => {
       const [curated] = CURATED_BOARD_DEFINITIONS;
       const [template] = curated?.widgets ?? [];
       if (!curated || !template)
         throw new Error("A From LangWatch board with a widget is expected");
-      const { board, send } = await projectWithBothBoards({ langy: true, actor: MEMBER });
+      const { board, send, asked } = await projectWithBothBoards({ langy: true, actor: MEMBER });
       const widgetId = templateWidgetId({ templateId: curated.templateId, key: template.key });
       const path = `${BOARDS}/${board.id}/widgets/${encodeURIComponent(widgetId)}`;
 
@@ -672,10 +672,14 @@ describe("given a Langy session key deleting at /api/v1/dashboards", () => {
         body: { name: "Renamed" },
       });
 
-      expect([refusal(deleted), refusal(patched)]).toEqual([
-        { status: 404, code: "dashboard_widget_not_found" },
-        { status: 404, code: "dashboard_widget_not_found" },
-      ]);
+      expect({ answers: [refusal(deleted), refusal(patched)], asked }).toEqual({
+        answers: [
+          { status: 404, code: "dashboard_widget_not_found" },
+          { status: 404, code: "dashboard_widget_not_found" },
+        ],
+        // Read as no such record: the gate then shows no card.
+        asked: [{ resource: "dashboard widget", names: [undefined] }],
+      });
     });
 
     it("asks for the click on a card naming the board, then deletes it", async () => {

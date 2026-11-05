@@ -38,9 +38,10 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
   const { grain, period, setRange, setGrain } = useBoardPeriod({
     refreshedAt: autoRefresh.refreshedAt,
   });
+  const boardPointerId = curatedBoardPointerId(board.templateId);
   const subject = boardSubject({
     board: {
-      id: curatedBoardPointerId(board.templateId),
+      id: boardPointerId,
       name: board.name,
       templateId: board.templateId,
     },
@@ -61,7 +62,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
           pointer={{
             boardKind: "template",
             boardId: board.templateId,
-            boardPointerId: subject.id,
+            boardPointerId,
             widgetCount: board.widgets.length,
           }}
           action={null}

@@ -347,6 +347,7 @@ describe("runFindingPointer", () => {
     it.each(widgets)("keeps $templateId/$key as curated/<templateId> and the widget's key", (w) => {
       const pointer = runFindingPointer({
         board: { kind: "template", id: w.templateId },
+        boardPointerId: curatedBoardPointerId(w.templateId),
         name: "Board",
         widget: { id: templateWidgetId(w), name: "Widget" },
       });
@@ -363,6 +364,7 @@ describe("runFindingPointer", () => {
     it("files the finding on the board with no widget", () => {
       const pointer = runFindingPointer({
         board: { kind: "template", id: "release" },
+        boardPointerId: "curated/release",
         name: "Board",
         widget: { id: "template:release:nope", name: "Widget" },
       });
@@ -378,6 +380,7 @@ describe("runFindingPointer", () => {
 
       const pointer = runFindingPointer({
         board: { kind: "template", id: "release" },
+        boardPointerId: "curated/release",
         name: "Board",
         widget: { id: templateWidgetId(other), name: "Widget" },
       });
@@ -391,7 +394,12 @@ describe("runFindingPointer", () => {
       const widget = { id: "widget-1", name: "Widget" };
 
       expect(
-        runFindingPointer({ board: { kind: "dashboard", id: "board-1" }, name: "Board", widget }),
+        runFindingPointer({
+          board: { kind: "dashboard", id: "board-1" },
+          boardPointerId: "board-1",
+          name: "Board",
+          widget,
+        }),
       ).toEqual({ id: "board-1", name: "Board", widget });
     });
   });
@@ -401,6 +409,7 @@ describe("runFindingPointer", () => {
       expect(
         runFindingPointer({
           board: { kind: "template", id: "release" },
+          boardPointerId: "curated/release",
           name: "Board",
           widget: null,
         }),

@@ -75,11 +75,10 @@ export function curatedBoardPointerId(templateId: string): string {
   return `${CURATED_POINTER_PREFIX}${templateId}`;
 }
 
-/** The template id a board pointer id names; undefined for a stored board's id. */
+/** The template id a pointer id names; undefined for a stored board's id or an unknown template. */
 export function templateIdOfCuratedBoardPointer(id: string): string | undefined {
-  return id.startsWith(CURATED_POINTER_PREFIX)
-    ? id.slice(CURATED_POINTER_PREFIX.length)
-    : undefined;
+  if (!id.startsWith(CURATED_POINTER_PREFIX)) return undefined;
+  return curatedBoardDefinitionById(id.slice(CURATED_POINTER_PREFIX.length))?.templateId;
 }
 
 /** The From LangWatch widget a `template:` id names; undefined for any other id. */

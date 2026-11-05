@@ -348,7 +348,12 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       ...words,
       replay: words.lwql === null ? null : dailyRunReplay({ window: ready.windows.window }),
       source,
-      board: runFindingPointer({ board: input.board, name: ready.gate.board.name, widget }),
+      board: runFindingPointer({
+        board: input.board,
+        boardPointerId: ready.boardPointerId,
+        name: ready.gate.board.name,
+        widget,
+      }),
       filedVia: "run",
       ownerUserId: userId,
       filedByUserId: null,
