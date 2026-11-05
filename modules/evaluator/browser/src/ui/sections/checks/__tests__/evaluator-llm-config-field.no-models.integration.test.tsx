@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The judge's picker offers Instant Evals only when the server releases the project, whatever
- * the flag says, and own decision models either way; the stand-in for the lent picker lists
- * exactly the options this field hands it.
+ * The picker offers Instant Evals only when the server releases LangWatch's model, and own
+ * decision models either way; the stand-in picker lists exactly the options it is handed.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
