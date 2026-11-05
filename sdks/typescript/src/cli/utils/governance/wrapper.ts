@@ -28,6 +28,7 @@ import {
   SHELL_FUNCTION_TOOLS,
 } from "./shell-rc";
 import { envForTool } from "./tool-env";
+import { isToolResolvable } from "./tool-presence";
 import { aliasShellFor, infoRunKind, runInfoRun, toolNotFoundMessage } from "./wrapper-info-run";
 import { resolveWrapperMode } from "./wrapper-mode";
 import {
@@ -771,6 +772,13 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   // anything below reads the config, signs in, mints a key or writes wiring.
   const infoRun = infoRunKind(args);
   if (infoRun) return runInfoRun({ tool, args, kind: infoRun });
+
+  // A tool that cannot start gets nothing written for it: no config, login,
+  // key, rc block, hook file or extension.
+  if (!isToolResolvable({ tool })) {
+    process.stderr.write(`${toolNotFoundMessage(tool)}\n`);
+    process.exit(127);
+  }
 
   // Before the config is read, so every save below carries it. The Claude
   // Code plugin's hooks run the CLI through this record when PATH cannot
