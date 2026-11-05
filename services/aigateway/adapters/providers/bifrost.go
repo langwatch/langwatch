@@ -2098,6 +2098,9 @@ func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usag
 	if d := resp.Usage.InputTokensDetails; d != nil {
 		u.CacheReadTokens = d.CachedReadTokens
 		u.CacheCreationTokens = d.CachedWriteTokens
+		if d.CachedWriteTokenDetails != nil {
+			u.CacheCreation1hTokens = d.CachedWriteTokenDetails.CachedWriteTokens1h
+		}
 		split.InputAudio = d.AudioTokens
 		split.InputText = d.TextTokens
 	}
@@ -2106,7 +2109,7 @@ func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usag
 		split.OutputAudio = d.AudioTokens
 		split.OutputText = d.TextTokens
 	}
-	return u.SplitAudioTokens(split)
+	return u.ReconcileCacheWrites().SplitAudioTokens(split)
 }
 
 // extractEmbeddingUsage maps Bifrost's embedding usage block. Embedding

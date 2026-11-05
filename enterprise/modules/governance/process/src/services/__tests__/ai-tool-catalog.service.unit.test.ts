@@ -81,6 +81,48 @@ describe("DefaultGovernanceAiToolCatalogService", () => {
 
       expect(policy.allowOtelDirect).toBe(false);
     });
+
+    /** @scenario "A stored pi tile that allows a virtual key still resolves without one" */
+    it("keeps the pi virtual key disabled even when a stored tile allows it", async () => {
+      const { catalogue } = world();
+      await catalogue.create({
+        organizationId: ORG,
+        departmentIds: [],
+        type: "coding_assistant",
+        displayName: "pi",
+        config: { assistantKind: "pi", setupCommand: "langwatch pi", allowVk: true },
+      });
+
+      const policy = await catalogue.resolveToolPolicy({
+        organizationId: ORG,
+        userId: "user",
+        slug: "pi",
+      });
+
+      expect(policy.allowVk).toBe(false);
+    });
+  });
+
+  describe("given a Grok tile that stores allowVk true", () => {
+    // ADR-192: Grok routes no model traffic through env, so there is no gateway path.
+    it("keeps the virtual key off for Grok", async () => {
+      const { catalogue } = world();
+      await catalogue.create({
+        organizationId: ORG,
+        departmentIds: [],
+        type: "coding_assistant",
+        displayName: "Grok",
+        config: { assistantKind: "grok", setupCommand: "langwatch grok", allowVk: true },
+      });
+
+      const policy = await catalogue.resolveToolPolicy({
+        organizationId: ORG,
+        userId: "user",
+        slug: "grok",
+      });
+
+      expect(policy).toEqual({ allowVk: false, allowOtelDirect: true });
+    });
   });
 
   describe("when an admin creates a tile", () => {

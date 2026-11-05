@@ -39,7 +39,7 @@ import {
   isEmailPasswordEnabled,
   type SocialProviderBases,
 } from "@langwatch/auth-contract";
-import { AuthzApi, type AuthzGrantsService } from "@langwatch/authz-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
 import {
   configuredAuthProvider,
@@ -64,7 +64,11 @@ import {
 } from "@langwatch/identity-contract";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { OrganizationApi, type InviteLanding } from "@langwatch/organization-contract";
+import {
+  OrganizationApi,
+  type InviteLanding,
+  type OrganizationUserRole,
+} from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
@@ -129,7 +133,6 @@ import type { AuthRateLimitRepository } from "../repositories/auth-rate-limit.re
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
-import { providerAccountIssuer } from "../rules/provider-account-issuer.rules.ts";
 import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { buildSignUpVerificationUrl } from "../rules/signup-verification-link.rules.ts";
@@ -735,7 +738,6 @@ export class AuthModule implements AuthApiContract {
             repositories,
             sharedStorage: repositories.sessionCache !== null,
             auth: app,
-            grants: dependencies.authz,
             organizations: dependencies.organizations,
             signUpPolicy: { checkSignUp },
             sendResetPassword: AuthModule.passwordResetSender({
@@ -1305,7 +1307,6 @@ function betterAuthCredentialAccounts(
       ).internalAdapter.linkAccount({
         userId,
         providerId: "credential",
-        issuer: providerAccountIssuer({ connectionIssuer: undefined, provider: "credential" }),
         accountId: userId,
         password: passwordHash,
       });
@@ -1547,6 +1548,7 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
     userId: string;
     organizationId: string;
     organizationName: string;
+    role: OrganizationUserRole;
   }): void {
     this.lifecycle.ssoAutoAdded(input);
   }
@@ -1619,17 +1621,12 @@ type BuildBetterAuthOptions = Readonly<{
   sharedStorage: boolean;
   /** The Auth application whose sessions this instance mints and revokes. */
   auth: AuthApiContract;
-  /** The grants ledger an SSO domain auto-join writes its organization binding to. */
-  grants: AuthzGrantsService;
   /**
    * Where a domain auto-join applies the pending invite an address already holds.
    */
   organizations: Pick<
     OrganizationApi,
-    | "applyPendingInvite"
-    | "findBySsoDomain"
-    | "createSsoDomainMembership"
-    | "countMembershipsForUser"
+    "applyPendingInvite" | "findBySsoDomain" | "createMembership" | "countMembershipsForUser"
   >;
   /** Who the installation lets create an account: the app's composed sign-up verdict. */
   signUpPolicy: SignUpPolicy;
@@ -1753,7 +1750,6 @@ async function buildBetterAuth(options: BuildBetterAuthOptions): Promise<BetterA
       lifecycle: options.lifecycle,
     }),
     shadow: OffSignInRouterShadow.create(),
-    authzGrants: options.grants,
     arrivals: IdentitySsoArrivals.create(options.identityApi),
     ssoActivity: {
       record: (args) => options.identityApi.ssoActivity().record(args),

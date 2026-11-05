@@ -48,7 +48,7 @@ function LentList({ openPath }: SavedDashboardsProps) {
 
 /** Stands in for analytics' lent Dashboards section, which decides itself what it draws. */
 function LentStarred() {
-  return <div data-testid="starred-dashboards">Starred dashboards</div>;
+  return <div data-testid="starred-dashboards">Pinned dashboards</div>;
 }
 
 /** Stands in for insight's lent unread pill. */
