@@ -725,8 +725,9 @@ async function firstNameOfTestUser(): Promise<string | undefined> {
       headers: { Cookie: cookie, Origin: APP_BASE },
       signal: AbortSignal.timeout(15_000),
     }).then((res) => res.json() as Promise<{ user?: { name?: string } }>);
-    const first = (session.user?.name ?? "").trim().split(/\s+/)[0];
-    if (first && !first.includes("@")) return first;
+    const name = (session.user?.name ?? "").trim();
+    // Mirrors firstNameOf: a name holding an email anywhere is no name at all.
+    if (name && !name.includes("@")) return name.split(/\s+/)[0];
   } catch (error) {
     console.debug(`[fixture] session read failed, sending no first name: ${String(error)}`);
   }
