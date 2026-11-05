@@ -256,11 +256,18 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then its routed cost reads as zero and its spend is priced from its input tokens
 
   @unit
-  Scenario: The router flag is on by default
+  Scenario: The router flag is on by default on LangWatch Cloud
     Given the feature flag registry
-    When the router flag is read with no targeting rule
+    When the router flag is read with no targeting rule on LangWatch Cloud
     Then it is on, so the LLM-judge caller sends a route
-    And with no route table configured, as on a self-hosted install, the call is today's classifier call at today's rate
+
+  @unit
+  Scenario: The router flag is off by default on a self-hosted install
+    Given a self-hosted install, where IS_SAAS is unset
+    When the router flag is read with no operator row and no override
+    Then it is off, so the LLM-judge caller sends no route
+    And the Instant Evals column of Default models does not offer routing
+    And an operator can still switch it on for the install
 
   # --- The LLM-judge caller (ADR-190 open question 2: one caller behind the flag) ---
 

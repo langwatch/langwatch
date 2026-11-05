@@ -11,6 +11,11 @@ export interface FeatureFlagDefinition {
   key: string;
   scope: FeatureFlagScope;
   defaultValue: boolean;
+  /**
+   * The default on a self-hosted install (`IS_SAAS` unset), where it differs from `defaultValue`:
+   * a feature LangWatch Cloud rolls out that a self-hosted install never sees unless switched on.
+   */
+  selfHostedDefaultValue?: boolean;
   description: string;
   /** Surface for the operator UI; `null` for product flags. */
   family?: string;
@@ -164,8 +169,9 @@ export const FEATURE_FLAGS = [
     key: "release_instant_evals_judge_router",
     scope: "PRODUCT",
     defaultValue: true,
+    selfHostedDefaultValue: false,
     description:
-      "Routes an organization's Instant Evals judgements through the LangWatch Judge router: a decision model answers what it is sure of and an LLM answers the rest, priced by the summed cost of every call. On by default; turn it off per organization via a targeting rule. On, an LLM-judge evaluation on LangWatch Instant Preview sends the llm_judge route and the Instant Evals column says it routes; an own decision model is never routed. Off, no caller sends a route and every judgement is the single hosted classifier call it is today. The route table and prices are deploy-time configuration; with none set, as on a self-hosted install, every slot goes to the hosted classifier at its published rate, so the answer and the cost are today's.",
+      "Routes an organization's Instant Evals judgements through the LangWatch Judge router: a decision model answers what it is sure of and an LLM answers the rest, priced by the summed cost of every call. On by default on LangWatch Cloud; turn it off per organization via a targeting rule. Off by default on a self-hosted install, whose judgements through Connect carry no route, so it never offers routing unless an operator switches it on. On, an LLM-judge evaluation on LangWatch Instant Preview sends the llm_judge route and the Instant Evals column says it routes; an own decision model is never routed. Off, no caller sends a route and every judgement is the single hosted classifier call it is today. The route table and prices are deploy-time configuration; with none set, as on a self-hosted install, every slot goes to the hosted classifier at its published rate, so the answer and the cost are today's.",
   },
   {
     key: "release_lwql_workbench",
