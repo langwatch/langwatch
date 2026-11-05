@@ -56,14 +56,16 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
 
   @unit @operator-seed
   Scenario: A still-set ADMIN_EMAILS seeds its verified users once
-    Given no platform operator holds the grant
+    Given the installation has email configured
+    And no platform operator holds the grant
     And ADMIN_EMAILS names a verified active user and an unverified one
     When the seed runs
     Then only the verified user is granted, by the system, with source migration
 
   @unit @operator-seed
   Scenario: A set ADMIN_EMAILS waits for a named verified user and never falls back
-    Given ADMIN_EMAILS names only an unverified user, or an address nobody holds
+    Given the installation has email configured
+    And ADMIN_EMAILS names only an unverified user, or an address nobody holds
     And the installation has exactly one organization with an active administrator
     When the seed runs on two wakes
     Then nobody is granted and nothing is recorded
@@ -72,8 +74,51 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     Then only the named user is decided
 
   @unit @operator-seed
+  Scenario: An install with no email configured seeds the named user unverified
+    Given the installation has no email configured, so no account can verify its address
+    And ADMIN_EMAILS names an active user whose address was never verified
+    And that user is the install's first-created account
+    And the installation has exactly one organization whose administrator is somebody else
+    When the seed runs
+    Then the named user is decided and recorded, and the administrator is not
+    And the ops:seed-platform-operators upgrade step grants the named user too
+    And a deactivated named user is still skipped
+    And an address nobody has signed up with still waits, since the seed never creates an account
+    And a mailer that is named but misconfigured counts as email configured, so the seed waits
+
+  @unit @operator-seed
+  Scenario: With no email configured a named unverified account that signed up later waits
+    Given the installation has no email configured
+    And ADMIN_EMAILS names an unverified active account that is not the install's first-created account
+    When the seed runs, or the ops:seed-platform-operators upgrade step runs
+    Then nobody is granted and nothing is recorded, since anyone could have registered that address
+    And the wait reason says the named account is not the install's first-created account
+    And a verified user ADMIN_EMAILS also names is still seeded
+
+  # A deactivated first account never hands its place to the next sign-up (Rogerio, 2026-10-19).
+  @unit @operator-seed
+  Scenario: With no email configured a deactivated first account seeds no later unverified sign-up
+    Given the installation has no email configured
+    And the install's first-created account has been deactivated
+    And ADMIN_EMAILS names an unverified active account that signed up after it
+    When the seed runs, or the ops:seed-platform-operators upgrade step runs
+    Then nobody is granted and nothing is recorded
+    And the wait reason says the named account is not the install's first-created account, even once that one is deactivated
+
+  # Erasure deletes the first account's row; user's erasure record keeps it first (Rogerio, 2026-10-19).
+  @unit @operator-seed
+  Scenario: With no email configured an erased first account seeds no later unverified sign-up
+    Given the installation has no email configured
+    And the install's first-created account has been erased
+    And ADMIN_EMAILS names an unverified active account that signed up after it
+    When the seed runs, or the ops:seed-platform-operators upgrade step runs
+    Then nobody is granted and nothing is recorded
+    And the wait reason says the named account is not the install's first-created account, even once that one is erased
+
+  @unit @operator-seed
   Scenario: The upgrade step grants the verified users a still-set ADMIN_EMAILS names
-    Given no platform operator holds the grant
+    Given the installation has email configured
+    And no platform operator holds the grant
     And ADMIN_EMAILS names a verified active user and an unverified one
     When the ops:seed-platform-operators upgrade step runs
     Then only the verified user is granted, by the system, with source migration
@@ -173,9 +218,19 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
 
   @unit @operator-recovery
   Scenario: The recovery task refuses an account whose address was never verified
-    Given an active account holds the address but never verified it
+    Given the installation has email configured
+    And an active account holds the address but never verified it
     When grant-platform-operator runs with that address, on any deployment
     Then it fails with platform_operator_user_not_found and nothing is granted
+
+  @unit @operator-recovery
+  Scenario: With no email configured the recovery task grants an unverified account
+    Given the installation has no email configured, so no account can verify its address
+    And the seed waits because the named unverified account is not the install's first-created account
+    When grant-platform-operator runs with that account's address
+    Then the account is granted by the system, since shell access naming it is the check
+    And the seed's wait reason names the grant-platform-operator task
+    And a deactivated account is still refused
 
   @unit @operator-recovery
   Scenario: The recovery task waits for a grant that is still being applied
@@ -271,3 +326,24 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     And the seeded admin's verified address is not on langwatch.ai
     When grant-platform-operator runs with that address
     Then the account is granted
+
+  # ============================================================================
+  # A self-hosted operator is not LangWatch staff
+  # ============================================================================
+  # Every grant path writes the one platform-operator role (ops:view, ops:manage). What only
+  # LangWatch staff do on the hosted cloud (licences, self-hosted instances, subscriptions, the
+  # bug-report inbox) is Cloud admin, behind ops's cloud-ops capability, not behind the role.
+  # Switching it on needs the private key of the release's licence public key (cloud-ops.feature).
+
+  @unit @operator-scope
+  Scenario: A self-hosted operator is refused Cloud admin
+    Given a self-hosted install, where the cloud-ops capability is off
+    And a user the seed, the recovery task or the page granted the platform-operator role
+    When they ask for a Cloud admin surface
+    Then the call is refused with not_found, though they hold ops:view and ops:manage
+
+  @unit @operator-scope
+  Scenario: A grant names the account and nothing more
+    When the page or authz is asked to grant the platform-operator role with a role, a permission or a scope beside the account
+    Then the input is refused before anything is granted
+    And no grant path can confer more than ops:view and ops:manage

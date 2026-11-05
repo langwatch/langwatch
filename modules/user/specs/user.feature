@@ -28,6 +28,23 @@ Feature: Canonical user lifecycle
     Then one is deactivated and the other is refused
     And one active operator remains
 
+  # ops's platform-operator seed asks this before granting an unverified account (Rogerio, 2026-10-19).
+  @unit @integration
+  Scenario: The install's first-created account is answered by id
+    Given accounts created one after another, some since deactivated
+    When asked whether an account is the install's first-created one
+    Then only the earliest-created account answers yes, deactivated or not
+    And with no account at all none does
+
+  # Erasure deletes the row, so user keeps the erased account's creation time alone (Rogerio, 2026-10-19).
+  @unit @integration
+  Scenario: An erased first account leaves no account first-created
+    Given accounts created one after another
+    When the first of them is erased
+    Then the erasure keeps that account's creation time and nothing else about it
+    And no remaining account answers yes to being the install's first-created one
+    And erasing a later account leaves the first one first-created
+
   # Addresses are stored lower-cased (Alex, 2026-10-13): every lookup is a plain match on the
   # unique index first; only a miss asks again case aside, for rows not lower-cased yet.
   @unit
@@ -187,6 +204,14 @@ Feature: Canonical user lifecycle
     When the step runs
     Then the account is recorded reactivated at the run's start
     And an active account whose log ends in a reactivation, or holds no deactivation, records nothing
+
+  @unit
+  Scenario: The created-facts step reads user's log from a process that only sends commands
+    Given a process whose event store refuses every read, as the one running upgrade steps does
+    And an account whose log holds a deactivation and then a reactivation
+    When a page of accounts' standing facts is read
+    Then they are answered through the event read seat in one read, oldest first, in each account's own tenant
+    And the same read through the lifecycle pipeline's own event store is refused by name
 
   @unit
   Scenario: Running the seed step twice records once

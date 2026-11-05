@@ -29,6 +29,7 @@ type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClie
  */
 type GdprUserDataEraseDatabase = {
   user: Delegate<"user", "findUnique" | "delete">;
+  userErasure: Delegate<"userErasure", "create">;
   organization: Delegate<"organization", "findMany" | "deleteMany">;
   organizationUser: Delegate<"organizationUser", "count" | "deleteMany" | "findMany" | "groupBy">;
   team: Delegate<"team", "findMany" | "deleteMany">;
@@ -308,7 +309,12 @@ export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepos
         await tx.organizationUser.deleteMany({ where: { userId } });
         await tx.account.deleteMany({ where: { userId } });
         await tx.session.deleteMany({ where: { userId } });
-        await tx.user.delete({ where: { id: userId } });
+        const { createdAt } = await tx.user.delete({
+          where: { id: userId },
+          select: { createdAt: true },
+        });
+        // Only the creation time stays, so the first-created account survives the row.
+        await tx.userErasure.create({ data: { accountCreatedAt: createdAt } });
         // Committed with the erase, so a rolled-back erase records no erased fact.
         const occurredAt = nowInstant().epochMilliseconds;
         await this.#facts.append({

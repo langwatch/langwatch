@@ -30,7 +30,7 @@ const DEFAULT_WAIT: GrantConfirmationWait = {
 export class GrantPlatformOperatorTask extends Task {
   readonly name = "grant-platform-operator";
   readonly description =
-    "Grants the platform-operator role to the existing, active, verified account an email address belongs to.";
+    "Grants the platform-operator role to the existing, active account an email address belongs to, verified where email is configured.";
 
   private constructor(
     private readonly operators: Operators,
