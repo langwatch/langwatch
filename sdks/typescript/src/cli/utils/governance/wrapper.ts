@@ -21,6 +21,7 @@ import { isLoggedIn, loadConfig, saveConfig } from "./config";
 import { copilotGatewayModelPreflight, copilotPrespawnWarnings } from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
 import { ensurePiTelemetryExtension } from "./pi-plugin";
+import { piPrespawnWarnings } from "./pi-prespawn";
 import { clearToolProjectPin, pinToolToProject } from "./project-scope";
 import {
   assertLaunchHookFile,
@@ -602,6 +603,12 @@ async function prepareLaunch({
   // capture silently incomplete on either path (ADR-039 D8/D9).
   if (tool === "copilot") {
     for (const warning of copilotPrespawnWarnings()) {
+      process.stderr.write(`${warning}\n`);
+    }
+  }
+  // A pi older than the extension's minimum still captures, so it warns and never blocks.
+  if (tool === "pi") {
+    for (const warning of piPrespawnWarnings()) {
       process.stderr.write(`${warning}\n`);
     }
   }
