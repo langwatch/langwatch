@@ -58,8 +58,13 @@ Feature: A Python package release keeps uv.lock in step
     Then the guard says the key is missing
 
   @unit
-  Scenario: A missing or duplicate uv.lock entry fails the check
-    Given uv.lock holds no entry or two entries for a workspace package
+  Scenario: A missing uv.lock entry fails with uv lock advice
+    Given uv.lock holds no entry for a workspace package
+    Then the guard says there is no such entry and to run `uv lock`
+
+  @unit
+  Scenario: A duplicate uv.lock entry fails without uv lock advice
+    Given uv.lock holds two entries for a workspace package
     Then the guard reports the count and does not suggest `uv lock`
 
   @unit
