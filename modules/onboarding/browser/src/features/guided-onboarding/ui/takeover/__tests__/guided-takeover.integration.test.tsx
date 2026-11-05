@@ -17,7 +17,7 @@ vi.mock("react-contextual-analytics", () => ({
 }));
 
 vi.mock("../hello-screen.tsx", () => ({
-  HelloScreen: ({ firstName, onNext }: { firstName: string; onNext: () => void }) => (
+  HelloScreen: ({ firstName, onNext }: { firstName?: string; onNext: () => void }) => (
     <div data-testid="hello-stub">
       hello {firstName}
       <button type="button" onClick={onNext}>
