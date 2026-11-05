@@ -17,6 +17,11 @@ const mockGetInheritedValues = vi.fn();
 const mockListAllForProjectForFrontend = vi.fn();
 const mockListDecisionModels = vi.fn();
 
+// The drawer asks the judge router flag; off unless a case turns it on.
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     closeDrawer: vi.fn(),

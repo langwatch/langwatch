@@ -363,6 +363,13 @@ Feature: Instant Evals decision model column in Default models
     Then I can pick "LangWatch Instant Preview" and "OpenAI Decisions API"
     And "Inception Mercury Decide" is not offered, so every pick I can make runs
 
+  @unit
+  Scenario: With the router flag on LangWatch Instant Preview says it routes
+    Given the judge router flag is on for my organization
+    When the Instant Evals choices are built
+    Then "LangWatch Instant Preview" says a decision model answers what it is sure of and an LLM the rest
+    And with the router flag off it reads "Hosted by LangWatch and billed with your plan."
+
   @integration
   Scenario: The drawer asks about the picked scopes, not the page's project
     Given I am on project "C"
