@@ -321,7 +321,7 @@ memberOrganizationIds(input: Readonly<{ userId: string; organizationIds: string[
 Every organization this person belongs to. Asked by a peer deciding something about the person rather than about a listed organization.
 
 ```typescript
-organizationIdsForMember(input: Readonly<{ userId: string }>): Promise<string[]>;
+organizationIdsForMember(input: Readonly<{ userId: string; activeOnly?: boolean }>): Promise<string[]>;
 ```
 
 #### `findBySsoDomain`
@@ -1795,7 +1795,7 @@ Contract `../contract/src/invite.trpc.ts:27`, router `src/transport/invite.trpc.
 ```typescript
 // invite.createInvites
 type Input = z.infer<typeof organizationApiCreateInvitesInputSchema>; // ../contract/src/organization.trpc-schemas.ts:186
-type Output = z.infer<typeof organizationInvitesCreatedSchema>; // ../contract/src/organization.responses.ts:67
+type Output = z.infer<typeof organizationInvitesCreatedSchema>; // ../contract/src/organization.responses.ts:68
 
 // invite.deleteInvite
 // Input: organizationApiInviteScopeSchema, ../contract/src/organization.trpc-schemas.ts:199
@@ -1806,18 +1806,18 @@ interface Input {
 
 // invite.resendInvite
 type Input = z.infer<typeof organizationApiInviteScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:199
-type Output = z.infer<typeof organizationInviteResentSchema>; // ../contract/src/organization.responses.ts:70
+type Output = z.infer<typeof organizationInviteResentSchema>; // ../contract/src/organization.responses.ts:71
 
 // invite.getOrganizationPendingInvites
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
-type Output = z.infer<typeof organizationListedInvitesSchema>; // ../contract/src/organization.responses.ts:113
+type Output = z.infer<typeof organizationListedInvitesSchema>; // ../contract/src/organization.responses.ts:114
 
 // invite.acceptInvite
 // Input: organizationApiAcceptInviteInputSchema, ../contract/src/organization.trpc-schemas.ts:246
 interface Input {
   inviteCode: string;
 }
-// Output: organizationInviteAcceptedSchema, ../contract/src/organization.responses.ts:127
+// Output: organizationInviteAcceptedSchema, ../contract/src/organization.responses.ts:128
 interface Output {
   success: true;
   invite: {
@@ -1852,7 +1852,7 @@ interface Output {
 // invite.myPendingInvitation
 // Input: inline, ../contract/src/invite.trpc.ts:57
 type Input = Record<string, unknown>;
-// Output: organizationPendingInvitationForCallerSchema, ../contract/src/organization.responses.ts:157
+// Output: organizationPendingInvitationForCallerSchema, ../contract/src/organization.responses.ts:158
 interface Output {
   inviteCode: string | null;
 }
@@ -1860,7 +1860,7 @@ interface Output {
 // invite.pendingForMe
 // Input: inline, ../contract/src/invite.trpc.ts:62
 type Input = Record<string, unknown>;
-// Output: organizationPendingInvitationsForCallerSchema, ../contract/src/organization.responses.ts:196
+// Output: organizationPendingInvitationsForCallerSchema, ../contract/src/organization.responses.ts:197
 type Output = {
   inviteCode: string;
   organizationName: string;
@@ -1938,7 +1938,7 @@ Contract `../contract/src/organization.trpc.ts:88`, router `src/transport/organi
 ```typescript
 // organization.createAndAssign
 type Input = z.infer<typeof organizationApiCreateAndAssignInputSchema>; // ../contract/src/organization.trpc.ts:58
-// Output: organizationCreatedSchema, ../contract/src/organization.responses.ts:28
+// Output: organizationCreatedSchema, ../contract/src/organization.responses.ts:29
 interface Output {
   success: true;
   organization: {
@@ -1958,7 +1958,7 @@ interface Input {
   userId: string;
   organizationId: string;
 }
-// Output: organizationWriteAckSchema, ../contract/src/organization.responses.ts:13
+// Output: organizationWriteAckSchema, ../contract/src/organization.responses.ts:14
 interface Output {
   success: true;
 }
@@ -1970,7 +1970,7 @@ interface Input {
   organizationId: string;
   disabled: boolean;
 }
-type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:13
+type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:14
 
 // organization.getAll
 // Input: organizationApiGetAllInputSchema, ../contract/src/organization.trpc-schemas.ts:116
@@ -1999,7 +1999,7 @@ interface Input {
   supportContact?: string | null;
   primaryIntent?: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
 }
-type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:13
+type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:14
 
 // organization.getOrganizationWithMembersAndTheirTeams
 // Input: organizationApiWithMembersInputSchema, ../contract/src/organization.trpc-schemas.ts:160
@@ -2007,11 +2007,11 @@ interface Input {
   organizationId: string;
   includeDeactivated?: boolean;
 }
-type Output = z.infer<typeof organizationMemberDirectorySchema>; // ../contract/src/organization.responses.ts:302
+type Output = z.infer<typeof organizationMemberDirectorySchema>; // ../contract/src/organization.responses.ts:303
 
 // organization.getDirectoryCounts
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
-// Output: organizationDirectoryCountsSchema, ../contract/src/organization.responses.ts:319
+// Output: organizationDirectoryCountsSchema, ../contract/src/organization.responses.ts:320
 interface Output {
   members: number;
   openInvites: number;
@@ -2022,11 +2022,11 @@ interface Output {
 
 // organization.getMemberById
 type Input = z.infer<typeof organizationApiMemberScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:26
-type Output = z.infer<typeof organizationMemberRecordSchema>; // ../contract/src/organization.responses.ts:269
+type Output = z.infer<typeof organizationMemberRecordSchema>; // ../contract/src/organization.responses.ts:270
 
 // organization.getInvitedMemberIds
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
-// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:421
+// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:422
 interface Output {
   memberUserIds: string[];
   invitedUserIds: string[];
@@ -2040,11 +2040,11 @@ interface Input {
   role: "ADMIN" | "MEMBER" | "VIEWER" | string;
   customRoleId?: string;
 }
-type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:13
+type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:14
 
 // organization.getAllOrganizationMembers
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
-// Output: organizationUserRowsSchema, ../contract/src/organization.responses.ts:245
+// Output: organizationUserRowsSchema, ../contract/src/organization.responses.ts:246
 type Output = {
   id: string;
   name: string | null;
@@ -2065,7 +2065,7 @@ interface Input {
     customRoleId?: string;
   }[];
 }
-// Output: organizationMemberRoleChangedSchema, ../contract/src/organization.responses.ts:333
+// Output: organizationMemberRoleChangedSchema, ../contract/src/organization.responses.ts:334
 interface Output {
   success: true;
   teamsLeftWithoutAdmin: {
@@ -2088,7 +2088,7 @@ interface Input {
   targetKind?: string;
   targetId?: string;
 }
-type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:384
+type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:385
 ```
 
 ### `personalWorkspaceFeatures`

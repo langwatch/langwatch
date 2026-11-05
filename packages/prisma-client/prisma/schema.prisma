@@ -4972,6 +4972,13 @@ model NurturingOrganization {
   codingAgentTypes     String[]  @default([])
   codingActiveDays     Int       @default(0)
   codingLastActiveDay  String? // UTC `YYYY-MM-DD`; sorts lexically
+  codingTerminalTypes  String[]  @default([])
+  // Keyed hashes (HMAC under a server secret) standing for repos, only ever counted and capped;
+  // no repo name is held here, and a guessed name cannot be tested without the secret.
+  codingRepositoryKeys String[]  @default([])
+  // UTC day offsets 0 to 2 from the organization's creation that held a coding session.
+  codingFirstDays      Int[]     @default([])
+  lastTraceAt          DateTime? // moves forward only; told to a person joining later
   updatedAt            DateTime  @updatedAt
 }
 

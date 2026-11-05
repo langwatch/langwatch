@@ -37,6 +37,13 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     })
     .handle(({ app, input, actor }) => app.listCallerBindings(input, { id: actor.id }))
 
+    .procedure("grantablePermissions")
+    .noPermission({
+      reason: OWN_KEYS_REASON,
+      allow: MEMBER_ONLY,
+    })
+    .handle(({ app, input, actor }) => app.listGrantablePermissions(input, { id: actor.id }))
+
     .procedure("nameById")
     .noPermission({
       reason: OWN_KEYS_REASON,

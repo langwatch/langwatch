@@ -53,10 +53,19 @@ export interface CioPersonTraits {
   coding_last_session_at?: number;
   coding_active_days?: number;
   coding_agent_types?: string[];
+  coding_terminal_types?: string[];
+  coding_repo_count?: number;
+  coding_session_days_first_3?: number;
   uses_coding_agent?: boolean;
+  // Present: the person sent a session from their own personal project. Absent: not known.
+  // First recorded across orgs, set once.
+  own_coding_first_session_at?: number;
+  own_coding_last_session_at?: number;
 
   // The person's own last page open
   app_last_opened_at?: number;
+  // The person's own last open of a usage, cost or plan page
+  usage_page_viewed_at?: number;
 
   // Evaluation milestones
   has_evaluations: boolean;
@@ -146,6 +155,7 @@ export type CioEventName =
   | "first_simulation_ran"
   | "coding_agent_first_session"
   | "sessions_page_viewed"
+  | "usage_page_viewed"
   | "joined_via_invite"
   | "joined_via_sso"
   | "onboarding_paths_selected"
