@@ -380,7 +380,14 @@
           "hidden": false
         }
       ],
-      "extra-files": ["langwatch_ksuid/__init__.py"]
+      "extra-files": [
+        "langwatch_ksuid/__init__.py",
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='langwatch-ksuid')].version"
+        }
+      ]
     },
     ".": {
       "release-type": "simple",
