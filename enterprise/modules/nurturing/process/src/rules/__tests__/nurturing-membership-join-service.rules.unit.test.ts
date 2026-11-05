@@ -61,6 +61,7 @@ describe("joined_via_invite", () => {
     ["EXTERNAL", "lite_member"],
     ["DEVELOPER", "developer"],
   ])("given the invitation granted %s", (role, seat) => {
+    /** @scenario "A join event carries the seat the person joined with" */
     it(`tracks seat ${seat} next to the existing properties`, () => {
       expect(inviteTrack(role)).toMatchObject({
         event: "joined_via_invite",
@@ -70,6 +71,7 @@ describe("joined_via_invite", () => {
   });
 
   describe("given an event stored without a role, or with one we cannot name", () => {
+    /** @scenario "A join event with no known role carries no seat" */
     it("omits seat and keeps the existing properties", () => {
       expect(inviteTrack()).toMatchObject({
         properties: { organization_id: "org-1", organization_name: "Acme Corp" },
@@ -87,6 +89,7 @@ describe("joined_via_sso", () => {
       traces: noTraces,
     }).find((call) => call.type === "track");
 
+  /** @scenario "A join event carries the seat the person joined with" */
   it("tracks the seat the person was admitted with", () => {
     expect(ssoTrack("EXTERNAL")).toMatchObject({
       event: "joined_via_sso",
@@ -94,6 +97,7 @@ describe("joined_via_sso", () => {
     });
   });
 
+  /** @scenario "A join event with no known role carries no seat" */
   it("omits seat when the event carries no role", () => {
     expect(ssoTrack()).not.toHaveProperty("properties.seat");
   });
