@@ -75,6 +75,22 @@ function datasetProcess({
   write("modules/dataset/process/src/services/upsert.service.ts", service);
 }
 
+function peerProcess(peers: {
+  peerDependencies: Record<string, string>;
+  peerDependenciesMeta?: Record<string, { optional: boolean }>;
+}): void {
+  write(
+    "modules/dataset/process/package.json",
+    JSON.stringify({
+      name: "@langwatch/dataset-process",
+      type: "module",
+      exports: { ".": "./src/index.ts" },
+      ...peers,
+    }),
+  );
+  write("modules/dataset/process/src/index.ts", 'import { z } from "zod";\nexport { z };\n');
+}
+
 function findings(): { file: string; specifier?: string }[] {
   return lintRuntimeDependencies(snapshotOf({ root })).map((violation) => ({
     file: violation.file.slice(root.length + 1),
@@ -152,6 +168,45 @@ describe("lintRuntimeDependencies", () => {
 
     expect(findings()).toEqual([
       { file: "modules/dataset/process/src/index.ts", specifier: "typescript" },
+    ]);
+  });
+
+  /** @scenario "A peer the image install keeps passes" */
+  it("passes a value import of a peer the image pnpmfile keeps", () => {
+    write("infra/docker/image.pnpmfile.cjs", 'const DEV_TOOL_PEERS = [\n  "typescript",\n];\n');
+    peerProcess({ peerDependencies: { zod: "*" } });
+
+    expect(findings()).toEqual([]);
+  });
+
+  /** @scenario "An optional peer is not installed at runtime" */
+  it("reports a value import of an optional peer", () => {
+    peerProcess({
+      peerDependencies: { zod: "*" },
+      peerDependenciesMeta: { zod: { optional: true } },
+    });
+
+    expect(findings()).toEqual([
+      { file: "modules/dataset/process/src/index.ts", specifier: "zod" },
+    ]);
+  });
+
+  /** @scenario "A recipe written as --filter-prod=<package> is read" */
+  it("reads a --filter-prod=<package> argument without the closure dots", () => {
+    write(
+      "infra/docker/prune-runtime-tree.sh",
+      "pnpm install --frozen-lockfile --prod --filter-prod=@langwatch/worker\n",
+    );
+    datasetProcess({
+      section: "devDependencies",
+      service: 'import "@langwatch/handled-error";\n',
+    });
+
+    expect(findings()).toEqual([
+      {
+        file: "modules/dataset/process/src/services/upsert.service.ts",
+        specifier: "@langwatch/handled-error",
+      },
     ]);
   });
 

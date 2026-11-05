@@ -17,7 +17,7 @@ const RUNTIME_TREE_RECIPE = "infra/docker/prune-runtime-tree.sh";
 const RUNTIME_IMAGE = "infra/docker/Dockerfile";
 /** The image install's pnpmfile; it deletes the peers its `DEV_TOOL_PEERS` list names. */
 const IMAGE_PNPMFILE = "infra/docker/image.pnpmfile.cjs";
-const FILTER_PROD = /--filter-prod\s+["']?([^"'\s]+?)\.\.\.["']?/g;
+const FILTER_PROD = /--filter-prod[\s=]+["']?([^"'\s]+?)(?:\.\.\.)?["']?(?=\s|$)/g;
 /** A `node --import <specifier>` preload in a start script; it runs before `src/main.ts`. */
 const PRELOAD = /--import[\s=]+["']?([^"'\s]+)/g;
 const STRIPPED_PEERS = /DEV_TOOL_PEERS\s*=\s*\[([^\]]*)\]/;
@@ -115,7 +115,11 @@ function devOnlyOf({
   const known = cache.get(record.manifestPath);
   if (known) return known;
   const manifest: PackageManifest = JSON.parse(sourceText({ file: record.manifestPath }));
-  const peers = Object.keys(manifest.peerDependencies ?? {}).filter((name) => !stripped.has(name));
+  // pnpm never installs an optional peer, and the image strips the dev-tool peers.
+  const optional = manifest.peerDependenciesMeta ?? {};
+  const peers = Object.keys(manifest.peerDependencies ?? {}).filter(
+    (name) => !stripped.has(name) && optional[name]?.optional !== true,
+  );
   const runtime = new Set([
     ...Object.keys(manifest.dependencies ?? {}),
     ...Object.keys(manifest.optionalDependencies ?? {}),

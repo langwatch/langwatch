@@ -37,6 +37,28 @@ Feature: The runtime-dependencies policy
     Then it reports the service file and its import of "typescript"
 
   @unit
+  Scenario: A peer the image install keeps passes
+    Given the image pnpmfile deletes the "typescript" peer only
+    And the process package lists "zod" in peerDependencies
+    And the process package's service value-imports "zod"
+    When the runtime-dependencies policy runs over the workspace
+    Then it reports nothing
+
+  @unit
+  Scenario: An optional peer is not installed at runtime
+    Given the process package lists "zod" in peerDependencies, marked optional
+    And the process package's service value-imports "zod"
+    When the runtime-dependencies policy runs over the workspace
+    Then it reports the service file and its import of "zod"
+
+  @unit
+  Scenario: A recipe written as --filter-prod=<package> is read
+    Given the runtime recipe installs `--filter-prod=@langwatch/worker` with no closure dots
+    And the process package's service value-imports a package it lists only in devDependencies
+    When the runtime-dependencies policy runs over the workspace
+    Then it reports the service file
+
+  @unit
   Scenario: A recipe that names no workspace package fails loudly
     Given the runtime recipe's `--filter-prod` names a package the workspace does not have
     When the runtime-dependencies policy runs over the workspace

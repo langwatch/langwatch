@@ -128,6 +128,10 @@ jobs:
               - 'pnpm-workspace.yaml'
               - 'package.json'
               - '.npmrc'
+              # The runtime-dependencies policy reads the image's install list and
+              # the peers its pnpmfile strips; an edit to either must run the lint.
+              - 'infra/docker/prune-runtime-tree.sh'
+              - 'infra/docker/image.pnpmfile.cjs'
               # NOTE: 'charts/**' is deliberately NOT listed. Integration suites
               # do render the chart and assert on the output, so a chart-only
               # edit can break a package test without touching a file
