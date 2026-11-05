@@ -49,16 +49,15 @@ func Tracing(instrumentationName string) func(http.Handler) http.Handler {
 				propagation.HeaderCarrier(r.Header),
 			)
 
-			// Route pattern, not the raw path: r.URL.Path would put ids and other
-			// high-cardinality junk into span names. ServeMux exposes the matched
-			// pattern, and the manager's routes are static anyway.
-			name := r.Method + " " + r.URL.Path
+			// The raw path, with credential segments cut short by RedactPath: a
+			// relay id must not reach a span name or attribute in full.
+			name := r.Method + " " + RedactPath(r.URL.Path)
 
 			ctx, span := tracer.Start(ctx, name,
 				trace.WithSpanKind(trace.SpanKindServer),
 				trace.WithAttributes(
 					semconv.HTTPRequestMethodKey.String(r.Method),
-					semconv.URLPath(r.URL.Path),
+					semconv.URLPath(RedactPath(r.URL.Path)),
 				),
 			)
 			defer span.End()

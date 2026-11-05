@@ -3,15 +3,21 @@ package aigateway
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/httpapi"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/mediarelay"
 )
+
+// minRelayIDKeyBytes is the shortest LW_GATEWAY_VOICE_RELAY_ID_KEY accepted.
+const minRelayIDKeyBytes = 32
 
 // Config is the top-level service configuration.
 type Config struct {
@@ -36,6 +42,15 @@ type Config struct {
 	// that `/responses` hangs off); unset is OpenAI's own codex backend.
 	// haven's +outbound names outboundsim.
 	CodexAPIBase string `env:"CODEX_API_BASE"`
+	// PodIP is this pod's address (GATEWAY_POD_IP, from the downward API). It
+	// goes into Twilio relay ids so any pod can tell which pod owns one.
+	// Empty means a single-pod gateway.
+	PodIP string `env:"GATEWAY_POD_IP"`
+	// Warnings are notes LoadConfig leaves for Serve to log at startup.
+	Warnings []string
+	// RelayHopAddr is where the owner side of a cross-pod relay hop listens
+	// (GATEWAY_RELAY_HOP_ADDR). Only the gateway's own pods may reach it.
+	RelayHopAddr string `env:"GATEWAY_RELAY_HOP_ADDR"`
 	// NonStreamingHeartbeatIntervalSeconds sets how often (in seconds) a
 	// non-streaming response writes a keep-alive byte while dispatch is
 	// still in flight. 0 falls back to config.DefaultNonStreamingHeartbeatInterval;
@@ -91,6 +106,27 @@ type VoiceConfig struct {
 	// MaxSupervisedSessions caps the calls one process supervises. A setup
 	// request past it is refused with 503 before anything is booked.
 	MaxSupervisedSessions int `env:"MAX_SUPERVISED_SESSIONS"`
+	// PendingTTLSeconds is how long an opened Twilio media relay waits for
+	// Twilio to dial in before it expires.
+	PendingTTLSeconds int64 `env:"PENDING_TTL_SECONDS"`
+	// MaxRelaySeconds caps how long a paired media relay runs, from the join.
+	MaxRelaySeconds int64 `env:"MAX_RELAY_SECONDS"`
+	// MaxMediaRelays caps the media relays one process holds, apart from the
+	// supervised calls above.
+	MaxMediaRelays int `env:"MAX_MEDIA_RELAYS"`
+	// MaxPendingRelaysPerScope caps the relays one instance or organization
+	// holds while still waiting for Twilio.
+	MaxPendingRelaysPerScope int `env:"MAX_PENDING_RELAYS_PER_SCOPE"`
+	// MaxRelaysPerScope caps all the relays one instance or organization
+	// holds, paired or not.
+	MaxRelaysPerScope int `env:"MAX_RELAYS_PER_SCOPE"`
+	// HopTimeoutSeconds bounds the dial to the pod that owns a relay.
+	HopTimeoutSeconds int64 `env:"HOP_TIMEOUT_SECONDS"`
+	// MaxHopDials caps the hop dials one process has in flight.
+	MaxHopDials int `env:"MAX_HOP_DIALS"`
+	// RelayIDKey keys the relay ids on its own, apart from the internal
+	// secret the workers share. Unset, the internal secret keys them.
+	RelayIDKey string `env:"RELAY_ID_KEY"`
 }
 
 // CORSConfig lets browser pages call the public /v1 routes directly.
@@ -211,6 +247,7 @@ func defaultConfig() Config {
 			MaxRequestBodyBytes: config.DefaultMaxRequestBodyBytes,
 		},
 		NonStreamingHeartbeatIntervalSeconds: int64(config.DefaultNonStreamingHeartbeatInterval / time.Second),
+		RelayHopAddr:                         ":5564",
 		Circuit: CircuitConfig{
 			WindowS:   30,
 			Threshold: 10,
@@ -230,6 +267,15 @@ func defaultConfig() Config {
 		Voice: VoiceConfig{
 			DrainSeconds:          570,
 			MaxSupervisedSessions: 2000,
+			// Twilio dials in within seconds; 150 leaves room for a slow
+			// placeCall. 330 is the 300 second call cap plus a margin.
+			PendingTTLSeconds:        150,
+			MaxRelaySeconds:          330,
+			MaxMediaRelays:           500,
+			MaxPendingRelaysPerScope: 20,
+			MaxRelaysPerScope:        50,
+			HopTimeoutSeconds:        3,
+			MaxHopDials:              64,
 		},
 		OTel: config.OTel{
 			// Left unset so an operator-supplied ratio is distinguishable from
@@ -263,6 +309,17 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	}
 	if err := validateSecondsFields(cfg); err != nil {
 		return Config{}, err
+	}
+	if err := validateMediaRelayLimits(cfg.Voice); err != nil {
+		return Config{}, err
+	}
+	if _, err := relayHopPort(cfg.RelayHopAddr); err != nil {
+		return Config{}, fmt.Errorf("GATEWAY_RELAY_HOP_ADDR: %w", err)
+	}
+	if cfg.PodIP != "" && !mediarelay.PrivateOwnerIP(cfg.PodIP) {
+		cfg.Warnings = append(cfg.Warnings, fmt.Sprintf(
+			"GATEWAY_POD_IP %q is not a private pod-network address: the cross-pod relay hop is off", cfg.PodIP))
+		cfg.PodIP = ""
 	}
 	if err := validateCodexAPIBase(cfg.CodexAPIBase); err != nil {
 		return Config{}, err
@@ -333,6 +390,8 @@ func validateSecondsFields(cfg Config) error {
 		{env: "SERVER_GRACEFUL_SECONDS", value: int64(cfg.Server.GracefulSeconds), rejectNegative: true},
 		{env: "SERVER_DRAIN_DELAY_SECONDS", value: int64(cfg.Server.DrainDelaySeconds), rejectNegative: true},
 		{env: "LW_GATEWAY_VOICE_DRAIN_SECONDS", value: cfg.Voice.DrainSeconds, rejectNegative: true},
+		{env: "LW_GATEWAY_VOICE_PENDING_TTL_SECONDS", value: cfg.Voice.PendingTTLSeconds, rejectNegative: true},
+		{env: "LW_GATEWAY_VOICE_MAX_RELAY_SECONDS", value: cfg.Voice.MaxRelaySeconds, rejectNegative: true},
 		{env: "NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS", value: cfg.NonStreamingHeartbeatIntervalSeconds},
 		{env: "LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS", value: cfg.AuthCache.SoftBumpSeconds},
 		{env: "LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS", value: cfg.AuthCache.HardGraceSeconds},
@@ -347,6 +406,45 @@ func validateSecondsFields(cfg Config) error {
 		if f.rejectNegative && f.value < 0 {
 			return fmt.Errorf("%s is %d seconds; it is a wait, so it must be zero or positive. Use 0 for no wait at all", f.env, f.value)
 		}
+	}
+	return nil
+}
+
+// relayHopPort is the port of a listen address. It errors on a missing or
+// out-of-range port.
+func relayHopPort(addr string) (int, error) {
+	_, portText, err := net.SplitHostPort(addr)
+	if err != nil {
+		return 0, err
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil || port < 1 || port > 65535 {
+		return 0, fmt.Errorf("bad port %q", portText)
+	}
+	return port, nil
+}
+
+// validateMediaRelayLimits rejects a negative relay cap; zero takes the
+// relay hub's default, so only a negative is a mistake.
+func validateMediaRelayLimits(voice VoiceConfig) error {
+	if voice.MaxMediaRelays < 0 {
+		return fmt.Errorf("LW_GATEWAY_VOICE_MAX_MEDIA_RELAYS is %d; it must be zero or positive", voice.MaxMediaRelays)
+	}
+	if voice.MaxPendingRelaysPerScope < 0 {
+		return fmt.Errorf("LW_GATEWAY_VOICE_MAX_PENDING_RELAYS_PER_SCOPE is %d; it must be zero or positive", voice.MaxPendingRelaysPerScope)
+	}
+	if voice.HopTimeoutSeconds < 0 {
+		return fmt.Errorf("LW_GATEWAY_VOICE_HOP_TIMEOUT_SECONDS is %d; it must be zero or positive", voice.HopTimeoutSeconds)
+	}
+	if voice.MaxHopDials < 0 {
+		return fmt.Errorf("LW_GATEWAY_VOICE_MAX_HOP_DIALS is %d; it must be zero or positive", voice.MaxHopDials)
+	}
+	// The key is not echoed: a short one is still a secret.
+	if voice.RelayIDKey != "" && len(voice.RelayIDKey) < minRelayIDKeyBytes {
+		return fmt.Errorf("LW_GATEWAY_VOICE_RELAY_ID_KEY is shorter than %d bytes", minRelayIDKeyBytes)
+	}
+	if voice.MaxRelaysPerScope < 0 {
+		return fmt.Errorf("LW_GATEWAY_VOICE_MAX_RELAYS_PER_SCOPE is %d; it must be zero or positive", voice.MaxRelaysPerScope)
 	}
 	return nil
 }

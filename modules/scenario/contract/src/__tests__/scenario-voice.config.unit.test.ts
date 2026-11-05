@@ -33,6 +33,15 @@ describe("scenario's voice configuration", () => {
     });
   });
 
+  describe("given VOICE_MEDIA_RELAY values", () => {
+    /** @scenario "Phone media goes through the gateway relay only when VOICE_MEDIA_RELAY is true" */
+    it("relays only for the literal true, case-insensitively", () => {
+      expect(read({}).voiceMediaRelay).toBe(false);
+      expect(read({ VOICE_MEDIA_RELAY: "1" }).voiceMediaRelay).toBe(false);
+      expect(read({ VOICE_MEDIA_RELAY: " TRUE " }).voiceMediaRelay).toBe(true);
+    });
+  });
+
   describe("given VOICE_WORKER_ONLY values", () => {
     /** @scenario "The voice worker reads its infrastructure environment variables" */
     it("turns on only for the literal true, case-insensitively", () => {

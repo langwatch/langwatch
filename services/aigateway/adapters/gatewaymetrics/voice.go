@@ -25,3 +25,11 @@ func (r *Recorder) RecordVoiceUsageReport(outcome string) {
 	}
 	r.voiceReports.WithLabelValues(orUnknown(outcome)).Inc()
 }
+
+// RecordVoiceMediaRelay counts one Twilio media relay outcome.
+func (r *Recorder) RecordVoiceMediaRelay(outcome string) {
+	if r == nil {
+		return
+	}
+	r.mediaRelays.WithLabelValues(orUnknown(outcome)).Inc()
+}

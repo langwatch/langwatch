@@ -26,13 +26,15 @@ export class VoiceCallDialService {
     private readonly callControl: TwilioCallControlChannel,
   ) {}
 
+  /** Dials the run's call; `streamUrl` sends its media to a gateway relay instead of the door. */
   async dial(input: {
     projectId: string;
     scenarioRunId: string;
     nonce: string;
     to: string;
+    streamUrl?: string;
   }): Promise<VoiceCallDialResult> {
-    const { projectId, scenarioRunId, nonce, to } = input;
+    const { projectId, scenarioRunId, nonce, to, streamUrl } = input;
 
     // A same-nonce retry short-circuits here; `put` itself refuses a different nonce while a
     // call is still pending, so a run never holds more than one pending call at a time.
@@ -50,7 +52,12 @@ export class VoiceCallDialService {
       };
     }
 
-    const { callSid } = await this.callControl.placeCall({ projectId, to, nonce });
+    const { callSid } = await this.callControl.placeCall({
+      projectId,
+      to,
+      nonce,
+      ...(streamUrl === undefined ? {} : { streamUrl }),
+    });
     const attached = await this.pending.attachCallSid({ scenarioRunId, callSid });
     if (!attached.attached) {
       // The cancel or the lapse came while dialling and could not see this SID: hang up here.

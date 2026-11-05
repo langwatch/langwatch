@@ -1,6 +1,6 @@
 import type { TwilioCallControlChannel } from "../twilio-call-control.channels.ts";
 
-type PlacedCall = { projectId: string; to: string; nonce: string };
+type PlacedCall = { projectId: string; to: string; nonce: string; streamUrl?: string };
 
 /**
  * Records the calls it was told to place and end; nothing reaches Twilio. A placed call's SID is
@@ -19,7 +19,8 @@ export class MemoryTwilioCallControlChannel implements TwilioCallControlChannel 
   private constructor(private readonly onPlaceCall?: (call: PlacedCall) => Promise<void>) {}
 
   async placeCall(input: PlacedCall): Promise<{ callSid: string }> {
-    const call = { projectId: input.projectId, to: input.to, nonce: input.nonce };
+    const call: PlacedCall = { projectId: input.projectId, to: input.to, nonce: input.nonce };
+    if (input.streamUrl !== undefined) call.streamUrl = input.streamUrl;
     this.placedCalls.push(call);
     await this.onPlaceCall?.(call);
     return { callSid: `CA${input.nonce}` };

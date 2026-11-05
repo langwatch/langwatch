@@ -121,6 +121,7 @@ type Recorder struct {
 	voiceSessions  *prometheus.GaugeVec
 	voiceEnded     *prometheus.CounterVec
 	voiceReports   *prometheus.CounterVec
+	mediaRelays    *prometheus.CounterVec
 
 	draining      gaugeSource
 	authCacheSize gaugeSource
@@ -241,6 +242,11 @@ func New() *Recorder {
 		Help: "Usage reports the gateway sent for supervised voice calls, by outcome (recorded, duplicate, closed, already_closed, error, dropped). error is retried; dropped is usage lost because the retry queue of one call was full.",
 	}, []string{"outcome"})
 
+	r.mediaRelays = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_voice_media_relay_total",
+		Help: "Twilio media relay outcomes (opened, paired, refused_auth, refused_unknown, refused_expired, refused_replay, refused_unpaired, expired_unpaired, drained_unpaired, dropped, completed; across pods: hop_joined, refused_owner_unreachable, refused_owner_invalid, refused_hop_busy). A hopped call counts hop_joined on the pod Twilio reached and paired on the owner. A hop the owner pod refuses counts as refused_unknown on the pod Twilio reached. The relay id is a credential and never a label.",
+	}, []string{"outcome"})
+
 	r.cacheHits = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_cache_hits_total",
 		Help: "Prompt-cache effectiveness by outcome: hit when the provider reported cache-read tokens, miss otherwise.",
@@ -309,7 +315,7 @@ func New() *Recorder {
 		r.guardrails, r.internalRTT, r.controlPlane, r.rateLimits,
 		r.clientRejects,
 		r.realtimeMints, r.realtimeLimits, r.realtimeErrors,
-		r.voiceSessions, r.voiceEnded, r.voiceReports,
+		r.voiceSessions, r.voiceEnded, r.voiceReports, r.mediaRelays,
 	)
 	return r
 }

@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/httpmiddleware"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 )
 
@@ -48,7 +49,7 @@ func Middleware(spanNamer func(*http.Request) string) func(http.Handler) http.Ha
 				trace.WithAttributes(
 					attribute.String(otelsetup.AttrLangWatchOrigin, OriginGateway),
 					attribute.String("http.request.method", r.Method),
-					attribute.String("url.path", r.URL.Path),
+					attribute.String("url.path", httpmiddleware.RedactPath(r.URL.Path)),
 				),
 			}
 			if observedSC.IsValid() {

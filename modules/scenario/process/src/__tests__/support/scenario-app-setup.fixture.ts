@@ -19,6 +19,7 @@ export const scenarioTestConfig: ScenarioServerConfig = {
   nlpCodeBlockTimeoutSeconds: void 0,
   generateTimeoutMs: 30_000,
   voiceWorkerOnly: false,
+  voiceMediaRelay: false,
   consumedResourceClasses: ["light", "voice"],
   slotBudget: 3,
   voiceCallMaxSeconds: void 0,
