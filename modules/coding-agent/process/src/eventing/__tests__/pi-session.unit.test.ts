@@ -629,7 +629,7 @@ function fileTool({
 
 const PROMPT = "Add a greeting to src/greet.ts\nand cover it with a test";
 
-/** The run the extension closes with the prompt that opened it, and pi's version on the resource. */
+/** The run the extension closes with the prompt that opened it, and pi's version as resource. */
 function promptedRun({ startMs = 1_000 }: { startMs?: number } = {}): CapturedSpan {
   const run = piRun({
     startMs,

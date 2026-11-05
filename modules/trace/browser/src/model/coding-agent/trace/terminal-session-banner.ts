@@ -83,10 +83,9 @@ export type BannerLogRecord = Pick<
 >;
 
 /**
- * `resourceAttributes` comes from the root-span `resourceInfo` read (same
- * across a session). `spans` supplies the model, per-call not per-resource —
- * the LAST model call's model is what the session ended on. A logs-only
- * agent (Grok, ADR-192) has neither, so its log records stand in for both.
+ * `resourceAttributes` comes from the root span's `resourceInfo` read, the same across a session.
+ * `spans` supplies the model: the last model call's model is what the session ended on. A
+ * logs-only agent (Grok, ADR-192) has neither, so its log records stand in for both.
  */
 export function deriveSessionBanner({
   resourceAttributes,
