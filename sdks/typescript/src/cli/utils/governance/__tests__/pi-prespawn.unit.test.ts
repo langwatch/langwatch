@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 
-import { PI_MIN_VERSION, parsePiVersion, piPrespawnWarnings } from "../pi-prespawn";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import {
+  PI_MIN_VERSION,
+  parsePiVersion,
+  piPrespawnWarnings,
+  readInstalledVersion,
+} from "../pi-prespawn";
 
 describe("piPrespawnWarnings()", () => {
   describe("when the installed pi is older than the minimum", () => {
@@ -24,6 +33,52 @@ describe("piPrespawnWarnings()", () => {
     it("does not warn", () => {
       expect(piPrespawnWarnings({ readVersionImpl: () => null })).toEqual([]);
     });
+  });
+});
+
+describe("readInstalledVersion()", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-pi-version-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  /** A stand-in pi at `file` that prints `version`. */
+  const plantPi = (file: string, version: string) => {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `#!/bin/sh\necho ${version}\n`, { mode: 0o755 });
+  };
+
+  it("reads the pi on PATH", () => {
+    plantPi(path.join(dir, "bin", "pi"), "0.84.2");
+    const env = { PATH: [path.join(dir, "bin"), "/bin", "/usr/bin"].join(path.delimiter) };
+
+    expect(readInstalledVersion({ env })).toBe("0.84.2");
+  });
+
+  it.skipIf(!fs.existsSync("/bin/bash"))(
+    "reads a pi only the shell's alias reaches, ignoring what the rc prints",
+    () => {
+      const hidden = path.join(dir, "hidden", "pi");
+      plantPi(hidden, "0.79.1");
+      fs.writeFileSync(
+        path.join(dir, ".bashrc"),
+        `echo "Now using node v24.22.1"\nalias pi='${hidden}'\n`,
+      );
+      const env = { HOME: dir, SHELL: "/bin/bash", PATH: ["/bin", "/usr/bin"].join(":") };
+
+      expect(readInstalledVersion({ env })).toBe("0.79.1");
+    },
+  );
+
+  it("returns null when no pi resolves at all", () => {
+    const env = { HOME: dir, SHELL: "/bin/sh", PATH: path.join(dir, "empty") };
+
+    expect(readInstalledVersion({ env })).toBeNull();
   });
 });
 

@@ -13,7 +13,7 @@ import * as cliApi from "../cli-api";
 import * as cliLocation from "../cli-location";
 import * as configMod from "../config";
 import * as loginFlow from "../login-flow";
-import { isExecutableOnPath, isToolResolvable } from "../tool-presence";
+import { isExecutableOnPath, isToolResolvable, shellLookupStdin } from "../tool-presence";
 import { runWrapped } from "../wrapper";
 import { toolNotFoundMessage } from "../wrapper-info-run";
 import * as wrapperMode from "../wrapper-mode";
@@ -91,8 +91,27 @@ describe("isExecutableOnPath", () => {
     expect(isExecutableOnPath({ tool: "grok", env: { PATH: binDir } })).toBe(false);
   });
 
+  it("reads an empty PATH entry as the current directory", () => {
+    const file = path.join(binDir, "pi");
+    fs.writeFileSync(file, "#!/bin/sh\n");
+    fs.chmodSync(file, 0o755);
+    const env = { PATH: ["/nonexistent-lw-bin", ""].join(path.delimiter) };
+    expect(isExecutableOnPath({ tool: "pi", env, cwd: binDir })).toBe(true);
+  });
+
   it("does not ask a shell it does not resolve aliases through", () => {
     expect(isToolResolvable({ tool: "pi", env: { PATH: binDir, SHELL: "/bin/sh" } })).toBe(false);
+  });
+});
+
+describe("shellLookupStdin", () => {
+  it("hands the lookup the terminal when the launch will have one", () => {
+    expect(shellLookupStdin({ isTTY: true })).toBe("inherit");
+  });
+
+  it("leaves a piped stdin for the tool, not the lookup", () => {
+    expect(shellLookupStdin({ isTTY: false })).toBe("ignore");
+    expect(shellLookupStdin({})).toBe("ignore");
   });
 });
 

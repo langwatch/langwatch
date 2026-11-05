@@ -16,15 +16,32 @@ const SHELL_LOOKUP_TIMEOUT_MS = 10_000;
 /** Single-quote a string for safe interpolation into a `sh -c` command. */
 const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
 
+/**
+ * The stdin a shell lookup gets: the terminal when the launch shell will have it, so an rc that
+ * defines aliases only on a TTY answers the lookup as it answers the launch.
+ */
+export const shellLookupStdin = (
+  stdin: { isTTY?: boolean } = process.stdin,
+): "inherit" | "ignore" => (stdin.isTTY ? "inherit" : "ignore");
+
+/** PATH's directories; on POSIX an empty entry is the current directory, as the shell reads it. */
+function pathDirs({ env, cwd }: { env: NodeJS.ProcessEnv; cwd: string }): string[] {
+  const entries = (env.PATH ?? "").split(path.delimiter);
+  if (process.platform === "win32") return entries.filter(Boolean);
+  return entries.map((entry) => (entry === "" ? cwd : entry));
+}
+
 /** Whether an executable named `tool` sits in one of PATH's directories. */
 export function isExecutableOnPath({
   tool,
   env = process.env,
+  cwd = process.cwd(),
 }: {
   tool: string;
   env?: NodeJS.ProcessEnv;
+  cwd?: string;
 }): boolean {
-  const dirs = (env.PATH ?? "").split(path.delimiter).filter(Boolean);
+  const dirs = pathDirs({ env, cwd });
   const extensions =
     process.platform === "win32"
       ? ["", ...(env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean)]
@@ -62,7 +79,7 @@ export function isToolResolvable({
   const lookup = spawnSync(
     aliasShell,
     ["-i", "-c", `${unsetOurs}command -v -- ${shellQuote(tool)} >/dev/null 2>&1`],
-    { stdio: "ignore", env, timeout: SHELL_LOOKUP_TIMEOUT_MS },
+    { stdio: [shellLookupStdin(), "ignore", "ignore"], env, timeout: SHELL_LOOKUP_TIMEOUT_MS },
   );
   if (lookup.error || lookup.status === null) return true;
   return lookup.status === 0;
