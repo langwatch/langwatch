@@ -84,9 +84,8 @@ describe("given 2 insights in the inbox, both already seen", () => {
 
 /** Absence holds only after the reads settle, so the wait outlasts the answered query. */
 async function expectNoBell() {
-  await expect(
-    screen.findByRole("button", { name: "Inbox: new insights" }, { timeout: 300 }),
-  ).rejects.toThrow("Unable to find an element");
+  await new Promise((settle) => setTimeout(settle, 300));
+  expect(screen.queryByRole("button", { name: "Inbox: new insights" })).not.toBeInTheDocument();
 }
 
 describe("given 2 unseen insights in the inbox", () => {
