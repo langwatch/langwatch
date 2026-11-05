@@ -2,6 +2,7 @@ import type * as Observability from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { lwqlAppFunctionNames } from "../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
 import { LangWatchQLPostgresMappingService } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
@@ -44,6 +45,8 @@ vi.mock("@langwatch/observability", async (importActual) => {
 });
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+
+const collectionBinding = LangWatchQLCollectionBindingService.create();
 const READER_PASSWORD = "reader-unit-secret";
 const NAMES = {
   database: "langwatch",
@@ -462,7 +465,7 @@ describe("convergeLwqlAccessModel", () => {
       }
       return { stale: staleTable, absent: absentTable };
     };
-    const fingerprint = selfProvisioning.credentialFingerprint({
+    const fingerprint = collectionBinding.credentialFingerprint({
       postgres: {
         endpoint: { host: "postgres", port: 5432, database: "langwatch" },
         readerPassword: READER_PASSWORD,
@@ -770,7 +773,7 @@ describe("when a PostgreSQL-backed view lacks a column over a current engine tab
   const view = LWQL_VIEW_CATALOG.find((entry) => entry.postgres !== undefined);
   if (!view) throw new Error("the catalog maps no PostgreSQL dataset");
   const present = [view.sourceTable, view.name];
-  const fingerprint = selfProvisioning.credentialFingerprint({
+  const fingerprint = collectionBinding.credentialFingerprint({
     postgres: {
       endpoint: { host: "postgres", port: 5432, database: "langwatch" },
       readerPassword: READER_PASSWORD,
@@ -870,7 +873,7 @@ describe("findLwqlAppOwnedDrift", () => {
   const { request } = clickHouseThat().plan;
   const commentFor = (readerPassword: string) =>
     LangWatchQLPostgresMappingService.create().credentialComment({
-      fingerprint: selfProvisioning.credentialFingerprint({
+      fingerprint: collectionBinding.credentialFingerprint({
         postgres: { endpoint: request.endpoint, readerPassword },
         schema: "public",
       }),
