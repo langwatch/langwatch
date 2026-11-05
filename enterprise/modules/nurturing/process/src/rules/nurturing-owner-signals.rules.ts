@@ -293,7 +293,7 @@ export function ssoAutoAddedSignal({
 }: OwnerEvent<SsoAutoAddedEventData>): NurturingSignal {
   const { tenantId, occurredAt, userId, organizationId, organizationName, role } = data;
   const sourceEventId = `${organizationId}:${aggregateId}`;
-  const who = { userId, organizationId, organizationName, ...(role ? { role } : {}) };
+  const who = { userId, organizationId, organizationName, role };
   return { kind: "sso_auto_added", sourceEventId, tenantId, occurredAt, ...who };
 }
 
@@ -333,7 +333,7 @@ export function inviteAcceptedSignal({
 }: OwnerEvent<InviteAcceptedEventData>): NurturingSignal {
   const { tenantId, occurredAt, userId, organizationId, organizationName, role } = data;
   const sourceEventId = `${aggregateId}:${data.inviteId}`;
-  const who = { userId, organizationId, organizationName, ...(role ? { role } : {}) };
+  const who = { userId, organizationId, organizationName, role };
   return { kind: "invite_accepted", sourceEventId, tenantId, occurredAt, ...who };
 }
 

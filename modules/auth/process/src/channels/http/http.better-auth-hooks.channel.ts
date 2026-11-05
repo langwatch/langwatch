@@ -17,7 +17,11 @@ import {
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi, SignUpVerdict } from "@langwatch/organization-contract";
+import type {
+  OrganizationApi,
+  OrganizationUserRole,
+  SignUpVerdict,
+} from "@langwatch/organization-contract";
 import { fromDate, nowInstant } from "@langwatch/time";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
@@ -140,7 +144,7 @@ const announceSsoAutoJoin = ({
   user: { id: string; email: string; name: string };
   org: { id: string; name: string };
   inviteId: string | null;
-  role: string;
+  role: OrganizationUserRole;
 }): void => {
   logger.info(
     { userId: user.id, organizationId: org.id, inviteId },

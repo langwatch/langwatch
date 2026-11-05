@@ -3,6 +3,7 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import { auditChannelSchema } from "./organization.ts";
+import type { OrganizationUserRole } from "./organization.rows.ts";
 
 /** A write with nothing else to report. */
 const organizationWriteAckSchemaDefinition = z.object({ success: z.literal(true) }).strict();
@@ -390,7 +391,7 @@ export type OrganizationAuditLogPage = z.infer<typeof organizationAuditLogPageSc
  * a default membership — rather than an absence.
  */
 export type OrganizationPendingInviteApplied =
-  | Readonly<{ applied: true; inviteId: string; role: string }>
+  | Readonly<{ applied: true; inviteId: string; role: OrganizationUserRole }>
   | Readonly<{ applied: false }>;
 
 /** Why one member is in the organization; `unknown` renders as no chip rather than a guess. */
