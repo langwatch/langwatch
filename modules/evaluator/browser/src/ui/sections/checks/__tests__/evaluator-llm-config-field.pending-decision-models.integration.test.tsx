@@ -48,7 +48,10 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => ({
     },
     instantEval: {
       access: {
-        useQuery: () => ({ data: { released: true, offer: "enable" }, isLoading: false }),
+        useQuery: () => ({
+          data: { released: true, hostedReleased: true, offer: "enable" },
+          isLoading: false,
+        }),
       },
     },
   },

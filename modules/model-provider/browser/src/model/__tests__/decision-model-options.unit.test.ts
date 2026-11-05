@@ -18,6 +18,6 @@ describe("decisionModelPickerOptions", () => {
   });
 
   it("keeps the hosted line when the judge router flag is off", () => {
-    expect(hostedSubtitle(false)).toBe("Hosted by LangWatch and billed with your plan.");
+    expect(hostedSubtitle(false)).toBe("LangWatch's hosted decision model, billed with your plan.");
   });
 });
