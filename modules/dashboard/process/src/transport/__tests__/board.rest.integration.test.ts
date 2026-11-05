@@ -72,8 +72,9 @@ async function projectWithBothBoards({
   analytics?: ReturnType<typeof createDashboardTestAnalytics>;
 } = {}) {
   const caller = { actor, scope: { tier: "project" as const, id: PROJECT } };
-  // Each card the gate was asked for, with the names it read; it holds a click for every one.
-  const cards: { resource: string; names: (string | null | undefined)[] }[] = [];
+  // Each ask of the gate, with every name the route read: undefined is no such record, which
+  // the real gate shows no card for (RestConfirmation.name). It holds a click for every one.
+  const asked: { resource: string; names: (string | null | undefined)[] }[] = [];
   const admit = ({ request }: { request: Request }) => {
     if (langy) recordProjectCredential(request, LANGY_KEY);
     return caller;
@@ -100,10 +101,7 @@ async function projectWithBothBoards({
           servedDoors: true as const,
           confirmations: {
             confirm: async ({ resource, targets }) => {
-              // Like Langy's gate: a target whose name reads undefined is gone and shows no card.
-              const names = await Promise.all(targets.map((t) => t.name()));
-              const shown = names.filter((name) => name !== undefined);
-              if (shown.length > 0) cards.push({ resource, names: shown });
+              asked.push({ resource, names: await Promise.all(targets.map((t) => t.name())) });
             },
           },
         }
@@ -152,7 +150,7 @@ async function projectWithBothBoards({
     };
   };
 
-  return { app, reports, board, widget, send, cards };
+  return { app, reports, board, widget, send, asked };
 }
 
 const BOARDS = "/api/v1/dashboards";
@@ -591,7 +589,7 @@ describe("given a Langy session key deleting at /api/v1/dashboards", () => {
      * @scenario "A route the project cannot reach refuses a Langy key before any card"
      */
     it("answers 404 dashboards_not_released before any card, and reads no name", async () => {
-      const { board, widget, send, cards, app } = await projectWithBothBoards({
+      const { board, widget, send, asked, app } = await projectWithBothBoards({
         released: false,
         langy: true,
         actor: MEMBER,
@@ -606,7 +604,7 @@ describe("given a Langy session key deleting at /api/v1/dashboards", () => {
         { status: 404, code: "dashboards_not_released" },
         { status: 404, code: "dashboards_not_released" },
       ]);
-      expect(cards).toEqual([]);
+      expect(asked).toEqual([]);
       expect((await app.findBoards({ projectId: PROJECT })).map(({ id }) => id)).toContain(
         board.id,
       );
@@ -620,7 +618,7 @@ describe("given a Langy session key deleting at /api/v1/dashboards", () => {
       const [template] = curated?.widgets ?? [];
       if (!curated || !template)
         throw new Error("A From LangWatch board with a widget is expected");
-      const { board, widget, send, cards } = await projectWithBothBoards({
+      const { board, widget, send, asked } = await projectWithBothBoards({
         langy: true,
         actor: MEMBER,
       });
@@ -631,7 +629,7 @@ describe("given a Langy session key deleting at /api/v1/dashboards", () => {
         method: "PATCH",
         body: { name: "Renamed" },
       });
-      const templateCards = [...cards];
+      const templateAsks = [...asked];
       const deletedStored = await send("dashboards", `${BOARDS}/${board.id}/widgets/${widget.id}`, {
         method: "DELETE",
       });
@@ -640,28 +638,32 @@ describe("given a Langy session key deleting at /api/v1/dashboards", () => {
       expect({
         deletedTemplate: refusal(deletedTemplate),
         patchedTemplate: refusal(patchedTemplate),
-        templateCards,
+        templateAsks,
         deletedStored: deletedStored.status,
         readAfter: refusal(readAfter),
-        cards,
+        asked,
       }).toEqual({
         deletedTemplate: { status: 404, code: "dashboard_widget_not_found" },
         patchedTemplate: { status: 404, code: "dashboard_widget_not_found" },
-        templateCards: [],
+        // Read as no such record: the gate's own test pins that it then shows no card.
+        templateAsks: [{ resource: "dashboard widget", names: [undefined] }],
         deletedStored: 204,
         readAfter: { status: 404, code: "dashboard_widget_not_found" },
-        cards: [{ resource: "dashboard widget", names: ["Traces"] }],
+        asked: [
+          { resource: "dashboard widget", names: [undefined] },
+          { resource: "dashboard widget", names: ["Traces"] },
+        ],
       });
     });
 
     it("asks for the click on a card naming the board, then deletes it", async () => {
-      const { board, send, cards } = await projectWithBothBoards({ langy: true, actor: MEMBER });
+      const { board, send, asked } = await projectWithBothBoards({ langy: true, actor: MEMBER });
 
       const deleted = await send("dashboards", `${BOARDS}/${board.id}`, { method: "DELETE" });
 
-      expect({ status: deleted.status, cards }).toEqual({
+      expect({ status: deleted.status, asked }).toEqual({
         status: 200,
-        cards: [{ resource: "board", names: ["Usage"] }],
+        asked: [{ resource: "board", names: ["Usage"] }],
       });
     });
   });

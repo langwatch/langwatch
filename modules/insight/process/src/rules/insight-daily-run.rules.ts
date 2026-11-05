@@ -6,7 +6,9 @@
 
 import { createHash } from "node:crypto";
 
+import { curatedBoardWidgetById } from "@langwatch/analytics-catalogue";
 import {
+  insightBoardPointerId,
   type InsightEntry,
   insightFolder,
   type InsightReplay,
@@ -126,6 +128,25 @@ export function dailyRunConversationTitle({
 }
 
 const MAX_POINTER_NAME_LENGTH = 200;
+
+/**
+ * The pointer a run's finding keeps: as a chat on that board files it. Langy reads a From
+ * LangWatch widget by its `template:<templateId>:<key>` id; the insight keeps its key.
+ */
+export function runFindingPointer({
+  board,
+  name,
+  widget,
+}: {
+  board: Pick<InsightRunBoard, "kind" | "id">;
+  name: string;
+  widget: { id: string; name: string } | null;
+}): { id: string; name: string; widget: { id: string; name: string } | null } {
+  const id = insightBoardPointerId(board);
+  if (board.kind === "dashboard" || widget === null) return { id, name, widget };
+  const key = curatedBoardWidgetById(widget.id)?.widget.key;
+  return { id, name, widget: key === undefined ? null : { id: key, name: widget.name } };
+}
 
 /** A board or widget name as a pointer keeps it: one line, within the pointer's limit. */
 export function pointerName({ name, fallback }: { name: string; fallback: string }): string {

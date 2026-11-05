@@ -32,7 +32,11 @@ and the viewer, so the dashboard module's own scope rules answer it. An Only me 
 is its author's alone, and to anyone else it reads as a board that was deleted. A From LangWatch board is
 named by its template id, and its widgets are read from `@langwatch/analytics-catalogue`,
 the one copy of the catalogue the browser and the server both import. Each widget is named
-`template:<templateId>:<key>`, which the dashboard widget API answers read-only. A
+`template:<templateId>:<key>`, which the dashboard widget API answers read-only. Only
+the check that dashboards and custom charts are on for the project goes through the
+dashboard module; the run reads the catalogue itself, as no person. Moving template reads
+behind the dashboard module is pending. A finding filed from a template board keeps it as
+`curated/<templateId>` and the widget by its key, as a chat on that board files it. A
 template id the catalogue no longer offers reads as `board_unreadable`, not `board_deleted`:
 a renamed or retired template turns its schedules off only after the skipped days, so a
 release that brings it back before `INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF` (7) days finds
@@ -325,8 +329,8 @@ contract; insight knows nothing of ops.
 - The browser counts every widget of a board, while a run reads custom chart widgets
   only. A board of builder graphs alone shows the control, and its run ends `board_empty`.
 - The control's "N new" tag counts the person's unseen insights whose pointer has the
-  board's id. A From LangWatch board is pointed at by its template id in a run and by
-  `curated/<template id>` in a chat, so chat insights from a template are not counted.
+  board's id. A From LangWatch board's is `curated/<template id>` from a run and from a
+  chat alike, so both are counted.
 - Hardening adds one peer, `AuditLogApi`, and two fact types of other modules'
   contracts (the organisation's member removed, the project's archived). Ops gains
   `InsightApi` as a peer.

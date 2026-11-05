@@ -111,16 +111,16 @@ describe("given a pointer to a From LangWatch board", () => {
     });
   });
 
-  describe("when a daily run filed it, naming the board and the widget as the run read them", () => {
+  describe("when a daily run filed it, keeping the board and the widget as a chat does", () => {
     /** @scenario "An insight a daily run filed on a From LangWatch board links to its live widget" */
     it("links the board and the widget to the live board", () => {
       const [widget] = curated?.widgets ?? [];
       if (!curated || !widget) throw new Error("No From LangWatch board ships a widget");
       const resolved = resolve({
         pointer: {
-          boardId: curated.templateId,
+          boardId: `curated/${curated.templateId}`,
           boardName: "As it was called",
-          widget: { id: `template:${curated.templateId}:${widget.key}`, name: "As it was" },
+          widget: { id: widget.key, name: "As it was" },
         },
         boards: [],
         widgets: [],

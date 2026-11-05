@@ -7,14 +7,15 @@
 
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type {
-  InsightEntry,
-  InsightRunBoard,
-  InsightRunFailureReason,
-  InsightRunOutcome,
-  InsightRunReason,
-  InsightScheduleOffReason,
-  InsightSource,
+import {
+  insightBoardPointerId,
+  type InsightEntry,
+  type InsightRunBoard,
+  type InsightRunFailureReason,
+  type InsightRunOutcome,
+  type InsightRunReason,
+  type InsightScheduleOffReason,
+  type InsightSource,
 } from "@langwatch/insight-contract";
 import type { LangyApi } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
@@ -36,6 +37,7 @@ import {
   decideRunFindings,
   matchableInsightsOfBoard,
   openInsightsOfBoard,
+  runFindingPointer,
   runInsightId,
 } from "../rules/insight-daily-run.rules.ts";
 import { isLastSkippedDay } from "../rules/insight-daily-skip-streak.rules.ts";
@@ -239,7 +241,11 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
           widgets: gate.widgets,
           windows,
           maxInsights,
-          openInsights: openInsightsOfBoard({ entries, boardId: gate.board.id, slot }),
+          openInsights: openInsightsOfBoard({
+            entries,
+            boardId: insightBoardPointerId(input.board),
+            slot,
+          }),
         }),
         title: dailyRunConversationTitle({
           boardName: gate.board.name,
@@ -300,7 +306,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     // Read again: what the person marked done while Langy read is not found again for them.
     const insights = matchableInsightsOfBoard({
       entries: await this.insightsOf(input),
-      boardId: ready.gate.board.id,
+      boardId: insightBoardPointerId(input.board),
       slot,
     });
     const acts = decideRunFindings({ findings, insights });
@@ -340,7 +346,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       ...words,
       replay: words.lwql === null ? null : dailyRunReplay({ window: ready.windows.window }),
       source,
-      board: { ...ready.gate.board, widget },
+      board: runFindingPointer({ board: input.board, name: ready.gate.board.name, widget }),
       filedVia: "run",
       ownerUserId: userId,
       filedByUserId: null,

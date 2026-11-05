@@ -4,8 +4,6 @@
  * so what is drawn is decided here, against the boards and widgets that exist now. Pure.
  */
 
-import { templateWidgetId } from "@langwatch/analytics-catalogue";
-
 import { CURATED_SEGMENT, curatedBoardPath, dashboardsPath } from "./boards.ts";
 import type { CuratedBoard } from "./curated-boards.ts";
 
@@ -37,20 +35,10 @@ export function keptDashboardPointer(pointer: DashboardPointer): ResolvedPointer
   return { board: kept(pointer.boardName), ...keptWidget(pointer) };
 }
 
-/**
- * A From LangWatch board's pointer id: its address segment, `curated/<templateId>`, from a
- * chat, or the bare template id a daily run keeps. A stored board's id is never a template id.
- */
-function curatedTemplateId({
-  boardId,
-  curated,
-}: {
-  boardId: string;
-  curated: readonly CuratedBoard[];
-}): string | undefined {
+/** A From LangWatch board's pointer id is its address segment, `curated/<templateId>`. */
+function curatedTemplateId(boardId: string): string | undefined {
   const prefix = `${CURATED_SEGMENT}/`;
-  if (boardId.startsWith(prefix)) return boardId.slice(prefix.length);
-  return curated.some(({ templateId }) => templateId === boardId) ? boardId : void 0;
+  return boardId.startsWith(prefix) ? boardId.slice(prefix.length) : void 0;
 }
 
 /**
@@ -71,7 +59,7 @@ export function resolveDashboardPointer({
   curated: readonly CuratedBoard[];
   projectSlug: string;
 }): ResolvedPointer {
-  const templateId = curatedTemplateId({ boardId: pointer.boardId, curated });
+  const templateId = curatedTemplateId(pointer.boardId);
   if (templateId !== void 0) {
     return curatedPointer({ pointer, templateId, curated, projectSlug });
   }
@@ -117,10 +105,7 @@ function curatedPointer({
     board: { name: board.name, href, deleted: false },
     widget: widgetPart({
       keptName: pointer.widget.name,
-      // A chat keeps the widget's key, a daily run its `template:<templateId>:<key>` id.
-      found: board.widgets.find(
-        ({ key }) => key === widgetKey || templateWidgetId({ templateId, key }) === widgetKey,
-      ),
+      found: board.widgets.find(({ key }) => key === widgetKey),
       known: true,
       href,
     }),

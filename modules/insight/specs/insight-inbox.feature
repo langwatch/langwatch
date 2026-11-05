@@ -161,7 +161,7 @@ Feature: The insights inbox
     @unit
     Scenario: An insight a daily run filed on a From LangWatch board links to its live widget
       Given an insight a daily run filed on a From LangWatch board that still ships
-      And it keeps the template id and the widget's template:<templateId>:<key> id
+      And it keeps the board as curated/<templateId> and the widget by its key, as a chat does
       When a member reads the row
       Then the board's name and the widget's name each link to the live board
 

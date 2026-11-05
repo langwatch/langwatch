@@ -36,6 +36,14 @@ export interface InsightRunBoardSchema extends Named<typeof insightRunBoardSchem
 export const insightRunBoardSchema: InsightRunBoardSchema = insightRunBoardSchemaDefinition;
 export type InsightRunBoard = z.infer<typeof insightRunBoardSchema>;
 
+/**
+ * The board id an insight keeps for a run's board. A From LangWatch board's is its address
+ * segment, `curated/<templateId>`, as a chat on that board files it: both name one board.
+ */
+export function insightBoardPointerId({ kind, id }: Pick<InsightRunBoard, "kind" | "id">): string {
+  return kind === "template" ? `curated/${id}` : id;
+}
+
 /** How many findings one run may file; whatever Langy returns is cut to it. */
 export const INSIGHT_RUN_MAX_INSIGHTS_CHOICES = [1, 3, 5, 10] as const;
 export const DEFAULT_INSIGHT_RUN_MAX_INSIGHTS = 3;

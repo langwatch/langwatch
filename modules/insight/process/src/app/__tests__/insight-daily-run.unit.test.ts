@@ -440,11 +440,14 @@ describe("given the board a run is asked for", () => {
   });
 
   /** @scenario "A From LangWatch board is read from the catalogue" */
-  it("files a finding on a From LangWatch widget with its catalogue query", async () => {
+  it("files a finding on a From LangWatch widget with its catalogue query, kept as a chat keeps it", async () => {
     const template: InsightRunBoard = { kind: "template", id: "data", name: "Data" };
-    const [widget] = curatedBoardDefinitionById("data")?.widgets ?? [];
+    const curated = curatedBoardDefinitionById("data");
+    const [widget] = curated?.widgets ?? [];
     const [query] = widget?.definition.queries ?? [];
-    if (!widget || !query) throw new Error("No From LangWatch board named data ships a query");
+    if (!curated || !widget || !query) {
+      throw new Error("No From LangWatch board named data ships a query");
+    }
     const widgetId = `template:data:${widget.key}`;
     installed.world.langy.answer = answerWith([finding({ widgetId, lwql: query.sql })]);
 
@@ -453,7 +456,11 @@ describe("given the board a run is asked for", () => {
     expect(await insightsOf()).toEqual([
       expect.objectContaining({
         lwql: query.sql,
-        board: expect.objectContaining({ id: "data", widget: { id: widgetId, name: widget.name } }),
+        board: {
+          id: "curated/data",
+          name: curated.name,
+          widget: { id: widget.key, name: widget.name },
+        },
       }),
     ]);
     expect(await lastRunOf({ board: template })).toMatchObject({ outcome: "filed", filedCount: 1 });

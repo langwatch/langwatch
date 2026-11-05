@@ -141,6 +141,7 @@ Feature: The daily insights run
       Then Langy is briefed on the board's widgets from the catalogue, in reading order
       And each widget is named template:<templateId>:<key>
       And the run's row names the template board by its name now
+      And a finding it files keeps the board as curated/<templateId> and the widget by its key
 
     @unit
     Scenario: A From LangWatch board no longer offered reads as unreadable

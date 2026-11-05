@@ -69,7 +69,7 @@ type InsightRunGateMembers = Readonly<{
 /**
  * The dashboard module's refusals that end a run. A board the person may not see is refused as
  * `dashboard_not_found`, like one that never existed, so the reason tells them apart from none.
- * `board_unreadable`: dashboards, or the custom charts on them, are off for the project.
+ * `board_unreadable`: dashboards or custom charts are off, or the catalogue no longer offers it.
  */
 const BOARD_REFUSALS: Readonly<Record<string, InsightRunSkipReason>> = {
   dashboard_not_found: "board_deleted",
