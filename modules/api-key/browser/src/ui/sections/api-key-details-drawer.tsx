@@ -99,7 +99,7 @@ export function ApiKeyDetailsDrawer({
 }: {
   apiKey: ApiKeyRow | null;
   /** Owner or admin; everyone else may only read. */
-  canModify: boolean;
+  canModify: (apiKey: ApiKeyRow) => boolean;
   onClose: () => void;
   onEdit: (apiKey: ApiKeyRow) => void;
   onRotate: (apiKey: ApiKeyRow) => void;
@@ -112,7 +112,7 @@ export function ApiKeyDetailsDrawer({
       onClose={onClose}
       title={apiKey?.name ?? "API key"}
       footer={
-        apiKey && canModify
+        apiKey && canModify(apiKey)
           ? {
               destructiveAction: {
                 label: "Revoke",

@@ -49,10 +49,10 @@ import { LegacyKeyRevokedNotice } from "../blocks/legacy-key-revoked-notice.tsx"
 import { LegacyProjectKeyBanner } from "../blocks/legacy-project-key-banner.tsx";
 import { RevokeConfirmDialog } from "../blocks/revoke-confirm-dialog.tsx";
 import { RevokeLegacyKeyDialog } from "../blocks/revoke-legacy-key-dialog.tsx";
-import { RotateConfirmDialog } from "../blocks/rotate-confirm-dialog.tsx";
 import { ApiKeyDetailsDrawer } from "./api-key-details-drawer.tsx";
 import { CreateApiKeyDrawer } from "./create-api-key-drawer.tsx";
 import { EditApiKeyDrawer } from "./edit-api-key-drawer.tsx";
+import { RotateApiKeyFlow } from "./rotate-api-key-flow.tsx";
 import { TokenCreatedDialog } from "./token-created-dialog.tsx";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */
@@ -382,7 +382,6 @@ export default function ApiKeysScreen() {
   const createMutation = apiKeyApi.apiKey.create.useMutation();
   const updateMutation = apiKeyApi.apiKey.update.useMutation();
   const revokeMutation = apiKeyApi.apiKey.revoke.useMutation();
-  const rotateMutation = apiKeyApi.apiKey.rotate.useMutation();
   const queryClient = apiKeyApi.useUtils();
 
   const { open: isCreateOpen, onOpen: onCreateOpen, onClose: onCreateClose } = useDisclosure();
@@ -393,8 +392,6 @@ export default function ApiKeysScreen() {
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
   const [apiKeyToView, setApiKeyToView] = useState<ApiKeyRow | null>(null);
   const [apiKeyToRotate, setApiKeyToRotate] = useState<ApiKeyRow | null>(null);
-  // The key whose new secret the token dialog shows; null while it shows a fresh mint.
-  const [rotatedKey, setRotatedKey] = useState<ApiKeyRow | null>(null);
   const [legacyKeyToRevoke, setLegacyKeyToRevoke] = useState<LegacyProjectKey | null>(null);
   const [legacyReplacement, setLegacyReplacement] = useState<CreateApiKeyInput | null>(null);
 
@@ -549,26 +546,6 @@ export default function ApiKeysScreen() {
     );
   };
 
-  const handleRotate = (apiKeyId: string) => {
-    const rotating = apiKeyToRotate;
-    rotateMutation.mutate(
-      { organizationId, apiKeyId },
-      {
-        onSuccess: (result) => {
-          setApiKeyToRotate(null);
-          setRotatedKey(rotating);
-          setNewToken(result.token);
-          void queryClient.apiKey.list.invalidate();
-        },
-        onError: (error) => host.failed({ error, fallbackTitle: "Couldn't rotate API key" }),
-      },
-    );
-  };
-
-  // The token dialog's project picker: the projects the shown key's grants reach.
-  const shownKeyBindings: { scopeType: string; scopeId: string }[] | undefined = rotatedKey
-    ? rotatedKey.grants
-    : newKeyInput?.bindings;
   const canModifyKey = (apiKeyRow: ApiKeyRow) => isAdmin || apiKeyRow.userId === currentUserId;
 
   // Confirming revokes the legacy key, then opens the create drawer filled with
@@ -750,7 +727,7 @@ export default function ApiKeysScreen() {
 
         <ApiKeyDetailsDrawer
           apiKey={apiKeyToView}
-          canModify={apiKeyToView ? canModifyKey(apiKeyToView) : false}
+          canModify={canModifyKey}
           onClose={() => setApiKeyToView(null)}
           onEdit={(apiKeyRow) => {
             setApiKeyToView(null);
@@ -768,13 +745,12 @@ export default function ApiKeysScreen() {
 
         <TokenCreatedDialog
           newToken={newToken}
-          title={rotatedKey ? "Key rotated" : undefined}
-          keyName={rotatedKey?.name ?? newKeyInput?.name}
+          keyName={newKeyInput?.name}
           projectId={scope.projectId}
           endpoint={endpoint}
           orgProjects={availableProjects.filter((project) =>
             findBindingAtScope({
-              bindings: shownKeyBindings,
+              bindings: newKeyInput?.bindings,
               scopeType: "PROJECT",
               scopeId: project.id,
               organizationId,
@@ -784,16 +760,17 @@ export default function ApiKeysScreen() {
           onClose={() => {
             setNewToken(null);
             setNewKeyInput(null);
-            setRotatedKey(null);
             onCreateClose();
           }}
         />
 
-        <RotateConfirmDialog
+        <RotateApiKeyFlow
           apiKey={apiKeyToRotate}
-          isRotating={rotateMutation.isPending}
-          onCancel={() => setApiKeyToRotate(null)}
-          onConfirm={handleRotate}
+          organizationId={organizationId}
+          projectId={scope.projectId}
+          endpoint={endpoint}
+          orgProjects={availableProjects}
+          onClose={() => setApiKeyToRotate(null)}
         />
 
         <RevokeConfirmDialog
