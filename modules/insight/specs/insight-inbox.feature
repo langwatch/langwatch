@@ -420,6 +420,13 @@ Feature: The insights inbox
       And the only item named Insights is Governance's own, which opens /governance/insights
 
     @integration
+    Scenario: The Governance side menu holds no Insights entry while its platform flag is loading
+      Given the release_insights and release_dashboards flags are on and a member with analytics:view
+      And the Governance platform flag has not answered yet
+      When they look at the Governance side menu
+      Then it holds no Insights entry, because it is not yet known which Insights item it lists
+
+    @integration
     Scenario: The Governance side menu pins Insights while it has no Insights page of its own
       Given the release_insights and release_dashboards flags are on and a member with analytics:view
       And the Governance platform pages are off

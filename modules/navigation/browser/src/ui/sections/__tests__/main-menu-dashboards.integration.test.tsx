@@ -272,7 +272,7 @@ describe("the Insights entry", () => {
       expect(bottom.queryByRole("link", { name: /Insights/ })).toBeNull();
     });
 
-    /** @scenario "The Governance side menu holds only its own Insights item" */
+    /** @scenario "The Governance side menu holds no Insights entry while its platform flag is loading" */
     it("pins nothing while the Governance platform flag is still loading", async () => {
       renderSidebar({
         surface: "governance",

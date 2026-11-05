@@ -114,7 +114,10 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
   },
 ];
 
-/** Governance's own Insights page; the shared sidebar entry steps aside while it is listed. */
+/**
+ * Governance's own Insights page; the shared sidebar entry steps aside while it is listed.
+ * Keep it the one shared instance: the sidebar compares by identity.
+ */
 export const governanceInsightsNavItem: SectionNavItemData = {
   label: "Insights",
   keywords: ["brief"],

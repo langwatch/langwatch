@@ -10,11 +10,13 @@ import { useMemo } from "react";
 
 import { type InsightHostProject, useInsightHost } from "../model/insight-host.ts";
 import { insightApi } from "./insight-api.ts";
-import { useInsightsShown } from "./use-insights-shown.ts";
+import { useInsightsUnavailable } from "./use-insights-shown.ts";
 
 export type InsightInboxReading = Readonly<{
   /** The one `useInsightsShown` rule: false means draw nothing and read nothing. */
   available: boolean;
+  /** Why nothing is available: the page names an aggregate project; "off" is left to the route. */
+  unavailable: "aggregate" | "off" | undefined;
   project: InsightHostProject | undefined;
   inbox: InsightInbox | undefined;
   /** The clock the folders were derived with, so rows print the same "today". */
@@ -27,7 +29,8 @@ export type InsightInboxReading = Readonly<{
 export function useInsightInbox(): InsightInboxReading {
   const host = useInsightHost();
   const project = host.project();
-  const available = useInsightsShown();
+  const unavailable = useInsightsUnavailable();
+  const available = unavailable === undefined;
   const query = insightApi.insights.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: available },
@@ -36,12 +39,13 @@ export function useInsightInbox(): InsightInboxReading {
     const now = nowInstant().epochMilliseconds;
     return {
       now,
-      inbox: query.data ? deriveInsightInbox({ entries: query.data, now }) : undefined,
+      inbox: available && query.data ? deriveInsightInbox({ entries: query.data, now }) : undefined,
     };
-  }, [query.data]);
+  }, [available, query.data]);
 
   return {
     available,
+    unavailable,
     project,
     inbox: derived.inbox,
     now: derived.now,

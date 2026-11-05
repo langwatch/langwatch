@@ -23,7 +23,6 @@ import {
   type InsightFolder,
   type InsightInbox,
 } from "@langwatch/insight-contract";
-import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { Inbox } from "lucide-react";
 import { useState } from "react";
 
@@ -119,7 +118,7 @@ function InboxBody({
       </VStack>
     );
   }
-  if (reading.project !== undefined && isAggregateProjectKind(reading.project.kind)) {
+  if (reading.unavailable === "aggregate") {
     return (
       <NoDataInfoBlock
         title="Insights are not available here"

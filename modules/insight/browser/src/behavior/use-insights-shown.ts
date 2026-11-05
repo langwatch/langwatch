@@ -8,13 +8,19 @@ import { isAggregateProjectKind } from "@langwatch/project-contract";
 
 import { useInsightHost } from "../model/insight-host.ts";
 
-export function useInsightsShown(): boolean {
+/**
+ * Why insight draws nothing: an aggregate project says so on the page; "off" is any other
+ * closed condition.
+ */
+export function useInsightsUnavailable(): "aggregate" | "off" | undefined {
   const host = useInsightHost();
   const project = host.project();
-  return (
-    project !== undefined &&
-    !isAggregateProjectKind(project.kind) &&
-    host.isEnabled() === true &&
-    host.hasPermission("analytics:view")
-  );
+  if (project !== undefined && isAggregateProjectKind(project.kind)) return "aggregate";
+  const shown =
+    project !== undefined && host.isEnabled() === true && host.hasPermission("analytics:view");
+  return shown ? undefined : "off";
+}
+
+export function useInsightsShown(): boolean {
+  return useInsightsUnavailable() === undefined;
 }

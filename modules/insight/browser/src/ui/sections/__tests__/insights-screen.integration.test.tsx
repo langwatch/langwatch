@@ -11,7 +11,12 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { insightEntry, renderWithInsightHost, StubInsightHost } from "../../../testing.tsx";
+import {
+  flushReads,
+  insightEntry,
+  renderWithInsightHost,
+  StubInsightHost,
+} from "../../../testing.tsx";
 import InsightsScreen from "../insights.screen.tsx";
 
 const HOUR_MS = 3_600_000;
@@ -59,7 +64,7 @@ describe("given a project with no insights", () => {
 describe("given an aggregate project, which files no insight", () => {
   describe("when a member opens Insights", () => {
     /** @scenario "An aggregate project's Insights page says insights are not available" */
-    it("says insights are not available here, reads nothing", () => {
+    it("says insights are not available here, reads nothing", async () => {
       const read = vi.fn<UiProcedureAnswer>(() => Promise.resolve([]));
       renderWithInsightHost({
         element: <InsightsScreen />,
@@ -72,6 +77,7 @@ describe("given an aggregate project, which files no insight", () => {
       expect(screen.getByTestId("insights-unavailable")).toHaveTextContent(
         "Insights are not available here",
       );
+      await flushReads();
       expect(read).not.toHaveBeenCalled();
     });
   });

@@ -3,7 +3,6 @@
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
-import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 
@@ -278,7 +277,7 @@ function SectionItemsNav({
   showExpanded: boolean;
 }) {
   const pathname = useNavigationHost().pathname();
-  const visibleItems = useVisibleSectionNavItems(items);
+  const { items: visibleItems } = useVisibleSectionNavItems(items);
   const ungrouped = visibleItems.filter((item) => item.group === undefined);
   const groups = new Map<string, SectionNavItemData[]>();
   for (const item of visibleItems) {
@@ -338,7 +337,6 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
 }
 
 const NO_SECTION_ITEMS: readonly SectionNavItemData[] = [];
-const FLAG_NOT_ASKED = { enabled: false, isLoading: false };
 
 /**
  * The one Insights entry, just above Settings in every product menu; Governance skips it while it
@@ -354,16 +352,12 @@ function InsightsMenuLink({
 }) {
   const host = useNavigationHost();
   const shown = useInsightsEntryShown();
-  const governanceItems = useVisibleSectionNavItems(
+  const governance = useVisibleSectionNavItems(
     surface === "governance" ? governanceNavItems : NO_SECTION_ITEMS,
   );
   // While Governance's flag loads its own Insights item is unknown, so show neither.
-  const governanceFlag =
-    surface === "governance"
-      ? host.featureFlag(FrontendFlags.release_ui_governance_billed_cost_enabled)
-      : FLAG_NOT_ASKED;
-  if (!shown || governanceFlag.isLoading) return null;
-  if (governanceItems.includes(governanceInsightsNavItem)) return null;
+  if (!shown || governance.isLoading) return null;
+  if (governance.items.includes(governanceInsightsNavItem)) return null;
   const destination = projectScopedDestination({
     path: projectNavItems.insights.path,
     label: projectNavItems.insights.title,
