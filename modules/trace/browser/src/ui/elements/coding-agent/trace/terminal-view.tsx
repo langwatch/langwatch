@@ -22,7 +22,6 @@ import {
 
 import { formatDurationSeconds } from "../../../../model/coding-agent/duration.ts";
 import {
-  PI_MARK_COLORS,
   TERMINAL_FONT_STACK,
   TERMINAL_TOKENS,
 } from "../../../../model/coding-agent/trace/terminal-palette.ts";
@@ -51,10 +50,12 @@ import { toolResultBodyToString } from "../../../../model/coding-agent/trace/too
 import {
   CLAUDE_MARK_GRADIENT,
   GEMINI_MARK_GRADIENT,
+  GROK_MARK_GREY,
   OPENCODE_GRAY,
   OPENCODE_GRAY_FILL,
   OPENCODE_WHITE,
   OPENCODE_WHITE_FILL,
+  PI_MARK_COLORS,
 } from "../../../../model/explorer/ai/ai-brand-palette.ts";
 import { TerminalDiff } from "./terminal-diff.tsx";
 import { TerminalOutput } from "./terminal-output.tsx";
@@ -1009,7 +1010,7 @@ const AGENT_BANNERS: Record<SessionBanner["agent"], { name: string; mark: MarkSp
         "⠀⢀⠞⠁⠠⢶⣶⣶⣶⠿⠋⠀⠀⠀",
         "⠐⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
       ],
-      "#6c6c6c",
+      GROK_MARK_GREY,
     ),
   },
   unknown: {

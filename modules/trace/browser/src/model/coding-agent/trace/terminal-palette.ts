@@ -39,10 +39,3 @@ export const DIFF_TOKENS = {
   removeBg: "bg.error",
   removeFg: "fg.error",
 } as const;
-
-/** pi's mark colours, from its official logo (apps/ui/public/images/external-icons/pi.svg). */
-export const PI_MARK_COLORS = {
-  coral: "#F09082",
-  blue: "#4D9ABF",
-  yellow: "#F1BE58",
-} as const;
