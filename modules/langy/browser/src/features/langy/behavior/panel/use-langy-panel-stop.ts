@@ -74,7 +74,7 @@ export function useLangyPanelStop({
         .then(
           () => {
             // Scoped to the stopped turn, so it holds even when the tab has moved on.
-            useLangyLocalControlStore.getState().cancelTurnQuestions({
+            useLangyLocalControlStore.getState().cancelTurnWaits({
               conversationId: target.conversationId,
               turnId: target.turnId,
             });

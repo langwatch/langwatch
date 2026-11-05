@@ -197,6 +197,15 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Then the permission card offers no answers any more
     And it says it was cancelled with the turn
 
+  # A failure ending one card must not strand the rest, or a waiting command hangs
+  # until its own timeout.
+  @unit
+  Scenario: One card that fails to end on Stop leaves the turn's other cards ending
+    Given a stopped turn has two waiting cards and ending one of them fails
+    When the turn is stopped
+    Then the other card still ends
+    And a waiting command still gets its expired answer
+
   # The server leaves a confirmation card the platform raised answerable after Stop,
   # since its click is read in a later turn; the live tab must not lock it either.
   @integration

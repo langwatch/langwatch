@@ -43,16 +43,17 @@ const { LangyLocalPermissionCard } =
   await import("../../ui/sections/langy-local-permission-card.tsx");
 
 /** The live wait a worker command put up, as the transport records it: tied to the tool call. */
-function recordLivePermission({ turnId, toolCallId }: { turnId: string; toolCallId: string }) {
+function recordLivePermission({ turnId, toolCallId }: { turnId: string; toolCallId?: string }) {
+  const id = toolCallId ?? "no-call";
   useLangyLocalControlStore.getState().recordWait({
     conversationId: "conv-1",
     wait: {
-      waitId: `wait-${toolCallId}`,
+      waitId: `wait-${id}`,
       kind: "permission",
       status: "pending",
       toolCallId,
       turnId,
-      callId: `local-${toolCallId}`,
+      callId: `local-${id}`,
       summary: "pnpm typecheck",
       pattern: "pnpm *",
       patterns: ["pnpm *"],
@@ -138,6 +139,26 @@ describe("a live permission card when Stop is answered", () => {
         expect(invalidateMessages).toHaveBeenCalled();
         expect(isAnswerable()).toBe(false);
         expect(screen.getByText("Cancelled with the turn")).toBeDefined();
+      });
+    });
+
+    describe("when the permission carries no tool call id", () => {
+      it("still takes the answers off the card: a permission is no confirmation", async () => {
+        recordLivePermission({ turnId: "turn-1" });
+        renderLive();
+        const { result } = renderHook(() =>
+          useLangyPanelStop({
+            projectId: "proj-1",
+            foldInFlightTurnId: null,
+            stop: async () => {},
+          }),
+        );
+        expect(isAnswerable()).toBe(true);
+
+        act(() => result.current());
+        await answerStop();
+
+        expect(isAnswerable()).toBe(false);
       });
     });
   });
