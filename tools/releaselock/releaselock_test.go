@@ -1,6 +1,7 @@
 package releaselock_test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,9 +75,12 @@ func TestExtraFilesProblems(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, err := releaselock.ExtraFilesProblems(config(tc.extra, ""), sdk)
-			if err != nil || len(got) != tc.want {
-				t.Fatalf("got %v, %v; want %d problems", got, err, tc.want)
+			var cfg releaselock.Config
+			if err := json.Unmarshal([]byte(config(tc.extra, "")), &cfg); err != nil {
+				t.Fatal(err)
+			}
+			if got := releaselock.ExtraFilesProblems(cfg, sdk); len(got) != tc.want {
+				t.Fatalf("got %v; want %d problems", got, tc.want)
 			}
 		})
 	}
@@ -106,6 +110,15 @@ func TestLockBehindReleaseFails(t *testing.T) {
 		}
 		if strings.Contains(got, "out of step") {
 			t.Fatalf("drift must not be reported as a lock problem: %q", got)
+		}
+	})
+	t.Run("lock ahead of pyproject with the manifest disagreeing", func(t *testing.T) {
+		files := inStep()
+		files.Lock = lock(lockBlock("langwatch", "1.6.0", "sdks/python"), lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"))
+		files.Manifest = manifest("1.5.0", "1.0.1")
+		got := problemsOf(t, files)
+		if !strings.Contains(got, `"1.5.0"`) || strings.Contains(got, "run `uv lock`") {
+			t.Fatalf("got %q, want the drift only, with no uv lock advice", got)
 		}
 	})
 }
@@ -180,5 +193,62 @@ func TestCheckReadsRepositoryFiles(t *testing.T) {
 	write("uv.lock", lock(lockBlock("langwatch", "1.3.0", "sdks/python"), lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python")))
 	if got, err := releaselock.Check(root); err != nil || len(got) != 1 {
 		t.Fatalf("got %v, %v; want one problem", got, err)
+	}
+}
+
+// @scenario "Manifest drift is reported without lock advice"
+func TestManifestDriftHasNoLockAdvice(t *testing.T) {
+	files := inStep()
+	files.Pyprojects["sdks/python"] = pyproject("1.5.0")
+	got := problemsOf(t, files)
+	if !strings.Contains(got, `"1.5.0"`) || !strings.Contains(got, `"1.4.0"`) || strings.Contains(got, "run `uv lock`") || strings.Contains(got, "out of step") {
+		t.Fatalf("got %q, want the drift only", got)
+	}
+}
+
+// @scenario "A package missing from the release manifest fails the check"
+func TestMissingManifestKeyFails(t *testing.T) {
+	files := inStep()
+	files.Manifest = `{"packages/ksuid-python":"1.0.1"}`
+	got := problemsOf(t, files)
+	if !strings.Contains(got, "no \"sdks/python\" key") || strings.Contains(got, "cannot fix") {
+		t.Fatalf("got %q, want the missing-key problem", got)
+	}
+}
+
+// @scenario "A missing or duplicate uv.lock entry fails the check"
+func TestLockEntryCountFails(t *testing.T) {
+	cases := map[string]string{
+		"none":      lock(lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python")),
+		"duplicate": lock(lockBlock("langwatch", "1.4.0", "sdks/python"), lockBlock("langwatch", "1.4.0", "sdks/python"), lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python")),
+	}
+	for name, lockContent := range cases {
+		t.Run(name, func(t *testing.T) {
+			files := inStep()
+			files.Lock = lockContent
+			got := problemsOf(t, files)
+			if !strings.Contains(got, "packages named langwatch") || strings.Contains(got, "run `uv lock`") {
+				t.Fatalf("got %q, want the count problem without uv lock advice", got)
+			}
+		})
+	}
+}
+
+// @scenario "A non-editable uv.lock entry fails the check"
+func TestNonEditableLockEntryFails(t *testing.T) {
+	files := inStep()
+	files.Lock = lock(lockBlock("langwatch", "1.4.0", "elsewhere"), lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"))
+	got := problemsOf(t, files)
+	if !strings.Contains(got, "not the editable sdks/python package") || strings.Contains(got, "run `uv lock`") {
+		t.Fatalf("got %q, want the non-editable problem without uv lock advice", got)
+	}
+}
+
+// @scenario "A multi-line workspace members list fails the check"
+func TestMultiLineMembersFails(t *testing.T) {
+	files := inStep()
+	files.RootPyproject = "[tool.uv.workspace]\nmembers = [\n  \"sdks/python\",\n  \"packages/ksuid-python\",\n]\n"
+	if got := problemsOf(t, files); !strings.Contains(got, "no one-line") {
+		t.Fatalf("got %q, want the members-list problem", got)
 	}
 }

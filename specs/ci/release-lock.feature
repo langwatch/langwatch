@@ -19,7 +19,7 @@ Feature: A Python package release keeps uv.lock in step
   Scenario: A lock behind the release version fails the check
     Given the package entry in uv.lock differs from pyproject.toml or the release manifest
     Then the guard fails and names both versions
-    And it tells the developer to run `uv lock` only when pyproject.toml is ahead of the lock
+    And it tells the developer to run `uv lock` only when pyproject.toml equals the release manifest and the lock differs
 
   @unit
   Scenario: A lock in step passes
@@ -45,3 +45,29 @@ Feature: A Python package release keeps uv.lock in step
   Scenario: The guard reads the repository files
     Given a repository root holding the config, manifest, pyprojects and uv.lock
     Then the guard reads them from disk and reports the problems in them
+
+  @unit
+  Scenario: Manifest drift is reported without lock advice
+    Given pyproject.toml and the release manifest disagree, whatever the lock holds
+    Then the guard reports only that drift, with both versions
+    And it does not tell the developer to run `uv lock`
+
+  @unit
+  Scenario: A package missing from the release manifest fails the check
+    Given the release manifest has no key for a workspace package
+    Then the guard says the key is missing
+
+  @unit
+  Scenario: A missing or duplicate uv.lock entry fails the check
+    Given uv.lock holds no entry or two entries for a workspace package
+    Then the guard reports the count and does not suggest `uv lock`
+
+  @unit
+  Scenario: A non-editable uv.lock entry fails the check
+    Given the uv.lock entry for a workspace package is not its editable source
+    Then the guard says it is not the editable package and does not suggest `uv lock`
+
+  @unit
+  Scenario: A multi-line workspace members list fails the check
+    Given the root pyproject.toml writes its uv workspace members over several lines
+    Then the guard says it cannot read the members list
