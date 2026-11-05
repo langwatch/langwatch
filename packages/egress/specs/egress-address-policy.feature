@@ -87,6 +87,12 @@ Feature: Egress address policy and the pinned fetch
     And the error does not repeat the proxy's credentials
 
   @unit
+  Scenario: A proxy whose hostname does not resolve is named as the failure
+    Given an outbound proxy setting whose hostname does not resolve
+    When a destination the policy admitted is fetched through it
+    Then the fetch fails with an error naming the proxy's host, not the destination
+
+  @unit
   Scenario: A proxy that refuses the tunnel is named as the failure
     Given an outbound proxy that answers a tunnel request with 407
     When an https destination the policy admitted is fetched through it

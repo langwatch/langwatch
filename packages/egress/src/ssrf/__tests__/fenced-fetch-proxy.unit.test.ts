@@ -199,6 +199,21 @@ describe("the pinned fetch with an outbound proxy", () => {
     });
   });
 
+  describe("given a proxy whose hostname does not resolve", () => {
+    /** @scenario "A proxy whose hostname does not resolve is named as the failure" */
+    it("fails naming the proxy's host, not the destination", async () => {
+      const failure = await fetchValidatedDestination(
+        httpsHop(),
+        { proxy: { httpsProxy: "http://proxy.invalid:3128" } },
+        tls,
+      ).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(OutboundProxyUnreachableError);
+      expect((failure as Error).message).toContain("proxy.invalid:3128");
+      expect((failure as Error).message).not.toMatch(/idp\.example\.test/);
+    });
+  });
+
   describe("given a proxy that refuses the tunnel", () => {
     /** @scenario "A proxy that refuses the tunnel is named as the failure" */
     it("fails naming the proxy, not the destination", async () => {
