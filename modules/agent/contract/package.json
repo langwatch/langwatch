@@ -21,6 +21,10 @@
     "./http-test": {
       "types": "./dist/http-test.d.ts",
       "default": "./src/http-test.ts"
+    },
+    "./hooks-url": {
+      "types": "./dist/hooks-url.d.ts",
+      "default": "./src/hooks-url.ts"
     }
   },
   "scripts": {

@@ -7,10 +7,10 @@
 
 import {
   isPreviousSigningSecretOpen,
-  readHooksOrigin,
   STATE_MAX_BYTES,
   type PreviousSigningSecret,
 } from "@langwatch/agent-contract";
+import { readHooksOrigin } from "@langwatch/agent-contract/hooks-url";
 import {
   isPrivateOrLocalhostIP,
   type SsrfValidationResult,

@@ -5,10 +5,10 @@ import {
   httpAgentConfigSchema,
   AgentHooksUrlTemplatedOriginError,
   AgentStoredCredentialsDestinationError,
-  templatesHooksOrigin,
   type CreateAgentCommand,
   type UpdateAgentCommand,
 } from "@langwatch/agent-contract";
+import { templatesHooksOrigin } from "@langwatch/agent-contract/hooks-url";
 import { createLogger } from "@langwatch/observability";
 import type { SecretApi } from "@langwatch/secret-contract";
 
