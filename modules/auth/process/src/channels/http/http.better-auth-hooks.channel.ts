@@ -134,11 +134,13 @@ const announceSsoAutoJoin = ({
   user,
   org,
   inviteId,
+  role,
 }: {
   announcements: BetterAuthAnnouncements;
   user: { id: string; email: string; name: string };
   org: { id: string; name: string };
   inviteId: string | null;
+  role: string;
 }): void => {
   logger.info(
     { userId: user.id, organizationId: org.id, inviteId },
@@ -157,6 +159,7 @@ const announceSsoAutoJoin = ({
     userId: user.id,
     organizationId: org.id,
     organizationName: org.name,
+    role,
   });
 };
 
@@ -182,7 +185,7 @@ const joinSsoOrganization = async ({
   });
 
   if (invite.applied) {
-    announceSsoAutoJoin({ announcements, user, org, inviteId: invite.inviteId });
+    announceSsoAutoJoin({ announcements, user, org, inviteId: invite.inviteId, role: invite.role });
     return;
   }
 
@@ -214,7 +217,7 @@ const joinSsoOrganization = async ({
     );
     return;
   }
-  announceSsoAutoJoin({ announcements, user, org, inviteId: null });
+  announceSsoAutoJoin({ announcements, user, org, inviteId: null, role: admission.seat });
 };
 
 /**

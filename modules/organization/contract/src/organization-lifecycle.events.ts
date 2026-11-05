@@ -88,6 +88,8 @@ const inviteAcceptedEventDataSchemaDefinition = z.object({
   ...envelope,
   inviteId: z.string().min(1),
   organizationName: z.string(),
+  /** The role the invitation granted; absent on events stored before it was recorded. */
+  role: z.string().optional(),
 });
 export interface InviteAcceptedEventDataSchema extends Named<
   typeof inviteAcceptedEventDataSchemaDefinition

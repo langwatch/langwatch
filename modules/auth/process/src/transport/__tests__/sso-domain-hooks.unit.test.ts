@@ -68,7 +68,7 @@ function pendingInvites(inviteId: string) {
   return {
     applyPendingInvite: vi
       .fn<OrganizationApi["applyPendingInvite"]>()
-      .mockResolvedValue({ applied: true, inviteId }),
+      .mockResolvedValue({ applied: true, inviteId, role: "MEMBER" }),
   };
 }
 
