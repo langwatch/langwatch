@@ -45,11 +45,11 @@ Feature: The runtime-dependencies policy
     Then it reports nothing
 
   @unit
-  Scenario: An optional peer is not installed at runtime
+  Scenario: An optional peer the image install keeps passes
     Given the process package lists "zod" in peerDependencies, marked optional
     And the process package's service value-imports "zod"
     When the runtime-dependencies policy runs over the workspace
-    Then it reports the service file and its import of "zod"
+    Then it reports nothing
 
   @unit
   Scenario: A recipe written as --filter-prod=<package> is read

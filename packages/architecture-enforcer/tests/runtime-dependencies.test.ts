@@ -179,16 +179,14 @@ describe("lintRuntimeDependencies", () => {
     expect(findings()).toEqual([]);
   });
 
-  /** @scenario "An optional peer is not installed at runtime" */
-  it("reports a value import of an optional peer", () => {
+  /** @scenario "An optional peer the image install keeps passes" */
+  it("passes a value import of an optional peer, which pnpm 12 installs", () => {
     peerProcess({
       peerDependencies: { zod: "*" },
       peerDependenciesMeta: { zod: { optional: true } },
     });
 
-    expect(findings()).toEqual([
-      { file: "modules/dataset/process/src/index.ts", specifier: "zod" },
-    ]);
+    expect(findings()).toEqual([]);
   });
 
   /** @scenario "A recipe written as --filter-prod=<package> is read" */

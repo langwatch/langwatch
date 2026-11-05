@@ -115,11 +115,8 @@ function devOnlyOf({
   const known = cache.get(record.manifestPath);
   if (known) return known;
   const manifest: PackageManifest = JSON.parse(sourceText({ file: record.manifestPath }));
-  // pnpm never installs an optional peer, and the image strips the dev-tool peers.
-  const optional = manifest.peerDependenciesMeta ?? {};
-  const peers = Object.keys(manifest.peerDependencies ?? {}).filter(
-    (name) => !stripped.has(name) && optional[name]?.optional !== true,
-  );
+  // pnpm 12 installs a workspace package's peers, optional ones too, unless the image strips them.
+  const peers = Object.keys(manifest.peerDependencies ?? {}).filter((name) => !stripped.has(name));
   const runtime = new Set([
     ...Object.keys(manifest.dependencies ?? {}),
     ...Object.keys(manifest.optionalDependencies ?? {}),
