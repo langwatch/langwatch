@@ -1,5 +1,9 @@
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
-import { AI_TOOL_STARTER_TILES } from "@langwatch/enterprise-governance-contract";
+import {
+  AI_TOOL_STARTER_TILES,
+  ASSISTANT_KIND_TO_TOOL_SLUG,
+  PLATFORM_TOOL_POLICY_DEFAULTS,
+} from "@langwatch/enterprise-governance-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -123,6 +127,35 @@ describe("DefaultGovernanceAiToolCatalogService", () => {
 
       expect(policy).toEqual({ allowVk: false, allowOtelDirect: true });
     });
+  });
+
+  describe("given a tile of each kind that stores both paths on", () => {
+    it.each(Object.entries(ASSISTANT_KIND_TO_TOOL_SLUG))(
+      "resolves %s to no path its platform default turns off",
+      async (kind, slug) => {
+        const { catalogue } = world();
+        await catalogue.create({
+          organizationId: ORG,
+          departmentIds: [],
+          type: "coding_assistant",
+          displayName: kind,
+          config: {
+            assistantKind: kind,
+            setupCommand: `langwatch ${slug}`,
+            allowVk: true,
+            allowOtelDirect: true,
+          },
+        });
+
+        const policy = await catalogue.resolveToolPolicy({
+          organizationId: ORG,
+          userId: "user",
+          slug: slug!,
+        });
+
+        expect(policy).toEqual(PLATFORM_TOOL_POLICY_DEFAULTS[slug!]);
+      },
+    );
   });
 
   describe("when an admin creates a tile", () => {
