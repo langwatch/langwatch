@@ -152,3 +152,57 @@ Feature: Coding-agent session signals reach Customer.io
   Scenario: The new signals reach Customer.io only
     When any of the six new signals is delivered
     Then PostHog receives nothing
+
+  # A person's own coding facts: set only on the profile of a personal project's
+  # owner. A shared project's stored session names no LangWatch user, so it sets
+  # no own fact for anyone.
+
+  @unit
+  Scenario: A personal project's session tells only its owner own_coding_last_session_at
+    Given project-1 is the personal project of member-2, and admin-1 is also a member
+    When coding-agent stores a session for project-1
+    Then one own-session signal names member-2
+    And admin-1 gets no own-session signal
+
+  @unit
+  Scenario: A session in another member's personal project sets only that member's own traits
+    Given project-1 is the personal project of admin-1 and project-2 that of member-2
+    When coding-agent stores a session for project-2
+    Then the own-session signal names member-2 only
+
+  @unit
+  Scenario: A shared project's session sets no own coding trait
+    Given project-1 is a shared project
+    When coding-agent stores a session for project-1
+    Then no own-session signal is raised
+
+  @unit
+  Scenario: A deactivated owner gets no own coding trait
+    Given project-1 is the personal project of a person who is not an active member
+    When coding-agent stores a session for project-1
+    Then no own-session signal is raised
+
+  @unit
+  Scenario: Own session updates are debounced per person for 300 seconds
+    When the owner's sessions from two projects are delivered inside 300 seconds
+    Then Customer.io identifies own_coding_last_session_at on the owner once
+
+  @unit
+  Scenario: A person's own first session is set once across organizations
+    Given the owner's first own session was delivered
+    When a session of the owner's personal project in another organization is delivered later
+    Then own_coding_first_session_at keeps the first recorded time
+    And own_coding_last_session_at moves to the later time
+
+  @unit
+  Scenario: Own coding traits reach Customer.io only, with no event
+    When an own-session signal is delivered
+    Then PostHog receives nothing
+    And Customer.io tracks no event
+
+  @unit
+  Scenario: A failed first-session send gives its claim back
+    Given Customer.io rejects the owner's own_coding_first_session_at
+    When an own-session signal is delivered
+    Then the owner's first-session claim is given back
+    And the owner's next session sets own_coding_first_session_at

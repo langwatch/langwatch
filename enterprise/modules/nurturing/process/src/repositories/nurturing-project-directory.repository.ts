@@ -13,6 +13,8 @@ export type NurturingProjectPlacement =
 export interface NurturingProjectDirectoryRepository {
   /** Unknown is an answer: nurturing counts nothing for a project its owners do not hold. */
   getPlacement(input: Readonly<{ projectId: string }>): Promise<NurturingProjectPlacement>;
+  /** The owner of a personal project, as one id; none for a shared or unknown project. */
+  findPersonalOwnerUserIds(input: Readonly<{ projectId: string }>): Promise<string[]>;
   /** The organization's earliest project, archived ones included, through its teams. */
   getFirstProjectCreatedAt(
     input: Readonly<{ organizationId: string }>,

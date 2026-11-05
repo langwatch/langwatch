@@ -87,3 +87,29 @@ export function fireCodingOrApp(signal: CodingOrAppSignal): CioBatchCall[] {
     }
   }
 }
+
+/** own_coding_last_session_at: the person's latest own session. */
+export function fireOwnCodingLastSession(
+  signal: NurturingSignalOf<"own_coding_session_stored">,
+): CioBatchCall[] {
+  return [
+    {
+      type: "identify",
+      userId: signal.userId,
+      traits: { own_coding_last_session_at: unixSecondsOf(signal.occurredAt) },
+    },
+  ];
+}
+
+/** own_coding_first_session_at, first recorded across orgs, set once: only the claim's winner. */
+export function fireOwnCodingFirstSession(
+  signal: NurturingSignalOf<"own_coding_session_stored">,
+): CioBatchCall[] {
+  return [
+    {
+      type: "identify",
+      userId: signal.userId,
+      traits: { own_coding_first_session_at: unixSecondsOf(signal.firstOccurredAt) },
+    },
+  ];
+}

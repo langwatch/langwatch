@@ -95,3 +95,40 @@ export function codingAgentFirstSessionSignal({
     memberUserIds: [...memberUserIds],
   };
 }
+
+/**
+ * Who a session is the person's own for: a personal project's owner while an active member of
+ * its organization (langwatch/tasks#1097: no updates for the deactivated). A shared project has
+ * no owner, and its stored session names no LangWatch user, so it tells no one.
+ */
+export function ownCodingSessionRecipients({
+  personalOwnerUserIds,
+  activeMemberUserIds,
+}: Readonly<{
+  personalOwnerUserIds: readonly string[];
+  activeMemberUserIds: readonly string[];
+}>): string[] {
+  const active = new Set(activeMemberUserIds);
+  return personalOwnerUserIds.filter((userId) => active.has(userId));
+}
+
+/** The owner's latest session of a batch, and its earliest should no first be recorded yet. */
+export function ownCodingSessionStoredSignal({
+  latest,
+  earliest,
+  userId,
+}: Readonly<{
+  latest: CodingAgentSessionStoredEventData;
+  earliest: CodingAgentSessionStoredEventData;
+  userId: string;
+}>): NurturingSignalOf<"own_coding_session_stored"> {
+  return {
+    kind: "own_coding_session_stored",
+    sourceEventId: `${userId}:${latest.projectId}:${latest.sessionId}:${latest.occurredAt}`,
+    tenantId: latest.tenantId,
+    occurredAt: latest.occurredAt,
+    userId,
+    projectId: latest.projectId,
+    firstOccurredAt: earliest.occurredAt,
+  };
+}
