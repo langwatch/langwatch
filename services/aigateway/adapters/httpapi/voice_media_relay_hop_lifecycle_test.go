@@ -500,8 +500,8 @@ func TestOversizedFrameFromTheWorkerThroughTheHopClosesTheRelayWith1009(t *testi
 		code, _ := fromRelay.ended(t, 3*time.Second)
 		assert.Equal(t, websocket.StatusMessageTooBig, code)
 	})
-	t.Run("Twilio's socket is closed with 1000", func(t *testing.T) {
+	t.Run("Twilio's socket is closed with 1009", func(t *testing.T) {
 		code, _ := fromTwilio.ended(t, 3*time.Second)
-		assert.Equal(t, websocket.StatusNormalClosure, code)
+		assert.Equal(t, websocket.StatusMessageTooBig, code)
 	})
 }
