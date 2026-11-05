@@ -566,7 +566,9 @@ export default function ApiKeysScreen() {
   };
 
   // The token dialog's project picker: the projects the shown key's grants reach.
-  const shownKeyBindings = rotatedKey ? rotatedKey.grants : newKeyInput?.bindings;
+  const shownKeyBindings: { scopeType: string; scopeId: string }[] | undefined = rotatedKey
+    ? rotatedKey.grants
+    : newKeyInput?.bindings;
   const canModifyKey = (apiKeyRow: ApiKeyRow) => isAdmin || apiKeyRow.userId === currentUserId;
 
   // Confirming revokes the legacy key, then opens the create drawer filled with

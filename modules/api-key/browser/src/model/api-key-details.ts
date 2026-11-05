@@ -21,12 +21,12 @@ export function restrictedCategoryAccess({ apiKey }: { apiKey: DetailsKey }): Ca
     getTeamRolePermissions: teamRolePermissions,
   });
 
-  return PERMISSION_CATEGORIES.flatMap((category) => {
+  return PERMISSION_CATEGORIES.flatMap((category): CategoryAccess[] => {
     const selection = selections[category.key];
-    if (selection === "write")
-      return [{ key: category.key, label: category.label, access: "Read and write" as const }];
-    if (selection === "read")
-      return [{ key: category.key, label: category.label, access: "Read" as const }];
+    if (selection === "write") {
+      return [{ key: category.key, label: category.label, access: "Read and write" }];
+    }
+    if (selection === "read") return [{ key: category.key, label: category.label, access: "Read" }];
     return [];
   });
 }
