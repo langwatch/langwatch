@@ -3,10 +3,31 @@
  */
 
 import { defineBrowserVitestConfig } from "@langwatch/vitest-config/browser";
-import { mergeConfig } from "vitest/config";
+import { mergeConfig, type Plugin } from "vitest/config";
 
-// The shader package is only reached through a mocked import, so the optimiser finds it
-// after the first run starts, reloads, and fails the file on a cold cache.
-export default mergeConfig(defineBrowserVitestConfig(), {
-  optimizeDeps: { include: ["@paper-design/shaders-react"] },
-});
+const diagnose: Plugin = {
+  name: "diag-failed-requests",
+  configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      res.on("finish", () => {
+        if (res.statusCode < 400) return;
+        const url = req.url ?? "";
+        process.stderr.write(`[diag] ${res.statusCode} ${url}\n`);
+        server
+          .transformRequest(url.replace(/[?&]import\b/, ""))
+          .then((r) => process.stderr.write(`[diag] retransform ok ${url} ${r ? r.code.length : "null"}\n`))
+          .catch((e: unknown) =>
+            process.stderr.write(`[diag] retransform error ${url}: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}\n`),
+          );
+      });
+      next();
+    });
+    const origError = server.config.logger.error;
+    server.config.logger.error = (msg, opts) => {
+      process.stderr.write(`[diag] logger.error ${msg} ${opts?.error?.stack ?? ""}\n`);
+      origError(msg, opts);
+    };
+  },
+};
+
+export default mergeConfig(defineBrowserVitestConfig(), { plugins: [diagnose] });
