@@ -78,6 +78,7 @@ A job running pi headless writes the extension first, then sets the variables on
       - run: pi -p "Update the dependency table in README.md"
         env:
           OTEL_TRACES_EXPORTER: otlp
+          OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true"
           OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
           OTEL_EXPORTER_OTLP_ENDPOINT: https://app.langwatch.ai/api/otel
           OTEL_EXPORTER_OTLP_HEADERS: Authorization=Bearer ${{ secrets.LANGWATCH_INGEST_KEY }}
