@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { OrganizationUserRole } from "@langwatch/organization-contract";
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -10,12 +11,21 @@ type Joined = Pick<
   "userId" | "organizationId" | "organizationName" | "role"
 >;
 
-const SEAT_BY_ROLE: Readonly<Record<string, string>> = {
+/** Keyed by every role, so a new OrganizationUserRole fails the compile until it is named here. */
+const SEAT_BY_ROLE: Readonly<Record<OrganizationUserRole, string>> = {
   ADMIN: "admin",
   MEMBER: "member",
   EXTERNAL: "lite_member",
   DEVELOPER: "developer",
 };
+
+/**
+ * The Customer.io seat name for a stored role. The stored field stays a plain string so old or
+ * unknown events still parse; a role we cannot name is left out rather than guessed.
+ */
+function seatFor(role: string | undefined): string | undefined {
+  return role ? (SEAT_BY_ROLE as Readonly<Record<string, string>>)[role] : undefined;
+}
 
 /** Groups the person into the organization they joined and tracks how they came in. */
 function joinedCalls({
@@ -26,8 +36,7 @@ function joinedCalls({
   event: "joined_via_invite" | "joined_via_sso";
 }): CioBatchCall[] {
   const { userId, organizationId, organizationName, role } = joined;
-  // Customer.io campaigns branch on the seat; a role we cannot name is left out rather than guessed.
-  const seat = role ? SEAT_BY_ROLE[role] : undefined;
+  const seat = seatFor(role);
   return [
     { type: "group", userId, groupId: organizationId, traits: { name: organizationName } },
     {

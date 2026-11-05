@@ -177,7 +177,7 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     userId: id,
     organizationId: id,
     organizationName: z.string(),
-    /** The role the person joined with, an OrganizationUserRole; absent on older events. */
+    /** The OrganizationUserRole joined with; absent on events stored before it was recorded. */
     role: z.string().optional(),
   }),
   z.object({
@@ -186,6 +186,7 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     userId: id,
     organizationId: id,
     organizationName: z.string(),
+    /** The OrganizationUserRole joined with; absent on events stored before it was recorded. */
     role: z.string().optional(),
   }),
   z.object({
