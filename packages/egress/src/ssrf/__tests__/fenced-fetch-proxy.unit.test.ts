@@ -182,6 +182,66 @@ describe("the pinned fetch with an outbound proxy", () => {
     });
   });
 
+  describe("given HTTP_PROXY and HTTPS_PROXY naming different proxies", () => {
+    /** @scenario "The proxy is chosen by the destination's scheme" */
+    it("sends an http destination through HTTP_PROXY", async () => {
+      const closedPort = await portNothingListensOn();
+      const validated = admitted({
+        hostname: "idp.example.test",
+        port: originPort,
+        path: "/",
+        resolvedIp: UNREACHABLE_IP,
+      });
+
+      const response = await fetchValidatedDestination(
+        validated,
+        { proxy: { httpProxy: proxyUrl, httpsProxy: `http://127.0.0.1:${closedPort}` } },
+        tls,
+      );
+
+      await expect(response.text()).resolves.toBe("from origin");
+      expect(tunnelled).toEqual([`idp.example.test:${originPort}`]);
+    });
+
+    /** @scenario "The proxy is chosen by the destination's scheme" */
+    it("sends an https destination through HTTPS_PROXY", async () => {
+      const closedPort = await portNothingListensOn();
+
+      const failure = await fetchValidatedDestination(
+        httpsHop(),
+        { proxy: { httpProxy: proxyUrl, httpsProxy: `http://127.0.0.1:${closedPort}` } },
+        tls,
+      ).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(OutboundProxyUnreachableError);
+      expect((failure as Error).message).toContain(`127.0.0.1:${closedPort}`);
+      expect(tunnelled).toEqual([]);
+    });
+
+    /** @scenario "The proxy is chosen by the destination's scheme" */
+    it("sends either scheme through the one proxy that is set", async () => {
+      const response = await fetchValidatedDestination(
+        admitted({
+          hostname: "idp.example.test",
+          port: originPort,
+          path: "/",
+          resolvedIp: UNREACHABLE_IP,
+        }),
+        { proxy: { httpsProxy: proxyUrl } },
+        tls,
+      );
+      await expect(response.text()).resolves.toBe("from origin");
+
+      await fetchValidatedDestination(httpsHop(), { proxy: { httpProxy: proxyUrl } }, tls).catch(
+        () => undefined,
+      );
+      expect(tunnelled).toEqual([
+        `idp.example.test:${originPort}`,
+        `idp.example.test:${originPort}`,
+      ]);
+    });
+  });
+
   describe("given a proxy that cannot be reached", () => {
     /** @scenario "A proxy that cannot be reached is named as the failure, not the destination" */
     it("fails naming the proxy's host, without its credentials", async () => {

@@ -54,6 +54,16 @@ Feature: Egress address policy and the pinned fetch
     Then the request is sent through the proxy, not to the judged address
 
   @unit
+  Scenario: The proxy is chosen by the destination's scheme
+    Given HTTP_PROXY and HTTPS_PROXY name different proxies
+    When an http destination the policy admitted is fetched
+    Then the request leaves through the HTTP_PROXY proxy
+    When an https destination the policy admitted is fetched
+    Then the request leaves through the HTTPS_PROXY proxy
+    When only one of the two is set
+    Then destinations of either scheme leave through it
+
+  @unit
   Scenario: A destination the proxy exclusions name is reached directly
     Given an outbound proxy is configured and NO_PROXY names a destination's host
     When that destination is fetched

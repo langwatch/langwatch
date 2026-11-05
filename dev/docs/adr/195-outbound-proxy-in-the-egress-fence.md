@@ -73,8 +73,11 @@ guaranteed to be the one connected to, so the DNS rebinding protection does not
 hold for that hop, nor does the connect-time metadata refusal. The operator runs
 the proxy and decides what it may reach, so the SSO docs tell them to make the
 proxy refuse every address that is not public (loopback, private, link-local and
-metadata) itself. This applies to every install that already sets `HTTPS_PROXY`,
-not only ones set up for SSO. Unproxied hops keep the pin.
+metadata) itself. This applies to every install that already sets `HTTPS_PROXY`
+or `HTTP_PROXY`, not only ones set up for SSO. Unproxied hops keep the pin.
+
+A hop takes the proxy for its own scheme: `HTTP_PROXY` for `http:`,
+`HTTPS_PROXY` for `https:`, each falling back to the other when unset.
 
 The judgement still needs the install's own resolver. A public SSO destination
 whose name does not resolve locally is refused, proxy or not.

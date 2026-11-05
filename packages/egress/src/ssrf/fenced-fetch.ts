@@ -11,7 +11,7 @@ import {
   fetch as undiciFetch,
 } from "undici";
 
-import { type OutboundProxyConfig, resolveProxyForHost } from "../proxy/outbound-proxy.ts";
+import { type OutboundProxyConfig, resolveProxyForDestination } from "../proxy/outbound-proxy.ts";
 import { classify } from "./address.ts";
 import {
   redactUrlForLog,
@@ -242,8 +242,8 @@ function createProxyAgent({
 }
 
 /**
- * How this hop travels: through the proxy when one applies to its host, else
- * pinned. The policy has already judged the hop; the proxy only carries it and
+ * How this hop travels: through the proxy for its scheme when one applies to
+ * its host, else pinned. The policy has already judged the hop; the proxy only carries it and
  * resolves the name itself, so the operator's proxy owns that address.
  */
 function createDispatcher({
@@ -258,7 +258,11 @@ function createDispatcher({
   const timeouts = resolveAgentTimeouts(init);
   const proxyUrl =
     init?.proxy && !init.bypassProxy?.(validated)
-      ? resolveProxyForHost(init.proxy, validated.hostname)
+      ? resolveProxyForDestination({
+          config: init.proxy,
+          hostname: validated.hostname,
+          protocol: validated.protocol,
+        })
       : undefined;
   if (proxyUrl) {
     logger.debug(
