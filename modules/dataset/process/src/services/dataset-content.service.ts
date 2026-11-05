@@ -16,12 +16,13 @@ import {
   DatasetChunkCountMissingError,
   DatasetNotReadyError,
   DatasetTooLargeToSearchError,
+  DuplicateRecordIdError,
   type DatasetColumnRenames,
 } from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 
-import type { DatasetContent } from "../app/dataset.app.ts";
+import type { DatasetContent, DatasetSeedRow } from "../app/dataset.app.ts";
 
 /**
  * The app's KSUID resource for a chunk-line row (`KSUID_RESOURCES.RECORD`).
@@ -30,12 +31,16 @@ import type { DatasetContent } from "../app/dataset.app.ts";
  */
 const RECORD_KSUID_RESOURCE = "record";
 
+/** The app's KSUID resource for a dataset row (`KSUID_RESOURCES.DATASET`), as the upload writes it. */
+const DATASET_KSUID_RESOURCE = "dataset";
+
 /** The stored row carries columns the Dataset omits (sourceStoredObjectId): strip, not refuse. */
 const storedDatasetSchema = z.object(datasetSchema.shape);
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import { readChunkOffsets, readSearchOffsets } from "../rules/dataset-chunk-offsets.rules.ts";
 import { assertStoredRowWithinLimit } from "../rules/dataset-row-limits.rules.ts";
+import { stripNullBytes } from "../rules/dataset-sanitize.rules.ts";
 import {
   matchesDatasetSearch,
   measureRowsBytes,
@@ -340,6 +345,71 @@ export class DatasetContentService implements DatasetContent {
       storage: this.storage,
     });
     return { count: result.deleted };
+  }
+
+  /**
+   * Born on storage (ADR-032 v13): the rows go to chunks one chunk at a time
+   * BEFORE the row exists, so a failed write leaves no dataset; whatever was
+   * written is reaped, whether the write or the row insert failed.
+   */
+  async createDataset({
+    projectId,
+    name,
+    slug,
+    columnTypes,
+    rows,
+  }: {
+    projectId: string;
+    name: string;
+    slug: string;
+    columnTypes: Dataset["columnTypes"];
+    rows: AsyncIterable<DatasetSeedRow> | Iterable<DatasetSeedRow>;
+  }): Promise<Dataset> {
+    const datasetId = generate(DATASET_KSUID_RESOURCE).toString();
+    const writer = StreamingChunkWriterService.create({
+      storage: this.storage,
+      projectId,
+      datasetId,
+    });
+    const pinnedIds = new Set<string>();
+    try {
+      for await (const row of rows) {
+        assertStoredRowWithinLimit(row.entry);
+        if (row.id !== undefined) {
+          if (pinnedIds.has(row.id)) throw new DuplicateRecordIdError(row.id);
+          pinnedIds.add(row.id);
+        }
+        await writer.push(stripNullBytes(row.entry), row.id === undefined ? {} : { id: row.id });
+      }
+      const written = await writer.finalize();
+      const created = await this.datasets.create({
+        id: datasetId,
+        projectId,
+        name,
+        slug,
+        columnTypes,
+        contentLayout: "s3_jsonl",
+        status: "ready",
+        rowCount: written.rowCount,
+        sizeBytes: BigInt(written.sizeBytes),
+        chunkCount: written.chunkCount,
+        chunkOffsets: written.chunkOffsets,
+      });
+
+      return storedDatasetSchema.parse(created);
+    } catch (error) {
+      await this.discardChunks({ projectId, datasetId });
+      throw error;
+    }
+  }
+
+  /** Best-effort: a failed reap must not hide the failure that caused it. */
+  private async discardChunks(input: { projectId: string; datasetId: string }): Promise<void> {
+    try {
+      await this.chunks.deleteAllChunks({ ...input, storage: this.storage });
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+    }
   }
 
   async copyDataset({

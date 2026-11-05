@@ -61,7 +61,7 @@ type DatasetRecordServiceOptions = {
 };
 
 /** The record operations both object-backed layouts answer. */
-type DatasetRecordContent = Omit<DatasetContent, "copyDataset" | "updateColumns">;
+type DatasetRecordContent = Omit<DatasetContent, "createDataset" | "copyDataset" | "updateColumns">;
 
 export class DatasetRecordService {
   static create(deps: DatasetRecordServiceOptions): DatasetRecordService {
