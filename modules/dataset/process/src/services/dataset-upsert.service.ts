@@ -236,7 +236,8 @@ export class DatasetUpsertService {
       });
     }
 
-    // Only a composition with no object storage (a unit test) still makes a Postgres-layout dataset.
+    // Only a composition with no object storage (a unit test) still makes a
+    // Postgres-layout dataset.
     const created = await options.repository.create({
       projectId: parsed.projectId,
       name,
