@@ -186,6 +186,7 @@ Feature: Subscription Page Plan Management
       When I view the subscription page
       Then I am offered the Growth upgrade for 1 seat
       And I am not told an upgrade is required
+      And I am not told my plan doesn't cover my seats
 
   # ============================================================================
   # An organization above its plan's seats is offered the upgrade
