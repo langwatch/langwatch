@@ -7,8 +7,15 @@ import { type KnownTraces, knownTraceTraits } from "./nurturing-member-facts.rul
 
 type Joined = Pick<
   NurturingSignalOf<"invite_accepted">,
-  "userId" | "organizationId" | "organizationName"
+  "userId" | "organizationId" | "organizationName" | "role"
 >;
+
+const SEAT_BY_ROLE: Readonly<Record<string, string>> = {
+  ADMIN: "admin",
+  MEMBER: "member",
+  EXTERNAL: "lite_member",
+  DEVELOPER: "developer",
+};
 
 /** Groups the person into the organization they joined and tracks how they came in. */
 function joinedCalls({
@@ -18,14 +25,20 @@ function joinedCalls({
   joined: Joined;
   event: "joined_via_invite" | "joined_via_sso";
 }): CioBatchCall[] {
-  const { userId, organizationId, organizationName } = joined;
+  const { userId, organizationId, organizationName, role } = joined;
+  // Customer.io campaigns branch on the seat; a role we cannot name is left out rather than guessed.
+  const seat = role ? SEAT_BY_ROLE[role] : undefined;
   return [
     { type: "group", userId, groupId: organizationId, traits: { name: organizationName } },
     {
       type: "track",
       userId,
       event,
-      properties: { organization_id: organizationId, organization_name: organizationName },
+      properties: {
+        organization_id: organizationId,
+        organization_name: organizationName,
+        ...(seat ? { seat } : {}),
+      },
     },
   ];
 }

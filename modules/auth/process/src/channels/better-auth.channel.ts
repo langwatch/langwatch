@@ -82,6 +82,7 @@ export abstract class BetterAuthAnnouncements {
     userId: string;
     organizationId: string;
     organizationName: string;
+    role: string;
   }): void;
 
   /** Nurturing, once per session a member of some organization mints. Ids only. */

@@ -66,7 +66,12 @@ export class AuthLifecycleNoticeService {
   }
 
   ssoAutoAdded(
-    input: Readonly<{ userId: string; organizationId: string; organizationName: string }>,
+    input: Readonly<{
+      userId: string;
+      organizationId: string;
+      organizationName: string;
+      role: string;
+    }>,
   ): void {
     this.#send(this.#senders?.recordSsoAutoAdded, {
       tenantId: input.organizationId,
@@ -74,6 +79,7 @@ export class AuthLifecycleNoticeService {
       userId: input.userId,
       organizationId: input.organizationId,
       organizationName: input.organizationName,
+      role: input.role,
     });
   }
 

@@ -390,7 +390,7 @@ export type OrganizationAuditLogPage = z.infer<typeof organizationAuditLogPageSc
  * a default membership — rather than an absence.
  */
 export type OrganizationPendingInviteApplied =
-  | Readonly<{ applied: true; inviteId: string }>
+  | Readonly<{ applied: true; inviteId: string; role: string }>
   | Readonly<{ applied: false }>;
 
 /** Why one member is in the organization; `unknown` renders as no chip rather than a guess. */

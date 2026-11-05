@@ -177,6 +177,8 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     userId: id,
     organizationId: id,
     organizationName: z.string(),
+    /** The role the person joined with, an OrganizationUserRole; absent on older events. */
+    role: z.string().optional(),
   }),
   z.object({
     kind: z.literal("sso_auto_added"),
@@ -184,6 +186,7 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     userId: id,
     organizationId: id,
     organizationName: z.string(),
+    role: z.string().optional(),
   }),
   z.object({
     /** A person's own sign-up, from user's or auth's fact: PostHog's signed_up, never Customer.io's. */

@@ -1544,6 +1544,7 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
     userId: string;
     organizationId: string;
     organizationName: string;
+    role: string;
   }): void {
     this.lifecycle.ssoAutoAdded(input);
   }
