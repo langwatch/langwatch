@@ -88,4 +88,4 @@ function TopicsContent() {
  * `analytics-routes.tsx` wraps these in `withPermissionGuard("analytics:view")`
  * (and `DashboardLayout` on two), in the composing app's own route tree.
  */
-export default withAggregateAnalyticsGate("Topics", TopicsContent);
+export default withAggregateAnalyticsGate(TopicsContent);

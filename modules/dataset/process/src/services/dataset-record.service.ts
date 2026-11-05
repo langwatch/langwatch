@@ -27,29 +27,23 @@ import {
 } from "@langwatch/dataset-contract";
 
 import type { DatasetContent } from "../app/dataset.app.ts";
+import type { LockedDatasetRecords } from "../repositories/dataset-record.repository.ts";
+import { assertColumnsCurrent } from "../rules/dataset-columns.rules.ts";
 import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
 import {
   assertPageWithinLimit,
   assertWholeReadWithinLimits,
-  entryBytesOf,
 } from "../rules/dataset-row-limits.rules.ts";
 import { normalizeDatasetSearch } from "../rules/dataset-search.rules.ts";
-import {
-  isDatasetRecordNotFound,
-  limitDatasetRecordsByBytes,
-  sanitizedEntry,
-  selectDatasetRecords,
-} from "../rules/dataset-selection.rules.ts";
+import { isDatasetRecordNotFound, sanitizedEntry } from "../rules/dataset-selection.rules.ts";
 import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
 import type { InlineAttachmentScope } from "./dataset-inline-attachment.service.ts";
 import { DatasetRecordSearchService } from "./dataset-record-search.service.ts";
+import { DatasetRecordWholeReadService } from "./dataset-record-whole-read.service.ts";
 import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
 import type { DatasetServiceOptions } from "./dataset.service.ts";
 
 const MIB = 1024 * 1024;
-
-/** How many postgres-backed rows a whole read asks for at a time. */
-const WHOLE_READ_PAGE_ROWS = 200;
 
 type DatasetRecordServiceOptions = {
   options: DatasetServiceOptions;
@@ -75,6 +69,7 @@ export class DatasetRecordService {
   }
 
   private readonly search: DatasetRecordSearchService;
+  private readonly wholeRead: DatasetRecordWholeReadService;
 
   private constructor(private readonly deps: DatasetRecordServiceOptions) {
     this.search = DatasetRecordSearchService.create({
@@ -82,6 +77,9 @@ export class DatasetRecordService {
       content: deps.options.content,
       singleFile: deps.options.singleFile,
       requestBounds: deps.requestBounds,
+    });
+    this.wholeRead = DatasetRecordWholeReadService.create({
+      readPage: (input) => this.readRecordsPage(input),
     });
   }
 
@@ -237,49 +235,13 @@ export class DatasetRecordService {
       });
     }
 
-    // Only a read of every row can stop early; picking one row needs them all.
-    const stopAtBytes = parsed.entrySelection === "all" ? limitBytes : null;
-    const records: DatasetRecord[] = [];
-    let bytes = 0;
-    let total = 0;
-    let page = 1;
-    let hasMoreRecords = true;
-    while (hasMoreRecords) {
-      const result = await this.readRecordsPage({
-        slugOrId: parsed.slugOrId,
-        projectId: parsed.projectId,
-        page,
-        limit: WHOLE_READ_PAGE_ROWS,
-      });
-      total = result.pagination.total;
-      for (const record of result.data) {
-        bytes += entryBytesOf(record.entry);
-        if (stopAtBytes !== null && bytes > stopAtBytes) {
-          return {
-            dataset,
-            records,
-            truncated: true,
-            totalRows: Math.max(total, records.length + 1),
-          };
-        }
-        records.push(record);
-      }
-      const lastPage = result.data.length < WHOLE_READ_PAGE_ROWS;
-      const readAllRecords = records.length >= total;
-      hasMoreRecords = !lastPage && !readAllRecords;
-
-      page += 1;
-    }
-
-    const selected = selectDatasetRecords(records, parsed.entrySelection);
-    const limited = limitDatasetRecordsByBytes(selected, limitBytes);
-
-    return {
+    return this.wholeRead.readAll({
+      slugOrId: parsed.slugOrId,
+      projectId: parsed.projectId,
+      entrySelection: parsed.entrySelection,
       dataset,
-      records: limited.records,
-      truncated: limited.truncated,
-      totalRows: selected.length,
-    };
+      limitBytes,
+    });
   }
 
   private async readBudget(projectId: string, limitMb: number | undefined): Promise<number> {
@@ -333,32 +295,51 @@ export class DatasetRecordService {
       return content.upsertRecord({ dataset, input: parsed });
     }
 
-    try {
-      return {
-        record: await this.options.records.update({
-          id: parsed.recordId,
-          datasetId: dataset.id,
-          projectId: parsed.projectId,
-          entry: sanitizedEntry(parsed.updatedRecord),
-        }),
-        created: false,
-      };
-    } catch (error) {
-      if (!isDatasetRecordNotFound(error)) {
-        throw error;
+    return this.lockedRecords({ dataset, columns: parsed.columns }, async (records) => {
+      try {
+        return {
+          record: await records.update({
+            id: parsed.recordId,
+            datasetId: dataset.id,
+            projectId: parsed.projectId,
+            entry: sanitizedEntry(parsed.updatedRecord),
+          }),
+          created: false,
+        };
+      } catch (error) {
+        if (!isDatasetRecordNotFound(error)) {
+          throw error;
+        }
       }
-    }
 
-    const [record] = await this.options.records.createMany({
-      datasetId: dataset.id,
-      projectId: parsed.projectId,
-      entries: [{ id: parsed.recordId, ...sanitizedEntry(parsed.updatedRecord) }],
+      const [record] = await records.createMany({
+        datasetId: dataset.id,
+        projectId: parsed.projectId,
+        entries: [{ id: parsed.recordId, ...sanitizedEntry(parsed.updatedRecord) }],
+      });
+      if (!record) {
+        throw new Error("Dataset record creation returned no record");
+      }
+
+      return { record, created: true };
     });
-    if (!record) {
-      throw new Error("Dataset record creation returned no record");
-    }
+  }
 
-    return { record, created: true };
+  /**
+   * Runs a Postgres record write under the dataset's lock, the one a column edit holds, after
+   * refusing a write keyed by a column that edit removed.
+   */
+  private lockedRecords<T>(
+    { dataset, columns }: { dataset: Dataset; columns?: readonly string[] | undefined },
+    write: (records: LockedDatasetRecords) => Promise<T>,
+  ): Promise<T> {
+    return this.options.records.withDatasetLock(
+      { datasetId: dataset.id, projectId: dataset.projectId },
+      async (records) => {
+        assertColumnsCurrent({ columns, columnTypes: await records.columnTypes() });
+        return write(records);
+      },
+    );
   }
 
   /** The dataset's image and file columns, read for files a row carries inline. */
@@ -416,14 +397,16 @@ export class DatasetRecordService {
       return content.batchCreateRecords({ dataset, input: parsed });
     }
 
-    return this.options.records.createMany({
-      datasetId: dataset.id,
-      projectId: parsed.projectId,
-      entries: parsed.entries.map((entry) => ({
-        id: entry.id ?? this.deps.generateId(),
-        ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
-      })),
-    });
+    return this.lockedRecords({ dataset, columns }, (records) =>
+      records.createMany({
+        datasetId: dataset.id,
+        projectId: parsed.projectId,
+        entries: parsed.entries.map((entry) => ({
+          id: entry.id ?? this.deps.generateId(),
+          ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
+        })),
+      }),
+    );
   }
 
   async createRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]> {
@@ -459,12 +442,14 @@ export class DatasetRecordService {
     }
 
     try {
-      return await this.options.records.update({
-        id: parsed.recordId,
-        datasetId: dataset.id,
-        projectId: parsed.projectId,
-        entry: sanitizedEntry(parsed.updatedRecord),
-      });
+      return await this.lockedRecords({ dataset, columns: parsed.columns }, (records) =>
+        records.update({
+          id: parsed.recordId,
+          datasetId: dataset.id,
+          projectId: parsed.projectId,
+          entry: sanitizedEntry(parsed.updatedRecord),
+        }),
+      );
     } catch (error) {
       if (isDatasetRecordNotFound(error)) {
         throw new DatasetRecordNotFoundError();
@@ -487,10 +472,9 @@ export class DatasetRecordService {
       return content.deleteRecords({ dataset, input: parsed });
     }
 
-    const count = await this.options.records.deleteMany({
-      ...parsed,
-      datasetId: dataset.id,
-    });
+    const count = await this.lockedRecords({ dataset }, (records) =>
+      records.deleteMany({ ...parsed, datasetId: dataset.id }),
+    );
 
     return { count };
   }

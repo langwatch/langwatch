@@ -5,12 +5,14 @@ import type React from "react";
 import type { SessionListRow } from "../behavior/session-list-row.ts";
 
 // Session name and branch; untitled sessions show branch (work identifier);
-// name is keyboard-focusable control for replay.
+// name is keyboard-focusable control for replay. A group project's rows also
+// name the member project that recorded each session.
 export const SessionNameCell: React.FC<{
   row: SessionListRow;
+  showProject?: boolean;
   isOpening: boolean;
   onOpenReplay?: (() => void) | undefined;
-}> = ({ row, isOpening, onOpenReplay }) => {
+}> = ({ row, showProject = false, isOpening, onOpenReplay }) => {
   const where = [row.repositoryFullName, row.gitBranch].filter((part) => part !== "").join(" · ");
 
   return (
@@ -32,6 +34,18 @@ export const SessionNameCell: React.FC<{
         </SessionNameButton>
         {isOpening ? <Spinner size="xs" color="fg.muted" flexShrink={0} /> : null}
       </HStack>
+      {showProject ? (
+        <Text
+          fontSize="xs"
+          color="fg.muted"
+          truncate
+          maxWidth="full"
+          title={`Member project: ${row.projectName}`}
+          data-testid="coding-agent-session-project"
+        >
+          {row.projectName}
+        </Text>
+      ) : null}
       {where === "" ? null : (
         <Tooltip content={where} positioning={{ placement: "bottom-start" }}>
           <Text fontSize="xs" color="fg.subtle" fontFamily="mono" truncate maxWidth="full">

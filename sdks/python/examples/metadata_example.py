@@ -96,7 +96,7 @@ def handle_user_message(
         print()
         
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-6-luna",
             messages=[
                 {
                     "role": "system",

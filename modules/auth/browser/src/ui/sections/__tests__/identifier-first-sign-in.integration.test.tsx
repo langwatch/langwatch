@@ -1,6 +1,7 @@
 /**
  * @vitest-environment jsdom
  * Identifier-first sign-in renders routing decisions; holds no routing logic.
+ * @see modules/auth/specs/forced-password-reset.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
@@ -15,6 +16,7 @@ const {
   registerMock,
   signInMock,
   replaceMock,
+  hardNavigateMock,
   sessionRef,
   searchParamsRef,
   publicEnvRef,
@@ -26,6 +28,7 @@ const {
   registerMock: vi.fn(),
   signInMock: vi.fn(),
   replaceMock: vi.fn(),
+  hardNavigateMock: vi.fn(),
   sessionRef: { current: { data: null as unknown } },
   searchParamsRef: { current: new URLSearchParams("") },
   publicEnvRef: {
@@ -76,7 +79,7 @@ vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
 
 vi.mock("../../../behavior/browser-navigation.ts", () => ({
   replaceLocation: replaceMock,
-  hardNavigate: vi.fn(),
+  hardNavigate: hardNavigateMock,
   reloadPage: vi.fn(),
 }));
 
@@ -632,6 +635,34 @@ describe("given the identifier-first sign-in screen", () => {
     });
   });
 
+  describe("when the password is right but must be replaced first", () => {
+    /** @scenario "The sign-in form sends a marked user to choose a new password" */
+    it("sends the person to choose a new password, carrying the address, with no error", async () => {
+      routeMock.mockResolvedValue(localPicker);
+      signInMock.mockResolvedValue({
+        error: "identity_password_reset_required",
+        code: "identity_password_reset_required",
+        status: 403,
+      });
+
+      const { container } = renderScreen();
+      await enterEmail("sam@example.com");
+      await screen.findByTestId("method-picker");
+
+      await userEvent.type(container.querySelector('input[type="password"]')!, "the-old-password");
+      await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
+
+      await waitFor(() => expect(hardNavigateMock).toHaveBeenCalledTimes(1));
+      const target = new URL(String(hardNavigateMock.mock.calls[0]?.[0]), "https://app.test");
+      expect(target.pathname).toBe("/auth/forgot-password");
+      expect(target.search).toBe("");
+      const fragment = new URLSearchParams(target.hash.slice(1));
+      expect(fragment.get("email")).toBe("sam@example.com");
+      expect(fragment.get("reset")).toBe("required");
+      expect(screen.queryByTestId("signin-failure")).toBeNull();
+    });
+  });
+
   describe("when the installation has stopped accepting attempts", () => {
     /** @scenario A rate-limited log-in says how long, and stops asking */
     it("says how long is actually left and disables the submit", async () => {
@@ -893,6 +924,27 @@ describe("given the identifier-first sign-in screen", () => {
       expect(registerMock).not.toHaveBeenCalled();
       expect(await screen.findByTestId("verification-sent")).toHaveTextContent(
         "nobody@example.com",
+      );
+    });
+
+    /** @scenario "The log-in door's confirmation link carries the invitation" */
+    it("sends the invitation the log-in was going to along with the link", async () => {
+      searchParamsRef.current = new URLSearchParams(
+        "callbackUrl=%2Finvite%2Faccept%3FinviteCode%3Dabc",
+      );
+      routeMock.mockResolvedValue(unknownIdentifier);
+      requestSignUpVerificationMock.mockResolvedValue({ sent: true });
+
+      renderScreen();
+      await enterEmail("nobody@example.com");
+      await screen.findByTestId("unknown-identifier");
+      await userEvent.click(screen.getByRole("button", { name: /send confirmation link/i }));
+
+      await waitFor(() =>
+        expect(requestSignUpVerificationMock).toHaveBeenCalledWith({
+          email: "nobody@example.com",
+          callbackUrl: "/invite/accept?inviteCode=abc",
+        }),
       );
     });
 

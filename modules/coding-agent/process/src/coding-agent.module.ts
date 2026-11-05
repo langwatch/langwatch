@@ -8,6 +8,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 
 import { CodingAgentModule } from "./app/coding-agent.app.ts";
 import { codingAgentEventing } from "./eventing/coding-agent-processing.pipeline.ts";
+import { codingAgentProjectMilestonesEventing } from "./eventing/coding-agent-project-milestones.pipeline.ts";
 import { CODING_AGENT_ID_INDEXES } from "./repositories/clickhouse/clickhouse.coding-agent-id-indexes.database.ts";
 import { codingAgentRepositories } from "./repositories/coding-agent-repositories.registry.ts";
 import { codingAgentV1Rest } from "./transport/coding-agent-v1.rest.ts";
@@ -28,6 +29,7 @@ export const codingAgentProcessModule: PublishedProcessModule<
     codingAgentTrpcTransport,
   )
   .withEventing(codingAgentEventing)
+  .withEventing(codingAgentProjectMilestonesEventing)
   .provideMiddlewareContext({
     codingAgentRestCaller: (request) => {
       const resolved = projectCredentialOfRequest(request);

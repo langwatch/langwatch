@@ -5,7 +5,7 @@
  */
 
 import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
-import type { ApiKeyRole, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
+import type { ApiKeyRole } from "@langwatch/api-key-contract";
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
@@ -21,24 +21,22 @@ import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/
 import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
 import { SettingsField } from "@langwatch/design-system/settings-field";
-import type { Instant } from "@langwatch/time";
 import { TriangleAlert } from "lucide-react";
-import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
+import { useGrantablePermissions } from "../../behavior/use-grantable-permissions.ts";
 import {
   earliestCustomExpiration,
+  EXPIRATION_NEVER,
   EXPIRATION_OPTIONS,
   EXPIRATION_UNCHOSEN,
+  type CreateApiKeyInput,
   isExpirationChosen,
   resolveExpiresAt,
 } from "../../model/api-key-form.ts";
 import { useApiKeyHost } from "../../model/api-key-host.ts";
-import {
-  deriveBindingRole,
-  getUserPermissionsAtScope,
-  type PermissionMode,
-} from "../../model/api-key-permissions.ts";
+import { deriveBindingRole, type PermissionMode } from "../../model/api-key-permissions.ts";
 import {
   PermissionCategoryList,
   PermissionCounter,
@@ -54,19 +52,6 @@ type MyBindings = {
 
 type OrgProject = { id: string; name: string; teamId: string };
 type OrgTeam = { id: string; name: string };
-
-export type CreateApiKeyInput = {
-  name: string;
-  description: string;
-  expiresAt: Instant | undefined;
-  permissionMode: PermissionMode;
-  keyType: "personal" | "service";
-  assignedToUserId?: string;
-  scopeType: string;
-  scopeId: string;
-  permissions?: string[];
-  bindings: ApiKeyTrpcGrant[];
-};
 
 type CreateKeyForm = {
   name: string;
@@ -377,6 +362,47 @@ function PermissionsField({
   );
 }
 
+/**
+ * The ceiling the mint checks (every selected scope, for the key's owner), and the reader's
+ * access as one load: the form is judged only once both the bindings and the ceiling land.
+ */
+function useKeyCeiling({
+  organizationId,
+  selectedScopes,
+  primaryScope,
+  owner,
+  isServiceKey,
+  enabled,
+  myBindings,
+}: {
+  organizationId: string;
+  selectedScopes: ScopeTriadEntry[];
+  primaryScope: ScopeTriadEntry;
+  owner: { isAdmin: boolean; selectedUserId: string; currentUserId: string };
+  isServiceKey: boolean;
+  enabled: boolean;
+  myBindings: MyBindings;
+}): { userPermissions: string[]; access: MyBindings } {
+  const assignsOther =
+    owner.isAdmin && !!owner.selectedUserId && owner.selectedUserId !== owner.currentUserId;
+  const grantable = useGrantablePermissions({
+    organizationId,
+    scopes: selectedScopes.length > 0 ? selectedScopes : [primaryScope],
+    ownerUserId: assignsOther ? owner.selectedUserId : void 0,
+    isServiceKey,
+    enabled,
+  });
+  return {
+    userPermissions: grantable.permissions,
+    access: {
+      data: myBindings.data,
+      isLoading: myBindings.isLoading || grantable.isLoading,
+      isError: myBindings.isError || grantable.isError,
+      refetch: () => Promise.all([myBindings.refetch(), grantable.refetch()]),
+    },
+  };
+}
+
 export function CreateApiKeyDrawer({
   isOpen,
   isCreating,
@@ -387,6 +413,8 @@ export function CreateApiKeyDrawer({
   organizationName,
   currentTeamId,
   currentProjectId,
+  prefill,
+  notice,
   onClose,
   onCreate,
 }: {
@@ -399,6 +427,10 @@ export function CreateApiKeyDrawer({
   organizationName: string | undefined;
   currentTeamId?: string;
   currentProjectId?: string;
+  /** The key the form opens filled with, such as a legacy key's replacement; no expiry. */
+  prefill?: Pick<CreateApiKeyInput, "name" | "description" | "scopeId" | "keyType">;
+  /** A warning over the form, such as that the key being replaced already stopped working. */
+  notice?: ReactNode;
   onClose: () => void;
   onCreate: (input: CreateApiKeyInput) => void;
 }) {
@@ -442,25 +474,15 @@ export function CreateApiKeyDrawer({
     scopeId: currentProjectId ?? "",
   };
 
-  const userPermissions = useMemo(
-    () =>
-      getUserPermissionsAtScope({
-        myBindings: myBindings.data,
-        scopeType: primaryScope.scopeType,
-        scopeId: primaryScope.scopeId,
-        organizationId,
-        orgProjects,
-        isServiceKey: keyType === "service",
-      }),
-    [
-      myBindings.data,
-      primaryScope.scopeType,
-      primaryScope.scopeId,
-      organizationId,
-      orgProjects,
-      keyType,
-    ],
-  );
+  const { userPermissions, access } = useKeyCeiling({
+    organizationId,
+    selectedScopes,
+    primaryScope,
+    owner: { isAdmin, selectedUserId, currentUserId },
+    isServiceKey: keyType === "service",
+    enabled: isOpen,
+    myBindings,
+  });
 
   const [attempted, setAttempted] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -471,16 +493,15 @@ export function CreateApiKeyDrawer({
 
   const resetForm = () => {
     setAttempted(false);
-    setName("");
-    setDescription("");
-    setExpirationPreset(EXPIRATION_UNCHOSEN);
+    setName(prefill?.name ?? "");
+    setDescription(prefill?.description ?? "");
+    setExpirationPreset(prefill ? EXPIRATION_NEVER : EXPIRATION_UNCHOSEN);
     setCustomDate("");
-    setSelectedScopes(
-      currentProjectId ? [{ scopeType: "PROJECT", scopeId: currentProjectId }] : [],
-    );
+    const scopeId = prefill?.scopeId ?? currentProjectId;
+    setSelectedScopes(scopeId ? [{ scopeType: "PROJECT", scopeId }] : []);
     setPermissionMode("all");
     setCategorySelections({});
-    setKeyType("personal");
+    setKeyType(prefill?.keyType ?? "personal");
     setSelectedUserId(currentUserId);
   };
 
@@ -534,7 +555,7 @@ export function CreateApiKeyDrawer({
   });
   const showError = (field: Exclude<KeyField, "expiration">) =>
     attempted && missing.includes(field) ? FIELD_ERROR[field] : undefined;
-  const accessBlocked = myBindings.isLoading || myBindings.isError;
+  const accessBlocked = access.isLoading || access.isError;
 
   return (
     <Drawer
@@ -552,13 +573,14 @@ export function CreateApiKeyDrawer({
           label: "Create secret key",
           onClick: handleCreate,
           loading: isCreating,
-          disabledReason: accessBlocked ? accessReason(myBindings) : void 0,
+          disabledReason: accessBlocked ? accessReason(access) : void 0,
           "data-testid": "api-key-create-submit",
         },
       }}
     >
       <VStack gap={5} align="start">
-        {accessBlocked && <AccessNote myBindings={myBindings} />}
+        {accessBlocked && <AccessNote myBindings={access} />}
+        {notice}
         {/* Key type — only admins can create service keys */}
         {isAdmin && (
           <KeyTypeField

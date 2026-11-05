@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { modelProviderListEntrySchema } from "./model-provider-list-entry.ts";
 import {
+  decisionModelsForScopesTrpcInputSchema,
   modelDefaultConfigDeleteTrpcInputSchema,
   modelDefaultConfigSaveTrpcInputSchema,
   modelDefaultConfigSavedSchema,
@@ -55,6 +56,22 @@ export const modelProviderTrpc = defineTrpcContract("modelProvider")
   .query("listAllForProjectForFrontend")
   .withInput(modelProviderProjectTrpcInputSchema)
   .withOutput(z.array(modelProviderListEntrySchema))
+
+  /**
+   * The decision models a judge may be offered for this project, hosted first. The
+   * own-decision-model flag and the provider keys are weighed here, never in the browser.
+   */
+  .query("listDecisionModelsForProject")
+  .withInput(modelProviderProjectTrpcInputSchema)
+  .withOutput(z.array(z.object({ value: z.string(), label: z.string() })))
+
+  /**
+   * The decision models a Default models config on these scopes may hold: only those that run
+   * from every one of them, so an organization row never offers a key one project holds.
+   */
+  .query("listDecisionModelsForScopes")
+  .withInput(decisionModelsForScopesTrpcInputSchema)
+  .withOutput(z.array(z.object({ value: z.string(), label: z.string() })))
 
   /** Org-wide variant: every provider anywhere in the organization, env-fed rows included. */
   .query("listAllForOrganizationForFrontend")

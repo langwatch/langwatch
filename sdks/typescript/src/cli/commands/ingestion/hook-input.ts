@@ -37,12 +37,18 @@ const reportedText = z
 const hookInputSchema = z
   .object({
     session_id: reportedText,
+    // The Copilot CLI spells it this way; VS Code Copilot Chat, Claude Code
+    // and codex spell it `session_id`. No seam sends both, so when one ever
+    // does, `session_id` wins as the spelling every other seam agrees on.
+    sessionId: reportedText,
     cwd: reportedText,
     hook_event_name: reportedText,
     // Claude's SessionStart payload carries the session's current title when
     // one is set (`--name` at launch, `/rename` before a resume). Absent on
     // the other events, where the live registry answers instead.
     session_title: reportedText,
+    // Grok's SubagentStart, which fires in the parent: the child's own session id.
+    subagentId: reportedText,
   })
   .transform(
     (
@@ -52,11 +58,13 @@ const hookInputSchema = z
       cwd?: string;
       hookEventName?: string;
       sessionTitle?: string;
+      subagentId?: string;
     } => ({
-      sessionId: payload.session_id,
+      sessionId: payload.session_id ?? payload.sessionId,
       cwd: payload.cwd,
       hookEventName: payload.hook_event_name,
       sessionTitle: payload.session_title,
+      subagentId: payload.subagentId,
     }),
   );
 

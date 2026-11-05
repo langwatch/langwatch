@@ -19,7 +19,7 @@ import {
   OPENCODE_PLUGIN_FILE_NAME,
   opencodePluginTarget,
 } from "../opencode-plugin";
-import { telemetryEnvVarNames } from "../otel-env-block";
+import { buildOtelEnvBlock, telemetryEnvVarNames } from "../otel-env-block";
 import { installSessionContextHooks, sessionContextHookCommand } from "../session-context-hooks";
 import { buildScopedToolFunction, persistBlockToRc, toolMarkers } from "../shell-rc";
 import { scanTelemetryTargets } from "../telemetry-targets";
@@ -44,6 +44,7 @@ let tmpHome: string;
 const origHome = process.env.HOME;
 const origUserprofile = process.env.USERPROFILE;
 const origCodexHome = process.env.CODEX_HOME;
+const origCopilotHome = process.env.COPILOT_HOME;
 const origXdgConfigHome = process.env.XDG_CONFIG_HOME;
 
 // The directory the scan treats as "this directory". A scratch one by
@@ -84,6 +85,8 @@ beforeEach(() => {
   // XDG_CONFIG_HOME the same way, for ~/.config/opencode.
   delete process.env.CODEX_HOME;
   delete process.env.XDG_CONFIG_HOME;
+  // Copilot's hook folder follows COPILOT_HOME the same way.
+  delete process.env.COPILOT_HOME;
 });
 
 afterEach(() => {
@@ -93,6 +96,8 @@ afterEach(() => {
   else process.env.USERPROFILE = origUserprofile;
   if (origCodexHome === undefined) delete process.env.CODEX_HOME;
   else process.env.CODEX_HOME = origCodexHome;
+  if (origCopilotHome === undefined) delete process.env.COPILOT_HOME;
+  else process.env.COPILOT_HOME = origCopilotHome;
   if (origXdgConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
   else process.env.XDG_CONFIG_HOME = origXdgConfigHome;
   fs.rmSync(tmpHome, { recursive: true, force: true });
@@ -251,6 +256,22 @@ describe("scanTelemetryTargets", () => {
 
       expect(fs.readFileSync(target.path, "utf8")).toBe("export const Mine = async () => ({});\n");
       expect(path.basename(target.path)).toBe(OPENCODE_PLUGIN_FILE_NAME);
+    });
+  });
+
+  describe("when LangWatch's Copilot hook file is installed", () => {
+    it("lists it as the copilot session hooks and removes the file", () => {
+      installSessionContextHooks({ tool: "copilot" });
+
+      expect(presentLabels()).toEqual(["copilot session hooks (~/.copilot/hooks/langwatch.json)"]);
+      expect(
+        scan()
+          .filter((t) => t.present)
+          .map((t) => t.remove()),
+      ).toEqual([true]);
+
+      expect(presentLabels()).toEqual([]);
+      expect(fs.existsSync(path.join(tmpHome, ".copilot", "hooks", "langwatch.json"))).toBe(false);
     });
   });
 
@@ -474,5 +495,27 @@ describe("scanTelemetryTargets", () => {
     const keys = telemetryEnvVarNames("claude");
     expect(keys).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
     expect(keys).toContain("CLAUDE_CODE_ENABLE_TELEMETRY");
+  });
+});
+
+describe("scanTelemetryTargets for pi", () => {
+  describe("when `langwatch pi` persisted its telemetry env for bare pi runs", () => {
+    const piBlock = buildOtelEnvBlock("pi", "http://app/api/otel", "ik-lw-pi_secret");
+
+    beforeEach(() => {
+      persistBlockToRc("zsh", buildScopedToolFunction("pi", piBlock, "zsh"), toolMarkers("pi"));
+    });
+
+    /** @scenario "Logout strips pi's injected env names" */
+    it("lists pi among the targets and strips every name pi injected from the rc", () => {
+      expect(presentLabels().some((l) => l.startsWith("pi shell function"))).toBe(true);
+
+      for (const t of scan().filter((t) => t.present)) t.remove();
+
+      const rcFile = path.join(tmpHome, ".zshrc");
+      const rc = fs.existsSync(rcFile) ? fs.readFileSync(rcFile, "utf8") : "";
+      for (const name of Object.keys(piBlock)) expect(rc).not.toContain(name);
+      expect(presentLabels()).toEqual([]);
+    });
   });
 });

@@ -11,12 +11,14 @@ import {
   type LangWatchQLCaller,
   type LangWatchQLExecuteInput,
   type LangWatchQLProtections,
+  type LangWatchQLReadableProject,
   type LangWatchQLQueryResult,
   type LangWatchQLSchema,
   type LangWatchQLTimeWindow,
   type LangWatchQLValidationResult,
 } from "@langwatch/analytics-contract";
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import type { Authorization } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 
 /**
@@ -32,16 +34,26 @@ export interface AnalyticsLwqlApi {
   /** Whether the Workbench is open to this project, and why not when it is not. */
   workbenchAvailability(input: { projectId: string }): Promise<LangWatchQLAvailability>;
   /** What this member may see of the project's content. */
-  resolveProtections(input: { projectId: string; userId: string }): Promise<LangWatchQLProtections>;
+  resolveProtections(input: {
+    projectId: string;
+    userId: string;
+    authorization?: Authorization;
+  }): Promise<LangWatchQLProtections>;
   /** The project identity a member's execution runs under, and its protections. */
   resolveRunCaller(input: {
     projectId: string;
     userId: string;
+    authorization?: Authorization;
   }): Promise<Readonly<{ project: LangWatchQLCaller; protections: LangWatchQLProtections }>>;
   describeLangWatchQLSchema(input: {
     projectId: string;
     protections: LangWatchQLProtections;
   }): Promise<LangWatchQLSchema>;
+  /** The organization's live projects this member holds `analytics:view` on. */
+  listReadableProjects(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<LangWatchQLReadableProject[]>;
   /** The statement's refusals for this member with their positions; nothing is run. */
   diagnoseLangWatchQL(input: {
     projectId: string;
@@ -50,7 +62,9 @@ export interface AnalyticsLwqlApi {
     parameters?: Readonly<Record<string, unknown>>;
     timeWindow?: LangWatchQLTimeWindow;
   }): Promise<LangWatchQLValidationResult>;
-  executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+  executeLangWatchQL(
+    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
+  ): Promise<LangWatchQLQueryResult>;
 }
 
 export const AnalyticsLwqlApi = moduleApi<AnalyticsLwqlApi>()("analytics");
@@ -72,7 +86,7 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("schema")
   .withPermission("analytics:view")
-  .handle(async ({ app, input, actor }) => {
+  .handle(async ({ app, input, actor, authorization }) => {
     await assertWorkbenchEnabled(app, input.projectId);
 
     return app.describeLangWatchQLSchema({
@@ -80,6 +94,7 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
       protections: await app.resolveProtections({
         projectId: input.projectId,
         userId: actor.id,
+        authorization,
       }),
     });
   })
@@ -98,26 +113,35 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
     });
   })
 
+  .procedure("readableProjects")
+  .withPermission("analytics:view")
+  .handle(async ({ app, input, actor }) => ({
+    projects: await app.listReadableProjects({ projectId: input.projectId, userId: actor.id }),
+  }))
+
   .procedure("query")
   .withPermission("analytics:view")
-  .handle(async ({ app, input, actor, signal }) => {
+  .handle(async ({ app, input, actor, authorization, signal }) => {
     await assertWorkbenchEnabled(app, input.projectId);
 
     const { project, protections } = await app.resolveRunCaller({
       projectId: input.projectId,
       userId: actor.id,
+      authorization,
     });
 
     return app.executeLangWatchQL({
       project,
       protections,
+      authorization,
       sql: input.sql,
       ...(input.parameters ? { parameters: input.parameters } : {}),
       ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
       ...(input.granularitySeconds === undefined
         ? {}
         : { granularitySeconds: input.granularitySeconds }),
-      ...(input.excludeOrigins ? { excludeOrigins: input.excludeOrigins } : {}),
+      ...(input.sources === undefined ? {} : { sources: input.sources }),
+      ...(input.projects === undefined ? {} : { projects: input.projects, userId: actor.id }),
       ...(signal ? { signal } : {}),
     });
   })

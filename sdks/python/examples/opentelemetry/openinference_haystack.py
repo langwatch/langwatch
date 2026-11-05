@@ -48,7 +48,7 @@ Answer:
 retriever = InMemoryBM25Retriever(document_store=document_store)
 prompt_builder = ChatPromptBuilder(template=[ChatMessage.from_user(prompt_template)])
 llm = OpenAIChatGenerator(
-    api_key=Secret.from_token(os.environ["OPENAI_API_KEY"]), model="gpt-5-mini"
+    api_key=Secret.from_token(os.environ["OPENAI_API_KEY"]), model="gpt-6-luna"
 )
 
 rag_pipeline = Pipeline()

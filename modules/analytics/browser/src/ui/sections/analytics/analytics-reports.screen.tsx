@@ -2,6 +2,7 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { Banner } from "@langwatch/design-system/banner";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { Plus } from "lucide-react";
 
 import { analyticsApi as api } from "../../../behavior/analytics-api.ts";
@@ -20,7 +21,6 @@ import { useWidgetGranularity } from "../../../features/dashboard-widget/behavio
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
 import { Link } from "../../elements/analytics-link.tsx";
-import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
 import AnalyticsLayout from "../analytics-layout.tsx";
 import { DashboardAutoRefreshMenu } from "../dashboard-auto-refresh-menu.tsx";
 import { FilterSidebar } from "../filter-sidebar.tsx";
@@ -41,8 +41,11 @@ function ReportsContent() {
   // Get dashboard ID from URL, or use first dashboard
   const urlDashboardId = host.route().query.dashboard;
 
-  // Get or create first dashboard
-  const getOrCreateFirst = useFirstDashboard({ projectId, enabled: !urlDashboardId });
+  // Get or create first dashboard; an aggregate keeps none and creates none (ADR-177).
+  const getOrCreateFirst = useFirstDashboard({
+    projectId,
+    enabled: !urlDashboardId && !isAggregateProjectKind(project?.kind),
+  });
 
   const activeDashboardId = urlDashboardId ?? getOrCreateFirst.data?.id;
 
@@ -228,7 +231,4 @@ function AddChartButton({ href }: { href: string }) {
   );
 }
 
-/** Exported for the test that renders the body past the aggregate gate. */
-export { ReportsContent };
-
-export default withAggregateAnalyticsGate("Reports", ReportsContent);
+export default ReportsContent;

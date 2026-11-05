@@ -8,6 +8,11 @@
 import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
+import type {
+  InstantEvalJudgeRouteRequest,
+  InstantEvalJudgeRouting,
+} from "./instant-eval-judge-route.ts";
+
 /**
  * The judge call and the cloud classifier behind it (ADR-174 decisions 10, 13). It calls no
  * peer: what it checks before each call comes from its own copies of its peers' facts.
@@ -26,7 +31,8 @@ export interface InstantEvalJudgeApi {
   classify(input: InstantEvalClassification): Promise<InstantEvalJudgement>;
   /**
    * One metered judge call: cloud only, unknown project, budget, classify, price, priced event.
-   * A refusal is returned, never thrown, and calls no classifier.
+   * A refusal is returned, never thrown, and calls no classifier. With an own decision model it
+   * only classifies, at no price (ADR-182 decision 7).
    */
   judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer>;
   /**
@@ -36,6 +42,12 @@ export interface InstantEvalJudgeApi {
    */
   recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void>;
   /**
+   * The rates a judged query's budget hold is priced at: the dearest base input rate a routed call
+   * could reach, never below the classifier's. A best-effort hold, not a hard cap: a routed query
+   * re-sends text and pays output and long-context rates, so it can spend past it (ADR-190 d7).
+   */
+  queryHoldPricing(): Promise<InstantEvalPricing>;
+  /**
    * Copies one confirmed Instant Evals row of the gateway ledger into the judge's own spend, for
    * the spend catch-up (ADR-174 decision 17). A request the judge already holds is kept as it is.
    */
@@ -43,6 +55,54 @@ export interface InstantEvalJudgeApi {
 }
 
 export const InstantEvalJudgeApi = moduleApi<InstantEvalJudgeApi>()("instant-eval-judge");
+
+/** The request shapes an own decision model speaks, one channel each (ADR-182 decision 8). */
+export const INSTANT_EVAL_DECISION_WIRES = ["openai_decisions", "jev", "cloudflare_jev"] as const;
+
+export type InstantEvalDecisionWire = (typeof INSTANT_EVAL_DECISION_WIRES)[number];
+
+/** How the key travels: `Authorization: Bearer`, or Azure's `api-key` header. */
+export type InstantEvalDecisionAuthHeader = "bearer" | "api_key";
+
+/**
+ * An organization's own decision model, resolved by the caller from Default models. The judge
+ * calls it with the organization's key, unmetered and uncapped (ADR-182 decisions 6 and 7).
+ */
+export interface InstantEvalOwnDecisionModel {
+  readonly model: string;
+  readonly wire: InstantEvalDecisionWire;
+  readonly providerModel: string;
+  readonly endpoint: string;
+  /** Bearer when absent. */
+  readonly authHeader?: InstantEvalDecisionAuthHeader;
+  /** Never logged, stored or returned. */
+  readonly apiKey: string;
+}
+
+/** The judge's view of a resolved own model; every caller of the judge maps it here. */
+export function instantEvalOwnDecisionModelOf(
+  resolved: InstantEvalOwnDecisionModel,
+): InstantEvalOwnDecisionModel {
+  const { model, wire, providerModel, endpoint, authHeader, apiKey } = resolved;
+  return { model, wire, providerModel, endpoint, ...(authHeader ? { authHeader } : {}), apiKey };
+}
+
+/** Why an own decision model cannot run; model-provider's list, as no contract imports another. */
+export type InstantEvalUnavailableDecisionModelReason =
+  | "not_enabled"
+  | "provider_missing"
+  | "provider_disabled"
+  | "key_missing"
+  | "endpoint_invalid";
+
+/** The skip an own model that cannot run answers with; never LangWatch's classifier (ADR-182). */
+export function instantEvalUnavailableDecisionModelSkipOf({
+  reason,
+}: {
+  reason: InstantEvalUnavailableDecisionModelReason;
+}): "classifier_not_configured" | "classifier_key_invalid" {
+  return reason === "not_enabled" ? "classifier_not_configured" : "classifier_key_invalid";
+}
 
 /** One text and every question about it, judged for a project. */
 export interface InstantEvalClassification {
@@ -52,6 +112,10 @@ export interface InstantEvalClassification {
   readonly text: string;
   readonly questions: readonly InstantEvalQuestion[];
   readonly signal?: AbortSignal;
+  /** Present when the project runs on its own decision model instead of LangWatch's. */
+  readonly decisionModel?: InstantEvalOwnDecisionModel;
+  /** Present when the call is routed; absent, the hosted classifier answers alone, as before. */
+  readonly route?: InstantEvalJudgeRouteRequest;
 }
 
 /** The model a judge's settings name to be answered by Instant Evals (ADR-174 decision 11). */
@@ -72,6 +136,10 @@ export interface InstantEvalJudgeSpendRecord {
   readonly requestId: string;
   /** Input tokens the classifier billed for. Zero records nothing. */
   readonly inputTokens: number;
+  /** The summed cost of routed calls, priced for the routed tokens instead of the rate. */
+  readonly costNanoUsd?: number;
+  /** The input tokens `costNanoUsd` covers; absent or zero, the spend is unrouted. */
+  readonly routedInputTokens?: number;
   /** Classifications made, one per judged text. */
   readonly requests: number;
   /** The run the spend belongs to, when it belongs to one. */
@@ -171,6 +239,10 @@ export const INSTANT_EVAL_SKIP_REASONS = [
   "classifier_rate_limited",
   "classifier_input_too_large",
   "classifier_failed",
+  // An own decision model's key is missing, off or refused; fixed in Model Providers (ADR-182).
+  "classifier_key_invalid",
+  // An own decision model's provider is down or answered unreadably; retry later (ADR-182).
+  "classifier_provider_unavailable",
 ] as const;
 
 export type InstantEvalSkipReason = (typeof INSTANT_EVAL_SKIP_REASONS)[number];
@@ -182,6 +254,11 @@ export interface InstantEvalVerdict {
   readonly probability?: number;
   /** The probability-weighted mean inside the declared range, for a score. */
   readonly score?: number;
+  /**
+   * The probability-weighted standard deviation of the levels, for a score read from a
+   * distribution: how unsure the score is. Absent when the judge gave no distribution.
+   */
+  readonly spread?: number;
   /** The most likely option name, for a category. */
   readonly label?: string;
   /** Every option's probability, for a category. Sums to one. */
@@ -195,6 +272,11 @@ export interface InstantEvalJudgement {
   readonly skippedReason?: InstantEvalSkipReason;
   /** Input tokens the classifier billed for. Zero for a skip. */
   readonly inputTokens: number;
+  /**
+   * Output tokens the backend reported, when it reports them. A routed leg prices them at its
+   * backend's output rate; an unrouted judgement is priced from input alone (ADR-174).
+   */
+  readonly outputTokens?: number;
   readonly isTextTruncated: boolean;
   /**
    * Time this classification waited for rate-limit capacity. A run whose wall
@@ -202,6 +284,10 @@ export interface InstantEvalJudgement {
    * opposite fixes, and elapsed time alone cannot tell them apart.
    */
   readonly limiterWaitMs?: number;
+  /** What every call of a routed judgement cost us, summed; absent when the call was not routed. */
+  readonly costNanoUsd?: number;
+  /** How a routed judgement was answered; absent when the call was not routed. */
+  readonly routing?: InstantEvalJudgeRouting;
 }
 
 /** What the classifier charges, and what the customer is charged. */

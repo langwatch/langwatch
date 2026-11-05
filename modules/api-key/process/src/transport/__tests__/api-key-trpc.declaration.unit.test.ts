@@ -59,6 +59,7 @@ it("binds every declared procedure once and preserves its access declaration", (
     ]),
   ).toEqual([
     ["myBindings", "query", { ...OWN_KEYS, allow: MEMBER_ONLY }],
+    ["grantablePermissions", "query", { ...OWN_KEYS, allow: MEMBER_ONLY }],
     ["nameById", "query", { ...OWN_KEYS, allow: MEMBER_ONLY }],
     ["list", "query", { ...OWN_KEYS, allow: MEMBER_ONLY }],
     ["create", "mutation", { ...OWN_KEYS, allow: MEMBER_ONLY }],
@@ -67,6 +68,7 @@ it("binds every declared procedure once and preserves its access declaration", (
     ["orgProjects", "query", { ...KEY_ASSIGNMENT, allow: MEMBER_ONLY }],
     ["orgTeams", "query", { ...KEY_ASSIGNMENT, allow: MEMBER_ONLY }],
     ["orgMembers", "query", { ...KEY_ASSIGNMENT, allow: MEMBER_ONLY }],
+    ["mintDocsSessionKey", "mutation", "project:view"],
   ]);
 });
 

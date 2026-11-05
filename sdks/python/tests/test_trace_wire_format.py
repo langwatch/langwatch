@@ -30,7 +30,8 @@ class _Receiver(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         body = self.rfile.read(int(self.headers["Content-Length"]))
-        self.received.append((dict(self.headers), body))
+        headers = {name.lower(): value for name, value in self.headers.items()}
+        self.received.append((headers, body))
         self.send_response(200)
         self.end_headers()
 
@@ -73,8 +74,8 @@ def test_exporter_sends_gzipped_protobuf_by_default(monkeypatch, receiver) -> No
 
     headers, body = export_one_span(*receiver)
 
-    assert headers["Content-Type"] == "application/x-protobuf"
-    assert headers["Content-Encoding"] == "gzip"
+    assert headers["content-type"] == "application/x-protobuf"
+    assert headers["content-encoding"] == "gzip"
     assert span_names(gzip.decompress(body)) == ["python.llm.chat"]
 
 
@@ -89,6 +90,6 @@ def test_exporter_defers_to_the_compression_variables(
 
     headers, body = export_one_span(*receiver)
 
-    assert headers["Content-Type"] == "application/x-protobuf"
-    assert "Content-Encoding" not in headers
+    assert headers["content-type"] == "application/x-protobuf"
+    assert "content-encoding" not in headers
     assert span_names(body) == ["python.llm.chat"]

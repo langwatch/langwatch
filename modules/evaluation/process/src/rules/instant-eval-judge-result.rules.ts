@@ -8,6 +8,7 @@ import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import {
   INSTANT_EVAL_SKIP_REASONS,
   type InstantEvalJudgeRefusalCode,
+  type InstantEvalJudgeRouting,
   type InstantEvalJudgement,
 } from "@langwatch/instant-eval-judge-contract";
 
@@ -40,6 +41,31 @@ const SKIPPED_REASONS: ReadonlySet<InstantEvalJudgeSkipReason> = new Set([
 ]);
 
 export function instantEvalJudgeResult({
+  judge,
+  judgement,
+  priceUsd,
+}: {
+  judge: InstantEvalJudge;
+  judgement: InstantEvalJudgement;
+  priceUsd: number;
+}): SingleEvaluationResult {
+  const result = verdictResultOf({ judge, judgement, priceUsd });
+  const { routing } = judgement;
+  if (!routing || result.status !== "processed") return result;
+  return { ...result, details: `${result.details ?? ""}. ${routedLine(routing)}` };
+}
+
+/**
+ * Who answered a routed judgement, by the backend names the route table gives; never a
+ * provider's own words (ADR-190).
+ */
+function routedLine({ answeredBy, escalated }: InstantEvalJudgeRouting): string {
+  const backends = Object.keys(answeredBy).join(", ") || "nobody";
+  const escalation = escalated > 0 ? `, ${escalated} escalated` : "";
+  return `LangWatch Judge: answered by ${backends}${escalation}`;
+}
+
+function verdictResultOf({
   judge,
   judgement,
   priceUsd,
@@ -104,8 +130,21 @@ export function instantEvalSkipResultOf(
   if (SKIPPED_REASONS.has(reason)) {
     return { status: "skipped", details: `Instant Evals skipped this evaluation: ${reason}` };
   }
-  return errorResultOf({ code: reason });
+  const message = NEXT_STEPS[reason];
+  return errorResultOf({ code: reason, ...(message ? { message } : {}) });
 }
+
+/** What to do about a decision model that did not answer; never the provider's words (ADR-182). */
+const NEXT_STEPS: Partial<Record<InstantEvalJudgeSkipReason, string>> = {
+  classifier_key_invalid:
+    "The decision model's key is missing, switched off or refused. Check it in Settings > Model Providers.",
+  classifier_not_configured:
+    "No decision model is set up to judge this, or its model or Azure deployment name was not found. Check it in Settings > Model Providers.",
+  classifier_rate_limited: "The decision model is rate limited. Wait a moment and retry.",
+  classifier_provider_unavailable: "The decision model's provider is unavailable. Retry later.",
+  classifier_failed:
+    "The classifier refused or could not read this text. Retry; if it keeps failing, pick another decision model in Settings > Model Providers.",
+};
 
 /** A refused judge call, returned as an error naming its code so it is never read as a skip. */
 export function instantEvalRefusalResultOf({

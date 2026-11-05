@@ -1,5 +1,6 @@
 /** Codex surfaces: Langy + the FAST assists that run through the AI gateway. */
 
+import { INSTANT_EVAL_DECISION_FEATURE_KEY, isDecisionModelId } from "./decision-models.ts";
 import { featuresByRole, type ModelRole } from "./model-feature-registry.ts";
 
 /** Langy's own conversation model. */
@@ -62,6 +63,8 @@ export function isModelAllowedForFeature({
   modelId: string;
   featureKey: string;
 }): boolean {
+  if (featureKey === INSTANT_EVAL_DECISION_FEATURE_KEY) return isDecisionModelId(modelId);
+  if (isDecisionModelId(modelId)) return false;
   if (!isCodexModel(modelId)) return true;
   return isCodexAllowedFeature(featureKey);
 }
@@ -72,6 +75,9 @@ export function isModelAllowedForFeature({
  * DEFAULT and EMBEDDINGS carry general inference and stay closed.
  */
 export function isModelAllowedAsRoleDefault(modelId: string, role: ModelRole): boolean {
+  // The Instant Evals column holds decision models only, and no other role holds one (ADR-182).
+  if (role === "INSTANT_EVALS") return isDecisionModelId(modelId);
+  if (isDecisionModelId(modelId)) return false;
   if (!isCodexModel(modelId)) return true;
   return role === "LANGY" || role === "FAST";
 }

@@ -3,6 +3,9 @@
  */
 
 const KEY = "email";
+/** Set when a sign-in was refused because the password must be replaced first. */
+const RESET_REQUIRED_KEY = "reset";
+const RESET_REQUIRED_VALUE = "required";
 
 /**
  * /auth/signup with callback in query, address in fragment; URLSearchParams escapes both.
@@ -26,9 +29,17 @@ export function signUpHref({
 }
 
 /** /auth/forgot-password with the address just typed in the fragment, never the query. */
-export function forgotPasswordHref({ email }: { email?: string | null }): string {
+export function forgotPasswordHref({
+  email,
+  resetRequired = false,
+}: {
+  email?: string | null;
+  /** The sign-in was refused until the password is replaced; the screen says so. */
+  resetRequired?: boolean;
+}): string {
   const fragment = new URLSearchParams();
   if (email) fragment.set(KEY, email);
+  if (resetRequired) fragment.set(RESET_REQUIRED_KEY, RESET_REQUIRED_VALUE);
   const fragmentPart = fragment.toString();
   return `/auth/forgot-password${fragmentPart ? `#${fragmentPart}` : ""}`;
 }
@@ -39,6 +50,13 @@ export function readCarriedEmail(): string | undefined {
   const fragment = window.location.hash.replace(/^#/, "");
   if (!fragment) return void 0;
   return new URLSearchParams(fragment).get(KEY) ?? void 0;
+}
+
+/** Whether this browser arrived because its sign-in was refused until a new password is set. */
+export function readCarriedResetRequirement(): boolean {
+  if (typeof window === "undefined") return false;
+  const fragment = window.location.hash.replace(/^#/, "");
+  return new URLSearchParams(fragment).get(RESET_REQUIRED_KEY) === RESET_REQUIRED_VALUE;
 }
 
 /**

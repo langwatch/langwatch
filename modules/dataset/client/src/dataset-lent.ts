@@ -1,6 +1,10 @@
 /** Dataset UI lent by token to the modules that pick, create, edit and sync datasets (§10.1). */
 
-import type { DatasetColumn, DatasetColumns } from "@langwatch/dataset-contract";
+import type {
+  DatasetColumn,
+  DatasetColumns,
+  DrawerDatasetColumn,
+} from "@langwatch/dataset-contract";
 import { uiTokens } from "@langwatch/module";
 import type { ReactNode } from "react";
 
@@ -9,12 +13,16 @@ export type AddOrEditDatasetDrawerProps = {
   datasetToSave?: {
     datasetId?: string;
     name?: string;
-    columnTypes: DatasetColumn[];
+    columnTypes: DrawerDatasetColumn[];
     datasetRecords?: ({ id?: string } & Record<string, unknown>)[];
   };
   open?: boolean;
   onClose?: () => void;
-  onSuccess?: (dataset: { datasetId: string; name: string; columnTypes: DatasetColumn[] }) => void;
+  onSuccess?: (dataset: {
+    datasetId: string;
+    name: string;
+    columnTypes: DrawerDatasetColumn[];
+  }) => void;
   /** Apply the form without saving it: the caller holds the dataset in memory. */
   localOnly?: boolean;
   columnVisibility?: {
@@ -39,6 +47,8 @@ export type DatasetRecordSyncProps = {
     dbDatasetId: string,
     recordId: string,
   ) => ({ id: string } & Record<string, unknown>) | undefined;
+  /** The dataset's column names in order as the screen holds them; undefined skips the check. */
+  resolveColumns: (dbDatasetId: string) => string[] | undefined;
   clearPendingChange: (dbDatasetId: string, recordId: string) => void;
   onStatus: (state: "idle" | "saving" | "saved" | "error", error?: string) => void;
 };
@@ -81,6 +91,12 @@ export type UiUploadCsvDrawerProps = {
   enableDirectUpload?: boolean;
 };
 
+/** What a caller hands dataset's history drawer: the dataset whose versions it lists. */
+export type UiDatasetHistoryDrawerProps = {
+  datasetId: string;
+  onClose?: () => void;
+};
+
 const tokens = uiTokens("dataset");
 
 export const AddOrEditDatasetDrawerToken =
@@ -95,3 +111,5 @@ export const AddOrEditDatasetRoutedDrawerToken =
   tokens.drawer<AddOrEditDatasetDrawerProps>("addOrEditDataset");
 export const SelectDatasetDrawerToken = tokens.drawer<UiSelectDatasetDrawerProps>("selectDataset");
 export const UploadCsvDrawerToken = tokens.drawer<UiUploadCsvDrawerProps>("uploadCSV");
+export const DatasetHistoryDrawerToken =
+  tokens.drawer<UiDatasetHistoryDrawerProps>("datasetHistory");

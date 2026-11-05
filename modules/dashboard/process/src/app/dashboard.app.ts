@@ -11,6 +11,7 @@ import {
   type DashboardWidgetDefinitionInput,
   type LangWatchQLBudgetOverflowMode,
   type LangWatchQLCaller,
+  type LangWatchQLKeyReach,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
@@ -599,10 +600,11 @@ export class DashboardModule implements DashboardApi {
     return this.#widgets.getAll(input);
   }
 
-  /** One custom chart widget. */
+  /** One custom chart widget; with `onDashboardId`, only if it is on that board. */
   getDashboardWidget(input: {
     projectId: string;
     id: string;
+    onDashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<DashboardWidget> {
     return this.#widgets.getById(input);
@@ -615,6 +617,7 @@ export class DashboardModule implements DashboardApi {
       dashboardId?: string;
       name: string;
       viewer?: DashboardViewer;
+      keyReach?: LangWatchQLKeyReach;
     } & DashboardWidgetDefinitionInput,
   ): Promise<DashboardWidget> {
     return this.#widgets.createWidget({
@@ -629,6 +632,7 @@ export class DashboardModule implements DashboardApi {
         ...(input.source === undefined ? {} : { source: input.source }),
       },
       viewer: input.viewer,
+      keyReach: input.keyReach,
     });
   }
 
@@ -637,14 +641,18 @@ export class DashboardModule implements DashboardApi {
     input: {
       projectId: string;
       id: string;
+      onDashboardId?: string;
       name?: string;
       viewer?: DashboardViewer;
+      keyReach?: LangWatchQLKeyReach;
     } & Partial<DashboardWidgetDefinitionInput>,
   ): Promise<DashboardWidget> {
     return this.#widgets.updateWidget({
       projectId: input.projectId,
       id: input.id,
       viewer: input.viewer,
+      keyReach: input.keyReach,
+      ...(input.onDashboardId === undefined ? {} : { onDashboardId: input.onDashboardId }),
       input: {
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.code === undefined ? {} : { code: input.code }),
@@ -666,10 +674,11 @@ export class DashboardModule implements DashboardApi {
     return this.#widgets.assignToDashboard(input);
   }
 
-  /** Removes one widget. */
+  /** Removes one widget; with `onDashboardId`, only if it is on that board. */
   deleteDashboardWidget(input: {
     projectId: string;
     id: string;
+    onDashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<void> {
     return this.#widgets.deleteWidget(input);
@@ -700,12 +709,12 @@ export class DashboardModule implements DashboardApi {
     return { success: true };
   }
 
-  /** Where a reader opens the dashboards list a widget lands on. */
+  /** Where a reader opens the Dashboards list; a placed widget links to its board beneath it. */
   dashboardWidgetPlatformUrl(input: { projectSlug: string }): string {
     return dashboardPlatformUrl({
       publicBaseUrl: this.#publicBaseUrl,
       projectSlug: input.projectSlug,
-      path: "/analytics/reports",
+      path: "/dashboards",
     });
   }
 

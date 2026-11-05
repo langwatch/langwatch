@@ -22,6 +22,7 @@ import { pickAnalyticsTable } from "../clickhouse.analytics-route-table.mapper.t
 import { buildEvalSlimTimeseriesQuery } from "../clickhouse.eval-slim-timeseries-query.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 import { buildSlimTimeseriesQuery } from "../clickhouse.slim-timeseries-query.mapper.ts";
+import { ownProjectReaderOver } from "./support/clickhouse-query-client.support.ts";
 
 const TENANT_ID = `acme-dashboard-memory-${nanoid(8)}`;
 const TRACE_COUNT = 1_000_000;
@@ -118,27 +119,32 @@ function buildPanelQuery(input: AnalyticsTimeseriesInput) {
   resetParamCounter();
   switch (table) {
     case "trace_analytics":
-      return { table, ...buildSlimTimeseriesQuery(builderInput) };
+      return { table, fenced: true, ...buildSlimTimeseriesQuery(builderInput) };
     case "evaluation_analytics":
-      return { table, ...buildEvalSlimTimeseriesQuery(builderInput) };
+      return { table, fenced: true, ...buildEvalSlimTimeseriesQuery(builderInput) };
     case "trace_summaries":
     case "evaluation_runs":
-      return { table, ...buildTimeseriesQuery(builderInput) };
+      return { table, fenced: true, ...buildTimeseriesQuery(builderInput) };
     default:
       throw new Error(`panel routed to an unexpected table: ${table}`);
   }
 }
 
+/**
+ * Runs a panel's statement under the scaled-down cap. A series reads through the project's own
+ * proof, as the repository sends it; top documents still name the project by hand.
+ */
 async function runCapped<T>(
   ch: ClickHouseClient,
   query: {
     sql: string;
     params: Record<string, unknown>;
     settings?: Record<string, string | number>;
+    fenced?: boolean;
   },
   overrides: Record<string, string> = {},
 ): Promise<T[]> {
-  const result = await ch.query({
+  const statement = {
     query: query.sql,
     query_params: query.params,
     format: "JSONEachRow",
@@ -151,7 +157,12 @@ async function runCapped<T>(
       ...(query.settings?.max_bytes_in_join ? { max_bytes_in_join: SCALED_JOIN_BYTES } : {}),
       ...overrides,
     },
-  });
+  } as const;
+  if (query.fenced) {
+    const reader = ownProjectReaderOver({ client: ch, projectId: TENANT_ID });
+    return (await reader.query<T>(statement)).json();
+  }
+  const result = await ch.query(statement);
   return result.json<T>();
 }
 
@@ -438,17 +449,12 @@ describe("dashboard panels under a memory cap", () => {
     /** @scenario The documents panel reads only the RAG contexts attribute */
     it("answers within the cap with the exact distinct document total", async () => {
       resetParamCounter();
-      const query = buildTopDocumentsQuery({
-        projectId: TENANT_ID,
-        startDate: start,
-        endDate: end,
-        filters: {},
-      });
+      const query = buildTopDocumentsQuery({ startDate: start, endDate: end, filters: {} });
       const rows = await runCapped<{
         documentId: string;
         count: string;
         total: string;
-      }>(ch, query);
+      }>(ch, { ...query, fenced: true });
       expect(rows).toHaveLength(10);
       expect(Number(rows[0]?.total)).toBe(RAG_DOCUMENT_COUNT);
       expect(Number(rows[0]?.count)).toBeGreaterThan(0);

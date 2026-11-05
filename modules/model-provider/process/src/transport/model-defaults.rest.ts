@@ -82,6 +82,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
         DEFAULT: snapshot.effective.DEFAULT ?? null,
         FAST: snapshot.effective.FAST ?? null,
         EMBEDDINGS: snapshot.effective.EMBEDDINGS ?? null,
+        INSTANT_EVALS: snapshot.effective.INSTANT_EVALS ?? null,
       },
       configs: snapshot.configs.map((config) => ({
         id: config.id,
@@ -102,7 +103,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .withMiddlewareContext(modelDefaultsRestCredential)
   .withDocs({
     description:
-      "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope.",
+      "Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS, INSTANT_EVALS) or registered feature keys; missing keys inherit from a higher scope.",
     responses: baseResponses,
   })
   .handle(async ({ app, input, scope }, credential) => {

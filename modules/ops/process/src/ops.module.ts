@@ -1,5 +1,9 @@
 import { ClientAddress } from "@langwatch/api/policy";
-import { bindRestCredential, browserSessionOfRequest } from "@langwatch/api/rest";
+import {
+  bindRestCredential,
+  browserSessionOfRequest,
+  callerAddressOfRequest,
+} from "@langwatch/api/rest";
 import { EVENT_LOG_ID_INDEX } from "@langwatch/eventing/server";
 import type { OpsApi, OpsServerConfig } from "@langwatch/ops-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
@@ -59,6 +63,7 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
     // The impersonation routes record against the session the browser door resolved.
     .provideMiddlewareContext({
       browserSession: browserSessionOfRequest,
+      callerAddress: callerAddressOfRequest,
       adminAuditRequest: (request) => ({
         headers: Object.fromEntries(request.headers),
         remoteAddress: ClientAddress.resolvedFor(request) ?? undefined,
@@ -183,7 +188,7 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
         kind: "data",
         mode: "background",
         description:
-          "Grants the platform-operator role to the active users a still-set ADMIN_EMAILS names, while nobody holds it: verified ones, or with no email configured an unverified one only if it is the install's first-created account.",
+          "Grants the platform-operator role to the verified users a still-set ADMIN_EMAILS names, while nobody holds it.",
         run: async ({ dryRun }) => {
           const granted = await app.seedPlatformOperatorsFromAdminEmails({ dryRun });
           return dryRun ? { wouldGrant: granted } : { granted };

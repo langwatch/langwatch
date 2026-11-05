@@ -40,6 +40,8 @@ interface InstantEvalBudgetPeers {
     tenantIds: readonly string[];
     requestType: string;
   }): Promise<number>;
+  /** Whether the project runs on its own decision model, which the budget never binds (ADR-182). */
+  isOwnDecisionModel?(input: { projectId: string }): Promise<boolean>;
 }
 
 interface CachedSpend {
@@ -196,6 +198,7 @@ export class InstantEvalFreeBudgetService {
    */
   async #boundOrganizationOf(projectId: string): Promise<string | undefined> {
     if (!this.isBounded) return undefined;
+    if (await this.peers.isOwnDecisionModel?.({ projectId })) return undefined;
 
     const organizationId = await this.peers.findOrganizationId({ projectId });
     if (organizationId === undefined) return undefined;

@@ -1,14 +1,19 @@
-import type {
-  LangWatchQLCatalogueAccess,
-  LangWatchQLProtections,
-  LangWatchQLRunCaller,
+import {
+  LangWatchQLProjectNotFoundError,
+  type LangWatchQLCatalogueAccess,
+  type LangWatchQLProtections,
+  type LangWatchQLRunCaller,
 } from "@langwatch/analytics-contract";
 /**
  * What one caller may read of a project through LangWatchQL's catalogue: the tables and columns
  * their grants unlock (AuthZ), and captured content from the SAME resolved data-privacy policy the
  * trace stack redacts by, so a chart never disagrees with the traces.
  */
-import type { RestCredentialPrincipal } from "@langwatch/authorization";
+import {
+  projectIdsReadBy,
+  type Authorization,
+  type RestCredentialPrincipal,
+} from "@langwatch/authorization";
 import type { AuthzApi, AuthzScopeRef } from "@langwatch/authz-contract";
 import {
   isContentVisible,
@@ -17,7 +22,6 @@ import {
   type DataPrivacyApi,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
@@ -45,8 +49,9 @@ export type WorkbenchProtectionsDependencies = Readonly<{
     | "getAccessBreakdown"
     | "hasPermission"
     | "hasApiKeyPermission"
+    | "canBatchByIds"
   >;
-  dataPrivacy: Pick<DataPrivacyApi, "getResolvedForProject">;
+  dataPrivacy: Pick<DataPrivacyApi, "getResolvedForProject" | "getResolvedForProjects">;
   projects: Pick<ProjectApi, "findById">;
 }>;
 
@@ -70,6 +75,8 @@ export class WorkbenchProtectionsService {
   async resolveMemberProtections(input: {
     userId: string;
     projectId: string;
+    /** The read's proof: the policy is the strictest across it and `projectId` (ADR-177 d9). */
+    authorization?: Authorization;
   }): Promise<LangWatchQLProtections> {
     const { authz } = this.dependencies;
     const { userId, projectId } = input;
@@ -84,7 +91,11 @@ export class WorkbenchProtectionsService {
     ]);
     const canSeeCosts = holdsCostView(catalogue);
 
-    const policy = await this.policyFor(projectId);
+    const policy = await this.policyFor(
+      input.authorization
+        ? [...new Set([projectId, ...projectIdsReadBy(input.authorization, "analytics:view")])]
+        : [projectId],
+    );
     if (!policy) {
       return { canSeeCosts, canSeeCapturedInput: false, canSeeCapturedOutput: false, catalogue };
     }
@@ -117,10 +128,11 @@ export class WorkbenchProtectionsService {
   async resolveRunCaller(input: {
     userId: string;
     projectId: string;
+    authorization?: Authorization;
   }): Promise<LangWatchQLRunCaller> {
     const project = await this.dependencies.projects.findById(input.projectId);
     if (!project) {
-      throw new NotFoundError("project_not_found", { resource: "Project", id: input.projectId });
+      throw new LangWatchQLProjectNotFoundError();
     }
     const protections = await this.resolveMemberProtections(input);
     return { project: { id: project.id, lwqlKey: project.lwqlKey }, protections };
@@ -206,7 +218,7 @@ export class WorkbenchProtectionsService {
     catalogue: LangWatchQLCatalogueAccess;
   }): Promise<LangWatchQLProtections> {
     const canSeeCosts = holdsCostView(catalogue);
-    const policy = await this.policyFor(projectId);
+    const policy = await this.policyFor([projectId]);
     if (!policy) {
       return { canSeeCosts, canSeeCapturedInput: false, canSeeCapturedOutput: false, catalogue };
     }
@@ -234,7 +246,7 @@ export class WorkbenchProtectionsService {
   private async projectScope(projectId: string): Promise<ProjectScope> {
     const scope = await this.dependencies.authz.getScope({ projectId });
     if (scope.type !== "project") {
-      throw new NotFoundError("project_not_found", { resource: "Project", id: projectId });
+      throw new LangWatchQLProjectNotFoundError();
     }
     return scope;
   }
@@ -271,13 +283,22 @@ export class WorkbenchProtectionsService {
     }
   }
 
-  /** The resolved policy, or none when resolution failed -- which hides captured content. */
-  private async policyFor(projectId: string): Promise<ResolvedDataPrivacy | undefined> {
+  /**
+   * One project's policy, or the strictest across several (an aggregate and its members); none
+   * when resolution failed, which hides captured content.
+   */
+  private async policyFor(projectIds: readonly string[]): Promise<ResolvedDataPrivacy | undefined> {
+    const [projectId] = projectIds;
     try {
-      return await this.dependencies.dataPrivacy.getResolvedForProject({ projectId });
+      if (projectIds.length > 1) {
+        return await this.dependencies.dataPrivacy.getResolvedForProjects({ projectIds });
+      }
+      return projectId === undefined
+        ? undefined
+        : await this.dependencies.dataPrivacy.getResolvedForProject({ projectId });
     } catch (error) {
       logger.error(
-        { error, projectId },
+        { error, projectIds },
         "data-privacy policy resolution failed; hiding captured content (fail-closed)",
       );
       return undefined;

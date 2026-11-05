@@ -529,6 +529,7 @@ const legacyReports = defineRestRouter(ReportApi)
   .withOutput(z.object({ id: z.string() }))
   .withDocs({
     summary: "Read a report",
+    description: "Reads one report",
     responses: documentedResponses({ 404: notFoundBody }),
   })
   .handle(async ({ app, input }) => app.read({ id: input.id }))
@@ -611,9 +612,40 @@ describe("a family the declaration marked superseded", () => {
       | undefined;
 
     expect(item?.get?.deprecated).toBe(true);
-    expect(item?.get?.description).toContain("Use /api/v1/reports instead");
+    expect(item?.get?.description).toBe("Reads one report. Use /api/v1/reports instead.");
     expect(Object.keys(published.paths ?? {})).not.toContainEqual(
       expect.stringMatching(/\/(latest|\d{4}-\d{2}-\d{2})(\/|$)/),
+    );
+  });
+
+  /** @scenario "A deprecated route's successor link fills in the caller's path parameters" */
+  it("links the successor at the caller's own ids", async () => {
+    const renamed = defineRestRouter(ReportApi)
+      .withNamespace("legacy-boards")
+      .withVersion(VERSION)
+      .withAddressing("literal", { v1Twin: false })
+      .get("/api/v1/projects/:projectId/boards/:id", "getLegacyBoard")
+      .withDeprecated({ successor: "/api/v1/projects/{projectId}/dashboards/{id}" })
+      .withParams(z.object({ projectId: z.string(), id: z.string() }))
+      .withPermission("annotations:view")
+      .withOutput(z.object({ id: z.string() }))
+      .handle(async ({ app, input }) => app.read({ id: input.id }))
+      .build();
+    const app = createRestRuntime({
+      authorization: authorizationPort,
+      identity: {
+        authenticate: () => ({ actor: null, scope: { tier: "project", id: "p1" } as const }),
+      },
+    }).mount(renamed.router(), {
+      app: () => ({ read: async ({ id }: { id: string }) => ({ id }) }),
+      credential: "project",
+      onError: createErrorHandler(),
+    });
+
+    const response = await app.request("/api/v1/projects/p1/boards/b1");
+
+    expect(response.headers.get("Link")).toBe(
+      '</api/v1/projects/p1/dashboards/b1>; rel="successor-version"',
     );
   });
 

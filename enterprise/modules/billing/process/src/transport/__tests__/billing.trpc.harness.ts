@@ -5,5 +5,6 @@ export type BillingTrpcTestContext = {
   actor: { id: string } | null;
   email?: string | null;
   headers?: Record<string, string | string[] | undefined> | null;
+  callerAddress?: string | null;
   operator?: OpsOperator | null;
 };

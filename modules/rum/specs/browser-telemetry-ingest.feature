@@ -100,9 +100,9 @@ Feature: The platform's own browser telemetry reaches its collector through the 
       Then it is refused without opening a bucket for that identity
 
     @unit
-    Scenario: A caller with no session is named by the nearest proxy's address
-      When a report carries no session and a forwarded-for chain
-      Then it is counted against the last address in the chain
+    Scenario: A caller with no session is named by its resolved address
+      When a report carries no session and a forged forwarded-for chain
+      Then it is counted against the address the door resolved, not the chain
 
   Rule: rum owns the browser tracing switch it hands the page
 

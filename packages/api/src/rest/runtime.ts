@@ -8,6 +8,7 @@ import {
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, REQUEST_CAUSE_FIELD, validationMeta } from "@langwatch/observability";
+import { noteRequestCredential } from "@langwatch/observability/credential-census";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { uniqueSymbol, validator as openApiValidator } from "hono-openapi";
@@ -54,6 +55,8 @@ import {
   UnsupportedMediaTypeError,
 } from "../errors.ts";
 import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
+import { declaredPath } from "../output-issue-path.ts";
+import { withoutUndeclaredKeys } from "../output-salvage.ts";
 import { ClientAddress } from "../policy/client-address.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
 import { type RegisteredSharedPath, registerRoutePolicy } from "../route-registry.ts";
@@ -74,9 +77,11 @@ import {
   type RestConfirmationGate,
   type RestConfirmationReceipt,
 } from "./confirmation.ts";
+import { doorCredentialOf } from "./credential-census.ts";
 import {
   admittedOwnerlessProjectKeyFor,
   OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
+  recordRouteTemplate,
 } from "./credential.ts";
 import {
   DOOR_SCOPE_TIER,
@@ -111,6 +116,7 @@ import {
   documentRoute,
   requiresBody,
 } from "./openapi.ts";
+import { recordRequestPrincipal, requestPrincipalOf } from "./request-principal.ts";
 import {
   bodyLimit,
   cachedRestAnswer,
@@ -146,6 +152,7 @@ import {
   ENDPOINT_ROUTE,
   isDeclined,
   REQUEST_FAMILY,
+  ROUTE_TEMPLATE,
   withRetryAfter,
 } from "./response.ts";
 
@@ -330,6 +337,7 @@ function mountFamilyRoutes<Api>({
           ports,
           options,
           contexts,
+          template: basePath === "" ? mount.path : mergePath(basePath, mount.path),
           ...mount.context,
         }),
         policy: registryPolicy({ route, options, credential }),
@@ -408,6 +416,13 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
         for (const scope of scopes) app.use(scope, middleware);
       }
 
+      // Ahead of every bare route and guard, so a refusal or a 404 there says so too.
+      const successor = declaration.bareDeprecated ? canonicalV1Path(basePath) : null;
+      if (successor) app.use(`${basePath}/*`, deprecatedAlias({ successor }));
+
+      // Ahead of the routes: a date no route names is the version, never a `/:id` it matches.
+      if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, contexts });
+
       const served = mountFamilyRoutes({
         app,
         basePath,
@@ -419,8 +434,6 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
       });
 
       mountMethodGuards({ app, served });
-
-      if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, contexts });
 
       app.onError(withRetryAfter(protocolRefusals(withLegacyError(options.onError))));
 
@@ -538,6 +551,8 @@ function assertPortsBound<Api>({
 
     assertDoorQuestions({ address, route, door, credential });
 
+    assertLegacyKeyScopes({ address, route, door, credential });
+
     if (anonymousOnRefusal(route) && !door.identify) {
       throw new Error(
         `REST ${address} answers a refused credential as none, and this runtime ` +
@@ -593,6 +608,38 @@ function assertDoorQuestions({
 /** Whether the route asks its plan before its permission (Q31), at the credential's scope. */
 function planFirst(route: RestTransportRoute<unknown>): boolean {
   return route.entitlement?.before === "permission";
+}
+
+/**
+ * A legacy key scope is told to the project door when it asks the route's permission, so the
+ * route must ask one before the body; a door that lists its scopes refuses a name it lacks.
+ */
+function assertLegacyKeyScopes({
+  address,
+  route,
+  door,
+  credential,
+}: {
+  address: string;
+  route: RestTransportRoute<unknown>;
+  door: RestIdentity;
+  credential: RestDoorCredential;
+}): void {
+  const scopes = route.legacyKeyScopes;
+  if (!scopes) return;
+
+  if (credential !== "project" || !route.permission || identifiedFirst({ route, credential })) {
+    throw new Error(
+      `REST ${address} names a legacy key scope, which only a project door route that asks ` +
+        "its permission before the body can carry",
+    );
+  }
+  const unknown = door.legacyKeyScopes
+    ? scopes.filter((scope) => !door.legacyKeyScopes?.includes(scope))
+    : [];
+  if (unknown.length > 0) {
+    throw new Error(`REST ${address} names unknown legacy key scopes: ${unknown.join(", ")}`);
+  }
 }
 
 /** Whether the door only identifies the caller, leaving the permission to be asked later. */
@@ -772,6 +819,7 @@ function routeStack<Api>({
   ports,
   options,
   contexts,
+  template,
   version,
   status,
   paramSource = "route",
@@ -782,6 +830,8 @@ function routeStack<Api>({
   ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
   contexts: ReadonlyMap<string, MiddlewareContextBinding>;
+  /** The full path template this mount answers, which the credential census counts by. */
+  template: string;
   version: string;
   status: VersionStatus;
   paramSource?: "route" | "context";
@@ -797,7 +847,12 @@ function routeStack<Api>({
   const publishable = route.anyMethod !== true && declaration.credential !== "browser";
   const documents = documented && publishable;
   const credential = route.credential ?? declaration.credential;
-  const door = authenticateMiddleware({ route, credential, ports });
+  const door = authenticateMiddleware({
+    route,
+    credential,
+    ports,
+    template: `${route.method.toUpperCase()} ${basePathOf(declaration)}${route.path}`,
+  });
   const refusal = routeRefusal({ route, door: doorOf({ credential, ports }) });
 
   // Ahead of the validators: they read the body to parse it, and a stream
@@ -827,7 +882,7 @@ function routeStack<Api>({
   return [
     ...legacyErrorScopes(route),
     ...(refusal ? [protocolRefusalScope({ route, refusal })] : []),
-    versionContext({ route, family, version, status }),
+    versionContext({ route, family, template, version, status }),
     ...(documents
       ? [
           documentRoute({
@@ -890,13 +945,17 @@ function authenticateMiddleware({
   route,
   credential,
   ports,
+  template,
 }: {
   route: RestTransportRoute<unknown>;
   credential: RestDoorCredential;
   ports: RestRuntimeMembers;
+  /** The route as `METHOD /path/:param`, which the door may log; never the concrete URL. */
+  template: string;
 }): MiddlewareHandler {
   return async (context, next) => {
     if (route.access?.kind !== "public") {
+      recordRouteTemplate(context.req.raw, template);
       const caller = await callerOf({
         route,
         door: doorOf({ credential, ports }),
@@ -913,7 +972,21 @@ function authenticateMiddleware({
         });
       }
 
+      if (caller) {
+        noteRequestCredential(doorCredentialOf({ credential, caller, request: context.req.raw }));
+      }
       callers.set(context, caller);
+      recordRequestPrincipal({
+        context,
+        read: () =>
+          requestPrincipalOf({
+            actor: caller?.actor,
+            key:
+              caller && isKeyDoor(credential)
+                ? recordedKeyOfDoor({ door: credential, request: context.req.raw })
+                : (caller?.key ?? null),
+          }),
+      });
     }
 
     await next();
@@ -1072,11 +1145,13 @@ function deprecationLog<Api>({
 function versionContext({
   route,
   family,
+  template,
   version,
   status,
 }: {
   route: RestTransportRoute<unknown>;
   family: string;
+  template: string;
   version: string;
   status: VersionStatus;
 }): MiddlewareHandler {
@@ -1085,6 +1160,7 @@ function versionContext({
 
   return async (context, next) => {
     context.set(ENDPOINT_ROUTE, identity);
+    context.set(ROUTE_TEMPLATE, template);
     context.set(REQUEST_FAMILY, family);
 
     try {
@@ -1430,6 +1506,11 @@ function handlerMiddleware<Api>({
           actor: null,
           scope: null,
           target: null,
+          recordKey: (key) =>
+            recordRequestPrincipal({
+              context,
+              read: () => requestPrincipalOf({ actor: null, key }),
+            }),
         }),
         ...(await resolveContexts({ route, contexts, context, input })),
       );
@@ -1515,6 +1596,8 @@ function handlerMiddleware<Api>({
         scope: resolved,
         context,
         run: async () => {
+          // Before the click, so a context that refuses never shows a card or spends a click.
+          const resolvedContexts = await resolveContexts({ route, contexts, context, input });
           // After every permission check and inside the trail, so a refusal is recorded too.
           const receipt = await confirmMarkedRequest({
             mark: route.confirmation,
@@ -1544,7 +1627,7 @@ function handlerMiddleware<Api>({
                   session: sessionOf({ route, credential, caller }),
                   key: keyOf({ route, credential, request: context.req.raw }),
                 }),
-                ...(await resolveContexts({ route, contexts, context, input })),
+                ...resolvedContexts,
               ),
           });
         },
@@ -1964,6 +2047,7 @@ function handlerArguments<Api>({
   authorization = null,
   session,
   key,
+  recordKey,
 }: {
   context: Context;
   route: RestTransportRoute<Api>;
@@ -1975,6 +2059,7 @@ function handlerArguments<Api>({
   authorization?: Authorization | null;
   session?: unknown;
   key?: RestKeyCredential | undefined;
+  recordKey?: ((key: RestKeyCredential) => void) | undefined;
 }): StoredHandlerArguments<Api> {
   return {
     app: options.app(),
@@ -1996,6 +2081,7 @@ function handlerArguments<Api>({
     response: route.response
       ? producerFor({ kind: route.response.kind, accept: context.req.header("Accept") ?? "" })
       : undefined,
+    ...(recordKey ? { recordKey } : {}),
   };
 }
 
@@ -2239,6 +2325,7 @@ async function callerOf({
     permissions: routePermissions(route),
     ...(route.permissionReach ? { reach: route.permissionReach } : {}),
     ...(route.keyKinds ? { keyKinds: route.keyKinds } : {}),
+    ...(route.legacyKeyScopes ? { legacyKeyScopes: route.legacyKeyScopes } : {}),
   });
 }
 
@@ -2532,28 +2619,36 @@ function respond({
   if (route.answers) return respondDeclared({ context, route, answers: route.answers, result });
 
   const validation = route.output.safeParse(result);
+  let answer: unknown = validation.data;
 
+  // A refused answer is logged and still sent, cut to the keys the schema names.
   if (!validation.success) {
     outputLogger.error(
       {
         endpoint: context.get(ENDPOINT_ROUTE) ?? "<unregistered>",
         method: context.req.method,
         path: context.req.path,
-        validation: validationMeta(validation.error, { privacy: "schema-only" }),
+        validation: validationMeta(validation.error, {
+          privacy: "schema-only",
+          schemaPath: (path) => declaredPath(route.output as z.ZodType, path),
+        }),
       },
       "REST handler response did not match its declared output schema",
     );
 
-    throw new Error(
-      `REST ${context.req.method} ${context.req.path} answered a value its declared output schema refuses`,
-    );
+    answer = withoutUndeclaredKeys(route.output as z.ZodType, result);
+  }
+
+  // A refused answer the schema left nothing of keeps the route's own status.
+  if (answer === undefined && !validation.success) {
+    return context.body(null, (route.status ?? 200) as ContentfulStatusCode);
   }
 
   // Reachable only for a `z.void()` output: a route that declared no answer
   // always takes this branch, and every other route never does.
-  if (validation.data === undefined) return context.body(null, route.status ?? 204);
+  if (answer === undefined) return context.body(null, route.status ?? 204);
 
-  return context.json(validation.data as never, route.status ?? 200);
+  return context.json(answer as never, route.status ?? 200);
 }
 
 /**
@@ -2752,13 +2847,12 @@ function respondDeclared({
         method: context.req.method,
         path: context.req.path,
         status,
-        validation: validationMeta(validation.error, { privacy: "schema-only" }),
+        validation: validationMeta(validation.error, {
+          privacy: "schema-only",
+          schemaPath: (path) => declaredPath(schema, path),
+        }),
       },
       "REST handler response did not match the answer its declaration named",
-    );
-
-    throw new Error(
-      `REST ${route.operation} answered a body its declared ${String(status)} schema refuses`,
     );
   }
 
@@ -2766,7 +2860,14 @@ function respondDeclared({
   // record reads as one rather than as a server fault.
   context.set(DECLARED_ANSWER, true);
 
-  return context.json(validation.data as never, status as ContentfulStatusCode);
+  // A refused body is logged above and still sent, cut to the keys the schema names.
+  const body = validation.success
+    ? validation.data
+    : withoutUndeclaredKeys(schema as z.ZodType, answer.body);
+
+  if (body === undefined) return context.body(null, status as ContentfulStatusCode);
+
+  return context.json(body as never, status as ContentfulStatusCode);
 }
 
 /**
@@ -2792,7 +2893,9 @@ function mountVersionGuards<Api>({
   const namespace = VERSION_NAMESPACE;
   const fallback = dateFallback({ basePath, declaration, ports, options, contexts });
   const notFound: MiddlewareHandler = async (context, next) =>
-    anotherFamilyServesTheVersion(context) ? next() : context.notFound();
+    anotherFamilyServesTheVersion(context) || aMethodGuardFollows(context)
+      ? next()
+      : context.notFound();
 
   for (const guard of [namespace, `${namespace}/*`]) {
     const handlers: [MiddlewareHandler, ...MiddlewareHandler[]] = [fallback, notFound];
@@ -2843,6 +2946,7 @@ function dateFallback<Api>({
       ports,
       options,
       contexts,
+      template: mergePath(basePath, route.path || "/"),
       version: declaration.version,
       status: "stable",
       paramSource: "context",
@@ -2899,6 +3003,22 @@ function anotherFamilyServesTheVersion(context: Context): boolean {
   return later.some(
     (route) => servesAtVersion({ route, position, requested }) || fallbackServes(context, route),
   );
+}
+
+/**
+ * A method guard of the very version asked for follows, so a method no route of that version
+ * serves answers 405 there; one of a dynamic segment standing in for the version does not count.
+ */
+function aMethodGuardFollows(context: Context): boolean {
+  const position = versionPosition(context.req.routePath);
+  const requested = versionAsked(context, context.req.routePath);
+
+  return matchedRoutes(context)
+    .slice(context.req.routeIndex + 1)
+    .some(
+      (route) =>
+        methodGuards.has(handlerOf(route)) && route.path.split("/")[position] === requested,
+    );
 }
 
 /** A route declared at the very version asked for, not a dynamic segment standing in for it. */

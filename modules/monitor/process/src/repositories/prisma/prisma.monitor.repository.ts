@@ -20,6 +20,7 @@ import {
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { isRecordNotFoundError } from "@langwatch/prisma-client/errors";
 import { Prisma } from "@langwatch/prisma-client/generated";
+import { type Instant, toDate } from "@langwatch/time";
 
 import type { MonitorRepository } from "../monitor.repository.ts";
 
@@ -46,7 +47,15 @@ const guardrailSelect = {
   evaluatorId: true,
   checkType: true,
   parameters: true,
+  evaluatorLabel: true,
 } as const;
+
+/** Switching a monitor on clears a pause it recorded itself. */
+const NOT_AUTO_PAUSED = { autoPausedAt: null, autoPausedReason: null } as const;
+
+function clearedWhenEnabled(enabled: boolean | undefined) {
+  return enabled === true ? NOT_AUTO_PAUSED : {};
+}
 
 function mapMonitor(row: unknown): Monitor {
   return monitorSchema.parse(normalizeRow(row));
@@ -173,9 +182,32 @@ export class PrismaMonitorRepository
     await whenPresent(input.id, () =>
       this.prisma.monitor.update({
         where: { id: input.id, projectId: input.projectId },
-        data: { enabled: input.enabled },
+        data: { enabled: input.enabled, ...clearedWhenEnabled(input.enabled) },
       }),
     );
+  }
+
+  async autoPause(input: {
+    id: string;
+    projectId: string;
+    revision: Instant;
+    pausedAt: Instant;
+    reason: string;
+  }): Promise<boolean> {
+    const { count } = await this.prisma.monitor.updateMany({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        enabled: true,
+        updatedAt: toDate(input.revision),
+      },
+      data: {
+        enabled: false,
+        autoPausedAt: toDate(input.pausedAt),
+        autoPausedReason: input.reason,
+      },
+    });
+    return count === 1;
   }
 
   async create(
@@ -197,6 +229,9 @@ export class PrismaMonitorRepository
         level: input.level ?? "trace",
         threadIdleTimeout: input.threadIdleTimeout,
         slug: input.slug,
+        evaluatorLabel: input.evaluatorLabel ?? null,
+        createdById: input.actorId ?? null,
+        updatedById: input.actorId ?? null,
       },
     });
 
@@ -221,6 +256,9 @@ export class PrismaMonitorRepository
         level: input.level,
         threadIdleTimeout: input.threadIdleTimeout,
         slug: input.slug,
+        evaluatorLabel: input.evaluatorLabel ?? null,
+        createdById: input.createdById ?? null,
+        updatedById: input.createdById ?? null,
       },
     });
 
@@ -240,13 +278,17 @@ export class PrismaMonitorRepository
           parameters: input.parameters as Prisma.InputJsonValue,
           mappings: input.mappings as Prisma.InputJsonValue,
           sample: input.sample,
-          ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
+          ...(input.enabled !== undefined
+            ? { enabled: input.enabled, ...clearedWhenEnabled(input.enabled) }
+            : {}),
           executionMode: input.executionMode,
           ...(input.evaluatorId !== undefined ? { evaluatorId: input.evaluatorId } : {}),
           ...(input.level !== undefined ? { level: input.level } : {}),
           ...(input.threadIdleTimeout !== undefined
             ? { threadIdleTimeout: input.threadIdleTimeout }
             : {}),
+          ...(input.evaluatorLabel !== undefined ? { evaluatorLabel: input.evaluatorLabel } : {}),
+          ...(input.actorId !== undefined ? { updatedById: input.actorId } : {}),
           slug: input.slug,
         },
       }),
@@ -285,6 +327,7 @@ export class PrismaMonitorRepository
       sample: input.sample,
       enabled: input.enabled,
       executionMode: input.executionMode,
+      ...clearedWhenEnabled(input.enabled),
     };
 
     const row = await this.prisma.monitor.upsert({

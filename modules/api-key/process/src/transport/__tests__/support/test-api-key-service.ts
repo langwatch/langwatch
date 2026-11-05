@@ -26,6 +26,8 @@ export class TestApiKeyService implements ApiKeyApi {
   getByIdForCaller = unsupported<ApiKeyApi["getByIdForCaller"]>();
   mintRunKey = unsupported<ApiKeyApi["mintRunKey"]>();
   mintAgentSandboxKey = unsupported<ApiKeyApi["mintAgentSandboxKey"]>();
+  mintDocsSessionKey = unsupported<ApiKeyApi["mintDocsSessionKey"]>();
+  revokeDocsSessionKeys = unsupported<ApiKeyApi["revokeDocsSessionKeys"]>();
   getOrgMembers = unsupported<ApiKeyApi["getOrgMembers"]>();
   getOrgProjects = unsupported<ApiKeyApi["getOrgProjects"]>();
   getOrgTeams = unsupported<ApiKeyApi["getOrgTeams"]>();
@@ -36,6 +38,7 @@ export class TestApiKeyService implements ApiKeyApi {
   listAll = unsupported<ApiKeyApi["listAll"]>();
   listForCaller = unsupported<ApiKeyApi["listForCaller"]>();
   listCallerBindings = unsupported<ApiKeyApi["listCallerBindings"]>();
+  listGrantablePermissions = unsupported<ApiKeyApi["listGrantablePermissions"]>();
   findIngestionKeysForUser = unsupported<ApiKeyApi["findIngestionKeysForUser"]>();
   listIngestionKeysForProject = unsupported<ApiKeyApi["listIngestionKeysForProject"]>();
   listKeys = unsupported<ApiKeyApi["listKeys"]>();

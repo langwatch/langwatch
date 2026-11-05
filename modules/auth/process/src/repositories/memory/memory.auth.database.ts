@@ -45,6 +45,7 @@ export type MemoryUserRow = {
   deactivatedAt?: Date | null;
   pendingSsoSetup?: boolean;
   signupConfirmationPending?: boolean;
+  passwordResetRequiredAt?: Date | null;
   lastLoginAt?: Date | null;
 };
 

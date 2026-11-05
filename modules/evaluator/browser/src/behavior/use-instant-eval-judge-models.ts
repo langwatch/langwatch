@@ -1,6 +1,7 @@
 /**
- * The built-in judge models a project may pick: Instant Evals, when the server releases it. The
- * server weighs the flag, the opt-in and a self-hosted license, so the flag is never read here.
+ * The built-in judge models a project may pick: Instant Evals, when the server releases it, and
+ * the project's own decision models, whether or not Instant Evals are released. The server weighs
+ * every flag, the opt-in, a self-hosted license and the provider keys, so none is read here.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
@@ -25,10 +26,19 @@ export function useInstantEvalJudgeModels({ projectId }: { projectId: string | u
     { projectId: projectId ?? "" },
     { enabled: !!projectId, staleTime: 5 * 60 * 1000 },
   );
-  const released = !!access.data?.released;
+  // Own models answer to their own flag on the server, never to the Instant Evals release.
+  const decisionModels = evaluatorApi.modelProvider.listDecisionModelsForProject.useQuery(
+    { projectId: projectId ?? "" },
+    { enabled: !!projectId },
+  );
+  // Instant Evals keeps its own name and its place first; the server's hosted entry is its twin.
+  const own = (decisionModels.data ?? []).filter(
+    (model) => model.value !== INSTANT_EVALS_BUILT_IN_MODEL.value,
+  );
+  const hosted = access.data?.hostedReleased ? RELEASED : NONE;
 
   return {
-    builtInModels: released ? RELEASED : NONE,
-    isLoading: !released && access.isLoading,
+    builtInModels: own.length === 0 ? hosted : [...hosted, ...own],
+    isLoading: access.isLoading || decisionModels.isLoading,
   };
 }

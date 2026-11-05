@@ -303,8 +303,10 @@ def run(
     *,
     data: Optional[Union[List[dict], "pd.DataFrame"]] = None,
     dataset_id: Optional[str] = None,
+    dataset_version: Optional[int] = None,
     parameters: Optional[Dict[str, Any]] = None,
     row_indices: Optional[List[int]] = None,
+    concurrency: Optional[int] = None,
     poll_interval: float = 2.0,
     timeout: float = 600.0,
     on_progress: Optional[Callable[[int, int], None]] = None,
@@ -323,8 +325,16 @@ def run(
             Mutually exclusive with ``dataset_id``.
         dataset_id: Optional id of a platform dataset to evaluate. Mutually
             exclusive with ``data``.
+        dataset_version: Optional version number of the saved dataset to run.
+            Overrides the version the experiment pins; without either, the run
+            saves the dataset's current content as a version and reads that.
+            Cannot be combined with ``data``.
         parameters: Optional constants applied to every row (e.g. ``{"model": ...}``).
         row_indices: Optional subset of row indices to evaluate.
+        concurrency: Optional number of cells (one row against one target) to
+            run at once (1 to 24), for this run only; the experiment's saved
+            setting is untouched. Defaults to the server's setting. Use ``1`` to
+            run them one at a time, in order.
         poll_interval: Seconds between status checks (default: 2.0)
         timeout: Maximum seconds to wait for completion (default: 600.0 = 10 minutes)
         on_progress: Optional callback for progress updates (completed, total)
@@ -336,7 +346,9 @@ def run(
         for a per-row pandas DataFrame.
 
     Raises:
-        ValueError: If both ``data`` and ``dataset_id`` are provided
+        ValueError: If both ``data`` and ``dataset_id`` are provided, if
+            ``dataset_version`` is combined with ``data``, or is not a whole
+            number from 1
         ExperimentNotFoundError: If the experiment slug doesn't exist
         ExperimentTimeoutError: If the experiment doesn't complete within timeout
         ExperimentRunFailedError: If the experiment fails
@@ -355,6 +367,17 @@ def run(
         raise ValueError(
             "Pass either `data` or `dataset_id`, not both — they are mutually exclusive."
         )
+    if dataset_version is not None:
+        if data is not None:
+            raise ValueError(
+                "`dataset_version` names a version of a saved dataset; it cannot go with `data`."
+            )
+        if (
+            isinstance(dataset_version, bool)
+            or not isinstance(dataset_version, int)
+            or dataset_version < 1
+        ):
+            raise ValueError("`dataset_version` must be a whole number from 1.")
 
     langwatch.ensure_setup()
 
@@ -369,8 +392,10 @@ def run(
     body = _build_run_body(
         data=data,
         dataset_id=dataset_id,
+        dataset_version=dataset_version,
         parameters=parameters,
         row_indices=row_indices,
+        concurrency=concurrency,
     )
 
     # Start the run
@@ -403,8 +428,10 @@ def _build_run_body(
     *,
     data: Optional[Union[List[dict], "pd.DataFrame"]] = None,
     dataset_id: Optional[str] = None,
+    dataset_version: Optional[int] = None,
     parameters: Optional[Dict[str, Any]] = None,
     row_indices: Optional[List[int]] = None,
+    concurrency: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Assemble the JSON body for a run request, including only provided keys."""
     body: Dict[str, Any] = {}
@@ -415,10 +442,14 @@ def _build_run_body(
             body["data"] = data
     if dataset_id is not None:
         body["dataset_id"] = dataset_id
+    if dataset_version is not None:
+        body["dataset_version"] = dataset_version
     if parameters is not None:
         body["parameters"] = parameters
     if row_indices is not None:
         body["row_indices"] = row_indices
+    if concurrency is not None:
+        body["concurrency"] = concurrency
     return body
 
 

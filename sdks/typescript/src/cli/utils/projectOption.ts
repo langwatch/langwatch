@@ -16,7 +16,7 @@ export const PROJECT_FLAG_HELP =
   "Project to run against, by id or slug (default: your personal project). Needs a login that reaches it; `langwatch projects list` shows which ones do";
 
 export const QUERY_PROJECT_FLAG_HELP =
-  "Read only this project, by id or slug. Without it the statement covers every project your login can read; `langwatch projects list` shows which ones";
+  "Read only this project, by id or slug. Without it a login for several projects must name them with --projects; `langwatch projects list` shows which ones";
 
 /**
  * Commands that do not run inside a project, each with its reason: machine-local,
@@ -31,6 +31,8 @@ export const COMMANDS_WITHOUT_PROJECT: Record<string, string> = {
   cursor: "runs a coding tool on this machine",
   gemini: "runs a coding tool on this machine",
   opencode: "runs a coding tool on this machine",
+  grok: "runs a coding tool on this machine",
+  pi: "runs a coding tool on this machine",
   commands: "lists this CLI's own commands",
   docs: "prints documentation bundled with this CLI",
   "scenario-docs": "prints documentation bundled with this CLI",
@@ -169,7 +171,7 @@ export const COMMANDS_ACROSS_PROJECTS: Record<string, string> = {
   "virtual-keys disable": "acts on a virtual key by id, in whichever scope it lives",
   "virtual-keys enable": "acts on a virtual key by id, in whichever scope it lives",
   "virtual-keys revoke": "acts on a virtual key by id, in whichever scope it lives",
-  "query run": "reads every project the login can read, and --project narrows it to one",
+  "query run": "reads the projects --projects names, and --project narrows it to one",
 };
 
 /**

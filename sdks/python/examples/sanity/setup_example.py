@@ -42,7 +42,7 @@ class Question(BaseModel):
 
 def stream_openai_response(question: str):
     response = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[{"role": "user", "content": question}],
         stream=True,
         stream_options={"include_usage": True},

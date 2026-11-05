@@ -5,15 +5,19 @@
  */
 
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
+
+import { configPath } from "./config";
 
 /** Fingerprints for sessions last seen longer ago than this are pruned. */
 const STATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 
-/** `~/.langwatch/state/session-context`, beside the CLI's own config. */
+/**
+ * `state/session-context` beside the CLI's config: `~/.langwatch` by default,
+ * or wherever LANGWATCH_CLI_CONFIG puts it, so an isolated login keeps its own.
+ */
 export function defaultStateDir(): string {
-  return path.join(os.homedir(), ".langwatch", "state", "session-context");
+  return path.join(path.dirname(configPath()), "state", "session-context");
 }
 
 /**

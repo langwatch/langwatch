@@ -117,8 +117,11 @@ function fleetFingerprint(): string {
     buildStudioLambdaConfig({
       fields: {
         region: fleet.AWS_REGION,
-        accessKeyId: fleet.AWS_ACCESS_KEY_ID,
-        secretAccessKey: fleet.AWS_SECRET_ACCESS_KEY,
+        credentials: {
+          kind: "static",
+          accessKeyId: fleet.AWS_ACCESS_KEY_ID,
+          secretAccessKey: fleet.AWS_SECRET_ACCESS_KEY,
+        },
         roleArn: fleet.role_arn,
         imageUri: fleet.image_uri,
         cacheBucket: fleet.cache_bucket,

@@ -20,6 +20,7 @@ import { SessionRowActions } from "../elements/session-row-actions.tsx";
  */
 export const SessionRow: React.FC<{
   row: SessionListRow;
+  showProject: boolean;
   largestTotal: number;
   largestCost: number;
   isOpening: boolean;
@@ -29,6 +30,7 @@ export const SessionRow: React.FC<{
   onPrefetch: () => void;
 }> = ({
   row,
+  showProject,
   largestTotal,
   largestCost,
   isOpening,
@@ -44,7 +46,12 @@ export const SessionRow: React.FC<{
     aria-busy={isOpening}
   >
     <ListTable.Cell maxWidth="320px">
-      <SessionNameCell row={row} isOpening={isOpening} onOpenReplay={onOpenReplay} />
+      <SessionNameCell
+        row={row}
+        showProject={showProject}
+        isOpening={isOpening}
+        onOpenReplay={onOpenReplay}
+      />
     </ListTable.Cell>
     <ListTable.Cell tone="muted" nowrap>
       {row.agent ? <AgentLabel agent={row.agent} /> : MISSING_VALUE}

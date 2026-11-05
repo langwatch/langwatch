@@ -14,6 +14,10 @@ import {
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { describe, expect, it } from "vitest";
 
+import {
+  analyticsProof,
+  analyticsTestAuthz,
+} from "../../repositories/__tests__/analytics-proof.fixture.ts";
 import { NullAnalyticsEvaluationRepository } from "../../repositories/analytics-persistence.repository.ts";
 import {
   AnalyticsRepository,
@@ -113,6 +117,7 @@ function serviceOver(repository: AnalyticsRepository): AnalyticsService {
   return AnalyticsService.create({
     repository,
     evaluationRepository: NullAnalyticsEvaluationRepository.create(),
+    authz: analyticsTestAuthz(),
     tenantLimiter: new InProcessTenantStatementLimiter({
       maxConcurrent: 4,
       maxQueued: 64,
@@ -122,6 +127,9 @@ function serviceOver(repository: AnalyticsRepository): AnalyticsService {
     }),
   });
 }
+
+/** The route's `cost:view` proof for the one project these reads ask about. */
+const COST = { authorization: analyticsProof({ projectId: PROJECT, permission: "cost:view" }) };
 
 function read(overrides: Partial<AnalyticsReadInput> = {}): AnalyticsReadInput {
   return { projectId: PROJECT, ...WINDOW, filters: {}, ...overrides };
@@ -145,7 +153,7 @@ describe("given a project's feedback history read a page at a time", () => {
     it("returns the newest feedbacks up to the page size and the cursor of the next page", async () => {
       const repository = new HistoryRepository(HISTORY);
 
-      const page = await serviceOver(repository).getFeedbacksPage({ ...read(), limit: 3 });
+      const page = await serviceOver(repository).getFeedbacksPage({ ...read(), limit: 3 }, COST);
 
       expect(page.hasMore).toBe(true);
       expect(page.events.map(identityOf)).toEqual(
@@ -161,9 +169,9 @@ describe("given a project's feedback history read a page at a time", () => {
     it("asks the repository for the newest page of the stated size from no position", async () => {
       const repository = new HistoryRepository(HISTORY);
 
-      await serviceOver(repository).getFeedbacksPage({ ...read(), limit: 3 });
+      await serviceOver(repository).getFeedbacksPage({ ...read(), limit: 3 }, COST);
 
-      expect(repository.pageReads).toEqual([{ ...read(), after: undefined, limit: 3 }]);
+      expect(repository.pageReads).toEqual([{ ...COST, ...read(), after: undefined, limit: 3 }]);
     });
   });
 
@@ -173,14 +181,17 @@ describe("given a project's feedback history read a page at a time", () => {
       const repository = new HistoryRepository(HISTORY);
       const service = serviceOver(repository);
       const seen: string[] = [];
-      let page = await service.getFeedbacksPage({ ...read(), limit: 2 });
+      let page = await service.getFeedbacksPage({ ...read(), limit: 2 }, COST);
       seen.push(...page.events.map(identityOf));
       while (page.hasMore) {
-        page = await service.getFeedbacksPage({ ...read(), limit: 2, cursor: page.nextCursor });
+        page = await service.getFeedbacksPage(
+          { ...read(), limit: 2, cursor: page.nextCursor },
+          COST,
+        );
         seen.push(...page.events.map(identityOf));
       }
 
-      const unpaged = await service.getFeedbacks(read());
+      const unpaged = await service.getFeedbacks(read(), COST);
       expect(seen).toEqual(unpaged.events.map(identityOf));
       expect(new Set(seen).size).toBe(HISTORY.length);
       expect("nextCursor" in page).toBe(false);
@@ -189,7 +200,7 @@ describe("given a project's feedback history read a page at a time", () => {
     it("ends exactly when the history ends, not one page late", async () => {
       const repository = new HistoryRepository(HISTORY.slice(0, 4));
 
-      const page = await serviceOver(repository).getFeedbacksPage({ ...read(), limit: 4 });
+      const page = await serviceOver(repository).getFeedbacksPage({ ...read(), limit: 4 }, COST);
 
       expect(page.hasMore).toBe(false);
       expect(page.events).toHaveLength(4);
@@ -201,14 +212,14 @@ describe("given a project's feedback history read a page at a time", () => {
     it("returns what there is with no cursor", async () => {
       const service = serviceOver(new HistoryRepository(HISTORY.slice(0, 2)));
 
-      const page = await service.getFeedbacksPage(read());
+      const page = await service.getFeedbacksPage(read(), COST);
 
       expect(page.hasMore).toBe(false);
       expect(page.events).toHaveLength(2);
     });
 
     it("returns an empty end for a project with no feedbacks", async () => {
-      const page = await serviceOver(new HistoryRepository([])).getFeedbacksPage(read());
+      const page = await serviceOver(new HistoryRepository([])).getFeedbacksPage(read(), COST);
 
       expect(page).toEqual({ hasMore: false, events: [] });
     });
@@ -220,16 +231,19 @@ describe("given a project's feedback history read a page at a time", () => {
       const repository = new HistoryRepository(HISTORY);
       const service = serviceOver(repository);
       const sorted = HISTORY.toSorted(newestFirst);
-      const first = await service.getFeedbacksPage({ ...read(), limit: 3 });
+      const first = await service.getFeedbacksPage({ ...read(), limit: 3 }, COST);
       if (!first.hasMore) throw new Error("the first page of eight must have a next one");
 
       const newest = { startedAt: 8_000, traceId: "trace-z", spanId: "span-9", eventIndex: 1 };
       repository.history = [...HISTORY, newest].filter((position) => position !== sorted[2]);
-      const second = await service.getFeedbacksPage({
-        ...read(),
-        limit: 3,
-        cursor: first.nextCursor,
-      });
+      const second = await service.getFeedbacksPage(
+        {
+          ...read(),
+          limit: 3,
+          cursor: first.nextCursor,
+        },
+        COST,
+      );
 
       expect(second.events.map(identityOf)).toEqual(
         sorted.slice(3, 6).map((position) => identityOf(eventOf(position))),
@@ -240,10 +254,13 @@ describe("given a project's feedback history read a page at a time", () => {
 
   describe("when a cursor is used somewhere it was not issued", () => {
     async function issuedCursor(repository: HistoryRepository) {
-      const first = await serviceOver(repository).getFeedbacksPage({
-        ...read({ filters: { "metadata.labels": ["prod"] } }),
-        limit: 2,
-      });
+      const first = await serviceOver(repository).getFeedbacksPage(
+        {
+          ...read({ filters: { "metadata.labels": ["prod"] } }),
+          limit: 2,
+        },
+        COST,
+      );
       if (!first.hasMore) throw new Error("the first page must have a next one");
       return first.nextCursor;
     }
@@ -255,10 +272,13 @@ describe("given a project's feedback history read a page at a time", () => {
       repository.pageReads.length = 0;
 
       await expect(
-        serviceOver(repository).getFeedbacksPage({
-          ...read({ projectId: "project-2", filters: { "metadata.labels": ["prod"] } }),
-          cursor,
-        }),
+        serviceOver(repository).getFeedbacksPage(
+          {
+            ...read({ projectId: "project-2", filters: { "metadata.labels": ["prod"] } }),
+            cursor,
+          },
+          COST,
+        ),
       ).rejects.toMatchObject({
         code: "validation_error",
         meta: { fieldErrors: { cursor: expect.any(Array) } },
@@ -272,10 +292,13 @@ describe("given a project's feedback history read a page at a time", () => {
       repository.pageReads.length = 0;
 
       await expect(
-        serviceOver(repository).getFeedbacksPage({
-          ...read({ filters: { "metadata.labels": ["staging"] } }),
-          cursor,
-        }),
+        serviceOver(repository).getFeedbacksPage(
+          {
+            ...read({ filters: { "metadata.labels": ["staging"] } }),
+            cursor,
+          },
+          COST,
+        ),
       ).rejects.toMatchObject({ code: "validation_error" });
       expect(repository.pageReads).toEqual([]);
     });
@@ -283,20 +306,26 @@ describe("given a project's feedback history read a page at a time", () => {
     it("accepts the same filters written in another key order and a window that moved", async () => {
       const repository = new HistoryRepository(HISTORY);
       const filters = { "metadata.labels": ["prod"], "metadata.user_id": ["u1"] };
-      const first = await serviceOver(repository).getFeedbacksPage({
-        ...read({ filters }),
-        limit: 2,
-      });
+      const first = await serviceOver(repository).getFeedbacksPage(
+        {
+          ...read({ filters }),
+          limit: 2,
+        },
+        COST,
+      );
       if (!first.hasMore) throw new Error("the first page must have a next one");
 
-      const second = await serviceOver(repository).getFeedbacksPage({
-        ...read({
-          filters: { "metadata.user_id": ["u1"], "metadata.labels": ["prod"] },
-          endDate: WINDOW.endDate + 60_000,
-        }),
-        limit: 2,
-        cursor: first.nextCursor,
-      });
+      const second = await serviceOver(repository).getFeedbacksPage(
+        {
+          ...read({
+            filters: { "metadata.user_id": ["u1"], "metadata.labels": ["prod"] },
+            endDate: WINDOW.endDate + 60_000,
+          }),
+          limit: 2,
+          cursor: first.nextCursor,
+        },
+        COST,
+      );
 
       expect(second.events).toHaveLength(2);
     });
@@ -324,7 +353,7 @@ describe("given a project's feedback history read a page at a time", () => {
       const repository = new HistoryRepository(HISTORY);
 
       await expect(
-        serviceOver(repository).getFeedbacksPage({ ...read(), limit: 101 }),
+        serviceOver(repository).getFeedbacksPage({ ...read(), limit: 101 }, COST),
       ).rejects.toMatchObject({ code: "validation_error" });
       expect(repository.pageReads).toEqual([]);
     });
@@ -332,13 +361,13 @@ describe("given a project's feedback history read a page at a time", () => {
 
   describe("when the existing feedback read is used", () => {
     /** @scenario "The existing feedback read keeps its query and result" */
-    it("still reads the four stated fields through the old repository read, unpaged", async () => {
+    it("still reads the four stated fields and the proof through the old repository read, unpaged", async () => {
       const repository = new HistoryRepository(HISTORY);
       const filters = { "metadata.labels": ["prod"] };
 
-      const result = await serviceOver(repository).getFeedbacks(read({ filters }));
+      const result = await serviceOver(repository).getFeedbacks(read({ filters }), COST);
 
-      expect(repository.legacyReads).toEqual([{ projectId: PROJECT, ...WINDOW, filters }]);
+      expect(repository.legacyReads).toEqual([{ ...COST, projectId: PROJECT, ...WINDOW, filters }]);
       expect(repository.pageReads).toEqual([]);
       expect(Object.keys(result)).toEqual(["events"]);
     });

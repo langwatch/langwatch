@@ -5,6 +5,7 @@
  */
 
 import { UiPageNotFound } from "@langwatch/browser/page-fallbacks";
+import { VStack } from "@langwatch/design-system/primitives";
 
 import {
   DashboardRefetchIntervalContext,
@@ -12,16 +13,19 @@ import {
 } from "../../../../behavior/use-dashboard-auto-refresh.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
-import { useBoardPeriod } from "../../behavior/use-board-period.ts";
+import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
+import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
-import { boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
+import { boardSetupDraft, boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
 import { CURATED_SEGMENT } from "../../model/boards.ts";
 import { type CuratedBoard, curatedBoardById } from "../../model/curated-boards.ts";
 import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
+import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
+import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
 import { CuratedWidgetsGrid } from "./curated-widgets-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
@@ -29,8 +33,11 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
   const saved = useSavedDashboards();
-  const { range, grain, period, setRange, setGrain } = useBoardPeriod();
+  const { range } = useBoardRange();
   const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
+  const { grain, period, setRange, setGrain } = useBoardPeriod({
+    refreshedAt: autoRefresh.refreshedAt,
+  });
   const subject = boardSubject({
     board: {
       id: `${CURATED_SEGMENT}/${board.templateId}`,
@@ -41,6 +48,8 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
   });
   useBoardOnScreen({ boardId: subject.id });
   const langy = useLangyAsk();
+  const empty = useEmptyWidgets();
+  const emptyWidgetNames = empty.emptyNames({ widgets: board.widgets, keyOf: ({ key }) => key });
 
   return (
     <BoardPage
@@ -72,19 +81,32 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
       <BoardLangy board={subject} period={period} />
       <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
         <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
-          <CuratedWidgetsGrid
-            projectId={projectId}
-            projectSlug={saved.projectSlug}
-            templateId={board.templateId}
-            boardName={board.name}
-            widgets={board.widgets}
-            period={period}
-            onAskLangy={
-              langy.enabled
-                ? (widget) => langy.ask(widgetPromptDraft({ widget, board: subject, period }))
-                : undefined
-            }
-          />
+          <VStack align="stretch" gap={4}>
+            <EmptyWidgetsBanner
+              emptyWidgetNames={emptyWidgetNames}
+              onAskLangy={
+                langy.enabled
+                  ? () => langy.ask(boardSetupDraft({ emptyWidgetNames, board: subject, period }))
+                  : undefined
+              }
+            />
+            <CuratedWidgetsGrid
+              projectId={projectId}
+              projectSlug={saved.projectSlug}
+              templateId={board.templateId}
+              boardName={board.name}
+              widgets={board.widgets}
+              period={period}
+              onAskLangy={
+                langy.enabled
+                  ? (widget) => langy.ask(widgetPromptDraft({ widget, board: subject, period }))
+                  : undefined
+              }
+              onEmptyChange={({ widget, empty: isEmpty }) =>
+                empty.report({ key: widget.key, empty: isEmpty })
+              }
+            />
+          </VStack>
         </DashboardRefreshedAtContext.Provider>
       </DashboardRefetchIntervalContext.Provider>
     </BoardPage>
@@ -95,7 +117,12 @@ function Curated() {
   const templateId = useAnalyticsHost().route().params.templateId ?? "";
   const board = curatedBoardById(templateId);
   if (!board) return <UiPageNotFound />;
-  return <OpenCuratedBoard key={board.templateId} board={board} />;
+  return (
+    <>
+      <OldAnalyticsBanner />
+      <OpenCuratedBoard key={board.templateId} board={board} />
+    </>
+  );
 }
 
 export default function CuratedBoardScreen() {

@@ -117,6 +117,7 @@ pnpm start:prepare:files            # generated files (Prisma client, etc.); fix
 pnpm generate:modules               # after editing modules/catalogue.json
 pnpm sync:references                # nx sync: project references, after a dependency change
 pnpm test:affected                  # Nx: only packages this change reached, cached
+pnpm test:changed [files...]        # only the test files this change reaches by imports, any package
 pnpm typecheck                      # one root tsc -b; incremental, rechecks only what changed
 pnpm typecheck:src                  # same, without the test programs: the local default; CI runs the full one
 pnpm start:prepare:db                # upgrade + system-migrations pass; the api refuses until it ran
@@ -146,9 +147,6 @@ them. Module code never reads `process.env`.
   before committing. Don't push or open a PR unless asked.
 - British English in prose; no em dashes; no attribution lines or agent names in
   commits, PRs or specs. Never name a customer: the repo is public.
-- Every PR description fills `## Architecture` honestly: tick the box only after reading the
-  sections of `dev/docs/ARCHITECTURE.md` the change touches, and list anything unusual under
-  "Needs a human look" rather than leaving it for the reviewer to find.
 - Review feedback is one round per batch, never one push per comment. Read every
   open thread, fix the real ones, reply to the wrong ones (leave those threads
   open: the review bot only accepts a reply on an open thread), push once, then

@@ -606,6 +606,18 @@
     "./column-picker": {
       "types": "./dist/components/layout/column-picker.d.ts",
       "default": "./src/components/layout/column-picker.tsx"
+    },
+    "./deploy-label-select": {
+      "types": "./dist/components/forms/deploy-label-select.d.ts",
+      "default": "./src/components/forms/deploy-label-select.tsx"
+    },
+    "./deploy-labels-dialog": {
+      "types": "./dist/components/overlays/deploy-labels-dialog.d.ts",
+      "default": "./src/components/overlays/deploy-labels-dialog.tsx"
+    },
+    "./version-list": {
+      "types": "./dist/components/display/version-list.d.ts",
+      "default": "./src/components/display/version-list.tsx"
     }
   },
   "scripts": {
@@ -640,9 +652,9 @@
     "@emotion/react": "catalog:",
     "@langwatch/design-system-internal": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
-    "@storybook/addon-a11y": "^10.5.10",
-    "@storybook/addon-docs": "^10.5.10",
-    "@storybook/react-vite": "^10.5.10",
+    "@storybook/addon-a11y": "^10.6.2",
+    "@storybook/addon-docs": "^10.6.2",
+    "@storybook/react-vite": "^10.6.2",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/lodash-es": "catalog:",
@@ -655,7 +667,7 @@
     "playwright": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "storybook": "^10.5.10",
+    "storybook": "^10.6.2",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

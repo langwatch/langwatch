@@ -36,6 +36,8 @@ export const opsConfig = Config.define((c) => ({
     /** The Helm chart release, which moves separately from the app. */
     chartVersion: c.env("LANGWATCH_CHART_VERSION", z.string().optional()),
   },
+  /** Set, the install ignores the notices LangWatch sends with the usage report reply. */
+  noticesDisabled: c.env("DISABLE_LANGWATCH_NOTICES", environmentOneOrTrueSchema),
   /** Set, the hourly check never sends a failed step's diagnostics by itself; Send still works. */
   upgradeDiagnosticsAutoSendDisabled: c.env(
     "DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND",

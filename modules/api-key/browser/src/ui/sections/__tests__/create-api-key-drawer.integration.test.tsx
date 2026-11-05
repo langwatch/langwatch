@@ -8,12 +8,31 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { CreateApiKeyInput } from "../../../model/api-key-form.ts";
 import { renderWithApiKeyHost } from "../../../testing.tsx";
-import { CreateApiKeyDrawer, type CreateApiKeyInput } from "../create-api-key-drawer.tsx";
+import { CreateApiKeyDrawer } from "../create-api-key-drawer.tsx";
 
 const { state } = vi.hoisted(() => ({
-  state: { members: [] as { id: string; name: string; email: string }[] },
+  state: {
+    members: [] as { id: string; name: string; email: string }[],
+    /** What the server answers the ceiling with, when a test pins it. */
+    grantable: void 0 as string[] | undefined,
+  },
 }));
+
+// The ceiling is the server's answer; faked here over the seeded bindings.
+vi.mock("../../../behavior/use-grantable-permissions.ts", async () => {
+  const { fakeGrantableHook } = await import("./support/fake-grantable.ts");
+  const fromBindings = fakeGrantableHook({
+    bindings: () => [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" }],
+  });
+  return {
+    useGrantablePermissions: (args: Parameters<typeof fromBindings>[0]) => {
+      const answer = fromBindings(args);
+      return state.grantable ? { ...answer, permissions: state.grantable } : answer;
+    },
+  };
+});
 
 vi.mock("../../../behavior/api-key-api.ts", () => ({
   apiKeyApi: {
@@ -47,10 +66,19 @@ vi.mock("@langwatch/design-system/scope-filter", () => ({ ScopeFilter: () => nul
 
 vi.mock("../../blocks/permission-category-list.tsx", () => ({
   PermissionCounter: ({ count }: { count: number }) => <span data-testid="counter">{count}</span>,
-  PermissionCategoryList: ({ onChange }: { onChange: (next: Record<string, string>) => void }) => (
-    <button type="button" onClick={() => onChange({ traces: "view", datasets: "none" })}>
-      Pick traces view
-    </button>
+  PermissionCategoryList: ({
+    onChange,
+    userPermissions,
+  }: {
+    onChange: (next: Record<string, string>) => void;
+    userPermissions: string[];
+  }) => (
+    <>
+      <span data-testid="ceiling">{userPermissions.join(",")}</span>
+      <button type="button" onClick={() => onChange({ traces: "view", datasets: "none" })}>
+        Pick traces view
+      </button>
+    </>
   ),
 }));
 
@@ -122,6 +150,7 @@ async function chooseExpiration({
 
 beforeEach(() => {
   state.members = [];
+  state.grantable = void 0;
 });
 
 afterEach(() => cleanup());
@@ -408,6 +437,20 @@ describe("given an admin", () => {
       await user.click(createButton());
       expect(onCreate.mock.calls[0]?.[0]?.assignedToUserId).toBeUndefined();
       expect(onCreate.mock.calls[0]?.[0]?.keyType).toBe("personal");
+    });
+  });
+});
+
+describe("given a member whose access to the project comes through a group, not a direct grant", () => {
+  describe("when restricted permissions are chosen", () => {
+    // Their own bindings hold only the organization membership; the server's resolver,
+    // which counts the group, holds read on traces and annotations at the project.
+    it("offers the rows the server says the key may carry", async () => {
+      state.grantable = ["traces:view", "annotations:view"];
+      const user = userEvent.setup();
+      renderDrawer();
+      await user.click(screen.getByText("Restricted"));
+      expect(screen.getByTestId("ceiling").textContent).toBe("traces:view,annotations:view");
     });
   });
 });

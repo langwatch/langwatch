@@ -9,6 +9,7 @@ import { MemoryIssuedLicenseRepository } from "./memory.issued-license.repositor
 import { MemoryLicensingRateLimitRepository } from "./memory.licensing-rate-limit.repository.ts";
 import { MemoryOrganizationLicenseRepository } from "./memory.organization-license.repository.ts";
 import { MemorySelfHostedInstanceRepository } from "./memory.self-hosted-instance.repository.ts";
+import { MemorySelfHostedNoticeRepository } from "./memory.self-hosted-notice.repository.ts";
 import { MemorySignInProviderMountRepository } from "./memory.sign-in-provider-mount.repository.ts";
 import { MemoryUpgradeDiagnosticBundleRepository } from "./memory.upgrade-diagnostic-bundle.repository.ts";
 import { MemoryUpgradeDiagnosticRepository } from "./memory.upgrade-diagnostic.repository.ts";
@@ -23,6 +24,7 @@ export class MemoryLicensingRepositories {
       issuedLicenses: MemoryIssuedLicenseRepository.create(),
       activationCodes: MemoryActivationCodeRepository.create(),
       selfHostedInstances: MemorySelfHostedInstanceRepository.create(),
+      selfHostedNotices: MemorySelfHostedNoticeRepository.create(),
       connectOrganizations: MemoryConnectOrganizationRepository.create(),
       instanceIdentity: MemoryInstanceIdentityRepository.create(),
       rateLimits: MemoryLicensingRateLimitRepository.create(),

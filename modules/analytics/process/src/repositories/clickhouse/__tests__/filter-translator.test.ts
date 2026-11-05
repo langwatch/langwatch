@@ -16,7 +16,10 @@ describe("filter-translator", () => {
   describe("translateFilter()", () => {
     describe("when filtering by topic", () => {
       it("translates topics.topics filter with parameterized query", () => {
-        const result = translateFilter({ field: "topics.topics", values: ["topic-1", "topic-2"] });
+        const result = translateFilter({
+          field: "topics.topics",
+          values: ["topic-1", "topic-2"],
+        });
         expect(result.whereClause).toContain("ts.TopicId IN");
         expect(result.whereClause).toContain("{topicIds_0:Array(String)}");
         expect(result.params).toEqual({ topicIds_0: ["topic-1", "topic-2"] });
@@ -24,7 +27,10 @@ describe("filter-translator", () => {
       });
 
       it("translates topics.subtopics filter with parameterized query", () => {
-        const result = translateFilter({ field: "topics.subtopics", values: ["subtopic-1"] });
+        const result = translateFilter({
+          field: "topics.subtopics",
+          values: ["subtopic-1"],
+        });
         expect(result.whereClause).toContain("ts.SubTopicId IN");
         expect(result.whereClause).toContain("{subtopicIds_0:Array(String)}");
         expect(result.params).toEqual({ subtopicIds_0: ["subtopic-1"] });
@@ -33,7 +39,10 @@ describe("filter-translator", () => {
 
     describe("when filtering by metadata", () => {
       it("translates metadata.user_id filter with parameterized query", () => {
-        const result = translateFilter({ field: "metadata.user_id", values: ["user-1", "user-2"] });
+        const result = translateFilter({
+          field: "metadata.user_id",
+          values: ["user-1", "user-2"],
+        });
         expect(result.whereClause).toContain("ts.Attributes[{metaValues_0_key:String}]");
         expect(result.whereClause).toContain("IN ({metaValues_0:Array(String)})");
         expect(result.params).toEqual({
@@ -43,18 +52,27 @@ describe("filter-translator", () => {
       });
 
       it("translates metadata.thread_id filter with parameterized query", () => {
-        const result = translateFilter({ field: "metadata.thread_id", values: ["thread-1"] });
+        const result = translateFilter({
+          field: "metadata.thread_id",
+          values: ["thread-1"],
+        });
         expect(result.whereClause).toContain("ts.Attributes[{metaValues_0_key:String}]");
         expect(result.params).toHaveProperty("metaValues_0_key", "gen_ai.conversation.id");
       });
 
       it("translates metadata.customer_id filter with parameterized query", () => {
-        const result = translateFilter({ field: "metadata.customer_id", values: ["customer-1"] });
+        const result = translateFilter({
+          field: "metadata.customer_id",
+          values: ["customer-1"],
+        });
         expect(result.params).toHaveProperty("metaValues_0_key", "langwatch.customer_id");
       });
 
       it("translates metadata.labels filter with parameterized query", () => {
-        const result = translateFilter({ field: "metadata.labels", values: ["label1", "label2"] });
+        const result = translateFilter({
+          field: "metadata.labels",
+          values: ["label1", "label2"],
+        });
         expect(result.whereClause).toContain("hasAny");
         expect(result.whereClause).toContain("JSONExtract");
         expect(result.whereClause).toContain("langwatch.labels");
@@ -63,7 +81,10 @@ describe("filter-translator", () => {
       });
 
       it("reads a metadata.key filter from all three storage formats", () => {
-        const result = translateFilter({ field: "metadata.key", values: ["custom_key"] });
+        const result = translateFilter({
+          field: "metadata.key",
+          values: ["custom_key"],
+        });
         expect(Object.values(result.params)).toEqual(
           expect.arrayContaining([
             "metadata.custom_key",
@@ -110,7 +131,10 @@ describe("filter-translator", () => {
       describe("when filtering by origin", () => {
         /** @scenario "ClickHouse origin filter for specific values" */
         it("translates non-application origin values with IN clause", () => {
-          const result = translateFilter({ field: "traces.origin", values: ["evaluation"] });
+          const result = translateFilter({
+            field: "traces.origin",
+            values: ["evaluation"],
+          });
           expect(result.whereClause).toContain("ts.Attributes['langwatch.origin'] IN");
           expect(result.whereClause).toContain("{originValues_0:Array(String)}");
           expect(result.params).toEqual({ originValues_0: ["evaluation"] });
@@ -119,7 +143,10 @@ describe("filter-translator", () => {
 
         /** @scenario 'ClickHouse origin filter for "application" matches absent values' */
         it("translates application origin as empty-or-null-or-literal check", () => {
-          const result = translateFilter({ field: "traces.origin", values: ["application"] });
+          const result = translateFilter({
+            field: "traces.origin",
+            values: ["application"],
+          });
           expect(result.whereClause).toContain("ts.Attributes['langwatch.origin'] = ''");
           expect(result.whereClause).toContain("IS NULL");
           expect(result.whereClause).toContain("= 'application'");
@@ -142,20 +169,29 @@ describe("filter-translator", () => {
         });
 
         it("returns 1=0 for empty values array (no origins selected)", () => {
-          const result = translateFilter({ field: "traces.origin", values: [] });
+          const result = translateFilter({
+            field: "traces.origin",
+            values: [],
+          });
           expect(result.whereClause).toBe("1=1"); // empty array returns noOp from translateFilter
         });
       });
 
       it("translates traces.error filter for true using ContainsErrorStatus", () => {
-        const result = translateFilter({ field: "traces.error", values: ["true"] });
+        const result = translateFilter({
+          field: "traces.error",
+          values: ["true"],
+        });
         expect(result.whereClause).toContain("ts.ContainsErrorStatus = 1");
         expect(result.params).toEqual({});
         expect(result.requiredJoins).toHaveLength(0);
       });
 
       it("translates traces.error filter for false using ContainsErrorStatus", () => {
-        const result = translateFilter({ field: "traces.error", values: ["false"] });
+        const result = translateFilter({
+          field: "traces.error",
+          values: ["false"],
+        });
         expect(result.whereClause).toContain("ts.ContainsErrorStatus = 0");
         expect(result.whereClause).toContain("IS NULL");
         expect(result.params).toEqual({});
@@ -163,7 +199,10 @@ describe("filter-translator", () => {
       });
 
       it("returns no-op when both true and false are specified", () => {
-        const result = translateFilter({ field: "traces.error", values: ["true", "false"] });
+        const result = translateFilter({
+          field: "traces.error",
+          values: ["true", "false"],
+        });
         expect(result.whereClause).toBe("1=1");
         expect(result.params).toEqual({});
       });
@@ -171,11 +210,14 @@ describe("filter-translator", () => {
 
     describe("when filtering by span attributes", () => {
       it("translates spans.type filter with parameterized IN subquery", () => {
-        const result = translateFilter({ field: "spans.type", values: ["llm", "agent"] });
+        const result = translateFilter({
+          field: "spans.type",
+          values: ["llm", "agent"],
+        });
         // Regression guard: issue #2660
         expect(result.whereClause).not.toContain("EXISTS");
-        expect(result.whereClause).toContain("ts.TraceId IN");
-        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("(ts.TenantId, ts.TraceId) IN");
+        expect(result.whereClause).toContain("{{tenantSet}}");
         expect(result.whereClause).toContain("stored_spans");
         expect(result.whereClause).toContain("langwatch.span.type");
         expect(result.whereClause).toContain("{spanTypes_0:Array(String)}");
@@ -183,14 +225,46 @@ describe("filter-translator", () => {
       });
 
       it("translates spans.model filter with parameterized IN subquery", () => {
-        const result = translateFilter({ field: "spans.model", values: ["gpt-4", "claude-3"] });
+        const result = translateFilter({
+          field: "spans.model",
+          values: ["gpt-4", "claude-3"],
+        });
         expect(result.whereClause).not.toContain("EXISTS");
-        expect(result.whereClause).toContain("ts.TraceId IN");
-        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("(ts.TenantId, ts.TraceId) IN");
+        expect(result.whereClause).toContain("{{tenantSet}}");
         expect(result.whereClause).toContain("gen_ai.request.model");
         expect(result.whereClause).toContain("{models_0:Array(String)}");
         expect(result.params).toEqual({ models_0: ["gpt-4", "claude-3"] });
       });
+    });
+
+    describe("when a side-table filter reads a group's members through the proof", () => {
+      const SIDE_TABLE_FILTERS = [
+        { field: "spans.type", values: ["llm"] },
+        { field: "spans.model", values: ["gpt-4"] },
+        { field: "evaluations.evaluator_id", values: ["eval-1"] },
+        { field: "evaluations.evaluator_id.has_passed", values: ["eval-1"] },
+        { field: "evaluations.passed", values: ["true"], key: "eval-1" },
+        { field: "evaluations.score", values: ["0", "1"], key: "eval-1" },
+        { field: "evaluations.label", values: ["good"], key: "eval-1" },
+        { field: "evaluations.state", values: ["processed"], key: "eval-1" },
+        { field: "events.event_type", values: ["feedback"] },
+        { field: "events.metrics.key", values: ["score"], key: "feedback" },
+        { field: "events.metrics.value", values: ["0", "1"], key: "feedback", subkey: "score" },
+        { field: "events.event_details.key", values: ["note"], key: "feedback" },
+      ] as const;
+
+      for (const filter of SIDE_TABLE_FILTERS) {
+        it(`matches ${filter.field} on the trace's own tenant and id, so a trace id two members share stays apart`, () => {
+          const result = translateFilter({
+            ...filter,
+            values: [...filter.values],
+          });
+          expect(result.whereClause).toMatch(
+            /^\(ts\.TenantId, ts\.TraceId\) IN \(\s*SELECT TenantId, TraceId FROM (stored_spans|evaluation_runs)/,
+          );
+        });
+      }
     });
 
     describe("when a span or event facet filter targets stored_spans", () => {
@@ -225,7 +299,11 @@ describe("filter-translator", () => {
         });
 
         it(`omits the StartTime predicate for ${field} when none is given (unchanged behavior)`, () => {
-          const result = translateFilter({ field, values: [...values], key });
+          const result = translateFilter({
+            field,
+            values: [...values],
+            key,
+          });
           expect(result.whereClause).toContain("stored_spans");
           expect(result.whereClause).not.toContain("StartTime");
         });
@@ -249,8 +327,8 @@ describe("filter-translator", () => {
           values: ["eval-1", "eval-2"],
         });
         expect(result.whereClause).not.toContain("EXISTS");
-        expect(result.whereClause).toContain("ts.TraceId IN");
-        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("(ts.TenantId, ts.TraceId) IN");
+        expect(result.whereClause).toContain("{{tenantSet}}");
         expect(result.whereClause).toContain("evaluation_runs");
         expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
         expect(result.params).toEqual({ evaluatorIds_0: ["eval-1", "eval-2"] });
@@ -261,7 +339,7 @@ describe("filter-translator", () => {
           field: "evaluations.evaluator_id.has_passed",
           values: ["eval-1"],
         });
-        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("(ts.TenantId, ts.TraceId) IN");
         expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
         expect(result.whereClause).toContain("AND Passed IS NOT NULL");
         expect(result.params).toEqual({ evaluatorIds_0: ["eval-1"] });
@@ -272,7 +350,7 @@ describe("filter-translator", () => {
           field: "evaluations.evaluator_id.has_score",
           values: ["eval-1"],
         });
-        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("(ts.TenantId, ts.TraceId) IN");
         expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
         expect(result.whereClause).toContain("AND Score IS NOT NULL");
         expect(result.params).toEqual({ evaluatorIds_0: ["eval-1"] });
@@ -283,7 +361,7 @@ describe("filter-translator", () => {
           field: "evaluations.evaluator_id.has_label",
           values: ["eval-1"],
         });
-        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("(ts.TenantId, ts.TraceId) IN");
         expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
         expect(result.whereClause).toContain("AND Label IS NOT NULL");
         expect(result.whereClause).toContain("AND Label != ''");
@@ -292,7 +370,10 @@ describe("filter-translator", () => {
       });
 
       it("translates base evaluations.evaluator_id without additional predicates", () => {
-        const result = translateFilter({ field: "evaluations.evaluator_id", values: ["eval-1"] });
+        const result = translateFilter({
+          field: "evaluations.evaluator_id",
+          values: ["eval-1"],
+        });
         expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
         expect(result.whereClause).not.toContain("Passed IS NOT NULL");
         expect(result.whereClause).not.toContain("Score IS NOT NULL");
@@ -300,11 +381,14 @@ describe("filter-translator", () => {
       });
 
       it("translates evaluations.passed filter with parameterized IN subquery", () => {
-        const result = translateFilter({ field: "evaluations.passed", values: ["true"] });
+        const result = translateFilter({
+          field: "evaluations.passed",
+          values: ["true"],
+        });
         // Regression guard: issue #2660
         expect(result.whereClause).not.toContain("EXISTS");
-        expect(result.whereClause).toContain("ts.TraceId IN");
-        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("(ts.TenantId, ts.TraceId) IN");
+        expect(result.whereClause).toContain("{{tenantSet}}");
         expect(result.whereClause).toContain("Passed IN ({evalPassed_0:Array(UInt8)})");
         expect(result.params).toEqual({ evalPassed_0: [1] });
       });
@@ -315,7 +399,7 @@ describe("filter-translator", () => {
           values: ["true"],
           key: "eval-123",
         });
-        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("{{tenantSet}}");
         expect(result.whereClause).toContain("EvaluatorId = {evaluatorId_1:String}");
         expect(result.whereClause).toContain("Passed IN ({evalPassed_0:Array(UInt8)})");
         expect(result.params).toEqual({
@@ -330,7 +414,7 @@ describe("filter-translator", () => {
           values: ["0.5", "1.0"],
           key: "eval-123",
         });
-        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("{{tenantSet}}");
         expect(result.whereClause).toContain("Score >= {scoreMin_0:Float64}");
         expect(result.whereClause).toContain("Score <= {scoreMax_1:Float64}");
         expect(result.params).toHaveProperty("scoreMin_0", 0.5);
@@ -346,18 +430,21 @@ describe("filter-translator", () => {
         });
         // Regression guard: issue #2660
         expect(result.whereClause).not.toContain("EXISTS");
-        expect(result.whereClause).toContain("ts.TraceId IN");
-        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("(ts.TenantId, ts.TraceId) IN");
+        expect(result.whereClause).toContain("{{tenantSet}}");
         expect(result.whereClause).toContain("Label IN ({evalLabels_0:Array(String)})");
         expect(result.params).toHaveProperty("evalLabels_0", ["good", "bad"]);
         expect(result.params).toHaveProperty("evaluatorId_1", "eval-123");
       });
 
       it("translates evaluations.state filter with parameterized IN subquery", () => {
-        const result = translateFilter({ field: "evaluations.state", values: ["processed"] });
+        const result = translateFilter({
+          field: "evaluations.state",
+          values: ["processed"],
+        });
         expect(result.whereClause).not.toContain("EXISTS");
-        expect(result.whereClause).toContain("ts.TraceId IN");
-        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("(ts.TenantId, ts.TraceId) IN");
+        expect(result.whereClause).toContain("{{tenantSet}}");
         expect(result.whereClause).toContain("Status IN ({evalStates_0:Array(String)})");
         expect(result.params).toEqual({ evalStates_0: ["processed"] });
       });
@@ -371,8 +458,8 @@ describe("filter-translator", () => {
         });
         // Regression guard: issue #2660
         expect(result.whereClause).not.toContain("EXISTS");
-        expect(result.whereClause).toContain("ts.TraceId IN");
-        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("(ts.TenantId, ts.TraceId) IN");
+        expect(result.whereClause).toContain("{{tenantSet}}");
         expect(result.whereClause).toContain('hasAny("Events.Name", {eventTypes_0:Array(String)})');
         expect(result.params).toEqual({
           eventTypes_0: ["thumbs_up_down", "feedback"],
@@ -386,8 +473,8 @@ describe("filter-translator", () => {
           key: "thumbs_up_down",
         });
         expect(result.whereClause).not.toContain("EXISTS");
-        expect(result.whereClause).toContain("ts.TraceId IN");
-        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("(ts.TenantId, ts.TraceId) IN");
+        expect(result.whereClause).toContain("{{tenantSet}}");
         expect(result.whereClause).toContain("arrayExists");
         expect(result.whereClause).toContain("mapContains");
         expect(result.whereClause).toContain("{metricKeys_0:Array(String)}");
@@ -403,8 +490,8 @@ describe("filter-translator", () => {
           subkey: "vote",
         });
         expect(result.whereClause).not.toContain("EXISTS");
-        expect(result.whereClause).toContain("ts.TraceId IN");
-        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("(ts.TenantId, ts.TraceId) IN");
+        expect(result.whereClause).toContain("{{tenantSet}}");
         expect(result.whereClause).toContain("toFloat64OrNull");
         expect(result.whereClause).toContain(">= {metricMin_1:Float64}");
         expect(result.whereClause).toContain("<= {metricMax_2:Float64}");
@@ -417,13 +504,19 @@ describe("filter-translator", () => {
 
     describe("when filtering by annotation attributes", () => {
       it("translates annotations.hasAnnotation filter for true", () => {
-        const result = translateFilter({ field: "annotations.hasAnnotation", values: ["true"] });
+        const result = translateFilter({
+          field: "annotations.hasAnnotation",
+          values: ["true"],
+        });
         expect(result.whereClause).toContain("ts.HasAnnotation = true");
         expect(result.params).toEqual({});
       });
 
       it("translates annotations.hasAnnotation filter for false", () => {
-        const result = translateFilter({ field: "annotations.hasAnnotation", values: ["false"] });
+        const result = translateFilter({
+          field: "annotations.hasAnnotation",
+          values: ["false"],
+        });
         expect(result.whereClause).toContain("ts.HasAnnotation = false");
         expect(result.params).toEqual({});
       });
@@ -431,20 +524,29 @@ describe("filter-translator", () => {
 
     describe("when given edge case inputs", () => {
       it("returns no-op for empty values array", () => {
-        const result = translateFilter({ field: "topics.topics", values: [] });
+        const result = translateFilter({
+          field: "topics.topics",
+          values: [],
+        });
         expect(result.whereClause).toBe("1=1");
         expect(result.params).toEqual({});
       });
 
       it("returns no-op for unknown filter field", () => {
-        const result = translateFilter({ field: "unknown.field" as any, values: ["value"] });
+        const result = translateFilter({
+          field: "unknown.field" as any,
+          values: ["value"],
+        });
         expect(result.whereClause).toBe("1=1");
         expect(result.params).toEqual({});
       });
 
       it("passes malicious values safely through parameters", () => {
         // With parameterized queries, SQL injection attempts are safely contained
-        const result = translateFilter({ field: "topics.topics", values: ["topic'with'quotes"] });
+        const result = translateFilter({
+          field: "topics.topics",
+          values: ["topic'with'quotes"],
+        });
         expect(result.whereClause).not.toContain("topic'with'quotes");
         expect(result.params.topicIds_0).toContain("topic'with'quotes");
       });

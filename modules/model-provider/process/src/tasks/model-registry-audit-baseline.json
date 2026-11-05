@@ -1,14 +1,18 @@
 {
-  "_comment": "Price-audit findings already known and accepted. The weekly sync fails on any finding NOT listed here, so this file is the line between known debt and a new defect. Remove an entry when the underlying gap is closed; never add one to silence a finding you have not understood. Cross-source disagreements are reported but never blocking, so they do not belong here.",
+  "_comment": "Price-audit findings already known and accepted. The weekly sync fails on any finding NOT listed here, so this file is the line between known debt and a new defect. Remove an entry when the underlying gap is closed; never add one to silence a finding you have not understood. Cross-source disagreements never block. A `disagreements` key for one is still allowed when the vendor's own price page confirms the catalog side: it drops that row from the weekly report, and the reason must cite the page. When litellm is the right side instead, list the model in litellm-preferred.rules.ts rather than here.",
   "unpriced": {
     "gemini/lyria-3-clip-preview": "Music generation, priced per 30-second clip at $0.04. Both price sources report 0 per token and the catalog has no per-clip field. Tracked as a coverage gap.",
-    "gemini/lyria-3-pro-preview": "Music generation, priced per song at $0.08. Same missing per-clip unit as the clip preview."
+    "gemini/lyria-3-pro-preview": "Music generation, priced per song at $0.08. Same missing per-clip unit as the clip preview.",
+    "stealth/space-bunny-alpha": "Anonymous stealth model, reachable only through OpenRouter, which serves it free during the stealth period (prompt and completion both 0 at https://openrouter.ai/api/v1/models, checked 2026-09-25). Zero is the real price. Remove this line when it launches under its vendor's name with a price."
   },
   "unitMismatch": {
     "openai/gpt-4o-mini-tts": "Overlay prices per character, derived from OpenAI's published per-minute estimate. OpenAI bills the output side per second of speech, and the catalog has a per-second field for input only. Remove this line once an output-per-second field exists and the model imports on its own."
   },
   "disagreements": {
-    "elevenlabs/eleven_multilingual_v2::inputCostPerCharacter": "The overlay carries $0.10 per 1k characters and litellm carries $0.18. The overlay entry was written because litellm lagged a provider price cut, so litellm may now be the stale side. Needs one check against the provider's own price page.",
-    "openai/gpt-realtime-2::outputCostPerToken": "The overlay carries $24.00 per million and litellm carries $16.00, which is the previous generation's rate. The provider page is the overlay's source (https://developers.openai.com/api/docs/models/gpt-realtime-2, verified 2026-08-16), so litellm is the stale side here. Remove this line once litellm agrees."
+    "elevenlabs/eleven_multilingual_v2::inputCostPerCharacter": "The overlay carries $0.10 per 1k characters and litellm carries $0.18. ElevenLabs lists v2 Multilingual at $0.10 per 1k characters on every API tier (https://elevenlabs.io/pricing/api, checked 2026-09-25), so litellm is the stale side. Remove this line once litellm agrees.",
+    "openai/gpt-realtime-2::outputCostPerToken": "The overlay carries $24.00 per million and litellm carries $16.00, which is the previous generation's rate. The provider page is the overlay's source (https://developers.openai.com/api/docs/models/gpt-realtime-2, verified 2026-08-16), so litellm is the stale side here. Remove this line once litellm agrees.",
+    "inception/mercury-2.5::inputCostPerToken": "Catalog carries $0.04 per million, litellm carries the $0.20 list price. Inception bills the 80 percent launch discount on its own API too: $0.04 input, $0.004 cached, $0.15 output (https://docs.inceptionlabs.ai/get-started/models, checked 2026-09-25). Remove these three lines when the discount ends and OpenRouter moves back to list.",
+    "inception/mercury-2.5::inputCacheReadPerToken": "Same launch discount: $0.004 per million cached input (https://docs.inceptionlabs.ai/get-started/models, checked 2026-09-25).",
+    "inception/mercury-2.5::outputCostPerToken": "Same launch discount: $0.15 per million output (https://docs.inceptionlabs.ai/get-started/models, checked 2026-09-25)."
   }
 }

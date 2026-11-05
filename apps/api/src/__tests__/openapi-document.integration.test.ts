@@ -8,7 +8,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { RestIdentity } from "@langwatch/api/hosting";
-import { RestHost } from "@langwatch/api/rest";
+import {
+  basePathOf,
+  DASHBOARDS_API_VERSION,
+  RestHost,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import { composeApiApplication } from "@langwatch/process";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import type { Hono } from "hono";
@@ -111,6 +116,108 @@ describe("the OpenAPI document generated from the installed declarations", () =>
   /** @scenario "The generator mounts exactly the route table the api serves" */
   it("mounts exactly the REST route table the booted api serves", () => {
     expect(routeTable(describedRestApplication())).toEqual(routeTable(booted.rest.app));
+  });
+
+  /** @scenario "AC199r Split: the Reports boards answer at /api/v1/analytics/reports" */
+  it("serves the Reports boards beside the timeseries query, and no /api/v1/boards", () => {
+    const { paths } = generated as OpenApiDocument;
+    const operations = (path: string) => METHODS.filter((method) => paths[path]?.[method]);
+
+    expect({
+      timeseries: operations("/api/v1/analytics"),
+      reports: operations("/api/v1/analytics/reports"),
+      reorder: operations("/api/v1/analytics/reports/reorder"),
+      report: operations("/api/v1/analytics/reports/{reportId}"),
+      dashboards: operations("/api/v1/dashboards"),
+      boards: Object.keys(paths).filter((path) => path.startsWith("/api/v1/boards")),
+    }).toEqual({
+      timeseries: ["post"],
+      reports: ["get", "post"],
+      reorder: ["put"],
+      report: ["get", "patch", "delete"],
+      dashboards: ["get", "post"],
+      boards: [],
+    });
+  });
+
+  /** @scenario "AC199r Split: the Reports boards answer at /api/v1/analytics/reports" */
+  it("marks every Reports boards operation deprecated, and not the timeseries query", () => {
+    const { paths } = generated as OpenApiDocument;
+    const deprecated = (path: string) =>
+      METHODS.flatMap((method) => {
+        const operation = paths[path]?.[method] as { deprecated?: boolean } | undefined;
+        return operation ? [operation.deprecated === true] : [];
+      });
+
+    expect({
+      timeseries: deprecated("/api/v1/analytics"),
+      reports: deprecated("/api/v1/analytics/reports"),
+      reorder: deprecated("/api/v1/analytics/reports/reorder"),
+      report: deprecated("/api/v1/analytics/reports/{reportId}"),
+      dashboards: deprecated("/api/v1/dashboards"),
+    }).toEqual({
+      timeseries: [false],
+      reports: [true, true],
+      reorder: [true],
+      report: [true, true, true],
+      dashboards: [false, false],
+    });
+  });
+
+  /** @scenario "AC199y Names: the project-path dashboards read answers at /analytics/dashboards" */
+  it("documents /analytics/dashboards and marks the /analytics/boards spelling deprecated", () => {
+    const { paths } = generated as OpenApiDocument;
+    const project = "/api/v1/projects/{projectId}/analytics";
+    const deprecated = (path: string) =>
+      (paths[path]?.get as { deprecated?: boolean } | undefined)?.deprecated === true;
+
+    expect(
+      [
+        `${project}/dashboards`,
+        `${project}/dashboards/{dashboardId}`,
+        `${project}/boards`,
+        `${project}/boards/{dashboardId}`,
+      ].map((path) => [path in paths, deprecated(path)]),
+    ).toEqual([
+      [true, false],
+      [true, false],
+      [true, true],
+      [true, true],
+    ]);
+  });
+
+  // Across every family the api installs, not only the host test's own.
+  /** @scenario "A header leaves a path the dated family does not serve to the route that does" */
+  it("pins X-API-Version only for routes of dated families", () => {
+    const sample = (path: string) => path.replace(/:\w+(\{[^}]*\})?|\*/g, "x");
+    const literal: string[] = [];
+    const dated: string[] = [];
+    for (const module of processModules) {
+      for (const transport of module.transports ?? []) {
+        if (transport.protocol !== "rest") continue;
+        const declaration = transport.router() as RestTransportDeclaration<unknown>;
+        for (const route of declaration.routes) {
+          const asked = (path: string) => ({ method: route.method, path: sample(path) });
+          if (declaration.addressing === "literal") literal.push(JSON.stringify(asked(route.path)));
+          if (declaration.addressing === "dated") {
+            const suffix = route.path === "/" ? "" : route.path;
+            dated.push(JSON.stringify(asked(`${basePathOf(declaration)}${suffix}`)));
+          }
+        }
+      }
+    }
+    const pinned = (each: string) =>
+      booted.rest.pinnedAddressOf({ ...JSON.parse(each), header: DASHBOARDS_API_VERSION });
+
+    expect(literal.filter((each) => pinned(each) !== null)).toEqual([]);
+    expect(dated.filter((each) => pinned(each) === null)).toEqual([]);
+    expect(
+      booted.rest.pinnedAddressOf({
+        method: "POST",
+        path: "/api/v1/analytics/reports",
+        header: DASHBOARDS_API_VERSION,
+      }),
+    ).toBeNull();
   });
 
   /** @scenario "The api serves the generated document" */

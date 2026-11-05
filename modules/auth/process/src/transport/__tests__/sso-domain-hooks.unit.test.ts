@@ -9,7 +9,7 @@ import type {
  * arriving through the wrong provider.
  * @see specs/auth/phase-1-better-auth-config.feature
  */
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationAdmission, OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
@@ -68,7 +68,7 @@ function pendingInvites(inviteId: string) {
   return {
     applyPendingInvite: vi
       .fn<OrganizationApi["applyPendingInvite"]>()
-      .mockResolvedValue({ applied: true, inviteId }),
+      .mockResolvedValue({ applied: true, inviteId, role: "MEMBER" }),
   };
 }
 
@@ -102,23 +102,60 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
     flagPendingSsoSetup: unused,
     reconcileSsoAccounts: unused,
     recordLastLogin: unused,
+    clearPasswordResetRequirement: unused,
     ...members,
   };
 }
 
-function signupRepo(organization: SsoDomainOrganization | null) {
+function signupRepo(
+  organization: SsoDomainOrganization | null,
+  admission: OrganizationAdmission = { outcome: "created", seat: "MEMBER", pending: false },
+) {
   const mocks = {
     findBySsoDomain: vi
       .fn<SsoDomainOrganizations["findBySsoDomain"]>()
       .mockImplementation(async () => {
         return organization;
       }),
-    createSsoDomainMembership: vi
-      .fn<SsoDomainOrganizations["createSsoDomainMembership"]>()
-      .mockResolvedValue("created"),
+    createMembership: vi
+      .fn<SsoDomainOrganizations["createMembership"]>()
+      .mockResolvedValue(admission),
   };
   return { double: hooksRepo({}), mocks, organizations: organizationsOver(mocks) };
 }
+
+/** Everything a sign-up's auto-join reaches. */
+function signupCollaborators({
+  organizations,
+  announcements = new RecordingAnnouncements(),
+  invites = new NoInvites(),
+}: {
+  organizations: SsoDomainOrganizations;
+  announcements?: RecordingAnnouncements;
+  invites?: Pick<OrganizationApi, "applyPendingInvite">;
+}): BetterAuthHookCollaborators {
+  return {
+    linkProposals: createApiFixture<LinkProposals>(),
+    organizations,
+    federation: new LicensedFederation(),
+    invites,
+    announcements,
+    arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
+    ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
+      record: async () => undefined,
+    }),
+    ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
+      decideAccountLink: async () => ({ kind: "not_migrating" }),
+    }),
+  };
+}
+
+const NEW_ACME_USER = {
+  id: "user_new",
+  email: "new@acme.com",
+  name: "New User",
+  emailVerified: true,
+};
 
 function accountRepo({
   organization,
@@ -135,6 +172,7 @@ function accountRepo({
       name: null,
       pendingSsoSetup: false,
       signupConfirmationPending: false,
+      passwordResetRequiredAt: null,
       lastLoginAt: null,
       emailVerified: true,
     }),
@@ -158,33 +196,38 @@ describe("signing in through a domain-matched organization's identity provider",
     /** @scenario New user with matching SSO domain joins the SSO org */
     it("joins the new user to the organization as a member", async () => {
       const { mocks, organizations } = signupRepo(ACME);
-      const attachBindings = vi.fn().mockResolvedValue(undefined);
 
       await afterUserCreate({
         user: { id: "user_new", email: "new@acme.com", name: "New User", emailVerified: true },
-        collaborators: {
-          linkProposals: createApiFixture<LinkProposals>(),
-          organizations,
-          federation: new LicensedFederation(),
-          invites: new NoInvites(),
-          announcements: new RecordingAnnouncements(),
-          authzGrants: { attachBindings } as never,
-          arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
-          ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
-            record: async () => undefined,
-          }),
-          ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
-            decideAccountLink: async () => ({ kind: "not_migrating" }),
-          }),
-        },
+        collaborators: signupCollaborators({ organizations }),
       });
 
-      expect(mocks.createSsoDomainMembership).toHaveBeenCalledWith({
+      // The organization decides the seat and writes the grant, audited to the domain rule.
+      expect(mocks.createMembership).toHaveBeenCalledWith({
         userId: "user_new",
         organizationId: "org_acme",
+        admittedBy: {
+          actor: { type: "system", id: "system:sso-auto-join" },
+          commandId: "sso-auto-join:org_acme:user_new",
+        },
       });
-      expect(attachBindings).toHaveBeenCalledWith(
-        expect.objectContaining({ organizationId: "org_acme" }),
+    });
+
+    it("announces the seat the admission gave, so a Lite fallback reads as Lite", async () => {
+      const { organizations } = signupRepo(ACME, {
+        outcome: "created",
+        seat: "EXTERNAL",
+        pending: false,
+      });
+      const announcements = new RecordingAnnouncements();
+
+      await afterUserCreate({
+        user: { id: "user_new", email: "new@acme.com", name: "New User", emailVerified: true },
+        collaborators: signupCollaborators({ organizations, announcements }),
+      });
+
+      expect(announcements.ssoAutoAddNurturing).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user_new", role: "EXTERNAL" }),
       );
     });
 
@@ -192,25 +235,10 @@ describe("signing in through a domain-matched organization's identity provider",
       const { mocks, organizations } = signupRepo(ACME);
       const invites = pendingInvites("invite_1");
       const announcements = new RecordingAnnouncements();
-      const attachBindings = vi.fn().mockResolvedValue(undefined);
 
       await afterUserCreate({
         user: { id: "user_new", email: "invited@acme.com", name: "New User", emailVerified: true },
-        collaborators: {
-          linkProposals: createApiFixture<LinkProposals>(),
-          organizations,
-          federation: new LicensedFederation(),
-          invites,
-          announcements,
-          authzGrants: { attachBindings } as never,
-          arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
-          ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
-            record: async () => undefined,
-          }),
-          ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
-            decideAccountLink: async () => ({ kind: "not_migrating" }),
-          }),
-        },
+        collaborators: signupCollaborators({ organizations, invites, announcements }),
       });
 
       expect(invites.applyPendingInvite).toHaveBeenCalledWith({
@@ -218,8 +246,68 @@ describe("signing in through a domain-matched organization's identity provider",
         organizationId: "org_acme",
         email: "invited@acme.com",
       });
-      expect(mocks.createSsoDomainMembership).not.toHaveBeenCalled();
-      expect(attachBindings).not.toHaveBeenCalled();
+      expect(mocks.createMembership).not.toHaveBeenCalled();
+      expect(announcements.ssoAutoAddNurturing).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user_new", organizationId: "org_acme", role: "MEMBER" }),
+      );
+    });
+  });
+
+  describe("given every full member seat the licence covers is in use", () => {
+    /** @scenario "A new account joined by its email domain past the seats is admitted as a Lite Member" */
+    it("takes the seat the organization's admission decides, and announces the join", async () => {
+      const { mocks, organizations } = signupRepo(ACME, {
+        outcome: "created",
+        seat: "EXTERNAL",
+        pending: false,
+      });
+      const announcements = new RecordingAnnouncements();
+
+      await afterUserCreate({
+        user: NEW_ACME_USER,
+        collaborators: signupCollaborators({ organizations, announcements }),
+      });
+
+      expect(mocks.createMembership).toHaveBeenCalledTimes(1);
+      expect(announcements.announceSignup).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A new account joined by its email domain with no seat left is held with no grant" */
+    it("announces nothing for a person held pending", async () => {
+      const { organizations } = signupRepo(ACME, {
+        outcome: "created",
+        seat: "EXTERNAL",
+        pending: true,
+      });
+      const announcements = new RecordingAnnouncements();
+
+      await afterUserCreate({
+        user: NEW_ACME_USER,
+        collaborators: signupCollaborators({ organizations, announcements }),
+      });
+
+      expect(announcements.announceSignup).not.toHaveBeenCalled();
+      expect(announcements.ssoAutoAddNurturing).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a concurrent sign-in already wrote the membership", () => {
+    it("asks for the admission once and announces nothing, leaving the grant to that sign-in", async () => {
+      const { mocks, organizations } = signupRepo(ACME, {
+        outcome: "already-present",
+        seat: "MEMBER",
+        pending: false,
+      });
+      const announcements = new RecordingAnnouncements();
+
+      await afterUserCreate({
+        user: NEW_ACME_USER,
+        collaborators: signupCollaborators({ organizations, announcements }),
+      });
+
+      expect(mocks.createMembership).toHaveBeenCalledTimes(1);
+      expect(announcements.announceSignup).not.toHaveBeenCalled();
+      expect(announcements.ssoAutoAddNurturing).not.toHaveBeenCalled();
     });
   });
 
@@ -227,7 +315,6 @@ describe("signing in through a domain-matched organization's identity provider",
     /** @scenario Unverified signup with a matching ssoDomain does not auto-join the SSO org */
     it("creates no membership and no grant at the domain-matched organization", async () => {
       const { mocks, organizations } = signupRepo(ACME);
-      const attachBindings = vi.fn().mockResolvedValue(undefined);
 
       await afterUserCreate({
         user: {
@@ -236,33 +323,17 @@ describe("signing in through a domain-matched organization's identity provider",
           name: "New User",
           emailVerified: false,
         },
-        collaborators: {
-          linkProposals: createApiFixture<LinkProposals>(),
-          organizations,
-          federation: new LicensedFederation(),
-          invites: new NoInvites(),
-          announcements: new RecordingAnnouncements(),
-          authzGrants: { attachBindings } as never,
-          arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
-          ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
-            record: async () => undefined,
-          }),
-          ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
-            decideAccountLink: async () => ({ kind: "not_migrating" }),
-          }),
-        },
+        collaborators: signupCollaborators({ organizations }),
       });
 
       expect(mocks.findBySsoDomain).not.toHaveBeenCalled();
-      expect(mocks.createSsoDomainMembership).not.toHaveBeenCalled();
-      expect(attachBindings).not.toHaveBeenCalled();
+      expect(mocks.createMembership).not.toHaveBeenCalled();
     });
 
     /** @scenario Unverified signup does not claim a pending invite addressed to its email */
     it("leaves the pending invite unapplied and grants nothing", async () => {
       const { mocks, organizations } = signupRepo(ACME);
       const invites = pendingInvites("invite_1");
-      const attachBindings = vi.fn().mockResolvedValue(undefined);
 
       await afterUserCreate({
         user: {
@@ -271,26 +342,11 @@ describe("signing in through a domain-matched organization's identity provider",
           name: "New User",
           emailVerified: false,
         },
-        collaborators: {
-          linkProposals: createApiFixture<LinkProposals>(),
-          organizations,
-          federation: new LicensedFederation(),
-          invites,
-          announcements: new RecordingAnnouncements(),
-          authzGrants: { attachBindings } as never,
-          arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
-          ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
-            record: async () => undefined,
-          }),
-          ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
-            decideAccountLink: async () => ({ kind: "not_migrating" }),
-          }),
-        },
+        collaborators: signupCollaborators({ organizations, invites }),
       });
 
       expect(invites.applyPendingInvite).not.toHaveBeenCalled();
-      expect(mocks.createSsoDomainMembership).not.toHaveBeenCalled();
-      expect(attachBindings).not.toHaveBeenCalled();
+      expect(mocks.createMembership).not.toHaveBeenCalled();
     });
   });
 

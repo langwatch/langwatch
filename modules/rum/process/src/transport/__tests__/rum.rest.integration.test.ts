@@ -2,7 +2,12 @@
  * @vitest-environment node
  * `POST /api/rum/v1/traces` over the installed app, the collector stubbed at `fetch`.
  */
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import {
+  bindMiddlewareContext,
+  callerAddressContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+} from "@langwatch/api/rest";
 import { RUM_MAX_BODY_BYTES, RUM_SERVICE_NAME } from "@langwatch/react-rum/constants";
 import { RumApi } from "@langwatch/rum-contract";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
@@ -13,12 +18,18 @@ import {
   exportWith,
   rumInstallation,
 } from "../../app/__tests__/rum.fixture.ts";
+import { RUM_PER_CALLER_PER_MINUTE } from "../../rules/rum-ingest.rules.ts";
 import { rumRest } from "../rum.rest.ts";
 
 async function door({
   hasCollector = true,
   collectorHeaders,
-}: Readonly<{ hasCollector?: boolean; collectorHeaders?: string }> = {}) {
+  callerAddress = null,
+}: Readonly<{
+  hasCollector?: boolean;
+  collectorHeaders?: string;
+  callerAddress?: string | null;
+}> = {}) {
   const collector = vi.fn(
     async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(null, { status: 200 }),
   );
@@ -36,7 +47,11 @@ async function door({
       },
       identify: () => ({ actor: null, scope: null }),
     },
-  }).mount(rumRest.router(), { app: () => api, onError: canonicalErrorResponse });
+  }).mount(rumRest.router(), {
+    app: () => api,
+    onError: canonicalErrorResponse,
+    middlewareContext: [bindMiddlewareContext(callerAddressContext, () => callerAddress)],
+  });
 
   return {
     collector,
@@ -122,6 +137,23 @@ describe("POST /api/rum/v1/traces", () => {
       expect(response.status).toBe(413);
       expect(await response.json()).toMatchObject({ code: "rum_payload_too_large" });
       expect(collector).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when callers with no session forge a different forwarded-for chain each time", () => {
+    /** @scenario "Browser telemetry ingest counts the resolved address" */
+    /** @scenario "A caller with no session is named by its resolved address" */
+    it("counts every report against the one resolved address", async () => {
+      const { post } = await door({ callerAddress: "203.0.113.9" });
+      const forged = (index: number) => ({ "x-forwarded-for": `198.51.100.${index % 250}` });
+
+      for (let index = 0; index < RUM_PER_CALLER_PER_MINUTE; index++) {
+        expect((await post(exportWith(1), forged(index))).status).toBe(202);
+      }
+      const refused = await post(exportWith(1), forged(RUM_PER_CALLER_PER_MINUTE));
+
+      expect(refused.status).toBe(429);
+      expect(await refused.json()).toMatchObject({ code: "rum_rate_limited" });
     });
   });
 

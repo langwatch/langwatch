@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.post_api_v1_query_body_sources_item import PostApiV1QueryBodySourcesItem
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -24,8 +25,16 @@ class PostApiV1QueryBody:
         parameters (PostApiV1QueryBodyParameters | Unset):
         time_window (PostApiV1QueryBodyTimeWindow | Unset):
         granularity_seconds (Literal[1] | Literal[3600] | Literal[604800] | Literal[60] | Literal[86400] | Unset):
-        project_id (str | Unset): Narrows the run to this one project, which the key must hold analytics:view on.
-            Without it the run spans every project the key can read.
+        project_id (str | Unset): Reads this one project, which the key must hold analytics:view on. Send projectId or
+            projects, not both.
+        projects (list[str] | str | Unset): The projects to read, each one the key holds analytics:view on, or the
+            string "all" for every project the key can read. A key that reaches several projects must name them or send
+            "all"; a key that reads one project defaults to it. When the statement declares
+            {dashboard_context_projects:Array(String)}, params.dashboard_context_projects lists what was read.
+        sources (list[PostApiV1QueryBodySourcesItem] | Unset): The trace origins
+            {dashboard_context_sources:Array(String)} is bound to; application when absent. The placeholder does not filter
+            by itself: the statement keeps its rows with a predicate such as WHERE Source IN
+            {dashboard_context_sources:Array(String)}. A statement that never uses the placeholder counts every origin.
     """
 
     sql: str
@@ -33,6 +42,8 @@ class PostApiV1QueryBody:
     time_window: PostApiV1QueryBodyTimeWindow | Unset = UNSET
     granularity_seconds: Literal[1] | Literal[3600] | Literal[604800] | Literal[60] | Literal[86400] | Unset = UNSET
     project_id: str | Unset = UNSET
+    projects: list[str] | str | Unset = UNSET
+    sources: list[PostApiV1QueryBodySourcesItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -54,6 +65,22 @@ class PostApiV1QueryBody:
 
         project_id = self.project_id
 
+        projects: list[str] | str | Unset
+        if isinstance(self.projects, Unset):
+            projects = UNSET
+        elif isinstance(self.projects, list):
+            projects = self.projects
+
+        else:
+            projects = self.projects
+
+        sources: list[str] | Unset = UNSET
+        if not isinstance(self.sources, Unset):
+            sources = []
+            for sources_item_data in self.sources:
+                sources_item = sources_item_data.value
+                sources.append(sources_item)
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -69,6 +96,10 @@ class PostApiV1QueryBody:
             field_dict["granularitySeconds"] = granularity_seconds
         if project_id is not UNSET:
             field_dict["projectId"] = project_id
+        if projects is not UNSET:
+            field_dict["projects"] = projects
+        if sources is not UNSET:
+            field_dict["sources"] = sources
 
         return field_dict
 
@@ -128,12 +159,38 @@ class PostApiV1QueryBody:
 
         project_id = d.pop("projectId", UNSET)
 
+        def _parse_projects(data: object) -> list[str] | str | Unset:
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                projects_type_1 = cast(list[str], data)
+
+                return projects_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(list[str] | str | Unset, data)
+
+        projects = _parse_projects(d.pop("projects", UNSET))
+
+        _sources = d.pop("sources", UNSET)
+        sources: list[PostApiV1QueryBodySourcesItem] | Unset = UNSET
+        if _sources is not UNSET:
+            sources = []
+            for sources_item_data in _sources:
+                sources_item = PostApiV1QueryBodySourcesItem(sources_item_data)
+
+                sources.append(sources_item)
+
         post_api_v1_query_body = cls(
             sql=sql,
             parameters=parameters,
             time_window=time_window,
             granularity_seconds=granularity_seconds,
             project_id=project_id,
+            projects=projects,
+            sources=sources,
         )
 
         post_api_v1_query_body.additional_properties = d

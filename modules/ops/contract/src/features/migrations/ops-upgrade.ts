@@ -13,6 +13,7 @@ import {
   opsMigrationRolledBackSchema,
   opsMigrationWithdrawnSchema,
 } from "../../ops.responses.ts";
+import { selfHostedNoticeSchema } from "../../self-hosted-notice.ts";
 import {
   opsAssertLegacyWritersDrainedInputSchema,
   opsEnrollMigrationCohortInputSchema,
@@ -132,6 +133,8 @@ const opsUpgradeStatusSchemaDefinition = z.object({
   version: opsUpgradeVersionSchema,
   /** Null unless usage reporting is on and cloud named a release newer than this one. */
   latestRelease: opsUpgradeLatestReleaseSchema.nullable(),
+  /** Cloud's notices this release does not fix, security first; empty when reporting is off. */
+  notices: z.array(selfHostedNoticeSchema),
 });
 export interface OpsUpgradeStatusSchema extends Named<typeof opsUpgradeStatusSchemaDefinition> {}
 export const opsUpgradeStatusSchema: OpsUpgradeStatusSchema = opsUpgradeStatusSchemaDefinition;

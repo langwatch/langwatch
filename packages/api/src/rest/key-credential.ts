@@ -100,7 +100,8 @@ function projectKeyKindOf(
   credential: Extract<RestResolvedProjectCredential, { type: "apiKey" }>,
 ): RestKeyKind {
   if (credential.isLangySessionKey === true) return "langy_session_key";
-  if (credential.ingestionTemplateId !== null) return "ingestion_key";
+  // A source type is what makes a key an ingestion key; a template is optional on one.
+  if (credential.ingestSourceType) return "ingestion_key";
 
   return "api_key";
 }

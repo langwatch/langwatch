@@ -14,6 +14,7 @@ import {
   AuthUnavailableError,
   FrontDoorRateLimitedError,
   NoAddressToConfirmError,
+  type AppPage,
   type AuthApi as AuthApiContract,
   type AuthServerConfig,
   type BrowserSessionInventoryEntry,
@@ -38,7 +39,7 @@ import {
   isEmailPasswordEnabled,
   type SocialProviderBases,
 } from "@langwatch/auth-contract";
-import { AuthzApi, type AuthzGrantsService } from "@langwatch/authz-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
 import {
   configuredAuthProvider,
@@ -63,7 +64,11 @@ import {
 } from "@langwatch/identity-contract";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { OrganizationApi, type InviteLanding } from "@langwatch/organization-contract";
+import {
+  OrganizationApi,
+  type InviteLanding,
+  type OrganizationUserRole,
+} from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
@@ -128,7 +133,6 @@ import type { AuthRateLimitRepository } from "../repositories/auth-rate-limit.re
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
-import { providerAccountIssuer } from "../rules/provider-account-issuer.rules.ts";
 import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { buildSignUpVerificationUrl } from "../rules/signup-verification-link.rules.ts";
@@ -136,6 +140,7 @@ import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins
 import { AccountLifecycleService } from "../services/account-lifecycle.service.ts";
 import { AddressConfirmationService } from "../services/address-confirmation.service.ts";
 import type { CliAccessProject } from "../services/api-rest-credentials.service.ts";
+import { AppPageOpenedService } from "../services/app-page-opened.service.ts";
 import { AuthDoorService } from "../services/auth-door.service.ts";
 import {
   AuthLifecycleNoticeService,
@@ -151,7 +156,11 @@ import {
   type LegacySsoAccessConnections,
   type LegacySsoAccessMemberships,
 } from "../services/legacy-sso-access.service.ts";
-import { type CredentialAccounts, OwnPasswordService } from "../services/own-password.service.ts";
+import {
+  type CredentialAccounts,
+  OwnPasswordService,
+  type PasswordResetMarks,
+} from "../services/own-password.service.ts";
 import { OwnSignInMethodService } from "../services/own-sign-in-method.service.ts";
 import { PriorSessionService } from "../services/prior-session.service.ts";
 import { ProjectAuthTokenService } from "../services/project-auth-token.service.ts";
@@ -191,7 +200,8 @@ type AuthAppPeers = Readonly<{
   featureFlags: FeatureFlagApi;
   identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation" | "resolveEmail">;
   /** The sign-up policy, and the invitation an invite link lands on (organization's). */
-  organizations: SignUpPolicy & Pick<OrganizationApi, "getInviteLanding" | "requestFreshInvite">;
+  organizations: SignUpPolicy &
+    Pick<OrganizationApi, "getInviteLanding" | "requestFreshInvite" | "countMembershipsForUser">;
   /** The account writes auth's lifecycle doors run before ending credentials. */
   users: Pick<
     UserApi,
@@ -304,6 +314,7 @@ export class AuthModule implements AuthApiContract {
   readonly #twoStep: TwoStepVerificationService;
   /** Where a session and a domain auto-join are recorded as auth's events. */
   readonly #lifecycle: AuthLifecycleNoticeService;
+  readonly #appPageOpened: AppPageOpenedService;
   /** The account writes that end credentials: deactivation and an address change. */
   readonly #accounts: AccountLifecycleService;
   readonly #ownPasswords: OwnPasswordService;
@@ -397,6 +408,7 @@ export class AuthModule implements AuthApiContract {
     addressConfirmation,
     priorSessions,
     twoStep,
+    passwordResetMarks,
   }: {
     sessions: BrowserSessionService;
     cliSessions: CliDeviceSessionService;
@@ -414,6 +426,7 @@ export class AuthModule implements AuthApiContract {
     addressConfirmation: AddressConfirmationService;
     priorSessions: PriorSessionService;
     twoStep: TwoStepVerificationService;
+    passwordResetMarks: PasswordResetMarks;
   }) {
     this.#sessions = sessions;
     this.#cliSessions = cliSessions;
@@ -435,6 +448,11 @@ export class AuthModule implements AuthApiContract {
       reportError: (error) =>
         logger.error({ error }, "a sign-in milestone was not recorded for nurturing"),
     });
+    this.#appPageOpened = AppPageOpenedService.create({
+      organizations: dependencies.organizations,
+      lifecycle: this.#lifecycle,
+      reportError: (error) => logger.error({ error }, "a page open was not recorded for nurturing"),
+    });
     this.#accounts = AccountLifecycleService.create({
       users: dependencies.users,
       credentials: {
@@ -448,6 +466,7 @@ export class AuthModule implements AuthApiContract {
       credentials: credentialAccounts,
       auth: this,
       issuesOwnPasswords: () => this.#issuesOwnPasswords,
+      passwordResetMarks,
     });
     this.#ownSignInMethods = OwnSignInMethodService.create({
       credentials: credentialAccounts,
@@ -512,6 +531,7 @@ export class AuthModule implements AuthApiContract {
         now,
       }),
       operators: dependencies.authz,
+      docsKeys: dependencies.apiKeys,
       now,
     });
 
@@ -542,6 +562,7 @@ export class AuthModule implements AuthApiContract {
     };
 
     const app = new AuthModule({
+      passwordResetMarks: accountRows,
       sessions,
       cliSessions,
       cliDeviceFlow: {
@@ -584,6 +605,8 @@ export class AuthModule implements AuthApiContract {
           checkSignUp,
           getInviteLanding: (input) => dependencies.organizations.getInviteLanding(input),
           requestFreshInvite: (input) => dependencies.organizations.requestFreshInvite(input),
+          countMembershipsForUser: (input) =>
+            dependencies.organizations.countMembershipsForUser(input),
         },
         users: dependencies.users,
       },
@@ -715,7 +738,6 @@ export class AuthModule implements AuthApiContract {
             repositories,
             sharedStorage: repositories.sessionCache !== null,
             auth: app,
-            grants: dependencies.authz,
             organizations: dependencies.organizations,
             signUpPolicy: { checkSignUp },
             sendResetPassword: AuthModule.passwordResetSender({
@@ -844,7 +866,7 @@ export class AuthModule implements AuthApiContract {
 
   validateProjectAuthToken(input: {
     token: string | undefined;
-    forwardedFor: string | undefined;
+    callerAddress: string | null;
   }): Promise<{ projectSlug: string }> {
     return this.#projectTokens.validateProjectAuthToken(input);
   }
@@ -1003,6 +1025,15 @@ export class AuthModule implements AuthApiContract {
     currentSessionId?: string | undefined;
   }): Promise<{ ended: number }> {
     return this.#sessions.endBrowserSession(input);
+  }
+
+  recordPageOpened(input: {
+    userId: string;
+    browserSessionId: string | null;
+    page: AppPage;
+    impersonatorId?: string | undefined;
+  }): Promise<void> {
+    return this.#appPageOpened.record(input);
   }
 
   endBrowserSessionsForIdentifier(input: {
@@ -1276,7 +1307,6 @@ function betterAuthCredentialAccounts(
       ).internalAdapter.linkAccount({
         userId,
         providerId: "credential",
-        issuer: providerAccountIssuer({ connectionIssuer: undefined, provider: "credential" }),
         accountId: userId,
         password: passwordHash,
       });
@@ -1518,6 +1548,7 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
     userId: string;
     organizationId: string;
     organizationName: string;
+    role: OrganizationUserRole;
   }): void {
     this.lifecycle.ssoAutoAdded(input);
   }
@@ -1590,17 +1621,12 @@ type BuildBetterAuthOptions = Readonly<{
   sharedStorage: boolean;
   /** The Auth application whose sessions this instance mints and revokes. */
   auth: AuthApiContract;
-  /** The grants ledger an SSO domain auto-join writes its organization binding to. */
-  grants: AuthzGrantsService;
   /**
    * Where a domain auto-join applies the pending invite an address already holds.
    */
   organizations: Pick<
     OrganizationApi,
-    | "applyPendingInvite"
-    | "findBySsoDomain"
-    | "createSsoDomainMembership"
-    | "countMembershipsForUser"
+    "applyPendingInvite" | "findBySsoDomain" | "createMembership" | "countMembershipsForUser"
   >;
   /** Who the installation lets create an account: the app's composed sign-up verdict. */
   signUpPolicy: SignUpPolicy;
@@ -1724,7 +1750,6 @@ async function buildBetterAuth(options: BuildBetterAuthOptions): Promise<BetterA
       lifecycle: options.lifecycle,
     }),
     shadow: OffSignInRouterShadow.create(),
-    authzGrants: options.grants,
     arrivals: IdentitySsoArrivals.create(options.identityApi),
     ssoActivity: {
       record: (args) => options.identityApi.ssoActivity().record(args),

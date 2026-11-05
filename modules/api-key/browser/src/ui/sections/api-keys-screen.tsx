@@ -30,9 +30,11 @@ import { Key, Plus } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
-import { useLegacyKeyPresent } from "../../behavior/use-legacy-key-status.ts";
+import { type LegacyProjectKey, useLegacyKeys } from "../../behavior/use-legacy-keys.ts";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
+import type { CreateApiKeyInput } from "../../model/api-key-form.ts";
 import { API_KEY_SCOPE_QUERY_KEY, useApiKeyHost } from "../../model/api-key-host.ts";
+import { findBindingAtScope } from "../../model/api-key-permissions.ts";
 import {
   filterRowsByScope,
   scopeFilterAddressWrite,
@@ -40,15 +42,26 @@ import {
   scopeHierarchyOf,
   type ScopeFilterValue,
 } from "../../model/api-key-scope-filter.ts";
+import { legacyKeyReplacementInput } from "../../model/legacy-key-replacement.ts";
 import { IngestionKeysSection } from "../blocks/ingestion-keys-section.tsx";
+import { LegacyKeyRevokedNotice } from "../blocks/legacy-key-revoked-notice.tsx";
 import { LegacyProjectKeyBanner } from "../blocks/legacy-project-key-banner.tsx";
 import { RevokeConfirmDialog } from "../blocks/revoke-confirm-dialog.tsx";
-import { CreateApiKeyDrawer, type CreateApiKeyInput } from "./create-api-key-drawer.tsx";
+import { RevokeLegacyKeyDialog } from "../blocks/revoke-legacy-key-dialog.tsx";
+import { CreateApiKeyDrawer } from "./create-api-key-drawer.tsx";
 import { EditApiKeyDrawer } from "./edit-api-key-drawer.tsx";
 import { TokenCreatedDialog } from "./token-created-dialog.tsx";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */
 type ApiKeyRow = WireOf<ApiKeyListEntry>;
+
+/** Whether the reads that decide a swapped key's type and role have all answered. */
+function readerAccess(
+  reads: readonly { data: unknown; isError: boolean }[],
+): "loading" | "failed" | "ready" {
+  if (reads.some((read) => read.isError)) return "failed";
+  return reads.every((read) => read.data !== undefined) ? "ready" : "loading";
+}
 
 /** Why a create request cannot be sent, or null when it can. */
 function createInputProblem(
@@ -67,19 +80,6 @@ function createInputProblem(
     description:
       "You have no role bindings in this organization, so there is nothing to grant to a key.",
   };
-}
-
-/** Whether a just-created key can reach this project, for the setup snippet's picker. */
-function isProjectReachable({
-  project,
-  keyInput,
-}: {
-  project: { id: string };
-  keyInput: CreateApiKeyInput | null;
-}): boolean {
-  if (!keyInput || keyInput.keyType === "service") return true;
-  if (keyInput.permissionMode !== "restricted") return true;
-  return keyInput.bindings.some((binding) => binding.scopeId === project.id);
 }
 
 function isExpired(key: ApiKeyRow): boolean {
@@ -247,6 +247,102 @@ function ApiKeyTableRow({
   );
 }
 
+/** The project's legacy key as a row: it can only be revoked, never read or rotated (ADR-002). */
+function LegacyKeyTableRow({
+  legacyKey,
+  onRevoke,
+}: {
+  legacyKey: LegacyProjectKey;
+  onRevoke: () => void;
+}) {
+  return (
+    <ListTable.Row data-testid="legacy-key-row" data-project-id={legacyKey.projectId}>
+      <ListTable.Cell>
+        <HStack align="start">
+          <Box paddingTop={1} color="fg.muted" flexShrink={0}>
+            <Key size={14} />
+          </Box>
+          <VStack align="start" gap={0} minWidth={0}>
+            <HStack gap={2} maxWidth="full" minWidth={0}>
+              <Text textStyle="label" flex={1} minWidth={0} truncate>
+                Project key
+              </Text>
+              <Badge size="sm" colorPalette="orange" flexShrink={0}>
+                Legacy
+              </Badge>
+            </HStack>
+            <Text textStyle="caption" color="fg.muted" maxWidth="full" lineClamp={2}>
+              Revoke it to get an API key in its place.
+            </Text>
+          </VStack>
+        </HStack>
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <IdText value="sk-lw-…" label="secret key prefix" copyable={false} />
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <VStack align="start" gap={0}>
+          <EmptyValue label="No owner" />
+          <Text textStyle="caption" color="fg.muted">
+            Project key
+          </Text>
+        </VStack>
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <VStack align="start" gap={0} minWidth={0}>
+          <ProviderScopeChips
+            size="xs"
+            scopes={[
+              {
+                scopeType: "PROJECT",
+                scopeId: legacyKey.projectId,
+                name: legacyKey.projectName,
+              },
+            ]}
+          />
+          <Text textStyle="caption" color="fg.muted">
+            {legacyKey.projectSlug}
+          </Text>
+        </VStack>
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <PermissionBadge permissionMode="all" />
+      </ListTable.Cell>
+      <ListTable.Cell nowrap>
+        {legacyKey.lastUsedAt ? (
+          <FormattedDate value={legacyKey.lastUsedAt} display="relative" />
+        ) : (
+          <EmptyValue label="Never used" />
+        )}
+      </ListTable.Cell>
+      <ListTable.ActionCell>
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button
+              size="xs"
+              variant="ghost"
+              aria-label={`Actions for the legacy project key of ${legacyKey.projectName} (${legacyKey.projectSlug})`}
+              data-testid="legacy-key-actions"
+            >
+              <MoreVerticalIcon size={14} />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item
+              value="revoke"
+              color="fg.error"
+              data-testid="legacy-key-revoke"
+              onClick={onRevoke}
+            >
+              Revoke
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
+      </ListTable.ActionCell>
+    </ListTable.Row>
+  );
+}
+
 export default function ApiKeysScreen() {
   const host = useApiKeyHost();
   const scope = host.scope();
@@ -258,15 +354,16 @@ export default function ApiKeysScreen() {
   const apiKeys = apiKeyApi.apiKey.list.useQuery({ organizationId });
   const myBindings = apiKeyApi.apiKey.myBindings.useQuery({ organizationId });
   const orgProjects = apiKeyApi.apiKey.orgProjects.useQuery({ organizationId });
+  const availableProjects = orgProjects.data ?? [];
   const orgTeams = apiKeyApi.apiKey.orgTeams.useQuery({ organizationId });
   const orgMembers = apiKeyApi.apiKey.orgMembers.useQuery({ organizationId });
   // An empty member list is how the page knows the reader is not an
   // organization admin: the procedure answers `[]` for everybody else.
   const isAdmin = (orgMembers.data?.length ?? 0) > 0;
-  const hasLegacyKey = useLegacyKeyPresent({
-    projectId: scope.projectId,
-    canManageProject: host.hasPermission("project:manage"),
-  });
+  // Organisation-wide, like the page: one project's revoke leaves every other
+  // project's nudge standing.
+  const legacyKeys = useLegacyKeys({ organizationId });
+  const revokeLegacyMutation = apiKeyApi.project.revokeProjectApiKey.useMutation();
   const createMutation = apiKeyApi.apiKey.create.useMutation();
   const updateMutation = apiKeyApi.apiKey.update.useMutation();
   const revokeMutation = apiKeyApi.apiKey.revoke.useMutation();
@@ -278,6 +375,8 @@ export default function ApiKeysScreen() {
   const [newKeyInput, setNewKeyInput] = useState<CreateApiKeyInput | null>(null);
   const [apiKeyToRevoke, setApiKeyToRevoke] = useState<string | null>(null);
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
+  const [legacyKeyToRevoke, setLegacyKeyToRevoke] = useState<LegacyProjectKey | null>(null);
+  const [legacyReplacement, setLegacyReplacement] = useState<CreateApiKeyInput | null>(null);
 
   // The scopes the reader can see: the filter's options, and the names the
   // per-row chips resolve their ids to.
@@ -349,14 +448,14 @@ export default function ApiKeysScreen() {
 
   // Deep links land on `#api-key-<id>`, but the rows only exist once the keys
   // query resolves, long after the browser has given up on the fragment.
-  const isLoadingKeys = apiKeys.isLoading;
+  const isLoadingKeys = apiKeys.isLoading || legacyKeys.isLoading;
   const anchorId = reading.fragment;
   useEffect(() => {
     if (isLoadingKeys || !anchorId || typeof document === "undefined") return;
     document.getElementById(anchorId)?.scrollIntoView({ block: "center" });
   }, [isLoadingKeys, anchorId]);
 
-  const handleCreate = (input: CreateApiKeyInput): void => {
+  const handleCreate = (input: CreateApiKeyInput, onCreated?: () => void): void => {
     const problem = createInputProblem(input);
     if (problem) {
       host.failed({ error: void 0, ...problem });
@@ -380,6 +479,7 @@ export default function ApiKeysScreen() {
           setNewToken(result.token);
           setNewKeyInput(input);
           void queryClient.apiKey.list.invalidate();
+          onCreated?.();
         },
         onError: (error) => host.failed({ error, fallbackTitle: "Couldn't create API key" }),
       },
@@ -429,6 +529,41 @@ export default function ApiKeysScreen() {
     );
   };
 
+  // Confirming revokes the legacy key, then opens the create drawer filled with
+  // its replacement. A reader whose key could not send traces is refused before
+  // the revoke, so they are never left with neither key.
+  const handleRevokeLegacyKey = () => {
+    const projectId = legacyKeyToRevoke?.projectId;
+    if (!projectId) return;
+    const replacement = legacyKeyReplacementInput({
+      projectId,
+      isOrganizationAdmin: isAdmin,
+      reader: { myBindings: myBindings.data, organizationId, orgProjects: orgProjects.data ?? [] },
+    });
+    if (!replacement) {
+      setLegacyKeyToRevoke(null);
+      host.failed({
+        error: undefined,
+        fallbackTitle: "Couldn't revoke the legacy project key",
+        description: "Your role can't create a key that sends traces. Ask an organization admin.",
+      });
+      return;
+    }
+    revokeLegacyMutation.mutate(
+      { projectId },
+      {
+        onSuccess: () => {
+          setLegacyKeyToRevoke(null);
+          host.succeeded({ title: "Legacy project key revoked" });
+          void queryClient.project.legacyKeys.invalidate();
+          setLegacyReplacement(replacement);
+        },
+        onError: (error) =>
+          host.failed({ error, fallbackTitle: "Couldn't revoke the legacy project key" }),
+      },
+    );
+  };
+
   const getScopeBadge = (apiKeyRow: ApiKeyRow) => {
     return (
       <ProviderScopeChips
@@ -465,11 +600,11 @@ export default function ApiKeysScreen() {
           them in the browser or other client-side code.
         </Text>
 
-        {hasLegacyKey && <LegacyProjectKeyBanner onCreateKey={onCreateOpen} />}
+        <LegacyProjectKeyBanner keys={legacyKeys.keys} onRevoke={setLegacyKeyToRevoke} />
 
         <VStack gap={8} width="full" align="stretch">
           {/* Personal + service keys (ingestSourceType == null); the page heading titles them. */}
-          {!isLoadingKeys && serviceApiKeys.length === 0 ? (
+          {!isLoadingKeys && serviceApiKeys.length === 0 && legacyKeys.keys.length === 0 ? (
             <NoDataInfoBlock
               title="No API keys"
               description="Create one to get started."
@@ -501,6 +636,13 @@ export default function ApiKeysScreen() {
               </ListTable.Header>
               <ListTable.Body>
                 {isLoadingKeys && <ListTable.LoadingRows rows={3} columns={KEY_COLUMNS} />}
+                {legacyKeys.keys.map((legacyKey) => (
+                  <LegacyKeyTableRow
+                    key={legacyKey.projectId}
+                    legacyKey={legacyKey}
+                    onRevoke={() => setLegacyKeyToRevoke(legacyKey)}
+                  />
+                ))}
                 {filteredKeys.map((apiKey) => (
                   <ApiKeyTableRow
                     key={apiKey.id}
@@ -512,7 +654,7 @@ export default function ApiKeysScreen() {
                   />
                 ))}
 
-                {!isLoadingKeys && filteredKeys.length === 0 && (
+                {!isLoadingKeys && filteredKeys.length === 0 && legacyKeys.keys.length === 0 && (
                   <NoMatchingKeysRow
                     onClearFilters={() => handleScopeFilterChange({ kind: "all" })}
                   />
@@ -530,24 +672,29 @@ export default function ApiKeysScreen() {
         </VStack>
 
         <CreateApiKeyDrawer
-          isOpen={isCreateOpen && !newToken}
+          isOpen={(isCreateOpen || legacyReplacement !== null) && !newToken}
           isCreating={createMutation.isPending}
           myBindings={myBindings}
-          orgProjects={orgProjects.data ?? []}
+          orgProjects={availableProjects}
           orgTeams={orgTeams.data ?? []}
           organizationId={organizationId}
           organizationName={scope.organizationName}
           currentTeamId={scope.teamId}
           currentProjectId={scope.projectId}
-          onClose={onCreateClose}
-          onCreate={handleCreate}
+          prefill={legacyReplacement ?? undefined}
+          notice={legacyReplacement ? <LegacyKeyRevokedNotice /> : undefined}
+          onClose={() => {
+            setLegacyReplacement(null);
+            onCreateClose();
+          }}
+          onCreate={(input) => handleCreate(input, () => setLegacyReplacement(null))}
         />
 
         <EditApiKeyDrawer
           apiKey={apiKeyToEdit}
           isUpdating={updateMutation.isPending}
           myBindings={myBindings}
-          orgProjects={orgProjects.data ?? []}
+          orgProjects={availableProjects}
           orgTeams={orgTeams.data ?? []}
           organizationId={organizationId}
           organizationName={scope.organizationName}
@@ -562,8 +709,14 @@ export default function ApiKeysScreen() {
           keyName={newKeyInput?.name}
           projectId={scope.projectId}
           endpoint={endpoint}
-          orgProjects={(orgProjects.data ?? []).filter((project) =>
-            isProjectReachable({ project, keyInput: newKeyInput }),
+          orgProjects={availableProjects.filter((project) =>
+            findBindingAtScope({
+              bindings: newKeyInput?.bindings,
+              scopeType: "PROJECT",
+              scopeId: project.id,
+              organizationId,
+              orgProjects: availableProjects,
+            }),
           )}
           onClose={() => {
             setNewToken(null);
@@ -577,6 +730,16 @@ export default function ApiKeysScreen() {
           isRevoking={revokeMutation.isPending}
           onCancel={() => setApiKeyToRevoke(null)}
           onConfirm={handleRevoke}
+        />
+
+        <RevokeLegacyKeyDialog
+          open={legacyKeyToRevoke !== null}
+          projectName={legacyKeyToRevoke?.projectName}
+          projectSlug={legacyKeyToRevoke?.projectSlug}
+          isRevoking={revokeLegacyMutation.isPending}
+          access={readerAccess([myBindings, orgMembers, orgProjects])}
+          onClose={() => setLegacyKeyToRevoke(null)}
+          onConfirm={handleRevokeLegacyKey}
         />
       </VStack>
     </>

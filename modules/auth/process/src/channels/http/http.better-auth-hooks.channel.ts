@@ -1,11 +1,5 @@
 import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/auth-contract";
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
-import {
-  GrantScopeTier,
-  newAuthzGrantId,
-  TeamUserRole,
-  type AuthzGrantsService,
-} from "@langwatch/authz-contract";
 import { isNativeSocialProvider } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -23,7 +17,11 @@ import {
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi, SignUpVerdict } from "@langwatch/organization-contract";
+import type {
+  OrganizationApi,
+  OrganizationUserRole,
+  SignUpVerdict,
+} from "@langwatch/organization-contract";
 import { fromDate, nowInstant } from "@langwatch/time";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
@@ -49,8 +47,6 @@ export type BetterAuthHookCollaborators = Readonly<{
   /** The organization an SSO domain names, and the membership an auto-join writes there. */
   organizations: SsoDomainOrganizations;
   announcements: BetterAuthAnnouncements;
-  /** The grant ledger an auto-joined membership is written through. */
-  authzGrants: AuthzGrantsService;
   /** The connection's own arrival door, asked of every federated sign-in. */
   arrivals: SsoArrivalApi;
   /** Where a sign-in through a connection is recorded as having happened. */
@@ -64,7 +60,7 @@ export type BetterAuthHookCollaborators = Readonly<{
 /** Organization reads and writes the hooks make through organization's own Api. */
 export type SsoDomainOrganizations = Pick<
   OrganizationApi,
-  "findBySsoDomain" | "createSsoDomainMembership" | "countMembershipsForUser"
+  "findBySsoDomain" | "createMembership" | "countMembershipsForUser"
 >;
 
 /** The one identity ledger write the account hook makes: a link proposal. */
@@ -134,39 +130,6 @@ async function refuseRestrictedSignUp({
 export const SIGN_UP_RESTRICTED_CODE = "auth_sign_up_restricted";
 
 /**
- * The organization-scoped grant that comes with a default membership. Idempotent by
- * construction: an identical row already present is skipped, so calling this twice grants
- * nothing twice, and calling it after a membership row turned up on its own is the repair.
- */
-const grantDefaultOrgMembership = ({
-  writer,
-  organizationId,
-  userId,
-}: {
-  writer: AuthzGrantsService;
-  organizationId: string;
-  userId: string;
-}) =>
-  writer.attachBindings({
-    organizationId,
-    bindings: [
-      {
-        bindingId: newAuthzGrantId(),
-        principal: { userId },
-        role: TeamUserRole.MEMBER,
-        customRoleId: null,
-        scopeType: GrantScopeTier.ORGANIZATION,
-        scopeId: organizationId,
-      },
-    ],
-    // The signup is the product acting on a domain rule, not an
-    // administrator granting access.
-    caller: { type: "system" },
-    actor: { type: "system", id: SYSTEM_ACTORS.ssoAutoJoin },
-    onDuplicate: "skip",
-  });
-
-/**
  * Success-side announcements once the membership landed: the log line, the
  * Slack signup event (fire-and-forget), and the nurturing calls.
  */
@@ -175,17 +138,17 @@ const announceSsoAutoJoin = ({
   user,
   org,
   inviteId,
+  role,
 }: {
   announcements: BetterAuthAnnouncements;
   user: { id: string; email: string; name: string };
   org: { id: string; name: string };
   inviteId: string | null;
+  role: OrganizationUserRole;
 }): void => {
   logger.info(
     { userId: user.id, organizationId: org.id, inviteId },
-    inviteId
-      ? "Applied pending invite on SSO signup"
-      : "Auto-added new user to SSO organization (default MEMBER)",
+    inviteId ? "Applied pending invite on SSO signup" : "Auto-added new user to SSO organization",
   );
 
   announcements.announceSignup({
@@ -200,13 +163,14 @@ const announceSsoAutoJoin = ({
     userId: user.id,
     organizationId: org.id,
     organizationName: org.name,
+    role,
   });
 };
 
 /**
- * Membership + grant for one domain-matched organization. A pending invite wins when one
- * exists (its role and team assignments carry their own grants); otherwise the default
- * MEMBER membership plus the organization- scoped grant beside it.
+ * Membership + grant for one domain-matched organization. A pending invite wins; otherwise the
+ * organization admits them on the seat its licence leaves free, as every other door does
+ * (specs/licensing/seat-limit-at-provisioning.feature).
  */
 const joinSsoOrganization = async ({
   collaborators,
@@ -217,7 +181,7 @@ const joinSsoOrganization = async ({
   user: { id: string; email: string; name: string };
   org: { id: string; name: string };
 }): Promise<void> => {
-  const { announcements, invites, authzGrants: writer } = collaborators;
+  const { announcements, invites } = collaborators;
   const invite = await invites.applyPendingInvite({
     userId: user.id,
     organizationId: org.id,
@@ -225,46 +189,45 @@ const joinSsoOrganization = async ({
   });
 
   if (invite.applied) {
-    announceSsoAutoJoin({ announcements, user, org, inviteId: invite.inviteId });
+    announceSsoAutoJoin({ announcements, user, org, inviteId: invite.inviteId, role: invite.role });
     return;
   }
 
-  // The membership row is not a grant fact and keeps its imperative
-  // write; the organization-scoped grant that comes with it is a ledger
-  // command, emitted once the membership exists (ADR-092).
-  const outcome = await collaborators.organizations.createSsoDomainMembership({
+  // The organization decides the seat and writes the grant that matches it, audited to the
+  // domain rule: the signup is the product acting, not an administrator granting access.
+  const admission = await collaborators.organizations.createMembership({
     userId: user.id,
     organizationId: org.id,
+    admittedBy: {
+      actor: { type: "system", id: SYSTEM_ACTORS.ssoAutoJoin },
+      commandId: `sso-auto-join:${org.id}:${user.id}`,
+    },
   });
-  if (outcome === "already-present") {
+  if (admission.outcome === "already-present") {
+    // A concurrent callback wrote the row and finishes its own grant; a second binding would
+    // leave that admission unconfirmed. Only a connection arrival resumes one left unfinished.
     logger.info(
       { userId: user.id, organizationId: org.id },
       "Auto-add SSO membership was already present (P2002) — treating as success",
     );
-    // The membership row existing says nothing about the grant beside it:
-    // the concurrent callback that created it may have died in between,
-    // and the two writes no longer share a transaction. Re-assert, which
-    // is a no-op when the other attempt finished.
-    await grantDefaultOrgMembership({
-      writer,
-      organizationId: org.id,
-      userId: user.id,
-    });
     return;
   }
 
-  await grantDefaultOrgMembership({
-    writer,
-    organizationId: org.id,
-    userId: user.id,
-  });
-  announceSsoAutoJoin({ announcements, user, org, inviteId: null });
+  if (admission.pending) {
+    // Held for want of any seat: no access yet, so nobody is told they joined.
+    logger.info(
+      { userId: user.id, organizationId: org.id },
+      "Held a new user pending at an SSO organization: the licence has no seat free",
+    );
+    return;
+  }
+  announceSsoAutoJoin({ announcements, user, org, inviteId: null, role: admission.seat });
 };
 
 /**
  * Called after a new user is created. Records the sign-up for nurturing,
- * then auto-onboards the user into an SSO-matched organization, granting
- * access via a re-assertable ledger command (ADR-092 delivery-plan PR 2).
+ * then auto-onboards the user into an SSO-matched organization through the
+ * organization's seat-checked admission, which writes the matching grant.
  */
 export const afterUserCreate = async ({
   user,
@@ -800,6 +763,12 @@ async function refuseNativeProviderOnSignIn({
   });
 }
 
+/** The one path where a password mints a session
+ *  (modules/auth/specs/forced-password-reset.feature). */
+const PASSWORD_SIGN_IN_PATH = "/sign-in/email";
+/** better-auth's code for a correct password whose user must choose a new one first. */
+export const PASSWORD_RESET_REQUIRED_CODE = "PASSWORD_RESET_REQUIRED";
+
 /**
  * Blocks deactivated users at this last layer, and refuses a way in the
  * cutover retired: a member linked before it started creates no account row,
@@ -834,6 +803,14 @@ export function createBeforeSessionCreateHook({
         "Blocked session create: sign-up confirmation pending",
       );
       return false;
+    }
+    if (user?.passwordResetRequiredAt && path === PASSWORD_SIGN_IN_PATH) {
+      logger.warn({ userId: session.userId }, "Blocked session create: password reset required");
+      // Thrown with a code so the sign-in screen sends the person to choose a new password.
+      throw APIError.from("FORBIDDEN", {
+        code: PASSWORD_RESET_REQUIRED_CODE,
+        message: PASSWORD_RESET_REQUIRED_CODE,
+      });
     }
 
     const authentication = await collaborators.ssoMigration.authorizeAndRecordAuthentication({
@@ -885,7 +862,10 @@ export type SessionMintClaims = Readonly<{
   identity: Pick<IdentityApi, "claimsForMint">;
   evidence: Pick<
     SessionCallbackEvidenceChannel,
-    "findAcceptedAccounts" | "recordVerifiedCallbackToken" | "recordAuthenticatedCallbackAccount"
+    | "findAcceptedAccounts"
+    | "recordVerifiedCallbackToken"
+    | "recordAuthenticatedCallbackAccount"
+    | "findSsoAccountIssuers"
   >;
 }>;
 

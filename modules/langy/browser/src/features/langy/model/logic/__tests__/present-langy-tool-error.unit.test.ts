@@ -78,7 +78,7 @@ describe("presentLangyToolError", () => {
     it("still says the access does not cover it, with no invented detail", () => {
       const presentation = present(
         failureDocument({
-          code: "unauthorized",
+          code: "forbidden",
           message: "Forbidden",
           httpStatus: 403,
           meta: {},
@@ -88,6 +88,79 @@ describe("presentLangyToolError", () => {
       expect(presentation.message).toBe("This action isn't available to you in this project.");
       expect(presentation.message).not.toContain("API key");
     });
+  });
+
+  // A 401 is Langy's own short-lived key refused, not the reader's access.
+  describe.each([
+    {
+      code: "unauthorized",
+      message: "Unauthorized",
+      httpStatus: 401,
+      suggestions: [
+        "Check that your API key is still valid — run `langwatch login` to re-authenticate",
+      ],
+    },
+    {
+      code: "missing_api_key",
+      message: "Not logged in and LANGWATCH_API_KEY is not set. Sign in with `langwatch login`.",
+      httpStatus: 0,
+      suggestions: ["Run `langwatch login` to authenticate"],
+    },
+    {
+      code: "not_authenticated",
+      message: "Not logged in. Run `langwatch login --device` to sign in via your company SSO.",
+      httpStatus: 0,
+      suggestions: [],
+    },
+  ])("given Langy's own credential failed with $code", (error) => {
+    const failure = failureDocument({
+      ...error,
+      meta: {},
+      isHandled: true,
+      docUrl: "https://docs.langwatch.ai/platform/api-keys",
+    });
+
+    /** @scenario "Langy's own refused credential reads as an internal error" */
+    it("says Langy hit an internal error", () => {
+      expect(present(failure).message).toBe(
+        "Langy hit an internal error and couldn't complete this step.",
+      );
+    });
+
+    /** @scenario "Langy's own refused credential reads as an internal error" */
+    it("never says the reader lacks access or tells them to sign in", () => {
+      const presentation = present(failure);
+      const shown = [presentation.message, presentation.detail, ...(presentation.tips ?? [])].join(
+        " ",
+      );
+      expect(shown).not.toMatch(/manages access|isn't available to you|log ?in|sign in|api key/i);
+      expect(presentation.tips).toBeUndefined();
+      expect(presentation.docsUrl).toBeUndefined();
+    });
+  });
+
+  describe("given a missing key on the developer's own machine", () => {
+    /** @scenario "A missing key on the developer's own machine keeps the CLI's own words" */
+    it.each(["missing_api_key", "unauthorized", "not_authenticated"])(
+      "keeps the CLI's sentence and next steps for a local tool (%s)",
+      (code) => {
+        const presentation = presentLangyToolError({
+          title: "Running a command",
+          toolName: "local_bash",
+          errorText: failureDocument({
+            code,
+            message: "Not logged in and LANGWATCH_API_KEY is not set.",
+            httpStatus: 0,
+            meta: {},
+            isHandled: true,
+            suggestions: ["Run `langwatch login` to authenticate"],
+          }),
+        });
+
+        expect(presentation.message).toBe("Not logged in and LANGWATCH_API_KEY is not set.");
+        expect(presentation.tips).toEqual(["Run `langwatch login` to authenticate"]);
+      },
+    );
   });
 
   // The failure the user hit: a free-plan scenario limit, rendered as

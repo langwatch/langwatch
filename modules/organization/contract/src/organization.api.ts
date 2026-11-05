@@ -448,18 +448,13 @@ export interface OrganizationApi {
    * Every organization this person belongs to. Asked by a peer deciding something about the person
    * rather than about a listed organization.
    */
-  organizationIdsForMember(input: Readonly<{ userId: string }>): Promise<string[]>;
+  organizationIdsForMember(
+    input: Readonly<{ userId: string; activeOnly?: boolean }>,
+  ): Promise<string[]>;
   /** The organization an email domain is claimed by for SSO, or null when none claims it. */
   findBySsoDomain(
     input: Readonly<{ domain: string }>,
   ): Promise<{ id: string; name: string; ssoProvider: string | null } | null>;
-  /**
-   * Writes the plain MEMBER row an SSO domain auto-join admits (ADR-116); the caller grants
-   * the seat itself. A row already there is `"already-present"`: a concurrent callback.
-   */
-  createSsoDomainMembership(
-    input: Readonly<{ organizationId: string; userId: string }>,
-  ): Promise<"created" | "already-present">;
   /** How many organizations this person has a membership row in, disabled ones included. */
   countMembershipsForUser(input: Readonly<{ userId: string }>): Promise<number>;
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]>;

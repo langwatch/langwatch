@@ -115,6 +115,13 @@ export class ApiKeyService {
     return this.lifecycle.update(input);
   }
 
+  /** Retires a key the platform minted for itself; false for one already gone. */
+  async revokeSystemManaged(
+    input: Parameters<ApiKeyLifecycleService["revokeSystemManaged"]>[0],
+  ): Promise<boolean> {
+    return this.lifecycle.revokeSystemManaged(input);
+  }
+
   async updateAsCaller(input: UpdateApiKeyInput): Promise<ApiKey> {
     try {
       return await this.lifecycle.update(input);
@@ -179,6 +186,12 @@ export class ApiKeyService {
     permissions: string[];
   }): Promise<void> {
     return this.policy.assertSelectionWithinCeiling(input);
+  }
+
+  async grantablePermissions(
+    input: Parameters<ApiKeyGrantPolicyService["grantablePermissions"]>[0],
+  ): Promise<string[]> {
+    return this.policy.grantablePermissions(input);
   }
 
   async isOrgAdmin(input: { userId: string; organizationId: string }): Promise<boolean> {

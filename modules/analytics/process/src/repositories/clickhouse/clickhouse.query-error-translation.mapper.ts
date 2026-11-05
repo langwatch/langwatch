@@ -4,6 +4,7 @@ import {
   QueryScanLimitExceededError,
   QueryTimeoutError,
 } from "@langwatch/analytics-contract";
+import { nowInstant } from "@langwatch/time";
 
 /** Anything thrown, as an `Error`, so a thrown string never reaches a log as `undefined`. */
 export function toError(value: unknown): Error {
@@ -291,4 +292,14 @@ export function translateClickHouseQueryError(error: unknown, durationMs: number
   }
 
   return error;
+}
+
+/** Runs a ClickHouse read and rethrows its failure translated, timed from the call (ADR-045). */
+export async function translatingQueryFailures<T>(read: () => Promise<T>): Promise<T> {
+  const startedAt = nowInstant().epochMilliseconds;
+  try {
+    return await read();
+  } catch (error) {
+    throw translateClickHouseQueryError(error, nowInstant().epochMilliseconds - startedAt);
+  }
 }
