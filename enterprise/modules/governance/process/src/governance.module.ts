@@ -110,65 +110,71 @@ export const governanceProcessModule: PublishedProcessModule<"governance", Gover
     .withEventing(codingAssistantBillingEventing)
     // Background, after old writers are gone: an older image edits coding-assistant configs
     // without a fact and appends pulled usage without a charge (governance-deploy-steps.feature).
-    .withMigrations(({ app, replayer }) => {
-      const recordBilling = ({ id, description }: { id: string; description: string }) =>
-        defineMigrationStep({
-          id,
-          kind: "data",
-          mode: "background",
-          description,
-          needsOldWritersGone: true,
-          run: async ({ checkpoint, dryRun, signal }) => {
-            const resumed = checkpoint.resumeFrom?.afterOrganizationId;
-            const report = await app.codingAssistantBilling.backfill({
-              after: typeof resumed === "string" ? resumed : undefined,
-              dryRun,
-              signal,
-              onPage: (page) => (dryRun ? Promise.resolve() : checkpoint.save({ report: page })),
-            });
-            return { ...report, dryRun };
-          },
-        });
-      return [
-        recordBilling({
-          id: "governance:record-coding-assistant-billing",
-          description:
-            "Records each organisation's coding-assistant billed facts, which trace folds at ingest.",
-        }),
-        // A completed step never reruns, so the ingest source types added since (pi_cli,
-        // copilot_*, grok_cli) are recorded by a step of their own.
-        recordBilling({
-          id: "governance:record-coding-assistant-ingest-source-billing",
-          description:
-            "Records each organisation's billed facts again, so every ingest source type has one.",
-        }),
-        // W11-D1 (b): migrated endpoints keep the legacy scheme, so the plan gate passes them.
-        defineMigrationStep({
-          id: "governance:migrate-anomaly-webhook-destinations",
-          kind: "data",
-          mode: "background",
-          description:
-            "Annotates each inline anomaly webhook destination with a legacy-scheme endpoint.",
-          needsOldWritersGone: true,
-          run: async ({ checkpoint, dryRun, signal }) => {
-            const resumed = checkpoint.resumeFrom?.afterOrganizationId;
-            const report = await app.anomalyWebhookMigration.migrate({
-              after: typeof resumed === "string" ? resumed : undefined,
-              dryRun,
-              signal,
-              onPage: (page) => (dryRun ? Promise.resolve() : checkpoint.save({ report: page })),
-            });
-            return { ...report, dryRun };
-          },
-        }),
-        defineProjectionReplayStep({
-          id: "governance:replay-cost-charges",
-          description:
-            "Fills the cost drift check's charge map from pulled usage over the settling window.",
-          lane: GOVERNANCE_COST_CHARGE_PROJECTION_NAME,
-          since: nowInstant().subtract({ hours: COST_CHARGES_REPLAY_WINDOW_HOURS }).toString(),
-          needsOldWritersGone: true,
-          replayer,
-        }),
-      ];
-    });
+    .withMigrations(({ app, replayer }) => [
+      defineMigrationStep({
+        id: "governance:record-coding-assistant-billing",
+        kind: "data",
+        mode: "background",
+        description:
+          "Records each organisation's coding-assistant billed facts, which trace folds at ingest.",
+        needsOldWritersGone: true,
+        run: async ({ checkpoint, dryRun, signal }) => {
+          const resumed = checkpoint.resumeFrom?.afterOrganizationId;
+          const report = await app.codingAssistantBilling.backfill({
+            after: typeof resumed === "string" ? resumed : undefined,
+            dryRun,
+            signal,
+            onPage: (page) => (dryRun ? Promise.resolve() : checkpoint.save({ report: page })),
+          });
+          return { ...report, dryRun };
+        },
+      }),
+      // A completed step never reruns, so the ingest source types added since (pi_cli,
+      // copilot_*, grok_cli) are recorded by a step of their own.
+      defineMigrationStep({
+        id: "governance:record-coding-assistant-ingest-source-billing",
+        kind: "data",
+        mode: "background",
+        description:
+          "Records each organisation's billed facts again, so every ingest source type has one.",
+        needsOldWritersGone: true,
+        run: async ({ checkpoint, dryRun, signal }) => {
+          const resumed = checkpoint.resumeFrom?.afterOrganizationId;
+          const report = await app.codingAssistantBilling.backfill({
+            after: typeof resumed === "string" ? resumed : undefined,
+            dryRun,
+            signal,
+            onPage: (page) => (dryRun ? Promise.resolve() : checkpoint.save({ report: page })),
+          });
+          return { ...report, dryRun };
+        },
+      }),
+      // W11-D1 (b): migrated endpoints keep the legacy scheme, so the plan gate passes them.
+      defineMigrationStep({
+        id: "governance:migrate-anomaly-webhook-destinations",
+        kind: "data",
+        mode: "background",
+        description:
+          "Annotates each inline anomaly webhook destination with a legacy-scheme endpoint.",
+        needsOldWritersGone: true,
+        run: async ({ checkpoint, dryRun, signal }) => {
+          const resumed = checkpoint.resumeFrom?.afterOrganizationId;
+          const report = await app.anomalyWebhookMigration.migrate({
+            after: typeof resumed === "string" ? resumed : undefined,
+            dryRun,
+            signal,
+            onPage: (page) => (dryRun ? Promise.resolve() : checkpoint.save({ report: page })),
+          });
+          return { ...report, dryRun };
+        },
+      }),
+      defineProjectionReplayStep({
+        id: "governance:replay-cost-charges",
+        description:
+          "Fills the cost drift check's charge map from pulled usage over the settling window.",
+        lane: GOVERNANCE_COST_CHARGE_PROJECTION_NAME,
+        since: nowInstant().subtract({ hours: COST_CHARGES_REPLAY_WINDOW_HOURS }).toString(),
+        needsOldWritersGone: true,
+        replayer,
+      }),
+    ]);
