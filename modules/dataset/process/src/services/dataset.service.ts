@@ -120,6 +120,7 @@ export class DatasetService {
       getBySlugOrId: (input) => this.getBySlugOrId(input),
       findNextAvailableName: (input) => this.findNextAvailableName(input),
       upsertDataset: (input) => this.upsertDataset(input),
+      createWithStoredRows: (input) => this.upserts.createWithStoredRows(input),
       generateId: () => this.generateId(),
     });
     this.records = DatasetRecordService.create({
