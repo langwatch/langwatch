@@ -143,6 +143,15 @@ func TestPRReviewBotWaitsForCIComplete(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "needs: ci-complete")
 }
 
+func TestPRReviewBotAcceptsCICompleteInANeedsList(t *testing.T) {
+	listed := strings.Replace(goodPRReviewBotWorkflow, "    needs: ci-complete\n", "    needs: [changes, ci-complete]\n", 1)
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, listed))
+
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+}
+
 // @scenario "The review still starts when CI skipped checks the change does not reach"
 func TestPRReviewBotStartsWhenCISkippedACall(t *testing.T) {
 	broken := strings.Replace(goodPRReviewBotWorkflow, "      !cancelled() &&\n", "", 1)

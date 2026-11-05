@@ -87,11 +87,20 @@ func prReviewBotNeeds(repoRoot string) ([]string, error) {
 		return nil, err
 	}
 	job, ok := file.Jobs[prReviewBotReviewJob]
-	if !ok || job.Needs == any("ci-complete") { // prReviewBotGates reports a missing job
+	if !ok || needsCIComplete(job.Needs) { // prReviewBotGates reports a missing job
 		return nil, nil
 	}
 
 	return []string{fmt.Sprintf("%s review job does not have needs: ci-complete", PRReviewBotWorkflow)}, nil
+}
+
+// needsCIComplete reads both forms GitHub accepts for `needs:`.
+func needsCIComplete(needs any) bool {
+	if list, isList := needs.([]any); isList {
+		return slices.Contains(list, any("ci-complete"))
+	}
+
+	return needs == any("ci-complete")
 }
 
 // prReviewBotGates checks the skip clauses are still present on the
