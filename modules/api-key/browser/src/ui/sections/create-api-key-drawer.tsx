@@ -1,8 +1,7 @@
 /**
- * "Create new secret key": decides what a key will be able to do. Every
- * level offered is bounded by what the caller holds at the selected
- * scope — the mint refuses (`api_key_scope_violation`) rather than dropping one.
- * Up front it asks only for a name and an expiry; the rest waits under Advanced.
+ * "Create new secret key": asks for a name and an expiry; the rest waits under Advanced.
+ * Every level offered is bounded by what the caller holds at the selected scope — the
+ * mint refuses (`api_key_scope_violation`) rather than dropping one.
  */
 
 import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
@@ -369,6 +368,52 @@ function PermissionsField({
   );
 }
 
+function scopeName({
+  scope,
+  orgProjects,
+  orgTeams,
+  organizationName,
+}: {
+  scope: ScopeTriadEntry;
+  orgProjects: OrgProject[];
+  orgTeams: OrgTeam[];
+  organizationName: string | undefined;
+}): string | undefined {
+  if (scope.scopeType === "PROJECT") return orgProjects.find((p) => p.id === scope.scopeId)?.name;
+  if (scope.scopeType === "TEAM") return orgTeams.find((t) => t.id === scope.scopeId)?.name;
+  return organizationName;
+}
+
+/**
+ * Moves focus to a field with a gap, a frame after the request: Advanced unhides its content in
+ * its own render, and a hidden field cannot take focus. A fresh request object per submit lets a
+ * second submit with the same gap refocus it.
+ */
+function useGapFocus() {
+  const [request, setRequest] = useState<{ field: KeyField } | null>(null);
+  const refs = {
+    name: useRef<HTMLInputElement>(null),
+    scope: useRef<HTMLDivElement>(null),
+    permissions: useRef<HTMLDivElement>(null),
+    expiration: useRef<HTMLDivElement>(null),
+    permissionsField: useRef<HTMLDivElement>(null),
+  };
+  useEffect(() => {
+    if (!request) return;
+    const frame = requestAnimationFrame(() =>
+      focusKeyField({ field: request.field, targets: refs, fallback: refs.permissionsField }),
+    );
+    return () => cancelAnimationFrame(frame);
+    // The refs are stable; only a new request moves focus.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request]);
+  return {
+    refs,
+    request: (field: KeyField) => setRequest({ field }),
+    clear: () => setRequest(null),
+  };
+}
+
 /** What the key will carry, said in one line so a closed Advanced section hides nothing. */
 function keySummary({
   keyType,
@@ -391,12 +436,7 @@ function keySummary({
   if (!only) return `${kind} with ${access}, no scope chosen yet.`;
   if (selectedScopes.length > 1)
     return `${kind} with ${access} on ${selectedScopes.length} scopes.`;
-  const named =
-    only.scopeType === "PROJECT"
-      ? orgProjects.find((p) => p.id === only.scopeId)?.name
-      : only.scopeType === "TEAM"
-        ? orgTeams.find((t) => t.id === only.scopeId)?.name
-        : organizationName;
+  const named = scopeName({ scope: only, orgProjects, orgTeams, organizationName });
   return `${kind} with ${access} on ${named ?? "the selected scope"}.`;
 }
 
@@ -566,18 +606,12 @@ export function CreateApiKeyDrawer({
 
   const [attempted, setAttempted] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  // A fresh object per submit, so a second submit with the same gap refocuses it.
-  const [focusRequest, setFocusRequest] = useState<{ field: KeyField } | null>(null);
-  const nameRef = useRef<HTMLInputElement>(null);
-  const scopeRef = useRef<HTMLDivElement>(null);
-  const permissionsRef = useRef<HTMLDivElement>(null);
-  const permissionListRef = useRef<HTMLDivElement>(null);
-  const expirationRef = useRef<HTMLDivElement>(null);
+  const gapFocus = useGapFocus();
 
   const resetForm = () => {
     setAttempted(false);
     setAdvancedOpen(false);
-    setFocusRequest(null);
+    gapFocus.clear();
     setName(prefill?.name ?? "");
     setDescription(prefill?.description ?? "");
     setExpirationPreset(EXPIRATION_NEVER);
@@ -598,32 +632,13 @@ export function CreateApiKeyDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, currentUserId]);
 
-  // A frame after the render that opened Advanced: the section unhides its content in its own
-  // render, and a hidden field cannot take focus.
-  useEffect(() => {
-    if (!focusRequest) return;
-    const frame = requestAnimationFrame(() =>
-      focusKeyField({
-        field: focusRequest.field,
-        targets: {
-          name: nameRef,
-          scope: scopeRef,
-          permissions: permissionListRef,
-          expiration: expirationRef,
-        },
-        fallback: permissionsRef,
-      }),
-    );
-    return () => cancelAnimationFrame(frame);
-  }, [focusRequest]);
-
   const handleCreate = () => {
     if (isCreating) return;
     const [firstMissing] = missing;
     if (firstMissing) {
       setAttempted(true);
       if (missing.some((field) => ADVANCED_FIELDS.includes(field))) setAdvancedOpen(true);
-      setFocusRequest({ field: firstMissing });
+      gapFocus.request(firstMissing);
       return;
     }
     onCreate(
@@ -679,7 +694,7 @@ export function CreateApiKeyDrawer({
         {notice}
         <SettingsField label="Name" error={showError("name")}>
           <Input
-            ref={nameRef}
+            ref={gapFocus.refs.name}
             placeholder="e.g., CI Pipeline, Local Dev"
             data-testid="api-key-name"
             value={name}
@@ -688,7 +703,7 @@ export function CreateApiKeyDrawer({
         </SettingsField>
 
         <SettingsField label="Expiration">
-          <VStack ref={expirationRef} gap={1} align="start" width="full">
+          <VStack ref={gapFocus.refs.expiration} gap={1} align="start" width="full">
             <Select.Root
               collection={expirationCollection}
               value={[expirationPreset]}
@@ -756,7 +771,7 @@ export function CreateApiKeyDrawer({
           </SettingsField>
 
           <SettingsField label="Scope" error={showError("scope")}>
-            <Box ref={scopeRef} width="full">
+            <Box ref={gapFocus.refs.scope} width="full">
               <ScopeChipPicker
                 value={selectedScopes}
                 onChange={(next) => {
@@ -786,8 +801,8 @@ export function CreateApiKeyDrawer({
             selections={categorySelections}
             userPermissions={userPermissions}
             onSelectionsChange={setCategorySelections}
-            containerRef={permissionsRef}
-            listRef={permissionListRef}
+            containerRef={gapFocus.refs.permissionsField}
+            listRef={gapFocus.refs.permissions}
           />
         </AdvancedSection>
       </VStack>
