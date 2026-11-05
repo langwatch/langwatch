@@ -1,7 +1,7 @@
 /**
  * The topbar bell, lent through `InsightsBellToken` (§10.1): your own insights you have not
- * seen, from the same derivation as the page and the sidebar. Draws nothing without a project,
- * the flag or the grant.
+ * seen, from the same derivation as the page and the sidebar. Shown by the same rule as the
+ * side menu's Insights entry (`useInsightsShown`).
  */
 
 import { Popover } from "@langwatch/design-system/popover";
@@ -11,6 +11,7 @@ import { Bell } from "lucide-react";
 import { useState } from "react";
 
 import { useInsightInbox } from "../../behavior/use-insight-inbox.ts";
+import { useInsightsShown } from "../../behavior/use-insights-shown.ts";
 import { useInsightHost } from "../../model/insight-host.ts";
 import { insightDay } from "../../model/insight-presentation.ts";
 import { ToneDot } from "../elements/tone-badge.tsx";
@@ -20,9 +21,10 @@ const NEW_INSIGHTS_SHOWN = 4;
 
 export function InsightsBell(_props: InsightsBellProps) {
   const host = useInsightHost();
+  const shown = useInsightsShown();
   const reading = useInsightInbox();
   const [open, setOpen] = useState(false);
-  if (!reading.available || !reading.project) return null;
+  if (!shown || !reading.project) return null;
   const inboxHref = `/${reading.project.slug}/insights`;
   const unseen = reading.inbox?.unseen ?? [];
   // The bell counts only unseen insights; seen ones still wait in the inbox.

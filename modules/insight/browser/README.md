@@ -1,6 +1,6 @@
 # @langwatch/insight-browser
 
-The browser half of [insight](../README.md). What a browser installs when it installs insight: the inbox screen behind `release_insights`, and what it lends the shell and a board's header (the bell, the sidebar count and "Daily insights"). Everything loads lazily; none of it is on first paint.
+The browser half of [insight](../README.md). What a browser installs when it installs insight: the inbox screen behind `release_insights`, and what it lends the shell and a board's header (the bell, the side-menu entry's rule and count, and "Daily insights"). Everything but the entry's rule loads lazily.
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
@@ -24,7 +24,7 @@ None.
 
 - `withApi(insightApi)`, tRPC contracts: `insights.*`.
 - Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/langy-client`.
-- Lends: `InsightsBellToken`, `InsightsNavCountToken`, `BoardHeaderActionToken`.
+- Lends: `InsightsBellToken`, `InsightsEntryToken`, `InsightsNavCountToken`, `BoardHeaderActionToken`.
 - Host APIs it requires: `InsightHostApi`.
 
 <!-- readme:generated:end -->

@@ -11,13 +11,16 @@ import {
 } from "@langwatch/analytics-client";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { InsightsNavCountToken } from "@langwatch/insight-contract";
+import { InsightsEntryToken, InsightsNavCountToken } from "@langwatch/insight-contract";
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const declarations: { current: UiDeclarations | undefined } = vi.hoisted(() => ({
   current: undefined,
 }));
+
+/** What insight's lent rule answers; insight's own tests cover how it decides. */
+const insight = { shown: false };
 
 vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -56,25 +59,29 @@ function LentInsightsCount() {
   return <span data-testid="insights-nav-count">3</span>;
 }
 
-const analyticsLends = uiDeclarations([
-  {
-    name: "analytics",
-    installation: {
-      capabilities: {},
-      lends: [
-        { token: SavedDashboardsToken, load: async () => ({ default: LentList }) },
-        { token: StarredDashboardsToken, load: async () => ({ default: LentStarred }) },
-      ],
+const insightLends = [
+  { token: InsightsEntryToken, value: { useIsShown: () => insight.shown } },
+  { token: InsightsNavCountToken, load: async () => ({ default: LentInsightsCount }) },
+];
+
+function lendsWith({ insightInstalled }: { insightInstalled: boolean }) {
+  return uiDeclarations([
+    {
+      name: "analytics",
+      installation: {
+        capabilities: {},
+        lends: [
+          { token: SavedDashboardsToken, load: async () => ({ default: LentList }) },
+          { token: StarredDashboardsToken, load: async () => ({ default: LentStarred }) },
+        ],
+      },
     },
-  },
-  {
-    name: "insight",
-    installation: {
-      capabilities: {},
-      lends: [{ token: InsightsNavCountToken, load: async () => ({ default: LentInsightsCount }) }],
+    {
+      name: "insight",
+      installation: { capabilities: {}, lends: insightInstalled ? insightLends : [] },
     },
-  },
-]);
+  ]);
+}
 
 function renderSidebar({
   surface,
@@ -84,7 +91,8 @@ function renderSidebar({
   dashboardsLoading = false,
   organizationLoading = false,
   kind,
-  insightsOn = false,
+  insightsShown = false,
+  insightInstalled = true,
   governancePlatformOn = false,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "governance" | "me" | "settings" | "admin";
@@ -94,10 +102,12 @@ function renderSidebar({
   dashboardsLoading?: boolean;
   organizationLoading?: boolean;
   kind?: string;
-  insightsOn?: boolean;
+  insightsShown?: boolean;
+  insightInstalled?: boolean;
   governancePlatformOn?: boolean;
 }) {
-  declarations.current = analyticsLends;
+  insight.shown = insightsShown;
+  declarations.current = lendsWith({ insightInstalled });
   return renderWithDesignSystem(
     <WithStubNavigationHost
       readings={{
@@ -107,7 +117,6 @@ function renderSidebar({
         isLoading: organizationLoading,
         flags: {
           release_dashboards: { enabled: dashboardsFlag, isLoading: dashboardsLoading },
-          release_insights: { enabled: insightsOn, isLoading: false },
           release_ui_governance_billed_cost_enabled: {
             enabled: governancePlatformOn,
             isLoading: false,
@@ -163,14 +172,14 @@ describe("the Dashboards product sidebar", () => {
 });
 
 describe("the Insights entry", () => {
-  describe("given release_insights is on and the member holds analytics:view", () => {
+  describe("given insight shows its entry", () => {
     /** @scenario "The Dashboards side menu holds the one Insights entry with its unread count" */
     /** @scenario The sidebar bottom block keeps usage, settings, support and theme */
     it("sits in the Dashboards sidebar's bottom block just above Settings, with the lent count", async () => {
       renderSidebar({
         surface: "dashboards",
         pathname: "/demo/dashboards",
-        insightsOn: true,
+        insightsShown: true,
         permissions: ["analytics:view", "organization:view"],
       });
 
@@ -186,7 +195,7 @@ describe("the Insights entry", () => {
 
     /** @scenario "The Dashboards side menu holds the one Insights entry with its unread count" */
     it("sits just above Support for a member who cannot see Settings", async () => {
-      renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards", insightsOn: true });
+      renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards", insightsShown: true });
 
       const entry = await screen.findByRole("link", { name: "Insights" });
       const block = screen.getByTestId("sidebar-bottom-block");
@@ -200,7 +209,7 @@ describe("the Insights entry", () => {
 
     /** @scenario "The Dashboards side menu holds the one Insights entry with its unread count" */
     it("is marked current on the Insights page", async () => {
-      renderSidebar({ surface: "dashboards", pathname: "/demo/insights", insightsOn: true });
+      renderSidebar({ surface: "dashboards", pathname: "/demo/insights", insightsShown: true });
 
       expect(await screen.findByRole("link", { name: "Insights" })).toHaveAttribute(
         "aria-current",
@@ -217,7 +226,7 @@ describe("the Insights entry", () => {
       renderSidebar({
         surface,
         pathname,
-        insightsOn: true,
+        insightsShown: true,
         permissions: ["analytics:view", "organization:view"],
       });
 
@@ -225,6 +234,7 @@ describe("the Insights entry", () => {
       expect(screen.getAllByRole("link", { name: /Insights/ })).toHaveLength(1);
       const bottom = within(screen.getByTestId("sidebar-bottom-block"));
       const links = bottom.getAllByRole("link");
+      expect(links.indexOf(entry)).toBeGreaterThanOrEqual(0);
       expect(links[links.indexOf(entry) + 1]).toBe(bottom.getByRole("link", { name: "Settings" }));
       expect(await within(entry).findByTestId("insights-nav-count")).toHaveTextContent("3");
     });
@@ -234,7 +244,7 @@ describe("the Insights entry", () => {
       { surface: "settings" as const, pathname: "/settings" },
       { surface: "admin" as const, pathname: "/ops" },
     ])("is not in the $surface sidebar", async ({ surface, pathname }) => {
-      renderSidebar({ surface, pathname, insightsOn: true });
+      renderSidebar({ surface, pathname, insightsShown: true });
 
       await screen.findByRole("button", { name: "Quick Search" });
       expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
@@ -247,7 +257,7 @@ describe("the Insights entry", () => {
       renderSidebar({
         surface: "governance",
         pathname: "/governance",
-        insightsOn: true,
+        insightsShown: true,
         governancePlatformOn: true,
         permissions: ["analytics:view", "organization:view"],
       });
@@ -265,7 +275,7 @@ describe("the Insights entry", () => {
       renderSidebar({
         surface: "governance",
         pathname: "/governance",
-        insightsOn: true,
+        insightsShown: true,
         governancePlatformOn: false,
         permissions: ["analytics:view", "organization:view"],
       });
@@ -279,57 +289,24 @@ describe("the Insights entry", () => {
     });
   });
 
-  describe("given release_insights is off", () => {
+  describe("given insight hides its entry", () => {
     /** @scenario "The side menu shows no Insights entry while the flag is off" */
-    it("draws no Insights entry in the Dashboards sidebar", async () => {
-      renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards" });
-
-      await screen.findByTestId("saved-dashboards");
-      expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
-    });
-  });
-
-  describe("given release_insights on but release_dashboards off", () => {
-    /** @scenario "The side menu shows no Insights entry while the flag is off" */
-    it("draws no Insights entry, because the Insights page is closed", async () => {
-      renderSidebar({
-        surface: "llm-ops",
-        pathname: "/demo",
-        insightsOn: true,
-        dashboardsFlag: false,
-      });
+    it.each([
+      { surface: "dashboards" as const, pathname: "/demo/dashboards" },
+      { surface: "llm-ops" as const, pathname: "/demo" },
+    ])("draws no Insights entry in the $surface sidebar", async ({ surface, pathname }) => {
+      renderSidebar({ surface, pathname, insightsShown: false });
 
       await screen.findByRole("button", { name: "Quick Search" });
       expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
     });
   });
 
-  describe("given a member without analytics:view", () => {
-    /** @scenario "The side menu shows no Insights entry while the flag is off" */
+  describe("given insight is not installed", () => {
     it("draws no Insights entry", async () => {
-      renderSidebar({
-        surface: "dashboards",
-        pathname: "/demo/dashboards",
-        insightsOn: true,
-        permissions: [],
-      });
+      renderSidebar({ surface: "llm-ops", pathname: "/demo", insightInstalled: false });
 
       await screen.findByRole("button", { name: "Quick Search" });
-      expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
-    });
-  });
-
-  describe("given an aggregate project, which files no insight", () => {
-    /** @scenario "An aggregate project's side menu holds no Insights entry" */
-    it("draws no Insights entry in the Dashboards sidebar", async () => {
-      renderSidebar({
-        surface: "dashboards",
-        pathname: "/demo/dashboards",
-        insightsOn: true,
-        kind: "aggregate",
-      });
-
-      await screen.findByTestId("saved-dashboards");
       expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
     });
   });

@@ -3,12 +3,10 @@
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
-import { FrontendFlags } from "@langwatch/feature-flag-contract";
-import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 
-import { InsightsNavCount } from "../../behavior/lent-insights.tsx";
+import { InsightsNavCount, useInsightsEntryShown } from "../../behavior/lent-insights.tsx";
 import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
@@ -337,10 +335,12 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
   return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
 }
 
+const NO_SECTION_ITEMS: readonly SectionNavItemData[] = [];
+const GOVERNANCE_INSIGHTS_HREF = "/governance/insights";
+
 /**
  * The one Insights entry, just above Settings in every product menu; Governance skips it while it
- * lists its own Insights page. Hidden until `release_insights` and `release_dashboards` answer on
- * (the page lives in Dashboards), and on an aggregate project; the unread pill is lent by insight.
+ * lists its own Insights page. Insight decides whether the entry exists and lends the unread pill.
  * @see modules/insight/specs/insight-inbox.feature
  */
 function InsightsMenuLink({
@@ -351,18 +351,12 @@ function InsightsMenuLink({
   showExpanded: boolean;
 }) {
   const host = useNavigationHost();
-  const insights = host.featureFlag(FrontendFlags.release_insights);
-  const dashboards = host.featureFlag(FrontendFlags.release_dashboards);
-  const governanceInsights = host.featureFlag(
-    FrontendFlags.release_ui_governance_billed_cost_enabled,
+  const shown = useInsightsEntryShown();
+  const governanceItems = useVisibleSectionNavItems(
+    surface === "governance" ? governanceNavItems : NO_SECTION_ITEMS,
   );
-  if (surface === "governance" && (governanceInsights.isLoading || governanceInsights.enabled)) {
-    return null;
-  }
-  if (insights.isLoading || !insights.enabled) return null;
-  if (dashboards.isLoading || !dashboards.enabled) return null;
-  if (!host.hasPermission("analytics:view")) return null;
-  if (isAggregateProjectKind(host.project()?.kind)) return null;
+  if (!shown) return null;
+  if (governanceItems.some((item) => item.href === GOVERNANCE_INSIGHTS_HREF)) return null;
   const destination = projectScopedDestination({
     path: projectNavItems.insights.path,
     label: projectNavItems.insights.title,

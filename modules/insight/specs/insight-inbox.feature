@@ -386,7 +386,8 @@ Feature: The insights inbox
     Every product's side menu carries one Insights entry, at the bottom just above Settings
     (above Support for a member who cannot see Settings), with the grey unread pill. The
     Insights page itself lives in the Dashboards product, so the entry shows only while
-    release_dashboards is on too. Settings and the Admin console are no product and carry none.
+    release_dashboards is on too. Insight decides whether the entry shows, by the same rule as
+    its bell; navigation only places it. Settings and the Admin console are no product and carry none.
     Governance skips it while it lists its own Insights page (the Preview placeholder behind
     release_ui_governance_billed_cost_enabled, specs/governance/governance-platform-placeholders.feature):
     two entries named Insights that open different pages would mislead.
@@ -441,16 +442,24 @@ Feature: The insights inbox
 
     @integration
     Scenario: The side menu shows no Insights entry while the flag is off
-      Given the release_insights or the release_dashboards flag is off, or a member without analytics:view
+      Given the release_insights or the release_dashboards flag is off or not answered yet, or a member without analytics:view
       When they look at any product's side menu
       Then it holds no Insights entry
 
     @integration
     Scenario: An aggregate project's side menu holds no Insights entry
-      Given release_insights is on and a member with analytics:view
+      Given the release_insights and release_dashboards flags are on and a member with analytics:view
       And the project is an aggregate, which files no insight
-      When they look at the Dashboards side menu
+      When they look at any product's side menu
       Then it holds no Insights entry
+
+    # The bell and the entry share one rule, so they never disagree on an aggregate.
+    @integration
+    Scenario: An aggregate project's top bar holds no insights bell
+      Given the release_insights and release_dashboards flags are on and a member with analytics:view
+      And the project is an aggregate, which files no insight
+      When they look at the top bar
+      Then it holds no insights bell
 
     @unit
     Scenario: The Insights page stays in the Dashboards product

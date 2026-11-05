@@ -114,7 +114,7 @@ async function refusalOf(request: Promise<unknown>) {
 }
 
 describe("given the insights tRPC family", () => {
-  describe("when a member with analytics:view saves a Langy answer as an insight", () => {
+  describe("when a member with analytics:view files an insight through the filing route", () => {
     /** @scenario "A member files an insight through the filing route" */
     it("files it in the project as theirs, with its Langy source, at the top of their inbox", async () => {
       vi.useFakeTimers({ toFake: ["Date"] });

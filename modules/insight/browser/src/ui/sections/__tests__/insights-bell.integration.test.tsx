@@ -82,24 +82,29 @@ describe("given 2 insights in the inbox, both already seen", () => {
   });
 });
 
-describe("given release_insights on and 2 unseen insights in the inbox", () => {
-  describe("when release_dashboards is off", () => {
-    /** @scenario "Insights shows nothing while release_dashboards is off" */
-    it("shows no bell, because the Insights page is closed", async () => {
-      // The host-mount test covers how the two flags make this false.
+/** Absence holds only after the reads settle, so the wait outlasts the answered query. */
+async function expectNoBell() {
+  await expect(
+    screen.findByRole("button", { name: "Inbox: new insights" }, { timeout: 300 }),
+  ).rejects.toThrow("Unable to find an element");
+}
+
+describe("given 2 unseen insights in the inbox", () => {
+  describe("when insight is off for this reader (a release flag off or not answered yet)", () => {
+    // The host-mount test binds how release_dashboards off makes the host report this.
+    it("shows no bell", async () => {
       const { host } = renderWithInsightHost({
         element: <InsightsBell />,
         host: new StubInsightHost({ enabled: false }),
         answer: () => Promise.resolve(UNSEEN.slice(0, 2)),
       });
 
-      await Promise.resolve();
-      expect(screen.queryByRole("button", { name: "Inbox: new insights" })).not.toBeInTheDocument();
+      await expectNoBell();
       expect(host.navigations).toEqual([]);
     });
   });
 
-  describe("when release_dashboards is on too", () => {
+  describe("when insight is on", () => {
     /** @scenario "Insights shows nothing while release_dashboards is off" */
     it("shows the bell with the unread count", async () => {
       renderWithInsightHost({
@@ -112,6 +117,22 @@ describe("given release_insights on and 2 unseen insights in the inbox", () => {
         await screen.findByRole("button", { name: "Inbox: new insights" }),
       ).toBeInTheDocument();
       expect(await screen.findByLabelText("2 unread")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the project is an aggregate, which files no insight", () => {
+    /** @scenario "An aggregate project's top bar holds no insights bell" */
+    it("shows no bell, as its side menu holds no Insights entry", async () => {
+      renderWithInsightHost({
+        element: <InsightsBell />,
+        host: new StubInsightHost({
+          enabled: true,
+          project: { id: "project-1", slug: "acme", kind: "aggregate" },
+        }),
+        answer: () => Promise.resolve(UNSEEN.slice(0, 2)),
+      });
+
+      await expectNoBell();
     });
   });
 });

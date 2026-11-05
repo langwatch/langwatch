@@ -1,6 +1,6 @@
 /**
  * The one derivation of the inbox, shared by the page, the bell and the sidebar count so the
- * three never disagree, and the two of them insight lends the shell. A folder is derived.
+ * three never disagree, and what insight lends the shell. A folder is derived.
  * @see modules/insight/specs/insight-inbox.feature
  */
 
@@ -18,6 +18,12 @@ export type InsightsNavCountProps = Record<string, never>;
 /** The unread pill beside the sidebar's Insights entry; draws nothing at zero. */
 export const InsightsNavCountToken =
   uiTokens("insight").component<InsightsNavCountProps>("insightsNavCount");
+
+/** Insight's rule for whether its menu entry shows; `useIsShown` is a hook, call it in render. */
+export type InsightsEntry = { useIsShown(): boolean };
+
+/** Lent so the side menu and the bell answer from one rule: navigation keeps only placement. */
+export const InsightsEntryToken = uiTokens("insight").hooks<InsightsEntry>("insightsEntry");
 
 export const INSIGHT_FOLDERS = ["inbox", "stale", "archived"] as const;
 export type InsightFolder = (typeof INSIGHT_FOLDERS)[number];
