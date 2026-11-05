@@ -68,7 +68,7 @@ function pendingInvites(inviteId: string) {
   return {
     applyPendingInvite: vi
       .fn<OrganizationApi["applyPendingInvite"]>()
-      .mockResolvedValue({ applied: true, inviteId }),
+      .mockResolvedValue({ applied: true, inviteId, role: "MEMBER" }),
   };
 }
 
@@ -213,6 +213,24 @@ describe("signing in through a domain-matched organization's identity provider",
       });
     });
 
+    it("announces the seat the admission gave, so a Lite fallback reads as Lite", async () => {
+      const { organizations } = signupRepo(ACME, {
+        outcome: "created",
+        seat: "EXTERNAL",
+        pending: false,
+      });
+      const announcements = new RecordingAnnouncements();
+
+      await afterUserCreate({
+        user: { id: "user_new", email: "new@acme.com", name: "New User", emailVerified: true },
+        collaborators: signupCollaborators({ organizations, announcements }),
+      });
+
+      expect(announcements.ssoAutoAddNurturing).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user_new", role: "EXTERNAL" }),
+      );
+    });
+
     it("applies the pending invite the address holds there instead of the default membership", async () => {
       const { mocks, organizations } = signupRepo(ACME);
       const invites = pendingInvites("invite_1");
@@ -229,6 +247,9 @@ describe("signing in through a domain-matched organization's identity provider",
         email: "invited@acme.com",
       });
       expect(mocks.createMembership).not.toHaveBeenCalled();
+      expect(announcements.ssoAutoAddNurturing).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user_new", organizationId: "org_acme", role: "MEMBER" }),
+      );
     });
   });
 

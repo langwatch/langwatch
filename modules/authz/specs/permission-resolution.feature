@@ -24,6 +24,13 @@ Feature: Permission resolution
     When view, create, update or delete is requested on workflows
     Then each request is satisfied
 
+  Scenario: Deleting the organization is never implied by managing it
+    Given a caller holding "organization:manage" but not "organization:delete"
+    When "organization:delete" is requested
+    Then the request is refused
+    And a key holding "organization:manage" cannot mint a key with "organization:delete"
+    But view on the organization is still satisfied by the manage grant
+
   Scenario: A view grant never satisfies manage
     Given a caller holding "workflows:view"
     When "workflows:manage" is requested

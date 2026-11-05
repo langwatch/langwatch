@@ -2,6 +2,7 @@ import type { Named } from "@langwatch/module";
 /** Contract schemas for the organization feature's tRPC responses. */
 import { z } from "zod";
 
+import type { OrganizationUserRole } from "./organization.rows.ts";
 import { auditChannelSchema } from "./organization.ts";
 
 /** A write with nothing else to report. */
@@ -390,7 +391,7 @@ export type OrganizationAuditLogPage = z.infer<typeof organizationAuditLogPageSc
  * a default membership — rather than an absence.
  */
 export type OrganizationPendingInviteApplied =
-  | Readonly<{ applied: true; inviteId: string }>
+  | Readonly<{ applied: true; inviteId: string; role: OrganizationUserRole }>
   | Readonly<{ applied: false }>;
 
 /** Why one member is in the organization; `unknown` renders as no chip rather than a guess. */

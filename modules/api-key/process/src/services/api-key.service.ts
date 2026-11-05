@@ -188,6 +188,12 @@ export class ApiKeyService {
     return this.policy.assertSelectionWithinCeiling(input);
   }
 
+  async grantablePermissions(
+    input: Parameters<ApiKeyGrantPolicyService["grantablePermissions"]>[0],
+  ): Promise<string[]> {
+    return this.policy.grantablePermissions(input);
+  }
+
   async isOrgAdmin(input: { userId: string; organizationId: string }): Promise<boolean> {
     return this.policy.isOrgAdmin(input);
   }

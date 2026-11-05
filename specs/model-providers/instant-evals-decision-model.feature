@@ -5,10 +5,17 @@ Feature: Instant Evals decision model column in Default models
 
   # ADR-182. LangWatch Instant Preview is the hosted, metered default. An own decision model
   # runs on the organization's key, unmetered and uncapped, behind the
-  # release_instant_evals_own_decision_model flag. A broken own key never falls back.
+  # release_instant_evals_own_decision_model flag, on by default. A broken own key never falls back.
 
   Background:
     Given an organization with a project
+
+  # --- The flag ---
+
+  @unit
+  Scenario: Own decision models are on by default
+    When the flag registry is read
+    Then the own decision model flag is a product flag, on unless switched off
 
   # --- Resolving the column ---
 
@@ -182,6 +189,34 @@ Feature: Instant Evals decision model column in Default models
     Then both Perplexity models are offered
     And the Perplexity row is read once
 
+  @unit
+  Scenario: A config row offers the models its own scope runs, not the page's project
+    Given the flag is on for the organization
+    And project "A" has an enabled OpenAI row with a key
+    And the page is on project "C", which has no OpenAI row
+    When the pickable decision models are listed for a config on project "A"
+    Then "OpenAI Decisions API" is offered
+
+  @unit
+  Scenario: An organization row is not offered a key only one project holds
+    Given the flag is on for the organization
+    And only project "A" has an enabled OpenAI row with a key
+    When the pickable decision models are listed for a config on the organization
+    Then only "LangWatch Instant Preview" is offered
+
+  @unit
+  Scenario: A config on several scopes is offered only what every scope runs
+    Given the flag is on for the organization
+    And project "A" has an enabled OpenAI row with a key
+    And project "B" has none
+    When the pickable decision models are listed for a config on projects "A" and "B"
+    Then "OpenAI Decisions API" is not offered
+
+  @unit
+  Scenario: Scopes from another organization are refused
+    When the pickable decision models are listed for a scope outside the project's organization
+    Then the request is refused
+
   # --- Writing the column ---
 
   @unit
@@ -196,6 +231,21 @@ Feature: Instant Evals decision model column in Default models
     And a config already stores "Inception Mercury Decide" in the Instant Evals column
     When an admin changes another column of the same config
     Then the write is accepted
+
+  @unit
+  Scenario: Picking an own decision model for a scope with no key for it is refused
+    Given the flag is on for the organization
+    And only project "A" has an enabled Inception row with a key
+    When an admin sets the Instant Evals column of an organization config to "Inception Mercury Decide"
+    Then the write is refused saying a scope has no key for it
+
+  @unit
+  Scenario: A kept own decision model is checked only on the scopes it gains
+    Given the flag is on for the organization
+    And a config on project "A" stores "Inception Mercury Decide" in the Instant Evals column
+    And project "B" has no Inception row
+    When an admin adds project "B" to the config
+    Then the write is refused saying a scope has no key for it
 
   @unit
   Scenario: The column only takes decision models
@@ -304,7 +354,13 @@ Feature: Instant Evals decision model column in Default models
   Scenario: The Default models table shows an Instant Evals column defaulting to LangWatch Instant Preview
     When I open Settings > Model Providers > Default models
     Then I see an "Instant Evals" column
-    And it reads "LangWatch Instant Preview" where nothing is set
+    And it reads "Instant Preview" with the LangWatch mark where nothing is set
+
+  @unit
+  Scenario: A decision model reads as its model name, as a chat model does
+    When a decision model is listed in a picker
+    Then its label is the model name only, such as "gpt-6-luna" or "Microsoft Decision 1"
+    And its provider is shown by the provider heading and icon, never written in the label
 
   @integration
   Scenario: The drawer offers only decision models for the Instant Evals column
@@ -319,6 +375,20 @@ Feature: Instant Evals decision model column in Default models
     When I edit the Instant Evals column
     Then I can pick "LangWatch Instant Preview" and "OpenAI Decisions API"
     And "Inception Mercury Decide" is not offered, so every pick I can make runs
+
+  @unit
+  Scenario: With the router flag on LangWatch Instant Preview says it routes
+    Given the judge router flag is on for my organization
+    When the Instant Evals choices are built
+    Then "LangWatch Instant Preview" says a decision model answers what it is sure of and an LLM the rest
+    And with the router flag off it reads "Hosted by LangWatch and billed with your plan."
+
+  @integration
+  Scenario: The drawer asks about the picked scopes, not the page's project
+    Given I am on project "C"
+    When I edit a config row scoped to the organization
+    Then the Instant Evals choices are asked for the organization scope
+    And with no scope picked only "LangWatch Instant Preview" is offered
 
   @integration
   Scenario: Each decision model provider draws its own brand mark

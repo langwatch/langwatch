@@ -284,7 +284,6 @@ var (
 		"specs/monitors/workflow-evaluator-checktype.feature",
 		"specs/monitors/workflow-evaluator-mappings.feature",
 		"specs/nlp-go/dataset-block.feature",
-		"specs/nlp-go/http-block.feature",
 		"specs/nlp-go/proxy.feature",
 		"specs/nlp-go/python-removal.feature",
 		"specs/nlp-go/remove-execute-evaluation.feature",

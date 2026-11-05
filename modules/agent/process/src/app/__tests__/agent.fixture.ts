@@ -11,7 +11,10 @@ import { Temporal, toDate } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import { MemoryAgentChannels } from "../../channels/memory/memory.agent.channels.ts";
-import type { RecordAgentArchivedCommandData } from "../../eventing/agent-lifecycle.commands.ts";
+import type {
+  RecordAgentArchivedCommandData,
+  RecordAgentChangedCommandData,
+} from "../../eventing/agent-lifecycle.commands.ts";
 import type { AgentRepositories } from "../../repositories/agent.repositories.ts";
 import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
 import { AgentModule } from "../agent.app.ts";
@@ -92,16 +95,19 @@ export function createAgentAppFixture(
     channels: MemoryAgentChannels.create(),
   });
   const archivedFacts: RecordAgentArchivedCommandData[] = [];
-  app.connectLifecycleCommands({
-    recordAgentArchived: {
-      send: async (payload) => {
-        archivedFacts.push(payload);
-      },
-      sendBatch: async () => {},
-      close: async () => {},
-      waitUntilReady: async () => {},
+  const changedFacts: RecordAgentChangedCommandData[] = [];
+  const sender = <Payload>(facts: Payload[]) => ({
+    send: async (payload: Payload) => {
+      facts.push(payload);
     },
+    sendBatch: async () => {},
+    close: async () => {},
+    waitUntilReady: async () => {},
+  });
+  app.connectLifecycleCommands({
+    recordAgentArchived: sender(archivedFacts),
+    recordAgentChanged: sender(changedFacts),
   });
 
-  return { app, repositories, resources, archivedFacts };
+  return { app, repositories, resources, archivedFacts, changedFacts };
 }

@@ -307,6 +307,6 @@ export class InviteService {
     if (!pending) return { applied: false };
 
     await this.applyInvite({ userId, invite: pending });
-    return { applied: true, inviteId: pending.id };
+    return { applied: true, inviteId: pending.id, role: pending.role };
   }
 }
