@@ -122,7 +122,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     lookupId: string;
     hashedSecret: string;
   }): Promise<ApiKeyRow> {
-    const live = await this.#find(
+    const live = this.#find(
       (key) => key.id === input.id && key.organizationId === input.organizationId && !key.revokedAt,
     );
     if (!live) throw new ApiKeyAlreadyRevokedError(input.id);
