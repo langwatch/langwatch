@@ -5,10 +5,17 @@ Feature: Instant Evals decision model column in Default models
 
   # ADR-182. LangWatch Instant Preview is the hosted, metered default. An own decision model
   # runs on the organization's key, unmetered and uncapped, behind the
-  # release_instant_evals_own_decision_model flag. A broken own key never falls back.
+  # release_instant_evals_own_decision_model flag, on by default. A broken own key never falls back.
 
   Background:
     Given an organization with a project
+
+  # --- The flag ---
+
+  @unit
+  Scenario: Own decision models are on by default
+    When the flag registry is read
+    Then the own decision model flag is a product flag, on unless switched off
 
   # --- Resolving the column ---
 
@@ -51,9 +58,56 @@ Feature: Instant Evals decision model column in Default models
     Then it resolves as unavailable because the key is missing
 
   @unit
+  Scenario: A project's own key wins over an older organization key
+    Given the organization saved an OpenAI key before the project saved its own
+    When the project's OpenAI row is looked up
+    Then the project's row is answered, as the settings page lists it
+
+  @unit
+  Scenario: A saved decision model or key judges the next run
+    Given the project's decision model was resolved
+    When five seconds have passed
+    Then the next resolve reads the stored column and row again
+
+  # A provider whose host differs per customer (Azure) gets only the resource name from the row;
+  # the catalogue writes the rest of the URL, so a key still goes only to its issuer's domain.
+
+  @unit
+  Scenario: An Azure decision model is sent to the project's own Azure resource
+    Given the flag is on for the organization
+    And the Instant Evals column is "Azure OpenAI Decisions API"
+    And the project's Azure row has a key and the endpoint "https://acme.openai.azure.com/"
+    When the project's decision model is resolved
+    Then it resolves to "https://acme.openai.azure.com/openai/v1/decisions"
+    And the key is sent in the "api-key" header, never as a bearer token
+    And a deployment name stored on the row replaces the model name in the request
+
+  @unit
+  Scenario: An admin can name the Azure deployment of a decision model
+    When an admin edits the project's Azure provider without the API gateway
+    Then the form shows an optional deployment name for each Azure decision model
+    And the deployment names are shown as typed, never masked as a secret
+
+  @unit
+  Scenario: An Azure key is never sent to a host outside Azure
+    Given the flag is on for the organization
+    And the Instant Evals column is "Azure OpenAI Decisions API"
+    And the project's Azure row points at a gateway, a lookalike domain, plain http or a custom port
+    When the project's decision model is resolved
+    Then it resolves as unavailable because the endpoint is not allowed
+    And the call is skipped as a key problem, never sent
+
+  @unit
+  Scenario: Every catalogue entry can be reached with the key it names
+    When the decision model catalogue is read
+    Then every own entry names a registry provider, an https endpoint and a wire format
+    And every placeholder in an endpoint is filled from a field of that provider's row
+    And no two entries share an id
+
+  @unit
   Scenario: With the flag off an own decision model is not run and not moved onto the billed model
     Given the flag is off for the organization
-    And the Instant Evals column is "OpenAI Decisions (gpt-6-luna)"
+    And the Instant Evals column is "OpenAI Decisions API"
     When the project's decision model is resolved
     Then it resolves as unavailable because it is not enabled
     And the call is skipped as not configured
@@ -68,7 +122,7 @@ Feature: Instant Evals decision model column in Default models
     Given the flag is on for the organization
     And the Instant Evals column is not set at any scope
     And the project has an enabled OpenAI row with a key
-    When the decision model is resolved for a caller picking "OpenAI Decisions (gpt-6-luna)"
+    When the decision model is resolved for a caller picking "OpenAI Decisions API"
     Then it resolves to the own model with its endpoint and key
     And the project's column is not read
 
@@ -82,7 +136,7 @@ Feature: Instant Evals decision model column in Default models
   @unit
   Scenario: A caller's pick is refused without the flag
     Given the flag is off for the organization
-    When the decision model is resolved for a caller picking "OpenAI Decisions (gpt-6-luna)"
+    When the decision model is resolved for a caller picking "OpenAI Decisions API"
     Then it resolves as unavailable because it is not enabled
 
   @unit
@@ -96,7 +150,7 @@ Feature: Instant Evals decision model column in Default models
   @unit
   Scenario: A caller's pick that is not a decision model is ignored
     Given the flag is on for the organization
-    And the Instant Evals column is "OpenAI Decisions (gpt-6-luna)"
+    And the Instant Evals column is "OpenAI Decisions API"
     And the project has an enabled OpenAI row with a key
     When the decision model is resolved for a caller picking a chat model
     Then the project's column is resolved instead
@@ -124,7 +178,7 @@ Feature: Instant Evals decision model column in Default models
     And the project has no Inception row
     When the project's pickable decision models are listed
     Then "LangWatch Instant Preview" is offered first
-    And "OpenAI Decisions (gpt-6-luna)" is offered
+    And "OpenAI Decisions API" is offered
     And "Inception Mercury Decide" is not offered
 
   @unit
@@ -134,6 +188,34 @@ Feature: Instant Evals decision model column in Default models
     When the project's pickable decision models are listed
     Then both Perplexity models are offered
     And the Perplexity row is read once
+
+  @unit
+  Scenario: A config row offers the models its own scope runs, not the page's project
+    Given the flag is on for the organization
+    And project "A" has an enabled OpenAI row with a key
+    And the page is on project "C", which has no OpenAI row
+    When the pickable decision models are listed for a config on project "A"
+    Then "OpenAI Decisions API" is offered
+
+  @unit
+  Scenario: An organization row is not offered a key only one project holds
+    Given the flag is on for the organization
+    And only project "A" has an enabled OpenAI row with a key
+    When the pickable decision models are listed for a config on the organization
+    Then only "LangWatch Instant Preview" is offered
+
+  @unit
+  Scenario: A config on several scopes is offered only what every scope runs
+    Given the flag is on for the organization
+    And project "A" has an enabled OpenAI row with a key
+    And project "B" has none
+    When the pickable decision models are listed for a config on projects "A" and "B"
+    Then "OpenAI Decisions API" is not offered
+
+  @unit
+  Scenario: Scopes from another organization are refused
+    When the pickable decision models are listed for a scope outside the project's organization
+    Then the request is refused
 
   # --- Writing the column ---
 
@@ -151,13 +233,28 @@ Feature: Instant Evals decision model column in Default models
     Then the write is accepted
 
   @unit
+  Scenario: Picking an own decision model for a scope with no key for it is refused
+    Given the flag is on for the organization
+    And only project "A" has an enabled Inception row with a key
+    When an admin sets the Instant Evals column of an organization config to "Inception Mercury Decide"
+    Then the write is refused saying a scope has no key for it
+
+  @unit
+  Scenario: A kept own decision model is checked only on the scopes it gains
+    Given the flag is on for the organization
+    And a config on project "A" stores "Inception Mercury Decide" in the Instant Evals column
+    And project "B" has no Inception row
+    When an admin adds project "B" to the config
+    Then the write is refused saying a scope has no key for it
+
+  @unit
   Scenario: The column only takes decision models
     When an admin sets the Instant Evals column to a chat model
     Then the write is refused saying it is not a decision model
 
   @unit
   Scenario: A decision model cannot be another role's default
-    When an admin sets the Default column to "OpenAI Decisions (gpt-6-luna)"
+    When an admin sets the Default column to "OpenAI Decisions API"
     Then the write is refused saying it can only be the Instant Evals default
 
   # --- Calling an own decision model ---
@@ -184,6 +281,12 @@ Feature: Instant Evals decision model column in Default models
     When the provider answers 401
     Then the text is skipped as "classifier_key_invalid" after one attempt
     And the provider's error text is not read
+
+  @unit
+  Scenario: A model or deployment the account does not hold is skipped as not configured
+    When the provider answers 404
+    Then the text is skipped as "classifier_not_configured" after one attempt
+    And the run is not failed over it
 
   @unit
   Scenario: A rate limited provider is retried, then named as rate limited
@@ -251,7 +354,13 @@ Feature: Instant Evals decision model column in Default models
   Scenario: The Default models table shows an Instant Evals column defaulting to LangWatch Instant Preview
     When I open Settings > Model Providers > Default models
     Then I see an "Instant Evals" column
-    And it reads "LangWatch Instant Preview" where nothing is set
+    And it reads "Instant Preview" with the LangWatch mark where nothing is set
+
+  @unit
+  Scenario: A decision model reads as its model name, as a chat model does
+    When a decision model is listed in a picker
+    Then its label is the model name only, such as "gpt-6-luna" or "Microsoft Decision 1"
+    And its provider is shown by the provider heading and icon, never written in the label
 
   @integration
   Scenario: The drawer offers only decision models for the Instant Evals column
@@ -260,7 +369,29 @@ Feature: Instant Evals decision model column in Default models
     Then I can pick only "LangWatch Instant Preview"
 
   @integration
+  Scenario: The drawer offers only the decision models that would run
+    Given the flag is on for my organization
+    And my project has an OpenAI key and no Inception key
+    When I edit the Instant Evals column
+    Then I can pick "LangWatch Instant Preview" and "OpenAI Decisions API"
+    And "Inception Mercury Decide" is not offered, so every pick I can make runs
+
+  @unit
+  Scenario: With the router flag on LangWatch Instant Preview says it routes
+    Given the judge router flag is on for my organization
+    When the Instant Evals choices are built
+    Then "LangWatch Instant Preview" says a decision model answers what it is sure of and an LLM the rest
+    And with the router flag off it reads "Hosted by LangWatch and billed with your plan."
+
+  @integration
+  Scenario: The drawer asks about the picked scopes, not the page's project
+    Given I am on project "C"
+    When I edit a config row scoped to the organization
+    Then the Instant Evals choices are asked for the organization scope
+    And with no scope picked only "LangWatch Instant Preview" is offered
+
+  @integration
   Scenario: Each decision model provider draws its own brand mark
     When the icon for a decision model provider is drawn
     Then the LangWatch hosted model draws the LangWatch logo
-    And Inception, Perplexity and Cloudflare each draw a mark of their own, not the generic one
+    And Inception, Perplexity, Cloudflare, TypeSafe, OpenRouter and Fireworks each draw a mark of their own, not the generic one

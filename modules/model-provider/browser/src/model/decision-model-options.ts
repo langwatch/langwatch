@@ -6,8 +6,8 @@
 import {
   DECISION_MODELS,
   findDecisionModel,
-  findModelProviderDefinition,
   LANGWATCH_DECISION_MODEL_ID,
+  type BuiltInModel,
   type ModelPickerOption,
 } from "@langwatch/model-provider-contract";
 
@@ -16,40 +16,37 @@ export const DECISION_MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = Ob
   DECISION_MODELS.map((entry) => [entry.id, entry.label]),
 );
 
+/** LangWatch Instant Preview's line when the judge router answers for it (ADR-190). */
+export const ROUTED_HOSTED_DECISION_MODEL_SUBTITLE =
+  "LLM-judge evaluations are routed by the LangWatch Judge: a decision model answers what it is sure of, " +
+  "an LLM the rest. Judged queries are not. Billed with your plan.";
+
 /** Whether the column can show a stored id; an id the catalogue dropped reads as unset. */
 export function isShownDecisionModel(id: string | null | undefined): id is string {
   return !!id && !!findDecisionModel(id);
 }
 
-function missingKeyHint(provider: string): string {
-  const name = findModelProviderDefinition(provider)?.name ?? provider;
-  const article = /^[aeiou]/i.test(name) ? "an" : "a";
-  return `Add ${article} ${name} key in Model Providers first`;
-}
-
 /**
- * The column's picker entries, LangWatch Instant Preview first. Own entries need the
- * own-decision-model flag; one whose provider has no enabled row says how to add it.
- * `enabledProviderKeys` null means the rows have not loaded, so no hint is shown yet.
+ * The column's picker entries: the decision models the server says would run, in catalogue
+ * order, LangWatch Instant Preview first, so a pick here always runs. `pickable` undefined means
+ * not loaded yet. With the judge router flag, Instant Preview says it routes.
  */
 export function decisionModelPickerOptions({
-  ownModelsEnabled,
-  enabledProviderKeys,
+  pickable,
+  isJudgeRouted,
 }: {
-  ownModelsEnabled: boolean;
-  enabledProviderKeys: ReadonlySet<string> | null;
+  pickable: readonly BuiltInModel[] | undefined;
+  isJudgeRouted: boolean;
 }): ModelPickerOption[] {
+  const offered = new Set((pickable ?? []).map((model) => model.value));
   return DECISION_MODELS.filter(
-    (entry) => entry.id === LANGWATCH_DECISION_MODEL_ID || ownModelsEnabled,
-  ).map((entry) => {
-    const needsKey =
-      entry.id !== LANGWATCH_DECISION_MODEL_ID &&
-      !!enabledProviderKeys &&
-      !enabledProviderKeys.has(entry.provider);
-    return {
-      label: entry.label,
-      value: entry.id,
-      subtitle: needsKey ? missingKeyHint(entry.provider) : entry.description,
-    };
-  });
+    (entry) => entry.id === LANGWATCH_DECISION_MODEL_ID || offered.has(entry.id),
+  ).map((entry) => ({
+    label: entry.label,
+    value: entry.id,
+    subtitle:
+      isJudgeRouted && entry.id === LANGWATCH_DECISION_MODEL_ID
+        ? ROUTED_HOSTED_DECISION_MODEL_SUBTITLE
+        : entry.description,
+  }));
 }

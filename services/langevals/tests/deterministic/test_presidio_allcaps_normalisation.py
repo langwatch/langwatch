@@ -7,7 +7,6 @@ specs/evaluators/langevals-presidio-allcaps-person-names.feature
 
 import sys
 import unicodedata
-from functools import lru_cache
 from typing import Any
 
 import pytest
@@ -20,59 +19,19 @@ from langevals_presidio.pii_detection import (
     PresidioEntities,
     PresidioPIIDetectionEntry,
     PresidioPIIDetectionEvaluator,
-    PresidioPIIDetectionSettings,
 )
 from presidio_analyzer import RecognizerResult
-from presidio_person_name_support import MIN_THRESHOLD, evaluator
+from presidio_person_name_support import (
+    MIN_THRESHOLD,
+    analyze_calls,
+    evaluator,
+    name_and_place_evaluator,
+)
 
 # U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE. Its lowercase mapping is two
 # characters, 'i' plus U+0307, which is what makes a naive lower() or title()
 # shift every offset after it.
 DOTTED_CAPITAL_I = "İ"
-
-
-class CountingAnalyzer:
-    """Passes every call through and records how many there were."""
-
-    def __init__(self, inner: Any):
-        self._inner = inner
-        self.calls: list[dict[str, Any]] = []
-
-    def analyze(self, **kwargs: Any) -> Any:
-        self.calls.append(kwargs)
-        return self._inner.analyze(**kwargs)
-
-
-def analyze_calls(*, entities: PresidioEntities, text: str) -> list[dict[str, Any]]:
-    """Every analyze() call one evaluate() of `text` makes.
-
-    The counter goes on the class: the pydantic evaluator refuses instance attributes.
-    """
-    subject = PresidioPIIDetectionEvaluator(
-        settings=PresidioPIIDetectionSettings(
-            entities=entities, min_threshold=MIN_THRESHOLD
-        )
-    )
-    inner = PresidioPIIDetectionEvaluator.analyzer
-    counting = CountingAnalyzer(inner)
-    PresidioPIIDetectionEvaluator.analyzer = counting  # type: ignore[assignment]
-    try:
-        result = subject.evaluate(PresidioPIIDetectionEntry(input=text))
-    finally:
-        PresidioPIIDetectionEvaluator.analyzer = inner  # type: ignore[assignment]
-    assert result.status == "processed", f"evaluator did not run: {result}"
-    return counting.calls
-
-
-@lru_cache(maxsize=1)
-def name_and_place_evaluator() -> PresidioPIIDetectionEvaluator:
-    """The default entities plus person and location, as strict redaction asks."""
-    return PresidioPIIDetectionEvaluator(
-        settings=PresidioPIIDetectionSettings(
-            entities=PresidioEntities(person=True, location=True),
-            min_threshold=MIN_THRESHOLD,
-        )
-    )
 
 
 def findings(
@@ -209,12 +168,80 @@ def test_second_pass_asks_for_places_when_location_is_on():
 
 
 # @scenario "The second pass is skipped when the only capitals are short words"
-def test_no_second_pass_when_only_short_words_are_capitalised():
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Marcus Whitfield said OK, the ID is on the USD invoice from the CFO.",
+        "Marcus Whitfield restarted the TCP/IP stack on the VM.",
+    ],
+)
+def test_no_second_pass_when_only_short_words_are_capitalised(text: str):
+    calls = analyze_calls(entities=PresidioEntities(person=True), text=text)
+    assert len(calls) == 1, f"expected one pass, got {len(calls)}: {calls}"
+
+
+# @scenario "The second pass is skipped when every capitalised word is its own field"
+@pytest.mark.parametrize(
+    "text",
+    [
+        '{"method": "POST", "url": "/v1/chat/completions", "status": 200}',
+        '{"level": "ERROR", "message": "upstream timed out after 30s"}',
+        '{"tool": "search", "args": {"query": "refund policy"}, "status": "SUCCESS"}',
+        '{"env": "PROD", "region": "eu-west-1", "service": "checkout"}',
+        '{"first": "Maria", "last": "GONZALEZ"}',
+        '["Maria", "GONZALEZ"]',
+        "{'method': 'POST', 'url': '/v1', 'level': 'ERROR'}",
+        '"method"; "POST"; "status"; "SUCCESS"',
+        "{“method”: “POST”, “level”: “ERROR”}",
+        "{‘method’: ‘POST’, ‘level’: ‘ERROR’}",
+        '{method: "POST", level: "ERROR"}',
+    ],
+)
+def test_no_second_pass_when_every_capitalised_word_is_its_own_field(text: str):
+    """A quote beside a colon, comma or semicolon ends a field, so a quoted POST
+    is not worth a pass."""
     calls = analyze_calls(
-        entities=PresidioEntities(person=True),
-        text="Marcus Whitfield said OK, the ID is on the USD invoice from the CFO.",
+        entities=PresidioEntities(person=True, location=True), text=text
     )
     assert len(calls) == 1, f"expected one pass, got {len(calls)}: {calls}"
+
+
+# @scenario "The second pass still runs for a capitalised word that may join another"
+@pytest.mark.parametrize(
+    "text,name",
+    [
+        ('{"customer": "MARIA GONZALEZ", "status": "OPEN"}', "MARIA GONZALEZ"),
+        ("Escalated by Anna Smith-JONES.", "Anna Smith-JONES"),
+        ("Note: AMY LEE called twice.", "AMY LEE"),
+        ("Signed by J. WHITFIELD on arrival.", "J. WHITFIELD"),
+        ('JOHN "JACK" WHITFIELD', 'JOHN "JACK" WHITFIELD'),
+        ('Customer: Robert "BOB" MILLER', 'Robert "BOB" MILLER'),
+        ("Ann – WHITFIELD", "Ann – WHITFIELD"),
+        ("Ann - WHITFIELD", "Ann - WHITFIELD"),
+        ("Contact Robert: MILLER", "Robert: MILLER"),
+        ("JAMES' WHITFIELD", "JAMES' WHITFIELD"),
+        ("Contact person: Robert (MILLER), phone unknown", "Robert (MILLER"),
+    ],
+)
+def test_second_pass_runs_for_a_capitalised_word_that_may_join_another(
+    text: str, name: str
+):
+    calls = analyze_calls(
+        entities=PresidioEntities(person=True, location=True), text=text
+    )
+    assert len(calls) == 2, f"expected two passes, got {len(calls)}: {calls}"
+    assert ("PERSON", name) in names_and_places(text)
+
+
+# @scenario "The second pass still runs for a capitalised word that may join another"
+def test_second_pass_runs_for_a_surname_before_a_comma():
+    """Only the comma joins GONZALEZ to a word. Just the forename is redacted
+    today (#9255)."""
+    calls = analyze_calls(
+        entities=PresidioEntities(person=True, location=True),
+        text='{"name": "GONZALEZ, Maria"}',
+    )
+    assert len(calls) == 2, f"expected two passes, got {len(calls)}: {calls}"
 
 
 # @scenario "The second pass is skipped when neither names nor places are redacted"

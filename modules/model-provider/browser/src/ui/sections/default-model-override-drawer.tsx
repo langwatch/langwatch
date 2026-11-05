@@ -352,11 +352,6 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   const { closeDrawer } = useDrawer();
   const { projectId, organizationId } = host.scope();
   const utils = modelProviderApi.useUtils();
-  // Asked of the organization only, so the picker agrees with the server's write check.
-  const { enabled: ownDecisionModelsEnabled } = useFeatureFlag(
-    FrontendFlags.release_instant_evals_own_decision_model,
-    { projectId: NOT_TARGETED, organizationId, enabled: !!organizationId },
-  );
   const saveMutation = modelProviderApi.modelProvider.saveDefaultModelsConfig.useMutation();
 
   // Pulls the same Payload DefaultModelsSection consumes - tRPC
@@ -439,11 +434,27 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     { enabled: !!projectId && open, refetchOnMount: false },
   );
 
+  // The server weighs the flag and the keys of the picked scopes, not the page's project, so
+  // the column offers only models every picked scope would run. No scope picked: LangWatch only.
+  const pickableDecisionModels =
+    modelProviderApi.modelProvider.listDecisionModelsForScopes.useQuery(
+      {
+        projectId: projectId ?? "",
+        scopes: scopes.map((s) => ({ scopeType: s.scopeType, scopeId: s.scopeId })),
+      },
+      { enabled: !!projectId && scopes.length > 0 && open },
+    );
+  const { enabled: isJudgeRouted } = useFeatureFlag(
+    FrontendFlags.release_instant_evals_judge_router,
+    {
+      projectId: projectId ?? NOT_TARGETED,
+      organizationId,
+      enabled: !!projectId && open,
+    },
+  );
   const decisionOptions = decisionModelPickerOptions({
-    ownModelsEnabled: ownDecisionModelsEnabled,
-    enabledProviderKeys: projectProviders.data
-      ? new Set(projectProviders.data.filter((p) => p.enabled === true).map((p) => p.provider))
-      : null,
+    pickable: pickableDecisionModels.data,
+    isJudgeRouted,
   });
   const modelOptionsByRole = modelOptionsByRoleFor({
     decisionOptions,

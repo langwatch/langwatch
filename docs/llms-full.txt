@@ -1122,12 +1122,14 @@ Manage them at **Settings > Model Providers**. The table lists each configuratio
 | Codex (OpenAI account) | Sign in with your OpenAI account. Used by coding features only |
 | Anthropic | API key, or a base URL |
 | Gemini | API key. Add a project and a location to use Gemini through Vertex AI |
-| Azure OpenAI | API key and endpoint, optional API version. **Use API Gateway** switches to an API gateway base URL and version |
+| Azure OpenAI | API key and endpoint, optional API version. **Use API Gateway** switches to an API gateway base URL and version. Optional **Decisions Deployment** and **Microsoft Decision 1 Deployment** name the deployments [Instant Evals can run on](/features/instant-evals/own-model#azure) |
 | Bedrock | AWS access key id, secret access key and region |
 | Vertex AI | Service account JSON, project and location |
 | DeepSeek, Doubleword, xAI, Cerebras, Groq, Voyage AI | API key |
 | ElevenLabs | API key, optional webhook secret. See [Voice Agents](/agent-testing/voice-agents#before-you-start) for the key permissions it needs |
 | Azure Safety | Content Safety endpoint and key, for the Azure safety evaluators |
+| Inception, Perplexity, TypeSafe, OpenRouter, Fireworks | API key, for the decision models [Instant Evals can run on](/features/instant-evals/own-model) |
+| Cloudflare Workers AI | Account id and API token, for the decision models [Instant Evals can run on](/features/instant-evals/own-model) |
 | Custom (OpenAI-compatible) | Base URL and optional API key, for a LiteLLM proxy, vLLM or any endpoint that serves `/chat/completions` |
 
 You can save several configurations of the same vendor, for example one OpenAI account per region, and tell them apart by **Name**.
@@ -1184,9 +1186,11 @@ The **All you can see** filter above the table narrows the list and the default 
 
 ## Default models
 
-The **Default Models** section on the same page sets the model each feature uses unless the user picks one in the feature itself. A config sets a model per role (**Default**, **Fast**, **Langy**, **Embeddings**) and per feature, for example the model a new prompt or evaluator starts with, the Langy chat model, trace AI search, workflow commit messages, and the topic clustering model and embeddings.
+The **Default Models** section on the same page sets the model each feature uses unless the user picks one in the feature itself. A config sets a model per role (**Default**, **Fast**, **Langy**, **Embeddings**, **Instant Evals**) and per feature, for example the model a new prompt or evaluator starts with, the Langy chat model, trace AI search, workflow commit messages, and the topic clustering model and embeddings.
 
 Click **Add config**, pick the scopes and the models. A project config beats a team config, which beats an organization config. A feature that no config names inherits from the wider scope.
+
+The **Instant Evals** column takes only decision models: LangWatch Instant Preview, the default, or one on your own key. See [Run Instant Evals on your own decision model](/features/instant-evals/own-model).
 
 <Frame>
 <img src="/images/platform/model-providers-default-models.png" alt="The Default Models section with one config and the Add config button" />
@@ -18889,6 +18893,184 @@ copilot() {
 
 ---
 
+# FILE: ./coding-agents/grok-cli.mdx
+
+---
+title: Grok CLI Monitoring with OpenTelemetry
+sidebarTitle: Grok CLI
+description: Monitor the Grok CLI with OpenTelemetry. Send sessions, cost and prompts to LangWatch with the LangWatch command-line tool.
+keywords:
+  - grok cli monitoring
+  - grok usage tracking
+  - grok telemetry
+  - grok opentelemetry
+  - grok cost
+---
+
+The Grok CLI is xAI's terminal coding agent. It reports every session over OpenTelemetry once its export is switched on. The LangWatch command-line tool switches it on and connects it to your workspace, so you can read the cost of each session, the prompts and responses of each turn, and every tool call.
+
+There are two ways to set it up:
+
+- `langwatch grok` starts Grok and sets up the connection on the first run. Use it on a machine you work on.
+- `langwatch instrument grok` writes the same setup and exits. Use it on a machine where people start Grok from a terminal, or when the telemetry must go to a team project.
+
+## Before you start
+
+- Install the Grok CLI.
+- Install the LangWatch command-line tool: `npm install -g langwatch`
+- Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
+
+## Run Grok through the wrapper
+
+```bash
+langwatch login --device
+langwatch grok
+```
+
+The first run asks no question. Grok sets its model endpoints in its own `config.toml`, not in the environment, so its model calls cannot go through the LangWatch AI Gateway: LangWatch receives telemetry only, and Grok keeps your own plan and keys.
+
+The wrapper also writes a hook file to `~/.grok/hooks/langwatch.json`, so every session reports the repository, branch and worktree it ran in. Grok runs global hooks only in a folder it trusts: accept its trust prompt at startup, or run `/hooks-trust`. A session in a folder you have not trusted still reaches LangWatch, without a repository or branch.
+
+Everything else is unchanged: `langwatch grok` accepts the same flags as `grok` and returns the same exit code.
+
+<Note>
+  If `GROK_HOME` is set, the hook file goes to the `hooks` folder inside that directory instead.
+</Note>
+
+## Set up a machine without starting Grok
+
+`langwatch instrument grok` writes the connection and exits. A plain `grok` run on that machine then sends its telemetry to LangWatch. This is the setup for a shared machine where people start Grok from a terminal, for a machine image, or for a configuration management run.
+
+```bash
+langwatch instrument grok
+```
+
+The command writes two things:
+
+- A `grok` function in your shell start file, which applies the LangWatch settings to `grok` runs and to no other command. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`. Grok reads its export settings from the environment only, so a plain `grok` run reports only through this function.
+- The hook file in `~/.grok/hooks/`.
+
+Open a new terminal after the command, or read the start file again, so the function is in place.
+
+Only a shell that reads the start file has the function. A service, a scheduled job or a script that starts `grok` without it gets no LangWatch settings and sends no telemetry. For those, set the variables from [Manual OpenTelemetry setup](#manual-opentelemetry-setup) in that process's environment.
+
+<Note>
+  The shell function needs zsh, bash or fish. On Windows, start Grok with `langwatch grok` each
+  time instead.
+</Note>
+
+### Choose where the telemetry goes
+
+Pass one scope flag, and one only:
+
+| Command                                            | Destination                                                                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `langwatch instrument grok`                        | Your personal workspace                                                                                       |
+| `langwatch instrument grok --project <id-or-slug>` | A team project. See [Team projects](/coding-agents/team-projects).                                            |
+| `langwatch instrument grok --key <ingest-key>`     | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
+| `langwatch instrument grok --personal`             | Back to your personal workspace                                                                               |
+
+The wrapper accepts the same flags: `langwatch grok --project acme-app` pins the project and then starts Grok. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Grok reads it.
+
+### Remove the setup
+
+```bash
+langwatch logout
+```
+
+This deletes every connection the command-line tool wrote, for every tool, the Grok hook file included.
+
+## What you get in LangWatch
+
+Open your personal page at `/me`, or open the project you pinned Grok to.
+
+- **[Sessions](/coding-agents/sessions)**: one row per Grok session, with the repository, branch and worktree it ran in. A subagent gets a row of its own, linked to the session that started it.
+- **Turns**: each prompt, the response, and every tool call with its arguments and its result.
+- **[Cost](/coding-agents/usage-analytics)**: the amount per session, from the cost Grok reports.
+
+<Frame caption="Grok sessions in the sessions list. Each row is named after its first prompt and shows the repository and branch the hook file reported, the context it carried and its cost.">
+  ![Grok sessions list](/images/coding-agents/grok-sessions-list.png)
+</Frame>
+
+Grok exports logs and metrics, not spans, so a session has no per-call model trace, and the session header names Grok and its version but no model.
+
+If the LangWatch Claude Code hooks are installed on the same machine, Grok loads them too. They stay silent inside Grok, so a Grok session never shows up as a Claude Code row as well.
+
+Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+## Content and privacy
+
+The setup switches on Grok's four content settings: prompts, responses, tool details and tool content. That is what makes a turn readable. To keep content out of storage, set the content categories to **Drop** in the [data privacy policy](/platform/data-privacy): the strip happens at ingestion, before storage, and tokens, cost, model and timing survive. Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No telemetry arrives in LangWatch">
+    Open a new terminal. The `grok` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
+
+    Grok exports no telemetry unless `GROK_EXTERNAL_OTEL=1` is set. The wrapper and the shell function both set it; a `grok` run outside either does not report.
+
+  </Accordion>
+
+  <Accordion title="Sessions arrive without a repository or branch">
+    Grok has not trusted the folder, so it skipped the LangWatch hook. Accept the trust prompt at startup, or run `/hooks-trust` in that folder.
+  </Accordion>
+
+  <Accordion title="The wrapper reports that the hook file is not a LangWatch file">
+    A file of your own named `langwatch.json` already sits in Grok's hook folder: `~/.grok/hooks/`, or `hooks` inside `GROK_HOME` when that is set. LangWatch never overwrites it, and sessions report no repository while it is there. Rename your file, then run `langwatch grok` again.
+  </Accordion>
+
+<Accordion title="The command reports that it could not write the shell start file">
+  The shell is not zsh, bash or fish. Start Grok with `langwatch grok` each time, which needs no
+  start file.
+</Accordion>
+
+  <Accordion title="The telemetry goes to the wrong workspace">
+    Run `langwatch instrument grok --project <id-or-slug>` to move it to a team project, or `langwatch instrument grok --personal` to move it back to your own.
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write telemetry and no other requests, so a key that works for ingestion still fails on other endpoints.
+
+    On a machine with a login, run `langwatch login --device` again to refresh the session.
+
+  </Accordion>
+</AccordionGroup>
+
+For more failure modes see [CLI debug](/ai-governance/cli-debug).
+
+## Manual OpenTelemetry setup
+
+Use this when you cannot install the LangWatch command-line tool. Set the variables below before you start Grok. They are the ones `langwatch instrument grok` writes for you.
+
+```bash
+export GROK_EXTERNAL_OTEL=1
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+export OTEL_LOG_USER_PROMPTS=1
+export OTEL_LOG_ASSISTANT_RESPONSES=1
+export OTEL_LOG_TOOL_DETAILS=1
+export OTEL_LOG_TOOL_CONTENT=1
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
+grok
+```
+
+The header takes an ingest key (`ik-lw-…`), which can create telemetry and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+
+For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Set any of the four `OTEL_LOG_*` lines to `0` to keep that kind of content on your machine. Leaving `OTEL_LOG_ASSISTANT_RESPONSES` out is not enough: it then follows `OTEL_LOG_USER_PROMPTS`.
+
+The hook file runs the LangWatch command-line tool, so a manual setup reports no repository or branch.
+
+<Warning>
+  A plain `export` applies the key to every program the shell starts, not to Grok alone. To keep it
+  to Grok, use the shell function `langwatch instrument grok` writes, or put the variables in a
+  function of your own that ends with `command grok "$@"`.
+</Warning>
+
+---
+
 # FILE: ./coding-agents/headless-and-ci.mdx
 
 ---
@@ -19487,7 +19669,7 @@ On fish, the same block is a function with `set -lx` for each variable.
 ---
 title: Coding Agent Monitoring and Cost Tracking
 sidebarTitle: Overview
-description: Track what Claude Code, Codex, Copilot, Gemini CLI and opencode really do and cost, per session, per pull request and per team, with privacy controls built for tracking people's tools.
+description: Track what Claude Code, Codex, Copilot, Gemini CLI, opencode, Grok CLI and pi really do and cost, per session, per pull request and per team, with privacy controls built for tracking people's tools.
 keywords:
   - coding agent monitoring
   - claude code usage
@@ -19548,6 +19730,22 @@ npx langwatch opencode
 ```
 
 
+  ### Grok CLI
+
+
+```bash
+npx langwatch grok
+```
+
+
+  ### pi
+
+
+```bash
+npx langwatch pi
+```
+
+
   ### Cursor
 
     Set Cursor's OpenAI base URL to `https://gateway.langwatch.ai/v1` and its OpenAI API key to a
@@ -19580,6 +19778,12 @@ Check out the [quickstart](/coding-agents/quickstart) for next steps.
   </Card>
   <Card title="OpenCode" icon="/images/logos/opencode.svg" href="/coding-agents/opencode">
     Sessions, cost and traces from opencode.
+  </Card>
+  <Card title="Grok CLI" icon="/images/logos/grok.svg" href="/coding-agents/grok-cli">
+    Sessions, cost and prompts from xAI's Grok CLI.
+  </Card>
+  <Card title="pi" icon="terminal" href="/coding-agents/pi">
+    Sessions, cost and traces from the pi coding agent.
   </Card>
   <Card title="Cursor and Aider" icon="/images/logos/cursor.svg" href="/ai-gateway/quickstart">
     Through the LangWatch AI Gateway: point their OpenAI base URL at
@@ -19638,6 +19842,174 @@ Check out the [quickstart](/coding-agents/quickstart) for next steps.
     Price your real usage mix against other providers.
   </Card>
 </CardGroup>
+
+---
+
+# FILE: ./coding-agents/pi.mdx
+
+---
+title: pi Monitoring with OpenTelemetry
+sidebarTitle: pi
+description: Monitor the pi coding agent with OpenTelemetry. Send sessions, cost and traces to LangWatch with the LangWatch command-line tool.
+keywords:
+  - pi coding agent monitoring
+  - pi usage tracking
+  - pi telemetry
+  - pi opentelemetry
+  - pi cost
+---
+
+[pi](https://pi.dev) is a terminal coding agent with its own extension system. pi describes every session as a tree of spans but ships no exporter, so on its own it sends no telemetry. The LangWatch command-line tool installs a small pi extension that exports those spans to your workspace, so you can read the cost of each session, the model calls of each turn and every tool call.
+
+There are two ways to set it up:
+
+- `langwatch pi` starts pi and sets up the connection on the first run. Use it on a machine you work on.
+- `langwatch instrument pi` writes the same setup and exits. Use it on a machine where people start pi from a terminal, or when the telemetry must go to a team project.
+
+## Before you start
+
+- Install pi: `npm install -g @earendil-works/pi-coding-agent`
+- Install the LangWatch command-line tool: `npm install -g langwatch`
+- Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
+
+## Run pi through the wrapper
+
+```bash
+langwatch login --device
+langwatch pi
+```
+
+The first run asks no question. pi fixes the address of every model provider in its own build, so its model calls cannot go through the LangWatch AI Gateway: LangWatch receives telemetry only, and pi keeps your own provider keys.
+
+On that run the wrapper writes the telemetry extension to `~/.pi/agent/extensions/langwatch-pi-telemetry.ts` and says so in the terminal. Later runs find it in place and leave it alone. Everything else is unchanged: `langwatch pi` accepts the same flags as `pi` and returns the same exit code.
+
+<Note>
+  If `PI_CODING_AGENT_DIR` is set, the extension goes to the `extensions` folder inside that
+  directory instead, which is where pi looks for it.
+</Note>
+
+## Set up a machine without starting pi
+
+`langwatch instrument pi` writes the connection and exits. A plain `pi` run on that machine then sends its telemetry to LangWatch. This is the setup for a shared machine where people start pi from a terminal, for a machine image, or for a configuration management run.
+
+```bash
+langwatch instrument pi
+```
+
+The command writes two files:
+
+- A `pi` function in your shell start file, which applies the LangWatch settings to `pi` runs and to no other command. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`.
+- The telemetry extension in pi's extension folder, `~/.pi/agent/extensions/`. It reads the endpoint and the key from the function's environment, since pi has no configuration file that holds either.
+
+Open a new terminal after the command, or read the start file again, so the function is in place.
+
+Only a shell that reads the start file has the function. A service, a scheduled job or a script that starts `pi` without it gets no LangWatch settings and sends no telemetry. For those, set the variables from [Manual setup](#manual-setup) in that process's environment.
+
+<Note>
+  The shell function needs zsh, bash or fish. On Windows, start pi with `langwatch pi` each time
+  instead.
+</Note>
+
+### Choose where the telemetry goes
+
+Pass one scope flag, and one only:
+
+| Command                                          | Destination                                                                                                   |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `langwatch instrument pi`                        | Your personal workspace                                                                                       |
+| `langwatch instrument pi --project <id-or-slug>` | A team project. See [Team projects](/coding-agents/team-projects).                                            |
+| `langwatch instrument pi --key <ingest-key>`     | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
+| `langwatch instrument pi --personal`             | Back to your personal workspace                                                                               |
+
+The wrapper accepts the same flags: `langwatch pi --project acme-app` pins the project and then starts pi. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before pi reads it.
+
+### Remove the setup
+
+```bash
+langwatch logout
+```
+
+This deletes every connection the command-line tool wrote, for every tool, the pi extension included.
+
+## What you get in LangWatch
+
+Open your personal page at `/me`, or open the project you pinned pi to.
+
+- **[Sessions](/coding-agents/sessions)**: one row per pi session, with the repository, branch and worktree it ran in.
+- **Traces**: one trace per run, with each model call and each tool call in order.
+- **[Cost](/coding-agents/usage-analytics)**: the amount per session and per turn, from the cost pi reports for each model call.
+
+<Frame caption="pi sessions in the sessions list. Each row shows the repository and branch the session ran in, the context it carried and its cost.">
+  ![pi sessions list](/images/coding-agents/pi-sessions-list.png)
+</Frame>
+
+<Frame caption="One pi run in the trace view. Each turn holds its model calls, with the cost of each, and its tool calls, such as bash, read and edit.">
+  ![pi session trace](/images/coding-agents/pi-session-trace.png)
+</Frame>
+
+Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+## Content and privacy
+
+The extension exports what pi's own span tree describes: model, provider, token counts, cost, timing, and the name and outcome of each tool call. It sends no prompt text, no model response and no tool arguments or results. To control who can open a stored session, see [Privacy](/coding-agents/privacy).
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No telemetry arrives in LangWatch">
+    Open a new terminal. The `pi` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
+
+    Then check that the extension exists at `~/.pi/agent/extensions/langwatch-pi-telemetry.ts`, or in the `extensions` folder inside `PI_CODING_AGENT_DIR` when that is set. Run `langwatch pi` or `langwatch instrument pi` once to write it again.
+
+  </Accordion>
+
+  <Accordion title="The wrapper reports that the extension file is not a LangWatch file">
+    A file of your own named `langwatch-pi-telemetry.ts` already sits in pi's extension folder: `~/.pi/agent/extensions/`, or `extensions` inside `PI_CODING_AGENT_DIR` when that is set. LangWatch never overwrites it, and pi sessions send no telemetry while it is there. Rename or remove your file, then run `langwatch pi` again.
+  </Accordion>
+
+<Accordion title="The command reports that it could not write the shell start file">
+  The shell is not zsh, bash or fish. Start pi with `langwatch pi` each time, which needs no start
+  file.
+</Accordion>
+
+  <Accordion title="The telemetry goes to the wrong workspace">
+    Run `langwatch instrument pi --project <id-or-slug>` to move it to a team project, or `langwatch instrument pi --personal` to move it back to your own.
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
+
+    On a machine with a login, run `langwatch login --device` again to refresh the session.
+
+  </Accordion>
+</AccordionGroup>
+
+For more failure modes see [CLI debug](/ai-governance/cli-debug).
+
+## Manual setup
+
+The extension is required: pi exports no telemetry without it. Run `langwatch instrument pi --key <ingest-key>` once to write it with no login (it writes the shell function too), or `langwatch ingest install pi_cli` on a machine where you are signed in. Then set the variables below before you start pi. They are the ones the shell function sets.
+
+```bash
+export OTEL_TRACES_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=none
+export OTEL_METRICS_EXPORTER=none
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
+export OTEL_RESOURCE_ATTRIBUTES="service.name=pi"
+pi
+```
+
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+
+For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`.
+
+<Warning>
+  A plain `export` applies the key to every program the shell starts, not to pi alone. To keep it
+  to pi, use the shell function `langwatch instrument pi` writes, or put the variables in a
+  function of your own that ends with `command pi "$@"`.
+</Warning>
 
 ---
 
@@ -43734,6 +44106,125 @@ The [Questions](/features/instant-evals/questions) page covers criteria, thresho
 
 ---
 
+# FILE: ./features/instant-evals/own-model.mdx
+
+---
+title: Run Instant Evals on your own decision model
+sidebarTitle: Your own model
+keywords: langwatch, instant evals, decision model, own key, bring your own key, azure openai, gpt-6-luna, decisions api, microsoft decision 1, openai, inception, perplexity, cloudflare, typesafe, jev, openrouter, fireworks, default models
+description: Run Instant Evals on a decision model in your own provider account, set up Azure, and read the rows your model cannot judge.
+---
+
+## LangWatch Instant Preview or your own model
+
+Instant Evals run on **LangWatch Instant Preview** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
+
+## The models you can pick
+
+The picker groups models under their provider, as it does chat models, and names each by its model only.
+
+| Provider to add       | Model in the picker  | What the provider needs                                                                  |
+| --------------------- | -------------------- | ---------------------------------------------------------------------------------------- |
+| OpenAI                | gpt-6-luna           | API key. Runs on the OpenAI Decisions API                                                |
+| Azure OpenAI          | gpt-6-luna           | API key, endpoint and a `gpt-6-luna` deployment on your resource. See [Azure](#azure)    |
+| Azure OpenAI          | Microsoft Decision 1 | API key, endpoint and a Microsoft Decision 1 deployment on Azure AI Foundry. See [Azure](#azure) |
+| Inception             | Mercury Decide       | API key                                                                                  |
+| Perplexity            | Decider v1.2         | API key                                                                                  |
+| Perplexity            | Decider Flash v1.2   | API key                                                                                  |
+| Cloudflare Workers AI | Clef                 | Account id and API token                                                                 |
+| Cloudflare Workers AI | Clef Flash           | Account id and API token                                                                 |
+| TypeSafe              | Jev 1.14             | API key                                                                                  |
+| OpenRouter            | Jev 1.14             | API key                                                                                  |
+| OpenRouter            | Microsoft Decision 1 | API key                                                                                  |
+| OpenRouter            | Liquid d1.1          | API key                                                                                  |
+| Fireworks             | Rune                 | API key                                                                                  |
+
+`gpt-6-luna` runs on the OpenAI Decisions API, so it needs that model on your OpenAI or Azure account. The other models need no OpenAI account.
+
+## Set it up
+
+<Steps>
+  <Step title="Add the provider">
+    In **Settings > Model Providers**, click **Add Model Provider**, pick the provider from the table and enter its key. Scope it to each organization, team or project that should use it. See [Model Providers](/platform/model-providers).
+  </Step>
+  <Step title="Pick the model">
+    In **Default Models** on the same page, add or edit a config and pick its scopes. In the **Instant Evals** picker, choose your model and save.
+
+    <Frame>
+      <img
+        src="/images/instant-evals/own-model-picker.png"
+        alt="Edit default models drawer for the ACME organization, with the Instant Evals picker open on LangWatch Instant Preview and OpenAI Decisions API"
+      />
+    </Frame>
+  </Step>
+  <Step title="Run">
+    Start a run as usual. The new model judges the next rows within five seconds.
+  </Step>
+</Steps>
+
+The config's **Instant Evals** column then shows your model.
+
+<Frame>
+  <img
+    src="/images/instant-evals/own-model-default-models.png"
+    alt="Default models table with the ACME config, whose Instant Evals column shows OpenAI Decisions API"
+  />
+</Frame>
+
+The picker offers a model only when every scope of the config holds an enabled key for it. An organization config sees only keys saved on the organization, not a key one project holds. A config on two projects sees only what both hold.
+
+As for other [default models](/platform/model-providers#default-models), a project config beats a team config, which beats an organization config. A provider key saved on the project beats one on its team or organization.
+
+## Azure
+
+Both Azure models use the Azure OpenAI provider, with its API key (`AZURE_OPENAI_API_KEY`) and endpoint (`AZURE_OPENAI_ENDPOINT`).
+
+<Frame>
+  <img
+    src="/images/instant-evals/own-model-azure-provider.png"
+    alt="Azure OpenAI provider drawer with Use API Gateway off, the endpoint https://my-resource.openai.azure.com and the decisions deployment gpt-6-luna-eu"
+  />
+</Frame>
+
+- **Endpoint** (`AZURE_OPENAI_ENDPOINT`): your resource URL, such as `https://my-resource.openai.azure.com`. LangWatch takes the resource name from it and calls `https://my-resource.openai.azure.com/openai/v1/decisions` or, for Microsoft Decision 1, `https://my-resource.services.ai.azure.com/providers/microsoft/v1/systemone`. Hosts on `openai.azure.com`, `cognitiveservices.azure.com` and `services.ai.azure.com` work. Other hosts, `http`, custom ports and API Management gateways are refused, so the key stays inside Azure.
+- **Decisions deployment** (`AZURE_OPENAI_DECISIONS_DEPLOYMENT`): your `gpt-6-luna` deployment name. Leave empty if it is `gpt-6-luna`.
+- **Microsoft Decision 1 deployment** (`AZURE_DECISION_1_DEPLOYMENT`): your Microsoft Decision 1 deployment name on Azure AI Foundry. Leave empty if it keeps the model's name.
+
+Keep **Use API Gateway** off. With it on, the endpoint and deployment fields are hidden and every row is skipped as `classifier_key_invalid`.
+
+Deploy the model on your resource before you pick it, in the Azure portal, Azure AI Foundry or the Azure CLI:
+
+```bash
+az cognitiveservices account deployment create \
+  --resource-group my-group --name my-resource \
+  --deployment-name gpt-6-luna --model-name gpt-6-luna --model-format OpenAI --model-version 2026-09-22 \
+  --sku-name GlobalStandard --sku-capacity 50
+```
+
+Without the deployment, every row is skipped as `classifier_not_configured`.
+
+## When your model cannot answer
+
+A run on your own model never falls back to LangWatch Instant Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. List them with `langwatch instant-eval results <run-id> --status skipped`.
+
+| `error`                           | Why                                                                                                         | Fix                                                                         |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `classifier_key_invalid`          | The provider refused the key (401, 402 or 403), or the scope has no enabled provider row, no key, or an endpoint outside Azure | Check the row and its key at **Settings > Model Providers**                 |
+| `classifier_not_configured`       | The provider answered 404: the account does not hold the model, or the Azure deployment does not exist      | Deploy the model, or set the deployment name on the Azure row               |
+| `classifier_rate_limited`         | The provider answered 429 on every retry                                                                    | Raise the rate limit or quota on your provider account                     |
+| `classifier_provider_unavailable` | The provider answered 5xx on every retry                                                                    | Try again later                                                             |
+
+Rate limits and outages are retried before the row is skipped. Refused keys and missing models are not.
+
+## What changes on your own model
+
+- **Cost.** Your provider bills you. LangWatch does not, and the [free budget](/features/instant-evals/limits-and-cost#the-free-budget) does not apply.
+- **Limits.** The [row, question and text limits](/features/instant-evals/limits-and-cost#limits) still apply.
+- **Data.** Each row's text and your questions go to your provider, under your agreement with it. LangWatch Instant Preview never sees them.
+- **Search bar.** Still runs on LangWatch Instant Preview.
+
+---
+
 # FILE: ./features/instant-evals/questions.mdx
 
 ---
@@ -46504,6 +46995,7 @@ By default the run uses the dataset attached to the experiment. You can override
 - `dataset_id`: a different platform dataset by id (`data` and `dataset_id` are mutually exclusive)
 - `row_indices`: a subset of dataset row indices to evaluate, instead of the whole dataset
 - `concurrency`: how many cells run at once, from 1 to 24, for this run only. A cell is one row against one target, so an experiment with two targets has two cells per row. Without it, the run uses the server's default. Use `1` to run the cells one at a time, in order, for example so the first row fills a prompt cache before the next rows read it. The experiment's saved run options stay unchanged.
+- `dataset_version`: the version of the saved dataset to run, for example `1`. It overrides the version the experiment pins. Without either, the run saves the dataset's current content as a version and reads that, so every run records the exact rows it used. A version the dataset does not have answers `404` with `dataset_version_not_found`
 
 
   ### Python
@@ -46519,6 +47011,8 @@ langwatch.experiment.run("my-experiment", dataset_id="dataset_xxxxxxxxxxxx")
 langwatch.experiment.run("my-experiment", parameters={"model": "gpt-6-luna"})
 # One row at a time, in order
 langwatch.experiment.run("my-experiment", concurrency=1)
+# Version 1 of the experiment's saved dataset
+langwatch.experiment.run("my-experiment", dataset_version=1)
 ```
 
   ### TypeScript
@@ -46536,6 +47030,8 @@ await langwatch.experiments.runWithResults("my-experiment", { datasetId: "datase
 await langwatch.experiments.runWithResults("my-experiment", { parameters: { model: "gpt-6-luna" } });
 // One row at a time, in order
 await langwatch.experiments.runWithResults("my-experiment", { concurrency: 1 });
+// Version 1 of the experiment's saved dataset
+await langwatch.experiments.runWithResults("my-experiment", { datasetVersion: 1 });
 ```
 
 
@@ -67128,7 +67624,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.22.0 # x-release-please-version
+    targetRevision: 3.23.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -67183,7 +67679,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.22.0 # x-release-please-version
+      targetRevision: 3.23.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -67587,7 +68083,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.22.0 # x-release-please-version
+VERSION=3.23.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -67603,13 +68099,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.22.0" # x-release-please-version
+    tag: "3.23.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.22.0" # x-release-please-version
+    tag: "3.23.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.22.0" # x-release-please-version
+    tag: "3.23.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -72439,7 +72935,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.22.0 \
+  --version 3.23.0 \
   -f values-production.yaml
 # x-release-please-end
 ```
@@ -73244,6 +73740,15 @@ openapi: "GET /api/v1/agents"
 
 ---
 
+# FILE: ./api-reference/agents/list-an-agent-s-versions.mdx
+
+---
+title: "List an agent's versions"
+openapi: "GET /api/v1/agents/{agentId}/versions"
+---
+
+---
+
 # FILE: ./api-reference/agents/list-poll.mdx
 
 ---
@@ -73266,11 +73771,29 @@ Manage AI agent configurations. Create, update, and organize agents that are tra
 
 ---
 
+# FILE: ./api-reference/agents/point-a-deploy-label-at-an-agent-version.mdx
+
+---
+title: "Point a deploy label at an agent version"
+openapi: "PUT /api/v1/agents/{agentId}/labels/{label}"
+---
+
+---
+
 # FILE: ./api-reference/agents/put-update-agents.mdx
 
 ---
 title: "Update Agents (PUT)"
 openapi: "PUT /api/v1/agents/{id}"
+---
+
+---
+
+# FILE: ./api-reference/agents/remove-a-deploy-label-from-an-agent.mdx
+
+---
+title: "Remove a deploy label from an agent"
+openapi: "DELETE /api/v1/agents/{agentId}/labels/{label}"
 ---
 
 ---
@@ -73819,6 +74342,15 @@ openapi: "POST /api/v1/dataset/evaluate"
 
 ---
 
+# FILE: ./api-reference/datasets/get-a-dataset-version.mdx
+
+---
+title: "Get a dataset version"
+openapi: "GET /api/v1/dataset/{slugOrId}/versions/{version}"
+---
+
+---
+
 # FILE: ./api-reference/datasets/get-dataset.mdx
 
 ---
@@ -73851,6 +74383,15 @@ openapi: "GET /api/v1/dataset/{slugOrId}/records"
 ---
 title: "Import an uploaded file into a dataset"
 openapi: "POST /api/v1/dataset/{slugOrId}/imports"
+---
+
+---
+
+# FILE: ./api-reference/datasets/list-dataset-versions.mdx
+
+---
+title: "List dataset versions"
+openapi: "GET /api/v1/dataset/{slugOrId}/versions"
 ---
 
 ---
@@ -73889,6 +74430,24 @@ This endpoint only adds entries. To read them back, call
 
 ---
 
+# FILE: ./api-reference/datasets/restore-a-dataset-version.mdx
+
+---
+title: "Restore a dataset version"
+openapi: "POST /api/v1/dataset/{slugOrId}/versions/{version}/restore"
+---
+
+---
+
+# FILE: ./api-reference/datasets/save-a-dataset-version.mdx
+
+---
+title: "Save a dataset version"
+openapi: "POST /api/v1/dataset/{slugOrId}/versions"
+---
+
+---
+
 # FILE: ./api-reference/datasets/update-dataset.mdx
 
 ---
@@ -73899,6 +74458,13 @@ openapi: "PATCH /api/v1/dataset/{slugOrId}"
 <Note>
 Renaming a dataset keeps its slug, so the old slug still resolves. A new name
 whose slug another dataset in the project already holds is refused with 409.
+</Note>
+
+<Note>
+New `columnTypes` re-key every record. To rename a column in the same request
+that deletes another, send `columnRenames` with `{ from, to }` for each renamed
+column, so each value stays with the column it came from. Without it, columns
+left over after matching names pair by position.
 </Note>
 
 ---
@@ -74002,11 +74568,29 @@ openapi: "DELETE /api/v1/evaluators/{id}"
 
 ---
 
+# FILE: ./api-reference/evaluators-config/delete-labels.mdx
+
+---
+title: "Remove a deploy label from an evaluator"
+openapi: "DELETE /api/v1/evaluators/{evaluatorId}/labels/{label}"
+---
+
+---
+
 # FILE: ./api-reference/evaluators-config/get-evaluators.mdx
 
 ---
 title: "Get a specific evaluator by ID or slug"
 openapi: "GET /api/v1/evaluators/{idOrSlug}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/get-versions.mdx
+
+---
+title: "Get Versions"
+openapi: "GET /api/v1/evaluators/{evaluatorId}/versions"
 ---
 
 ---
@@ -74038,6 +74622,15 @@ Manage evaluator configurations for your project. Create, update, and organize e
 ---
 title: "Update an existing evaluator"
 openapi: "PUT /api/v1/evaluators/{id}"
+---
+
+---
+
+# FILE: ./api-reference/evaluators-config/update-labels.mdx
+
+---
+title: "Update Labels"
+openapi: "PUT /api/v1/evaluators/{evaluatorId}/labels/{label}"
 ---
 
 ---

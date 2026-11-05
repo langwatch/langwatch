@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { PrismaRepository } from "@langwatch/prisma-client";
 
-import type {
-  NurturingCodingMilestonesRepository,
-  NurturingMilestonesRepository,
-  NurturingOrganizationCounts,
-  NurturingOrganizationRow,
+import {
+  MAX_CODING_REPOSITORY_KEYS,
+  type NurturingCodingMilestonesRepository,
+  type NurturingMilestonesRepository,
+  type NurturingOrganizationCounts,
+  type NurturingOrganizationRow,
+  type NurturingTraceMilestonesRepository,
 } from "../nurturing-milestones.repository.ts";
 
 const ORGANIZATION_STATE = {
@@ -27,11 +29,35 @@ const ORGANIZATION_ROW = {
 /** Nurturing's organizations, the one table it claims; the owners' rows are read elsewhere (R40). */
 export class PrismaNurturingMilestonesRepository
   extends PrismaRepository.for("NurturingOrganization")
-  implements NurturingMilestonesRepository, NurturingCodingMilestonesRepository
+  implements
+    NurturingMilestonesRepository,
+    NurturingCodingMilestonesRepository,
+    NurturingTraceMilestonesRepository
 {
   static readonly create = this.factory(
     (prisma) => new PrismaNurturingMilestonesRepository(prisma),
   );
+
+  async recordLastTrace({
+    organizationId,
+    occurredAt,
+  }: Readonly<{ organizationId: string; occurredAt: number }>): Promise<void> {
+    const at = new Date(occurredAt);
+    await this.prisma.nurturingOrganization.updateMany({
+      where: { organizationId, OR: [{ lastTraceAt: null }, { lastTraceAt: { lt: at } }] },
+      data: { lastTraceAt: at },
+    });
+  }
+
+  async findLastTraceAt({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<number | null> {
+    const organization = await this.prisma.nurturingOrganization.findUnique({
+      where: { organizationId },
+      select: { lastTraceAt: true },
+    });
+    return organization?.lastTraceAt?.getTime() ?? null;
+  }
 
   async recordOrganization({
     organizationId,
@@ -80,7 +106,7 @@ export class PrismaNurturingMilestonesRepository
     ];
   }
 
-  // The three coding writes are one conditional updateMany each: Postgres re-checks the WHERE
+  // The coding writes are one conditional updateMany each: Postgres re-checks the WHERE
   // under the row lock, so concurrent writers change the row once.
   async recordCodingFirstSession({
     organizationId,
@@ -114,6 +140,65 @@ export class PrismaNurturingMilestonesRepository
       select: { codingAgentTypes: true },
     });
     return organization?.codingAgentTypes ?? [];
+  }
+
+  async addCodingTerminalType({
+    organizationId,
+    terminalType,
+  }: Parameters<NurturingCodingMilestonesRepository["addCodingTerminalType"]>[0]): Promise<
+    string[]
+  > {
+    await this.prisma.nurturingOrganization.updateMany({
+      where: { organizationId, NOT: { codingTerminalTypes: { has: terminalType } } },
+      data: { codingTerminalTypes: { push: terminalType } },
+    });
+    const organization = await this.prisma.nurturingOrganization.findUnique({
+      where: { organizationId },
+      select: { codingTerminalTypes: true },
+    });
+    return organization?.codingTerminalTypes ?? [];
+  }
+
+  async addCodingRepository({
+    organizationId,
+    repositoryKey,
+  }: Parameters<NurturingCodingMilestonesRepository["addCodingRepository"]>[0]): Promise<number> {
+    // Read first because Prisma cannot filter on an array's length: writers racing at the cap can
+    // pass it by one each, which costs a few bytes and no wrong count anyone segments on.
+    const held = await this.codingRepositoryKeysOf(organizationId);
+    if (held.includes(repositoryKey) || held.length >= MAX_CODING_REPOSITORY_KEYS) {
+      return held.length;
+    }
+    await this.prisma.nurturingOrganization.updateMany({
+      where: { organizationId, NOT: { codingRepositoryKeys: { has: repositoryKey } } },
+      data: { codingRepositoryKeys: { push: repositoryKey } },
+    });
+    return (await this.codingRepositoryKeysOf(organizationId)).length;
+  }
+
+  private async codingRepositoryKeysOf(organizationId: string): Promise<string[]> {
+    const organization = await this.prisma.nurturingOrganization.findUnique({
+      where: { organizationId },
+      select: { codingRepositoryKeys: true },
+    });
+    return organization?.codingRepositoryKeys ?? [];
+  }
+
+  async addCodingSessionDayOffset({
+    organizationId,
+    dayOffset,
+  }: Parameters<
+    NurturingCodingMilestonesRepository["addCodingSessionDayOffset"]
+  >[0]): Promise<number> {
+    await this.prisma.nurturingOrganization.updateMany({
+      where: { organizationId, NOT: { codingFirstDays: { has: dayOffset } } },
+      data: { codingFirstDays: { push: dayOffset } },
+    });
+    const organization = await this.prisma.nurturingOrganization.findUnique({
+      where: { organizationId },
+      select: { codingFirstDays: true },
+    });
+    return organization?.codingFirstDays.length ?? 0;
   }
 
   async recordCodingActiveDay({

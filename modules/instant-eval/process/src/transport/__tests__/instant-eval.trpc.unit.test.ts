@@ -37,7 +37,12 @@ const PROGRESS: ExplorerInstantEvalProgress = {
   finishedAtMs: null,
 };
 
-const OFFERED = { released: false, offer: "enable", viaConnect: false } as const;
+const OFFERED = {
+  released: false,
+  hostedReleased: false,
+  offer: "enable",
+  viaConnect: false,
+} as const;
 
 function harness({ permitted = () => true }: { permitted?: (permission: string) => boolean } = {}) {
   const getExplorerRun = vi.fn<InstantEvalBrowserApi["getExplorerRun"]>(async () => PROGRESS);
@@ -54,6 +59,7 @@ function harness({ permitted = () => true }: { permitted?: (permission: string) 
   const getOptInAccess = vi.fn(async () => OFFERED);
   const optIn = vi.fn(async () => ({
     released: true,
+    hostedReleased: true,
     offer: "enable" as const,
     viaConnect: false,
   }));
@@ -281,6 +287,7 @@ describe("given the opt-in procedures", () => {
 
       await expect(caller.enable({ projectId: "project-1" })).resolves.toEqual({
         released: true,
+        hostedReleased: true,
         offer: "enable",
         viaConnect: false,
       });

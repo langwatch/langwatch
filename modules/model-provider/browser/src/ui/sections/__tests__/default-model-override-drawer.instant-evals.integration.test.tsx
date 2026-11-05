@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- * The Instant Evals column offers decision models only, LangWatch Instant Preview first;
- * own decision models need the organization's flag (ADR-182).
+ * The Instant Evals column offers decision models only, LangWatch Instant Preview first, and
+ * only the ones the server says would run from the picked scopes, not the page's project (ADR-182).
  * Binds specs/model-providers/instant-evals-decision-model.feature.
  */
 import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
@@ -15,7 +15,12 @@ import "@testing-library/jest-dom/vitest";
 const mockGetDefaultModels = vi.fn();
 const mockGetInheritedValues = vi.fn();
 const mockListAllForProjectForFrontend = vi.fn();
-const mockUseFeatureFlag = vi.fn();
+const mockListDecisionModels = vi.fn();
+
+// The drawer asks the judge router flag; off unless a case turns it on.
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
@@ -27,10 +32,6 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
     currentDrawer: undefined,
   }),
   useDrawerParams: () => ({}),
-}));
-
-vi.mock("@langwatch/feature-flag-client", () => ({
-  useFeatureFlag: (...args: unknown[]) => mockUseFeatureFlag(...args),
 }));
 
 vi.mock("@langwatch/design-system/scope-chip-picker", async () => {
@@ -47,6 +48,9 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
       getDefaultModelsForProject: { useQuery: () => mockGetDefaultModels() },
       getInheritedValuesForScopes: { useQuery: () => mockGetInheritedValues() },
       listAllForProjectForFrontend: { useQuery: () => mockListAllForProjectForFrontend() },
+      listDecisionModelsForScopes: {
+        useQuery: (input: unknown, options: unknown) => mockListDecisionModels(input, options),
+      },
       saveDefaultModelsConfig: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
@@ -78,6 +82,18 @@ const PAYLOAD = {
   features: [],
 };
 
+const HOSTED = { value: "langwatch/instant-evals", label: "Instant Preview" };
+const OPENAI_DECISIONS = {
+  value: "openai/decisions:gpt-6-luna",
+  label: "gpt-6-luna",
+};
+
+function instantEvalsOptions() {
+  return within(instantEvalsListbox())
+    .getAllByRole("option", { hidden: true })
+    .filter((option) => option.dataset.testid !== "provider-model-selector-inherit");
+}
+
 function instantEvalsListbox() {
   const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
   const listbox = document.getElementById(trigger.getAttribute("aria-controls") ?? "");
@@ -97,75 +113,85 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       isLoading: false,
       isError: false,
     });
-    mockUseFeatureFlag.mockReturnValue({ enabled: false, isLoading: false });
+    mockListDecisionModels.mockReturnValue({ data: [HOSTED], isLoading: false });
   });
   afterEach(() => cleanup());
 
-  describe("given the own-decision-model flag is off for the organization", () => {
+  describe("given the server offers only LangWatch Instant Preview", () => {
     /** @scenario "The drawer offers only decision models for the Instant Evals column" */
     it("offers only LangWatch Instant Preview, never a chat model or an own model", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
-      const listbox = instantEvalsListbox();
-      const options = within(listbox)
-        .getAllByRole("option", { hidden: true })
-        .filter((option) => option.dataset.testid !== "provider-model-selector-inherit");
+      const options = instantEvalsOptions();
       expect(options).toHaveLength(1);
-      expect(options[0]).toHaveTextContent("LangWatch Instant Preview");
+      expect(options[0]).toHaveTextContent("Instant Preview");
+      const listbox = instantEvalsListbox();
       expect(within(listbox).queryByText(/gpt-5\.5/)).not.toBeInTheDocument();
-      expect(within(listbox).queryByText("Inception Mercury Decide")).not.toBeInTheDocument();
-    });
-
-    it("asks the flag of the organization, not the project", () => {
-      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
-
-      expect(mockUseFeatureFlag).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "release_instant_evals_own_decision_model" }),
-        expect.objectContaining({ organizationId: "org-1", enabled: true }),
-      );
+      expect(within(listbox).queryByText("Mercury Decide")).not.toBeInTheDocument();
     });
 
     it("reads LangWatch Instant Preview as the value when nothing is set", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
-      expect(trigger).toHaveTextContent("LangWatch Instant Preview");
+      expect(trigger).toHaveTextContent("Instant Preview");
       expect(trigger).not.toHaveTextContent("Not configured");
     });
   });
 
-  describe("given the own-decision-model flag is on for the organization", () => {
-    beforeEach(() => mockUseFeatureFlag.mockReturnValue({ enabled: true, isLoading: false }));
+  describe("given the server says the project's OpenAI decision model would run", () => {
+    beforeEach(() =>
+      mockListDecisionModels.mockReturnValue({
+        data: [HOSTED, OPENAI_DECISIONS],
+        isLoading: false,
+      }),
+    );
 
-    it("lists LangWatch Instant Preview first, then the own decision models", () => {
+    /** @scenario "The drawer offers only the decision models that would run" */
+    it("offers LangWatch Instant Preview first, then exactly the models the server offers", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
-      const options = within(instantEvalsListbox())
-        .getAllByRole("option", { hidden: true })
-        .filter((option) => option.dataset.testid !== "provider-model-selector-inherit");
-      expect(options[0]).toHaveTextContent("LangWatch Instant Preview");
-      expect(options.map((option) => option.textContent)).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining("OpenAI Decisions (gpt-6-luna)"),
-          expect.stringContaining("Inception Mercury Decide"),
-          expect.stringContaining("Cloudflare Clef"),
-        ]),
-      );
+      const labels = instantEvalsOptions().map((option) => option.textContent ?? "");
+      expect(labels).toHaveLength(2);
+      expect(labels[0]).toContain("Instant Preview");
+      expect(labels[1]).toContain("gpt-6-luna");
+      expect(
+        within(instantEvalsListbox()).getByText("OpenAI Decisions API, on your OpenAI key."),
+      ).toBeInTheDocument();
     });
 
-    it("tells the reader to add a key for a provider the project has not enabled", () => {
+    it("never offers a model whose provider key is missing, so a pick always runs", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const listbox = instantEvalsListbox();
-      expect(
-        within(listbox).getByText("Add an Inception key in Model Providers first"),
-      ).toBeInTheDocument();
-      expect(
-        within(listbox).queryByText("Add an OpenAI key in Model Providers first"),
-      ).not.toBeInTheDocument();
-      expect(
-        within(listbox).getByText("OpenAI's Decisions API, on your OpenAI key."),
-      ).toBeInTheDocument();
+      expect(within(listbox).queryByText("Mercury Decide")).not.toBeInTheDocument();
+      expect(within(listbox).queryByText(/key in Model Providers first/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a config row scoped to the organization", () => {
+    /** @scenario "The drawer asks about the picked scopes, not the page's project" */
+    it("asks for the decision models of the organization scope, not the page's project", () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const [input, options] = mockListDecisionModels.mock.lastCall ?? [];
+      expect(input).toEqual({
+        projectId: expect.any(String),
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+      });
+      expect(options).toMatchObject({ enabled: true });
+    });
+
+    it("asks nothing and offers only LangWatch Instant Preview with no scope picked", () => {
+      mockListDecisionModels.mockReturnValue({ data: undefined, isLoading: false });
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer />);
+
+      const [input, options] = mockListDecisionModels.mock.lastCall ?? [];
+      expect(input).toMatchObject({ scopes: [] });
+      expect(options).toMatchObject({ enabled: false });
+      const offered = instantEvalsOptions();
+      expect(offered).toHaveLength(1);
+      expect(offered[0]).toHaveTextContent("Instant Preview");
     });
   });
 });

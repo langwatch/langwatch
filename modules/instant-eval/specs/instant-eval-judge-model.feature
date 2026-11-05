@@ -602,12 +602,14 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When a member opens the model picker on an LLM judge
       Then Instant Evals is the only option
 
+    # Own models answer to their own flag, never to the Instant Evals release.
     @integration
-    Scenario: The picker offers nothing of its own when Instant Evals are not released
+    Scenario: The picker offers own decision models when Instant Evals are not released
       Given a project the server does not release Instant Evals for
+      And the server answers with Instant Evals and an own decision model
       When a member opens the model picker on an LLM judge
       Then Instant Evals is not an option
-      And no own decision model is an option
+      And the own decision model is the only option
 
     @integration
     Scenario: A judge holding a decision model nobody offers any more asks for an update

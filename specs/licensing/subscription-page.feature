@@ -172,6 +172,23 @@ Feature: Subscription Page Plan Management
       And the rest of the enterprise features are still listed
 
   # ============================================================================
+  # A Free organization can always upgrade
+  # ============================================================================
+
+  Rule: A Free organization is offered the Growth upgrade without changing seats
+
+    An organization that hits the Free plan's event limit needs to upgrade
+    whatever its size. Adding a seat is not a step on the way to paying.
+
+    @integration
+    Scenario: A Free organization with one member is offered the upgrade
+      Given my organization is on the Free plan with 1 member
+      When I view the subscription page
+      Then I am offered the Growth upgrade for 1 seat
+      And I am not told an upgrade is required
+      And I am not told my plan doesn't cover my seats
+
+  # ============================================================================
   # An organization above its plan's seats is offered the upgrade
   # ============================================================================
 

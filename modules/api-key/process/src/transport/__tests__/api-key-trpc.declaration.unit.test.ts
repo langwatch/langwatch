@@ -59,6 +59,7 @@ it("binds every declared procedure once and preserves its access declaration", (
     ]),
   ).toEqual([
     ["myBindings", "query", { ...OWN_KEYS, allow: MEMBER_ONLY }],
+    ["grantablePermissions", "query", { ...OWN_KEYS, allow: MEMBER_ONLY }],
     ["nameById", "query", { ...OWN_KEYS, allow: MEMBER_ONLY }],
     ["list", "query", { ...OWN_KEYS, allow: MEMBER_ONLY }],
     ["create", "mutation", { ...OWN_KEYS, allow: MEMBER_ONLY }],

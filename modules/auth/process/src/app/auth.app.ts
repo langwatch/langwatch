@@ -64,7 +64,11 @@ import {
 } from "@langwatch/identity-contract";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { OrganizationApi, type InviteLanding } from "@langwatch/organization-contract";
+import {
+  OrganizationApi,
+  type InviteLanding,
+  type OrganizationUserRole,
+} from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
@@ -129,7 +133,6 @@ import type { AuthRateLimitRepository } from "../repositories/auth-rate-limit.re
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
-import { providerAccountIssuer } from "../rules/provider-account-issuer.rules.ts";
 import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { buildSignUpVerificationUrl } from "../rules/signup-verification-link.rules.ts";
@@ -1304,7 +1307,6 @@ function betterAuthCredentialAccounts(
       ).internalAdapter.linkAccount({
         userId,
         providerId: "credential",
-        issuer: providerAccountIssuer({ connectionIssuer: undefined, provider: "credential" }),
         accountId: userId,
         password: passwordHash,
       });
@@ -1546,6 +1548,7 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
     userId: string;
     organizationId: string;
     organizationName: string;
+    role: OrganizationUserRole;
   }): void {
     this.lifecycle.ssoAutoAdded(input);
   }

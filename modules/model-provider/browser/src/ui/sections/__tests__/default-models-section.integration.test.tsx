@@ -16,6 +16,11 @@ const mockGetDefaultModels = vi.fn();
 const mockInvalidate = vi.fn();
 const mockDelete = vi.fn();
 
+// The drawer asks the judge router flag; off unless a case turns it on.
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
     useUtils: () => ({ modelProvider: { invalidate: mockInvalidate } }),
@@ -223,7 +228,7 @@ describe("given the Default Models table", () => {
 
       expect(screen.getByRole("columnheader", { name: "Instant Evals" })).toBeInTheDocument();
       const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
-      expect(cell.textContent).toBe("LangWatch Instant Preview");
+      expect(cell.textContent).toBe("Instant Preview");
       expect(cell.textContent).not.toMatch(/Not configured/);
     });
 
@@ -243,7 +248,7 @@ describe("given the Default Models table", () => {
       renderSection();
 
       expect(screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals").textContent).toBe(
-        "Inception Mercury Decide",
+        "Mercury Decide",
       );
     });
   });

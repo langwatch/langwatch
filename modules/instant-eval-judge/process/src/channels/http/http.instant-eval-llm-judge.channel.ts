@@ -81,7 +81,7 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
     }
     if (response.status !== 200) {
       await response.body?.cancel().catch(() => undefined);
-      const { reason } = decisionFailureOf({ status: response.status });
+      const { reason } = decisionFailureOf({ status: response.status, isOwnModel: false });
       return this.skip({ wire, reason, status: response.status });
     }
     const parsed: unknown = await response.json().catch(() => undefined);
