@@ -65,13 +65,14 @@ func problemsOf(t *testing.T, files releaselock.Files) string {
 func TestExtraFilesProblems(t *testing.T) {
 	good := entry("langwatch")
 	cases := map[string]struct {
-		extra string
-		want  int
+		extra  string
+		want   int
+		advice string
 	}{
-		"entry present":   {`"src/__version__.py",` + good, 0},
-		"entry missing":   {`"src/__version__.py"`, 1},
-		"other package":   {entry("langwatch-ksuid"), 1},
-		"entry duplicate": {good + "," + good, 1},
+		"entry present":   {`"src/__version__.py",` + good, 0, ""},
+		"entry missing":   {`"src/__version__.py"`, 1, "add the toml"},
+		"other package":   {entry("langwatch-ksuid"), 1, "add the toml"},
+		"entry duplicate": {good + "," + good, 1, "remove the extras"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -79,8 +80,8 @@ func TestExtraFilesProblems(t *testing.T) {
 			if err := json.Unmarshal([]byte(config(tc.extra, "")), &cfg); err != nil {
 				t.Fatal(err)
 			}
-			if got := releaselock.ExtraFilesProblems(cfg, sdk); len(got) != tc.want {
-				t.Fatalf("got %v; want %d problems", got, tc.want)
+			if got := releaselock.ExtraFilesProblems(cfg, sdk); len(got) != tc.want || (tc.want > 0 && !strings.Contains(got[0], tc.advice)) {
+				t.Fatalf("got %v; want %d problems advising %q", got, tc.want, tc.advice)
 			}
 		})
 	}
@@ -216,21 +217,23 @@ func TestMissingManifestKeyFails(t *testing.T) {
 	}
 }
 
-// @scenario "A missing or duplicate uv.lock entry fails the check"
-func TestLockEntryCountFails(t *testing.T) {
-	cases := map[string]string{
-		"none":      lock(lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python")),
-		"duplicate": lock(lockBlock("langwatch", "1.4.0", "sdks/python"), lockBlock("langwatch", "1.4.0", "sdks/python"), lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python")),
+// @scenario "A missing uv.lock entry fails with uv lock advice"
+func TestMissingLockEntryAdvisesUvLock(t *testing.T) {
+	files := inStep()
+	files.Lock = lock(lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"))
+	got := problemsOf(t, files)
+	if !strings.Contains(got, "no entry named langwatch") || !strings.Contains(got, "run `uv lock`") {
+		t.Fatalf("got %q, want the missing-entry problem with uv lock advice", got)
 	}
-	for name, lockContent := range cases {
-		t.Run(name, func(t *testing.T) {
-			files := inStep()
-			files.Lock = lockContent
-			got := problemsOf(t, files)
-			if !strings.Contains(got, "packages named langwatch") || strings.Contains(got, "run `uv lock`") {
-				t.Fatalf("got %q, want the count problem without uv lock advice", got)
-			}
-		})
+}
+
+// @scenario "A duplicate uv.lock entry fails without uv lock advice"
+func TestDuplicateLockEntryOmitsUvLockAdvice(t *testing.T) {
+	files := inStep()
+	files.Lock = lock(lockBlock("langwatch", "1.4.0", "sdks/python"), lockBlock("langwatch", "1.4.0", "sdks/python"), lockBlock("langwatch-ksuid", "1.0.1", "packages/ksuid-python"))
+	got := problemsOf(t, files)
+	if !strings.Contains(got, "packages named langwatch") || strings.Contains(got, "run `uv lock`") {
+		t.Fatalf("got %q, want the count problem without uv lock advice", got)
 	}
 }
 

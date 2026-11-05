@@ -58,7 +58,7 @@ func main() {
 	}
 
 	if failed := runAll(guards, repoRoot); failed {
-		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature, specs/ci/pr-review-bot.feature, specs/ci/one-pull-request-workflow.feature specs/ci/no-static-cloud-keys.feature, specs/ci/publish-ecr-images.feature, specs/ci/publish-prerelease-charts-to-ecr.feature specs/ci/package-suites-transform-cache.feature and specs/ci/release-lock.feature")
+		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature, specs/ci/pr-review-bot.feature, specs/ci/one-pull-request-workflow.feature specs/ci/no-static-cloud-keys.feature, specs/ci/publish-ecr-images.feature, specs/ci/publish-prerelease-charts-to-ecr.feature, specs/ci/package-suites-transform-cache.feature and specs/ci/release-lock.feature")
 		os.Exit(1)
 	}
 }

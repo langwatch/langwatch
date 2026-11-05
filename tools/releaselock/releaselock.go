@@ -125,8 +125,11 @@ func ExtraFilesProblems(config Config, pkg Package) []string {
 			matches++
 		}
 	}
-	if matches != 1 {
-		return []string{fmt.Sprintf("release-please would leave uv.lock stale (%d matching entries, want 1): add the toml /uv.lock entry to the %s extra-files", matches, pkg.Path)}
+	switch {
+	case matches == 0:
+		return []string{fmt.Sprintf("release-please would leave uv.lock stale: add the toml /uv.lock entry to the %s extra-files", pkg.Path)}
+	case matches > 1:
+		return []string{fmt.Sprintf("the %s extra-files has %d /uv.lock entries for this package: remove the extras", pkg.Path, matches)}
 	}
 
 	return nil
@@ -160,7 +163,10 @@ func LockProblems(pkg Package, in LockInputs) []string {
 			named = append(named, block)
 		}
 	}
-	if len(named) != 1 {
+	switch {
+	case len(named) == 0:
+		return []string{fmt.Sprintf("uv.lock has no entry named %s: run `uv lock` at the repo root", pkg.LockName)}
+	case len(named) > 1:
 		return []string{fmt.Sprintf("uv.lock holds %d packages named %s, the release-please jsonpath must match exactly one; `uv lock` does not remove a duplicate, fix uv.lock by hand", len(named), pkg.LockName)}
 	}
 	if !slices.Contains(strings.Split(named[0], "\n"), fmt.Sprintf(`source = { editable = %q }`, pkg.Path)) {
