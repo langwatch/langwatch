@@ -23,6 +23,7 @@ const PUT = `
 local state = redis.call('HGET', KEYS[2], 'state')
 if state == 'cancelled' then return 0 end
 if state == 'claimed' then return 2 end
+if state == 'pending' then return 3 end
 redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
 redis.call('DEL', KEYS[2])
 redis.call('HSET', KEYS[2], 'state', 'pending')
@@ -78,7 +79,9 @@ export class RedisPendingVoiceCallRepository implements PendingVoiceCallReposito
       ttlSeconds,
     );
     if (stored === 1) return { stored: true } as const;
-    return { stored: false, reason: stored === 2 ? "claimed" : "cancelled" } as const;
+    if (stored === 2) return { stored: false, reason: "claimed" } as const;
+    if (stored === 3) return { stored: false, reason: "pending" } as const;
+    return { stored: false, reason: "cancelled" } as const;
   }
 
   async peek({ scenarioRunId, nonce }: PendingVoiceCallKey): Promise<PendingVoiceCallPeekResult> {

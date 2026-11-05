@@ -186,6 +186,27 @@ export function describePendingVoiceCallRepositoryContract(
     });
   });
 
+  describe("given a pending call", () => {
+    describe("when another call is put for the same run before it is claimed or cancelled", () => {
+      it("refuses the put as pending and keeps the call SID", async () => {
+        const { repository } = await create();
+        const call = freshPendingVoiceCall();
+        await repository.put({ call, ttlSeconds: TTL_SECONDS });
+        await repository.attachCallSid({ scenarioRunId: call.scenarioRunId, callSid: "CA-10" });
+
+        const retry = { ...call, nonce: `${call.nonce}-retry` };
+        const put = await repository.put({ call: retry, ttlSeconds: TTL_SECONDS });
+        const cancelled = await repository.cancel({
+          scenarioRunId: call.scenarioRunId,
+          tombstoneTtlSeconds: TOMBSTONE_TTL_SECONDS,
+        });
+
+        expect(put).toEqual({ stored: false, reason: "pending" });
+        expect(cancelled).toEqual({ state: "pending", callSid: "CA-10" });
+      });
+    });
+  });
+
   describe("given a claimed run", () => {
     describe("when another call is put for it", () => {
       it("refuses the put as claimed and keeps the call SID", async () => {
