@@ -429,14 +429,17 @@ An [ingestion template](/ai-governance/ingestion-templates) mints an ingestion k
     Go to [Settings > API Keys](https://app.langwatch.ai/settings/api-keys) and click **Create new secret key**.
   </Step>
 
-<Step title="Fill in the drawer">
-  - **Key type**: shown to organization admins only. Pick **Personal**. Other members always create
-  a personal key. - **Name**: for example `Local dev` or `MCP key` - **Description**: optional -
-  **Scope**: the projects, teams or the organization the key can access - **Permissions**: **All**
-  gives the key your own permissions on each scope. **Restricted** lets you pick read or write per
-  [permission category](#permission-categories) - **Expiration**: **No expiration**, 7, 30, 60 or 90
-  days, or **Custom**
-</Step>
+  <Step title="Fill in the drawer">
+    - **Name**: for example `Local dev` or `MCP key`
+    - **Expiration**: **No expiration** by default, or 7, 30, 60 or 90 days, or **Custom**
+
+    That is all a first key needs: it gets all your permissions on the current project. Open **Advanced** to change the rest:
+
+    - **Key type**: shown to organization admins only. Other members always create a personal key
+    - **Description**: optional
+    - **Scope**: the projects, teams or the organization the key can access
+    - **Permissions**: **All** gives the key your own permissions on each scope. **Restricted** lets you pick read or write per [permission category](#permission-categories)
+  </Step>
 
   <Step title="Copy the key">
     Click **Create secret key**. The key is shown once, as `sk-lw-<id>_<secret>`, with ready-made `.env`, HTTP header, terminal and MCP snippets whose copy buttons carry the real key. Copy it now; the table never shows it again.
@@ -473,11 +476,12 @@ Service keys are for automated systems: CI/CD pipelines, production services and
   </Step>
 
   <Step title="Fill in the drawer">
-    - **Key type**: **Service**
-    - **Name** and optional **Description**
-    - **Scope**: the projects, teams or the organization the key can access
-    - **Permissions**: **All** gives Admin on every scope you picked. **Restricted** gives only the categories you tick
-    - **Expiration**
+    - **Name** and **Expiration**
+    - Under **Advanced**:
+      - **Key type**: **Service**
+      - **Description**: optional
+      - **Scope**: the projects, teams or the organization the key can access
+      - **Permissions**: **All** gives Admin on every scope you picked. **Restricted** gives only the categories you tick
 
     <Warning>
       A service key scoped to the organization with **All** permissions is an organization-wide Admin. Scope service keys to the projects they serve.

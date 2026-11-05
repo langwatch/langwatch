@@ -1,9 +1,10 @@
 /**
  * @vitest-environment jsdom
- * Pins what the create drawer sends: reset on open, key type, permission mode, payload.
+ * Pins what the create drawer sends: reset on open, key type, permission mode, payload,
+ * and that only the name and expiry sit outside Advanced.
  */
 
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -137,15 +138,15 @@ function renderDrawer({
 const nameInput = () => screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev");
 const createButton = () => screen.getByRole("button", { name: "Create secret key" });
 
-async function chooseExpiration({
-  user,
-  label,
-}: {
-  user: ReturnType<typeof userEvent.setup>;
-  label: string;
-}) {
-  await user.click(screen.getByText("Choose when this key expires"));
+type User = ReturnType<typeof userEvent.setup>;
+
+async function chooseExpiration({ user, label }: { user: User; label: string }) {
+  await user.click(within(screen.getByTestId("api-key-expiration")).getByRole("combobox"));
   await user.click(await screen.findByRole("option", { name: label }));
+}
+
+async function openAdvanced(user: User) {
+  await user.click(screen.getByTestId("api-key-advanced-toggle"));
 }
 
 beforeEach(() => {
@@ -161,6 +162,7 @@ describe("given a member who is not an admin", () => {
     it("sends a personal key on the current project, role from the reader's binding", async () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
+      await openAdvanced(user);
       expect(screen.queryByText("Key type")).toBeNull();
       // Set directly: on a cold, loaded run the drawer's focus trap can land mid-typing and
       // swallow keystrokes, leaving the button disabled. This test pins the payload.
@@ -168,7 +170,6 @@ describe("given a member who is not an admin", () => {
       fireEvent.change(nameInput, { target: { value: "CI" } });
       const descriptionInput = screen.getByPlaceholderText("What is this key used for?");
       fireEvent.change(descriptionInput, { target: { value: "pipeline" } });
-      await chooseExpiration({ user, label: "No expiration" });
       expect(createButton()).toBeEnabled();
       await user.click(createButton());
       expect(onCreate.mock.calls).toEqual([
@@ -195,7 +196,7 @@ describe("given a member who is not an admin", () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
       await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "Scoped");
-      await chooseExpiration({ user, label: "No expiration" });
+      await openAdvanced(user);
       fireEvent.click(screen.getByText("Restricted"));
       expect(await screen.findByTestId("counter")).toHaveTextContent("0");
       await user.click(createButton());
@@ -222,35 +223,62 @@ describe("given a member who is not an admin", () => {
   });
 });
 
-describe("given a named key with no expiry chosen", () => {
-  describe("when the creator has not chosen yet", () => {
-    /** @scenario "Create stays unavailable until an expiry is chosen" */
-    it("asks for a choice and refuses Create until one is made", async () => {
+describe("given a new key", () => {
+  describe("when the drawer opens", () => {
+    /** @scenario "A new key starts with no expiration" */
+    it("reads No expiration and creates a key with no expiry once it is named", async () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
-      fireEvent.change(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), {
-        target: { value: "CI" },
-      });
-      expect(screen.getByTestId("api-key-expiration-hint")).toHaveTextContent(
-        "Choose when this key expires",
-      );
-      await user.click(createButton());
-      expect(onCreate).not.toHaveBeenCalled();
-      await chooseExpiration({ user, label: "No expiration" });
+      expect(screen.getByTestId("api-key-expiration")).toHaveTextContent("No expiration");
       expect(screen.queryByTestId("api-key-expiration-hint")).toBeNull();
+      fireEvent.change(nameInput(), { target: { value: "CI" } });
       await user.click(createButton());
       expect(onCreate).toHaveBeenCalledTimes(1);
+      expect(onCreate.mock.calls[0]?.[0]?.expiresAt).toBeUndefined();
+    });
+
+    /** @scenario "The create drawer asks only for a name and an expiry up front" */
+    it("keeps key type, description, scope and permissions under a closed Advanced", async () => {
+      state.members = ADMIN_MEMBERS;
+      const user = userEvent.setup();
+      renderDrawer();
+      expect(nameInput()).toBeVisible();
+      expect(screen.getByTestId("api-key-expiration")).toBeVisible();
+      expect(screen.getByTestId("api-key-advanced-summary")).toHaveTextContent(
+        "Personal key with all permissions on Web App.",
+      );
+      expect(screen.queryByRole("button", { name: "Clear scope" })).toBeNull();
+      expect(screen.queryByRole("textbox", { name: /Description/ })).toBeNull();
+      expect(screen.queryByRole("radio", { name: "Restricted" })).toBeNull();
+      expect(screen.queryByRole("radio", { name: "Service" })).toBeNull();
+      await openAdvanced(user);
+      expect(screen.getByRole("button", { name: "Clear scope" })).toBeVisible();
+      expect(screen.getByPlaceholderText("What is this key used for?")).toBeVisible();
+      expect(screen.getByRole("radio", { name: "Restricted" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Service" })).toBeInTheDocument();
     });
   });
 
-  describe("when No expiration is chosen", () => {
+  describe("when a custom expiry is chosen with no date", () => {
+    /** @scenario "A custom expiry asks for its date before the key is minted" */
+    it("asks for a date and mints nothing", async () => {
+      const user = userEvent.setup();
+      const { onCreate } = renderDrawer();
+      fireEvent.change(nameInput(), { target: { value: "CI" } });
+      await chooseExpiration({ user, label: "Custom..." });
+      await user.click(createButton());
+      expect(screen.getByTestId("api-key-expiration-hint")).toHaveTextContent("Pick a date");
+      expect(onCreate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when another expiry is chosen and then No expiration again", () => {
     /** @scenario "Choosing no expiration mints a key with no expiry" */
     it("sends no expiry", async () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
-      fireEvent.change(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), {
-        target: { value: "CI" },
-      });
+      fireEvent.change(nameInput(), { target: { value: "CI" } });
+      await chooseExpiration({ user, label: "30 days" });
       await chooseExpiration({ user, label: "No expiration" });
       await user.click(createButton());
       expect(onCreate.mock.calls[0]?.[0]?.expiresAt).toBeUndefined();
@@ -307,18 +335,22 @@ describe("given the read of the caller's access fails", () => {
 describe("given a creator who submits an incomplete form", () => {
   describe("when nothing has been filled in and the scope is cleared", () => {
     /** @scenario "Every unmet requirement of a new key is named and the first is focused" */
-    it("names every missing requirement, focuses the first and mints nothing", async () => {
+    it("names every missing requirement, opens Advanced, focuses the first and mints nothing", async () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
+      await openAdvanced(user);
       await user.click(screen.getByRole("button", { name: "Clear scope" }));
       await user.click(screen.getByText("Restricted"));
+      await openAdvanced(user);
+      const advanced = screen.getByTestId("api-key-advanced-toggle");
+      expect(advanced).toHaveAttribute("aria-expanded", "false");
       await user.click(createButton());
+      expect(advanced).toHaveAttribute("aria-expanded", "true");
       expect(screen.getByText("Enter a name for this key.")).toBeInTheDocument();
       expect(screen.getByText("Choose where this key can be used.")).toBeInTheDocument();
       expect(
         screen.getByText("Choose at least one permission, or switch to All."),
       ).toBeInTheDocument();
-      expect(screen.getByTestId("api-key-expiration-hint")).toBeInTheDocument();
       await waitFor(() => expect(nameInput()).toHaveFocus());
       expect(onCreate).not.toHaveBeenCalled();
     });
@@ -328,10 +360,10 @@ describe("given a creator who submits an incomplete form", () => {
     it("keeps what was entered, drops that error and moves focus to the next gap", async () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
+      await openAdvanced(user);
       await user.click(screen.getByRole("button", { name: "Clear scope" }));
       await user.click(createButton());
       await user.type(nameInput(), "CI");
-      await chooseExpiration({ user, label: "No expiration" });
       await user.click(createButton());
       expect(nameInput()).toHaveValue("CI");
       expect(screen.queryByText("Enter a name for this key.")).toBeNull();
@@ -351,7 +383,7 @@ describe("given a creator who submits an incomplete form", () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
       await user.type(nameInput(), "CI");
-      await chooseExpiration({ user, label: "No expiration" });
+      await openAdvanced(user);
       await user.click(screen.getByRole("button", { name: "Clear scope" }));
       await user.click(createButton());
       expect(screen.getByText("Choose where this key can be used.")).toBeInTheDocument();
@@ -368,7 +400,7 @@ describe("given a creator who submits an incomplete form", () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
       await user.type(nameInput(), "CI");
-      await chooseExpiration({ user, label: "No expiration" });
+      await openAdvanced(user);
       await user.click(screen.getByText("Restricted"));
       await user.click(createButton());
       expect(
@@ -388,7 +420,6 @@ describe("given a creator who submits an incomplete form", () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer({ isCreating: true });
       await user.type(nameInput(), "CI");
-      await chooseExpiration({ user, label: "No expiration" });
       await user.click(screen.getByTestId("api-key-create-submit"));
       expect(onCreate).not.toHaveBeenCalled();
     });
@@ -414,11 +445,12 @@ describe("given an admin", () => {
       state.members = ADMIN_MEMBERS;
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
+      await openAdvanced(user);
       expect(screen.getByText("Key type")).toBeInTheDocument();
       fireEvent.click(screen.getByText("Service"));
       expect(await screen.findByText(/Not tied to any user/)).toBeInTheDocument();
       await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "Bot");
-      await chooseExpiration({ user, label: "No expiration" });
+      expect(screen.getByTestId("api-key-advanced-summary")).toHaveTextContent("Service key");
       await user.click(createButton());
       const sent = onCreate.mock.calls[0]?.[0];
       expect(sent?.keyType).toBe("service");
@@ -433,7 +465,6 @@ describe("given an admin", () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
       await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "Mine");
-      await chooseExpiration({ user, label: "No expiration" });
       await user.click(createButton());
       expect(onCreate.mock.calls[0]?.[0]?.assignedToUserId).toBeUndefined();
       expect(onCreate.mock.calls[0]?.[0]?.keyType).toBe("personal");
@@ -449,6 +480,7 @@ describe("given a member whose access to the project comes through a group, not 
       state.grantable = ["traces:view", "annotations:view"];
       const user = userEvent.setup();
       renderDrawer();
+      await openAdvanced(user);
       await user.click(screen.getByText("Restricted"));
       expect(screen.getByTestId("ceiling").textContent).toBe("traces:view,annotations:view");
     });

@@ -925,8 +925,7 @@ describe("given a key is being created", () => {
       ).toBeInTheDocument();
 
       await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "CI");
-      await user.click(screen.getByText("Choose when this key expires"));
-      await user.click(await screen.findByRole("option", { name: "No expiration" }));
+      await user.click(screen.getByTestId("api-key-advanced-toggle"));
       await user.click(screen.getByTestId("clear-scopes"));
       await user.click(screen.getByRole("button", { name: "Create secret key" }));
 
@@ -947,8 +946,6 @@ describe("given a key is being created", () => {
 
       await user.click(screen.getByRole("button", { name: /Create new secret key/ }));
       await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "CI");
-      await user.click(screen.getByText("Choose when this key expires"));
-      await user.click(await screen.findByRole("option", { name: "No expiration" }));
       await user.click(screen.getByRole("button", { name: "Create secret key" }));
 
       expect(await screen.findByText("Token created")).toBeInTheDocument();

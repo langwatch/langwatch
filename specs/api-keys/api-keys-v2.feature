@@ -310,14 +310,29 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the 401 says the key was revoked
       And when it is presented with a wrong secret the 401 is the plain invalid-key answer
 
-  Rule: nobody mints a key beyond what they hold, and the minter chooses when it expires
+  Rule: nobody mints a key beyond what they hold, and a new key never expires unless the minter says so
 
     @integration
-    Scenario: Create stays unavailable until an expiry is chosen
-      Given "ada" has named a new key and has not chosen an expiry
-      Then the expiry field asks her to choose one
-      And Create is unavailable
-      And when she chooses an expiry Create becomes available
+    Scenario: A new key starts with no expiration
+      When "ada" opens the create drawer
+      Then the expiry reads "No expiration"
+      And naming the key is enough to create it with no expiry
+
+    @integration
+    Scenario: The create drawer asks only for a name and an expiry up front
+      When "ada" opens the create drawer on project "alpha"
+      Then she sees the name and the expiry
+      And key type, description, scope and permissions sit in a closed "Advanced" section
+      And the closed section says the key gets all permissions on project "alpha"
+      When she opens "Advanced"
+      Then she can change the key type, description, scope and permissions
+
+    @integration
+    Scenario: A custom expiry asks for its date before the key is minted
+      Given "ada" has named a new key and chosen a custom expiry with no date
+      When she submits the create drawer
+      Then the expiry field asks her for a date
+      And no key is minted
 
     @integration
     Scenario: The authorize page mints nothing until an expiry is chosen
@@ -377,8 +392,9 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
 
     @integration
     Scenario: Every unmet requirement of a new key is named and the first is focused
-      Given "ada" submits the create drawer with no name, no scope, Restricted with no permission and no expiry
+      Given "ada" submits the create drawer with no name, no scope and Restricted with no permission
       Then each of those fields shows its own error
+      And the "Advanced" section opens so the errors inside it show
       And focus moves to the first of them
       And no key is minted
       And what she entered is kept when she fixes one field and submits again
