@@ -29,20 +29,30 @@ export class ApiKeyRotationService {
     tokens: ApiKeyTokenService;
     answers: Pick<ApiKeyTokenResolutionService, "forget">;
   }): ApiKeyRotationService {
-    return new ApiKeyRotationService(
-      options.repository,
-      ApiKeyGrantsService.create({ authz: options.authz }),
-      options.tokens,
-      options.answers,
-    );
+    return new ApiKeyRotationService({
+      repository: options.repository,
+      bindings: ApiKeyGrantsService.create({ authz: options.authz }),
+      tokens: options.tokens,
+      answers: options.answers,
+    });
   }
 
-  private constructor(
-    private readonly repository: ApiKeyRepository,
-    private readonly bindings: ApiKeyGrantsService,
-    private readonly tokens: ApiKeyTokenService,
-    private readonly answers: Pick<ApiKeyTokenResolutionService, "forget">,
-  ) {}
+  private readonly repository: ApiKeyRepository;
+  private readonly bindings: ApiKeyGrantsService;
+  private readonly tokens: ApiKeyTokenService;
+  private readonly answers: Pick<ApiKeyTokenResolutionService, "forget">;
+
+  private constructor(deps: {
+    repository: ApiKeyRepository;
+    bindings: ApiKeyGrantsService;
+    tokens: ApiKeyTokenService;
+    answers: Pick<ApiKeyTokenResolutionService, "forget">;
+  }) {
+    this.repository = deps.repository;
+    this.bindings = deps.bindings;
+    this.tokens = deps.tokens;
+    this.answers = deps.answers;
+  }
 
   /** The same caller rule as revoke: the owner, or an organization admin. */
   async rotate(input: RotateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
