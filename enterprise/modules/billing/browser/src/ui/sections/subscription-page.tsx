@@ -378,6 +378,7 @@ export function SubscriptionPage() {
             monthlyEquivalent={monthlyEquivalent}
             onUpgrade={handleUpgrade}
             isLoading={isUpgradeLoading}
+            isRequired={updateRequired}
           />
         )}
 
