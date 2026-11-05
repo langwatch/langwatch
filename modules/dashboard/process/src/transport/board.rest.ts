@@ -379,7 +379,7 @@ export const boardRest = defineRestRouter(DashboardApi)
     resource: "dashboard widget",
     action: "delete",
     idParam: "widgetId",
-    // A From LangWatch widget can never be deleted, so it gets no card: the delete answers 404.
+    // A `template:` widget id gets no card under any board's path, as none can be deleted: 404.
     name: async ({ app, projectId, id, ownerUserId, input }) =>
       curatedBoardWidgetById(id)
         ? undefined

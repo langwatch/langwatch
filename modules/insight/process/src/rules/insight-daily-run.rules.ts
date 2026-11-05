@@ -6,9 +6,8 @@
 
 import { createHash } from "node:crypto";
 
-import { curatedBoardWidgetById } from "@langwatch/analytics-catalogue";
+import { curatedBoardPointerId, curatedBoardWidgetById } from "@langwatch/analytics-catalogue";
 import {
-  insightBoardPointerId,
   type InsightEntry,
   insightFolder,
   type InsightReplay,
@@ -130,6 +129,14 @@ export function dailyRunConversationTitle({
 const MAX_POINTER_NAME_LENGTH = 200;
 
 /**
+ * The board id an insight keeps for a run's board: a From LangWatch board's is the one a chat
+ * on that board files, so both name one board.
+ */
+export function insightBoardPointerId({ kind, id }: Pick<InsightRunBoard, "kind" | "id">): string {
+  return kind === "template" ? curatedBoardPointerId(id) : id;
+}
+
+/**
  * The pointer a run's finding keeps: as a chat on that board files it. Langy reads a From
  * LangWatch widget by its `template:<templateId>:<key>` id; the insight keeps its key.
  */
@@ -144,7 +151,9 @@ export function runFindingPointer({
 }): { id: string; name: string; widget: { id: string; name: string } | null } {
   const id = insightBoardPointerId(board);
   if (board.kind === "dashboard" || widget === null) return { id, name, widget };
-  const key = curatedBoardWidgetById(widget.id)?.widget.key;
+  // A widget of another template is no widget of this board.
+  const found = curatedBoardWidgetById(widget.id);
+  const key = found?.templateId === board.id ? found.widget.key : undefined;
   return { id, name, widget: key === undefined ? null : { id: key, name: widget.name } };
 }
 

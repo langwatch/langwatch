@@ -68,6 +68,20 @@ export function templateWidgetId({ templateId, key }: { templateId: string; key:
   return `${TEMPLATE_WIDGET_PREFIX}${templateId}:${key}`;
 }
 
+const CURATED_POINTER_PREFIX = "curated/";
+
+/** The board id a peer keeps for a From LangWatch board: `curated/<templateId>`, its address. */
+export function curatedBoardPointerId(templateId: string): string {
+  return `${CURATED_POINTER_PREFIX}${templateId}`;
+}
+
+/** The template id a board pointer id names; undefined for a stored board's id. */
+export function templateIdOfCuratedBoardPointer(id: string): string | undefined {
+  return id.startsWith(CURATED_POINTER_PREFIX)
+    ? id.slice(CURATED_POINTER_PREFIX.length)
+    : undefined;
+}
+
 /** The From LangWatch widget a `template:` id names; undefined for any other id. */
 export function curatedBoardWidgetById(widgetId: string): CuratedBoardWidget | undefined {
   if (!widgetId.startsWith(TEMPLATE_WIDGET_PREFIX)) return undefined;

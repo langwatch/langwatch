@@ -8,11 +8,7 @@ import type { BoardHeaderActionProps } from "@langwatch/analytics-client";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, Button, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
-import {
-  insightBoardPointerId,
-  type InsightDailyRunSetting,
-  type InsightRunSettings,
-} from "@langwatch/insight-contract";
+import { type InsightDailyRunSetting, type InsightRunSettings } from "@langwatch/insight-contract";
 import { nowInstant } from "@langwatch/time";
 import { ChevronDown, Inbox, Settings2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -31,6 +27,7 @@ export function BoardDailyInsights(props: BoardHeaderActionProps) {
 function DailyInsightsControl({
   boardKind,
   boardId,
+  boardPointerId,
   boardName,
   widgetCount,
 }: BoardHeaderActionProps) {
@@ -49,7 +46,7 @@ function DailyInsightsControl({
     <>
       {isOn || turnedOff !== undefined ? (
         <DailyInsightsDropdown
-          insightBoardId={insightBoardPointerId({ kind: boardKind, id: boardId })}
+          insightBoardId={boardPointerId}
           isEmpty={widgetCount === 0}
           settings={settings}
           lastRun={setting.lastRun}

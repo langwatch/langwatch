@@ -10,7 +10,9 @@ import {
   CURATED_BOARD_DEFINITIONS,
   CURATED_TEMPLATE_IDS,
   curatedBoardDefinitionById,
+  curatedBoardPointerId,
   curatedBoardWidgetById,
+  templateIdOfCuratedBoardPointer,
   templateWidgetId,
 } from "../curated-boards.ts";
 
@@ -66,4 +68,17 @@ describe("curatedBoardWidgetById", () => {
       expect(curatedBoardWidgetById(id)).toBeUndefined();
     },
   );
+});
+
+describe("curatedBoardPointerId", () => {
+  it("round-trips every template id", () => {
+    for (const { templateId } of CURATED_BOARD_DEFINITIONS) {
+      expect(templateIdOfCuratedBoardPointer(curatedBoardPointerId(templateId))).toBe(templateId);
+    }
+  });
+
+  it("names no template for a stored board's id or a bare template id", () => {
+    expect(templateIdOfCuratedBoardPointer("board-1")).toBeUndefined();
+    expect(templateIdOfCuratedBoardPointer("release")).toBeUndefined();
+  });
 });

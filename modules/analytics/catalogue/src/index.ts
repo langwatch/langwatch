@@ -22,8 +22,10 @@ export {
   CURATED_TEMPLATE_IDS,
   type CuratedBoardDefinition,
   curatedBoardDefinitionById,
+  curatedBoardPointerId,
   type CuratedBoardWidget,
   curatedBoardWidgetById,
+  templateIdOfCuratedBoardPointer,
   templateWidgetId,
 } from "./model/curated-boards.ts";
 export {

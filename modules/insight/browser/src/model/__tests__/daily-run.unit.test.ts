@@ -4,8 +4,7 @@
  */
 
 import {
-  INSIGHT_RUN_RETIRED_REASONS,
-  INSIGHT_RUN_SKIP_REASONS,
+  INSIGHT_RUN_RECORDED_SKIP_REASONS,
   INSIGHT_SCHEDULE_OFF_REASONS,
   type InsightRunReason,
 } from "@langwatch/insight-contract";
@@ -28,7 +27,6 @@ import {
 } from "../daily-run.ts";
 
 /** The reasons a skipped run may carry: today's and the retired ones old runs still hold. */
-const SKIPPED_REASONS = [...INSIGHT_RUN_SKIP_REASONS, ...INSIGHT_RUN_RETIRED_REASONS];
 
 const DAY_MS = 86_400_000;
 /** 12:34 in Amsterdam, in summer: the same calendar day there as in UTC. */
@@ -172,17 +170,20 @@ describe("given a board that is on", () => {
     );
 
     /** @scenario "The dropdown says how the last run ended" */
-    it.each(SKIPPED_REASONS)("says a run skipped as %s did not run, and why", (reason) => {
-      expect(SKIP_REASON_WORDS[reason]).not.toBe("");
-      expect(words({ outcome: "skipped", reason })).toBe(
-        `Did not run 12:34 · ${SKIP_REASON_WORDS[reason]}`,
-      );
-    });
+    it.each(INSIGHT_RUN_RECORDED_SKIP_REASONS)(
+      "says a run skipped as %s did not run, and why",
+      (reason) => {
+        expect(SKIP_REASON_WORDS[reason]).not.toBe("");
+        expect(words({ outcome: "skipped", reason })).toBe(
+          `Did not run 12:34 · ${SKIP_REASON_WORDS[reason]}`,
+        );
+      },
+    );
 
     /** @scenario "The dropdown says how the last run ended" */
     it("has words of its own for every skip reason, retired ones included", () => {
-      const said = SKIPPED_REASONS.map((reason) => SKIP_REASON_WORDS[reason]);
-      expect(new Set(said).size).toBe(SKIPPED_REASONS.length);
+      const said = INSIGHT_RUN_RECORDED_SKIP_REASONS.map((reason) => SKIP_REASON_WORDS[reason]);
+      expect(new Set(said).size).toBe(INSIGHT_RUN_RECORDED_SKIP_REASONS.length);
     });
 
     /** @scenario "The dropdown says how the last run ended" */

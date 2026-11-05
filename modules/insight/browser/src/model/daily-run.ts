@@ -7,8 +7,7 @@
 import {
   DEFAULT_INSIGHT_RUN_MAX_INSIGHTS,
   INSIGHT_RUN_MAX_INSIGHTS_CHOICES,
-  INSIGHT_RUN_RETIRED_REASONS,
-  INSIGHT_RUN_SKIP_REASONS,
+  INSIGHT_RUN_RECORDED_SKIP_REASONS,
   INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF,
   type InsightDailyRunSetting,
   type InsightRunRetiredReason,
@@ -111,9 +110,6 @@ export function scheduleWords({
   return `Langy reads this board for you every day ${runTimeWords(settings)} and files what stands out, at most ${most} per run.`;
 }
 
-/** Every reason a skipped run may carry: the ones recorded today and the retired ones. */
-const SKIP_WORDS_REASONS = [...INSIGHT_RUN_SKIP_REASONS, ...INSIGHT_RUN_RETIRED_REASONS];
-
 /**
  * Why a run never reached Langy, in a person's words. One per skip reason the contract lists,
  * retired ones included: a run recorded before a reason retired still says why it did not run.
@@ -182,6 +178,6 @@ export function lastRunWords({
   if (lastRun.outcome === "failed") {
     return `Failed ${when} · nothing was filed, and the next run tries again`;
   }
-  const reason = SKIP_WORDS_REASONS.find((known) => known === lastRun.reason);
+  const reason = INSIGHT_RUN_RECORDED_SKIP_REASONS.find((known) => known === lastRun.reason);
   return `Did not run ${when} · ${reason ? SKIP_REASON_WORDS[reason] : "nothing was filed"}`;
 }

@@ -7,8 +7,7 @@
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import {
-  INSIGHT_RUN_RETIRED_REASONS,
-  INSIGHT_RUN_SKIP_REASONS,
+  INSIGHT_RUN_RECORDED_SKIP_REASONS,
   type InsightDailyRunSetting,
   type InsightEntry,
 } from "@langwatch/insight-contract";
@@ -78,6 +77,8 @@ function Board({
   witness?: boolean;
 }) {
   const [added, setAdded] = useState(0);
+  // A From LangWatch board's pointer id is its address segment, as analytics hands it over.
+  const boardPointerId = kind === "template" ? `curated/${id}` : id;
   return (
     <>
       <button type="button" onClick={() => setAdded(added + 1)}>
@@ -86,6 +87,7 @@ function Board({
       <BoardDailyInsights
         boardKind={kind}
         boardId={id}
+        boardPointerId={boardPointerId}
         boardName="Checkout health"
         widgetCount={widgets === "loading" ? void 0 : widgets + added}
       />
@@ -94,6 +96,7 @@ function Board({
           <BoardDailyInsights
             boardKind={kind}
             boardId={id}
+            boardPointerId={boardPointerId}
             boardName="Checkout health"
             widgetCount={1}
           />
@@ -412,6 +415,28 @@ describe("given a member turned a board's daily run on", () => {
     });
   });
 
+  describe("when a From LangWatch board has 1 unseen insight filed under its pointer id", () => {
+    /** @scenario "The control counts the board's unseen insights" */
+    it("says 1 new", async () => {
+      openBoard({
+        kind: "template",
+        id: "release",
+        setting: ON,
+        entries: [
+          insightEntry({
+            id: "i-1",
+            board: { id: "curated/release", name: "Release", widget: null },
+          }),
+          insightEntry({ id: "i-2", board: { id: "release", name: "Other", widget: null } }),
+        ],
+      });
+
+      expect(
+        await screen.findByRole("button", { name: "Daily insights: on, 1 new" }),
+      ).toHaveTextContent("1 new");
+    });
+  });
+
   describe("when the board lost its last widget", () => {
     /** @scenario "A board that is on with no widgets waits" */
     it("says it waits, and that there is nothing to read", async () => {
@@ -440,7 +465,7 @@ describe("given a member turned a board's daily run on", () => {
         { outcome: "failed", reason: "turn_failed" },
         `Failed ${RAN_AT} · nothing was filed, and the next run tries again`,
       ],
-      ...[...INSIGHT_RUN_SKIP_REASONS, ...INSIGHT_RUN_RETIRED_REASONS].map(
+      ...INSIGHT_RUN_RECORDED_SKIP_REASONS.map(
         (reason) =>
           [
             `was skipped as ${reason}`,

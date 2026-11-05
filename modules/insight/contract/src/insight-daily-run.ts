@@ -36,14 +36,6 @@ export interface InsightRunBoardSchema extends Named<typeof insightRunBoardSchem
 export const insightRunBoardSchema: InsightRunBoardSchema = insightRunBoardSchemaDefinition;
 export type InsightRunBoard = z.infer<typeof insightRunBoardSchema>;
 
-/**
- * The board id an insight keeps for a run's board. A From LangWatch board's is its address
- * segment, `curated/<templateId>`, as a chat on that board files it: both name one board.
- */
-export function insightBoardPointerId({ kind, id }: Pick<InsightRunBoard, "kind" | "id">): string {
-  return kind === "template" ? `curated/${id}` : id;
-}
-
 /** How many findings one run may file; whatever Langy returns is cut to it. */
 export const INSIGHT_RUN_MAX_INSIGHTS_CHOICES = [1, 3, 5, 10] as const;
 export const DEFAULT_INSIGHT_RUN_MAX_INSIGHTS = 3;
@@ -102,11 +94,16 @@ export type InsightRunQuietReason = (typeof INSIGHT_RUN_QUIET_REASONS)[number];
 export const INSIGHT_RUN_RETIRED_REASONS = ["template_board"] as const;
 export type InsightRunRetiredReason = (typeof INSIGHT_RUN_RETIRED_REASONS)[number];
 
-export const insightRunReasonSchema = z.enum([
+/** Every reason a recorded `skipped` run can carry: the live ones and the retired. */
+export const INSIGHT_RUN_RECORDED_SKIP_REASONS = [
   ...INSIGHT_RUN_SKIP_REASONS,
+  ...INSIGHT_RUN_RETIRED_REASONS,
+] as const;
+
+export const insightRunReasonSchema = z.enum([
+  ...INSIGHT_RUN_RECORDED_SKIP_REASONS,
   ...INSIGHT_RUN_FAILURE_REASONS,
   ...INSIGHT_RUN_QUIET_REASONS,
-  ...INSIGHT_RUN_RETIRED_REASONS,
 ]);
 export type InsightRunReason = z.infer<typeof insightRunReasonSchema>;
 

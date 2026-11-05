@@ -4,6 +4,7 @@
  * @see modules/insight/specs/insight-inbox.feature
  */
 
+import { curatedBoardPointerId } from "@langwatch/analytics-catalogue";
 import { describe, expect, it } from "vitest";
 
 import { CURATED_BOARDS } from "../model/curated-boards.ts";
@@ -96,7 +97,10 @@ describe("given a pointer to a From LangWatch board", () => {
     it("links it at its own address, with no list of stored boards needed", () => {
       if (!curated) throw new Error("No From LangWatch board ships");
       const resolved = resolve({
-        pointer: { boardId: `curated/${curated.templateId}`, boardName: "As it was called" },
+        pointer: {
+          boardId: curatedBoardPointerId(curated.templateId),
+          boardName: "As it was called",
+        },
         boards: undefined,
         widgets: undefined,
       });
@@ -118,7 +122,7 @@ describe("given a pointer to a From LangWatch board", () => {
       if (!curated || !widget) throw new Error("No From LangWatch board ships a widget");
       const resolved = resolve({
         pointer: {
-          boardId: `curated/${curated.templateId}`,
+          boardId: curatedBoardPointerId(curated.templateId),
           boardName: "As it was called",
           widget: { id: widget.key, name: "As it was" },
         },
@@ -144,5 +148,39 @@ describe("given a pointer to a From LangWatch board", () => {
 
       expect(resolved).toEqual({ board: { name: "Retired board", deleted: true } });
     });
+  });
+});
+
+describe("given a pointer an insight run files on a From LangWatch board", () => {
+  describe.each(CURATED_BOARDS)("when it names the $templateId board", (board) => {
+    /** @scenario "A From LangWatch board is read from the catalogue" */
+    it.each(board.widgets.map(({ key }) => key))("links widget %s", (key) => {
+      const resolved = resolve({
+        pointer: {
+          boardId: curatedBoardPointerId(board.templateId),
+          boardName: "As it was called",
+          widget: { id: key, name: "As it was" },
+        },
+        boards: [],
+        widgets: [],
+      });
+
+      expect([resolved.board.deleted, resolved.widget?.deleted]).toEqual([false, false]);
+    });
+  });
+});
+
+describe("given a pointer whose board id is a bare template id", () => {
+  it("does not resolve as a From LangWatch board", () => {
+    const [curated] = CURATED_BOARDS;
+    if (!curated) throw new Error("No From LangWatch board ships");
+
+    const resolved = resolve({
+      pointer: { boardId: curated.templateId, boardName: "Bare" },
+      boards: [],
+      widgets: [],
+    });
+
+    expect(resolved).toEqual({ board: { name: "Bare", deleted: true } });
   });
 });
