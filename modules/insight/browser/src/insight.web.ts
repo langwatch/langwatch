@@ -8,6 +8,7 @@ import { BoardHeaderActionToken } from "@langwatch/analytics-client";
 import { defineBrowserModule } from "@langwatch/browser";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import {
+  type InsightsEntry,
   InsightsBellToken,
   InsightsEntryToken,
   InsightsNavCountToken,
@@ -15,7 +16,10 @@ import {
 } from "@langwatch/insight-contract";
 
 import { insightApi } from "./behavior/insight-api.ts";
-import { insightsEntry } from "./behavior/use-insights-shown.ts";
+import { useInsightsShown } from "./behavior/use-insights-shown.ts";
+
+/** What insight lends through `InsightsEntryToken`. */
+const insightsEntry: InsightsEntry = { useIsShown: useInsightsShown };
 
 export const insightWeb = defineBrowserModule("insight")
   .withApi(insightApi, { contracts: [insightTrpc] })

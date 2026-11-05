@@ -10,9 +10,10 @@ import { useMemo } from "react";
 
 import { type InsightHostProject, useInsightHost } from "../model/insight-host.ts";
 import { insightApi } from "./insight-api.ts";
+import { useInsightsShown } from "./use-insights-shown.ts";
 
 export type InsightInboxReading = Readonly<{
-  /** False while the flag, the grant or the project is missing: draw nothing. */
+  /** The one `useInsightsShown` rule: false means draw nothing and read nothing. */
   available: boolean;
   project: InsightHostProject | undefined;
   inbox: InsightInbox | undefined;
@@ -26,8 +27,7 @@ export type InsightInboxReading = Readonly<{
 export function useInsightInbox(): InsightInboxReading {
   const host = useInsightHost();
   const project = host.project();
-  const available =
-    project !== undefined && host.isEnabled() === true && host.hasPermission("analytics:view");
+  const available = useInsightsShown();
   const query = insightApi.insights.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: available },

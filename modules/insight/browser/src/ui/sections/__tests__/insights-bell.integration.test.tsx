@@ -4,10 +4,11 @@
  * @see modules/insight/specs/insight-inbox.feature
  */
 
+import type { UiProcedureAnswer } from "@langwatch/browser/testing-transport";
 import { nowInstant } from "@langwatch/time";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, type Mock, vi } from "vitest";
 
 import { insightEntry, renderWithInsightHost, StubInsightHost } from "../../../testing.tsx";
 import { InsightsBell } from "../insights-bell.tsx";
@@ -82,23 +83,27 @@ describe("given 2 insights in the inbox, both already seen", () => {
   });
 });
 
-/** Absence holds only after the reads settle, so the wait outlasts the answered query. */
-async function expectNoBell() {
-  await new Promise((settle) => setTimeout(settle, 300));
+/** Host answers are synchronous, so absence is settled once render returns; a read is a call. */
+function expectNoBellAndNoRead({ read }: { read: Mock<UiProcedureAnswer> }) {
   expect(screen.queryByRole("button", { name: "Inbox: new insights" })).not.toBeInTheDocument();
+  expect(read).not.toHaveBeenCalled();
 }
 
 describe("given 2 unseen insights in the inbox", () => {
-  describe("when insight is off for this reader (a release flag off or not answered yet)", () => {
-    // The host-mount test binds how release_dashboards off makes the host report this.
-    it("shows no bell", async () => {
+  describe.each([
+    { case: "release_dashboards is off", options: { enabled: false } },
+    { case: "a release flag has not answered yet", options: { enabled: undefined } },
+  ])("when $case", ({ options }) => {
+    /** @scenario "Insights shows nothing while release_dashboards is off" */
+    it("shows no bell and reads nothing", () => {
+      const read = vi.fn<UiProcedureAnswer>(() => Promise.resolve(UNSEEN.slice(0, 2)));
       const { host } = renderWithInsightHost({
         element: <InsightsBell />,
-        host: new StubInsightHost({ enabled: false }),
-        answer: () => Promise.resolve(UNSEEN.slice(0, 2)),
+        host: new StubInsightHost(options),
+        answer: read,
       });
 
-      await expectNoBell();
+      expectNoBellAndNoRead({ read });
       expect(host.navigations).toEqual([]);
     });
   });
@@ -121,17 +126,18 @@ describe("given 2 unseen insights in the inbox", () => {
 
   describe("when the project is an aggregate, which files no insight", () => {
     /** @scenario "An aggregate project's top bar holds no insights bell" */
-    it("shows no bell, as its side menu holds no Insights entry", async () => {
+    it("shows no bell and reads nothing, as its side menu holds no Insights entry", () => {
+      const read = vi.fn<UiProcedureAnswer>(() => Promise.resolve(UNSEEN.slice(0, 2)));
       renderWithInsightHost({
         element: <InsightsBell />,
         host: new StubInsightHost({
           enabled: true,
           project: { id: "project-1", slug: "acme", kind: "aggregate" },
         }),
-        answer: () => Promise.resolve(UNSEEN.slice(0, 2)),
+        answer: read,
       });
 
-      await expectNoBell();
+      expectNoBellAndNoRead({ read });
     });
   });
 });

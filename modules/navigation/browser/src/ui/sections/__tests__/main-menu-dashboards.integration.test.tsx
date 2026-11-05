@@ -94,6 +94,7 @@ function renderSidebar({
   insightsShown = false,
   insightInstalled = true,
   governancePlatformOn = false,
+  governancePlatformLoading = false,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "governance" | "me" | "settings" | "admin";
   pathname: string;
@@ -105,6 +106,7 @@ function renderSidebar({
   insightsShown?: boolean;
   insightInstalled?: boolean;
   governancePlatformOn?: boolean;
+  governancePlatformLoading?: boolean;
 }) {
   insight.shown = insightsShown;
   declarations.current = lendsWith({ insightInstalled });
@@ -119,7 +121,7 @@ function renderSidebar({
           release_dashboards: { enabled: dashboardsFlag, isLoading: dashboardsLoading },
           release_ui_governance_billed_cost_enabled: {
             enabled: governancePlatformOn,
-            isLoading: false,
+            isLoading: governancePlatformLoading,
           },
         },
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
@@ -268,6 +270,20 @@ describe("the Insights entry", () => {
       const bottom = within(screen.getByTestId("sidebar-bottom-block"));
       expect(bottom.getByRole("link", { name: "Settings" })).toBeInTheDocument();
       expect(bottom.queryByRole("link", { name: /Insights/ })).toBeNull();
+    });
+
+    /** @scenario "The Governance side menu holds only its own Insights item" */
+    it("pins nothing while the Governance platform flag is still loading", async () => {
+      renderSidebar({
+        surface: "governance",
+        pathname: "/governance",
+        insightsShown: true,
+        governancePlatformLoading: true,
+        permissions: ["analytics:view", "organization:view"],
+      });
+
+      await screen.findByRole("button", { name: "Quick Search" });
+      expect(screen.queryByRole("link", { name: /Insights/ })).toBeNull();
     });
 
     /** @scenario "The Governance side menu pins Insights while it has no Insights page of its own" */

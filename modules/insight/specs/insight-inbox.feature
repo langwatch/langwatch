@@ -461,6 +461,14 @@ Feature: The insights inbox
       When they look at the top bar
       Then it holds no insights bell
 
+    @integration
+    Scenario: An aggregate project's Insights page says insights are not available
+      Given the release_insights and release_dashboards flags are on and a member with analytics:view
+      And the project is an aggregate, which files no insight
+      When they open its Insights page
+      Then it says insights are not available here
+      And no inbox is read
+
     @unit
     Scenario: The Insights page stays in the Dashboards product
       Given a member in Dashboards

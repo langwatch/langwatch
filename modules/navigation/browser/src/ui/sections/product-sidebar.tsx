@@ -3,6 +3,7 @@
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 
@@ -35,6 +36,7 @@ import { QUIET_SIDEBAR_CHIP } from "../../model/quiet-chip-style.ts";
 import { resolveSettingsBackTarget } from "../../model/resolve-settings-back-target.ts";
 import {
   gatewayNavItems,
+  governanceInsightsNavItem,
   governanceNavItems,
   type SectionNavItemData,
 } from "../../model/section-nav-items.ts";
@@ -336,7 +338,7 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
 }
 
 const NO_SECTION_ITEMS: readonly SectionNavItemData[] = [];
-const GOVERNANCE_INSIGHTS_HREF = "/governance/insights";
+const FLAG_NOT_ASKED = { enabled: false, isLoading: false };
 
 /**
  * The one Insights entry, just above Settings in every product menu; Governance skips it while it
@@ -355,8 +357,13 @@ function InsightsMenuLink({
   const governanceItems = useVisibleSectionNavItems(
     surface === "governance" ? governanceNavItems : NO_SECTION_ITEMS,
   );
-  if (!shown) return null;
-  if (governanceItems.some((item) => item.href === GOVERNANCE_INSIGHTS_HREF)) return null;
+  // While Governance's flag loads its own Insights item is unknown, so show neither.
+  const governanceFlag =
+    surface === "governance"
+      ? host.featureFlag(FrontendFlags.release_ui_governance_billed_cost_enabled)
+      : FLAG_NOT_ASKED;
+  if (!shown || governanceFlag.isLoading) return null;
+  if (governanceItems.includes(governanceInsightsNavItem)) return null;
   const destination = projectScopedDestination({
     path: projectNavItems.insights.path,
     label: projectNavItems.insights.title,

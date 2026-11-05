@@ -4,7 +4,7 @@ The browser half of [insight](../README.md). What a browser installs when it ins
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/insight.web.ts:20` (`defineBrowserModule("insight")`), exported as `insightWeb` at `./declaration`.
+Declared in `src/insight.web.ts:24` (`defineBrowserModule("insight")`), exported as `insightWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 

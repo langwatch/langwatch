@@ -5,11 +5,11 @@
  * @see modules/insight/specs/insight-inbox.feature
  */
 
-import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
+import type { UiProcedureAnswer, UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { nowInstant } from "@langwatch/time";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { insightEntry, renderWithInsightHost, StubInsightHost } from "../../../testing.tsx";
 import InsightsScreen from "../insights.screen.tsx";
@@ -52,6 +52,27 @@ describe("given a project with no insights", () => {
 
       expect(host.navigations).toEqual(["/acme/dashboards"]);
       expect(host.langyAsks).toEqual([]);
+    });
+  });
+});
+
+describe("given an aggregate project, which files no insight", () => {
+  describe("when a member opens Insights", () => {
+    /** @scenario "An aggregate project's Insights page says insights are not available" */
+    it("says insights are not available here, reads nothing", () => {
+      const read = vi.fn<UiProcedureAnswer>(() => Promise.resolve([]));
+      renderWithInsightHost({
+        element: <InsightsScreen />,
+        host: new StubInsightHost({
+          project: { id: "project-1", slug: "acme", kind: "aggregate" },
+        }),
+        answer: read,
+      });
+
+      expect(screen.getByTestId("insights-unavailable")).toHaveTextContent(
+        "Insights are not available here",
+      );
+      expect(read).not.toHaveBeenCalled();
     });
   });
 });
