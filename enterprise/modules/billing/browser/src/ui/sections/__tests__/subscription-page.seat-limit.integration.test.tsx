@@ -299,6 +299,44 @@ describe("<SubscriptionPage/> seat limit", () => {
     });
   });
 
+  describe("when a Free organization has one member", () => {
+    beforeEach(() => {
+      mockGetOrganizationWithMembers.mockReturnValue({
+        data: { ...mockOrganizationMembers, members: [mockOrganizationMembers.members[0]!] },
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      mockGetUsage.mockReturnValue({
+        data: { seatLimitInfo: { status: "ok", message: "" }, membersCount: 1 },
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    /** @scenario "A Free organization with one member is offered the upgrade" */
+    it("offers the Growth upgrade for one seat without adding a seat first", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({ url: null });
+      mockCreateSubscription.mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync,
+        isLoading: false,
+        isPending: false,
+      });
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByText("1 / 2")).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
+      expect(screen.queryByText("Upgrade required")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: /Upgrade now/i }));
+
+      await waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 1 }));
+      });
+    });
+  });
+
   describe("when an invite has expired", () => {
     beforeEach(() => {
       // Before the usage query answers, the page counts members and invites
