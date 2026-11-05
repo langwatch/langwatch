@@ -1,8 +1,8 @@
-// Command releaselock asserts the Python SDK release keeps uv.lock in step.
+// Command releaselock asserts uv workspace package releases keep uv.lock in step.
 //
 // Usage:
 //
-//	go run ./cmd/releaselock            # from anywhere in the tree
+//	go run ./cmd/releaselock            # repo root only: ./cmd/... is a relative package path
 //	go run ./cmd/releaselock -root .    # explicit root
 package main
 
@@ -41,5 +41,5 @@ func main() {
 		fmt.Fprintln(os.Stderr, "\nSee specs/ci/release-lock.feature")
 		os.Exit(1)
 	}
-	fmt.Println("✓ uv.lock follows the Python SDK release")
+	fmt.Println("✓ uv.lock follows the Python package releases")
 }

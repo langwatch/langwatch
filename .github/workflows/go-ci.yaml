@@ -97,9 +97,12 @@ jobs:
               - 'tools/ciguard/**'
               - 'tools/releaselock/**'
               - 'cmd/releaselock/**'
-              # cmd/releaselock reads these; a lock-only or pyproject-only PR must reach it.
+              # cmd/releaselock reads all of these; a PR touching any must reach it.
               - 'uv.lock'
               - 'sdks/python/pyproject.toml'
+              - 'packages/ksuid-python/pyproject.toml'
+              - '.github/release-please-config.json'
+              - '.github/.release-please-manifest.json'
               - 'pkg/ciscan/**'
               # The static-cloud-keys guard walks composite actions too.
               - '.github/actions/**'

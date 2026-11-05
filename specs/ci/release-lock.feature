@@ -1,5 +1,5 @@
-Feature: A Python SDK release keeps uv.lock in step
-  As a maintainer cutting a Python SDK release
+Feature: A Python package release keeps uv.lock in step
+  As a maintainer cutting a release of a uv workspace Python package
   I want the root uv.lock to carry the released version
   So that CI does not relock and fail on a dirty git diff
 
@@ -12,20 +12,36 @@ Feature: A Python SDK release keeps uv.lock in step
 
   @unit
   Scenario: The release config bumps uv.lock
-    Given the sdks/python package in the release-please config
-    Then it has exactly one toml extra-files entry for /uv.lock
+    Given a uv workspace package in the release-please config
+    Then it has exactly one toml extra-files entry for its own /uv.lock package
 
   @unit
   Scenario: A lock behind the release version fails the check
-    Given the langwatch entry in uv.lock differs from pyproject.toml or the release manifest
-    Then the guard fails and tells the developer to run `uv lock`
+    Given the package entry in uv.lock differs from pyproject.toml or the release manifest
+    Then the guard fails and names both versions
+    And it tells the developer to run `uv lock` only when pyproject.toml is ahead of the lock
 
   @unit
   Scenario: A lock in step passes
-    Given the langwatch entry in uv.lock matches pyproject.toml and the release manifest
+    Given every package entry in uv.lock matches its pyproject.toml and the release manifest
     Then the guard reports no problem
 
   @unit
   Scenario: A pyproject without a static project version fails the check
-    Given sdks/python/pyproject.toml has no static version under [project]
+    Given a package pyproject.toml has no static version under [project]
     Then the guard says there is no static [project] version
+
+  @unit
+  Scenario: A ksuid-python release that leaves the lock behind fails the check
+    Given packages/ksuid-python is released and the langwatch-ksuid entry in uv.lock is behind
+    Then the guard fails for packages/ksuid-python only
+
+  @unit
+  Scenario: A uv workspace member the guard does not check fails the check
+    Given the root pyproject.toml lists a uv workspace member the guard does not know
+    Then the guard fails and names the member
+
+  @unit
+  Scenario: The guard reads the repository files
+    Given a repository root holding the config, manifest, pyprojects and uv.lock
+    Then the guard reads them from disk and reports the problems in them
