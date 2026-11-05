@@ -163,8 +163,7 @@ export function plainHttpHookRefusal(destination: SsrfValidationResult): string 
   if (destination.type === "unresolved") return PLAIN_HTTP_REFUSAL;
   const { resolvedIp } = destination;
   // An allowlisted host may be pinned without a lookup; the operator named it as internal.
-  if (resolvedIp === undefined)
-    return destination.type === "allowlisted" ? null : PLAIN_HTTP_REFUSAL;
+  if (resolvedIp === undefined) return null;
   return isPrivateOrLocalhostIP(resolvedIp) ? null : PLAIN_HTTP_REFUSAL;
 }
 
