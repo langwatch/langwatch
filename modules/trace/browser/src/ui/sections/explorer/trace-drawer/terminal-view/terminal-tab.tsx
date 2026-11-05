@@ -14,6 +14,7 @@ import {
 } from "../../../../../behavior/reads/use-trace-detail-reads.ts";
 import { TERMINAL_TOKENS } from "../../../../../model/coding-agent/trace/terminal-palette.ts";
 import { deriveSessionBanner } from "../../../../../model/coding-agent/trace/terminal-session-banner.ts";
+import { promptLineText } from "../../../../../model/coding-agent/trace/terminal-session.ts";
 import { indexToolSpansBySpanId } from "../../../../../model/coding-agent/trace/terminal-tool-spans.ts";
 import { TerminalSkeleton } from "../../../../elements/coding-agent/trace/terminal-skeleton.tsx";
 import { TerminalView } from "../../../../elements/coding-agent/trace/terminal-view.tsx";
@@ -96,6 +97,11 @@ export function TerminalTab({
     [session.status, session.earlierCount, session.loadEarlier],
   );
 
+  const promptLine = useMemo(
+    () => promptLineText({ sessionName, spans: spansQuery.data ?? [], entries: session.entries }),
+    [sessionName, spansQuery.data, session.entries],
+  );
+
   // The loading state has to look like a terminal too — see TerminalSkeleton.
   if (transcriptQuery.isLoading) {
     return <TerminalSkeleton />;
@@ -116,7 +122,7 @@ export function TerminalTab({
       sessionStartAtMs={session.sessionStartAtMs}
       sessionCostUsd={sessionCostUsd}
       banner={banner}
-      sessionName={sessionName}
+      sessionName={promptLine}
     />
   );
 }
