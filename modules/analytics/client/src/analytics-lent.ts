@@ -92,8 +92,6 @@ export const CustomGraphToken = uiTokens("analytics").component<CustomGraphProps
  */
 export type DashboardPointerProps = {
   boardId: string;
-  /** The id a pointer to this board keeps; a From LangWatch board's is `curated/<templateId>`. */
-  boardPointerId: string;
   boardName: string;
   widget?: { id: string; name: string };
 };
@@ -130,6 +128,8 @@ export const LwqlReplayChartToken =
 export type BoardHeaderActionProps = {
   boardKind: "dashboard" | "template";
   boardId: string;
+  /** The id a pointer to this board keeps; a From LangWatch board's is `curated/<templateId>`. */
+  boardPointerId: string;
   boardName: string;
   /** How many widgets the board holds; undefined while a stored board's widgets load. */
   widgetCount: number | undefined;
