@@ -792,7 +792,9 @@ describe("the wide run detail drawer", () => {
     expect(within(passed).getByText("Every reply was courteous.")).toBeInTheDocument();
     expect(within(passed).getByText("The agent must not reveal the password")).toBeInTheDocument();
     expect(within(passed).queryByText(/Checked as/)).not.toBeInTheDocument();
-    expect(within(passed).queryByText(/The agent keeps the password secret/)).not.toBeInTheDocument();
+    expect(
+      within(passed).queryByText(/The agent keeps the password secret/),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId("run-verdict-status-passed")).toBeInTheDocument();
   });
 
