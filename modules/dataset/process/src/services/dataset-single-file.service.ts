@@ -4,8 +4,11 @@
  * as that release kept it. Owner's ruling: served in place, never migrated.
  */
 import {
+  DatasetStaleColumnsError,
   DatasetTooLargeToSearchError,
   datasetRecordSchema,
+  type DatasetColumnRenames,
+  type DatasetColumns,
   type CreateDatasetRecordsInput,
   type Dataset,
   type DatasetEntrySelection,
@@ -24,6 +27,9 @@ import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import type { DatasetContent } from "../app/dataset.app.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { DatasetSingleFileRepository } from "../repositories/dataset-single-file.repository.ts";
+import type { DatasetRow } from "../repositories/dataset.repository.ts";
+import { mapPreviousColumnsToNewColumns } from "../rules/dataset-chunk-lines.rules.ts";
+import { assertColumnsCurrent } from "../rules/dataset-columns.rules.ts";
 import {
   matchesDatasetSearch,
   refuseSearchScan,
@@ -158,7 +164,8 @@ export class DatasetSingleFileService implements Omit<
   }): Promise<DatasetRecordMutationResult> {
     const { dataset } = input;
     const entry = sanitizedEntry(input.input.updatedRecord);
-    const created = await this.rewrite(dataset, (records, now) => {
+    const created = await this.rewrite(dataset, (records, now, current) => {
+      assertColumnsCurrent({ columns: input.input.columns, columnTypes: current.columnTypes });
       const result = upsertSingleFileRecord({
         ...keyOf(dataset),
         records,
@@ -216,6 +223,31 @@ export class DatasetSingleFileService implements Omit<
     return { count };
   }
 
+  /** Re-keys every record to the new columns and stores them, under the dataset's lock. */
+  async updateColumns(input: {
+    dataset: Dataset;
+    columnTypes: DatasetColumns;
+    columnRenames?: DatasetColumnRenames | undefined;
+  }): Promise<void> {
+    const { dataset } = input;
+    await this.rewrite(dataset, (records, _now, current) => {
+      if (JSON.stringify(current.columnTypes) !== JSON.stringify(dataset.columnTypes)) {
+        throw new DatasetStaleColumnsError();
+      }
+      const entries = mapPreviousColumnsToNewColumns({
+        records: records.map((record) => record.entry),
+        previousColumns: dataset.columnTypes,
+        newColumns: input.columnTypes,
+        renames: input.columnRenames,
+      });
+      return {
+        records: records.map((record, index) => ({ ...record, entry: entries[index] ?? {} })),
+        answer: undefined,
+        columnTypes: input.columnTypes,
+      };
+    });
+  }
+
   /**
    * Read, change and write the whole file under the dataset's lock. The count is recorded
    * first: a failed count update leaves the file untouched, and a failed file write rolls
@@ -226,15 +258,20 @@ export class DatasetSingleFileService implements Omit<
     change: (
       records: SingleFileRecord[],
       now: string,
-    ) => { records: SingleFileRecord[]; answer: T },
+      current: DatasetRow,
+    ) => { records: SingleFileRecord[]; answer: T; columnTypes?: DatasetColumns },
   ): Promise<T> {
     const key = keyOf(dataset);
     return this.datasets.withDatasetLock(dataset.id, async (locked) => {
-      const changed = change(await this.readStored(key), nowInstant().toString());
+      const current = await locked.getOne({ id: dataset.id, projectId: dataset.projectId });
+      const changed = change(await this.readStored(key), nowInstant().toString(), current);
       await locked.update({
         id: dataset.id,
         projectId: dataset.projectId,
-        data: { s3RecordCount: changed.records.length },
+        data: {
+          s3RecordCount: changed.records.length,
+          ...(changed.columnTypes ? { columnTypes: changed.columnTypes } : {}),
+        },
       });
       await this.files.putSingleFile({ ...key, text: JSON.stringify(changed.records) });
       return changed.answer;

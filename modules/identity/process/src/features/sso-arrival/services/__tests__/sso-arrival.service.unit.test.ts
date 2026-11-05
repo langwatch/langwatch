@@ -94,6 +94,7 @@ function serviceOver({
 }) {
   let pending = pendingAdmission;
   const isMember = vi.fn().mockResolvedValue(member);
+  const getMemberSeat = vi.fn(async () => existingSeat ?? joinerSeat);
   const createMembership = vi.fn(async () => {
     const outcome = await membership();
     if (outcome === "created") {
@@ -135,7 +136,9 @@ function serviceOver({
   const applyPendingInvite = vi
     .fn()
     .mockResolvedValue(
-      pendingInvite ? { applied: true, inviteId: pendingInvite.inviteId } : { applied: false },
+      pendingInvite
+        ? { applied: true, inviteId: pendingInvite.inviteId, role: "MEMBER" }
+        : { applied: false },
     );
   const findOrganization = vi.fn().mockResolvedValue(ORG);
   const joinedAutomatically = vi.fn<() => Promise<void>>().mockResolvedValue();
@@ -155,13 +158,20 @@ function serviceOver({
     service: SsoArrivalService.create({
       connections,
       authz,
-      memberships: { isMember, createMembership, applyPendingInvite, findOrganization },
+      memberships: {
+        isMember,
+        getMemberSeat,
+        createMembership,
+        applyPendingInvite,
+        findOrganization,
+      },
       joinRequests: { requestFromSsoArrival, recordSsoArrival },
       notifications: { joinedAutomatically, startNurturing },
       signups: { announceJoin: announceSignup },
       adoption: { adopt },
     }),
     isMember,
+    getMemberSeat,
     getConnection,
     requestFromSsoArrival,
     recordSsoArrival,
@@ -674,6 +684,31 @@ describe("given somebody who already belongs to the organization", () => {
 
     expect(parts.attachBindings).not.toHaveBeenCalled();
     expect(parts.completeAdmission).not.toHaveBeenCalled();
+    // Nothing is pending, so the seat is never read.
+    expect(parts.getMemberSeat).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A Lite Member's unfinished admission is resumed with the Viewer grant, never a full one" */
+  it("resumes a Lite Member's unfinished admission with the Viewer grant", async () => {
+    const parts = serviceOver({
+      row: connection({ arrivalPolicy: "admit" }),
+      member: true,
+      existingSeat: "EXTERNAL",
+      pendingAdmission: {
+        grantId: "rb_admission",
+        occurredAtMs: 1_756_000_000_000,
+        state: "pending",
+      },
+    });
+
+    await admit(parts);
+
+    expect(parts.attachBindings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bindings: [expect.objectContaining({ principal: { userId: USER.id }, role: "VIEWER" })],
+      }),
+    );
+    expect(parts.completeAdmission).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -850,6 +885,7 @@ describe("given a process that composed nowhere for a join request to be raised"
       authz: createApiFixture<AuthzApi>({}),
       memberships: {
         isMember,
+        getMemberSeat: vi.fn(),
         createMembership,
         applyPendingInvite: vi.fn(),
         findOrganization: vi.fn(),

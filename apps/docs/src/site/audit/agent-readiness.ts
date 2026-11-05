@@ -5,13 +5,9 @@ import path from "node:path";
 import { z } from "zod";
 
 import { type DocsItem, readDocsConfig } from "../../features/navigation/compile.ts";
+import { approximateTokens, TOKENISER } from "../../lib/page-tokens.ts";
 import { DOCS_URL } from "../../lib/site-path.ts";
-import {
-  approximateTokens,
-  checkPageMarkdown,
-  TOKENISER,
-  type AgentIssue,
-} from "./agent-markdown.ts";
+import { checkPageMarkdown, type AgentIssue } from "./agent-markdown.ts";
 import type { Budgets } from "./budgets.ts";
 import { pageFile, sitemapPages } from "./seo-check.ts";
 

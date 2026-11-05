@@ -27,6 +27,8 @@ import {
   type AgentPage,
   type WorkflowAgentConfig,
   httpSecretsKeepingStored,
+  agentWriteAuthorOf,
+  type AgentCaller,
 } from "@langwatch/agent-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -96,7 +98,7 @@ export class AgentService {
     };
   }
 
-  create(input: CreateAgentCommand): Promise<Agent> {
+  create(input: CreateAgentCommand & { caller?: AgentCaller }): Promise<Agent> {
     if (input.type === "connected") throw new AgentRegisterOnlyError();
 
     const result = createAgentCommandSchema.safeParse(input);
@@ -104,13 +106,14 @@ export class AgentService {
 
     const command = result.data;
     const id = command.id ?? nextAgentId();
-    if (command.type !== "http") return this.#repository.create({ ...command, id });
+    const author = agentWriteAuthorOf(input.caller);
+    if (command.type !== "http") return this.#repository.create({ ...command, id, author });
     // A new agent has no rotation behind it: the window is only ever the server's.
     const { hooksPreviousSigningSecret: _sent, ...config } = command.config;
-    return this.#repository.create({ ...command, id, config });
+    return this.#repository.create({ ...command, id, config, author });
   }
 
-  async update(input: UpdateAgentCommand): Promise<Agent> {
+  async update(input: UpdateAgentCommand & { caller?: AgentCaller }): Promise<Agent> {
     if (input.type === "connected") throw new AgentRegisterOnlyError();
 
     const existing = await this.#repository.getByIdIncludingArchived({
@@ -153,7 +156,12 @@ export class AgentService {
       });
     }
 
-    return this.#repository.update({ ...parsed.data, type, config });
+    return this.#repository.update({
+      ...parsed.data,
+      type,
+      config,
+      author: agentWriteAuthorOf(input.caller),
+    });
   }
 
   archive(input: GetAgentInput): Promise<Agent> {

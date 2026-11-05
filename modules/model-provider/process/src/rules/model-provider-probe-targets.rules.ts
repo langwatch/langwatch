@@ -67,6 +67,9 @@ export const NOT_PROBEABLE: ReadonlySet<string> = new Set([
   "inception",
   "perplexity",
   "cloudflare",
+  "typesafe",
+  "openrouter",
+  "fireworks",
 ] as const);
 
 /**

@@ -115,6 +115,7 @@ function SourceDetailHeader({
     // A run stopped by a page limit reports no error, so without this the
     // badge reads Active on a source collecting a fraction of its data.
     completeness: runCompleteness(source.lastRunCompleteness),
+    configComplaints: source.configComplaints,
   });
   const StatusIcon = status.icon;
   return (
@@ -171,12 +172,32 @@ function SourceDetailHeader({
 
 /** Pull completion time and provider record time answer different questions. */
 function SourcePullStatus({ source }: { source: Source }) {
-  if (!source.pullSchedule) return null;
+  const complaints = source.configComplaints ?? [];
+  if (!source.pullSchedule && complaints.length === 0) return null;
   const pull = source.pullStatus;
-  const retrying = source.status !== "disabled" && !source.archivedAt;
+  const isLive = source.status !== "disabled" && !source.archivedAt;
+  // A configuration the adapter refuses fails every retry the same way, so
+  // promising one would leave the admin waiting on a fix only they can make.
+  const retrying = isLive && complaints.length === 0;
   return (
     <Card padding="sm">
       <VStack align="stretch" gap={2}>
+        {complaints.length > 0 && (
+          <VStack align="stretch" gap={1} data-testid="source-config-error">
+            <Text fontSize="sm" fontWeight="medium" color="red.fg">
+              This source's connection needs fixing before it can pull.
+            </Text>
+            {complaints.map((complaint) => (
+              <Text key={complaint} fontSize="sm" color="red.fg">
+                {complaint}
+              </Text>
+            ))}
+            <Text fontSize="sm">
+              Use Edit to fix the connection. Pulls fail until it is saved with values the source
+              can read.
+            </Text>
+          </VStack>
+        )}
         <Text fontSize="sm">
           Last successful pull:{" "}
           {source.lastSuccessAt ? formatMoment(source.lastSuccessAt) : "No successful pull yet"}
@@ -188,9 +209,7 @@ function SourcePullStatus({ source }: { source: Source }) {
         )}
         {pull?.error && (
           <Text fontSize="sm" color="red.fg">
-            {pull.error}{" "}
-            {retrying ? "The next scheduled pull will retry." : "This source is disabled."} Saved
-            records may be incomplete.
+            {pull.error} {pullErrorFollowUp({ retrying, isLive })} Saved records may be incomplete.
           </Text>
         )}
         {pull?.backfillThrough && (
@@ -201,15 +220,26 @@ function SourcePullStatus({ source }: { source: Source }) {
         )}
         {pull?.hasMore && (
           <Text fontSize="sm" color="fg.muted">
-            More history remains.
-            {retrying
-              ? " The next scheduled pull continues from the saved checkpoint."
-              : " Resume the source to continue."}
+            More history remains. {moreHistoryFollowUp({ retrying, isLive })}
           </Text>
         )}
       </VStack>
     </Card>
   );
+}
+
+/** What happens after a failed pull, in the words the status card closes on. */
+function pullErrorFollowUp({ retrying, isLive }: { retrying: boolean; isLive: boolean }): string {
+  if (retrying) return "The next scheduled pull will retry.";
+  if (isLive) return "Pulls keep failing until the connection is fixed.";
+  return "This source is disabled.";
+}
+
+/** How the remaining history gets pulled, in the words the checkpoint line closes on. */
+function moreHistoryFollowUp({ retrying, isLive }: { retrying: boolean; isLive: boolean }): string {
+  if (retrying) return "The next scheduled pull continues from the saved checkpoint.";
+  if (isLive) return "Fix the connection to continue.";
+  return "Resume the source to continue.";
 }
 
 /**

@@ -25,6 +25,7 @@ import { TriangleAlert } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
+import { useGrantablePermissions } from "../../behavior/use-grantable-permissions.ts";
 import {
   earliestCustomExpiration,
   EXPIRATION_NEVER,
@@ -35,11 +36,7 @@ import {
   resolveExpiresAt,
 } from "../../model/api-key-form.ts";
 import { useApiKeyHost } from "../../model/api-key-host.ts";
-import {
-  deriveBindingRole,
-  getUserPermissionsAtScope,
-  type PermissionMode,
-} from "../../model/api-key-permissions.ts";
+import { deriveBindingRole, type PermissionMode } from "../../model/api-key-permissions.ts";
 import {
   PermissionCategoryList,
   PermissionCounter,
@@ -365,6 +362,47 @@ function PermissionsField({
   );
 }
 
+/**
+ * The ceiling the mint checks (every selected scope, for the key's owner), and the reader's
+ * access as one load: the form is judged only once both the bindings and the ceiling land.
+ */
+function useKeyCeiling({
+  organizationId,
+  selectedScopes,
+  primaryScope,
+  owner,
+  isServiceKey,
+  enabled,
+  myBindings,
+}: {
+  organizationId: string;
+  selectedScopes: ScopeTriadEntry[];
+  primaryScope: ScopeTriadEntry;
+  owner: { isAdmin: boolean; selectedUserId: string; currentUserId: string };
+  isServiceKey: boolean;
+  enabled: boolean;
+  myBindings: MyBindings;
+}): { userPermissions: string[]; access: MyBindings } {
+  const assignsOther =
+    owner.isAdmin && !!owner.selectedUserId && owner.selectedUserId !== owner.currentUserId;
+  const grantable = useGrantablePermissions({
+    organizationId,
+    scopes: selectedScopes.length > 0 ? selectedScopes : [primaryScope],
+    ownerUserId: assignsOther ? owner.selectedUserId : void 0,
+    isServiceKey,
+    enabled,
+  });
+  return {
+    userPermissions: grantable.permissions,
+    access: {
+      data: myBindings.data,
+      isLoading: myBindings.isLoading || grantable.isLoading,
+      isError: myBindings.isError || grantable.isError,
+      refetch: () => Promise.all([myBindings.refetch(), grantable.refetch()]),
+    },
+  };
+}
+
 export function CreateApiKeyDrawer({
   isOpen,
   isCreating,
@@ -436,25 +474,15 @@ export function CreateApiKeyDrawer({
     scopeId: currentProjectId ?? "",
   };
 
-  const userPermissions = useMemo(
-    () =>
-      getUserPermissionsAtScope({
-        myBindings: myBindings.data,
-        scopeType: primaryScope.scopeType,
-        scopeId: primaryScope.scopeId,
-        organizationId,
-        orgProjects,
-        isServiceKey: keyType === "service",
-      }),
-    [
-      myBindings.data,
-      primaryScope.scopeType,
-      primaryScope.scopeId,
-      organizationId,
-      orgProjects,
-      keyType,
-    ],
-  );
+  const { userPermissions, access } = useKeyCeiling({
+    organizationId,
+    selectedScopes,
+    primaryScope,
+    owner: { isAdmin, selectedUserId, currentUserId },
+    isServiceKey: keyType === "service",
+    enabled: isOpen,
+    myBindings,
+  });
 
   const [attempted, setAttempted] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -527,7 +555,7 @@ export function CreateApiKeyDrawer({
   });
   const showError = (field: Exclude<KeyField, "expiration">) =>
     attempted && missing.includes(field) ? FIELD_ERROR[field] : undefined;
-  const accessBlocked = myBindings.isLoading || myBindings.isError;
+  const accessBlocked = access.isLoading || access.isError;
 
   return (
     <Drawer
@@ -545,13 +573,13 @@ export function CreateApiKeyDrawer({
           label: "Create secret key",
           onClick: handleCreate,
           loading: isCreating,
-          disabledReason: accessBlocked ? accessReason(myBindings) : void 0,
+          disabledReason: accessBlocked ? accessReason(access) : void 0,
           "data-testid": "api-key-create-submit",
         },
       }}
     >
       <VStack gap={5} align="start">
-        {accessBlocked && <AccessNote myBindings={myBindings} />}
+        {accessBlocked && <AccessNote myBindings={access} />}
         {notice}
         {/* Key type — only admins can create service keys */}
         {isAdmin && (

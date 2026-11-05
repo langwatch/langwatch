@@ -10,7 +10,9 @@ import {
   type Agent,
   type AgentOverview,
   type AgentWithFields,
+  type AgentVersions,
   type HttpAgentConfig,
+  httpAgentConfigSchema,
   type HttpAuth,
   type PreviousSigningSecret,
 } from "@langwatch/agent-contract";
@@ -126,6 +128,20 @@ function movesHooksUrl(input: { stored: HttpDestination; incoming: HttpDestinati
     Boolean(hooksUrl) &&
     !isSameOrigin({ requested: hooksUrl ?? "", saved: trustedHooksOrigin(input.stored) })
   );
+}
+
+/** Every version's literal HTTP credentials blank, as a read of the agent row. */
+export function agentVersionsWithoutSecrets(versions: AgentVersions): AgentVersions {
+  return {
+    ...versions,
+    versions: versions.versions.map((version) => {
+      if (version.type !== "http") return version;
+      const parsed = httpAgentConfigSchema.safeParse(version.config);
+      if (parsed.success) return { ...version, config: httpConfigWithoutSecrets(parsed.data) };
+      const { headers: _headers, auth: _auth, ...rest } = version.config;
+      return { ...version, config: rest };
+    }),
+  };
 }
 
 /**

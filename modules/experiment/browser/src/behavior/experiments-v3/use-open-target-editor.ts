@@ -137,6 +137,33 @@ const targetMappingChangeHandler =
     });
   };
 
+/** The agent editor drawers an agent target opens; each carries `targetId` in its address. */
+const AGENT_TARGET_DRAWERS = [
+  "agentWorkflowTargetEditor",
+  "agentHttpEditor",
+  "agentCodeEditor",
+] as const;
+export type AgentTargetDrawer = (typeof AGENT_TARGET_DRAWERS)[number];
+
+export const isAgentTargetDrawer = (drawer: unknown): drawer is AgentTargetDrawer =>
+  AGENT_TARGET_DRAWERS.some((name) => name === drawer);
+
+/** What an agent target's drawer writes back: its input mappings and its deploy label. */
+export const agentTargetDrawerCallbacks = ({
+  targetId,
+  datasetId,
+  isDatasetSource,
+  updateTarget,
+}: {
+  targetId: string;
+  datasetId: string;
+  isDatasetSource: (sourceId: string) => boolean;
+  updateTarget: (targetId: string, updates: Partial<TargetConfig>) => void;
+}) => ({
+  onInputMappingsChange: targetMappingChangeHandler({ targetId, datasetId, isDatasetSource }),
+  onAgentLabelChange: (agentLabel: string | undefined) => updateTarget(targetId, { agentLabel }),
+});
+
 /**
  * The evaluator drawer's props for a comparison column-target: the comparison form
  * (variants and golden field) in place of per-row mappings. A legacy pairwise
@@ -273,16 +300,19 @@ export const useOpenTargetEditor = () => {
             id: target.dbAgentId,
           });
           const drawer = agentEditorDrawerFor(agent?.type);
-          setFlowCallbacks(drawer, {
-            onInputMappingsChange: targetMappingChangeHandler({
+          setFlowCallbacks(
+            drawer,
+            agentTargetDrawerCallbacks({
               targetId: target.id,
               datasetId: activeDatasetId,
               isDatasetSource,
+              updateTarget,
             }),
-          });
+          );
           openDrawer(drawer, {
             availableSources: buildAvailableSources(target.id),
             inputMappings: buildUIMappings(target, activeDatasetId),
+            agentLabel: target.agentLabel,
             urlParams: { targetId: target.id, agentId: target.dbAgentId ?? "" },
           });
           requestAnimationFrame(() => scrollToTargetColumn(target.id));

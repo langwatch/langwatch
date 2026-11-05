@@ -1,5 +1,10 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { Dataset, DatasetApi, DatasetRecord } from "@langwatch/dataset-contract";
+import type {
+  Dataset,
+  DatasetApi,
+  DatasetRecord,
+  DatasetVersion,
+} from "@langwatch/dataset-contract";
 import { ExperimentEvaluationInputError } from "@langwatch/experiment-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -26,8 +31,8 @@ type Bounds = Partial<Record<RequestBoundKey, number>>;
 
 const rows = (count: number) => Array.from({ length: count }, (_, index) => ({ row: index }));
 
-/** A saved dataset served the two ways a run reads one: its head, then its pages. */
-function savedDataset(entries: Record<string, unknown>[]) {
+/** A saved dataset served the way a run reads one: its head, then the version saved for the run. */
+function savedDataset(entries: Record<string, unknown>[], { sizeBytes = 0 } = {}) {
   const at = new Date(0);
   const dataset: Dataset = {
     id: DATASET_ID,
@@ -60,31 +65,47 @@ function savedDataset(entries: Record<string, unknown>[]) {
       createdAt: at,
       updatedAt: at,
     }));
-  const pagesRead: { page: number; limit: number }[] = [];
+  const versionsRead: number[] = [];
+  const versionOf = (): DatasetVersion => ({
+    id: "version-1",
+    projectId: PROJECT_ID,
+    datasetId: DATASET_ID,
+    version: 1,
+    name: null,
+    trigger: "experiment_run",
+    contentHash: "hash",
+    columnTypes: dataset.columnTypes,
+    rowCount: entries.length,
+    sizeBytes,
+    chunkCount: 1,
+    restoredFromVersion: null,
+    authorId: null,
+    authorKind: "system",
+    pinned: false,
+    runCount: 0,
+    createdAt: at,
+  });
+  let saved: DatasetVersion | undefined;
   const api = createApiFixture<DatasetApi>({
     getDatasetHead: async () => ({
       dataset,
       records: records().slice(0, 5),
       total: entries.length,
     }),
-    getDatasetPage: async ({ page = 1, limit = 50 }) => {
-      pagesRead.push({ page, limit });
-      const all = records();
-
+    resolveVersionForRun: async () => {
+      saved = versionOf();
+      return saved;
+    },
+    readVersion: async ({ version }) => {
+      versionsRead.push(version);
       return {
-        id: DATASET_ID,
-        name: "Saved",
-        columnTypes: dataset.columnTypes,
-        datasetRecords: all.slice((page - 1) * limit, page * limit),
-        count: all.length,
-        page,
-        limit,
-        totalPages: Math.ceil(all.length / limit),
+        version: saved ?? versionOf(),
+        rows: records().map((record) => ({ id: record.id, entry: record.entry })),
       };
     },
   });
 
-  return { api, entries, pagesRead };
+  return { api, entries, versionsRead };
 }
 
 function services({
@@ -198,8 +219,6 @@ describe("loadExecutionData bounds", () => {
         expect(result.datasetRows.map((row) => row.row)).toEqual(
           Array.from({ length: 40 }, (_, index) => index),
         );
-        // Pages are sized to the rows: large rows are asked for a few at a time.
-        expect(saved.pagesRead.every((page) => page.limit <= 40)).toBe(true);
       });
     });
 
@@ -230,7 +249,7 @@ describe("loadExecutionData bounds", () => {
           httpStatus: 422,
           meta: { rowCount: 11, maxRows: 10 },
         });
-        expect(saved.pagesRead).toEqual([]);
+        expect(saved.versionsRead).toEqual([]);
       });
 
       it("holds the registry's 100,000 row limit when the organization sets nothing", () => {
@@ -252,6 +271,18 @@ describe("loadExecutionData bounds", () => {
           httpStatus: 413,
           meta: { maxBytes: 2 * MB },
         });
+      });
+    });
+
+    describe("when the version it reads is recorded as larger than the whole-dataset limit", () => {
+      /** @scenario "A saved dataset version larger than a run holds is refused before its rows are read" */
+      it("refuses on the version's size without reading its rows", async () => {
+        const saved = savedDataset([{ row: 1 }], { sizeBytes: 3 * MB });
+
+        await expect(
+          loadSaved({ datasets: saved.api, bounds: { datasetWholeReadBytes: 2 * MB } }),
+        ).rejects.toMatchObject({ code: "experiment_dataset_too_large_to_run" });
+        expect(saved.versionsRead).toEqual([]);
       });
     });
 
@@ -278,15 +309,16 @@ describe("loadExecutionData bounds", () => {
       });
     });
 
-    describe("when rows are removed while the run is reading it", () => {
+    describe("when the version answers fewer rows than it recorded", () => {
       /** @scenario "A saved dataset that changes while the run reads it is refused instead of run short" */
       it("refuses instead of running the rows that were left", async () => {
         const saved = savedDataset(rows(2500));
-        const readPage = saved.api.getDatasetPage.bind(saved.api);
-        saved.api.getDatasetPage = async (input) => {
-          if ((input.page ?? 1) === 2) saved.entries.splice(0, 600);
+        const resolve = saved.api.resolveVersionForRun.bind(saved.api);
+        saved.api.resolveVersionForRun = async (input) => {
+          const version = await resolve(input);
+          saved.entries.splice(0, 600);
 
-          return readPage(input);
+          return version;
         };
 
         await expect(loadSaved({ datasets: saved.api })).rejects.toMatchObject({
