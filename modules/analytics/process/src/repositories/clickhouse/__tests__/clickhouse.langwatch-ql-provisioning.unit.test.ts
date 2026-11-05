@@ -2,7 +2,7 @@
 import type * as Observability from "@langwatch/observability";
 import { describe, expect, it, vi } from "vitest";
 
-import { LangWatchQLSelfProvisioningService } from "../../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import { LangWatchQLCollectionBindingService } from "../../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
 import { CLICKHOUSE_ERROR_CODE } from "../../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import {
   CLICKHOUSE_CONFIG_STORE_ERROR_CODE,
@@ -609,9 +609,9 @@ describe("readCollectionState", () => {
     keyMapTable: "lwql_api_key_tenant_map",
     tenantSetting: "custom_api_key_hash",
   };
-  const selfProvisioning = LangWatchQLSelfProvisioningService.create();
-  const candidates = selfProvisioning.renderedCollectionCandidates({ names: NAMES });
-  const alias = selfProvisioning.namedCollection({ names: NAMES, mode: "sql" });
+  const collectionBinding = LangWatchQLCollectionBindingService.create();
+  const candidates = collectionBinding.renderedCollectionCandidates({ names: NAMES });
+  const alias = collectionBinding.namedCollection({ names: NAMES, mode: "sql" });
   const table = "lwql_trace_pg";
 
   describe("when ClickHouse refuses both catalog reads", () => {
@@ -624,7 +624,7 @@ describe("readCollectionState", () => {
       }).readCollectionState({ database: NAMES.database, candidates });
 
       expect(server).toEqual({ available: [], bound: {} });
-      expect(selfProvisioning.renderedCollectionFor({ names: NAMES, table, server })).toBe(
+      expect(collectionBinding.renderedCollectionFor({ names: NAMES, table, server })).toBe(
         "lwql_postgres",
       );
       expect(logCalls.length).toBeGreaterThan(0);
@@ -641,7 +641,7 @@ describe("readCollectionState", () => {
       }).readCollectionState({ database: NAMES.database, candidates });
 
       expect(server).toEqual({ available: [alias], bound: {} });
-      expect(selfProvisioning.renderedCollectionFor({ names: NAMES, table, server })).toBe(alias);
+      expect(collectionBinding.renderedCollectionFor({ names: NAMES, table, server })).toBe(alias);
     });
   });
 });

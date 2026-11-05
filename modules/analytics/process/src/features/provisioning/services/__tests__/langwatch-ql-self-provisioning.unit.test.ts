@@ -6,10 +6,13 @@ import { LWQL_VIEW_CATALOG } from "../../../../rules/lwql-view-catalog.rules.ts"
 import type { LangWatchQLNames } from "../../../../services/langwatch-ql-access-model.service.ts";
 import { lwqlAppFunctionNames } from "../../../app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { canProvisionAppFunctions } from "../../../app-functions/rules/langwatch-ql-app-function-store.rules.ts";
+import { LangWatchQLCollectionBindingService } from "../langwatch-ql-collection-binding.service.ts";
 import { LangWatchQLPostgresMappingService } from "../langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLSelfProvisioningService } from "../langwatch-ql-self-provisioning.service.ts";
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+
+const collectionBinding = LangWatchQLCollectionBindingService.create();
 const postgresMapping = LangWatchQLPostgresMappingService.create();
 
 const SOURCE_DATABASE = "langwatch";
@@ -147,7 +150,7 @@ describe("given a config store that delivers the access model (rendered mode)", 
 
     for (const database of ["langwatch", "lw_other"]) {
       expect(
-        selfProvisioning.namedCollection({ names: { ...NAMES, database }, mode: "rendered" }),
+        collectionBinding.namedCollection({ names: { ...NAMES, database }, mode: "rendered" }),
       ).toBe("lwql_postgres");
       const engineTables = statementsFor(database).filter((s) => s.includes("ENGINE = PostgreSQL"));
       expect(engineTables.length).toBeGreaterThan(0);
@@ -316,7 +319,7 @@ const CATALOG_COLUMNS = Object.fromEntries(
 
 describe("given what the reconvergence check finds in ClickHouse", () => {
   const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
-  const fingerprint = selfProvisioning.credentialFingerprint({
+  const fingerprint = collectionBinding.credentialFingerprint({
     postgres: POSTGRES,
     schema: SCHEMA,
   });
@@ -373,7 +376,7 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
     const engineTables = relations.filter((name) => name.endsWith("_pg"));
     const [rotated, unstamped] = engineTables;
     const stale = postgresMapping.credentialComment({
-      fingerprint: selfProvisioning.credentialFingerprint({
+      fingerprint: collectionBinding.credentialFingerprint({
         postgres: { ...POSTGRES, readerPassword: "the-password-before-rotation" },
         schema: SCHEMA,
       }),
@@ -397,7 +400,7 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
       const [beforeSchema] = engineTables;
       if (!beforeSchema) throw new Error("the catalog maps no PostgreSQL dataset");
       // The stamp before #9263: five-element material, same salt and scrypt cost (salt is private).
-      const { host, port, database, user, password } = selfProvisioning.namedCollectionValues({
+      const { host, port, database, user, password } = collectionBinding.namedCollectionValues({
         names: NAMES,
         postgres: POSTGRES,
         mode: "sql",
@@ -428,7 +431,7 @@ describe("given what the reconvergence check finds in ClickHouse", () => {
 describe("given whether ClickHouse holds the app's collection values", () => {
   const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
   const [engineTable] = relations.filter((name) => name.endsWith("_pg"));
-  const fingerprint = selfProvisioning.credentialFingerprint({
+  const fingerprint = collectionBinding.credentialFingerprint({
     postgres: POSTGRES,
     schema: SCHEMA,
   });
@@ -584,17 +587,17 @@ describe("given what the reconvergence check finds in PostgreSQL", () => {
 
 describe("given the collection probe", () => {
   it("names the collection it reads through", () => {
-    const collection = selfProvisioning.namedCollection({ names: NAMES, mode: "sql" });
+    const collection = collectionBinding.namedCollection({ names: NAMES, mode: "sql" });
     expect(
-      selfProvisioning.collectionProbe({ collection, postgres: POSTGRES, schema: "public" })
+      collectionBinding.collectionProbe({ collection, postgres: POSTGRES, schema: "public" })
         .collection,
     ).toBe(`lwql_postgres_${NAMES.database}`);
   });
 
   it("refuses a database name that is not an identifier before any SQL is built", () => {
     expect(() =>
-      selfProvisioning.collectionProbe({
-        collection: selfProvisioning.namedCollection({
+      collectionBinding.collectionProbe({
+        collection: collectionBinding.namedCollection({
           names: { ...NAMES, database: "lwql'; DROP" },
           mode: "sql",
         }),
@@ -606,7 +609,7 @@ describe("given the collection probe", () => {
 
   describe("when rendered-mode engine tables are bound to both collections", () => {
     it("probes each collection they bind to once", () => {
-      const alias = selfProvisioning.namedCollection({ names: NAMES, mode: "sql" });
+      const alias = collectionBinding.namedCollection({ names: NAMES, mode: "sql" });
       const engineTables = [
         ...new Set(
           selfProvisioning
@@ -616,7 +619,7 @@ describe("given the collection probe", () => {
       ];
       const [first] = engineTables;
       if (!first) throw new Error("the catalog maps no PostgreSQL dataset");
-      const probes = selfProvisioning.collectionProbes({
+      const probes = collectionBinding.collectionProbes({
         names: NAMES,
         postgres: POSTGRES,
         schema: "public",
