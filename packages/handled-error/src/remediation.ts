@@ -443,7 +443,7 @@ const registry = {
   },
   duplicate_invite: {
     tips: [
-      "A pending invite for this email already exists; revoke it first, or treat this as already done",
+      "A pending invite for this email already exists; resend it, revoke it first, or treat this as already done",
     ],
   },
   scim_token_not_found: {

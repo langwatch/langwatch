@@ -63,6 +63,7 @@ function currentPlanNameFor({
   isLicenseOverride,
   isTieredPricingModel,
   isDeveloperPlan,
+  isEnterprisePlan,
   isSaaS,
 }: {
   plan: PlanInfo;
@@ -70,6 +71,7 @@ function currentPlanNameFor({
   isLicenseOverride: boolean;
   isTieredPricingModel: boolean;
   isDeveloperPlan: boolean;
+  isEnterprisePlan: boolean;
 }): string {
   if (isLicenseOverride) {
     const name = plan.name ?? formatPlanTypeLabel(plan.type);
@@ -77,6 +79,7 @@ function currentPlanNameFor({
   }
   if (isTieredPricingModel) return plan.name ?? formatPlanTypeLabel(plan.type);
   if (isDeveloperPlan) return "Free plan";
+  if (isEnterprisePlan) return "Enterprise";
   return "Growth plan";
 }
 
@@ -108,7 +111,10 @@ function currentPlanFeaturesFor({
   return getGrowthFeatures(currency);
 }
 
-/** This month's events for the plan card, with the cap only where the plan is held to one. */
+/**
+ * This month's events for the plan card, with the cap only where the plan is held to one.
+ * An enterprise subscription shows no usage row.
+ */
 function currentPlanEventUsage({
   usage,
   flags,
@@ -122,6 +128,7 @@ function currentPlanEventUsage({
   pricingModel: BillingHostOrganization["pricingModel"];
   planSource: PlanInfo["planSource"];
 }) {
+  if (flags.isEnterprisePlan) return undefined;
   return planEventUsage({
     currentMonthCount: usage?.currentMonthMessagesCount,
     messageLimitInfo: usage?.messageLimitInfo,
@@ -328,6 +335,7 @@ export function SubscriptionPage() {
     isLicenseOverride,
     isTieredPricingModel,
     isDeveloperPlan,
+    isEnterprisePlan,
     isSaaS: deploymentIsSaaS(host),
   });
   const currentPlanPricing = currentPlanPricingFor({

@@ -448,6 +448,40 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
         (invite.expiration === null || invite.expiration.epochMilliseconds > now),
     );
   }
+  async hasPendingInviteForEmail({
+    email,
+    organizationId,
+  }: {
+    email: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const now = nowInstant().epochMilliseconds;
+    return Array.from(this.invitesById.values()).some(
+      (invite) =>
+        invite.organizationId === organizationId &&
+        invite.email.toLowerCase() === email.trim().toLowerCase() &&
+        invite.status === "PENDING" &&
+        (invite.expiration === null || invite.expiration.epochMilliseconds > now),
+    );
+  }
+
+  async deletePaymentPendingInvitesForEmail({
+    email,
+    organizationId,
+  }: {
+    email: string;
+    organizationId: string;
+  }): Promise<number> {
+    const held = Array.from(this.invitesById.values()).filter(
+      (invite) =>
+        invite.organizationId === organizationId &&
+        invite.email.toLowerCase() === email.trim().toLowerCase() &&
+        invite.status === "PAYMENT_PENDING",
+    );
+    for (const invite of held) this.invitesById.delete(invite.id);
+    return held.length;
+  }
+
   findMemberEmails =
     unsupported<OrganizationInviteRepository["findMemberEmails"]>("findMemberEmails");
   findTeamIdsInOrganization = unsupported<

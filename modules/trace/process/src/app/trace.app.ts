@@ -3824,9 +3824,19 @@ export class TraceModule implements TraceApi, CollectorApp {
     }).ingest(input);
   }
 
-  /** A failure the door answered but did not raise, kept off the customer's body. */
-  collectorReportError(error: Error, context: Readonly<{ projectId: string }>): void {
-    logger.error({ error, projectId: context.projectId }, "the collector answered a failure");
+  /**
+   * A payload the door refused with a 400, kept off the customer's body. Every caller is a
+   * validation refusal: the sender's mistake, watched by rate, so it logs at warn. At error it
+   * would page as a new error signature for each new kind of bad payload a customer sends.
+   */
+  collectorReportError(
+    error: Error,
+    context: Readonly<{ projectId: string; traceId?: string | undefined }>,
+  ): void {
+    logger.warn(
+      { error, projectId: context.projectId, traceId: context.traceId },
+      "the collector refused a payload",
+    );
   }
 
   // -- the tracked-event family's own members --------------------------------

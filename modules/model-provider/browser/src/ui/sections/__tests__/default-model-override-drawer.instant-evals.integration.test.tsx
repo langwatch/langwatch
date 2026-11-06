@@ -95,11 +95,11 @@ const JUDGE_ROUTER_FLAG = "release_instant_evals_judge_router";
 const HOSTED = { value: "langwatch/instant-evals", label: "Evals Preview" };
 const OPENAI_DECISIONS = {
   value: "openai/decisions:gpt-6-luna",
-  label: "OpenAI Decisions (gpt-6-luna)",
+  label: "OpenAI Decisions",
 };
 const AZURE_DECISIONS = {
   value: "azure/decisions:gpt-6-luna",
-  label: "Azure OpenAI Decisions (gpt-6-luna)",
+  label: "Azure OpenAI Decisions",
 };
 
 function instantEvalsOptions() {

@@ -42,7 +42,15 @@ export function useDrawerSave({
         })),
       },
       {
-        onSuccess: () => {
+        onSuccess: (created) => {
+          if (!Array.isArray(created) || created.length === 0) {
+            host.failed({
+              error: void 0,
+              fallbackTitle: "No invitations were sent",
+              description: "None of these addresses could be invited. Check them and try again.",
+            });
+            return;
+          }
           host.succeeded({ title: "Invites sent successfully" });
           onInvitesSent();
         },

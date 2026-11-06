@@ -165,7 +165,7 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
     mockListDecisionModels.mockReturnValue({
       data: [
         { value: LANGWATCH_DECISION_MODEL_ID, label: "Evals Preview" },
-        { value: "openai/decisions:gpt-6-luna", label: "OpenAI Decisions (gpt-6-luna)" },
+        { value: "openai/decisions:gpt-6-luna", label: "OpenAI Decisions" },
       ],
       isLoading: false,
     });
