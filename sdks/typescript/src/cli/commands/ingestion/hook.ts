@@ -551,21 +551,18 @@ async function postOwnSessionContext({
 }): Promise<OwnContextOutcome> {
   const projectDir = spec.projectDirVar ? env[spec.projectDirVar] : undefined;
   const directory = firstNonEmpty(input.cwd, projectDir) ?? process.cwd();
-  // The session's own name, as claude itself holds it. The SessionStart
-  // payload carries it at start; the live registry is what makes a
-  // mid-session /rename observable from the Stop hook, which runs after
-  // every turn. Codex and opencode hold no such registry, so for them the
-  // record carries no name and the harvest names their sessions instead.
-  const name =
-    agent === "claude_code"
-      ? normalizeSessionName(
-          input.sessionTitle ??
-            readClaudeSessionName({
-              sessionId,
-              registryDir: claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
-            }),
-        )
-      : null;
+  // The session's own name, as the harness holds it. Claude's live registry
+  // makes a mid-session /rename observable from the Stop hook. pi sends its
+  // name on every run start. Agents that send none are named by the harvest.
+  const name = normalizeSessionName(
+    input.sessionTitle ??
+      (agent === "claude_code"
+        ? readClaudeSessionName({
+            sessionId,
+            registryDir: claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
+          })
+        : null),
+  );
   // Outside a repository the record can still carry the session's name, and
   // the name alone is worth a post: it is what labels the session before its
   // first prompt. With neither identity nor a name there is nothing to say.

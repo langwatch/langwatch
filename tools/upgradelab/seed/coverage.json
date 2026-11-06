@@ -144,6 +144,12 @@
       "cells": ["C2"],
       "note": "codingAgents router only reads on the old image: SQL, flagged"
     },
+    "governance:record-coding-assistant-ingest-source-billing": {
+      "status": "pending",
+      "seed": "tenancy-sql:governance",
+      "cells": ["C2"],
+      "note": "codingAgents router only reads on the old image: SQL, flagged"
+    },
     "governance:replay-cost-charges": {
       "status": "pending",
       "seed": "tenancy-sql:governance",

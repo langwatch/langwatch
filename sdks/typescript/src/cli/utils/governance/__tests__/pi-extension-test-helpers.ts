@@ -23,10 +23,11 @@ export async function loadPiExtension({ dir }: { dir: string }): Promise<FakePi>
   const file = path.join(dir, `pi-extension-${Date.now()}-${Math.random()}.mjs`);
   fs.writeFileSync(file, piExtensionSource());
   const module = (await import(pathToFileURL(file).href)) as {
-    default: (pi: { on(name: string, handler: Handler): void }) => void;
+    default: (pi: { on(name: string, handler: Handler): void }) => unknown;
   };
   const handlers = new Map<string, Handler[]>();
-  module.default({
+  // Awaited as pi's loader awaits it: the factory resolves pi's version last.
+  await module.default({
     on: (name, handler) => handlers.set(name, [...(handlers.get(name) ?? []), handler]),
   });
   return {
@@ -41,14 +42,24 @@ export async function loadPiExtension({ dir }: { dir: string }): Promise<FakePi>
 export const piContext = ({
   sessionId,
   cwd = "/repo",
+  sessionCwd,
+  sessionName,
   aborted = false,
 }: {
   sessionId: string;
   cwd?: string;
+  /** What the session manager reports as its own directory; absent when undefined. */
+  sessionCwd?: string;
+  /** The name the user gave the session in pi; absent when undefined. */
+  sessionName?: string;
   aborted?: boolean;
 }) => ({
   cwd,
-  sessionManager: { getSessionId: () => sessionId },
+  sessionManager: {
+    getSessionId: () => sessionId,
+    ...(sessionCwd !== undefined ? { getCwd: () => sessionCwd } : {}),
+    ...(sessionName !== undefined ? { getSessionName: () => sessionName } : {}),
+  },
   signal: { aborted },
   model: { id: "claude-sonnet-4-5", provider: "anthropic", api: "anthropic-messages" },
 });

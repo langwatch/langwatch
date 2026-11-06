@@ -32,7 +32,8 @@ const FLUSH_TIMEOUT_MS = 5000;
 
 // Every value below is a stand-in for a measurement pi's event surface does
 // not carry, kept only because pi's schema marks the key required. ADR-188
-// Decision 5 records each one; deleting this file is what retires them.
+// Decision 5 records each one; LangWatch reads none of them as a fact, and
+// deleting this file is what retires them.
 const LANE_NAME = "main";
 const OPERATION_RECOVERY = false;
 const TOOL_REPLAY = "never";
@@ -40,6 +41,14 @@ const TOOL_RECOVERY = false;
 const AI_OPERATION = "stream";
 const AI_STREAMING = true;
 const STEP_ATTEMPT = 1;
+
+// The standard GenAI switch for message content, read as the OTel
+// instrumentations read it. Off unless set: prompts, replies and tool
+// arguments are the user's own content.
+const CONTENT_CAPTURE_SWITCH = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT";
+const CONTENT_CAPTURE_VALUES = ["true", "span_only", "span_and_event"];
+// The packages pi's loader resolves for every extension, under both of pi's names.
+const PI_PACKAGES = ["@earendil-works/pi-coding-agent", "@mariozechner/pi-coding-agent"];
 `;
 
 const PI_EXTENSION_ENCODER = `
@@ -193,9 +202,29 @@ const tracesEndpoint = () => {
 const exportDisabled = () =>
   envValue("OTEL_TRACES_EXPORTER") === "none" || tracesEndpoint() === "";
 
+let piVersion = null;
+
+// pi's own version, from the package its loader hands every extension. A pi
+// that resolves neither name leaves the resource without one.
+const loadPiVersion = async () => {
+  for (const specifier of PI_PACKAGES) {
+    try {
+      const module = await import(specifier);
+      if (typeof module?.VERSION === "string" && module.VERSION !== "") return module.VERSION;
+    } catch {
+      // Not resolvable here; the next name may be.
+    }
+  }
+  return null;
+};
+
+const captureContent = () =>
+  CONTENT_CAPTURE_VALUES.includes(envValue(CONTENT_CAPTURE_SWITCH).toLowerCase());
+
 const resourceAttributes = () => {
   const parsed = parseKeyValues(envValue("OTEL_RESOURCE_ATTRIBUTES"));
   if (!parsed["service.name"]) parsed["service.name"] = "pi";
+  if (!parsed["service.version"] && piVersion !== null) parsed["service.version"] = piVersion;
   return parsed;
 };
 
@@ -245,6 +274,7 @@ let compaction = null;
 let navigation = null;
 let requestStartNano = null;
 let responseStatus = null;
+let pendingPrompt = null;
 const toolSpans = new Map();
 
 // Derived, not guessed: pi's own session id plus a per-run counter is stable
@@ -262,12 +292,133 @@ const operationAttributes = (kind, id) => ({
   "pi.operation.kind": kind,
 });
 
-const runHook = (cwd, hookEvent) => {
+const sessionIdFrom = (ctx) => {
+  const id = ctx?.sessionManager?.getSessionId?.();
+  return typeof id === "string" ? id : "";
+};
+
+// The session's own directory first, so a worktree the session moved into is kept.
+const cwdFrom = (ctx) => {
+  const cwd = ctx?.sessionManager?.getCwd?.();
+  return typeof cwd === "string" && cwd !== "" ? cwd : ctx?.cwd;
+};
+
+// Takes pi's session id from the handler's context when it has one; false while
+// neither it nor an earlier run has named a session.
+const adoptSession = (ctx) => {
+  const id = sessionIdFrom(ctx);
+  if (id !== "") sessionId = id;
+  return sessionId !== "";
+};
+
+const toJson = (value) => {
+  if (value === undefined) return undefined;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return undefined;
+  }
+};
+
+// The server keeps 256 KiB of any one value (DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES). Cut here too, so
+// one huge tool result cannot push a run's single POST past the body limit and lose the run.
+const MAX_CONTENT_BYTES = 256 * 1024;
+const truncationMarker = (total) => "…[langwatch: truncated, " + total + " bytes total]";
+const cutTo = (bytes, keep) => new TextDecoder().decode(bytes.subarray(0, Math.max(0, keep)));
+const capped = (value) => {
+  if (typeof value !== "string") return value;
+  const bytes = utf8(value);
+  if (bytes.length <= MAX_CONTENT_BYTES) return value;
+  const marker = truncationMarker(bytes.length);
+  return cutTo(bytes, MAX_CONTENT_BYTES - utf8(marker).length) + marker;
+};
+
+// The longest string anywhere in a parsed JSON value, as its holder and key.
+const longestString = (holder, key, best = null) => {
+  const value = holder[key];
+  if (typeof value === "string") {
+    return best === null || value.length > best.holder[best.key].length ? { holder, key } : best;
+  }
+  if (value === null || typeof value !== "object") return best;
+  let found = best;
+  for (const child of Object.keys(value)) found = longestString(value, child, found);
+  return found;
+};
+
+// JSON of a value, kept within the limit as JSON is measured, escaping included. The longest
+// strings are cut first, so the shape survives: a write call still names its path.
+const boundedJson = (value) => {
+  let json = toJson(value);
+  if (json === undefined) return undefined;
+  const total = utf8(json).length;
+  if (total <= MAX_CONTENT_BYTES) return json;
+  const marker = truncationMarker(total);
+  const root = { value: JSON.parse(json) };
+  for (let attempt = 0; attempt < 64; attempt++) {
+    const over = utf8(json).length - MAX_CONTENT_BYTES;
+    if (over <= 0) return json;
+    const leaf = longestString(root, "value");
+    if (leaf === null) return undefined;
+    const current = leaf.holder[leaf.key];
+    const bytes = utf8(current.endsWith(marker) ? current.slice(0, -marker.length) : current);
+    leaf.holder[leaf.key] = cutTo(bytes, bytes.length - over - utf8(marker).length) + marker;
+    json = JSON.stringify(root.value);
+  }
+  return utf8(json).length <= MAX_CONTENT_BYTES ? json : undefined;
+};
+
+// GenAI semantic-convention message parts: text, and a requested tool call.
+const assistantParts = (message, withToolCalls) => {
+  const content = Array.isArray(message?.content) ? message.content : [];
+  return content.flatMap((part) => {
+    if (part?.type === "text" && typeof part.text === "string" && part.text !== "") {
+      return [{ type: "text", content: part.text }];
+    }
+    if (withToolCalls && part?.type === "toolCall") {
+      return [{ type: "tool_call", id: part.id, name: part.name, arguments: part.arguments }];
+    }
+    return [];
+  });
+};
+
+const outputMessages = (message, withToolCalls) => {
+  const parts = assistantParts(message, withToolCalls);
+  if (parts.length === 0) return undefined;
+  const finishReason = STOP_REASONS[message?.stopReason];
+  return boundedJson([
+    { role: "assistant", parts, ...(finishReason ? { finish_reason: finishReason } : {}) },
+  ]);
+};
+
+const inputMessages = (prompt) =>
+  typeof prompt === "string" && prompt !== ""
+    ? boundedJson([{ role: "user", parts: [{ type: "text", content: prompt }] }])
+    : undefined;
+
+// What the model read back from the tool: its text parts, as pi returned them.
+const toolResultText = (result) => {
+  if (typeof result === "string") return result === "" ? undefined : capped(result);
+  const content = Array.isArray(result?.content) ? result.content : [];
+  const text = content
+    .filter((part) => part?.type === "text" && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("\\n");
+  return text === "" ? undefined : capped(text);
+};
+
+// The name the user gave the session in pi (/name), so the row carries it.
+const sessionNameFrom = (ctx) => {
+  const name = ctx?.sessionManager?.getSessionName?.();
+  return typeof name === "string" && name.trim() !== "" ? name : undefined;
+};
+
+const runHook = (cwd, hookEvent, sessionName) => {
   if (sessionId === "") return;
   const payload = JSON.stringify({
     session_id: sessionId,
     cwd,
     hook_event_name: hookEvent,
+    ...(sessionName !== undefined ? { session_title: sessionName } : {}),
   });
   try {
     const child = spawn(HOOK_COMMAND[0], HOOK_COMMAND.slice(1), {
@@ -282,9 +433,12 @@ const runHook = (cwd, hookEvent) => {
   }
 };
 
-const runOutcome = (event, ctx) => {
+const lastAssistant = (event) => {
   const messages = Array.isArray(event?.messages) ? event.messages : [];
-  const last = messages.filter((message) => message?.role === "assistant").pop();
+  return messages.filter((message) => message?.role === "assistant").pop();
+};
+
+const runOutcome = (last, ctx) => {
   if (last?.stopReason === "aborted" || ctx?.signal?.aborted === true) return "aborted";
   if (last?.stopReason === "error") return "failed";
   return "completed";
@@ -319,22 +473,31 @@ const aiAttributes = (message, ctx) => {
     "gen_ai.response.model": message?.responseModel,
     "gen_ai.usage.input_tokens": usage.input,
     "gen_ai.usage.output_tokens": usage.output,
+    "gen_ai.output.messages": captureContent() ? outputMessages(message, true) : undefined,
   };
 };
 
-export default (pi) => {
+export default async (pi) => {
+  // The prompt the user submitted, held for the run it opens.
+  pi.on("before_agent_start", (event) => {
+    pendingPrompt = typeof event?.prompt === "string" ? event.prompt : null;
+  });
+
   // A pi build without the session manager gets no run, so nothing under it
   // is recorded: a span without pi's session id joins no session.
   pi.on("agent_start", (_event, ctx) => {
-    const id = ctx?.sessionManager?.getSessionId?.();
-    if (typeof id !== "string" || id === "") {
+    const id = sessionIdFrom(ctx);
+    const prompt = pendingPrompt;
+    pendingPrompt = null;
+    if (id === "") {
       run = null;
       return;
     }
     sessionId = id;
     operationId = nextOperationId("run");
-    run = { spanId: spanId(), startNano: nowNano() };
-    runHook(ctx.cwd, "SessionStart");
+    run = { spanId: spanId(), startNano: nowNano(), prompt };
+    // The name is the user's own words: it leaves the machine only with content.
+    runHook(cwdFrom(ctx), "SessionStart", captureContent() ? sessionNameFrom(ctx) : undefined);
   });
 
   pi.on("turn_start", (event) => {
@@ -371,6 +534,7 @@ export default (pi) => {
       spanId: spanId(),
       startNano: nowNano(),
       toolName: event.toolName,
+      args: event.args,
       turnId: turn?.turnId,
       parentSpanId: turn?.spanId ?? run?.spanId,
     });
@@ -381,6 +545,7 @@ export default (pi) => {
     if (pending === undefined) return;
     toolSpans.delete(event.toolCallId);
     const isError = event?.isError === true;
+    const content = captureContent();
     record({
       traceId: traceId(),
       spanId: pending.spanId,
@@ -399,6 +564,8 @@ export default (pi) => {
         "pi.tool.replay": TOOL_REPLAY,
         "pi.tool.recovery": TOOL_RECOVERY,
         "pi.tool.is_error": isError,
+        "gen_ai.tool.call.arguments": content ? boundedJson(pending.args) : undefined,
+        "gen_ai.tool.call.result": content ? toolResultText(event?.result) : undefined,
       },
     });
   });
@@ -429,7 +596,8 @@ export default (pi) => {
     requestStartNano = null;
   });
 
-  pi.on("session_before_compact", () => {
+  pi.on("session_before_compact", (_event, ctx) => {
+    if (!adoptSession(ctx)) return;
     compaction = { spanId: spanId(), startNano: nowNano(), operationId: nextOperationId("compaction") };
   });
 
@@ -469,7 +637,8 @@ export default (pi) => {
     compaction = null;
   });
 
-  pi.on("session_before_tree", () => {
+  pi.on("session_before_tree", (_event, ctx) => {
+    if (!adoptSession(ctx)) return;
     navigation = { spanId: spanId(), startNano: nowNano(), operationId: nextOperationId("navigation") };
   });
 
@@ -489,9 +658,13 @@ export default (pi) => {
     navigation = null;
   });
 
+  // The run's input is the prompt that opened it and its output the reply that
+  // closed it, so the trace and its session read as the conversation they were.
   pi.on("agent_end", async (event, ctx) => {
     if (run === null) return;
-    const outcome = runOutcome(event, ctx);
+    const last = lastAssistant(event);
+    const outcome = runOutcome(last, ctx);
+    const content = captureContent();
     record({
       traceId: traceId(),
       spanId: run.spanId,
@@ -502,6 +675,8 @@ export default (pi) => {
       attributes: {
         ...operationAttributes("run", operationId),
         "pi.operation.outcome": outcome,
+        "gen_ai.input.messages": content ? inputMessages(run.prompt) : undefined,
+        "gen_ai.output.messages": content ? outputMessages(last, false) : undefined,
       },
     });
     run = null;
@@ -515,6 +690,10 @@ export default (pi) => {
   pi.on("session_shutdown", async () => {
     await flush();
   });
+
+  // Last, after every handler is registered: pi awaits the factory, so the
+  // version is known before the first span is exported.
+  piVersion = await loadPiVersion();
 };
 `;
 

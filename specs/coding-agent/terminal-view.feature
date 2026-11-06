@@ -97,21 +97,26 @@ Feature: Coding agent terminal view
   # `pi.ai.request` is a model call (MODEL_CALL_SPAN_NAMES); anything else falls
   # through to the tool branch.
 
-  # pi declares no arguments and no result on pi.harness.tool, only the tool's
-  # name, its call id and whether it errored. A pi tool run therefore shows
-  # less than a Claude or Copilot one, and the transcript has to render that
-  # honestly rather than leave empty argument and result panes behind.
+  # pi's tool span carries its arguments and result only with content capture
+  # on. Without it a pi tool run shows its name, its call id and whether it
+  # errored, and the transcript renders that honestly rather than leave empty
+  # argument and result panes behind.
 
-  # Parked: a pi tool run is dropped from the transcript, not shown. The tool-name
-  # reader (deriveToolName) reads gen_ai.tool.name only on an execute_tool span.
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A pi session reads back as a transcript, not as a span tree
     Given a pi session whose run, turns and tool executions were captured
     When the Terminal tab renders the session
     Then its spans and logs read in timestamp order, not in parent order
     And each tool execution shows its name and whether it errored
     And no empty arguments or result pane is shown for it
+
+  # pi's model calls carry no prompt: the user's message rides only the run span.
+
+  @unit
+  Scenario: A pi session's prompt reads from its run span
+    Given a pi session whose run span carries the user's message
+    When the Terminal tab renders the session
+    Then the prompt shows once, before the first model call
 
   @unit
   Scenario: A pi model call is shown as a model call, not as a tool run
@@ -120,14 +125,32 @@ Feature: Coding agent terminal view
     Then each model call appears once with the tokens it used
     And none of them appears among the tool runs
 
-  # Parked: the model half holds, but the banner's agent list in
-  # modules/trace/browser has no pi, so the top of the session reads unknown.
-  # becomes @unit
-  @unimplemented
+  # pi stamps no service name the banner can test (`pi` is a substring of
+  # `copilot` and `api`), so the banner names it from its span namespace.
+
+  @unit
   Scenario: The banner of a pi session names the model pi called
     Given a pi session whose model calls name their model
     When the Terminal tab renders the session
     Then the top of the session shows pi and the model it called
+
+  # A trace with no name of its own is named after its root span (`pi.harness.run`),
+  # which the user never typed.
+
+  @unit
+  Scenario: The prompt line never shows a span name as if the user had typed it
+    Given a session whose trace is named after its own root span
+    When the Terminal tab renders the session
+    Then the bottom bar's prompt line shows the session's first prompt
+    And when the session has no prompt text it shows the untitled placeholder, not the span name
+
+  # A logs-only trace (Grok) has no span to name it, so it is named after its own id.
+
+  @unit
+  Scenario: The prompt line never shows a trace id as if the user had typed it
+    Given a logs-only session whose trace is named after its own id
+    When the Terminal tab renders the session
+    Then the bottom bar's prompt line shows the session's first prompt
 
   # The system prompt is the context the user pays for on every call - CLAUDE.md,
   # MCP tool definitions, skills. It rides the first request body of the session.

@@ -1,6 +1,7 @@
 import type { RecordCodingAssistantBillingCommand } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { CODING_ASSISTANT_BILLING_SOURCE_TYPES } from "../../features/cost/rules/coding-assistant-billing.rules.ts";
 import { CodingAssistantBillingFactService } from "../../features/cost/services/coding-assistant-billing-fact.service.ts";
 import { MemoryCostAttributionPolicyRepository } from "../../repositories/memory/memory.cost-attribution-policy.repository.ts";
 
@@ -65,7 +66,11 @@ describe("CodingAssistantBillingFactService", () => {
         opencode: false,
         cursor: false,
         github_copilot: false,
+        copilot_cli: false,
+        copilot_app: false,
+        copilot_vscode: false,
         grok: false,
+        grok_cli: false,
         pi: false,
         pi_cli: false,
         custom: false,
@@ -85,6 +90,26 @@ describe("CodingAssistantBillingFactService", () => {
       const billed = billedBySource(sent, "org-1");
       expect([billed.pi, billed.pi_cli, billed.codex]).toEqual([true, true, false]);
     });
+
+    it.each([
+      ["github_copilot", ["copilot_cli", "copilot_app", "copilot_vscode"]],
+      ["grok", ["grok_cli"]],
+    ])(
+      "bills %s's ingest source types as well as its kind when its config is off a bundled plan",
+      async (assistantKind, sourceTypes) => {
+        const { facts, sent } = world({
+          seed: [{ organizationId: "org-1", config: { assistantKind, bundledPlan: false } }],
+        });
+
+        await facts.recordForOrganization({ organizationId: "org-1" });
+
+        const billed = billedBySource(sent, "org-1");
+        expect([assistantKind, ...sourceTypes].map((source) => billed[source])).toEqual(
+          [assistantKind, ...sourceTypes].map(() => true),
+        );
+        expect(billed.codex).toBe(false);
+      },
+    );
 
     it("records the source as not billed when no config exists", async () => {
       const { facts, sent } = world({ seed: [] });
@@ -129,7 +154,11 @@ describe("CodingAssistantBillingFactService", () => {
 
       const totals = await facts.backfill();
 
-      expect(totals).toEqual({ afterOrganizationId: "org-3", organizations: 3, recorded: 30 });
+      expect(totals).toEqual({
+        afterOrganizationId: "org-3",
+        organizations: 3,
+        recorded: 3 * CODING_ASSISTANT_BILLING_SOURCE_TYPES.length,
+      });
       expect(billedBySource(sent, "org-1").codex).toBe(true);
       expect(billedBySource(sent, "org-2").cursor).toBe(false);
     });

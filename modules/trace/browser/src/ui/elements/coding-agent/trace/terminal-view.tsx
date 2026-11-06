@@ -50,10 +50,12 @@ import { toolResultBodyToString } from "../../../../model/coding-agent/trace/too
 import {
   CLAUDE_MARK_GRADIENT,
   GEMINI_MARK_GRADIENT,
+  GROK_MARK_GREY,
   OPENCODE_GRAY,
   OPENCODE_GRAY_FILL,
   OPENCODE_WHITE,
   OPENCODE_WHITE_FILL,
+  PI_MARK_COLORS,
 } from "../../../../model/explorer/ai/ai-brand-palette.ts";
 import { TerminalDiff } from "./terminal-diff.tsx";
 import { TerminalOutput } from "./terminal-output.tsx";
@@ -889,6 +891,25 @@ function claudeGradientMark(rows: readonly string[]): MarkSpec {
  */
 const GEMINI_MARK = columnColoredMark(["▝▜▄  ", "  ▝▜▄", " ▗▟▀ ", "▝▀   "], GEMINI_MARK_GRADIENT);
 
+/** pi's logo, its 4x4 grid of squares drawn two block glyphs to a square, colour for colour. */
+const PI_MARK: MarkSpec = {
+  rows: [
+    [{ text: "██████", color: PI_MARK_COLORS.coral }],
+    [
+      { text: "██  ", color: PI_MARK_COLORS.blue },
+      { text: "██", color: PI_MARK_COLORS.coral },
+    ],
+    [
+      { text: "████  ", color: PI_MARK_COLORS.blue },
+      { text: "██", color: PI_MARK_COLORS.yellow },
+    ],
+    [
+      { text: "██    ", color: PI_MARK_COLORS.blue },
+      { text: "██", color: PI_MARK_COLORS.yellow },
+    ],
+  ],
+};
+
 /**
  * opencode's block wordmark, segment-for-segment from the real TUI (tmux capture-pane -e of
  * `opencode` v1.18): "open" in gray, "code" in near-white, letter counters filled with a
@@ -970,14 +991,27 @@ const AGENT_BANNERS: Record<SessionBanner["agent"], { name: string; mark: MarkSp
   opencode: { name: "opencode", mark: OPENCODE_MARK },
   codex: { name: "Codex", mark: CODEX_MARK },
   gemini_cli: { name: "Gemini CLI", mark: GEMINI_MARK },
+  pi: { name: "pi", mark: PI_MARK },
   copilot: {
     name: "GitHub Copilot",
     mark: flatMark(["▗▛▀▀▀▜▖", "▐ ▐▌▐▌▌", "▝▙▄▄▄▟▘"], TERMINAL_TOKENS.blue),
   },
-  // A plain mark, not Grok's own startup art, which no capture has recorded.
+  // Grok's dotted ring and slash, glyph for glyph from `grok` 1.0.70's welcome screen
+  // (tmux capture-pane -e), in the xterm-256 grey 242 it draws it in.
   grok: {
     name: "Grok",
-    mark: flatMark(["▗▄▄▄▖", "▐ ▞ ▌", "▝▀▀▀▘"], TERMINAL_TOKENS.screenFg),
+    mark: flatMark(
+      [
+        "⠀⠀⠀⠀⠀⠀⣀⣀⡀⠀⠀⠀⢀⠄",
+        "⠀⠀⠀⣠⣾⠿⠛⠛⠛⠛⢀⡴⠁⠀",
+        "⠀⠀⣼⡟⠁⠀⠀⠀⢀⡴⠻⣿⡀⠀",
+        "⠀⠀⣿⡇⠀⠀⠀⠔⠁⠀⠀⣿⡇⠀",
+        "⠀⠀⢹⣷⠀⠀⠀⠀⠀⢀⣴⡿⠀⠀",
+        "⠀⢀⠞⠁⠠⢶⣶⣶⣶⠿⠋⠀⠀⠀",
+        "⠐⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
+      ],
+      GROK_MARK_GREY,
+    ),
   },
   unknown: {
     name: "Coding agent",

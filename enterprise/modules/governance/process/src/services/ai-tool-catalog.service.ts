@@ -68,13 +68,12 @@ function tilePolicy({
   slug: PlatformToolSlug;
   config: { allowVk?: unknown; allowOtelDirect?: unknown };
 }): PlatformToolPolicy {
-  // None of these routes model traffic through env, so none has a gateway path
-  // (ADR-192; pi fixes every model's address in its build, ADR-188).
-  const hasGatewayPath = slug !== "code" && slug !== "grok" && slug !== "pi";
+  // A path the platform default turns off is one the tool cannot take; no tile turns it on.
+  const capable = PLATFORM_TOOL_POLICY_DEFAULTS[slug];
   return {
-    allowVk: hasGatewayPath && (config.allowVk === undefined || Boolean(config.allowVk)),
+    allowVk: capable.allowVk && (config.allowVk === undefined || Boolean(config.allowVk)),
     allowOtelDirect:
-      slug !== "cursor" &&
+      capable.allowOtelDirect &&
       (config.allowOtelDirect === undefined || Boolean(config.allowOtelDirect)),
   };
 }

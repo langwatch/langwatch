@@ -7,8 +7,10 @@ const codingAssistantConfigSchema = z.looseObject({
   bundledPlan: z.boolean(),
 });
 
-/** pi's traces arrive under its ingest key's source type, not its kind (ADR-188), so its fact names both. */
+/** Kinds whose traces arrive under their ingest key's source types, so a fact names both. */
 const INGEST_SOURCE_TYPES_BY_KIND: Partial<Record<AssistantKind, readonly string[]>> = {
+  github_copilot: ["copilot_cli", "copilot_app", "copilot_vscode"],
+  grok: ["grok_cli"],
   pi: ["pi_cli"],
 };
 

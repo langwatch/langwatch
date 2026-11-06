@@ -60,6 +60,8 @@ interface CapturedSpan {
   name: string;
   scopeName?: string;
   serviceName?: string;
+  /** Further resource attributes, as the extension sends them. */
+  resource?: Record<string, unknown>;
   startMs: number;
   endMs: number;
   statusCode?: number;
@@ -70,6 +72,7 @@ function normalized({
   name,
   scopeName = PI_SCOPE,
   serviceName,
+  resource = {},
   startMs,
   endMs,
   statusCode,
@@ -92,6 +95,7 @@ function normalized({
     resourceAttributes: {
       [SOURCE]: "pi_cli",
       ...(serviceName !== undefined ? { "service.name": serviceName } : {}),
+      ...resource,
     },
     spanAttributes: attributes,
     events: [],
@@ -565,7 +569,7 @@ describe("pi session fold", () => {
       });
 
       /** @scenario "A pi session falls back to untitled rather than to a span name" */
-      it("leaves the row untitled, since pi declares no prompt or title attribute", () => {
+      it("leaves the row untitled when no run carries the prompt that opened it", () => {
         expect(row?.title ?? null).toBeNull();
       });
     });
@@ -599,6 +603,117 @@ describe("pi session fold", () => {
 
       expect(lift(keyless).outcome).toBe("ignored");
       expect(foldSessions([keyless]).size).toBe(0);
+    });
+  });
+});
+
+/** A pi file tool run as the extension sends it with content capture on: its call arguments. */
+function fileTool({
+  name,
+  filePath,
+  startMs,
+}: {
+  name: string;
+  filePath: string;
+  startMs: number;
+}): CapturedSpan {
+  const tool = piTool({ name, startMs });
+  return {
+    ...tool,
+    attributes: {
+      ...tool.attributes,
+      "gen_ai.tool.call.arguments": JSON.stringify({ path: filePath, content: "export {};\n" }),
+    },
+  };
+}
+
+const PROMPT = "Add a greeting to src/greet.ts\nand cover it with a test";
+
+/** The run the extension closes with the prompt that opened it, and pi's version as resource. */
+function promptedRun({ startMs = 1_000 }: { startMs?: number } = {}): CapturedSpan {
+  const run = piRun({
+    startMs,
+    attributes: {
+      "gen_ai.input.messages": JSON.stringify([
+        { role: "user", parts: [{ type: "text", content: PROMPT }] },
+      ]),
+    },
+  });
+  return { ...run, resource: { "service.version": "0.84.2" } };
+}
+
+describe("pi session columns", () => {
+  describe("given a run that read, edited and wrote files with content capture on", () => {
+    const spans: CapturedSpan[] = [
+      piTurn({ startMs: 1_500 }),
+      // A model with no prompt caching: the call reports fresh input and nothing cached.
+      piCall({ startMs: 2_000, input: 966, output: 40 }),
+      fileTool({ name: "read", filePath: "src/greet.ts", startMs: 3_000 }),
+      fileTool({ name: "edit", filePath: "src/greet.ts", startMs: 3_400 }),
+      fileTool({ name: "write", filePath: "src/greet.test.ts", startMs: 3_800 }),
+      piTool({ name: "bash", startMs: 4_200 }),
+      piCall({ startMs: 5_000, input: 300, output: 23, cacheRead: 400 }),
+      promptedRun(),
+    ];
+    const row = foldSessions(spans).get(SESSION);
+
+    /** @scenario "A pi session is named from the prompt its run carries" */
+    it("names the session from the first line of the run's prompt", () => {
+      expect(row?.title).toBe("Add a greeting to src/greet.ts");
+      expect(row?.titleSource).toBe("prompt");
+    });
+
+    /** @scenario "Each pi run counts as one prompt" */
+    it("counts one prompt for the one run", () => {
+      expect(row?.prompts).toBe(1);
+    });
+
+    /** @scenario "A pi call's context is its whole prompt, cached or not" */
+    it("takes the peak context from the largest call's fresh and cached input together", () => {
+      expect(row?.peakContextTokens).toBe(966);
+    });
+
+    /** @scenario "The files pi's file tools name are the session's files touched" */
+    it("lists the files the read, edit and write calls named, once each", () => {
+      expect(row?.filesTouched).toEqual(["src/greet.ts", "src/greet.test.ts"]);
+    });
+
+    /** @scenario "A pi session records pi's version" */
+    it("records pi's version from the resource", () => {
+      expect(row?.agentVersion).toBe("0.84.2");
+    });
+
+    /** @scenario "Lines changed stay unreported for pi" */
+    it("reports no lines changed, since nothing pi sends counts them", () => {
+      expect(row?.linesAdded).toBe(0);
+      expect(row?.linesRemoved).toBe(0);
+    });
+  });
+
+  describe("given two runs of one session", () => {
+    it("counts a prompt per run and keeps the first run's title", () => {
+      const second = piRun({
+        startMs: 30_000,
+        attributes: {
+          "gen_ai.input.messages": JSON.stringify([
+            { role: "user", parts: [{ type: "text", content: "Now rename it" }] },
+          ]),
+        },
+      });
+      const row = foldSessions([promptedRun(), second]).get(SESSION);
+
+      expect(row?.prompts).toBe(2);
+      expect(row?.title).toBe("Add a greeting to src/greet.ts");
+    });
+  });
+
+  describe("given a file tool run without its call arguments", () => {
+    it("touches no file", () => {
+      const row = foldSessions([piTool({ name: "edit", startMs: 3_000 }), promptedRun()]).get(
+        SESSION,
+      );
+
+      expect(row?.filesTouched).toEqual([]);
     });
   });
 });
@@ -825,6 +940,69 @@ describe("pi session transcript", () => {
       ).toEqual([150, 100]);
       expect(transcript.entries.filter((entry) => entry.kind === "tool")).toEqual([]);
       expect(transcript.totals.toolCalls).toBe(0);
+    });
+  });
+
+  describe("given a pi session whose run, turns and tool executions were captured", () => {
+    const prompt = JSON.stringify([
+      { role: "user", parts: [{ type: "text", content: "Fix the flaky widget test" }] },
+    ]);
+    const transcript = buildCodingAgentTranscript({
+      spans: [
+        spanDetail({
+          name: "pi.harness.run",
+          startTimeMs: 0,
+          params: { pi: { session: { id: SESSION } }, gen_ai: { input: { messages: prompt } } },
+        }),
+        spanDetail({
+          name: "pi.harness.turn",
+          startTimeMs: 100,
+          params: { pi: { turn: { id: "t1" } } },
+        }),
+        spanDetail({
+          name: "pi.harness.tool",
+          startTimeMs: 3_000,
+          status: "error",
+          params: { pi: { tool: { name: "bash" } }, gen_ai: { tool: { name: "bash" } } },
+        }),
+        spanDetail({
+          name: "pi.harness.tool",
+          startTimeMs: 2_000,
+          params: { pi: { tool: { name: "read" } }, gen_ai: { tool: { name: "read" } } },
+        }),
+        spanDetail({
+          name: "pi.ai.request",
+          startTimeMs: 200,
+          params: {
+            gen_ai: { request: { model: MODEL }, usage: { input_tokens: 120, output_tokens: 30 } },
+          },
+        }),
+      ],
+      logs: [],
+    });
+    const tools = transcript.entries.filter((entry) => entry.kind === "tool");
+
+    /** @scenario "A pi session reads back as a transcript, not as a span tree" */
+    it("reads in time order, names each tool and whether it errored, with no empty panes", () => {
+      const times = transcript.entries.map((entry) => entry.atMs);
+      expect(times).toEqual(times.toSorted((left, right) => left - right));
+      expect(tools.map((tool) => [tool.name, tool.failed])).toEqual([
+        ["read", false],
+        ["bash", true],
+      ]);
+      expect(tools.map((tool) => [tool.input, tool.output])).toEqual([
+        [null, null],
+        [null, null],
+      ]);
+    });
+
+    /** @scenario "A pi session's prompt reads from its run span" */
+    it("shows the prompt from the run span once, before the first model call", () => {
+      const prompts = transcript.entries.filter((entry) => entry.kind === "user_prompt");
+      expect(prompts.map((entry) => ("text" in entry ? entry.text : null))).toEqual([
+        "Fix the flaky widget test",
+      ]);
+      expect(transcript.entries[0]?.kind).toBe("user_prompt");
     });
   });
 });

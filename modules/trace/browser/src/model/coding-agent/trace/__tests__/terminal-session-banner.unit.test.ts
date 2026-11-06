@@ -102,6 +102,42 @@ describe("deriveSessionBanner", () => {
     });
   });
 
+  describe("given a pi session, named only by its span namespace", () => {
+    /** @scenario "The banner of a pi session names the model pi called" */
+    it("names pi and the model its last pi.ai.request called", () => {
+      const banner = deriveSessionBanner({
+        resourceAttributes: { "service.name": "pi", "service.version": "0.84.2" },
+        spans: [
+          span({ spanId: "run", name: "pi.harness.run", type: "agent", startTimeMs: 1 }),
+          span({ spanId: "turn", parentSpanId: "run", name: "pi.harness.turn", startTimeMs: 2 }),
+          span({
+            spanId: "call",
+            parentSpanId: "turn",
+            name: "pi.ai.request",
+            startTimeMs: 3,
+            params: { gen_ai: { request: { model: "claude-sonnet-5" } } },
+          }),
+          span({ spanId: "tool", parentSpanId: "turn", name: "pi.harness.tool", startTimeMs: 4 }),
+        ],
+      });
+
+      expect(banner).toEqual({
+        agent: "pi",
+        version: "0.84.2",
+        model: "claude-sonnet-5",
+        repo: null,
+      });
+    });
+
+    it("does not read pi into another agent's service name", () => {
+      const banner = deriveSessionBanner({
+        resourceAttributes: { "service.name": "acme-api" },
+        spans: [span({ name: "some.custom.span" })],
+      });
+      expect(banner.agent).toBe("unknown");
+    });
+  });
+
   describe("given real-shaped NESTED span params", () => {
     it("still reads the model: the span mapper unflattens dotted keys", () => {
       const banner = deriveSessionBanner({
@@ -150,22 +186,53 @@ describe("deriveSessionBanner", () => {
   });
 
   describe("given a Grok session, which sends logs and no spans", () => {
+    // Resource and attributes as grok 1.0.70 sent them on a captured session.
+    const GROK_RESOURCE = {
+      "service.name": "grok-cli",
+      "service.version": "1.0.70 (f50904eaee6c)",
+      "client.version": "1.0.70",
+    };
+    const grokLog = (timeUnixMs: number, attributes: Record<string, string>) => ({
+      timeUnixMs,
+      attributes,
+      resourceAttributes: GROK_RESOURCE,
+    });
+
     /** @scenario The terminal banner names Grok and its version */
-    it("names Grok from its service and reads its version, with no model to show", () => {
+    it("names Grok from its log records' resource, with the version Grok itself prints", () => {
       const banner = deriveSessionBanner({
-        resourceAttributes: {
-          "service.name": "grok-cli",
-          "service.version": "1.0.70 (f50904eaee6c)",
-        },
+        resourceAttributes: {},
         spans: [],
+        logs: [grokLog(1_000, { "event.name": "grok_code.assistant_response" })],
       });
 
-      expect(banner).toEqual({
-        agent: "grok",
-        version: "1.0.70 (f50904eaee6c)",
-        model: null,
-        repo: null,
+      expect(banner).toEqual({ agent: "grok", version: "1.0.70", model: null, repo: null });
+    });
+
+    /** @scenario "The terminal banner shows the model Grok's records name" */
+    it("reads the model off the last Grok record that names one", () => {
+      const banner = deriveSessionBanner({
+        resourceAttributes: {},
+        spans: [],
+        logs: [
+          grokLog(3_000, { "event.name": "grok_code.api_request", model: "grok-4.7-fast" }),
+          grokLog(1_000, { "event.name": "grok_code.user_prompt", model: "grok-4.7" }),
+          grokLog(4_000, { "event.name": "grok_code.assistant_response" }),
+        ],
       });
+
+      expect(banner.model).toBe("grok-4.7-fast");
+    });
+
+    it("prefers the span resource when the trace has one", () => {
+      const banner = deriveSessionBanner({
+        resourceAttributes: { "service.name": "claude-code", "service.version": "2.1.207" },
+        spans: [],
+        logs: [grokLog(1_000, {})],
+      });
+
+      expect(banner.agent).toBe("claude_code");
+      expect(banner.version).toBe("2.1.207");
     });
   });
 });
