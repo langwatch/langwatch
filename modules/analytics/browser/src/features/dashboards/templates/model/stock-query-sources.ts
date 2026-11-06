@@ -4,7 +4,15 @@
  * refuses for a member with a gated column. A view with no origin is left as written (AC202f).
  */
 
-import { SOURCE_VIEWS, SOURCES_PLACEHOLDER, TRACE_VIEWS } from "../../model/sources-parameter.ts";
+import {
+  SOURCE_VIEWS,
+  SOURCES_PLACEHOLDER,
+  TRACE_VIEWS,
+  VIEWS_WITH_ORIGIN,
+} from "../../model/sources-parameter.ts";
+
+/** The trace views that leave out the traces of other sources, rather than list the chosen ones. */
+const COMPLEMENT_VIEWS: readonly string[] = ["traces", "spans"];
 
 /** Words that can follow a view name without being its alias. */
 const NOT_AN_ALIAS = new Set([
@@ -124,17 +132,40 @@ function referenceAt({
   code: readonly string[];
   position: number;
   ctes: ReadonlySet<string>;
-}): { alias: string; isSource: boolean } | undefined {
+}): { alias: string; view: string } | undefined {
   const written = (code[position + 1] ?? "").replace(/^analytics\./i, "").toLowerCase();
-  const isSource = (SOURCE_VIEWS as readonly string[]).includes(written);
-  if (!isSource && !(TRACE_VIEWS as readonly string[]).includes(written)) return undefined;
+  if (!VIEWS_WITH_ORIGIN.includes(written)) return undefined;
   if (ctes.has(written)) return undefined;
 
   const word = code[position + 2 + (code[position + 2]?.toUpperCase() === "AS" ? 1 : 0)];
   const named =
     word !== undefined && /^[A-Za-z_]\w*$/.test(word) && !NOT_AN_ALIAS.has(word.toUpperCase());
 
-  return { alias: named ? word : written, isSource };
+  return { alias: named ? word : written, view: written };
+}
+
+/** The condition that keeps `view` to the sources, by its own column or by its trace's. */
+function sourcesPredicate({
+  alias,
+  view,
+  bound,
+}: {
+  alias: string;
+  view: string;
+  bound: string;
+}): string {
+  if ((SOURCE_VIEWS as readonly string[]).includes(view)) {
+    return `${alias}.Source IN ${SOURCES_PLACEHOLDER}`;
+  }
+
+  const key = `(${alias}.TenantId, ${alias}.TraceId)`;
+  const lookup = (operator: string) =>
+    `(SELECT TenantId, TraceId FROM trace_metrics WHERE Source ${operator} ${SOURCES_PLACEHOLDER}${bound})`;
+
+  // Why each view has its form, and an empty list its false branch: analytics ADR-003.
+  return COMPLEMENT_VIEWS.includes(view)
+    ? `notEmpty(${SOURCES_PLACEHOLDER}) AND ${key} NOT IN ${lookup("NOT IN")}`
+    : `${key} IN ${lookup("IN")}`;
 }
 
 /** `sql` with every view it names that can follow sources kept to them by its select's WHERE. */
@@ -149,11 +180,7 @@ export function readSources(sql: string): string {
   code.forEach((token, position) => {
     const view = token.toUpperCase() === "FROM" ? referenceAt({ code, position, ctes }) : undefined;
     if (!view) return;
-    const { alias, isSource } = view;
-    const predicate = isSource
-      ? `${alias}.Source IN ${SOURCES_PLACEHOLDER}`
-      : `(${alias}.TenantId, ${alias}.TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics ` +
-        `WHERE Source IN ${SOURCES_PLACEHOLDER}${bound})`;
+    const predicate = sourcesPredicate({ ...view, bound });
     const { where, end } = regionOf({ code, from: position + 2 });
     const last = at[end - 1] ?? at[position] ?? 0;
 

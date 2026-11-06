@@ -36,9 +36,22 @@ The views `trace_metrics` and `evaluation_metrics` carry a computed `Source` col
 So an unstamped trace is `application`'s and never NULL. The column is computed in the view; no
 ClickHouse migration is made. A statement keeps its rows with
 `WHERE Source IN {dashboard_context_sources:Array(String)}`. A view with a `TraceId` column
-reaches the origin through `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics
-WHERE Source IN {dashboard_context_sources:Array(String)})`, keyed by tenant so another
-project's trace never decides.
+reaches the origin through `trace_metrics`, keyed by tenant so another project's trace never
+decides. The stock widgets write that lookup in one of two fixed forms, by the view they read.
+
+`traces` and `spans` use the complement: `notEmpty({dashboard_context_sources:Array(String)}) AND
+(TenantId, TraceId) NOT IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source NOT IN
+{dashboard_context_sources:Array(String)})`. On a large project the set of traces of other
+sources is the small one, and the measured failures, widgets over the query memory limit, are on
+trace-list widgets. So a trace with no `trace_metrics` row counts as being in the chosen sources,
+and so does a span whose trace is older than the lookup's time bound, whatever its source. A list
+of every source gives an empty set, so every trace counts. `notEmpty` is there because the
+complement of an empty list would otherwise keep the traces with no row.
+
+`evaluations` and `annotations` keep `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM
+trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)})`. Their trace id can be
+NULL, their rows often sit on old traces, which the complement would count whatever the source,
+and `annotations` reads PostgreSQL, a path the complement has not been measured on.
 
 The list is an enum checked at the door, and a caller cannot supply, assign or alias the
 reserved name in its own parameters. An empty list matches no row. Picking every source keeps
