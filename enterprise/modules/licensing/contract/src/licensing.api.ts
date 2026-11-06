@@ -244,6 +244,8 @@ export interface LicensingApi {
 
   /** What a customer's licenses add up to commercially, right now. */
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms>;
+  /** Full member seats an organization uses now: active members and live invitations. */
+  countFullSeatsInUse(input: { organizationId: string }): Promise<number>;
   /** The seats a connected customer holds and last reported, for its statement and overview. */
   getConnectedSeats(input: { organizationId: string }): Promise<ConnectedSeats>;
   /** Every seat change that raised a linked license, oldest first; one customer's when named. */
