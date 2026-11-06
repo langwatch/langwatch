@@ -159,6 +159,11 @@ const NARROW_FACE = "@container (max-width: 340px) and (min-height: 158px)";
 const SHORT_FACE = "@container (max-height: 157px)";
 const SHORT_WIDE_FACE = "@container (min-width: 241px) and (max-height: 157px)";
 const SHORT_SMALL_FACE = "@container (max-width: 240px) and (max-height: 157px)";
+// Wide and 158 to 169 high, five lines need 80px and the default 68 slices the fifth, so four.
+const MID_WIDE_FACE =
+  "@container (min-width: 341px) and (min-height: 158px) and (max-height: 169px)";
+// Tall cards have the room to show a long message whole.
+const TALL_FACE = "@container (min-height: 278px)";
 
 // Clipped away but still read by screen readers, so the full words stay the accessible name.
 const VISUALLY_HIDDEN = {
@@ -249,6 +254,8 @@ export function WidgetFailedFace({
               title={message}
               css={{
                 ...HIDE_SHORT_WORDS,
+                ...(note ? {} : { [MID_WIDE_FACE]: { lineClamp: 4 } }),
+                [TALL_FACE]: { lineClamp: "none" },
                 [SHORT_WIDE_FACE]: { lineClamp: note || hasEdits ? 1 : 2 },
                 [SHORT_SMALL_FACE]: {
                   lineClamp: hasEdits || shortMessage ? 1 : 2,
