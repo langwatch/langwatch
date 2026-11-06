@@ -86,6 +86,67 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
     });
   });
 
+  describe("when a request is reopened, claimed and declined while another arrival is in flight", () => {
+    /** @scenario "Sales hear about a seat request from an account-managed organization once" */
+    it("leaves the newer decline and its sales claim in place", async () => {
+      const email = "inflight@acme.example";
+      const arrival = (repository: PrismaSeatRequestRepository, id: string, at: number) =>
+        repository.open({
+          id,
+          organizationId,
+          email,
+          userId: null,
+          name: null,
+          source: "pending",
+          idpRefused: false,
+          idpKind: null,
+          at,
+        });
+      const decline = (id: string, at: number) =>
+        requests.resolve({ organizationId, id, status: "DECLINED", resolvedByUserId: "u", at });
+      const { request } = await arrival(requests, `${namespace}-f1`, 60_000);
+      await decline(request.id, 61_000);
+
+      let interleave = async () => {};
+      const stalledRequests = new Proxy(prisma.seatRequest, {
+        get(target, property) {
+          if (property !== "findUnique") return Reflect.get(target, property);
+          return async (args: Parameters<typeof target.findUnique>[0]) => {
+            const row = await target.findUnique(args);
+            await interleave();
+            return row;
+          };
+        },
+      });
+      const stalledPrisma = new Proxy(prisma, {
+        get(target, property) {
+          if (property === "seatRequest") return stalledRequests;
+          const value = Reflect.get(target, property);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+      interleave = async () => {
+        interleave = async () => {};
+        expect((await arrival(requests, `${namespace}-f2`, 62_000)).outcome).toBe("reopened");
+        expect(await requests.claimSalesNotice({ id: request.id, at: 62_500 })).toBe(true);
+        expect(await decline(request.id, 63_000)).toBe(true);
+      };
+
+      const late = await arrival(
+        PrismaSeatRequestRepository.create(stalledPrisma),
+        `${namespace}-f3`,
+        62_100,
+      );
+
+      expect(late.outcome).toBe("resolved_meanwhile");
+      expect(late.request).toMatchObject({
+        status: "DECLINED",
+        resolvedAt: 63_000,
+        salesNotifiedAt: 62_500,
+      });
+    });
+  });
+
   describe("when callers race to resolve a request, claim its sales notice or claim a notice", () => {
     /** @scenario "Sales hear about a seat request from an account-managed organization once" */
     it("lets exactly one of them win each claim", async () => {

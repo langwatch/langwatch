@@ -18,10 +18,10 @@ export type SeatRequestRow = Readonly<{
   resolvedByUserId: string | null;
 }>;
 
-/** What opening a request found: a new row, a closed row reopened, or one already open. */
+/** What opening found: a new row, a reopened one, one already open, or one answered since. */
 export type SeatRequestOpened = Readonly<{
   request: SeatRequestRow;
-  outcome: "opened" | "reopened" | "already_open";
+  outcome: "opened" | "reopened" | "already_open" | "resolved_meanwhile";
 }>;
 
 /** The seat requests organization keeps, one row per organization and address. */

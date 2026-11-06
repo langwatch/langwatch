@@ -334,7 +334,7 @@ export class SeatRequestService {
   }): Promise<void> {
     const { requests, notices, now, newId } = this.dependencies;
     const opened = await requests.open({ ...input, id: newId(), at: now() });
-    if (opened.outcome === "already_open") return;
+    if (opened.outcome === "already_open" || opened.outcome === "resolved_meanwhile") return;
     // The request is open either way, and a later arrival answers already_open, so sales are
     // told even when the notice could not be recorded.
     await notices
