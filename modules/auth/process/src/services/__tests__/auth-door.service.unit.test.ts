@@ -1222,6 +1222,14 @@ describe("given a sign-in this browser started that its provider never answered"
       ["no hint", undefined],
       ["an expired hint", sealedHint({ issuedAt: NOW_MS - UNFINISHED_SIGN_IN_TTL_MS - 1 })],
       ["a forged hint", sealedHint({ secret: "another-secret" })],
+      [
+        "a social sign-in's hint",
+        signInHintSealer({ secret: HINT_SECRET }).seal({
+          providerId: "github",
+          source: "provider",
+          issuedAt: NOW_MS - 60_000,
+        }),
+      ],
     ])("answers none for %s", async (_, hint) => {
       const { refusedSignIns, calls } = classifier({
         organizationId: "org_1",

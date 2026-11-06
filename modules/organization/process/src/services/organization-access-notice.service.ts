@@ -151,7 +151,7 @@ export class OrganizationAccessNoticeService {
 
   /**
    * One bouncing address must not silence the rest: the notice stands once any send went.
-   * Answers false when none did, so the notice is released for a later arrival to retry.
+   * Answers false when none did or there was no one to mail, so a later arrival retries it.
    */
   private async fanOut({
     organizationId,
@@ -162,6 +162,13 @@ export class OrganizationAccessNoticeService {
     what: string;
     sends: Promise<unknown>[];
   }): Promise<boolean> {
+    if (sends.length === 0) {
+      this.dependencies.logger.warn(
+        { organizationId, what },
+        "an access notice has no one to mail",
+      );
+      return false;
+    }
     const outcomes = await Promise.allSettled(sends);
     const failed = outcomes.filter((outcome) => outcome.status === "rejected").length;
     if (failed > 0) {
@@ -170,6 +177,6 @@ export class OrganizationAccessNoticeService {
         "some access notices could not be mailed",
       );
     }
-    return sends.length === 0 || failed < sends.length;
+    return failed < sends.length;
   }
 }

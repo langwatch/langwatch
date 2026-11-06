@@ -425,15 +425,15 @@ export class AuthDoorService {
         })
       : undefined;
     const headers = { "cache-control": "no-store" };
-    if (!hint) return Response.json({ unfinished: null } satisfies UnfinishedSignIn, { headers });
+    // Only a company connection can refuse for want of an app assignment; social starts never do.
+    if (!hint || hint.source === "provider") {
+      return Response.json({ unfinished: null } satisfies UnfinishedSignIn, { headers });
+    }
     let idp: SignInIdpKind | null = null;
     try {
       const answer = await withinClassificationTime(
         this.deps.refusedSignIns.classifyRefusedSignIn({
-          refusedBy:
-            hint.source === "provider"
-              ? { kind: "provider", providerId: hint.providerId }
-              : { kind: "connection", connectionId: hint.providerId },
+          refusedBy: { kind: "connection", connectionId: hint.providerId },
           email: null,
         }),
       );

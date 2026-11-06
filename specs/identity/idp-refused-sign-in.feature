@@ -75,13 +75,14 @@ Feature: A sign-in the company's identity provider refused says who refused it
 
   @unit
   Scenario: A sign-in that never came back is noticed on the next visit
-    Given the person started a sign-in with a provider from our sign-in page, with or without an address
+    Given the person started a sign-in with their company's connection from our sign-in page, with or without an address
     And the provider never sent them back, for example by showing its own error page
     When they open the sign-in page again within an hour
     Then the page reads the unfinished sign-in from the unspent hint
     And it learns the provider to dial again and the provider kind, never the address
     And the organization is not told and no mail is sent
     And with no hint, an expired one or one already spent, there is no unfinished sign-in
+    And a social sign-in such as GitHub or Google never reads as unfinished, since only a company connection asks the IT team
 
   @integration
   Scenario: The sign-in page says the last sign-in did not finish

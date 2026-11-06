@@ -2,21 +2,17 @@
  * Whoever paid keeps paying: the person who started a checkout gets the Billing role,
  * unless they already administer the organization. Spec: specs/licensing/billing-role.feature
  */
-import { type AuthzApi, BILLING_CHECKOUT_ACTOR } from "@langwatch/authz-contract";
+import {
+  type AuthzApi,
+  BILLING_CHECKOUT_ACTOR,
+  BindingMissingError,
+} from "@langwatch/authz-contract";
 
 /** Authz's Billing role, as a checkout's completion hands it out. */
 export type CheckoutBillingRoles = Pick<
   AuthzApi,
   "setBillingRole" | "findActiveOrganizationAdministrators"
 >;
-
-function isMembershipGone(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    (error as { code?: unknown }).code === "role_binding_not_found"
-  );
-}
 
 export class BillingStarterRoleService {
   static create({
@@ -57,7 +53,7 @@ export class BillingStarterRoleService {
       .catch((error: unknown) => {
         // A starter who left the organization has no membership to hold the role; a retry
         // would fail the same way, so the checkout completes without it.
-        if (isMembershipGone(error)) return;
+        if (error instanceof BindingMissingError) return;
         throw error;
       });
   }

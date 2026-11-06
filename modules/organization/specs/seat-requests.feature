@@ -253,6 +253,7 @@ Feature: Seat requests when an organization is over its seat limit
     @unit
     Scenario: A notice whose mail reached nobody is retried by the next arrival that day
       Given "late@acme.example" opened a seat request and no mail about it could be sent
+      And the same holds when there was no administrator or Billing member with an address to mail
       When "late@acme.example" arrives again the same day
       Then "Ada Admin" and "Bill Payer" are mailed about "late@acme.example"
 

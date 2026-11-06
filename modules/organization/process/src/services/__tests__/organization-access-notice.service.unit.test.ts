@@ -15,7 +15,7 @@ const START = Date.UTC(2026, 10, 6, 9);
 
 function notices() {
   const clock = { now: START };
-  const outage = { recipients: false, bouncing: new Set<string>() };
+  const outage = { recipients: false, nobody: false, bouncing: new Set<string>() };
   let ids = 0;
   const repository = MemoryOrganizationAccessNoticeRepository.create();
   const mail = MemoryAccessNoticeMailChannel.create();
@@ -30,6 +30,7 @@ function notices() {
     context: {
       recipients: async () => {
         if (outage.recipients) throw new Error("recipients unavailable");
+        if (outage.nobody) return [];
         return [
           { userId: "user-ada", email: "ada@acme.example" },
           { userId: "user-bill", email: "bill@acme.example" },
@@ -147,6 +148,21 @@ describe("OrganizationAccessNoticeService", () => {
 
       const first = await seatRequest("late@acme.example");
       outage.recipients = false;
+      const second = await seatRequest("late@acme.example");
+
+      expect([first.mailed, second.mailed]).toEqual([false, true]);
+      expect(mail.seatRequests).toHaveLength(2);
+    });
+  });
+
+  describe("when the organization has no one to mail yet", () => {
+    /** @scenario "A notice whose mail reached nobody is retried by the next arrival that day" */
+    it("keeps the notice unmailed, so a later arrival that day mails it", async () => {
+      const { mail, outage, seatRequest } = notices();
+      outage.nobody = true;
+
+      const first = await seatRequest("late@acme.example");
+      outage.nobody = false;
       const second = await seatRequest("late@acme.example");
 
       expect([first.mailed, second.mailed]).toEqual([false, true]);
