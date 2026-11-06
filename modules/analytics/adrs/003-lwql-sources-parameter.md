@@ -48,6 +48,13 @@ and so does a span whose trace is older than the lookup's time bound, whatever i
 of every source gives an empty set, so every trace counts. `notEmpty` is there because the
 complement of an empty list would otherwise keep the traces with no row.
 
+Consequences: traces older than the bound count whatever their source. For the changes widget,
+which scans traces 90 days back, an older application prompt no longer reads as new, and a prompt
+used earlier only by another source can read as not new. A trace with rows of two sources (its
+anchor moved) drops under either source alone. A list that leaves out the largest source makes the
+excluded set large, so that list can hit the memory limit where the old form did not; this has not
+been measured.
+
 `evaluations` and `annotations` keep `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM
 trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)})`. Their trace id can be
 NULL, their rows often sit on old traces, which the complement would count whatever the source,

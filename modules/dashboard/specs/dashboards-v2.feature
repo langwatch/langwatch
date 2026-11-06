@@ -1972,6 +1972,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And a list holding every source keeps every trace
     And a source name no trace has keeps only the trace with no row
     And a span of a trace older than the lookup's bound counts, whatever the trace's source
+    And a trace older than the lookup's bound counts, whatever its source, so a query that scans further back than the lookup, such as the prompt versions in the changes widget, sees those traces
     # Why: leaving out the traces of other sources keeps the lookup's set small on a large project,
     # where the set of the chosen list took 30-day widgets over the query memory limit.
 

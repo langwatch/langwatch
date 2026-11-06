@@ -36,13 +36,18 @@ function storedLookup(view: string): string {
     `(?:notEmpty\\(\\{[^}]*\\}\\) AND )?\\(${view}\\.TenantId, .*?, 1\\)\\)`,
   );
 
-  return (STOCK_SQL.match(stored)?.[0] ?? "")
+  const lookup = STOCK_SQL.match(stored)?.[0];
+  if (!lookup)
+    throw new Error(`no stored lookup for the "${view}" view in the stock widget fixture`);
+
+  return lookup
     .replaceAll(`${view}.`, "")
     .replace("FROM trace_metrics", `FROM ${DATABASE}.trace_metrics`)
     .replace("Source", sourceOfOrigin("Origin"));
 }
 
 const BY_TRACE = storedLookup("spans");
+const TRACES_BY_TRACE = storedLookup("traces");
 const EVALUATION_BY_TRACE = storedLookup("evaluations");
 
 async function count(query: string, sources?: string[]): Promise<number> {
@@ -230,6 +235,18 @@ describe.skipIf(!url)("given traces of the application and of Langy, each with s
       expect(await kept({ ...spans, trace: "old_langy" })).toBe(1);
       expect(await kept({ ...spans, trace: "chat1" })).toBe(0);
     });
+
+    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as being in the chosen sources" */
+    it("counts a trace older than the lookup bound, whatever its source", async () => {
+      const traces = {
+        table: "old_trace_spans",
+        lookup: TRACES_BY_TRACE,
+        sources: ["application"],
+      };
+
+      expect(await kept({ ...traces, trace: "old_langy" })).toBe(1);
+      expect(await kept({ ...traces, trace: "chat1" })).toBe(0);
+    });
   });
 
   describe("given evaluations whose trace is of a source, unknown, old or absent", () => {
@@ -246,8 +263,9 @@ describe.skipIf(!url)("given traces of the application and of Langy, each with s
     });
 
     /** @scenario "AC202h Stock widgets: evaluation and annotation widgets still read the traces of the chosen sources" */
-    it("drops an evaluation on an old trace of another source", async () => {
-      expect(await evaluations({ sources: ["application"], trace: "old_langy" })).toBe(0);
+    it("drops an evaluation on a trace older than the lookup bound", async () => {
+      // Bound to its own source, so only the bound can drop it.
+      expect(await evaluations({ sources: ["langy"], trace: "old_langy" })).toBe(0);
     });
 
     // Pins today's outcome of the form stock queries already use: if this fails, it is a finding
