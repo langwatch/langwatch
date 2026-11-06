@@ -521,7 +521,20 @@ describe("<SubscriptionPage/> layout", () => {
   describe("when the organization has an enterprise subscription", () => {
     beforeEach(() => {
       givenGrowthSubscription({ type: "ENTERPRISE" });
-      givenUsage({ membersCount: 2 });
+      givenUsage({
+        membersCount: 2,
+        messageLimitInfo: eventLimit({ current: 812400, currentFormatted: "812,400" }),
+      });
+    });
+
+    /** @scenario "An enterprise subscription's card is named Enterprise and shows no usage row" */
+    it("names the plan Enterprise and leaves the events row out", async () => {
+      renderSubscriptionPage();
+
+      const card = await screen.findByTestId("current-plan-block");
+      expect(within(card).getByRole("heading", { name: "Enterprise" })).toBeInTheDocument();
+      expect(within(card).queryByTestId("plan-event-usage")).toBeNull();
+      expect(within(card).getByText("Members / seats")).toBeInTheDocument();
     });
 
     /** @scenario "An enterprise plan's card has no price row" */
