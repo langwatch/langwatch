@@ -337,6 +337,7 @@ describe("BillingSubscriptionService", () => {
             stripeSubscriptionId: "sub_stripe_1",
             status: SubscriptionStatus.ACTIVE,
             plan: PlanTypes.LAUNCH,
+            maxMembers: 5,
           }),
         );
         stripeSubscriptions.seed({
@@ -399,6 +400,29 @@ describe("BillingSubscriptionService", () => {
             totalTraces: 30_000,
           }),
         ).rejects.toMatchObject({ code: "seat_quantity_below_in_use" });
+        expect(stripeSubscriptions.updates).toEqual([]);
+      });
+    });
+
+    describe("when seats are held for people removed within 30 days", () => {
+      /** @scenario "Lowering below the seats in use and held is refused" */
+      it("refuses a count below the seats in use plus the held seats", async () => {
+        // Licensing counts 3 active full members and 1 held seat as 4 in use.
+        fullSeatsInUse = 4;
+
+        await expect(
+          service.updateSubscriptionItems({
+            organizationId: "org_123",
+            plan: PlanTypes.LAUNCH,
+            upgradeMembers: true,
+            upgradeTraces: false,
+            totalMembers: 3,
+            totalTraces: 0,
+          }),
+        ).rejects.toMatchObject({
+          code: "seat_quantity_below_in_use",
+          meta: { requested: 3, minimum: 4 },
+        });
         expect(stripeSubscriptions.updates).toEqual([]);
       });
     });
