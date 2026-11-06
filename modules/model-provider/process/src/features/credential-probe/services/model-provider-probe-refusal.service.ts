@@ -1,5 +1,6 @@
 import { type HandledError, type SerializedHandledError } from "@langwatch/handled-error";
 import {
+  ProviderDeploymentNotFoundError,
   ProviderKeyInvalidError,
   ProviderKeyRestrictedError,
   ProviderRefusedError,
@@ -10,9 +11,11 @@ import { createLogger } from "@langwatch/observability";
 import {
   MAX_UPSTREAM_DETAIL_LENGTH,
   type UpstreamRefusal,
+  extractUpstreamCode,
   extractUpstreamMessage,
   extractUpstreamReason,
   geminiRefusalKind,
+  isAzureDeploymentNotFound,
   redactApiKey,
 } from "../../../rules/model-provider-probe-upstream.rules.ts";
 import type { ProbeContext } from "./model-provider-probe-chain.service.ts";
@@ -56,6 +59,7 @@ async function readUpstreamRefusal(
       ? redactApiKey(message, apiKey).slice(0, MAX_UPSTREAM_DETAIL_LENGTH)
       : undefined,
     reason: extractUpstreamReason(parsed),
+    code: extractUpstreamCode(parsed),
   };
 }
 
@@ -113,7 +117,7 @@ export async function handleHttpError({
   response: ProbeResponse;
   context: ProbeContext;
 }): Promise<RankedFailure> {
-  const { message, reason } = await readUpstreamRefusal(response, context.apiKey);
+  const { message, reason, code } = await readUpstreamRefusal(response, context.apiKey);
 
   // The one place the provider's own words are kept. Redacted at the point of
   // reading, because this is a log and the key is what it would otherwise
@@ -149,6 +153,19 @@ export async function handleHttpError({
     return refusal(
       new ProviderKeyInvalidError({ provider: context.provider }),
       message ? FAILURE_RANK.explained : FAILURE_RANK.generic,
+    );
+  }
+
+  if (
+    context.model &&
+    isAzureDeploymentNotFound({ provider: context.provider, status: response.status, code })
+  ) {
+    return refusal(
+      new ProviderDeploymentNotFoundError({
+        provider: context.provider,
+        deployment: context.model,
+      }),
+      FAILURE_RANK.actionable,
     );
   }
 

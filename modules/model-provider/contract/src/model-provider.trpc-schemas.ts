@@ -159,6 +159,8 @@ const modelProviderValidateApiKeyTrpcInputSchemaDefinition = z
     ...modelProviderTenantAnchorFields,
     provider: z.string(),
     customKeys: z.record(z.string(), z.string()),
+    // The model about to run on the credential; Azure probes this deployment.
+    model: z.string().min(1).optional(),
     // The scopes the credential is being set up for. Required on the
     // no-project path, where they are what the probe is authorized
     // against — see the process's credential-probe policy.
