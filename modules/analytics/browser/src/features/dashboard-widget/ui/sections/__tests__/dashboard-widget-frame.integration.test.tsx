@@ -355,6 +355,58 @@ describe("given a widget on a board", () => {
       expect(screen.queryByRole("button", { name: "Edit with Langy" })).toBeNull();
     });
 
+    /** @scenario "The smallest cards show short words and keep the full words for readers" */
+    it.each([
+      [OUT_OF_MEMORY, "The query used more memory than a widget may use.", "Hit the memory limit."],
+      [TIMED_OUT, "The query ran past the time a widget may take.", "Hit the time limit."],
+    ])("renders short words beside the full ones for %#", async (error, full, short) => {
+      const run = frameRuns(() => Promise.reject(error));
+      render(boardWidget({ limitAudience: { kind: "editable" } }));
+      await run();
+
+      const message = screen.getByText(short).closest("[title]") as HTMLElement;
+      expect(message.getAttribute("title")).toBe(full);
+      expect(screen.getByText(short).getAttribute("aria-hidden")).toBe("true");
+      expect(message.textContent).toContain(full);
+      expect(screen.getByText(full).getAttribute("aria-hidden")).toBeNull();
+      const note = screen.getByText("Ask someone to edit it.").closest("[title]") as HTMLElement;
+      expect(note.getAttribute("title")).toBe(
+        "Ask someone who can edit this dashboard to change the query.",
+      );
+    });
+
+    /** @scenario "The smallest cards show short words and keep the full words for readers" */
+    it("gives a built-in card no short words", async () => {
+      const run = frameRuns(() => Promise.reject(OUT_OF_MEMORY));
+      render(boardWidget({ limitAudience: { kind: "built_in" } }));
+      await run();
+
+      expect(screen.queryByText("Hit the memory limit.")).toBeNull();
+    });
+
+    /** @scenario "Edit actions wait while the board is being written" */
+    it("disables the edit actions but not Retry while the board is being written", async () => {
+      const run = frameRuns(() => Promise.reject(OUT_OF_MEMORY));
+      render(
+        boardWidget({
+          limitAudience: {
+            kind: "editable",
+            editsDisabled: true,
+            onEditWithLangy: vi.fn(),
+            onEditCode: vi.fn(),
+          },
+        }),
+      );
+      await run();
+
+      expect(screen.getByRole("button", { name: "Edit with Langy" })).toHaveProperty(
+        "disabled",
+        true,
+      );
+      expect(screen.getByRole("button", { name: "Edit code" })).toHaveProperty("disabled", true);
+      expect(screen.getByRole("button", { name: "Retry" })).toHaveProperty("disabled", false);
+    });
+
     /** @scenario "A failure that is not a limit keeps its existing message" */
     it.each<WidgetLimitAudience>([{ kind: "built_in" }, { kind: "editable", onEditCode: vi.fn() }])(
       "keeps another error's own message for a $kind card",

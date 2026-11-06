@@ -303,6 +303,9 @@ function faceInPlaceOfChart({
         <WidgetFailedFace
           message={limit.message}
           note={limit.note}
+          shortMessage={limit.shortMessage}
+          shortNote={limit.shortNote}
+          editsDisabled={editable?.editsDisabled}
           onRetry={onRetry}
           onEditWithLangy={editable?.onEditWithLangy}
           onEditCode={editable?.onEditCode}

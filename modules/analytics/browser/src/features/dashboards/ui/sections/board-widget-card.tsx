@@ -159,6 +159,7 @@ export function BoardWidgetCard({
           onFaceChange={setFace}
           limitAudience={{
             kind: "editable",
+            editsDisabled: isWriting,
             ...(langyOnData && onEdit
               ? { onEditWithLangy: () => onEdit({ withLangy: true }) }
               : {}),

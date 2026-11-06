@@ -160,6 +160,34 @@ const SHORT_FACE = "@container (max-height: 157px)";
 const SHORT_WIDE_FACE = "@container (min-width: 241px) and (max-height: 157px)";
 const SHORT_SMALL_FACE = "@container (max-width: 240px) and (max-height: 157px)";
 
+// Clipped away but still read by screen readers, so the full words stay the accessible name.
+const VISUALLY_HIDDEN = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+} as const;
+const SHORT_WORDS_ONLY_HERE = {
+  "& [data-short-words]": { display: "inline" },
+  "& [data-full-words]": VISUALLY_HIDDEN,
+} as const;
+const HIDE_SHORT_WORDS = { "& [data-short-words]": { display: "none" } } as const;
+
+/** The full words, plus the short ones the smallest cards show instead (hidden from readers). */
+function Words({ full, short }: { full: string; short?: string | undefined }) {
+  if (!short) return full;
+  return (
+    <>
+      <span data-full-words>{full}</span>
+      <span data-short-words aria-hidden>
+        {short}
+      </span>
+    </>
+  );
+}
+
 /**
  * Says the widget couldn't load and why, and offers Retry; the card's title names it. A limit
  * failure may add a note or the edit actions; beside an edit action, Retry steps back.
@@ -167,6 +195,9 @@ const SHORT_SMALL_FACE = "@container (max-width: 240px) and (max-height: 157px)"
 export function WidgetFailedFace({
   message,
   note,
+  shortMessage,
+  shortNote,
+  editsDisabled,
   onRetry,
   onEditWithLangy,
   onEditCode,
@@ -175,6 +206,12 @@ export function WidgetFailedFace({
   message?: string;
   /** A further line, such as who to ask when the reader cannot edit. */
   note?: string | undefined;
+  /** One line shown in place of `message` on the smallest cards; `message` stays the title. */
+  shortMessage?: string | undefined;
+  /** One line shown in place of `note` on the smallest cards; `note` stays the title. */
+  shortNote?: string | undefined;
+  /** Disables the edit actions while a board write runs; Retry stays live. */
+  editsDisabled?: boolean | undefined;
   onRetry: () => void;
   onEditWithLangy?: (() => void) | undefined;
   onEditCode?: (() => void) | undefined;
@@ -207,16 +244,19 @@ export function WidgetFailedFace({
               textStyle="caption"
               color="fg.muted"
               maxWidth="320px"
-              lineClamp={3}
+              lineClamp={note ? 3 : 5}
               flexShrink={0}
               title={message}
               css={{
-                [NARROW_FACE]: { lineClamp: note ? 3 : 5 },
+                ...HIDE_SHORT_WORDS,
                 [SHORT_WIDE_FACE]: { lineClamp: note || hasEdits ? 1 : 2 },
-                [SHORT_SMALL_FACE]: { lineClamp: hasEdits ? 1 : 2 },
+                [SHORT_SMALL_FACE]: {
+                  lineClamp: hasEdits || shortMessage ? 1 : 2,
+                  ...(shortMessage ? SHORT_WORDS_ONLY_HERE : {}),
+                },
               }}
             >
-              {message}
+              <Words full={message} short={shortMessage} />
             </Text>
           )}
           {note && (
@@ -228,12 +268,15 @@ export function WidgetFailedFace({
               flexShrink={0}
               title={note}
               css={{
+                ...HIDE_SHORT_WORDS,
                 [NARROW_FACE]: { lineClamp: 3 },
                 [SHORT_WIDE_FACE]: { lineClamp: 1 },
-                [SHORT_SMALL_FACE]: { display: "none" },
+                [SHORT_SMALL_FACE]: shortNote
+                  ? { lineClamp: 1, ...SHORT_WORDS_ONLY_HERE }
+                  : { display: "none" },
               }}
             >
-              {note}
+              <Words full={note} short={shortNote} />
             </Text>
           )}
         </VStack>
@@ -250,13 +293,13 @@ export function WidgetFailedFace({
         }}
       >
         {onEditWithLangy && (
-          <Button size="xs" variant="outline" onClick={onEditWithLangy}>
+          <Button size="xs" variant="outline" disabled={editsDisabled} onClick={onEditWithLangy}>
             <Sparkles size={13} aria-hidden />
             Edit with Langy
           </Button>
         )}
         {onEditCode && (
-          <Button size="xs" variant="outline" onClick={onEditCode}>
+          <Button size="xs" variant="outline" disabled={editsDisabled} onClick={onEditCode}>
             <Code2 size={13} aria-hidden />
             Edit code
           </Button>

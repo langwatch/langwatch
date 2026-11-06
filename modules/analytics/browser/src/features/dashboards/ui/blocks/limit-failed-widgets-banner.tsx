@@ -1,6 +1,6 @@
 /**
- * Above a board where two or more widgets failed on a resource limit: one line in place of
- * the same failure told on every card. One failure is left to its card.
+ * Above a board where two or more widgets failed on a resource limit: one line that says why
+ * once. Each card still says its own failure. One failure is left to its card.
  */
 
 import { Banner } from "@langwatch/design-system/banner";

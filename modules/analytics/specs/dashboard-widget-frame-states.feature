@@ -69,6 +69,20 @@ Feature: A dashboard widget frame shows what its queries report
       And it offers no edit action
 
     @integration
+    Scenario: The smallest cards show short words and keep the full words for readers
+      Given a stored widget that fails on a limit, on a card of three rows
+      When the card is as narrow as 240px and as short as 157px
+      Then the card shows "Hit the memory limit." or "Hit the time limit."
+      And a reader who cannot edit also sees "Ask someone to edit it."
+      And the full message and note stay in the title and are what a screen reader reads
+
+    @integration
+    Scenario: Edit actions wait while the board is being written
+      Given a stored widget that failed on a limit, on a board the reader can edit
+      When the board is being written
+      Then "Edit with Langy" and "Edit code" are disabled and Retry is not
+
+    @integration
     Scenario: A failure that is not a limit keeps its existing message
       Given a built-in widget and a stored widget
       When a query fails with another code, such as "lwql_unknown_identifier"
@@ -104,7 +118,7 @@ Feature: A dashboard widget frame shows what its queries report
       Given a widget whose query answered for the last hour
       When the reader chooses Live and the query fails
       Then the card says it couldn't load the widget
-      And the rows of the last 7 days are not shown under the 30 days label
+      And the rows of the last hour are not shown under the Live label
 
     @integration
     Scenario: A failed card goes back to loading while a new period runs

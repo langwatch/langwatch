@@ -13,16 +13,27 @@ export type WidgetLimitAudience =
       /** Absent, with `onEditCode`, when the reader cannot edit the board. */
       readonly onEditWithLangy?: (() => void) | undefined;
       readonly onEditCode?: (() => void) | undefined;
+      /** True while a board write runs, so the edit actions wait for it. */
+      readonly editsDisabled?: boolean;
     };
 
 export interface WidgetLimitWords {
   readonly message: string;
   /** Extra line for a reader who cannot change the query. */
   readonly note?: string;
+  /** Shown in place of `message` on the smallest cards, where the full words do not fit. */
+  readonly shortMessage?: string;
+  /** Shown in place of `note` on the smallest cards. */
+  readonly shortNote?: string;
 }
 
 const BUILT_IN_MESSAGE =
   "This widget hit a LangWatch limit in the selected period. This is not a problem with your data.";
+
+const SHORT_MESSAGE: Readonly<Record<string, string>> = {
+  query_memory_exceeded: "Hit the memory limit.",
+  query_timeout: "Hit the time limit.",
+};
 
 const EDITABLE_MESSAGE: Readonly<Record<string, string>> = {
   query_memory_exceeded: "The query used more memory than a widget may use.",
@@ -45,12 +56,15 @@ export function widgetLimitWords({
   const editable = EDITABLE_MESSAGE[code];
   if (!audience || !editable) return null;
   if (audience.kind === "built_in") return { message: BUILT_IN_MESSAGE };
+  const shortMessage = SHORT_MESSAGE[code];
   const canEdit = audience.onEditWithLangy !== undefined || audience.onEditCode !== undefined;
   return canEdit
-    ? { message: editable }
+    ? { message: editable, ...(shortMessage ? { shortMessage } : {}) }
     : {
         message: editable,
         note: "Ask someone who can edit this dashboard to change the query.",
+        ...(shortMessage ? { shortMessage } : {}),
+        shortNote: "Ask someone to edit it.",
       };
 }
 
