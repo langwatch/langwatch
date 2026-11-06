@@ -355,6 +355,30 @@ describe("a failed step", () => {
     });
   });
 
+  describe("given the sandbox's own credential failed", () => {
+    const unauthorized = failedStep({
+      id: "unauthorized-1",
+      command: "langwatch trace list",
+      errorText: JSON.stringify({
+        ok: false,
+        error: {
+          code: "unauthorized",
+          message: "Invalid API key.",
+          httpStatus: 401,
+          isHandled: true,
+        },
+      }),
+    });
+
+    /** @scenario "A sandbox credential failure folds into the record" */
+    it("folds into the receipt after the turn answered", () => {
+      renderActivity({ parts: [unauthorized, reply, ls], live: false });
+
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(receiptSteps().getByText("langwatch trace list")).toBeTruthy();
+    });
+  });
+
   describe("given a probe for something that does not exist", () => {
     const notFound = failedStep({
       id: "missing-1",

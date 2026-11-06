@@ -43,6 +43,7 @@ import {
 import { isSayToolPart } from "../../../tools/model/langy-say-tool.ts";
 import { isSecretSnippetToolPart } from "../../../tools/model/langy-secret-snippet-tool.ts";
 import {
+  isSandboxCredentialCode,
   type LangyToolErrorPresentation,
   presentLangyToolError,
 } from "../../model/logic/langy-tool-failure.ts";
@@ -770,6 +771,8 @@ const ACCESS_STATUSES = new Set([401, 403]);
  */
 function refusesAccess(presentation: LangyToolErrorPresentation): boolean {
   if (!presentation.terminal) return false;
+  // A handled sandbox credential fault is ours to fix; there is nothing for the reader to do.
+  if (isSandboxCredentialCode(presentation.code)) return false;
   if (presentation.code === "langy_github_not_connected") return true;
   return presentation.httpStatus !== undefined && ACCESS_STATUSES.has(presentation.httpStatus);
 }

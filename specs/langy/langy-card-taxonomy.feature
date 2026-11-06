@@ -114,6 +114,12 @@ Feature: Langy's cards read at the right attention weight
     Then that failure keeps its card in the conversation
 
   @integration
+  Scenario: A sandbox credential failure folds into the record
+    Given a step that failed because Langy's own sandbox credential was refused, and a reply after it
+    When I read the turn, while it runs or after it answered
+    Then that failure is a row in the folded record of the work, not a card
+
+  @integration
   Scenario: A not-found probe folds into the record
     Given a step that looked for something that does not exist, and a reply after it
     When I read the turn, while it runs or after it answered

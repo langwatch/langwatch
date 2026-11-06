@@ -188,6 +188,10 @@ const isAccessDenial = (domain: LangWatchHandledErrorShape): boolean =>
 const isSandboxCredentialFailure = (domain: LangWatchHandledErrorShape): boolean =>
   SANDBOX_CREDENTIAL_CODES.has(normalizedCode(domain));
 
+/** Whether a failure code is the sandbox or CLI credential fault, not the reader's access. */
+export const isSandboxCredentialCode = (code: string | undefined): boolean =>
+  code !== undefined && SANDBOX_CREDENTIAL_CODES.has(code.trim().toLowerCase());
+
 const asCount = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 
