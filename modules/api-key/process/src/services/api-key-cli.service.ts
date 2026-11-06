@@ -6,6 +6,7 @@ import {
   loginKeyExpiresAt,
   CLI_LOGIN_KEY_NAME_PREFIX,
   categorizablePermissions,
+  isNeverOnCliKey,
   isOffByDefaultOnCliKey,
   type CliKeyScopeSummary,
   type CliKeySelection,
@@ -76,10 +77,13 @@ export class ApiKeyCliService {
       });
     }
 
+    // Never on a CLI key, whatever the approval sent: a customised "Write" on
+    // Organization expands to every org action, organization:delete with it.
     const permissions = [...new Set(selection.permissions)].filter(
       (permission) =>
-        bindings.some((binding) => binding.scopeType === "ORGANIZATION") ||
-        !isOffByDefaultOnCliKey(permission),
+        !isNeverOnCliKey(permission) &&
+        (bindings.some((binding) => binding.scopeType === "ORGANIZATION") ||
+          !isOffByDefaultOnCliKey(permission)),
     );
     if (permissions.length === 0) {
       throw new CliKeySelectionInvalidError({
@@ -171,10 +175,14 @@ export class ApiKeyCliService {
     maxSessionDurationDays?: number;
     refreshWindowMs?: number;
   }): Promise<{ token: string; apiKeyId: string; scope: CliKeyScopeSummary }> {
+    // An approval stamped before validation dropped these can still reach the exchange.
+    const permissions = input.selection.permissions.filter(
+      (permission) => !isNeverOnCliKey(permission),
+    );
     const scope = await this.resolveCliScopeSummary({
       organizationId: input.organizationId,
       bindings: input.selection.bindings,
-      permissions: input.selection.permissions,
+      permissions,
     });
     const expiresAt =
       input.sessionStartedAtMs === void 0
@@ -191,7 +199,7 @@ export class ApiKeyCliService {
       createdByUserId: input.userId,
       organizationId: input.organizationId,
       permissionMode: "restricted",
-      permissions: input.selection.permissions,
+      permissions,
       bindings: input.selection.bindings.map((binding) => ({
         ...binding,
         role: "CUSTOM" as const,

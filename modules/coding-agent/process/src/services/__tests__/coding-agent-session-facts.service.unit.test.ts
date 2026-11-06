@@ -25,6 +25,8 @@ const stored = (over: Partial<StoredSession> = {}): StoredSession => ({
   occurredAt: Date.UTC(2026, 9, 20, 12),
   firstStoredAt: Date.UTC(2026, 9, 20, 12),
   auxiliary: false,
+  terminalType: null,
+  repositoryKey: null,
   ...over,
 });
 
@@ -80,6 +82,64 @@ describe("CodingAgentSessionFactsService", () => {
           occurredAt: Date.UTC(2026, 9, 20, 12),
         },
       ]);
+    });
+  });
+
+  describe("given a stored session with a terminal type and a repo key", () => {
+    /** @scenario "A stored session's fact carries its terminal type and repo key" */
+    it("records both on the fact", async () => {
+      const { service, recorded } = factsOver();
+
+      await service.record([stored({ terminalType: "vscode", repositoryKey: "a1b2" })]);
+
+      expect(recorded[0]).toMatchObject({ terminalType: "vscode", repositoryKey: "a1b2" });
+    });
+  });
+
+  describe("given a stored session with no terminal type or repo", () => {
+    /** @scenario "A stored session with no terminal type or repo records a fact without them" */
+    it("records the fact without them", async () => {
+      const { service, recorded } = factsOver();
+
+      await service.record([stored()]);
+
+      expect([recorded[0]?.terminalType, recorded[0]?.repositoryKey]).toEqual([
+        undefined,
+        undefined,
+      ]);
+    });
+  });
+
+  describe("given a session whose fact was recorded before its repo was known", () => {
+    /** @scenario "A session that learns its terminal type or repo inside the hold records again" */
+    it("records a second fact when the repo arrives inside the hold", async () => {
+      const now = Date.UTC(2026, 9, 20, 12);
+      const { service, recorded } = factsOver({ nowMs: () => now });
+
+      await service.record([stored()]);
+      await service.record([stored({ repositoryKey: "a1b2" })]);
+
+      expect(recorded.map((fact) => fact.repositoryKey)).toEqual([undefined, "a1b2"]);
+    });
+
+    it("records a second fact when the terminal type arrives inside the hold", async () => {
+      const now = Date.UTC(2026, 9, 20, 12);
+      const { service, recorded } = factsOver({ nowMs: () => now });
+
+      await service.record([stored()]);
+      await service.record([stored({ terminalType: "vscode" })]);
+
+      expect(recorded.map((fact) => fact.terminalType)).toEqual([undefined, "vscode"]);
+    });
+
+    it("records nothing when reported again unchanged inside the hold", async () => {
+      const now = Date.UTC(2026, 9, 20, 12);
+      const { service, recorded } = factsOver({ nowMs: () => now });
+
+      await service.record([stored({ repositoryKey: "a1b2" })]);
+      await service.record([stored({ repositoryKey: "a1b2" })]);
+
+      expect(recorded).toHaveLength(1);
     });
   });
 
