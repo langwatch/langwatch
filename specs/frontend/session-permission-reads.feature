@@ -154,6 +154,13 @@ Feature: Permission reads come from the session, and a public page holds none
     Then the authorize host sends no grant read of its own, leaving the session's read the only one
     And it reads the person's grants only when a project token is minted, capping the token at them
 
+  @unit
+  Scenario: Recording a last-seen stamp refetches nothing on the page
+    Given a project page has loaded its reads
+    When the page records the person's last sign-in
+    Then the write is sent
+    And no read on the page is marked stale or fetched again
+
   @integration
   Scenario: A migrated screen answers a signed-in reader the same as before
     Given a signed-in reader whose role grants some permissions and not others in the active project
