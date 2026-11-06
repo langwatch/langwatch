@@ -633,6 +633,7 @@ export function LangyActivityParts({
                 groups={completedGroups}
                 heldGroups={heldGroup ? [heldGroup] : []}
                 failures={receiptFailures}
+                heldFailures={heldFailure ? [heldFailure] : []}
                 reasoningTitles={reasoningTitles}
                 devMode={devMode}
               />
@@ -799,6 +800,7 @@ function CompletedActivityBatch({
   groups,
   heldGroups = [],
   failures,
+  heldFailures = [],
   reasoningTitles = [],
   devMode,
 }: {
@@ -810,6 +812,8 @@ function CompletedActivityBatch({
   heldGroups?: ActivityGroup[];
   /** Failed steps the turn worked past, listed among the steps that worked. */
   failures: FailedToolCall[];
+  /** The newest failure, standing beside the receipt as one line; the header still counts it. */
+  heldFailures?: FailedToolCall[];
   /** The turn's folded thinking steps — rows of the receipt, expanded only. */
   reasoningTitles?: string[];
   devMode: boolean;
@@ -836,7 +840,7 @@ function CompletedActivityBatch({
     pinned.current = true;
     pauseClose();
   };
-  const failedCount = failures.length;
+  const failedCount = failures.length + heldFailures.length;
   const worked = [...groups, ...heldGroups];
   const callCount = worked.reduce((count, group) => count + group.calls.length, failedCount);
   const steps = [

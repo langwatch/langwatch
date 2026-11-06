@@ -92,7 +92,7 @@ Feature: Langy's cards read at the right attention weight
     When I read the record of the work
     Then its header says "2 actions completed" and "5 tool calls, 3 failed" in a quiet grey
     And when every step failed it says "3 actions failed" with a grey mark, not the green check
-    And a step that worked still counts while it stands beside the record as the latest step
+    And a step that worked or failed still counts while it stands beside the record as the latest step
     And nothing in the header is red
 
   @integration
@@ -124,9 +124,11 @@ Feature: Langy's cards read at the right attention weight
     When I read the turn, while it runs or after it answered
     Then that failure keeps its card in the conversation
 
+  # Known limit: the sandbox CLI's plain-text login error carries no code, so it takes the
+  # plain-failure path and, as the last step, keeps the generic card.
   @integration
   Scenario: A sandbox credential failure folds into the record
-    Given a step that failed because Langy's own sandbox credential was refused, and a reply after it
+    Given a step whose JSON error document carries a credential code for Langy's own sandbox credential, and a reply after it
     When I read the turn, while it runs or after it answered
     Then that failure is a row in the folded record of the work, not a card
     And opening it says the failure is on Langy's side, not the reader's access

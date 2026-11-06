@@ -224,7 +224,7 @@ describe("a failed step", () => {
       expect(screen.queryByRole("alert")).toBeNull();
       expect(receiptSteps().queryByText("cat a.txt")).toBeNull();
       expect(container.textContent).toContain("cat a.txt");
-      expect(receiptHeader().textContent).toContain("1 tool call");
+      expect(receiptHeader().textContent).toContain("2 tool calls, 1 failed");
     });
 
     /** @scenario "A step that fails while the turn is running folds into the record too" */
@@ -618,24 +618,24 @@ describe("the receipt of the work", () => {
     pass(2200);
     expect(opened()).toBe("false");
   });
+});
 
-  describe("given a turn still running whose newest step worked after a failure", () => {
-    beforeEach(() => {
-      useLangyStore.setState({ turnPhase: "active" });
-    });
+describe("the receipt header while the turn runs", () => {
+  beforeEach(() => {
+    useLangyStore.setState({ turnPhase: "active" });
+  });
 
-    /** @scenario "The record of the work counts its failures quietly" */
-    it("does not call the receipt all failed while the step that worked stands beside it", () => {
-      renderActivity({ parts: [failA, ls], live: true });
+  /** @scenario "The record of the work counts its failures quietly" */
+  it("does not call the receipt all failed while the step that worked stands beside it", () => {
+    renderActivity({ parts: [failA, ls], live: true });
 
-      expect(receiptHeader().textContent).toMatch(/^1 action completed/);
-    });
+    expect(receiptHeader().textContent).toMatch(/^1 action completed/);
+  });
 
-    /** @scenario "The record of the work counts its failures quietly" */
-    it("still calls a receipt of only failures all failed", () => {
-      renderActivity({ parts: [failA, failB], live: true });
+  /** @scenario "The record of the work counts its failures quietly" */
+  it("still calls a receipt of only failures all failed, counting the one beside it", () => {
+    renderActivity({ parts: [failA, failB], live: true });
 
-      expect(receiptHeader().textContent).toMatch(/^1 action failed/);
-    });
+    expect(receiptHeader().textContent).toMatch(/^2 actions failed/);
   });
 });
