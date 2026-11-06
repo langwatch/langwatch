@@ -224,6 +224,18 @@ Feature: Subscription Page Plan Management
       And the first row of the bordered box is "Price", reading "€58/mo" then "2 seats × €29"
 
     @integration
+    Scenario: A one-seat plan's price row does not restate the total
+      Given my organization has an active monthly Growth subscription for 1 seat at €29
+      When I view the subscription page
+      Then the price row reads "€29/mo" with no seats breakdown
+
+    @integration
+    Scenario: An enterprise plan's card has no price row
+      Given my organization has an active enterprise subscription
+      When I view the subscription page
+      Then the card's bordered box has no price row
+
+    @integration
     Scenario: An annual plan's price row shows the yearly total and the monthly seat price
       Given my organization has an active annual Growth subscription for 2 seats
       When I view the subscription page

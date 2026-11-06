@@ -19,7 +19,7 @@ Feature: Card, resource tile, load more and the one-line empty state
   @integration
   Scenario: A boxed setting list is a small bordered table with values at the right end
     Given a setting list in the boxed variant
-    Then the list draws a muted border round its rows
+    Then the list draws a border round its rows in the same grey as the lines between them
     And each row's values sit at the right end of the row
 
   @integration

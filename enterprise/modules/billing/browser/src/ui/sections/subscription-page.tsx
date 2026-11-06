@@ -135,7 +135,7 @@ function currentPlanEventUsage({
   });
 }
 
-/** The current plan's price row; a free, tiered or licensed plan shows none. */
+/** The current plan's price row; a free, tiered, licensed or enterprise plan shows none. */
 function currentPlanPricingFor({
   flags,
   plan,
@@ -153,9 +153,12 @@ function currentPlanPricingFor({
   monthlyEquivalent: string;
   billingPeriod: BillingInterval;
 }): PlanPrice | undefined {
-  if (flags.isTieredPricingModel || flags.isDeveloperPlan || flags.isLicenseOverride) {
-    return undefined;
-  }
+  const isUnpriced =
+    flags.isTieredPricingModel ||
+    flags.isDeveloperPlan ||
+    flags.isLicenseOverride ||
+    flags.isEnterprisePlan;
+  if (isUnpriced) return undefined;
   return planPrice({
     seatCount: plan.maxMembers ?? 1,
     seatPrice: formatPrice({ cents: seatPricePerPeriodCents, currency }),

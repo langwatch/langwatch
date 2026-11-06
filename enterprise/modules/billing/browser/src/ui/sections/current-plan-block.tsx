@@ -179,9 +179,11 @@ export function CurrentPlanBlock({
               <Text textStyle="bodySm" fontWeight={600} fontVariantNumeric="tabular-nums">
                 {pricing.total}
               </Text>
-              <Text textStyle="bodySm" color="fg.subtle" fontVariantNumeric="tabular-nums">
-                {pricing.breakdown}
-              </Text>
+              {pricing.breakdown && (
+                <Text textStyle="bodySm" color="fg.subtle" fontVariantNumeric="tabular-nums">
+                  {pricing.breakdown}
+                </Text>
+              )}
             </SettingRow>
           )}
           {eventUsage && <EventUsageRow usage={eventUsage} />}
@@ -219,7 +221,9 @@ export function CurrentPlanBlock({
                 <Box color="green.fg" flexShrink={0} paddingTop="0.5">
                   <Check size={16} />
                 </Box>
-                <Text fontSize="sm">{feature}</Text>
+                <Text fontSize="sm" color="fg.muted">
+                  {feature}
+                </Text>
               </HStack>
             ))}
           </SimpleGrid>

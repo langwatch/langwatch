@@ -567,7 +567,7 @@ function refuseUnsupportedShape({
   }
 }
 
-/** What the reader can do, under the body; a divided footer sits under a muted rule. */
+/** What the reader can do, under the body; a divided footer sits under a rule in the border grey. */
 function CardFooter({
   band,
   insetX,

@@ -135,7 +135,7 @@ export function SettingList({
       align="stretch"
       gap={0}
       width="full"
-      separator={<Box height="1px" background="border.nested" />}
+      separator={<Box height="1px" background={variant === "boxed" ? "border" : "border.nested"} />}
       {...(variant === "boxed" ? BOXED_LIST : {})}
       data-setting-list={variant}
       data-testid={testId}

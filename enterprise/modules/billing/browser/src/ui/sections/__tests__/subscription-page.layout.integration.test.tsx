@@ -227,7 +227,9 @@ const givenOneMember = () => {
 
 const givenGrowthSubscription = ({
   interval = "MONTHLY",
-}: { interval?: "MONTHLY" | "ANNUAL" } = {}) => {
+  seats = 2,
+  type = `GROWTH_SEAT_EUR_${interval}`,
+}: { interval?: "MONTHLY" | "ANNUAL"; seats?: number; type?: string } = {}) => {
   setMockOrganization({
     id: "test-org-id",
     name: "Test Org",
@@ -237,10 +239,10 @@ const givenGrowthSubscription = ({
   mockGetActivePlan.mockReturnValue({
     data: createMockPlan({
       planSource: "subscription",
-      type: `GROWTH_SEAT_EUR_${interval}`,
+      type,
       name: "Growth",
       free: false,
-      maxMembers: 2,
+      maxMembers: seats,
       maxMessagesPerMonth: 200000,
     }),
     isLoading: false,
@@ -497,6 +499,37 @@ describe("<SubscriptionPage/> layout", () => {
       expect(row).toHaveTextContent("Traces this month");
       expect(row).toHaveTextContent("New traces are not processed");
       expect(row).not.toHaveTextContent("events");
+    });
+  });
+
+  describe("when the organization has a one-seat Growth subscription", () => {
+    beforeEach(() => {
+      givenGrowthSubscription({ seats: 1 });
+      givenUsage({ membersCount: 1 });
+    });
+
+    /** @scenario "A one-seat plan's price row does not restate the total" */
+    it("shows the total alone", async () => {
+      renderSubscriptionPage();
+
+      const price = await screen.findByTestId("plan-price");
+      expect(price).toHaveTextContent("€29/mo");
+      expect(price).not.toHaveTextContent("seat");
+    });
+  });
+
+  describe("when the organization has an enterprise subscription", () => {
+    beforeEach(() => {
+      givenGrowthSubscription({ type: "ENTERPRISE" });
+      givenUsage({ membersCount: 2 });
+    });
+
+    /** @scenario "An enterprise plan's card has no price row" */
+    it("leaves the price out of the plan card", async () => {
+      renderSubscriptionPage();
+
+      await screen.findByTestId("plan-usage-rows");
+      expect(screen.queryByTestId("plan-price")).toBeNull();
     });
   });
 

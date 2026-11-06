@@ -176,7 +176,8 @@ export function planEventUsage({
 /** The plan card's price row: the period total, then seats times the seat price. */
 export type PlanPrice = {
   total: string;
-  breakdown: string;
+  /** Seats times the seat price (from two seats), then the per-month seat price on annual plans. */
+  breakdown?: string;
 };
 
 export function planPrice({
@@ -191,6 +192,9 @@ export function planPrice({
   /** Annual plans add the per-month seat price, as the rest of the page does. */
   monthlyEquivalent?: string;
 }): PlanPrice {
-  const seats = `${seatCount} seat${seatCount === 1 ? "" : "s"} \u00d7 ${seatPrice}`;
-  return { total, breakdown: monthlyEquivalent ? `${seats} · ${monthlyEquivalent}` : seats };
+  const parts = [
+    seatCount > 1 ? `${seatCount} seats \u00d7 ${seatPrice}` : undefined,
+    monthlyEquivalent,
+  ].filter((part): part is string => Boolean(part));
+  return { total, breakdown: parts.length > 0 ? parts.join(" · ") : undefined };
 }
