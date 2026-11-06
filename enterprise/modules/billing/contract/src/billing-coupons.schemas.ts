@@ -120,8 +120,17 @@ export const promotionCodeTargetSchema: PromotionCodeTargetSchema =
   promotionCodeTargetSchemaDefinition;
 export type PromotionCodeTarget = z.infer<typeof promotionCodeTargetSchema>;
 
+/** The fields of a create request a refusal can name. */
+export const COUPON_INPUT_FIELDS = [
+  "percentOff",
+  "durationInMonths",
+  "code",
+  "maxRedemptions",
+  "expiresAt",
+] as const;
+
 /** One field of a create request the service refused, with the copy the drawer shows. */
 export type CouponInputProblem = Readonly<{
-  field: "percentOff" | "durationInMonths" | "code" | "maxRedemptions" | "expiresAt";
+  field: (typeof COUPON_INPUT_FIELDS)[number];
   message: string;
 }>;

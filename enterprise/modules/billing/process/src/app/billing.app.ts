@@ -444,6 +444,7 @@ export class BillingModule
       coupons: isSaas
         ? BillingCouponService.create({
             coupons: stripe.channels.coupons,
+            stripeErrors: StripeErrorTranslatorService.create(),
             products: resolveGrowthCheckoutProducts(
               stripePricesFile,
               getStripeEnvironmentFromNodeEnv(nodeEnvironment),
@@ -1051,7 +1052,6 @@ export class BillingModule
     await this.#connectedBilling().tick.run();
   }
 
-  /** Off Cloud nothing is invoiced; on Cloud a missing payment key is a deployment fault. */
   async listCoupons(_staff: BillingStaff): Promise<CouponList> {
     return this.#couponService().list();
   }
@@ -1096,6 +1096,7 @@ export class BillingModule
     return this.#coupons;
   }
 
+  /** Off Cloud nothing is invoiced; on Cloud a missing payment key is a deployment fault. */
   #connectedBilling(): ConnectedBilling {
     if (this.#connected) return this.#connected;
     if (!this.#isSaas) throw new ConnectedBillingUnavailableError();

@@ -26,7 +26,7 @@ Feature: Coupons in the Cloud admin console
     @unit
     Scenario: The page answers not found off LangWatch Cloud
       Given a self-hosted deployment
-      When an operator opens /ops/coupons
+      When an operator opens /ops/cloud/coupons
       Then the page is not found
 
   Rule: The list shows every coupon with its codes, newest first

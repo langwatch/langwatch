@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryStripeCouponsChannel } from "../../channels/memory/memory.stripe-coupons.channel.ts";
 import type { StripeCoupon, StripePromotionCode } from "../../channels/stripe-coupons.channel.ts";
 import { BillingCouponService } from "../billing-coupon.service.ts";
+import { StripeErrorTranslatorService } from "../stripe-error-translator.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-11-10T12:00:00Z");
 const NOW_SECONDS = Math.floor(NOW.epochMilliseconds / 1000);
@@ -63,6 +64,7 @@ function compose() {
   const service = BillingCouponService.create({
     coupons: channel,
     products: PRODUCTS,
+    stripeErrors: StripeErrorTranslatorService.create(),
     now: () => NOW,
   });
   return { channel, service };
@@ -138,7 +140,7 @@ describe("BillingCouponService", () => {
     });
 
     /** @scenario "The list fails clearly when Stripe is unreachable" */
-    it("passes Stripe's refusal through for the page to show", async () => {
+    it("names the payment provider unavailable for the page to show", async () => {
       const { channel, service } = compose();
       channel.refuse({
         operation: "listCoupons",
@@ -148,7 +150,7 @@ describe("BillingCouponService", () => {
         }),
       });
 
-      await expect(service.list()).rejects.toMatchObject({ type: "StripeConnectionError" });
+      await expect(service.list()).rejects.toMatchObject({ code: "billing_provider_unavailable" });
     });
   });
 
@@ -257,6 +259,37 @@ describe("BillingCouponService", () => {
         type: "StripeInvalidRequestError",
       });
       expect(channel.coupons).toEqual([]);
+    });
+
+    it("refuses by name when another operator takes the code between the check and the write", async () => {
+      const { channel, service } = compose();
+      channel.refuse({
+        operation: "createPromotionCode",
+        error: new Stripe.errors.StripeInvalidRequestError({
+          type: "invalid_request_error",
+          code: "promotion_code_already_exists",
+          message: "taken",
+        }),
+      });
+
+      const refusal = await refusalOf(service.create(REQUEST));
+
+      expect(refusal.code).toBe("billing_coupon_code_taken");
+      expect(channel.coupons).toEqual([]);
+    });
+
+    it("keeps Stripe's refusal of the code when deleting the coupon also fails", async () => {
+      const { channel, service } = compose();
+      channel.refuse({
+        operation: "createPromotionCode",
+        error: new Stripe.errors.StripeInvalidRequestError({
+          type: "invalid_request_error",
+          message: "code refused",
+        }),
+      });
+      channel.refuse({ operation: "deleteCoupon", error: new Error("delete refused") });
+
+      await expect(service.create(REQUEST)).rejects.toMatchObject({ message: "code refused" });
     });
   });
 

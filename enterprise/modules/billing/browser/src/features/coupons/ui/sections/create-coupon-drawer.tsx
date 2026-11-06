@@ -10,7 +10,11 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import type { CouponDuration } from "@langwatch/enterprise-billing-contract";
+import {
+  COUPON_INPUT_FIELDS,
+  type CouponDuration,
+  MAX_DURATION_MONTHS,
+} from "@langwatch/enterprise-billing-contract";
 import { nowInstant } from "@langwatch/time";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
@@ -33,15 +37,8 @@ const DURATIONS: { value: CouponDuration; label: string }[] = [
   { value: "forever", label: "Forever" },
 ];
 
-const COUPON_FIELDS: readonly CouponField[] = [
-  "percentOff",
-  "durationInMonths",
-  "code",
-  "maxRedemptions",
-  "expiresAt",
-];
 const isCouponField = (name: string): name is CouponField =>
-  (COUPON_FIELDS as readonly string[]).includes(name);
+  (COUPON_INPUT_FIELDS as readonly string[]).includes(name);
 
 /**
  * Creates a percentage coupon on Growth Seats with one promotion code: the only kind the
@@ -197,6 +194,7 @@ function DiscountFields({
               type="number"
               inputMode="numeric"
               min={1}
+              max={MAX_DURATION_MONTHS}
               aria-invalid={problems.durationInMonths !== undefined || undefined}
               value={draft.durationInMonths}
               onChange={(event) => set("durationInMonths", event.target.value)}
@@ -256,7 +254,7 @@ function CodeFields({
           <Field.ErrorText>{problems.maxRedemptions}</Field.ErrorText>
         </Field.Root>
         <Field.Root invalid={problems.expiresAt !== undefined}>
-          <Field.Label>Code expires on</Field.Label>
+          <Field.Label>Code expires on (UTC)</Field.Label>
           <Input
             type="date"
             aria-invalid={problems.expiresAt !== undefined || undefined}
