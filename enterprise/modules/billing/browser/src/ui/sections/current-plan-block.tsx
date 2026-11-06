@@ -62,7 +62,6 @@ function PlanActions({
   isManageLoading?: boolean;
   contactSalesUrl?: string;
 }) {
-  if (!onUpgrade && !onManageSubscription && !contactSalesUrl) return null;
   return (
     <HStack gap={2} width="full" justify="flex-end" data-testid="current-plan-actions">
       {onUpgrade && (
@@ -143,11 +142,14 @@ export function CurrentPlanBlock({
   contactSalesUrl?: string;
 }) {
   const isOverSeats = maxSeats != null && userCount > maxSeats;
+  const hasActions = Boolean(onUpgrade || onManageSubscription || contactSalesUrl);
   return (
     <Card
       data-testid="current-plan-block"
       title={planName}
       status="ok"
+      badgePlacement="title"
+      footerDivider={hasActions}
       description={
         pricing && (
           <PricingSummary
@@ -166,17 +168,19 @@ export function CurrentPlanBlock({
         </HStack>
       }
       footer={
-        <PlanActions
-          onUpgrade={onUpgrade}
-          isUpgradeLoading={isUpgradeLoading}
-          onManageSubscription={onManageSubscription}
-          isManageLoading={isManageLoading}
-          contactSalesUrl={contactSalesUrl}
-        />
+        hasActions ? (
+          <PlanActions
+            onUpgrade={onUpgrade}
+            isUpgradeLoading={isUpgradeLoading}
+            onManageSubscription={onManageSubscription}
+            isManageLoading={isManageLoading}
+            contactSalesUrl={contactSalesUrl}
+          />
+        ) : undefined
       }
     >
       <VStack align="stretch" gap={4}>
-        <SettingList>
+        <SettingList variant="boxed" data-testid="plan-usage-rows">
           {eventUsage && <EventUsageRow usage={eventUsage} />}
           <SettingRow label="Members / seats">
             <Text

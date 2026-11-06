@@ -208,6 +208,14 @@ Feature: Subscription Page Plan Management
       And choosing it starts the Growth checkout for 1 seat
 
     @integration
+    Scenario: The plan card reads like a bill
+      Given my organization is on the Free plan with 1 member
+      When I view the subscription page
+      Then the "Current" chip sits right after the plan name
+      And the events and seats rows sit together in one bordered box, their figures at the right end
+      And a rule separates that box from the card's action below it
+
+    @integration
     Scenario: The plan card holds the page's one primary upgrade button
       Given my organization is on the Free plan with 1 member
       When I view the subscription page

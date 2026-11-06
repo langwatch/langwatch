@@ -298,6 +298,24 @@ describe("<SubscriptionPage/> layout", () => {
       });
     });
 
+    /** @scenario "The plan card reads like a bill" */
+    it("puts the chip by the plan name, the usage in a box and the action under a rule", async () => {
+      renderSubscriptionPage();
+
+      const card = await screen.findByTestId("current-plan-block");
+      const title = within(card).getByRole("heading", { name: "Free plan" });
+      expect(title.nextElementSibling).toHaveTextContent("Current");
+      const rows = within(card).getByTestId("plan-usage-rows");
+      expect(rows).toHaveAttribute("data-setting-list", "boxed");
+      expect(within(rows).getByText("Events this month")).toBeInTheDocument();
+      expect(within(rows).getByText("Members / seats")).toBeInTheDocument();
+      const footer = card.querySelector("[data-card-footer-divider]");
+      expect(footer).not.toBeNull();
+      expect(
+        within(footer as HTMLElement).getByRole("button", { name: "Upgrade to Growth" }),
+      ).toBeInTheDocument();
+    });
+
     /** @scenario "The plan card holds the page's one primary upgrade button" */
     it("keeps the Growth offer's button secondary and starting the same checkout", async () => {
       const mutateAsync = vi.fn().mockResolvedValue({ url: null });
