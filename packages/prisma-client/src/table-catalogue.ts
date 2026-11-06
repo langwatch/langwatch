@@ -182,6 +182,7 @@ export const prismaTableCatalogue = {
   "IdentityMatchSuggestion": "IdentityMatchSuggestion",
   "ConnectedSeatChange": "ConnectedSeatChange",
   "ConnectedStatement": "ConnectedStatement",
+  "LicenseRenewalClaim": "LicenseRenewalClaim",
   "InstanceIdentity": "InstanceIdentity",
   "SelfHostedInstance": "SelfHostedInstance",
   "SelfHostedInstanceDiagnostic": "SelfHostedInstanceDiagnostic",
@@ -3029,6 +3030,15 @@ export const prismaModelFieldCatalogue = {
     "month",
     "sentAt"
   ],
+  "LicenseRenewalClaim": [
+    "stripeInvoiceId",
+    "stripeSubscriptionId",
+    "claimToken",
+    "claimedAt",
+    "issuedLicense",
+    "deliveredAt",
+    "licenseId"
+  ],
   "InstanceIdentity": [
     "id",
     "instanceId",
@@ -3723,6 +3733,7 @@ export const prismaRelationCatalogue = {
   "IdentityMatchSuggestion": {},
   "ConnectedSeatChange": {},
   "ConnectedStatement": {},
+  "LicenseRenewalClaim": {},
   "InstanceIdentity": {},
   "SelfHostedInstance": {},
   "SelfHostedInstanceDiagnostic": {},

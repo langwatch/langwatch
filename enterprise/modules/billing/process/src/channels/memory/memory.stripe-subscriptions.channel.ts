@@ -8,6 +8,7 @@ import type {
   BillingPurchasedLineItem,
   BillingSubscription,
   BillingSubscriptionChange,
+  BillingSubscriptionCheckout,
   BillingSubscriptionPreviewChange,
 } from "../../rules/billing-stripe-shapes.rules.ts";
 import { StripeSubscriptionsChannel } from "../stripe-subscriptions.channel.ts";
@@ -29,6 +30,8 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
   readonly previews: { subscriptionId: string; change: BillingSubscriptionPreviewChange }[] = [];
   private readonly held = new Map<string, BillingSubscription>();
   private readonly lineItems = new Map<string, BillingPurchasedLineItem[]>();
+  private readonly subscriptionCheckouts = new Map<string, BillingSubscriptionCheckout>();
+  readonly checkoutLookups: string[] = [];
   private readonly refusals = new Map<Operation, Error>();
   private preview: BillingInvoicePreview | undefined;
 
@@ -54,6 +57,17 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     lineItems: BillingPurchasedLineItem[];
   }): void {
     this.lineItems.set(checkoutSessionId, lineItems);
+  }
+
+  /** Records the checkout session, and its payment link, a subscription was bought through. */
+  seedSubscriptionCheckout({
+    subscriptionId,
+    checkout,
+  }: {
+    subscriptionId: string;
+    checkout: BillingSubscriptionCheckout;
+  }): void {
+    this.subscriptionCheckouts.set(subscriptionId, checkout);
   }
 
   /** What every invoice preview answers from now on. */
@@ -114,6 +128,17 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     const lineItems = this.lineItems.get(checkoutSessionId);
     if (lineItems) return lineItems;
     throw missing(`No such checkout.session: '${checkoutSessionId}'`);
+  }
+
+  async findSubscriptionCheckouts({
+    subscriptionId,
+  }: {
+    subscriptionId: string;
+  }): Promise<BillingSubscriptionCheckout[]> {
+    this.throwIfRefused("findSubscriptionCheckouts");
+    this.checkoutLookups.push(subscriptionId);
+    const checkout = this.subscriptionCheckouts.get(subscriptionId);
+    return checkout ? [checkout] : [];
   }
 
   async createCheckoutSession(request: BillingCheckoutRequest): Promise<{ url: string | null }> {

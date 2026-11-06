@@ -639,6 +639,10 @@ export class LicensingModule implements LicensingApiContract {
     return this.#sync.verify(input);
   }
 
+  verifyLicenceTokenForSync(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller> {
+    return this.#sync.verifyForSync(input);
+  }
+
   verifyActivationCode(input: ConnectPresentedCredential): Promise<ConnectActivationCaller> {
     return this.#activation.verifyPresented(input);
   }
