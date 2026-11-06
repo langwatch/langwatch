@@ -4,13 +4,13 @@
  */
 import { Banner } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
+import { DailyBarChart, type DailyBar } from "@langwatch/design-system/daily-bar-chart";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Activity } from "lucide-react";
 
 import { allowanceText, type MonthEvents } from "../../model/usage-page-state.ts";
-import { DailyUsageBars } from "../elements/daily-usage-bars.tsx";
 
 const METER_FILL: Record<MonthEvents["status"], string> = {
   ok: "blue.solid",
@@ -27,7 +27,7 @@ export type UsageEventsCardState =
   | {
       kind: "month";
       events: MonthEvents;
-      chart: { heights: number[]; labels: string[]; axis: string[]; summary: string } | null;
+      chart: { bars: DailyBar[]; axis: string[]; summary: string } | null;
     };
 
 function Muted({ children }: { children: string }) {
@@ -79,11 +79,11 @@ function EventsBody({ state }: { state: UsageEventsCardState }) {
         )}
       </HStack>
       {chart && (
-        <DailyUsageBars
-          heights={chart.heights}
-          labels={chart.labels}
+        <DailyBarChart
+          bars={chart.bars}
           axis={chart.axis}
           summary={chart.summary}
+          data-testid="usage-daily-chart"
         />
       )}
     </VStack>

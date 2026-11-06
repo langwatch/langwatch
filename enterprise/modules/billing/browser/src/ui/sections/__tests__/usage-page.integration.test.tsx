@@ -255,7 +255,7 @@ describe("the usage page", () => {
       expect(screen.getByTestId("usage-events-count")).toHaveTextContent("31,800");
       expect(within(card).getByText("of 50,000 included")).toBeInTheDocument();
       expect(screen.getByTestId("usage-events-meter")).toBeInTheDocument();
-      expect(screen.getAllByTestId("usage-daily-bar")).toHaveLength(30);
+      expect(screen.getAllByTestId("daily-bar")).toHaveLength(30);
       expect(within(card).getByText("Resets on 1 Dec")).toBeInTheDocument();
     });
 
@@ -303,7 +303,7 @@ describe("the usage page", () => {
 
       expect(screen.getByTestId("usage-events-count")).toHaveTextContent("31,800");
       expect(screen.getByTestId("usage-events-meter")).toBeInTheDocument();
-      expect(screen.queryAllByTestId("usage-daily-bar")).toHaveLength(0);
+      expect(screen.queryAllByTestId("daily-bar")).toHaveLength(0);
       expect(screen.queryByTestId("usage-projects-card")).not.toBeInTheDocument();
       expect(screen.queryByTestId("usage-events-unavailable")).not.toBeInTheDocument();
     });
@@ -429,7 +429,7 @@ describe("the usage page", () => {
       expect(
         within(screen.getByTestId("usage-events-card")).getByText("Traces this month"),
       ).toBeInTheDocument();
-      expect(screen.queryAllByTestId("usage-daily-bar")).toHaveLength(0);
+      expect(screen.queryAllByTestId("daily-bar")).toHaveLength(0);
     });
 
     /** @scenario "A plan without Lite seats shows no Lite row" */

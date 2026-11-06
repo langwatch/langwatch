@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  barHeights,
+  dailyBars,
   chartAxis,
   fullSeats,
   liteRow,
@@ -41,15 +41,11 @@ describe("chartAxis", () => {
   });
 });
 
-describe("barHeights", () => {
-  it("draws each day against the busiest, a small day still visible and an empty day flat", () => {
-    expect(
-      barHeights([
-        { date: "a", count: 100 },
-        { date: "b", count: 1 },
-        { date: "c", count: 0 },
-      ]),
-    ).toEqual([1, 0.04, 0]);
+describe("dailyBars", () => {
+  it("gives each day its count and a hover title", () => {
+    expect(dailyBars({ days: [{ date: "2026-11-03", count: 4800 }], unit: "events" })).toEqual([
+      { value: 4800, title: "3 Nov: 4,800 events" },
+    ]);
   });
 });
 

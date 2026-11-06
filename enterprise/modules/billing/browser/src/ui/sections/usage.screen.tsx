@@ -22,10 +22,9 @@ import { SUBSCRIPTION_PATH, UPGRADE_TO_GROWTH_HREF } from "../../model/checkout-
 import { getPlanActionLabel, planManagementUrl } from "../../model/plan-management-url.ts";
 import { PricingModel } from "../../model/prisma-types.ts";
 import {
-  barHeights,
   breakdownGapMessage,
   chartAxis,
-  dayLabels,
+  dailyBars,
   fullSeats,
   liteRow,
   monthEvents,
@@ -142,8 +141,7 @@ function eventsCardState({
   const days = breakdown?.days;
   const chart = days
     ? {
-        heights: barHeights(days),
-        labels: dayLabels({ days, unit: "events" }),
+        bars: dailyBars({ days, unit: "events" }),
         axis: chartAxis(days),
         summary: `Events per day this month, from ${chartAxis(days)[0] ?? ""}.`,
       }

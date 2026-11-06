@@ -149,15 +149,18 @@ export function chartAxis(days: readonly UsageDay[]): string[] {
   return [shortDate(first.date), shortDate(days[14]?.date ?? first.date), shortDate(last.date)];
 }
 
-/** Each day's count as a hover label: "3 Nov: 4,800 events". */
-export function dayLabels({ days, unit }: { days: readonly UsageDay[]; unit: string }): string[] {
-  return days.map((day) => `${shortDate(day.date)}: ${formatCount(day.count)} ${unit}`);
-}
-
-/** Each day's bar height as a share of the busiest day, 0 for a day with none. */
-export function barHeights(days: readonly UsageDay[]): number[] {
-  const max = Math.max(0, ...days.map((day) => day.count));
-  return days.map((day) => (max > 0 && day.count > 0 ? Math.max(0.04, day.count / max) : 0));
+/** One bar per day, titled for hover: "3 Nov: 4,800 events". */
+export function dailyBars({
+  days,
+  unit,
+}: {
+  days: readonly UsageDay[];
+  unit: string;
+}): { value: number; title: string }[] {
+  return days.map((day) => ({
+    value: day.count,
+    title: `${shortDate(day.date)}: ${formatCount(day.count)} ${unit}`,
+  }));
 }
 
 /** The Lite members row: a count on plans that have Lite seats, a note on Free, none otherwise. */
