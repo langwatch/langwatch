@@ -79,9 +79,11 @@ export function useScenarioRunDetail({
     scenarioId,
     projectId: project?.id,
     projectSlug: project?.slug,
-    runTarget: reserved?.targetType
-      ? { type: reserved.targetType, id: reserved.targetReferenceId }
-      : null,
+    // A connector run is not a pickable target yet, so running again falls back to the last pick.
+    runTarget:
+      reserved?.targetType && reserved.targetType !== "connector"
+        ? { type: reserved.targetType, id: reserved.targetReferenceId }
+        : null,
     runCallbacks,
   });
   const handleOpenInTraces = useOpenRunInTraces({

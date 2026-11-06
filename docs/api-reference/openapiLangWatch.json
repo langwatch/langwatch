@@ -5401,7 +5401,8 @@
                               "workflow",
                               "http",
                               "connected",
-                              "voice"
+                              "voice",
+                              "connector"
                             ],
                             "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
                           },
@@ -5858,7 +5859,8 @@
                         "workflow",
                         "http",
                         "connected",
-                        "voice"
+                        "voice",
+                        "connector"
                       ],
                       "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
                     },
@@ -7844,6 +7846,308 @@
                       "type",
                       "config"
                     ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      },
+                      "commitMessage": {
+                        "description": "What changed, kept on the version this write creates.",
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      "workflowId": {
+                        "type": "string"
+                      },
+                      "copiedFromAgentId": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string",
+                        "const": "connector"
+                      },
+                      "config": {
+                        "type": "object",
+                        "properties": {
+                          "_library_ref": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "cls": {
+                            "type": "string"
+                          },
+                          "parameters": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "identifier": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "str",
+                                    "image",
+                                    "file",
+                                    "float",
+                                    "int",
+                                    "bool",
+                                    "list",
+                                    "list[str]",
+                                    "list[float]",
+                                    "list[int]",
+                                    "list[bool]",
+                                    "dict",
+                                    "json_schema",
+                                    "chat_messages",
+                                    "signature",
+                                    "llm",
+                                    "prompting_technique",
+                                    "dataset",
+                                    "code"
+                                  ]
+                                },
+                                "optional": {
+                                  "type": "boolean"
+                                },
+                                "value": {},
+                                "desc": {
+                                  "type": "string"
+                                },
+                                "prefix": {
+                                  "type": "string"
+                                },
+                                "hidden": {
+                                  "type": "boolean"
+                                },
+                                "json_schema": {
+                                  "type": "object",
+                                  "properties": {},
+                                  "additionalProperties": {}
+                                }
+                              },
+                              "required": [
+                                "identifier",
+                                "type"
+                              ]
+                            }
+                          },
+                          "inputs": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "identifier": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "str",
+                                    "image",
+                                    "file",
+                                    "float",
+                                    "int",
+                                    "bool",
+                                    "list",
+                                    "list[str]",
+                                    "list[float]",
+                                    "list[int]",
+                                    "list[bool]",
+                                    "dict",
+                                    "json_schema",
+                                    "chat_messages",
+                                    "signature",
+                                    "llm",
+                                    "prompting_technique",
+                                    "dataset",
+                                    "code"
+                                  ]
+                                },
+                                "optional": {
+                                  "type": "boolean"
+                                },
+                                "value": {},
+                                "desc": {
+                                  "type": "string"
+                                },
+                                "prefix": {
+                                  "type": "string"
+                                },
+                                "hidden": {
+                                  "type": "boolean"
+                                },
+                                "json_schema": {
+                                  "type": "object",
+                                  "properties": {},
+                                  "additionalProperties": {}
+                                }
+                              },
+                              "required": [
+                                "identifier",
+                                "type"
+                              ]
+                            }
+                          },
+                          "outputs": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "identifier": {
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "str",
+                                    "image",
+                                    "file",
+                                    "float",
+                                    "int",
+                                    "bool",
+                                    "list",
+                                    "list[str]",
+                                    "list[float]",
+                                    "list[int]",
+                                    "list[bool]",
+                                    "dict",
+                                    "json_schema",
+                                    "chat_messages",
+                                    "signature",
+                                    "llm",
+                                    "prompting_technique",
+                                    "dataset",
+                                    "code"
+                                  ]
+                                },
+                                "optional": {
+                                  "type": "boolean"
+                                },
+                                "value": {},
+                                "desc": {
+                                  "type": "string"
+                                },
+                                "prefix": {
+                                  "type": "string"
+                                },
+                                "hidden": {
+                                  "type": "boolean"
+                                },
+                                "json_schema": {
+                                  "type": "object",
+                                  "properties": {},
+                                  "additionalProperties": {}
+                                }
+                              },
+                              "required": [
+                                "identifier",
+                                "type"
+                              ]
+                            }
+                          },
+                          "isCustom": {
+                            "type": "boolean"
+                          },
+                          "behave_as": {
+                            "type": "string",
+                            "const": "evaluator"
+                          },
+                          "call": {
+                            "type": "object",
+                            "properties": {
+                              "language": {
+                                "type": "string",
+                                "enum": [
+                                  "python"
+                                ]
+                              },
+                              "code": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "language",
+                              "code"
+                            ]
+                          },
+                          "setup": {
+                            "type": "object",
+                            "properties": {
+                              "language": {
+                                "type": "string",
+                                "enum": [
+                                  "python"
+                                ]
+                              },
+                              "code": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "language",
+                              "code"
+                            ]
+                          },
+                          "teardown": {
+                            "type": "object",
+                            "properties": {
+                              "language": {
+                                "type": "string",
+                                "enum": [
+                                  "python"
+                                ]
+                              },
+                              "code": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "language",
+                              "code"
+                            ]
+                          },
+                          "secretNames": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[A-Z][A-Z0-9_]*$"
+                            }
+                          },
+                          "fixturesDatasetId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "timeoutMs": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "call"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "type",
+                      "config"
+                    ]
                   }
                 ]
               }
@@ -7877,7 +8181,8 @@
                         "workflow",
                         "http",
                         "connected",
-                        "voice"
+                        "voice",
+                        "connector"
                       ],
                       "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
                     },
@@ -8305,7 +8610,8 @@
                         "workflow",
                         "http",
                         "connected",
-                        "voice"
+                        "voice",
+                        "connector"
                       ],
                       "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
                     },
@@ -8681,7 +8987,8 @@
                       "workflow",
                       "http",
                       "connected",
-                      "voice"
+                      "voice",
+                      "connector"
                     ]
                   },
                   "config": {
@@ -8758,7 +9065,8 @@
                         "workflow",
                         "http",
                         "connected",
-                        "voice"
+                        "voice",
+                        "connector"
                       ],
                       "description": "The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API."
                     },
@@ -9134,7 +9442,8 @@
                       "workflow",
                       "http",
                       "connected",
-                      "voice"
+                      "voice",
+                      "connector"
                     ]
                   },
                   "config": {
@@ -9211,7 +9520,8 @@
                         "workflow",
                         "http",
                         "connected",
-                        "voice"
+                        "voice",
+                        "connector"
                       ]
                     },
                     "archivedAt": {
@@ -9308,7 +9618,8 @@
                               "workflow",
                               "http",
                               "connected",
-                              "voice"
+                              "voice",
+                              "connector"
                             ]
                           },
                           "config": {
@@ -103934,7 +104245,8 @@
                                   "code",
                                   "workflow",
                                   "connected",
-                                  "voice"
+                                  "voice",
+                                  "connector"
                                 ]
                               },
                               "targetKey": {

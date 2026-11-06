@@ -10,8 +10,14 @@ import type {
   TargetAdapterData,
 } from "@langwatch/scenario-contract";
 
-/** Whether a run against this target calls a setup or a teardown hook. */
+/**
+ * Whether a run against this target calls a setup or a teardown hook: a connected agent's own
+ * (ADR-180), or a connector agent's blocks (ADR-194), whose refusal is recorded as its setup.
+ */
 export function adapterDeclaresHooks(adapterData: TargetAdapterData): boolean {
+  if (adapterData.type === "connector") {
+    return Boolean(adapterData.setup || adapterData.teardown || adapterData.refusal);
+  }
   if (adapterData.type !== "connected") return false;
   return Boolean(adapterData.hooks?.setup || adapterData.hooks?.teardown);
 }

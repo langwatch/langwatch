@@ -193,5 +193,17 @@ describe("mapClickHouseRowToScenarioRunData", () => {
         targetType: "http",
       });
     });
+
+    /** @scenario "A connector run's target type survives a read" */
+    it("keeps the connector target type", () => {
+      const data = mapClickHouseRowToScenarioRunData(
+        stored({ targetReferenceId: "agent_1", targetType: "connector" }),
+      );
+
+      expect(data.metadata?.langwatch).toMatchObject({
+        targetReferenceId: "agent_1",
+        targetType: "connector",
+      });
+    });
   });
 });

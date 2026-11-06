@@ -201,8 +201,13 @@ export function AgentManagementPage(props: AgentManagementPageProps) {
                 <Fragment key={agent.id}>
                   {props.card.render({
                     agent,
-                    onClick: () => props.navigation.openEditor(agent),
-                    onEdit: () => props.navigation.openEditor(agent),
+                    // A connector has no editor yet, so its card offers neither action.
+                    ...(agent.type === "connector"
+                      ? {}
+                      : {
+                          onClick: () => props.navigation.openEditor(agent),
+                          onEdit: () => props.navigation.openEditor(agent),
+                        }),
                     onDelete: () => setAgentToDelete(agent),
                     onOpenWorkflow: () => props.navigation.openWorkflow(agent),
                     onReplicate: () => setAgentForCopy({ id: agent.id, name: agent.name }),

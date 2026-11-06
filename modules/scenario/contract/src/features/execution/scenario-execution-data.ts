@@ -1,4 +1,4 @@
-import { agentHooksSchema } from "@langwatch/agent-contract";
+import { agentHooksSchema, CONNECTOR_BLOCK_LANGUAGES } from "@langwatch/agent-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -247,6 +247,44 @@ export const ConnectedAgentDataSchema: ConnectedAgentDataSchema =
   ConnectedAgentDataSchemaDefinition;
 export type ConnectedAgentData = z.infer<typeof ConnectedAgentDataSchema>;
 
+/** One block of a connector agent, as the child posts it to the code runner (ADR-194). */
+const ConnectorBlockDataSchemaDefinition = z.object({
+  language: z.enum(CONNECTOR_BLOCK_LANGUAGES),
+  code: z.string(),
+});
+export interface ConnectorBlockDataSchema extends Named<
+  typeof ConnectorBlockDataSchemaDefinition
+> {}
+export const ConnectorBlockDataSchema: ConnectorBlockDataSchema =
+  ConnectorBlockDataSchemaDefinition;
+export type ConnectorBlockData = z.infer<typeof ConnectorBlockDataSchema>;
+
+/**
+ * Pre-fetched Scenario Connector agent (ADR-194): its blocks, and only the secrets and fixture
+ * rows it names. Every block runs in the code runner; the child never evaluates one.
+ */
+const ConnectorAgentDataSchemaDefinition = z.object({
+  type: z.literal("connector"),
+  agentId: z.string(),
+  call: ConnectorBlockDataSchema,
+  setup: ConnectorBlockDataSchema.optional(),
+  teardown: ConnectorBlockDataSchema.optional(),
+  /** The values of the secrets the agent names; no other secret travels to its blocks. */
+  secrets: z.record(z.string(), z.string()).default({}),
+  /** The fixtures dataset's entries, which every block receives. */
+  rows: z.array(z.record(z.string(), z.unknown())).optional(),
+  /** The call block's budget per turn, in milliseconds, already capped by the platform. */
+  timeoutMs: z.number().int().positive(),
+  /** Why no block may run (release off, missing secret, unusable fixtures); each fails with it. */
+  refusal: z.string().optional(),
+});
+export interface ConnectorAgentDataSchema extends Named<
+  typeof ConnectorAgentDataSchemaDefinition
+> {}
+export const ConnectorAgentDataSchema: ConnectorAgentDataSchema =
+  ConnectorAgentDataSchemaDefinition;
+export type ConnectorAgentData = z.infer<typeof ConnectorAgentDataSchema>;
+
 // Voice run carries transport, agent id, and provider credential (never stored on agent).
 // When project lacks a key, child fails with a named reason instead of an empty credential.
 const ElevenLabsVoiceTargetSchemaDefinition = z.object({
@@ -321,6 +359,7 @@ const TargetAdapterDataSchemaDefinition = z.discriminatedUnion("type", [
   WorkflowAgentDataSchema,
   ConnectedAgentDataSchema,
   VoiceAgentDataSchema,
+  ConnectorAgentDataSchema,
 ]);
 export interface TargetAdapterDataSchema extends Named<typeof TargetAdapterDataSchemaDefinition> {}
 export const TargetAdapterDataSchema: TargetAdapterDataSchema = TargetAdapterDataSchemaDefinition;
@@ -410,7 +449,7 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
 const TargetConfigSchemaDefinition = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
+  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice", "connector"]),
   referenceId: z.string(),
   /** A suite prompt target's field mappings, pinned when the suite queued the run. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),

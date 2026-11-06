@@ -13,6 +13,7 @@ import {
 } from "@langwatch/scenario-contract";
 import type {
   CodeAgentData,
+  ConnectorAgentData,
   HttpAgentData,
   PromptConfigData,
   TargetAdapterData,
@@ -28,6 +29,7 @@ import type { ModelParamsFailureReason } from "../../../services/scenario-model-
 import { ScenarioWorkflowAgentSecretsService } from "../../../services/scenario-workflow-agent-secrets.service.ts";
 import type { ScenarioWorkflowHydratorService } from "../../../services/scenario-workflow-hydrator.service.ts";
 import { ScenarioWorkflowMappingService } from "../../../services/scenario-workflow-mapping.service.ts";
+import type { ConnectorTargetReader } from "./scenario-connector-target.service.ts";
 
 /** Failure result propagated from hydrateLlmParameters through the fetch chain */
 type HydrationFailure = {
@@ -50,6 +52,8 @@ export class ScenarioTargetPrefetchService {
     legacyDefaultModel: string;
     langwatchEndpoint: string;
     voiceTargets: VoiceTargetReader | null;
+    /** Null where no run targets a connector agent, such as an agent test. */
+    connectorTargets: ConnectorTargetReader | null;
   }): ScenarioTargetPrefetchService {
     return new ScenarioTargetPrefetchService(
       options,
@@ -68,6 +72,7 @@ export class ScenarioTargetPrefetchService {
       legacyDefaultModel: string;
       langwatchEndpoint: string;
       voiceTargets: VoiceTargetReader | null;
+      connectorTargets: ConnectorTargetReader | null;
     },
     private readonly workflowMappings: ScenarioWorkflowMappingService,
     private readonly workflowAgentSecrets: ScenarioWorkflowAgentSecretsService,
@@ -122,6 +127,14 @@ export class ScenarioTargetPrefetchService {
       return this.fetchVoiceAgentTarget(projectId, target.referenceId);
     }
 
+    if (target.type === "connector") {
+      return this.fetchConnectorAgentTarget({
+        projectId,
+        agentId: target.referenceId,
+        runSecretValues,
+      });
+    }
+
     return this.fetchHttpAgentTarget({
       projectId,
       agentId: target.referenceId,
@@ -134,6 +147,17 @@ export class ScenarioTargetPrefetchService {
       throw new Error("Voice target prefetch is not installed");
     }
     return this.options.voiceTargets.getVoiceTarget({ projectId, agentId });
+  }
+
+  private async fetchConnectorAgentTarget(input: {
+    projectId: string;
+    agentId: string;
+    runSecretValues: Record<string, string>;
+  }): Promise<ConnectorAgentData> {
+    if (!this.options.connectorTargets) {
+      throw new Error("Connector target prefetch is not installed");
+    }
+    return this.options.connectorTargets.getConnectorTarget(input);
   }
 
   private async tryGetAgent(projectId: string, agentId: string): Promise<Agent | null> {

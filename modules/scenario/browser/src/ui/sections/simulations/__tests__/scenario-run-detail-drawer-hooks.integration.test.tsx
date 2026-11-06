@@ -321,6 +321,23 @@ describe("<ScenarioRunDetailDrawer/> setup and teardown", () => {
     });
   });
 
+  describe("given a run on a connector agent with a teardown", () => {
+    /** @scenario 'A connector run offers no "Rerun and keep data"' */
+    it("offers no keep-data rerun, as it has no target to rerun against", async () => {
+      const user = userEvent.setup();
+      mocks.runState = buildRunState({
+        targetType: "connector",
+        hooks: { setup: SETUP_OK, teardown: { status: "ok", durationMs: 200 } },
+      });
+
+      renderDrawer();
+
+      const more = screen.queryByRole("button", { name: "More actions" });
+      if (more) await user.click(more);
+      expect(screen.queryByText("Rerun and keep data")).toBeNull();
+    });
+  });
+
   describe("given a finished run whose target type is unknown", () => {
     /** @scenario 'A run with no known target type offers no "Rerun and keep data" and is not marked "No hooks"' */
     it("shows no No hooks mark and offers no keep-data rerun", async () => {

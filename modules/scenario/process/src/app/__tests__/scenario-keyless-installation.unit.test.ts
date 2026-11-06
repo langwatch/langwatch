@@ -10,6 +10,7 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -141,6 +142,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       testPeer({ token: AuditLogApi, instance: createApiFixture<AuditLogApi>() }),
       testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
       testPeer({ token: DataRetentionApi, instance: createApiFixture<DataRetentionApi>() }),
+      testPeer({ token: DatasetApi, instance: createApiFixture<DatasetApi>() }),
       testPeer({ token: EvaluatorApi, instance: createApiFixture<EvaluatorApi>() }),
       testPeer({ token: EvaluationApi, instance: createApiFixture<EvaluationApi>() }),
       testPeer({ token: PromptApi, instance: createApiFixture<PromptApi>() }),

@@ -1,5 +1,5 @@
 Feature: Scenario run hooks: setup and teardown
-  As a person who tests a connected agent with scenarios
+  As a person who tests a connected agent or a Scenario Connector agent with scenarios
   I want the platform to run the agent's setup before the turns and its teardown after
   So that a scenario starts from known test data and leaves none behind.
 
@@ -7,7 +7,9 @@ Feature: Scenario run hooks: setup and teardown
     The order is setup, turns, teardown. Hooks run for scenario runs only.
     Parameters come from the run parameters, one value per name per run.
     The child sends each hook's result on its result line; the parent records
-    it as a platform event folded into the run. Decided in ADR-180.
+    it as a platform event folded into the run. Decided in ADR-180. A Scenario
+    Connector agent's setup, call and teardown are code blocks LangWatch stores and
+    runs in the code runner, decided in ADR-194.
 
   Rule: Order and state
 
@@ -262,6 +264,11 @@ Feature: Scenario run hooks: setup and teardown
       Then the run does not show "No hooks"
       And the run offers no "Rerun and keep data"
 
+    @integration
+    Scenario: A connector run offers no "Rerun and keep data"
+      Given a finished run on a connector agent whose teardown ran
+      Then the run offers no "Rerun and keep data"
+
     @unit @unimplemented
     Scenario: Keep data is never saved to a plan
       Given a run started with "Rerun and keep data"
@@ -319,3 +326,167 @@ Feature: Scenario run hooks: setup and teardown
       Given a scenario child that writes a result line naming a setup and a teardown result
       When the processor runs the job and the child exits
       Then the run records both hooks
+
+  # Decided in ADR-194: a Scenario Connector agent's blocks are code LangWatch stores and runs.
+  Rule: Scenario Connector agents
+
+    @integration
+    Scenario: A connector agent runs setup, a call per turn, then teardown in the code runner
+      Given a connector agent with a setup, a call and a teardown block
+      When a scenario runs against it with two turns
+      Then the code runner gets setup, call, call, teardown in that order
+      And each block is posted as the one code node of a workflow
+      And the scenario child never evaluates a block itself
+
+    @integration
+    Scenario: The call block gets the message, the history, the state and the run-scoped secrets
+      Given a setup block that returns the state accountId "acc_1" and the run-scoped secret ACCOUNT_TOKEN
+      When a turn is played
+      Then the call block receives the user's message, the history and the state accountId "acc_1"
+      And it can read ACCOUNT_TOKEN as a secret
+      And its reply is the agent's answer
+
+    @unit
+    Scenario: Every connector block gets the run, the parameters, the fixture rows and its idempotency key
+      Given a run with the parameter persona "gold" and a fixtures dataset of two rows
+      When the setup, call and teardown blocks are called
+      Then each receives the run ids, the parameters, both rows and the key "<scenarioRunId>:<attemptId>:<kind>", the call block with ":<turn>" added
+      And teardown receives the state setup returned
+
+    @unit
+    Scenario: A connector agent's blocks receive only the secrets it names
+      Given a project with the secrets SHOP_ADMIN_KEY and OTHER_KEY
+      And a connector agent that names SHOP_ADMIN_KEY
+      When the run is prepared
+      Then the run carries SHOP_ADMIN_KEY and not OTHER_KEY
+
+    @unit
+    Scenario: The state never chooses where a connector block runs
+      Given a setup block that returns a state holding a URL
+      When the call and teardown blocks run
+      Then they are posted to the same code runner as setup
+      And the URL reaches them only as data in their input
+
+    @integration
+    Scenario: Run-scoped secrets stay out of the record, the reply and every error
+      Given a setup block that returns a run-scoped secret and puts the same value in its state
+      When the run records setup and a call echoes the value
+      Then the recorded state holds "[redacted]" in its place
+      And the reply holds "[redacted]" in its place
+
+    @unit
+    Scenario: A secret is redacted in its encoded forms too
+      Given a run-scoped secret value
+      When a block returns it in base64, URL-safe base64, URL-encoded form or inside an object key
+      Then every such form reads "[redacted]" in setup's state and in teardown's returned object
+
+    @integration
+    Scenario: A connector setup that raises leaves the run not scored and still runs teardown
+      Given a setup block that raises an error
+      When a scenario runs against the agent
+      Then no call block runs
+      And setup records "failed" with the traceback as its error
+      And the teardown block was called once
+
+    @integration
+    Scenario: A connector setup that does not answer in time records a timeout
+      Given a setup block that runs past its budget
+      When a scenario runs against the agent
+      Then setup records "timed_out"
+      And the teardown block was called once
+
+    @integration
+    Scenario: A connector block whose code runner fails records failed without internal addresses
+      Given a setup block and a code runner that answers non-2xx, cannot be reached or answers no JSON
+      When a scenario runs against the agent
+      Then setup records "failed" with the cause
+      And the error holds no internal address
+
+    @unit
+    Scenario: A connector setup state over 64 KiB fails setup
+      Given a setup block that returns a state over 64 KiB
+      Then setup records "failed" naming the cap
+
+    @unit
+    Scenario: A connector setup that answers outside the state shape fails setup
+      Given a setup block that returns {"accountId": "acc_1"} instead of a state
+      Then setup records "failed" naming the expected { state, secrets? } shape
+
+    @unit
+    Scenario: A connector agent that names a missing secret fails setup before any block runs
+      Given a connector agent that names a secret the project does not have
+      When the run is prepared and started
+      Then setup records "failed" naming the secret
+      And the code runner is not called
+
+    @unit
+    Scenario: A connector agent whose fixtures are over 64 KiB fails setup before any block runs
+      Given a connector agent whose fixtures dataset is over 64 KiB
+      When the run is prepared and started
+      Then setup records "failed" naming the cap
+      And the code runner is not called
+
+    @unit
+    Scenario: A connector agent whose fixtures dataset was deleted fails setup before any block runs
+      Given a connector agent whose fixtures dataset no longer exists
+      When the run is prepared
+      Then the run carries a refusal saying the dataset no longer exists
+
+    @integration
+    Scenario: A secret in a connector block's error is scrubbed
+      Given a teardown block whose traceback prints a secret it was given
+      Then the teardown error holds "[redacted]" in its place
+
+    @integration
+    Scenario: A failed connector teardown leaves the verdict unchanged
+      Given a passing run whose teardown block raises
+      Then the run verdict is still success
+      And teardown records "failed"
+
+    @integration
+    Scenario: Rerun and keep data skips a connector teardown
+      Given a run started with "Rerun and keep data" against a connector agent
+      Then the teardown block is not called
+      And teardown records "skipped"
+
+    @integration
+    Scenario: A call block that raises fails the turn with its scrubbed error
+      Given a call block whose traceback prints a secret it was given
+      When a turn is played
+      Then the turn fails with the traceback
+      And the error holds "[redacted]" in place of the secret
+
+    @unit
+    Scenario: A run of a connector agent goes to the Node child
+      Given a project with the release_scenario_go_runner_enabled flag on
+      And a connector agent with only a call block
+      When a scenario runs against it
+      Then the run is routed to the Node child
+
+    # The owner has not decided the defaults (ADR-194, open questions), so the flag is off everywhere.
+    @unit
+    Scenario: The connector release flag is off by default on every deployment
+      Given the product flag release_scenario_connector_steps
+      Then its default is off
+
+    @unit
+    Scenario: Without the release flag a connector agent runs no block and is not scored
+      Given a project without release_scenario_connector_steps
+      And a connector agent with only a call block
+      When a scenario runs against it
+      Then setup records "failed" with "Connector steps are not released for this project yet."
+      And no secret or fixture row is read
+      And the code runner is not called
+
+    @unit
+    Scenario: With the release flag on a connector agent's blocks run
+      Given a project with release_scenario_connector_steps on
+      When the run is prepared
+      Then the run carries no refusal
+
+    # The Python code runner has no app-level egress fence yet (ADR-194, Isolation and egress).
+    @integration @unimplemented
+    Scenario: A connector block's outbound calls pass the deployment's egress policy
+      Given a deployment that refuses private and metadata addresses
+      When a connector block calls a metadata address
+      Then the call is refused

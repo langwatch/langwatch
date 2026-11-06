@@ -168,6 +168,25 @@ from .create_agent_body_type_5 import CreateAgentBodyType5
 from .create_agent_body_type_5_config_type_0 import CreateAgentBodyType5ConfigType0
 from .create_agent_body_type_5_config_type_1 import CreateAgentBodyType5ConfigType1
 from .create_agent_body_type_5_config_type_1_call_direction import CreateAgentBodyType5ConfigType1CallDirection
+from .create_agent_body_type_6 import CreateAgentBodyType6
+from .create_agent_body_type_6_config import CreateAgentBodyType6Config
+from .create_agent_body_type_6_config_call import CreateAgentBodyType6ConfigCall
+from .create_agent_body_type_6_config_call_language import CreateAgentBodyType6ConfigCallLanguage
+from .create_agent_body_type_6_config_inputs_item import CreateAgentBodyType6ConfigInputsItem
+from .create_agent_body_type_6_config_inputs_item_json_schema import CreateAgentBodyType6ConfigInputsItemJsonSchema
+from .create_agent_body_type_6_config_inputs_item_type import CreateAgentBodyType6ConfigInputsItemType
+from .create_agent_body_type_6_config_outputs_item import CreateAgentBodyType6ConfigOutputsItem
+from .create_agent_body_type_6_config_outputs_item_json_schema import CreateAgentBodyType6ConfigOutputsItemJsonSchema
+from .create_agent_body_type_6_config_outputs_item_type import CreateAgentBodyType6ConfigOutputsItemType
+from .create_agent_body_type_6_config_parameters_item import CreateAgentBodyType6ConfigParametersItem
+from .create_agent_body_type_6_config_parameters_item_json_schema import (
+    CreateAgentBodyType6ConfigParametersItemJsonSchema,
+)
+from .create_agent_body_type_6_config_parameters_item_type import CreateAgentBodyType6ConfigParametersItemType
+from .create_agent_body_type_6_config_setup import CreateAgentBodyType6ConfigSetup
+from .create_agent_body_type_6_config_setup_language import CreateAgentBodyType6ConfigSetupLanguage
+from .create_agent_body_type_6_config_teardown import CreateAgentBodyType6ConfigTeardown
+from .create_agent_body_type_6_config_teardown_language import CreateAgentBodyType6ConfigTeardownLanguage
 from .create_agent_response_201 import CreateAgentResponse201
 from .create_agent_response_201_config_type_0 import CreateAgentResponse201ConfigType0
 from .create_agent_response_201_created_by_type_0 import CreateAgentResponse201CreatedByType0
@@ -9493,6 +9512,23 @@ __all__ = (
     "CreateAgentBodyType5ConfigType0",
     "CreateAgentBodyType5ConfigType1",
     "CreateAgentBodyType5ConfigType1CallDirection",
+    "CreateAgentBodyType6",
+    "CreateAgentBodyType6Config",
+    "CreateAgentBodyType6ConfigCall",
+    "CreateAgentBodyType6ConfigCallLanguage",
+    "CreateAgentBodyType6ConfigInputsItem",
+    "CreateAgentBodyType6ConfigInputsItemJsonSchema",
+    "CreateAgentBodyType6ConfigInputsItemType",
+    "CreateAgentBodyType6ConfigOutputsItem",
+    "CreateAgentBodyType6ConfigOutputsItemJsonSchema",
+    "CreateAgentBodyType6ConfigOutputsItemType",
+    "CreateAgentBodyType6ConfigParametersItem",
+    "CreateAgentBodyType6ConfigParametersItemJsonSchema",
+    "CreateAgentBodyType6ConfigParametersItemType",
+    "CreateAgentBodyType6ConfigSetup",
+    "CreateAgentBodyType6ConfigSetupLanguage",
+    "CreateAgentBodyType6ConfigTeardown",
+    "CreateAgentBodyType6ConfigTeardownLanguage",
     "CreateAgentResponse201",
     "CreateAgentResponse201ConfigType0",
     "CreateAgentResponse201CreatedByType0",

@@ -279,6 +279,8 @@ export class ScenarioPrefetchCompletionService {
         return "HTTP agent";
       case "voice":
         return "Voice agent";
+      case "connector":
+        return "Scenario Connector agent";
     }
   }
 

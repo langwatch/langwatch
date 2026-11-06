@@ -4,6 +4,7 @@ from enum import Enum
 class ArchiveAgentResponse200Type(str, Enum):
     CODE = "code"
     CONNECTED = "connected"
+    CONNECTOR = "connector"
     HTTP = "http"
     SIGNATURE = "signature"
     VOICE = "voice"
