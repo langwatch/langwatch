@@ -53,6 +53,13 @@ Feature: Large dataset storage
     And the rows written before the failure are removed
 
   @unit
+  Scenario: A new dataset refuses two rows with the same id
+    When I create a new dataset whose rows include the same id twice
+    Then the create fails because the id is duplicated
+    And no dataset with that name exists
+    And the rows written before the failure are removed
+
+  @unit
   Scenario: A copy of a dataset is created directly in object storage
     Given a dataset whose rows are kept in the Postgres records table
     When I copy it to another project
