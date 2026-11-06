@@ -2,10 +2,12 @@
  * What an SSO auto-add tells Customer.io.
  * @see specs/features/customer-io-nurturing-integration.feature
  */
+import { Temporal } from "@langwatch/time";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   fireInviteAccepted,
+  fireJoinedOrganization,
   fireSsoAutoAdded,
 } from "../nurturing-membership-join-service.rules.ts";
 
@@ -30,7 +32,6 @@ describe("fireSsoAutoAdded", () => {
             organizationName: "Acme Corp",
           },
           traces: { hasTraces: false, lastTraceAt: null },
-          firstJoin: true,
         });
 
         expect(calls[0]).toMatchObject({ traits: { createdAt: 1_792_664_000 } });
@@ -42,18 +43,17 @@ describe("fireSsoAutoAdded", () => {
 const joinSource = {
   sourceEventId: "event-1",
   tenantId: "org-1",
-  occurredAt: Date.UTC(2026, 10, 7),
+  occurredAt: Temporal.Instant.from("2026-11-07T00:00:00Z").epochMilliseconds,
   userId: "user-1",
   organizationId: "org-1",
   organizationName: "Acme Corp",
 };
 const noTraces = { hasTraces: false, lastTraceAt: null };
 
-const inviteCalls = (role?: string, occurredAt = joinSource.occurredAt, firstJoin = true) =>
+const inviteCalls = (role?: string) =>
   fireInviteAccepted({
-    signal: { kind: "invite_accepted", ...joinSource, occurredAt, role },
+    signal: { kind: "invite_accepted", ...joinSource, role },
     traces: noTraces,
-    firstJoin,
   });
 const tracksOf = (calls: ReturnType<typeof inviteCalls>) =>
   calls.filter((call) => call.type === "track");
@@ -92,7 +92,6 @@ describe("joined_via_sso", () => {
     fireSsoAutoAdded({
       signal: { kind: "sso_auto_added", ...joinSource, role },
       traces: noTraces,
-      firstJoin: true,
     }).find((call) => call.type === "track");
 
   /** @scenario "A join event carries the seat the person joined with" */
@@ -110,18 +109,16 @@ describe("joined_via_sso", () => {
 });
 
 describe("joined_organization", () => {
-  const joinedOrganization = (calls: ReturnType<typeof inviteCalls>) =>
-    tracksOf(calls).find((call) => call.event === "joined_organization");
+  const CUT_OFF = Temporal.Instant.from("2026-11-06T00:00:00Z").epochMilliseconds;
+  const invite = (overrides: { role?: string; occurredAt?: number } = {}) =>
+    fireJoinedOrganization({ kind: "invite_accepted", ...joinSource, ...overrides });
 
   /** @scenario "A join is tracked as joined_organization beside its own event" */
-  it("is tracked beside joined_via_invite with the invite method and a stable message id", () => {
-    const calls = inviteCalls("MEMBER");
-
-    expect(tracksOf(calls).map((call) => call.event)).toEqual([
-      "joined_via_invite",
-      "joined_organization",
-    ]);
-    expect(joinedOrganization(calls)).toMatchObject({
+  it("is decided with the invite method, the seat and a stable message id", () => {
+    expect(invite({ role: "MEMBER" })).toEqual({
+      type: "track",
+      userId: "user-1",
+      event: "joined_organization",
       messageId: "joined_organization:user-1:org-1",
       properties: {
         organization_id: "org-1",
@@ -134,26 +131,23 @@ describe("joined_organization", () => {
 
   /** @scenario "A join is tracked as joined_organization beside its own event" */
   it("carries the sso method for an SSO add", () => {
-    const calls = fireSsoAutoAdded({
-      signal: { kind: "sso_auto_added", ...joinSource },
-      traces: noTraces,
-      firstJoin: true,
+    expect(fireJoinedOrganization({ kind: "sso_auto_added", ...joinSource })).toMatchObject({
+      properties: { join_method: "sso" },
     });
-
-    expect(joinedOrganization(calls)).toMatchObject({ properties: { join_method: "sso" } });
   });
 
-  /** @scenario "An invite and an SSO add of the same person and organization are tracked once" */
-  it("is left out when the person already joined, keeping the old event", () => {
-    const calls = inviteCalls(undefined, undefined, false);
-
-    expect(tracksOf(calls).map((call) => call.event)).toEqual(["joined_via_invite"]);
+  /** @scenario "A join is tracked as joined_organization beside its own event" */
+  it("is not one of the join's own calls, which keep joined_via_invite", () => {
+    expect(tracksOf(inviteCalls()).map((call) => call.event)).toEqual(["joined_via_invite"]);
   });
 
-  /** @scenario "A join from before joined_organization existed is not tracked as it" */
-  it("is left out for a join that predates it, keeping the old event", () => {
-    const calls = inviteCalls(undefined, Date.UTC(2026, 9, 20));
+  /** @scenario "A join at the cut-off is tracked as joined_organization, one a millisecond earlier is not" */
+  it("is decided for a join at exactly the cut-off", () => {
+    expect(invite({ occurredAt: CUT_OFF })).toMatchObject({ event: "joined_organization" });
+  });
 
-    expect(tracksOf(calls).map((call) => call.event)).toEqual(["joined_via_invite"]);
+  /** @scenario "A join at the cut-off is tracked as joined_organization, one a millisecond earlier is not" */
+  it("is not decided for a join one millisecond before the cut-off", () => {
+    expect(invite({ occurredAt: CUT_OFF - 1 })).toBeNull();
   });
 });

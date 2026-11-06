@@ -180,16 +180,29 @@ Feature: An organization's session facts reach every active member in Customer.i
     Then joined_organization is tracked once, and joined_via_sso is still tracked
 
   @unit
-  Scenario: A joined_organization that failed to send is tracked on the person's next join
-    Given the joined_organization track for the person and org-1 failed
-    When the person's next join signal for org-1 is delivered
-    Then joined_organization is tracked once, and not again after that
+  Scenario: A person joining a second organization is tracked joined_organization again
+    Given the person's join of org-1 was tracked joined_organization
+    When their invite_accepted signal for org-2 is delivered
+    Then joined_organization is tracked for org-2 as well
+
+  @unit
+  Scenario: A joined_organization that failed to send is tracked when the same join is replayed
+    Given the joined_organization track for the person and org-1 was rejected, or threw before it went out
+    When the same invite_accepted signal is delivered again, and again after that
+    Then joined_organization is tracked once and joined_via_invite is not tracked a second time
 
   @unit
   Scenario: A join from before joined_organization existed is not tracked as it
     Given an invite_accepted signal for org-1 that occurred before 2026-11-06
     When the signal is delivered
     Then joined_via_invite is tracked and joined_organization is not
+    And no joined_organization slot is taken, so nothing is held for that person and organization
+
+  @unit
+  Scenario: A join at the cut-off is tracked as joined_organization, one a millisecond earlier is not
+    Given a join that occurred at exactly 2026-11-06T00:00:00.000Z, and one at 1 ms earlier
+    When each is decided
+    Then the first is tracked joined_organization and the second is not
 
   @unit
   Scenario: A large organization's members go out in batches of one hundred

@@ -94,7 +94,7 @@ export class NurturingDeliveryService {
     private readonly parts: Readonly<{
       postHogDelivery: NurturingPostHogDeliveryService | undefined;
       ownCodingDelivery: NurturingOwnCodingDeliveryService | undefined;
-      joinedOrganization: NurturingJoinedOrganizationService;
+      joinedOrganization: NurturingJoinedOrganizationService | undefined;
     }>,
   ) {}
 
@@ -104,19 +104,21 @@ export class NurturingDeliveryService {
       postHogDelivery: posthog && NurturingPostHogDeliveryService.create(posthog),
       ownCodingDelivery:
         customerIo && NurturingOwnCodingDeliveryService.create({ claims, customerIo }),
-      joinedOrganization: NurturingJoinedOrganizationService.create({ claims }),
+      joinedOrganization:
+        customerIo && NurturingJoinedOrganizationService.create({ claims, customerIo }),
     });
   }
 
   /** `key` names the signal: its kind and source event. A first session also tells its members. */
   async deliver({ key, signal }: { key: string; signal: NurturingSignal }): Promise<void> {
     if (!this.deps.customerIo && !this.deps.posthog) return;
+    // Before the delivered claim: a replay it stops must still send a failed joined_organization.
+    await this.parts.joinedOrganization?.deliver(signal);
     const deliveredClaim = `nurturing:${key}`;
     if (!(await this.deps.claims.claim(deliveredClaim, DELIVERED_WINDOW_SECONDS))) return;
     if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
-    const firstJoin = await this.parts.joinedOrganization.isFirstJoin({ signal, deliveredClaim });
     const memberBatch = await this.memberBatchOf({ signal, deliveredClaim });
-    this.toCustomerIo({ signal, firstJoin });
+    this.toCustomerIo(signal);
     this.toPostHogSafely(signal);
     await this.identifyCodingAgentMembers(signal);
     await this.parts.ownCodingDelivery?.deliver(signal);
@@ -249,9 +251,7 @@ export class NurturingDeliveryService {
             .catch(reportFailure);
           break;
         case "track":
-          void nurturing
-            .trackEvent(call)
-            .catch((error: unknown) => this.parts.joinedOrganization.afterFailedTrack(call, error));
+          void nurturing.trackEvent(call).catch(reportFailure);
           break;
         case "group":
           void nurturing
@@ -262,13 +262,7 @@ export class NurturingDeliveryService {
     }
   }
 
-  private toCustomerIo({
-    signal,
-    firstJoin,
-  }: {
-    signal: NurturingSignal;
-    firstJoin: boolean;
-  }): void {
+  private toCustomerIo(signal: NurturingSignal): void {
     if (!this.deps.customerIo) return;
     if (isCodingOrAppSignal(signal)) return this.sendCustomerIoCalls(fireCodingOrApp(signal));
     switch (signal.kind) {
@@ -295,12 +289,12 @@ export class NurturingDeliveryService {
       case "invite_accepted":
         return this.sendWithTraces({
           ...signal,
-          callsFor: (traces) => fireInviteAccepted({ signal, traces, firstJoin }),
+          callsFor: (traces) => fireInviteAccepted({ signal, traces }),
         });
       case "sso_auto_added":
         return this.sendWithTraces({
           ...signal,
-          callsFor: (traces) => fireSsoAutoAdded({ signal, traces, firstJoin }),
+          callsFor: (traces) => fireSsoAutoAdded({ signal, traces }),
         });
       case "session_started":
         return this.sendCustomerIoCalls(fireActivity(signal));

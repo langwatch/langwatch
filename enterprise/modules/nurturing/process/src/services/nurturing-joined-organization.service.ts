@@ -1,85 +1,55 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type {
-  CioBatchCall,
-  NurturingSignal,
-  NurturingSignalOf,
-} from "@langwatch/enterprise-nurturing-contract";
+import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
+import { fireJoinedOrganization } from "../rules/nurturing-membership-join-service.rules.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
+import type { NurturingService } from "./nurturing.service.ts";
 
 const nurturingLogger = createLogger("langwatch:nurturing");
-
-/** A failure here is swallowed: the join the customer asked for is already done. */
-function reportFailure(error: unknown): void {
-  nurturingLogger.warn({ error }, "a lifecycle signal could not be delivered");
-}
 
 /** A person joins an organization once, so this outlives any realistic replay of the join. */
 const JOINED_WINDOW_SECONDS = 365 * 24 * 60 * 60;
 
-type JoinSignal = Pick<NurturingSignalOf<"invite_accepted">, "userId" | "organizationId">;
-type TrackCall = Extract<CioBatchCall, { type: "track" }>;
+type JoinedOrganizationDependencies = Readonly<{
+  claims: NurturingClaimRepository;
+  customerIo: NurturingService;
+}>;
 
 /**
  * Lets the one joined_organization event, which starts a campaign, reach a person once per
- * organization however they joined and however often the join is replayed.
+ * organization however they joined and however often the join is replayed. Its slot, keyed on
+ * person and organization, is held only once the track succeeded, so a replay of the same join,
+ * the other route or a new join of theirs sends it after a failure.
  */
 export class NurturingJoinedOrganizationService {
-  static create({
-    claims,
-  }: {
-    claims: NurturingClaimRepository;
-  }): NurturingJoinedOrganizationService {
-    return new NurturingJoinedOrganizationService(claims);
+  static create(dependencies: JoinedOrganizationDependencies): NurturingJoinedOrganizationService {
+    return new NurturingJoinedOrganizationService(dependencies);
   }
 
-  private constructor(private readonly claims: NurturingClaimRepository) {}
+  private constructor(private readonly dependencies: JoinedOrganizationDependencies) {}
 
   /**
-   * True when this is the person's first join of this organization, by invite or by SSO.
-   * Keyed on person and organization, not on the source event, so a replay or the other route
-   * is not first. Always true for a signal that is no join. When the claim fails, the signal's
-   * own delivered claim is given back and the error rethrown.
+   * Tracks joined_organization for a join signal. Runs apart from the signal's delivered claim:
+   * a replay that claim stops must still reach here. The slot is taken right before the track,
+   * and any failure after it gives it back; a failed claim fails the delivery, which then retries.
    */
-  async isFirstJoin({
-    signal,
-    deliveredClaim,
-  }: {
-    signal: NurturingSignal;
-    deliveredClaim: string;
-  }): Promise<boolean> {
-    if (signal.kind !== "invite_accepted" && signal.kind !== "sso_auto_added") return true;
+  async deliver(signal: NurturingSignal): Promise<void> {
+    if (signal.kind !== "invite_accepted" && signal.kind !== "sso_auto_added") return;
+    const call = fireJoinedOrganization(signal);
+    if (!call) return;
+    const { claims, customerIo } = this.dependencies;
+    const claimKey = `nurturing:joined_organization:${signal.userId}:${signal.organizationId}`;
+    if (!(await claims.claim(claimKey, JOINED_WINDOW_SECONDS))) return;
     try {
-      return await this.claims.claim(claimKey(signal), JOINED_WINDOW_SECONDS);
+      await customerIo.trackEvent(call);
     } catch (error) {
-      reportFailure(error);
-      return NurturingClaimReleaseService.create(this.claims).rethrowAfterReleasing({
-        error,
-        keys: [deliveredClaim],
-      });
+      const released = await NurturingClaimReleaseService.create(claims).releasedAll([claimKey]);
+      nurturingLogger.warn(
+        { error, released },
+        "joined_organization could not be delivered; its claim is given back",
+      );
     }
   }
-
-  /**
-   * Reports a failed track. A joined_organization that failed to send gives its
-   * person-and-organization slot back, so the next join signal of theirs can send it; the slot
-   * stays held after a success.
-   */
-  afterFailedTrack(call: TrackCall, error: unknown): void {
-    reportFailure(error);
-    if (call.event !== "joined_organization") return;
-    const { organization_id: organizationId } = call.properties ?? {};
-    if (typeof organizationId !== "string") return;
-    void NurturingClaimReleaseService.create(this.claims)
-      .releasedAll([claimKey({ userId: call.userId, organizationId })])
-      .then((released) => {
-        if (released.length > 0) reportFailure(new AggregateError(released));
-      });
-  }
-}
-
-function claimKey(signal: JoinSignal): string {
-  return `nurturing:joined_organization:${signal.userId}:${signal.organizationId}`;
 }

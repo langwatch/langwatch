@@ -6,9 +6,10 @@ import { nowInstant, Temporal } from "@langwatch/time";
 import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
 import { type KnownTraces, knownTraceTraits } from "./nurturing-member-facts.rules.ts";
 
+type TrackCall = Extract<CioBatchCall, { type: "track" }>;
 type Joined = Pick<
   NurturingSignalOf<"invite_accepted">,
-  "userId" | "organizationId" | "organizationName" | "role" | "occurredAt"
+  "userId" | "organizationId" | "organizationName" | "role"
 >;
 
 /**
@@ -35,48 +36,55 @@ function seatFor(role: OrganizationUserRole): string {
   return SEAT_BY_ROLE[role];
 }
 
-const JOINED_VIA = { invite: "joined_via_invite", sso: "joined_via_sso" } as const;
-
-/** Groups the person into the organization they joined and tracks that they joined, with how. */
-function joinedCalls({
-  joined,
-  joinMethod,
-  firstJoin,
-}: {
-  joined: Joined;
-  joinMethod: "invite" | "sso";
-  /** False when this person already got joined_organization for this organization. */
-  firstJoin: boolean;
-}): CioBatchCall[] {
-  const { userId, organizationId, organizationName, role, occurredAt } = joined;
+/** The properties every join event carries. */
+function joinProperties({
+  organizationId,
+  organizationName,
+  role,
+}: Joined): Record<string, string> {
   // A role we cannot name is left out rather than guessed.
   const seat = role && isOrganizationUserRole(role) ? seatFor(role) : undefined;
-  const group: CioBatchCall = {
-    type: "group",
-    userId,
-    groupId: organizationId,
-    traits: { name: organizationName },
-  };
-  const properties = {
+  return {
     organization_id: organizationId,
     organization_name: organizationName,
     ...(seat ? { seat } : {}),
   };
-  const calls: CioBatchCall[] = [
-    group,
-    { type: "track", userId, event: JOINED_VIA[joinMethod], properties },
+}
+
+/** Groups the person into the organization they joined and tracks how they came in. */
+function joinedCalls({
+  joined,
+  event,
+}: {
+  joined: Joined;
+  event: "joined_via_invite" | "joined_via_sso";
+}): CioBatchCall[] {
+  const { userId, organizationId, organizationName } = joined;
+  return [
+    { type: "group", userId, groupId: organizationId, traits: { name: organizationName } },
+    { type: "track", userId, event, properties: joinProperties(joined) },
   ];
-  if (firstJoin && occurredAt >= JOINED_ORGANIZATION_SINCE.epochMilliseconds) {
-    calls.push({
-      type: "track",
-      userId,
-      event: "joined_organization",
-      // Stable per person and organization, so Customer.io drops a repeat of this join.
-      messageId: `joined_organization:${userId}:${organizationId}`,
-      properties: { ...properties, join_method: joinMethod },
-    });
-  }
-  return calls;
+}
+
+const JOIN_METHOD = { invite_accepted: "invite", sso_auto_added: "sso" } as const;
+
+/**
+ * Decides the one joined_organization track of a join, by invite or by SSO; null for a join from
+ * before the event existed. Sent once per person and organization by its delivery, not here.
+ */
+export function fireJoinedOrganization(
+  signal: NurturingSignalOf<"invite_accepted"> | NurturingSignalOf<"sso_auto_added">,
+): TrackCall | null {
+  if (signal.occurredAt < JOINED_ORGANIZATION_SINCE.epochMilliseconds) return null;
+  const { userId, organizationId } = signal;
+  return {
+    type: "track",
+    userId,
+    event: "joined_organization",
+    // Stable per person and organization, so Customer.io can drop a repeat of this join.
+    messageId: `joined_organization:${userId}:${organizationId}`,
+    properties: { ...joinProperties(signal), join_method: JOIN_METHOD[signal.kind] },
+  };
 }
 
 /**
@@ -87,18 +95,16 @@ function joinedCalls({
 export function fireInviteAccepted({
   signal,
   traces,
-  firstJoin,
 }: {
   signal: NurturingSignalOf<"invite_accepted">;
   traces: KnownTraces | null;
-  firstJoin: boolean;
 }): CioBatchCall[] {
   const { userId } = signal;
   return [
     ...(traces?.hasTraces
       ? [{ type: "identify" as const, userId, traits: knownTraceTraits(traces) }]
       : []),
-    ...joinedCalls({ joined: signal, joinMethod: "invite", firstJoin }),
+    ...joinedCalls({ joined: signal, event: "joined_via_invite" }),
   ];
 }
 
@@ -109,11 +115,9 @@ export function fireInviteAccepted({
 export function fireSsoAutoAdded({
   signal,
   traces,
-  firstJoin,
 }: {
   signal: NurturingSignalOf<"sso_auto_added">;
   traces: KnownTraces | null;
-  firstJoin: boolean;
 }): CioBatchCall[] {
   const { userId } = signal;
   return [
@@ -129,6 +133,6 @@ export function fireSsoAutoAdded({
         createdAt: unixSecondsOf(nowInstant().epochMilliseconds),
       },
     },
-    ...joinedCalls({ joined: signal, joinMethod: "sso", firstJoin }),
+    ...joinedCalls({ joined: signal, event: "joined_via_sso" }),
   ];
 }
