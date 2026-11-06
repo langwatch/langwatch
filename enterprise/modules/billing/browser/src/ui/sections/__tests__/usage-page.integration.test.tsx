@@ -343,7 +343,9 @@ describe("the usage page", () => {
       state.breakdownError = true;
       renderPage();
 
-      expect(screen.getByTestId("usage-breakdown-unavailable")).toBeInTheDocument();
+      expect(screen.getByTestId("usage-breakdown-unavailable")).toHaveTextContent(
+        "The month by day and by project could not be loaded.",
+      );
       expect(screen.getByTestId("usage-events-count")).toHaveTextContent("31,800");
     });
 
@@ -355,8 +357,20 @@ describe("the usage page", () => {
       });
       renderPage();
 
-      expect(screen.getByTestId("usage-breakdown-unavailable")).toBeInTheDocument();
+      expect(screen.getByTestId("usage-breakdown-unavailable")).toHaveTextContent(
+        "The month by day could not be loaded.",
+      );
       expect(screen.getAllByTestId("usage-project-row")).toHaveLength(3);
+    });
+
+    it("names only the project list when that half failed", () => {
+      given({ plan: FREE_PLAN, count: 31_800, breakdown: { ...month({}), projects: null } });
+      renderPage();
+
+      expect(screen.getByTestId("usage-breakdown-unavailable")).toHaveTextContent(
+        "The month by project could not be loaded.",
+      );
+      expect(screen.queryByTestId("usage-project-row")).not.toBeInTheDocument();
     });
 
     it("says the same when the usage read fails outright", () => {

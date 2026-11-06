@@ -199,3 +199,22 @@ export function projectShares(projects: readonly { count: number }[]): number[] 
   const total = projects.reduce((sum, project) => sum + project.count, 0);
   return projects.map((project) => (total > 0 ? project.count / total : 0));
 }
+
+/** Names the half of the month breakdown that failed, or null when both loaded. */
+export function breakdownGapMessage({
+  isError,
+  isDailyUnavailable,
+  isProjectsUnavailable,
+}: {
+  isError: boolean;
+  isDailyUnavailable: boolean;
+  isProjectsUnavailable: boolean;
+}): string | null {
+  const retry = "Refresh the page to try again.";
+  if (isError || (isDailyUnavailable && isProjectsUnavailable)) {
+    return `The month by day and by project could not be loaded. ${retry}`;
+  }
+  if (isDailyUnavailable) return `The month by day could not be loaded. ${retry}`;
+  if (isProjectsUnavailable) return `The month by project could not be loaded. ${retry}`;
+  return null;
+}

@@ -23,6 +23,7 @@ import { getPlanActionLabel, planManagementUrl } from "../../model/plan-manageme
 import { PricingModel } from "../../model/prisma-types.ts";
 import {
   barHeights,
+  breakdownGapMessage,
   chartAxis,
   dayLabels,
   fullSeats,
@@ -175,11 +176,13 @@ function HostedUsage({
   const projects = breakdown.data?.projects ?? [];
   // When the count itself is unknown the events card already says so.
   const isCountKnown = usage.data !== undefined && usage.data.currentMonthMessagesCount !== null;
-  const isBreakdownMissing =
-    isCountKnown &&
-    (breakdown.isError ||
-      breakdown.data?.projects === null ||
-      breakdown.data?.isDailyUnavailable === true);
+  const breakdownGap = isCountKnown
+    ? breakdownGapMessage({
+        isError: breakdown.isError,
+        isDailyUnavailable: breakdown.data?.isDailyUnavailable === true,
+        isProjectsUnavailable: breakdown.data?.projects === null,
+      })
+    : null;
   const unitTitle = usage.data?.usageUnit === "traces" ? "Traces this month" : "Events this month";
 
   return (
@@ -195,9 +198,9 @@ function HostedUsage({
         state={eventsCardState({ usage, breakdown: breakdown.data, plan, pricingModel, currency })}
         resetsOn={breakdown.data ? `Resets on ${shortDate(breakdown.data.resetsOn)}` : undefined}
       />
-      {isBreakdownMissing && (
+      {breakdownGap && (
         <Banner status="warning" data-testid="usage-breakdown-unavailable">
-          The month by day and by project could not be loaded. Refresh the page to try again.
+          {breakdownGap}
         </Banner>
       )}
       {projects.length > 0 && usage.data?.currentMonthMessagesCount !== 0 && (
