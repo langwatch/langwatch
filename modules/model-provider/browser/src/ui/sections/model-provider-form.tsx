@@ -810,10 +810,13 @@ export const EditModelProviderForm = ({
     guided,
     providerKey: provider.provider,
     chatModel: guidedSave.chatModel,
+    registersModel: guidedSave.registersModel,
     state,
     actions,
     storedRow: provider,
   });
+  // Only the guided panel names the model up front; the drawer probes without one.
+  const probedModel = guided ? guidedSave.chatModel : undefined;
 
   // Same answer the credential fields render their required markers from.
   const requiredKeys = useRequiredCredentialKeys({
@@ -839,6 +842,7 @@ export const EditModelProviderForm = ({
   } = useModelProviderApiKeyValidation({
     provider: provider.provider,
     customKeys: state.customKeys,
+    model: probedModel,
     projectId,
     organizationId: organization?.id,
     scopes: state.scopes,
@@ -848,6 +852,7 @@ export const EditModelProviderForm = ({
   // end of the road on one surface and a hard block on the next.
   const { probeRequired, recordRefusal, clearRefusal, saveLabel } = useCredentialProbeGate({
     customKeys: state.customKeys,
+    model: probedModel,
     resetKey: providerId,
   });
 

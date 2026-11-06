@@ -100,14 +100,9 @@ export function GuidedProviderForm({
     if (refusal) clearRefusal();
   };
 
-  const pickModel = (model: string) => {
-    if (guidedSave.models.length > 0) {
-      guidedSave.pick(model);
-      return;
-    }
-    const typed = model.trim();
-    guidedSave.pick(typed || undefined);
-    actions.setCustomModels(typed ? [{ modelId: typed, displayName: typed, mode: "chat" }] : []);
+  const changeModel = (apply: () => void) => {
+    apply();
+    if (refusal) clearRefusal();
   };
 
   return (
@@ -128,10 +123,13 @@ export function GuidedProviderForm({
         <GuidedChatModelField
           guidedModels={guidedSave.models}
           pickedModel={guidedSave.chatModel}
-          onPick={pickModel}
+          typedModel={guidedSave.typed}
+          onPick={(model) => changeModel(() => guidedSave.pick(model))}
+          onType={(model) => changeModel(() => guidedSave.type(model))}
           locked={locked}
           providerName={spec.name}
           modelPlaceholder={spec.modelPlaceholder}
+          deploymentPlaceholder={spec.deploymentPlaceholder}
         />
         <GuidedConnectButton
           ready={canResolveTarget && credentialsReady && typedModel}

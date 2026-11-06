@@ -212,6 +212,42 @@ Feature: Credential Validation
     Then validation is skipped instead of probing a relative URL
     And no misleading network-connection error is shown
 
+  # Azure has no models route to list, so its probe is one chat completion
+  # against a named deployment. It proves the key, the endpoint and the
+  # deployment together, and only when the caller names a deployment.
+  @unit
+  Scenario: An Azure key is checked with one chat completion against the chosen deployment
+    Given an Azure endpoint, key and deployment name
+    When I call validateProviderApiKey for it
+    Then one chat completion with max_tokens 1 is posted to the deployment's chat completions route
+    And the key travels in the api-key header, never in the URL
+
+  @unit
+  Scenario: Azure reports a refused key as a bad key
+    Given Azure answers the check with 401 or 403
+    Then the key is reported as refused
+
+  @unit
+  Scenario: Azure reports a missing deployment by its name
+    Given Azure answers the check with 404
+    Then the refusal names the deployment that was not found
+
+  @unit
+  Scenario: Azure answering past authentication proves the credential
+    Given Azure answers the check with 429 or 400
+    Then the credential is reported as verified
+
+  @unit
+  Scenario: An Azure endpoint that does not answer is reported as unreachable
+    Given the Azure endpoint does not resolve or never answers
+    Then the provider is reported unreachable, with advice to check the endpoint
+
+  @unit
+  Scenario: An Azure credential with no deployment to ask is not checked
+    Given an Azure credential and no deployment name
+    When I call validateProviderApiKey for it
+    Then validation is skipped as not probeable
+
   # A refused key holds the save back on the first attempt, so the message has
   # to name the real cause — otherwise the customer regenerates a working key
   # over and over. Saving anyway is available once the reason has been read.
