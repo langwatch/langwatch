@@ -79,3 +79,23 @@ export class BillingPriceCatalogue {
     );
   }
 }
+
+/** The Stripe products the Growth checkout charges: its seats and its metered events. */
+export type GrowthCheckoutProducts = Readonly<{ seats: string; events: string }>;
+
+/**
+ * The Growth Seats and Growth Events products of one Stripe mode, read off the catalogue's
+ * own price records so a coupon is limited to what the checkout actually sells.
+ */
+export const resolveGrowthCheckoutProducts = (
+  data: StripePricesFile,
+  environment: StripeEnvironment,
+): GrowthCheckoutProducts => {
+  const productOf = (name: StripePriceName): string => {
+    const priceId = data.mapping[name]?.[environment];
+    const product = priceId ? data.prices[priceId]?.product : null;
+    if (!product) throw new Error(`No product recorded for ${name} in ${environment} mode`);
+    return product;
+  };
+  return { seats: productOf("GROWTH_SEAT_EUR_MONTHLY"), events: productOf("GROWTH_EVENTS_EUR_MONTHLY") };
+};

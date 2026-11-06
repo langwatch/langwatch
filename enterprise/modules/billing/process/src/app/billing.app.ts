@@ -29,6 +29,13 @@ import {
   type ResourceLimitNotifierInput,
   type SubscriptionPlanInput,
   type BillingPricingModel,
+  BillingCouponsUnavailableError,
+  type CouponList,
+  type CouponView,
+  type CreateCouponRequest,
+  type PromotionCodeTarget,
+  resolveGrowthCheckoutProducts,
+  stripePricesFile,
 } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type {
@@ -73,6 +80,7 @@ import {
 } from "../services/billing-alert-cooldown.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
 import { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
+import { BillingCouponService } from "../services/billing-coupon.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
 import {
   EEWebhookService,
@@ -407,6 +415,7 @@ export class BillingModule
         ...gate,
         lifecycle,
         connected: void 0,
+        coupons: void 0,
         stripeWebhook: BillingModule.#undispatchedWebhook(),
         subscriptions: void 0,
       });
@@ -431,6 +440,16 @@ export class BillingModule
     return new BillingModule({
       ...gate,
       lifecycle,
+      // Coupons are sold on LangWatch Cloud alone, limited to its Growth checkout's products.
+      coupons: isSaas
+        ? BillingCouponService.create({
+            coupons: stripe.channels.coupons,
+            products: resolveGrowthCheckoutProducts(
+              stripePricesFile,
+              getStripeEnvironmentFromNodeEnv(nodeEnvironment),
+            ),
+          })
+        : void 0,
       stripeWebhook: webhook
         ? BillingModule.#composeStripeWebhook({
             webhook,
@@ -685,6 +704,7 @@ export class BillingModule
   readonly #stripeWebhook: StripeWebhookReceiptService;
   readonly #subscriptions: SubscriptionDoor | undefined;
   readonly #connected: ConnectedBilling | undefined;
+  readonly #coupons: BillingCouponService | undefined;
   readonly #authorization: Pick<AuthzApi, "can">;
   readonly #overview: ConnectedBillingOverviewService;
   readonly #subscriptionPlans: SaaSPlanProviderService;
@@ -698,6 +718,7 @@ export class BillingModule
     stripeWebhook,
     subscriptions,
     connected,
+    coupons,
     authorization,
     overview,
     subscriptionPlans,
@@ -711,6 +732,7 @@ export class BillingModule
     stripeWebhook: StripeWebhookReceiptService;
     subscriptions: SubscriptionDoor | undefined;
     connected: ConnectedBilling | undefined;
+    coupons: BillingCouponService | undefined;
     authorization: Pick<AuthzApi, "can">;
     overview: ConnectedBillingOverviewService;
     subscriptionPlans: SaaSPlanProviderService;
@@ -722,6 +744,7 @@ export class BillingModule
     this.#stripeWebhook = stripeWebhook;
     this.#subscriptions = subscriptions;
     this.#connected = connected;
+    this.#coupons = coupons;
     this.#authorization = authorization;
     this.#overview = overview;
     this.#subscriptionPlans = subscriptionPlans;
@@ -1029,6 +1052,50 @@ export class BillingModule
   }
 
   /** Off Cloud nothing is invoiced; on Cloud a missing payment key is a deployment fault. */
+  async listCoupons(_staff: BillingStaff): Promise<CouponList> {
+    return this.#couponService().list();
+  }
+
+  async createCoupon(input: CreateCouponRequest, staff: BillingStaff): Promise<CouponView> {
+    const coupon = await this.#couponService().create(input);
+    await this.#audited().audited({
+      tenantId: PLATFORM_TENANT_ID,
+      userId: staff.id,
+      action: "billingCoupons.create",
+      args: {
+        couponId: coupon.id,
+        code: input.code,
+        percentOff: input.percentOff,
+        duration: input.duration,
+      },
+      targetKind: "coupon",
+      targetId: coupon.id,
+    });
+    return coupon;
+  }
+
+  async deactivatePromotionCode(
+    input: PromotionCodeTarget,
+    staff: BillingStaff,
+  ): Promise<PromotionCodeTarget> {
+    const target = await this.#couponService().deactivateCode(input);
+    await this.#audited().audited({
+      tenantId: PLATFORM_TENANT_ID,
+      userId: staff.id,
+      action: "billingCoupons.deactivateCode",
+      args: { promotionCodeId: input.promotionCodeId },
+      targetKind: "promotion_code",
+      targetId: input.promotionCodeId,
+    });
+    return target;
+  }
+
+  /** Coupons need LangWatch Cloud and its payment provider; anywhere else they refuse by name. */
+  #couponService(): BillingCouponService {
+    if (!this.#coupons) throw new BillingCouponsUnavailableError();
+    return this.#coupons;
+  }
+
   #connectedBilling(): ConnectedBilling {
     if (this.#connected) return this.#connected;
     if (!this.#isSaas) throw new ConnectedBillingUnavailableError();

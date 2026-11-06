@@ -4,6 +4,12 @@ import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type {
+  CouponList,
+  CouponView,
+  CreateCouponRequest,
+  PromotionCodeTarget,
+} from "./billing-coupons.schemas.ts";
+import type {
   BillingPricingModel,
   ResourceLimitNotifierInput,
   SubscriptionPlanInput,
@@ -56,6 +62,18 @@ export interface BillingApi {
     input: { organizationId: string },
     staff: BillingStaff,
   ): Promise<RenewalCompletion>;
+  /**
+   * Every Stripe coupon with its promotion codes, newest first, each code judged against
+   * the Growth checkout. Cloud only, with the payment provider's key.
+   */
+  listCoupons(staff: BillingStaff): Promise<CouponList>;
+  /** A percentage coupon on the Growth products and its one promotion code, or neither. */
+  createCoupon(input: CreateCouponRequest, staff: BillingStaff): Promise<CouponView>;
+  /** Retires a promotion code so a new coupon may take its name. */
+  deactivatePromotionCode(
+    input: PromotionCodeTarget,
+    staff: BillingStaff,
+  ): Promise<PromotionCodeTarget>;
   /** Finance received the money outside the payment provider. */
   markConnectedInvoicePaidOutOfBand(
     input: { stripeInvoiceId: string },

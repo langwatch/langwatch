@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { ConnectedInvoicingChannel } from "./connected-invoicing.channel.ts";
+import type { StripeCouponsChannel } from "./stripe-coupons.channel.ts";
 import type { StripeCustomersChannel } from "./stripe-customers.channel.ts";
 import type { StripeInvoicesChannel } from "./stripe-invoices.channel.ts";
 import type { StripeMetersChannel } from "./stripe-meters.channel.ts";
@@ -18,6 +19,8 @@ export interface BillingStripeChannels {
   readonly subscriptions: StripeSubscriptionsChannel;
   readonly invoices: StripeInvoicesChannel;
   readonly prices: StripePricesChannel;
+  /** The account's coupons and promotion codes, for the Cloud admin console. */
+  readonly coupons: StripeCouponsChannel;
   readonly meters: StripeMetersChannel;
   readonly connectedInvoicing: ConnectedInvoicingChannel;
 }
