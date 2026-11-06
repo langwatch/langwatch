@@ -71,6 +71,14 @@ Feature: Join before create - the choice happens before an organization is minte
     And creating a new organization stays visible as the explicit secondary choice
 
   @integration
+  Scenario: A name filter that matches nothing says so and folds back cleanly
+    Given twelve organizations open to requests from "acme.com"
+    And "sam" has asked to show all of them
+    When "sam" filters by a name no organization has
+    Then the list says no organization matches and offers to clear the search
+    And asking to show fewer returns to three rows with the filter cleared
+
+  @integration
   Scenario: With nothing to offer, sign-up continues exactly as before
     Given no organization is open to "acme.com"
     When "sam" completes verification
