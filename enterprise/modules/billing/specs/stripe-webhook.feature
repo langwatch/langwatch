@@ -180,6 +180,7 @@ Feature: Stripe webhook handling grants and removes plans correctly
       When the invoice-paid webhook is handled and then redelivered
       Then the tiered subscription is cancelled in Stripe and in our records
       And the organization is moved to seat pricing
+      And the subscription is announced as started once
 
     @unit
     Scenario: The subscription update arrives before the invoice is paid
@@ -187,6 +188,7 @@ Feature: Stripe webhook handling grants and removes plans correctly
       When Stripe reports the subscription active before it reports the invoice paid
       Then the tiered subscription is cancelled in Stripe and in our records
       And it is cancelled once, not again when the invoice event arrives
+      And the subscription is announced as started once
 
     @unit
     Scenario: An organization already billed for both plans is healed by its next payment
@@ -194,6 +196,14 @@ Feature: Stripe webhook handling grants and removes plans correctly
       And its old tiered subscription is still active
       When its next invoice is paid
       Then the tiered subscription is cancelled in Stripe and in our records
+      And no subscription is announced as started
+
+    @unit
+    Scenario: A late activation for a cancelled Growth subscription retires nothing
+      Given an organization's Growth seat subscription is cancelled in our records
+      And its tiered subscription is active
+      When a delayed update reports the Growth subscription active
+      Then the tiered subscription stays active and nothing is cancelled in Stripe
 
     @unit
     Scenario: A renewal with nothing left to retire changes nothing

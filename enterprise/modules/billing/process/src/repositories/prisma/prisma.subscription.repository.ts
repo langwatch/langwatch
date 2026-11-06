@@ -222,19 +222,23 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
         where: supersededBySeatEventWhere(input),
       });
 
+      // Only the run that flips a row cancels it in Stripe; a concurrent run sees count 0.
+      const retired: { stripeSubscriptionId: string | null }[] = [];
       for (const oldSub of oldSubs) {
-        await tx.subscription.update({
-          where: { id: oldSub.id },
+        const { count } = await tx.subscription.updateMany({
+          where: {
+            id: oldSub.id,
+            status: { not: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus },
+          },
           data: {
             status: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
             endDate: toDate(nowInstant()),
           },
         });
+        if (count === 1) retired.push({ stripeSubscriptionId: oldSub.stripeSubscriptionId });
       }
 
-      return oldSubs.map((s) => ({
-        stripeSubscriptionId: s.stripeSubscriptionId,
-      }));
+      return retired;
     });
   }
 

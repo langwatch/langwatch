@@ -198,16 +198,13 @@ export class BillingSubscriptionLifecycleService {
     const updatedSubscription = quantitiesResult.subscription;
 
     await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription updated to active");
+    if (shouldNotify) await this.announceSubscriptionStarted(updatedSubscription);
     // Stripe may report the seat subscription active here before the invoice is paid, and
     // the invoice path then sees an active subscription; the retirement cannot wait for it.
-    const finishedEarlierActivation = isGrowthSeatEventPlan(updatedSubscription.plan)
-      ? await this.retireSupersededPlans({ updated: updatedSubscription, activated: shouldNotify })
-      : false;
-    if (!shouldNotify && !finishedEarlierActivation) {
-      return;
+    // A stale update for a row already cancelled retires nothing.
+    if (existing.status !== SubscriptionStatus.CANCELLED) {
+      await this.retireSupersededPlans({ updated: updatedSubscription, activated: shouldNotify });
     }
-
-    await this.announceSubscriptionStarted(updatedSubscription);
   }
 
   /**
@@ -330,15 +327,11 @@ export class BillingSubscriptionLifecycleService {
     if (activated) {
       await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");
     }
+    // Announced first: a redelivery that finishes a failed retirement must not announce again.
+    if (activated) await this.announceSubscriptionStarted(updatedSubscription);
     // Every paid invoice re-checks: a redelivery after a failed retirement, or a renewal of
     // an organization still billed for its old plan, finishes what the activation left.
-    const finishedEarlierActivation = isGrowthSeatEventPlan(updatedSubscription.plan)
-      ? await this.retireSupersededPlans({ updated: updatedSubscription, activated })
-      : false;
-
-    if (activated || finishedEarlierActivation) {
-      await this.announceSubscriptionStarted(updatedSubscription);
-    }
+    await this.retireSupersededPlans({ updated: updatedSubscription, activated });
   }
 
   /**
@@ -389,7 +382,7 @@ export class BillingSubscriptionLifecycleService {
   /**
    * Retires the tiered plans a seat-event subscription supersedes. On activation it always
    * moves the organization to seat pricing; afterwards only while a tiered plan is still
-   * alive, and then answers true: an earlier activation did not finish.
+   * alive, which means an earlier activation did not finish.
    */
   private async retireSupersededPlans({
     updated,
@@ -397,20 +390,20 @@ export class BillingSubscriptionLifecycleService {
   }: {
     updated: SubscriptionWithOrg;
     activated: boolean;
-  }): Promise<boolean> {
+  }): Promise<void> {
+    if (!isGrowthSeatEventPlan(updated.plan)) return;
     if (!activated) {
       const superseded = await this.subscriptionRepository.findSupersededBySeatEvent({
         organizationId: updated.organizationId,
         excludeSubscriptionId: updated.id,
       });
-      if (superseded.length === 0) return false;
+      if (superseded.length === 0) return;
       logger.warn(
         { organizationId: updated.organizationId, superseded: superseded.length },
         "[stripeWebhook] Seat subscription active beside a live tiered plan; retiring it now",
       );
     }
     await this.migrateToSeatEventPlan(updated);
-    return !activated;
   }
 
   /** Moves the organization to seat pricing and cancels its tiered plans, records first. */

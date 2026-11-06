@@ -33,6 +33,7 @@ const licenses = createApiFixture<LicensingApi>({
 /** A real announcer; `pricingModelChanged` is recorded, and refused the given number of times. */
 function announcerRefusingPricingModel({ refusals }: { refusals: number }) {
   const pricingModels: Record<string, unknown>[] = [];
+  const started: Record<string, unknown>[] = [];
   let remaining = refusals;
   const unused = {
     sendBatch: async () => {},
@@ -51,7 +52,12 @@ function announcerRefusingPricingModel({ refusals }: { refusals: number }) {
   });
   announcer.connect({
     recordSubscriptionChanged: quiet,
-    recordSubscriptionStarted: quiet,
+    recordSubscriptionStarted: {
+      send: async (payload: Record<string, unknown>) => {
+        started.push(payload);
+      },
+      ...unused,
+    },
     recordCheckoutCompleted: quiet,
     recordUsageBillingChanged: quiet,
     recordAudit: quiet,
@@ -70,7 +76,7 @@ function announcerRefusingPricingModel({ refusals }: { refusals: number }) {
     recordSeatCheckoutPaid: quiet,
     recordSeatCheckoutsAbandoned: quiet,
   });
-  return { announcer, pricingModels };
+  return { announcer, pricingModels, started };
 }
 
 function subscriptionRow(
@@ -88,7 +94,7 @@ function subscriptionRow(
     maxMembers: null,
     maxMembersLite: null,
     maxMessagesPerMonth: null,
-  } as BillingSubscriptionRecord;
+  };
 }
 
 function setup({
@@ -115,12 +121,13 @@ function setup({
   store.subscriptions.push(subscriptionRow(GROWTH, growthStatus));
 
   const stripe = MemoryStripeSubscriptionsChannel.create();
+  const slackConfirmations: string[] = [];
   for (const id of [GROWTH.stripeSubscriptionId, TIERED.stripeSubscriptionId]) {
     stripe.seed({
       subscription: { id, status: "active", canceledAt: null, billingThreshold: null, items: [] },
     });
   }
-  const { announcer, pricingModels } = announcerRefusingPricingModel({
+  const { announcer, pricingModels, started } = announcerRefusingPricingModel({
     refusals: pricingModelRefusals,
   });
   const service = EEWebhookService.create({
@@ -135,13 +142,15 @@ function setup({
     ),
     licenses,
     host: {
-      sendSlackSubscriptionEvent: async () => {},
+      sendSlackSubscriptionEvent: async (event) => {
+        slackConfirmations.push(event.type);
+      },
       sendSlackBillingThresholdFailureAlert: async () => {},
     },
     announcer,
   });
   const statusOf = (id: string) => store.subscriptions.find((row) => row.id === id)?.status;
-  return { service, stripe, pricingModels, statusOf };
+  return { service, stripe, pricingModels, started, slackConfirmations, statusOf };
 }
 
 /** Lets Stripe's consistency wait pass; a rejection is caught first so it stays the caller's. */
@@ -185,7 +194,7 @@ describe("Growth seat upgrade retires the tiered subscription", () => {
   describe("when recording the move to seat pricing fails the first time", () => {
     /** @scenario "Retiring the old plan fails, and Stripe's redelivery retires it" */
     it("retires the tiered subscription on Stripe's redelivery", async () => {
-      const { service, stripe, pricingModels, statusOf } = setup({
+      const { service, stripe, pricingModels, started, slackConfirmations, statusOf } = setup({
         growthStatus: SubscriptionStatus.PENDING,
         pricingModelRefusals: 1,
       });
@@ -201,13 +210,17 @@ describe("Growth seat upgrade retires the tiered subscription", () => {
       expect(pricingModels).toEqual([
         expect.objectContaining({ organizationId: ORGANIZATION_ID, pricingModel: "SEAT_EVENT" }),
       ]);
+      expect(started).toHaveLength(1);
+      expect(slackConfirmations).toEqual(["confirmed"]);
     });
   });
 
   describe("when Stripe reports the subscription active before the invoice paid", () => {
     /** @scenario "The subscription update arrives before the invoice is paid" */
     it("retires the tiered subscription once", async () => {
-      const { service, stripe, statusOf } = setup({ growthStatus: SubscriptionStatus.PENDING });
+      const { service, stripe, started, slackConfirmations, statusOf } = setup({
+        growthStatus: SubscriptionStatus.PENDING,
+      });
 
       await subscriptionActive(service);
       await invoicePaid(service);
@@ -217,13 +230,17 @@ describe("Growth seat upgrade retires the tiered subscription", () => {
       expect(stripe.cancellations).toEqual([
         { subscriptionId: TIERED.stripeSubscriptionId, prorate: true },
       ]);
+      expect(started).toHaveLength(1);
+      expect(slackConfirmations).toEqual(["confirmed"]);
     });
   });
 
   describe("when an organization is already billed for both plans", () => {
     /** @scenario "An organization already billed for both plans is healed by its next payment" */
     it("retires the tiered subscription on the next paid invoice", async () => {
-      const { service, stripe, statusOf } = setup({ growthStatus: SubscriptionStatus.ACTIVE });
+      const { service, stripe, started, slackConfirmations, statusOf } = setup({
+        growthStatus: SubscriptionStatus.ACTIVE,
+      });
 
       await invoicePaid(service);
 
@@ -231,6 +248,20 @@ describe("Growth seat upgrade retires the tiered subscription", () => {
       expect(stripe.cancellations).toEqual([
         { subscriptionId: TIERED.stripeSubscriptionId, prorate: true },
       ]);
+      expect(started).toEqual([]);
+      expect(slackConfirmations).toEqual([]);
+    });
+  });
+
+  describe("when a delayed update reports a cancelled Growth subscription active", () => {
+    /** @scenario "A late activation for a cancelled Growth subscription retires nothing" */
+    it("leaves the tiered subscription active", async () => {
+      const { service, stripe, statusOf } = setup({ growthStatus: SubscriptionStatus.CANCELLED });
+
+      await subscriptionActive(service);
+
+      expect(statusOf(TIERED.id)).toBe(SubscriptionStatus.ACTIVE);
+      expect(stripe.cancellations).toEqual([]);
     });
   });
 
