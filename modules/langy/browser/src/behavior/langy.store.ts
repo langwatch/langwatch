@@ -573,16 +573,20 @@ function beganTurn(
 }
 
 /**
- * Was a turn started in `projectId` started HERE? A send still waiting for its ids when the panel
- * moved to another project (or to the personal workspace) belongs to the place it was sent from.
+ * Was a turn sent from `sentScope` into `projectId` started HERE? A send still waiting for its ids
+ * when the panel moved to another user, organisation or project (or to the personal workspace)
+ * belongs to the place it was sent from.
  */
 export function isTurnInPanelScope({
+  sentScope,
   scope,
   projectId,
 }: {
+  sentScope: LangyScope | null;
   scope: LangyScope | null;
   projectId: string;
 }): boolean {
+  if (!isSameScope(sentScope, scope)) return false;
   return !scope?.projectId || scope.projectId === projectId;
 }
 

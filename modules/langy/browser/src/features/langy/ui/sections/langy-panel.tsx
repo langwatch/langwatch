@@ -278,6 +278,7 @@ function LangyPanel({
   const model = useLangyComposerModel({ projectId });
   const makeDefault = useLangyMakeDefault({ resolvedDefault: model.resolvedDefault });
   const engine = useLangyChatEngine({ transport });
+  refs.sendStrandedRef.current = () => engine.applyHistoryToEngine([]);
   const isBusy = engine.status === "submitted" || engine.status === "streaming";
   useLangyWarmWorker({
     projectId,

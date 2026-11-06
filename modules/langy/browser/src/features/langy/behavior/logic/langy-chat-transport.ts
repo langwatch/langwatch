@@ -62,7 +62,7 @@ export interface LangyChatTransportDeps {
    * Adopt the conversation + turn the server started in `projectId`. Answering `false` means the
    * panel moved somewhere else while the send was in flight: the turn is not streamed here.
    */
-  onIds: (ids: { conversationId: string; turnId: string; projectId: string }) => boolean | void;
+  onIds: (ids: { conversationId: string; turnId: string; projectId: string }) => boolean;
   /** Push a status/progress/milestone signal (drives StreamingStatusLine via the store). */
   onSignal: (signal: LangyTurnSignalEntry) => void;
   /**
@@ -123,7 +123,7 @@ export function createLangyChatTransport(deps: LangyChatTransportDeps): ChatTran
         idempotencyKey,
       });
       const adopted = deps.onIds({ conversationId, turnId, projectId: ctx.projectId });
-      if (adopted === false) return emptyTurnStream();
+      if (!adopted) return emptyTurnStream();
 
       return subscribeTurnStream({
         client: deps.client,

@@ -42,7 +42,7 @@ function makeTransport(
   context: Partial<LangyTurnRequestContext> = {},
   over: Partial<LangyChatTransportDeps> = {},
 ) {
-  const onIds = vi.fn();
+  const onIds = vi.fn(() => true);
   const deps: LangyChatTransportDeps = {
     client,
     getContext: () => ({
