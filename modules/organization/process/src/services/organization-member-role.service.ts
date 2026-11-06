@@ -3,13 +3,11 @@
  * across the organization and its teams.
  */
 import { GrantScopeTier, type AuthzGrantCaller } from "@langwatch/authz-contract";
-import { getRoleChangeType, isFullMember } from "@langwatch/entitlement-contract";
 import {
   TeamRoleUpdateRejectedError,
   OrganizationUserRole,
   type TeamUserRole,
   CannotDisableSelfError,
-  MemberSeatLimitReachedError,
   PersonalWorkspaceNotManagedHereError,
 } from "@langwatch/organization-contract";
 
@@ -17,7 +15,6 @@ import type {
   OrganizationMembershipRepository,
   UpdateMemberRoleResult,
 } from "../repositories/organization-membership.repository.ts";
-import type { SeatTransition } from "../repositories/seat-hold.repository.ts";
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
 import {
   customRoleIdsOf,
@@ -33,6 +30,7 @@ import type {
   OrganizationGrantCeilingService,
   OrganizationIntendedGrant,
 } from "./organization-grant-ceiling.service.ts";
+import type { OrganizationMemberSeatService } from "./organization-member-seat.service.ts";
 import type {
   OrganizationSeatLicense,
   OrganizationPlanUser,
@@ -95,8 +93,10 @@ type OrganizationMemberRoleDependencies = {
   seatNotices: OrganizationSeatRevocationNotice;
   grantCache: OrganizationGrantCache;
   ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
-  /** The 30-day seat hold a disable, enable or role change writes (seat-rotation.feature). */
+  /** The 30-day seat hold a disable writes (seat-rotation.feature). */
   seatHolds: SeatHoldService;
+  /** The seat an enable or a role change takes or leaves. */
+  memberSeats: OrganizationMemberSeatService;
 };
 
 export class OrganizationMemberRoleService {
@@ -127,7 +127,11 @@ export class OrganizationMemberRoleService {
 
     const seat = disabled
       ? await this.dependencies.seatHolds.releaseOf({ organizationId, userId, reason: "DISABLED" })
-      : await this.seatOnEnable({ organizationId, userId, actingUser: actingUser ?? undefined });
+      : await this.dependencies.memberSeats.seatOnEnable({
+          organizationId,
+          userId,
+          actingUser: actingUser ?? undefined,
+        });
 
     await this.repo.setMemberDisabled({ organizationId, userId, disabled, seat });
 
@@ -154,78 +158,6 @@ export class OrganizationMemberRoleService {
     // cache to age out before it is true, and re-enabling must not leave the
     // person locked out for the same window.
     await this.dependencies.grantCache.invalidateOrganization({ organizationId });
-  }
-
-  /**
-   * Gives a full seat to a person admission left waiting (seat-rotation.feature): their membership
-   * becomes MEMBER and is enabled. Answers false, changing nothing, when they no longer wait or no
-   * full seat fits.
-   */
-  async admitWaitingMember({
-    organizationId,
-    userId,
-    actingUserId,
-    caller,
-  }: {
-    organizationId: string;
-    userId: string;
-    actingUserId: string | null;
-    caller: AuthzGrantCaller;
-  }): Promise<boolean> {
-    const { seatHolds, seats, seatNotices, grantCache } = this.dependencies;
-    if (!(await seatHolds.isWaiting({ organizationId, userId }))) return false;
-    if (!(await seatHolds.hasLiveHold({ organizationId, userId }))) {
-      const fit = await seats.checkLimit({ organizationId, resource: "members" });
-      if (!fit.allowed) return false;
-    }
-    // The role first, while the membership is still disabled: access comes with the enable.
-    await this.repo.updateMemberRole({
-      organizationId,
-      userId,
-      role: OrganizationUserRole.MEMBER,
-      effectiveTeamRoleUpdates: [],
-      currentUserId: actingUserId,
-      caller,
-      seat: await seatHolds.takeOf({ organizationId, userId }),
-    });
-    await this.repo.setMemberDisabled({ organizationId, userId, disabled: false });
-    await seatNotices.memberEnabled({ organizationId, userId, enabledByUserId: actingUserId });
-    await grantCache.invalidateOrganization({ organizationId });
-    return true;
-  }
-
-  /**
-   * The seat an enable takes: a disabled full member takes their hold back, else a seat the plan
-   * must still have free. A person who already holds their seat, or has a hold, is not re-checked.
-   */
-  private async seatOnEnable({
-    organizationId,
-    userId,
-    actingUser,
-  }: {
-    organizationId: string;
-    userId: string;
-    actingUser: OrganizationPlanUser | undefined;
-  }): Promise<SeatTransition> {
-    const { seatHolds, seats } = this.dependencies;
-    if (!(await seatHolds.hasLiveHold({ organizationId, userId }))) {
-      const result = await seats.checkLimit({
-        organizationId,
-        resource: "members",
-        user: actingUser,
-      });
-      if (!result.allowed) {
-        throw new MemberSeatLimitReachedError({
-          meta: { limitType: result.limitType, current: result.current, max: result.max },
-        });
-      }
-    }
-    const [standing] = await this.repo.findSeatStandings({ organizationId, userId });
-    if (!standing || standing.disabledAt === null) return { kind: "unchanged" };
-    if (!(await seatHolds.classifiesFull({ organizationId, userId, standing }))) {
-      return { kind: "unchanged" };
-    }
-    return seatHolds.takeOf({ organizationId, userId });
   }
 
   /**
@@ -332,27 +264,15 @@ export class OrganizationMemberRoleService {
       grants: intendedRoleChangeGrants({ organizationId, role, effectiveTeamRoleUpdates }),
     });
 
-    const seat = await this.seatOnRoleChange({
+    const seat = await this.dependencies.memberSeats.seatOnRoleChange({
       organizationId,
       userId,
       active: currentMember.disabledAt === null,
       oldRole: currentMember.role,
       oldPermissions: userPermissions,
       role,
+      planUser: params.planUser,
     });
-    // A person taking back their own held seat is not asked for a second one.
-    if (
-      seat?.kind !== "taken" ||
-      !(await this.dependencies.seatHolds.hasLiveHold({ organizationId, userId }))
-    ) {
-      await this.dependencies.seats.assertRoleChangeAllowed({
-        organizationId,
-        currentRole: currentMember.role,
-        userPermissions,
-        role,
-        user: params.planUser,
-      });
-    }
 
     return this.repo.updateMemberRole({
       organizationId,
@@ -363,39 +283,6 @@ export class OrganizationMemberRoleService {
       caller,
       seat,
     });
-  }
-
-  /** A role change onto a full seat takes one; one off a full seat leaves its hold. */
-  private async seatOnRoleChange({
-    organizationId,
-    userId,
-    active,
-    oldRole,
-    oldPermissions,
-    role,
-  }: {
-    organizationId: string;
-    userId: string;
-    active: boolean;
-    oldRole: OrganizationUserRole;
-    oldPermissions: string[] | undefined;
-    role: OrganizationUserRole;
-  }): Promise<SeatTransition> {
-    // A disabled membership holds no seat, so changing its role moves none.
-    if (!active) return { kind: "unchanged" };
-    const change = getRoleChangeType({
-      oldRole,
-      oldPermissions,
-      newRole: role,
-      newPermissions: undefined,
-    });
-    const { seatHolds } = this.dependencies;
-    if (change === "lite-to-full") return seatHolds.takeOf({ organizationId, userId });
-    const leavesFullSeat =
-      change === "full-to-lite" ||
-      (change === "to-developer" && isFullMember(oldRole, oldPermissions));
-    if (!leavesFullSeat) return { kind: "unchanged" };
-    return seatHolds.releaseOf({ organizationId, userId, reason: "DEMOTED" });
   }
 
   /**

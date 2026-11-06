@@ -2095,9 +2095,9 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     // membership transaction has committed.
     const plans: ScopeBindingPlan[] = [];
 
-    // The transaction answers the seat the member held before it, kept so a
-    // failed correction can put it back (see the compensation below).
-    const previousRole = await this.prisma.$transaction(async (tx) => {
+    // The transaction answers the role and seat the member held before it, kept so a
+    // failed correction can put them back (see the compensation below).
+    const previous = await this.prisma.$transaction(async (tx) => {
       const currentMember = await tx.organizationUser.findUnique({
         where: {
           userId_organizationId: {
@@ -2118,6 +2118,18 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         currentRole: currentMember.role,
       });
 
+      const seatMoves = input.seat !== undefined && input.seat.kind !== "unchanged";
+      const previousHold = seatMoves
+        ? await tx.seatHold.findUnique({
+            where: { organizationId_userId: { organizationId, userId } },
+          })
+        : null;
+      const seatColumns = await applySeatTransition({
+        tx,
+        organizationId,
+        userId,
+        seat: input.seat,
+      });
       await tx.organizationUser.update({
         where: {
           userId_organizationId: {
@@ -2125,10 +2137,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
             organizationId,
           },
         },
-        data: {
-          role,
-          ...(await applySeatTransition({ tx, organizationId, userId, seat: input.seat })),
-        },
+        data: { role, ...seatColumns },
       });
 
       plans.push(await planOrganizationSeatBinding({ tx, organizationId, userId, role }));
@@ -2203,7 +2212,12 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         throw new CannotDemoteLastAdminError();
       }
 
-      return currentMember.role;
+      return {
+        role: currentMember.role,
+        fullSeatSince: currentMember.fullSeatSince,
+        hold: previousHold,
+        seatColumns,
+      };
     });
 
     // The seat has committed and the grants it caps have not. A ledger append
@@ -2223,16 +2237,52 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         }),
       });
     } catch (error) {
-      if (previousRole !== role) {
-        await this.prisma.organizationUser.updateMany({
-          where: { organizationId, userId, role },
-          data: { role: previousRole },
-        });
-      }
+      await this.restoreRoleAndSeat({ organizationId, userId, role, previous });
       throw error;
     }
 
     return { teamsLeftWithoutAdmin };
+  }
+
+  /**
+   * Puts back the role, the seat date and the hold a role change replaced, only while the
+   * membership still stands as that change left it, so a later change is never undone.
+   */
+  private async restoreRoleAndSeat({
+    organizationId,
+    userId,
+    role,
+    previous,
+  }: {
+    organizationId: string;
+    userId: string;
+    role: OrganizationUserRole;
+    previous: {
+      role: OrganizationUserRole;
+      fullSeatSince: Date | null;
+      hold: Prisma.SeatHoldGetPayload<object> | null;
+      seatColumns: { fullSeatSince?: Date | null };
+    };
+  }): Promise<void> {
+    const seatMoved = "fullSeatSince" in previous.seatColumns;
+    if (previous.role === role && !seatMoved) return;
+    await this.prisma.$transaction(async (tx) => {
+      const restored = await tx.organizationUser.updateMany({
+        where: {
+          organizationId,
+          userId,
+          role,
+          ...(seatMoved ? { fullSeatSince: previous.seatColumns.fullSeatSince ?? null } : {}),
+        },
+        data: {
+          role: previous.role,
+          ...(seatMoved ? { fullSeatSince: previous.fullSeatSince } : {}),
+        },
+      });
+      if (restored.count === 0 || !seatMoved) return;
+      await tx.seatHold.deleteMany({ where: { organizationId, userId } });
+      if (previous.hold) await tx.seatHold.create({ data: previous.hold });
+    });
   }
 
   async updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void> {

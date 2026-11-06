@@ -75,6 +75,13 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
     });
   }
 
+  async keepSeats({ id, kept }: { id: string; kept: KeptSeats }): Promise<void> {
+    await this.prisma.subscription.update({
+      where: { id },
+      data: { seatsKept: kept.seats, seatsKeptUntil: toDate(kept.until) },
+    });
+  }
+
   async reactivateWithSeats({
     id,
     maxMembers,

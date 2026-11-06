@@ -615,7 +615,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   async getSeatRemovalPreview(
     input: Readonly<{ organizationId: string; userId: string }>,
   ): Promise<OrganizationSeatRemovalPreview> {
-    const preview = await this.#dependencies.membership.seatRemovalPreview(input);
+    const preview = await this.#infrastructure.seatHolds.removalPreview(input);
     return {
       holdsFullSeat: preview.holdsFullSeat,
       seatFreesAt: preview.seatFreesAt ? toDate(preview.seatFreesAt) : null,
@@ -630,7 +630,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   }
 
   async listHeldSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationHeldSeats> {
-    const holds = await this.#dependencies.membership.findHeldSeats(input);
+    const holds = await this.#infrastructure.seatHolds.findHeld(input);
     return {
       heldSeats: holds.map((hold) => ({
         userId: hold.userId,

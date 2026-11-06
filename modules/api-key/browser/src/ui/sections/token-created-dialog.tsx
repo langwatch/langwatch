@@ -24,6 +24,7 @@ import { Select } from "@langwatch/design-system/select";
 import { Check, Clipboard, Eye, EyeOff, Key } from "lucide-react";
 import { type Ref, useMemo, useRef, useState } from "react";
 
+import { useCopiedFlash } from "../../behavior/use-copied-flash.ts";
 import { useApiKeyHost } from "../../model/api-key-host.ts";
 import {
   buildMcpJson,
@@ -166,11 +167,9 @@ function KeyHandOff({
   copyRef: Ref<HTMLButtonElement>;
 }) {
   const [revealed, setRevealed] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { copied, flash } = useCopiedFlash();
   const copyKey = async () => {
-    if (!(await copy({ text: token, what: "API key" }))) return;
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (await copy({ text: token, what: "API key" })) flash();
   };
   return (
     <Card

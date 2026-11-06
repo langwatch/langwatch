@@ -74,7 +74,7 @@ describe("PrismaOrganizationSeatRepository", () => {
 
       const seats = await repository.countMemberSeats(organizationId);
 
-      expect(seats).toMatchObject({ fullMembers: 3, heldFullMembers: 1 });
+      expect(seats).toMatchObject({ fullMembers: 3 });
       expect(mockPrisma.seatHold.findMany).toHaveBeenCalledWith({
         where: { organizationId, heldUntil: { gt: new Date("2024-03-15T12:00:00.000Z") } },
         select: { userId: true, email: true },

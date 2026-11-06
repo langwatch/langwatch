@@ -92,6 +92,17 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
     return { id };
   }
 
+  async keepSeats({ id, kept }: { id: string; kept: KeptSeats }): Promise<void> {
+    const index = this.store.subscriptions.findIndex((subscription) => subscription.id === id);
+    const current = this.store.subscriptions[index];
+    if (!current) throw new Error(`No subscription "${id}" exists.`);
+    this.store.subscriptions[index] = {
+      ...current,
+      seatsKept: kept.seats,
+      seatsKeptUntil: kept.until,
+    };
+  }
+
   async reactivateWithSeats({
     id,
     maxMembers,

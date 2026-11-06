@@ -87,7 +87,6 @@ export function countMemberSeats(
   fullMembers: number;
   liteMembers: number;
   developers: number;
-  heldFullMembers: number;
 }> {
   const count = (type: MemberType) =>
     holders.filter((holder) => classifyMemberType(holder.role, holder.permissions) === type).length;
@@ -111,6 +110,5 @@ export function countMemberSeats(
     fullMembers: count("FullMember") + heldFullMembers,
     liteMembers: count("LiteMember"),
     developers: count("Developer"),
-    heldFullMembers,
   };
 }

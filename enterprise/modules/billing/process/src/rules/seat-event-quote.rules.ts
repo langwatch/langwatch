@@ -38,20 +38,26 @@ export const quotedAmounts = (
 };
 
 /**
- * The quote for a charged step. When kept seats are lifted back without proration first,
- * the preview prices the whole move, so only the share above the seats paid for is due;
- * proration is linear in quantity, and credit is drawn down to the smaller total.
+ * The quote for a charged step. After a lift back to kept seats, `preview` prices the whole
+ * move and `lifted` the move to the seats paid for; both carry the subscription's pending
+ * prorations in full, so their difference is the seats above. Credit draws to the smaller total.
  */
 export const chargedAmounts = ({
   preview,
+  lifted,
   share,
 }: {
   preview: AlwaysInvoicePreview;
+  lifted: AlwaysInvoicePreview | null;
   share: { added: number; moved: number } | null;
 }): { prorationCents: number; creditAppliedCents: number } => {
   const whole = quotedAmounts(preview);
-  if (!share || share.moved <= 0) return whole;
-  const totalCents = Math.round((preview.total * share.added) / share.moved);
+  if (!share || !lifted || share.added <= 0 || share.moved <= share.added) return whole;
+  const liftedSeats = share.moved - share.added;
+  // Proration is linear in quantity: take the lifted seats' share off the whole move.
+  const totalCents = Math.round(
+    preview.total - ((preview.total - lifted.total) * liftedSeats) / share.added,
+  );
   const creditAppliedCents = Math.max(0, Math.min(whole.creditAppliedCents, totalCents));
   return { prorationCents: totalCents - creditAppliedCents, creditAppliedCents };
 };

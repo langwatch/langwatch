@@ -183,14 +183,12 @@ export type OrganizationInviteValidation = "strict" | "lenient";
 
 /**
  * An organization's seats: full, lite and Developer (ADR-171), live invitations included.
- * `fullMembers` includes the seats held after a removal (seat-rotation.feature); `heldFullMembers`
- * is that part alone, absent where a source counts no holds.
+ * `fullMembers` includes the seats held after a removal (seat-rotation.feature).
  */
 export type OrganizationMemberSeats = Readonly<{
   fullMembers: number;
   liteMembers: number;
   developers: number;
-  heldFullMembers?: number;
 }>;
 
 /** One invitation batch as a transport asks for it, with the mode it chose. */

@@ -46,11 +46,19 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }))
     .client as PrismaClient;
 
+  /** Set to make every grant write fail, as a ledger outage after the seat committed would. */
+  let grantWritesFail = false;
+  const grantWrite =
+    <T>(answer: T) =>
+    async () => {
+      if (grantWritesFail) throw new Error("grant ledger unavailable");
+      return answer;
+    };
   const grants = createApiFixture<AuthzGrantsService>({
-    attachBindings: async () => ({ attached: [], duplicates: [] }),
-    revokeBindings: async () => {},
-    revokeBindingsWhere: async () => 0,
-    changeBindingRole: async () => {},
+    attachBindings: grantWrite({ attached: [], duplicates: [] }),
+    revokeBindings: grantWrite(undefined),
+    revokeBindingsWhere: grantWrite(0),
+    changeBindingRole: grantWrite(undefined),
   });
   /** Organizations whose plan lookup fails, to prove one failing admission spares the others. */
   const unreachablePlans = new Set<string>();
@@ -214,7 +222,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
 
       expect(await membershipOf(organizationId, bar)).toBeNull();
       expect(await fullSeatsInUse(organizationId)).toBe(4);
-      expect(await memberships.findHeldSeats({ organizationId })).toEqual([]);
+      expect(await seatHolds.findHeld({ organizationId })).toEqual([]);
     });
 
     /** @scenario "Removing someone who took their seat under 30 days ago holds it until 30 days after" */
@@ -230,7 +238,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
 
       expect(await membershipOf(organizationId, bar)).toBeNull();
       expect(await fullSeatsInUse(organizationId)).toBe(5);
-      const [held] = await memberships.findHeldSeats({ organizationId });
+      const [held] = await seatHolds.findHeld({ organizationId });
       expect(held).toMatchObject({ userId: bar, name: "Bar", reason: "REMOVED" });
       expect(held?.heldUntil.epochMilliseconds).toBe(taken.getTime() + 30 * DAY_MS);
     });
@@ -266,6 +274,73 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
       expect(await fullSeatsInUse(organizationId)).toBe(5);
     });
 
+    /** @scenario "A role change whose grants fail keeps the seat as it was" */
+    it("puts back the role, seat date and hold when a demotion's grants fail", async () => {
+      const { organizationId, adminId, bar } = await acme({ barTookSeatDaysAgo: 3 });
+      // Bar's organization binding, so the demotion has a grant to revoke.
+      await prisma.roleBinding.create({
+        data: {
+          organizationId,
+          userId: bar,
+          role: "MEMBER",
+          scopeType: "ORGANIZATION",
+          scopeId: organizationId,
+        },
+      });
+      const before = await membershipOf(organizationId, bar);
+      grantWritesFail = true;
+
+      try {
+        await expect(
+          memberships.changeMemberRole({
+            organizationId,
+            userId: bar,
+            role: OrganizationUserRole.EXTERNAL,
+            currentUserId: adminId,
+            caller: { type: "user", id: adminId },
+          }),
+        ).rejects.toThrow("grant ledger unavailable");
+      } finally {
+        grantWritesFail = false;
+      }
+
+      expect(await membershipOf(organizationId, bar)).toEqual(before);
+      expect(await prisma.seatHold.count({ where: { organizationId } })).toBe(0);
+    });
+
+    /** @scenario "A role change whose grants fail keeps the seat as it was" */
+    it("keeps the hold when a promotion back to a full seat fails", async () => {
+      const { organizationId, adminId, bar } = await acme({ barTookSeatDaysAgo: 3 });
+      await memberships.changeMemberRole({
+        organizationId,
+        userId: bar,
+        role: OrganizationUserRole.EXTERNAL,
+        currentUserId: adminId,
+        caller: { type: "user", id: adminId },
+      });
+      const [hold] = await seatHolds.findHeld({ organizationId });
+      const demoted = await membershipOf(organizationId, bar);
+      grantWritesFail = true;
+
+      try {
+        await expect(
+          memberships.changeMemberRole({
+            organizationId,
+            userId: bar,
+            role: OrganizationUserRole.MEMBER,
+            currentUserId: adminId,
+            caller: { type: "user", id: adminId },
+          }),
+        ).rejects.toThrow("grant ledger unavailable");
+      } finally {
+        grantWritesFail = false;
+      }
+
+      expect(await membershipOf(organizationId, bar)).toEqual(demoted);
+      expect(await seatHolds.findHeld({ organizationId })).toEqual([hold]);
+      expect(await fullSeatsInUse(organizationId)).toBe(5);
+    });
+
     /** @scenario "A held seat frees on its own when the hold ends" */
     it("stops counting a hold that ended yesterday", async () => {
       const { organizationId, adminId, bar } = await acme({ barTookSeatDaysAgo: 45 });
@@ -278,7 +353,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
       });
 
       expect(await fullSeatsInUse(organizationId)).toBe(4);
-      expect(await memberships.findHeldSeats({ organizationId })).toEqual([]);
+      expect(await seatHolds.findHeld({ organizationId })).toEqual([]);
     });
 
     /** @scenario "A person added back within their hold reuses the held seat" */
@@ -304,7 +379,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
       expect((await membershipOf(organizationId, bar))?.fullSeatSince?.getTime()).toBe(
         taken.getTime(),
       );
-      expect(await memberships.findHeldSeats({ organizationId })).toEqual([]);
+      expect(await seatHolds.findHeld({ organizationId })).toEqual([]);
     });
 
     /** @scenario "A pending invitation that is revoked frees its seat at once" */
@@ -362,7 +437,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
       expect((await membershipOf(organizationId, bar))?.fullSeatSince?.getTime()).toBe(
         taken.getTime(),
       );
-      expect(await memberships.findHeldSeats({ organizationId })).toEqual([]);
+      expect(await seatHolds.findHeld({ organizationId })).toEqual([]);
     });
 
     it("keeps no seat for a directory offboarding of someone who held it over 30 days", async () => {
@@ -370,7 +445,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
 
       await seatHolds.holdSeatOfDepartingMember({ organizationId, userId: bar });
 
-      expect(await memberships.findHeldSeats({ organizationId })).toEqual([]);
+      expect(await seatHolds.findHeld({ organizationId })).toEqual([]);
     });
 
     /** @scenario "A person who accepts an invitation within their hold takes the held seat" */
@@ -423,7 +498,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
       expect((await membershipOf(organizationId, bar))?.fullSeatSince?.getTime()).toBe(
         taken.getTime(),
       );
-      expect(await memberships.findHeldSeats({ organizationId })).toEqual([]);
+      expect(await seatHolds.findHeld({ organizationId })).toEqual([]);
     });
 
     /** @scenario "A person who comes back as a Lite Member leaves the full seat held" */
@@ -437,7 +512,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
       expect(await seatHolds.takeBackHeldSeat({ organizationId, userId: bar })).toBe(false);
 
       expect(await fullSeatsInUse(organizationId)).toBe(5);
-      expect(await memberships.findHeldSeats({ organizationId })).toMatchObject([
+      expect(await seatHolds.findHeld({ organizationId })).toMatchObject([
         { userId: bar, reason: "REMOVED" },
       ]);
     });
@@ -563,7 +638,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
     it("says the seat frees at once and names who waits", async () => {
       const { organizationId, bar, waitingIds } = await acme({ waiting: ["Qux"] });
 
-      const preview = await memberships.seatRemovalPreview({ organizationId, userId: bar });
+      const preview = await seatHolds.removalPreview({ organizationId, userId: bar });
 
       expect(preview).toMatchObject({
         holdsFullSeat: true,
@@ -584,7 +659,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
         })
       ).createdAt;
 
-      const preview = await memberships.seatRemovalPreview({ organizationId, userId: bar });
+      const preview = await seatHolds.removalPreview({ organizationId, userId: bar });
 
       expect(waitingIds).toHaveLength(1);
       expect(preview.holdsFullSeat).toBe(true);

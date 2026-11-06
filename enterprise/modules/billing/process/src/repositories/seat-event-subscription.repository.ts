@@ -24,6 +24,8 @@ export abstract class SeatEventSubscriptionRepository {
     plan: GrowthSeatPlanType;
     maxMembers: number;
   }): Promise<{ id: string }>;
+  /** Records the seats a decrease keeps before the provider lowers the line; the count stays. */
+  abstract keepSeats(input: { id: string; kept: KeptSeats }): Promise<void>;
   /** Back to ACTIVE at the new seat count with the seats it keeps, any scheduled end cleared. */
   abstract reactivateWithSeats(input: {
     id: string;

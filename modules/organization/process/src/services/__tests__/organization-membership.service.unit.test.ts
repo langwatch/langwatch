@@ -996,6 +996,67 @@ describe("OrganizationMembershipService", () => {
       });
     });
 
+    describe("when re-enabling a member who is not on a full seat", () => {
+      const disabledAs = (role: OrganizationUserRole) => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role,
+          disabledAt: nowInstant(),
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
+          user: { id: "user-456", name: null, email: null },
+        });
+        vi.mocked(mockRepo.findSeatStandings).mockResolvedValue([
+          {
+            role,
+            disabledAt: nowInstant(),
+            createdAt: nowInstant(),
+            fullSeatSince: null,
+            seatPendingSince: null,
+            email: null,
+            name: null,
+          },
+        ]);
+        mockCheckLimit.mockResolvedValue({
+          allowed: true,
+          limitType: "membersLite",
+          current: 1,
+          max: 5,
+        });
+      };
+      const enable = () =>
+        service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: false,
+          actingUser: { id: "admin-789" },
+        });
+
+      /** @scenario "Re-enabling a Lite Member asks for a Lite Member seat" */
+      it("checks the Lite Member seats for a Lite Member", async () => {
+        disabledAs(OrganizationUserRole.EXTERNAL);
+
+        await enable();
+
+        expect(mockCheckLimit).toHaveBeenCalledWith(
+          expect.objectContaining({ resource: "membersLite" }),
+        );
+      });
+
+      /** @scenario "Re-enabling a Developer is never refused for seats" */
+      it("checks no capped seat for a Developer", async () => {
+        disabledAs(OrganizationUserRole.DEVELOPER);
+
+        await enable();
+
+        expect(mockCheckLimit).not.toHaveBeenCalled();
+        expect(mockRepo.setMemberDisabled).toHaveBeenCalledWith(
+          expect.objectContaining({ disabled: false, seat: { kind: "unchanged" } }),
+        );
+      });
+    });
+
     describe("when re-enabling a member the plan has a seat for", () => {
       /** @scenario A disabled member can be re-enabled when a seat is free */
       it("delegates to the repository", async () => {

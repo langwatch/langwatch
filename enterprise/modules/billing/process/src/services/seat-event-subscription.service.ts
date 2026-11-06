@@ -326,19 +326,35 @@ export class SeatEventSubscriptionService {
     const { subscription, stripeSubscription, seatItem } = target;
     const plan = this.planChange({ target, requested: totalMembers });
 
+    // Kept seats are recorded first: a provider webhook lowering the count before the final
+    // write still finds the seats paid for, and a retry recomputes the same plan.
+    if (plan.kept) await this.subscriptions.keepSeats({ id: subscription.id, kept: plan.kept });
+
     // An increase charges the proration now; a decrease applies from the next cycle with
     // no credit. Either reactivates a subscription scheduled for cancellation.
-    for (const step of plan.steps) {
-      await this.stripeSubscriptions.updateSubscription({
+    const moveTo = (quantity: number, prorationBehavior: "always_invoice" | "none") =>
+      this.stripeSubscriptions.updateSubscription({
         subscriptionId: subscription.stripeSubscriptionId,
         change: seatChange({
           subscription: stripeSubscription,
           seatItem,
-          quantity: step.quantity,
+          quantity,
           prorationDate,
-          prorationBehavior: step.prorationBehavior,
+          prorationBehavior,
         }),
       });
+    let lifted = false;
+    try {
+      for (const step of plan.steps) {
+        await moveTo(step.quantity, step.prorationBehavior);
+        lifted = step.prorationBehavior === "none" && plan.steps.length > 1;
+      }
+    } catch (error) {
+      // A charge refused after the lift puts the line back, so the next cycle bills as before.
+      if (lifted && seatItem.quantity != null) {
+        await moveTo(seatItem.quantity, "none").catch(() => undefined);
+      }
+      throw error;
     }
 
     await this.subscriptions.reactivateWithSeats({
@@ -405,17 +421,17 @@ export class SeatEventSubscriptionService {
     const charged = plan.steps.find((step) => step.prorationBehavior === "always_invoice");
     // Preview the exact charged change the confirm button performs, through the Create
     // Preview Invoice API (the Upcoming Invoice API rejects flexible billing mode).
-    const preview = charged
-      ? await this.stripeSubscriptions.previewInvoice({
-          subscriptionId: subscription.stripeSubscriptionId,
-          change: seatChange({
-            subscription: stripeSubscription,
-            seatItem,
-            quantity: charged.quantity,
-            prorationDate,
-          }),
-        })
-      : null;
+    const previewAt = (quantity: number) =>
+      this.stripeSubscriptions.previewInvoice({
+        subscriptionId: subscription.stripeSubscriptionId,
+        change: seatChange({ subscription: stripeSubscription, seatItem, quantity, prorationDate }),
+      });
+    const preview = charged ? await previewAt(charged.quantity) : null;
+    // With a lift step, the move to the seats paid for separates them from carried prorations.
+    const lifted =
+      preview && plan.chargedShare
+        ? await previewAt(newTotalSeats - plan.chargedShare.added)
+        : null;
 
     const currency = (
       preview?.currency ??
@@ -425,7 +441,7 @@ export class SeatEventSubscriptionService {
     const billingInterval = seatItem.interval ?? "month";
 
     const { prorationCents, creditAppliedCents } = preview
-      ? chargedAmounts({ preview, share: plan.chargedShare })
+      ? chargedAmounts({ preview, lifted, share: plan.chargedShare })
       : { prorationCents: 0, creditAppliedCents: 0 };
 
     const format = (cents: number) => {

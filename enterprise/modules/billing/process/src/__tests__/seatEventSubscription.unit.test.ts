@@ -56,6 +56,7 @@ const createMockSubscriptions = (): {
   findSeatCandidates: vi.fn().mockResolvedValue([]),
   cancelPendingSeatCheckouts: vi.fn().mockResolvedValue([]),
   createPendingSeatCheckout: vi.fn().mockResolvedValue({ id: "sub_new_1" }),
+  keepSeats: vi.fn(),
   reactivateWithSeats: vi.fn(),
 });
 

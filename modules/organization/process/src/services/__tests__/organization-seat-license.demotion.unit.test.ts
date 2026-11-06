@@ -40,6 +40,18 @@ describe("OrganizationSeatLicenseService.assertRoleChangeAllowed", () => {
       ).resolves.toBeUndefined();
     });
 
+    /** @scenario "Moving a Developer to Lite Member needs a free Lite Member seat" */
+    it("refuses a Developer moved onto a Lite Member seat the plan has no room for", async () => {
+      await expect(
+        seatsWithEveryLiteSeatInUse().assertRoleChangeAllowed({
+          organizationId: "acme",
+          currentRole: "DEVELOPER",
+          userPermissions: undefined,
+          role: "EXTERNAL",
+        }),
+      ).rejects.toMatchObject({ code: "resource_limit_exceeded" });
+    });
+
     it("still refuses a Lite Member promoted onto a full seat the plan has no room for", async () => {
       await expect(
         seatsWithEveryLiteSeatInUse().assertRoleChangeAllowed({

@@ -151,14 +151,16 @@ export function UserManagementDrawer({
     });
   };
 
-  /** Hands the drawer's rows to the page; false when an address needs fixing first. */
-  const saveRows = (): boolean => {
+  /** False, with the errors shown, when an address needs fixing first. */
+  const validateRows = (): boolean => {
     const errors = invalidEmailErrors(localPlannedUsers);
-    if (Object.keys(errors).length > 0) {
-      setEmailErrors(errors);
-      return false;
-    }
+    if (Object.keys(errors).length === 0) return true;
+    setEmailErrors(errors);
+    return false;
+  };
 
+  /** Hands the drawer's rows to the page, which may send invitations. */
+  const applyRows = () => {
     const autoRows = localPlannedUsers.filter((u) => u.id.startsWith("auto-"));
     const manualRows = localPlannedUsers.filter((u) => u.id.startsWith("planned-"));
     const autoRowsWithEmail = autoRows.filter((u) => u.email.trim() !== "");
@@ -169,11 +171,12 @@ export function UserManagementDrawer({
       newSeats: manualRows,
       deletedSeatCount: Math.max(0, deletedAutoCount),
     });
-    return true;
   };
 
   const handleSave = () => {
-    if (saveRows()) onClose();
+    if (!validateRows()) return;
+    applyRows();
+    onClose();
   };
 
   const totalFullMembersInDrawer =
@@ -188,7 +191,8 @@ export function UserManagementDrawer({
     open,
     seatChange: isLoading ? undefined : seatChange,
     newSeats: totalFullMembersInDrawer,
-    saveRows,
+    validateRows,
+    applyRows,
     onCommitted: onClose,
   });
 
@@ -313,13 +317,16 @@ function useDrawerSeatChange({
   open,
   seatChange,
   newSeats,
-  saveRows,
+  validateRows,
+  applyRows,
   onCommitted,
 }: {
   open: boolean;
   seatChange: DrawerSeatChange | undefined;
   newSeats: number;
-  saveRows: () => boolean;
+  validateRows: () => boolean;
+  /** Runs only once the provider took the change, so a failed commit leaves the page as it was. */
+  applyRows: () => void;
   onCommitted: () => void;
 }) {
   const [isCommitting, setIsCommitting] = useState(false);
@@ -333,10 +340,12 @@ function useDrawerSeatChange({
   const quote = seatQuoteOf(quoteQuery.data);
   const summary = seatChangeSummary({ from: seatChange.currentSeats, to: newSeats, quote });
   const commit = async () => {
-    if (!saveRows()) return;
+    if (!validateRows()) return;
     setIsCommitting(true);
     try {
-      if (await seatChange.onCommit({ newSeats, quotedAt: quote?.quotedAt })) onCommitted();
+      if (!(await seatChange.onCommit({ newSeats, quotedAt: quote?.quotedAt }))) return;
+      applyRows();
+      onCommitted();
     } finally {
       setIsCommitting(false);
     }

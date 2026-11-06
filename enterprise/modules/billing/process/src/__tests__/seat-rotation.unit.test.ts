@@ -193,6 +193,37 @@ describe("Growth seat changes", () => {
       expect(await planSeats()).toBe(5);
     });
 
+    /** @scenario "Lowering seats applies from the next billing cycle" */
+    it("keeps the seats paid for when the provider lowered the line but the record failed", async () => {
+      const repository = MemorySeatEventSubscriptionRepository.create(store);
+      const failingRecord = SeatEventSubscriptionService.create({
+        stripeSubscriptions,
+        subscriptions: createApiFixture<MemorySeatEventSubscriptionRepository>({
+          findSeatCandidates: (input) => repository.findSeatCandidates(input),
+          keepSeats: (input) => repository.keepSeats(input),
+          reactivateWithSeats: async () => {
+            throw new Error("database unavailable");
+          },
+        }),
+        abandoned: { seatCheckoutsAbandoned: vi.fn() },
+        prices,
+        customerCurrency: StripeCustomerCurrencyService.create({
+          customers: MemoryStripeCustomersChannel.create(),
+          stripeErrors: StripeErrorTranslatorService.create(),
+        }),
+      });
+
+      await expect(
+        failingRecord.updateSeatEventItems({ organizationId: "org_1", totalMembers: 3 }),
+      ).rejects.toThrow("database unavailable");
+      const synced = lifecycle.handleSubscriptionUpdated({ subscription: PROVIDER_AT_THREE });
+      await vi.advanceTimersByTimeAsync(2000);
+      await synced;
+
+      expect(store.subscriptions[0]?.maxMembers).toBe(3);
+      expect(await planSeats()).toBe(5);
+    });
+
     it("previews nothing due today and the day the lower count applies", async () => {
       const quote = await seats.previewProration({ organizationId: "org_1", newTotalSeats: 3 });
 
@@ -236,15 +267,56 @@ describe("Growth seat changes", () => {
       expect(await planSeats()).toBe(6);
     });
 
+    it("puts the line back when the charge after the lift is refused", async () => {
+      stripeSubscriptions.refuse({
+        operation: "updateSubscription",
+        error: new Error("card declined"),
+        allowed: 1,
+        times: 1,
+      });
+
+      await expect(
+        seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 }),
+      ).rejects.toThrow("card declined");
+
+      expect(stripeSubscriptions.updates.map((update) => update.change)).toEqual([
+        { items: [{ id: "si_seat", quantity: 5 }], prorationBehavior: "none" },
+        { items: [{ id: "si_seat", quantity: 3 }], prorationBehavior: "none" },
+      ]);
+      expect(store.subscriptions[0]).toMatchObject({ maxMembers: 3, seatsKept: 5 });
+    });
+
     it("quotes the share of the previewed proration above the seats already paid for", async () => {
-      // The preview prices the move from 3 to 6; one seat of those three is due.
+      // The preview prices the move from 3 to 6, the lift the move from 3 to 5; one seat is due.
       stripeSubscriptions.seedPreview({
         preview: { total: 5400, amountDue: 5400, currency: "eur" },
+        quantity: 6,
+      });
+      stripeSubscriptions.seedPreview({
+        preview: { total: 3600, amountDue: 3600, currency: "eur" },
+        quantity: 5,
       });
 
       const quote = await seats.previewProration({ organizationId: "org_1", newTotalSeats: 6 });
 
       expect(quote).toMatchObject({ amountDueCents: 1800, appliesAt: null, keptSeats: null });
+    });
+
+    /** @scenario "Amount due counts prorations the subscription already carried" */
+    it("quotes a carried proration in full beside the seat above the ones paid for", async () => {
+      // 1000 carried from an earlier change sits on both previews; one seat costs 1800.
+      stripeSubscriptions.seedPreview({
+        preview: { total: 6400, amountDue: 6400, currency: "eur" },
+        quantity: 6,
+      });
+      stripeSubscriptions.seedPreview({
+        preview: { total: 4600, amountDue: 4600, currency: "eur" },
+        quantity: 5,
+      });
+
+      const quote = await seats.previewProration({ organizationId: "org_1", newTotalSeats: 6 });
+
+      expect(quote.amountDueCents).toBe(2800);
     });
   });
 });

@@ -325,6 +325,19 @@ export interface LwqlPrismaRows {
     readonly disabledAt: "DateTime?";
     readonly pendingSsoGrantId: "String?";
     readonly membershipStamp: "String";
+    readonly fullSeatSince: "DateTime?";
+    readonly seatPendingSince: "DateTime?";
+  };
+  readonly SeatHold: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly userId: "String";
+    readonly email: "String?";
+    readonly name: "String?";
+    readonly seatTakenAt: "DateTime";
+    readonly heldUntil: "DateTime";
+    readonly reason: "String";
+    readonly createdAt: "DateTime";
   };
   readonly Team: {
     readonly id: "String";
@@ -1718,6 +1731,8 @@ export interface LwqlPrismaRows {
     readonly maxDashboards: "Int?";
     readonly maxCustomGraphs: "Int?";
     readonly maxAutomations: "Int?";
+    readonly seatsKept: "Int?";
+    readonly seatsKeptUntil: "DateTime?";
   };
   readonly Invoice: {
     readonly id: "String";

@@ -69,6 +69,25 @@ Feature: Seat rotation
       Then the change goes through
 
     @unit
+    Scenario: Moving a Developer to Lite Member needs a free Lite Member seat
+      Given every Lite Member seat is in use
+      And "Dev" is a Developer
+      When an administrator changes "Dev" to a Lite Member
+      Then the change is refused for want of a Lite Member seat
+
+    @unit
+    Scenario: Re-enabling a Lite Member asks for a Lite Member seat
+      Given "Lia" is a disabled Lite Member
+      When an administrator re-enables "Lia"
+      Then the Lite Member seats are checked, not the full member seats
+
+    @unit
+    Scenario: Re-enabling a Developer is never refused for seats
+      Given "Dev" is a disabled Developer
+      When an administrator re-enables "Dev"
+      Then no capped seat is checked
+
+    @unit
     Scenario: A directory offboarding keeps the seat as a manual removal does
       Given "Bar" took their seat 3 days ago
       When the identity provider deprovisions "Bar"
@@ -154,6 +173,12 @@ Feature: Seat rotation
       When an administrator removes "Bar" without giving the seat away
       Then "Qux" is still waiting
       And 4 of 5 full member seats are in use
+
+    @integration
+    Scenario: A role change whose grants fail keeps the seat as it was
+      Given "Bar" took their seat on 3 November
+      When an administrator changes the role of "Bar" and writing the grants fails
+      Then "Bar" keeps their role, their seat date and any hold they had
 
     @integration
     Scenario: A hold that ends admits the person waiting longest
@@ -256,6 +281,13 @@ Feature: Seat rotation
       When an administrator adds one seat in the seat drawer
       Then the summary reads "Seats 3 → 4" with nothing due today
       And the button reads "Add 1 seat"
+
+    @integration
+    Scenario: A seat change the payment provider refuses sends no invitations
+      Given an administrator typed an address into the seat drawer and added a seat
+      When the payment provider refuses the seat change
+      Then no invitation is sent
+      And the seat drawer stays open with the address
 
   Rule: contract, AWS Marketplace and licence seats are fixed until renewal
 

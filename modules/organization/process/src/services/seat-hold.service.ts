@@ -2,7 +2,7 @@
  * The 30-day seat hold (specs/licensing/seat-rotation.feature): what a membership write does to
  * its person's full seat, who waits for a seat, and what the remove dialog and Users list read.
  */
-import { isFullMember } from "@langwatch/entitlement-contract";
+import { classifyMemberType, type MemberType } from "@langwatch/entitlement-contract";
 import { type Instant, nowInstant } from "@langwatch/time";
 
 import type {
@@ -99,8 +99,18 @@ export class SeatHoldService {
     userId: string;
     standing: Pick<MemberSeatStanding, "role">;
   }): Promise<boolean> {
+    return (await this.memberTypeOf(input)) === "FullMember";
+  }
+
+  /** The seat pool the membership's role and custom roles put it in, enabled or not. */
+  async memberTypeOf(input: {
+    organizationId: string;
+    userId: string;
+    standing: Pick<MemberSeatStanding, "role">;
+  }): Promise<MemberType> {
     const { memberships } = this.dependencies;
-    if (input.standing.role !== "EXTERNAL") return isFullMember(input.standing.role, undefined);
+    if (input.standing.role !== "EXTERNAL")
+      return classifyMemberType(input.standing.role, undefined);
     const teamIds = await memberships.findSharedTeamIds({ organizationId: input.organizationId });
     const customRoleIds = customRoleIdsOf({
       bindings: await memberships.findTeamGrants({ ...input, teamIds }),
@@ -114,7 +124,10 @@ export class SeatHoldService {
               customRoleIds,
             }),
           });
-    return isFullMember(input.standing.role, permissions.length > 0 ? permissions : undefined);
+    return classifyMemberType(
+      input.standing.role,
+      permissions.length > 0 ? permissions : undefined,
+    );
   }
 
   /**

@@ -101,7 +101,6 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
       fullMembers: this.#count(organizationId, isFullMember) + heldFullMembers,
       liteMembers: this.#count(organizationId, isLiteMember),
       developers: this.#count(organizationId, isDeveloper),
-      heldFullMembers,
     };
   }
 

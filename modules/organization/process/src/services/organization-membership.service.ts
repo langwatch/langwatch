@@ -39,6 +39,7 @@ import type {
   OrganizationSeatRevocationNotice,
 } from "./organization-member-role.service.ts";
 import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
+import { OrganizationMemberSeatService } from "./organization-member-seat.service.ts";
 import {
   OrganizationProvisioningService,
   type OrganizationCreationNotice,
@@ -47,12 +48,7 @@ import type {
   OrganizationSeatLicense,
   OrganizationPlanUser,
 } from "./organization-seat-license.service.ts";
-import type {
-  SeatHoldCheckFailure,
-  SeatHoldCheckOutcome,
-  SeatHoldService,
-  SeatRemovalPreview,
-} from "./seat-hold.service.ts";
+import type { SeatHoldCheckOutcome, SeatHoldService } from "./seat-hold.service.ts";
 
 /**
  * Whether this person is mid-way through proving a single sign-on connection
@@ -63,6 +59,22 @@ export interface OrganizationTestArrivals {
   standingFor(args: { userId: string }): Promise<SsoTestArrivalStanding>;
 }
 
+type OrganizationMembershipDependencies = {
+  repository: OrganizationMembershipRepository;
+  creations: OrganizationCreationNotice;
+  seats: OrganizationSeatLicense;
+  seatNotices: OrganizationSeatRevocationNotice;
+  grantCache: OrganizationGrantCache;
+  testArrivals: OrganizationTestArrivals;
+  admissions: OrganizationAdmissions;
+  workspaceNotices: PersonalWorkspaceArchiveNotice;
+  memberNotices: OrganizationMemberChangeNotice;
+  /** Authz's escalation rule, asked before a role change writes anything. */
+  ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
+  /** The 30-day seat hold (seat-rotation.feature). */
+  seatHolds: SeatHoldService;
+};
+
 /**
  * The membership, provisioning and audit operations, over one repository and
  * four ports.
@@ -70,46 +82,24 @@ export interface OrganizationTestArrivals {
 export class OrganizationMembershipService {
   static readonly enrichTeamWithGrants = enrichTeamWithGrants;
 
-  static create(dependencies: {
-    repository: OrganizationMembershipRepository;
-    creations: OrganizationCreationNotice;
-    seats: OrganizationSeatLicense;
-    seatNotices: OrganizationSeatRevocationNotice;
-    grantCache: OrganizationGrantCache;
-    testArrivals: OrganizationTestArrivals;
-    admissions: OrganizationAdmissions;
-    workspaceNotices: PersonalWorkspaceArchiveNotice;
-    memberNotices: OrganizationMemberChangeNotice;
-    /** Authz's escalation rule, asked before a role change writes anything. */
-    ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
-    /** The 30-day seat hold (seat-rotation.feature). */
-    seatHolds: SeatHoldService;
-  }): OrganizationMembershipService {
+  static create(dependencies: OrganizationMembershipDependencies): OrganizationMembershipService {
     return new OrganizationMembershipService(dependencies);
   }
 
-  private constructor(
-    private readonly dependencies: {
-      repository: OrganizationMembershipRepository;
-      creations: OrganizationCreationNotice;
-      seats: OrganizationSeatLicense;
-      seatNotices: OrganizationSeatRevocationNotice;
-      grantCache: OrganizationGrantCache;
-      testArrivals: OrganizationTestArrivals;
-      admissions: OrganizationAdmissions;
-      workspaceNotices: PersonalWorkspaceArchiveNotice;
-      memberNotices: OrganizationMemberChangeNotice;
-      /** Authz's escalation rule, asked before a role change writes anything. */
-      ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
-      /** The 30-day seat hold (seat-rotation.feature). */
-      seatHolds: SeatHoldService;
-    },
-  ) {
-    this.roles = OrganizationMemberRoleService.create(dependencies);
-    this.provisioning = OrganizationProvisioningService.create(dependencies);
+  private constructor(private readonly dependencies: OrganizationMembershipDependencies) {
     this.admission = OrganizationMemberAdmissionService.create(dependencies);
+    this.memberSeats = OrganizationMemberSeatService.create({
+      ...dependencies,
+      admission: this.admission,
+    });
+    this.roles = OrganizationMemberRoleService.create({
+      ...dependencies,
+      memberSeats: this.memberSeats,
+    });
+    this.provisioning = OrganizationProvisioningService.create(dependencies);
   }
 
+  private readonly memberSeats: OrganizationMemberSeatService;
   private readonly roles: OrganizationMemberRoleService;
   private readonly provisioning: OrganizationProvisioningService;
   private readonly admission: OrganizationMemberAdmissionService;
@@ -387,86 +377,15 @@ export class OrganizationMembershipService {
     return this.admission.deleteMember(params);
   }
 
-  /**
-   * Removes a member and, when the seat frees at once and a full seat fits, gives it to the
-   * person waiting the caller named (seat-rotation.feature). Answers who got the seat.
-   */
-  async removeMember(params: {
-    organizationId: string;
-    userId: string;
-    actingUserId: string | null;
-    giveSeatToUserId?: string | null;
-    caller: AuthzGrantCaller;
-  }): Promise<{ seatGivenToUserId: string | null }> {
-    const { organizationId, userId, actingUserId, giveSeatToUserId, caller } = params;
-    await this.admission.deleteMember({ organizationId, userId, actingUserId });
-    if (!giveSeatToUserId) return { seatGivenToUserId: null };
-    const admitted = await this.roles.admitWaitingMember({
-      organizationId,
-      userId: giveSeatToUserId,
-      actingUserId,
-      caller,
-    });
-    return { seatGivenToUserId: admitted ? giveSeatToUserId : null };
+  removeMember(
+    params: Parameters<OrganizationMemberSeatService["removeMember"]>[0],
+  ): ReturnType<OrganizationMemberSeatService["removeMember"]> {
+    return this.memberSeats.removeMember(params);
   }
 
-  /** What removing this member does to their seat, and who waits for it. */
-  seatRemovalPreview(params: {
-    organizationId: string;
-    userId: string;
-  }): Promise<SeatRemovalPreview> {
-    return this.dependencies.seatHolds.removalPreview(params);
-  }
-
-  /** The seats removed, disabled or demoted people still hold, ending soonest first. */
-  findHeldSeats(params: { organizationId: string }): ReturnType<SeatHoldService["findHeld"]> {
-    return this.dependencies.seatHolds.findHeld(params);
-  }
-
-  /**
-   * The hourly seat hold check: in each organization with ended holds, gives free full seats to
-   * the people waiting longest, then deletes those holds. An organization that fails keeps its
-   * ended holds (they no longer count) so the next check retries it; the others go on.
-   */
-  async runSeatHoldCheck(): Promise<SeatHoldCheckOutcome> {
-    const { seatHolds } = this.dependencies;
-    const now = seatHolds.now();
-    let admitted = 0;
-    const failures: SeatHoldCheckFailure[] = [];
-    for (const organizationId of await seatHolds.findOrganizationsWithEnded({ now })) {
-      try {
-        admitted += await this.admitWaitingMembers({ organizationId });
-        await seatHolds.deleteEnded({ organizationId, now });
-      } catch (error) {
-        failures.push({
-          organizationId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-    return { admitted, failures };
-  }
-
-  /** Gives free full seats to the people waiting longest; answers how many were admitted. */
-  private async admitWaitingMembers({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<number> {
-    let admitted = 0;
-    for (const waiting of await this.dependencies.seatHolds.findWaitingMembers({
-      organizationId,
-    })) {
-      const given = await this.roles.admitWaitingMember({
-        organizationId,
-        userId: waiting.userId,
-        actingUserId: null,
-        caller: { type: "system" },
-      });
-      if (!given) break;
-      admitted += 1;
-    }
-    return admitted;
+  /** The hourly seat hold check (seat-rotation.feature). */
+  runSeatHoldCheck(): Promise<SeatHoldCheckOutcome> {
+    return this.memberSeats.runSeatHoldCheck();
   }
 
   createMembership(

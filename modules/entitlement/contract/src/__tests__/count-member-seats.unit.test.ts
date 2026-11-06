@@ -14,7 +14,7 @@ describe("countMemberSeats", () => {
         { role: OrganizationUserRole.EXTERNAL, permissions: undefined },
         { role: OrganizationUserRole.DEVELOPER, permissions: ["project:update"] },
       ]),
-    ).toEqual({ fullMembers: 3, liteMembers: 2, developers: 1, heldFullMembers: 0 });
+    ).toEqual({ fullMembers: 3, liteMembers: 2, developers: 1 });
   });
 
   it("answers no seats for nobody", () => {
@@ -22,7 +22,6 @@ describe("countMemberSeats", () => {
       fullMembers: 0,
       liteMembers: 0,
       developers: 0,
-      heldFullMembers: 0,
     });
   });
 
@@ -35,7 +34,7 @@ describe("countMemberSeats", () => {
         ],
         [{ userId: "back" }, { userId: "demoted" }, { userId: "removed" }, { userId: "removed" }],
       ),
-    ).toEqual({ fullMembers: 3, liteMembers: 1, developers: 0, heldFullMembers: 2 });
+    ).toEqual({ fullMembers: 3, liteMembers: 1, developers: 0 });
   });
 
   it("counts a held seat once when its person is invited back on a full seat", () => {
@@ -50,6 +49,6 @@ describe("countMemberSeats", () => {
         ],
         [{ userId: "back", email: "back@example.com" }],
       ),
-    ).toEqual({ fullMembers: 1, liteMembers: 0, developers: 0, heldFullMembers: 0 });
+    ).toEqual({ fullMembers: 1, liteMembers: 0, developers: 0 });
   });
 });

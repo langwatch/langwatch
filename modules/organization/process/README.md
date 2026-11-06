@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:252`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:250`; nothing else in this package is public.
 
 #### `createAndAssign`
 

@@ -22,6 +22,7 @@ import {
   mockAddTeamMemberOrEvents,
   mockGetActivePlan,
   mockGetLastSubscription,
+  mockCreateInvitesMutate,
   mockGetUsage,
   mockOrganization,
   resetMocks,
@@ -332,6 +333,25 @@ describe("<SubscriptionPage/> seat rotation", () => {
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ totalMembers: 6 })),
       );
     });
+    /** @scenario "A seat change the payment provider refuses sends no invitations" */
+    it("sends no invitation and keeps the drawer open when the seat change fails", async () => {
+      mockPreviewProration.mockReturnValue({ data: addQuote, isLoading: false, isError: false });
+      mutateAsync.mockRejectedValue(new Error("card declined"));
+      renderSubscriptionPage();
+
+      fireEvent.click(screen.getByTestId("user-count-link"));
+      fireEvent.change(await screen.findByTestId("seat-email-0"), {
+        target: { value: "new@acme.example" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /Add Seat/ }));
+      fireEvent.click(button("Add 1 seat"));
+
+      await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+      await waitFor(() => expect(button("Add 1 seat")).toBeEnabled());
+      expect(mockCreateInvitesMutate).not.toHaveBeenCalled();
+      expect(screen.getByTestId("seat-email-0")).toHaveValue("new@acme.example");
+    });
+
     describe("when the seats were lowered to 3 and 5 are kept until 1 Dec", () => {
       beforeEach(() => {
         mockGetLastSubscription.mockReturnValue({
