@@ -14,7 +14,7 @@ export type IssuedRenewalLicense = {
 };
 
 /** What claiming a paid renewal invoice found. */
-export type LicenseRenewalClaim =
+export type LicenseRenewalClaimOutcome =
   /** This caller holds the invoice; `issued` is the licence an earlier holder minted but never mailed. */
   | { outcome: "claimed"; token: string; issued: IssuedRenewalLicense | null }
   /** The invoice's licence went out already: a redelivery mints nothing. */
@@ -34,7 +34,7 @@ export abstract class LicenseRenewalClaimRepository {
     stripeSubscriptionId: string;
     now: Instant;
     leaseMs: number;
-  }): Promise<LicenseRenewalClaim>;
+  }): Promise<LicenseRenewalClaimOutcome>;
 
   /** False when the claim was taken over: the caller no longer holds it. */
   abstract recordIssued(input: {

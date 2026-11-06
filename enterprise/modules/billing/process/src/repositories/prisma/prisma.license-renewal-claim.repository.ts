@@ -8,7 +8,7 @@ import { z } from "zod";
 import {
   LicenseRenewalClaimRepository,
   type IssuedRenewalLicense,
-  type LicenseRenewalClaim,
+  type LicenseRenewalClaimOutcome,
 } from "../license-renewal-claim.repository.ts";
 
 type LicenseRenewalClaimDatabase = Pick<PrismaClient, "licenseRenewalClaim">;
@@ -36,7 +36,7 @@ export class PrismaLicenseRenewalClaimRepository extends LicenseRenewalClaimRepo
     stripeSubscriptionId: string;
     now: Instant;
     leaseMs: number;
-  }): Promise<LicenseRenewalClaim> {
+  }): Promise<LicenseRenewalClaimOutcome> {
     const token = generate("billing").toString();
     const { count } = await this.prisma.licenseRenewalClaim.createMany({
       data: [{ stripeInvoiceId, stripeSubscriptionId, claimToken: token, claimedAt: toDate(now) }],
@@ -58,7 +58,9 @@ export class PrismaLicenseRenewalClaimRepository extends LicenseRenewalClaimRepo
       data: { claimToken: token, claimedAt: toDate(now) },
     });
     if (takeover.count !== 1) return { outcome: "in_flight" };
-    const kept = issuedRenewalLicenseSchema.safeParse(existing.issuedLicense);
+    // Read after the takeover: the stale holder may have kept a licence since the first read.
+    const taken = await this.prisma.licenseRenewalClaim.findUnique({ where: { stripeInvoiceId } });
+    const kept = issuedRenewalLicenseSchema.safeParse(taken?.issuedLicense);
     return { outcome: "claimed", token, issued: kept.success ? kept.data : null };
   }
 

@@ -6,7 +6,7 @@ import { Temporal, type Instant } from "@langwatch/time";
 import {
   LicenseRenewalClaimRepository,
   type IssuedRenewalLicense,
-  type LicenseRenewalClaim,
+  type LicenseRenewalClaimOutcome,
 } from "../license-renewal-claim.repository.ts";
 
 /** A released claim with a minted licence keeps its row; this lease is long over. */
@@ -43,7 +43,7 @@ export class MemoryLicenseRenewalClaimRepository extends LicenseRenewalClaimRepo
     stripeSubscriptionId: string;
     now: Instant;
     leaseMs: number;
-  }): Promise<LicenseRenewalClaim> {
+  }): Promise<LicenseRenewalClaimOutcome> {
     const existing = this.rows.get(stripeInvoiceId);
     if (existing?.deliveredAt) return { outcome: "delivered" };
     if (existing && existing.claimedAt.epochMilliseconds > now.epochMilliseconds - leaseMs)

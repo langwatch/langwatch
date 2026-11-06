@@ -67,9 +67,14 @@ export class LicensePlanSourceService {
     return { licenseKey: instanceKey, source: "environment" };
   }
 
-  /** The Cloud reading: signature AND term, so a lapsed contract steps aside. */
+  /**
+   * The Cloud reading: the stored licence only, signature AND term, so a lapsed
+   * contract steps aside and an instance key never overrides a subscription.
+   */
   async getActivePlan(organizationId: string): Promise<PlanInfo> {
-    const { licenseKey } = await this.resolveLicenseKey(organizationId);
+    const { licenseKey } = await this.licenses
+      .getOrganizationLicense(organizationId)
+      .catch(unlicensedWhenMissing);
     if (!licenseKey) {
       return UNLIMITED_PLAN;
     }
