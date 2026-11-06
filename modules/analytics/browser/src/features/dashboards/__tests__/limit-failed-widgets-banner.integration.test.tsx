@@ -102,9 +102,10 @@ function boardServer(failures: Failures) {
   };
 }
 
-/** Runs the query of every frame on screen, the way the sandboxed widget's code would. */
-async function answerFrames() {
+/** Runs the query of every frame on screen not in `skip`, the way the widget's code would. */
+async function answerFrames({ skip = [] }: { skip?: readonly HTMLElement[] } = {}) {
   for (const frame of await screen.findAllByTestId("sandboxed-frame")) {
+    if (skip.includes(frame)) continue;
     const props = frames.get(frame);
     if (!props) throw new Error("a frame never rendered");
     await act(async () => {
@@ -199,10 +200,15 @@ describe("given a board of three widgets", () => {
       await openBoard(failures);
       expect(await screen.findByTestId(BANNER)).toBeTruthy();
 
+      // Retry remounts only its own frame; answering the rest would hide a Retry that did nothing.
+      const before = screen.getAllByTestId("sandboxed-frame");
       delete failures["w-2"];
       fireEvent.click(screen.getAllByRole("button", { name: "Retry" })[0] as HTMLElement);
-      await answerFrames();
+      await answerFrames({ skip: before });
 
+      expect(
+        screen.getAllByTestId("sandboxed-frame").filter((f) => !before.includes(f)),
+      ).toHaveLength(1);
       expect(screen.queryByTestId(BANNER)).toBeNull();
     });
   });
