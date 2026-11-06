@@ -104,7 +104,7 @@ export function SettingRow({
 
 const BOXED_LIST = {
   borderWidth: "1px",
-  borderColor: "border.nested",
+  borderColor: "border",
   borderRadius: "lg",
   overflow: "hidden",
   css: {

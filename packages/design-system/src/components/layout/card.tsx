@@ -589,7 +589,7 @@ function CardFooter({
       paddingX={insetX || 4}
       paddingTop={divided ? 3 : 2}
       paddingBottom={divided ? 3 : insetY || 3}
-      {...(divided ? { borderTopWidth: "1px", borderColor: "border.nested" } : {})}
+      {...(divided ? { borderTopWidth: "1px", borderColor: "border" } : {})}
       data-card-footer-divider={divided ? "" : undefined}
     >
       {children}
