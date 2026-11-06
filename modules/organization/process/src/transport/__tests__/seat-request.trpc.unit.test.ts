@@ -22,6 +22,7 @@ type TestContext = {
 const asked: string[] = [];
 const granted = new Set<string>();
 const approvals: Parameters<OrganizationApi["approveSeatRequest"]>[] = [];
+const declines: Parameters<OrganizationApi["declineSeatRequest"]>[] = [];
 
 const members = trpcTestMembers<TestContext>({
   permits: (permission) => {
@@ -35,6 +36,15 @@ const app = createApiFixture<OrganizationApi>({
     approvals.push(args);
     return { outcome: "enabled" };
   },
+  declineSeatRequest: async (...args: Parameters<OrganizationApi["declineSeatRequest"]>) => {
+    declines.push(args);
+    return { outcome: "declined" };
+  },
+  listOpenSeatRequests: async () => ({
+    requests: [],
+    seatFree: true,
+    approvalPath: { kind: "upgrade_plan", url: "/settings/subscription" },
+  }),
   getHeldMemberships: async () => ({ hasActiveMembership: false, held: [] }),
 });
 const trpc = initTRPC.context<TestContext>().create();
@@ -57,6 +67,7 @@ describe("seatRequest on organization's router", () => {
   beforeEach(() => {
     asked.length = 0;
     approvals.length = 0;
+    declines.length = 0;
     granted.clear();
   });
 
@@ -86,6 +97,42 @@ describe("seatRequest on organization's router", () => {
 
       await expect(caller.approve(scope)).resolves.toEqual({ outcome: "enabled" });
       expect(approvals).toEqual([
+        [scope, { id: "user_ada", name: "Ada Admin", email: "ada@acme.example" }],
+      ]);
+    });
+  });
+
+  describe("when a member lists the open seat requests", () => {
+    it("refuses without seatRequests:view", async () => {
+      await expect(caller.listOpen({ organizationId: "org_acme" })).rejects.toMatchObject({
+        cause: expect.objectContaining({ code: "permission_denied" }),
+      });
+      expect(asked).toEqual(["seatRequests:view"]);
+    });
+
+    it("answers with seatRequests:view", async () => {
+      granted.add("seatRequests:view");
+
+      await expect(caller.listOpen({ organizationId: "org_acme" })).resolves.toMatchObject({
+        requests: [],
+      });
+    });
+  });
+
+  describe("when a member declines a seat request", () => {
+    it("refuses without seatRequests:manage before the application is asked", async () => {
+      await expect(caller.decline(scope)).rejects.toMatchObject({
+        cause: expect.objectContaining({ code: "permission_denied" }),
+      });
+      expect(asked).toEqual(["seatRequests:manage"]);
+      expect(declines).toEqual([]);
+    });
+
+    it("forwards the request and the caller with seatRequests:manage", async () => {
+      granted.add("seatRequests:manage");
+
+      await expect(caller.decline(scope)).resolves.toEqual({ outcome: "declined" });
+      expect(declines).toEqual([
         [scope, { id: "user_ada", name: "Ada Admin", email: "ada@acme.example" }],
       ]);
     });
