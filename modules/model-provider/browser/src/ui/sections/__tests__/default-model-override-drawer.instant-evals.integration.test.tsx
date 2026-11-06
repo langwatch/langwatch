@@ -5,6 +5,7 @@
  * Binds specs/model-providers/instant-evals-decision-model.feature.
  */
 import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,11 +20,12 @@ const mockListDecisionModels = vi.fn();
 
 // The drawer asks the judge router and own decision model flags; off unless a case turns one on.
 const flagsOn = new Set<string>();
+const flagReads: { flag: string; target: unknown }[] = [];
 vi.mock("@langwatch/feature-flag-client", () => ({
-  useFeatureFlag: (flag: { name: string }) => ({
-    enabled: flagsOn.has(flag.name),
-    isLoading: false,
-  }),
+  useFeatureFlag: (flag: { name: string }, target: unknown) => {
+    flagReads.push({ flag: flag.name, target });
+    return { enabled: flagsOn.has(flag.name), isLoading: false };
+  },
 }));
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
@@ -214,6 +216,13 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       expect(within(listbox).getByText("Evals Preview")).toBeInTheDocument();
       expect(within(listbox).queryByText("Scenario Judge Preview")).not.toBeInTheDocument();
       expect(within(listbox).queryByText("Search Preview")).not.toBeInTheDocument();
+    });
+
+    it("asks the own decision model flag of the organization, never the project", () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const read = flagReads.find((entry) => entry.flag === OWN_MODEL_FLAG);
+      expect(read?.target).toMatchObject({ projectId: NOT_TARGETED });
     });
 
     /** @scenario "A decision model whose provider has no key says how to enable it" */

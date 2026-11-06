@@ -455,7 +455,8 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   );
   const { enabled: isOwnModelEnabled } = useFeatureFlag(
     FrontendFlags.release_instant_evals_own_decision_model,
-    { projectId: projectId ?? NOT_TARGETED, organizationId, enabled: !!projectId && open },
+    // Asked of the organization only, as the server asks it (ADR-182 decision 4).
+    { projectId: NOT_TARGETED, organizationId, enabled: !!projectId && open },
   );
   const decisionOptions = decisionModelPickerOptions({
     pickable: pickableDecisionModels.data,
