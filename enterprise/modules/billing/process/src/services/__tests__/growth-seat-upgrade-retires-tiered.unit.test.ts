@@ -255,13 +255,18 @@ describe("Growth seat upgrade retires the tiered subscription", () => {
 
   describe("when a delayed update reports a cancelled Growth subscription active", () => {
     /** @scenario "A late activation for a cancelled Growth subscription retires nothing" */
-    it("leaves the tiered subscription active", async () => {
-      const { service, stripe, statusOf } = setup({ growthStatus: SubscriptionStatus.CANCELLED });
+    it("changes nothing and announces nothing", async () => {
+      const { service, stripe, started, slackConfirmations, statusOf } = setup({
+        growthStatus: SubscriptionStatus.CANCELLED,
+      });
 
       await subscriptionActive(service);
 
+      expect(statusOf(GROWTH.id)).toBe(SubscriptionStatus.CANCELLED);
       expect(statusOf(TIERED.id)).toBe(SubscriptionStatus.ACTIVE);
       expect(stripe.cancellations).toEqual([]);
+      expect(started).toEqual([]);
+      expect(slackConfirmations).toEqual([]);
     });
   });
 

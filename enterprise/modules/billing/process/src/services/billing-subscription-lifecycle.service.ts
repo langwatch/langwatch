@@ -186,6 +186,14 @@ export class BillingSubscriptionLifecycleService {
     subscription: Stripe.Subscription;
     existing: BillingSubscriptionRecord;
   }): Promise<void> {
+    // Stripe delivers out of order: an active update for a row already cancelled is stale.
+    if (existing.status === SubscriptionStatus.CANCELLED) {
+      logger.info(
+        { subscriptionId: existing.id },
+        "[stripeWebhook] Active update for a cancelled subscription, skipping",
+      );
+      return;
+    }
     const shouldNotify = existing.status !== SubscriptionStatus.ACTIVE;
     const { usersQuantity, tracesQuantity } = this.quantitiesOf({ subscription, existing });
     const quantitiesResult = await this.subscriptionRepository.updateQuantities({
@@ -201,10 +209,7 @@ export class BillingSubscriptionLifecycleService {
     if (shouldNotify) await this.announceSubscriptionStarted(updatedSubscription);
     // Stripe may report the seat subscription active here before the invoice is paid, and
     // the invoice path then sees an active subscription; the retirement cannot wait for it.
-    // A stale update for a row already cancelled retires nothing.
-    if (existing.status !== SubscriptionStatus.CANCELLED) {
-      await this.retireSupersededPlans({ updated: updatedSubscription, activated: shouldNotify });
-    }
+    await this.retireSupersededPlans({ updated: updatedSubscription, activated: shouldNotify });
   }
 
   /**
@@ -324,11 +329,11 @@ export class BillingSubscriptionLifecycleService {
     const updatedSubscription = activationResult.subscription;
 
     const activated = previousSubscription.status !== SubscriptionStatus.ACTIVE;
+    // Announced first: a redelivery that finishes a failed retirement must not announce again.
     if (activated) {
       await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");
+      await this.announceSubscriptionStarted(updatedSubscription);
     }
-    // Announced first: a redelivery that finishes a failed retirement must not announce again.
-    if (activated) await this.announceSubscriptionStarted(updatedSubscription);
     // Every paid invoice re-checks: a redelivery after a failed retirement, or a renewal of
     // an organization still billed for its old plan, finishes what the activation left.
     await this.retireSupersededPlans({ updated: updatedSubscription, activated });

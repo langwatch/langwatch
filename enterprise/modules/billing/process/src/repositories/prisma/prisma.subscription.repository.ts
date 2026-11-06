@@ -1,4 +1,5 @@
 import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type {
   PrismaClient,
   PlanTypes as PrismaPlanTypes,
@@ -54,7 +55,7 @@ function subscriptionRecordOf(row: SubscriptionRow): BillingSubscriptionRecord {
  */
 type BillingSubscriptionDatabase = Pick<
   PrismaClient,
-  "organization" | "subscription" | "$transaction"
+  "organization" | "subscription" | "$queryRaw"
 >;
 
 export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepository {
@@ -217,29 +218,22 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     organizationId: string;
     excludeSubscriptionId: string;
   }): Promise<{ stripeSubscriptionId: string | null }[]> {
-    return this.prisma.$transaction(async (tx) => {
-      const oldSubs = await tx.subscription.findMany({
-        where: supersededBySeatEventWhere(input),
-      });
-
-      // Only the run that flips a row cancels it in Stripe; a concurrent run sees count 0.
-      const retired: { stripeSubscriptionId: string | null }[] = [];
-      for (const oldSub of oldSubs) {
-        const { count } = await tx.subscription.updateMany({
-          where: {
-            id: oldSub.id,
-            status: { not: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus },
-          },
-          data: {
-            status: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
-            endDate: toDate(nowInstant()),
-          },
-        });
-        if (count === 1) retired.push({ stripeSubscriptionId: oldSub.stripeSubscriptionId });
-      }
-
-      return retired;
-    });
+    // One conditional statement: a retirement parked on the row lock re-checks the status
+    // against the committed row, so only the run that cancels a row cancels it in Stripe.
+    return this.prisma.$queryRaw<{ stripeSubscriptionId: string | null }[]>`
+      ${skipTenantCheck({
+        // Scoped to the one organization by its id in the WHERE clause.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "Subscription"
+         SET "status" = 'CANCELLED', "endDate" = ${toDate(nowInstant())}, "updatedAt" = now()
+       WHERE "organizationId" = ${input.organizationId}
+         AND "id" <> ${input.excludeSubscriptionId}
+         AND "status" <> 'CANCELLED'
+         AND "stripeSubscriptionId" IS NOT NULL
+         AND "plan"::text = ANY(${TIERED_PLAN_TYPES})
+      RETURNING "stripeSubscriptionId"
+    `;
   }
 
   async updateQuantities(input: {

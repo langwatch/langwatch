@@ -203,7 +203,21 @@ Feature: Stripe webhook handling grants and removes plans correctly
       Given an organization's Growth seat subscription is cancelled in our records
       And its tiered subscription is active
       When a delayed update reports the Growth subscription active
-      Then the tiered subscription stays active and nothing is cancelled in Stripe
+      Then the Growth subscription stays cancelled and nothing is announced
+      And the tiered subscription stays active and nothing is cancelled in Stripe
+
+    @integration
+    Scenario: A retirement cancels the live tiered subscription and hands it to Stripe
+      Given an organization's tiered subscription is active
+      When its Growth seat subscription retires the plans it supersedes
+      Then the tiered subscription is cancelled in our records
+      And it is handed back to be cancelled in Stripe
+
+    @integration
+    Scenario: Two retirements at once cancel the tiered subscription in Stripe once
+      Given two deliveries retire the same tiered subscription at the same time
+      When the second waits on the first's write and then re-checks the row
+      Then only the first is handed the tiered subscription to cancel in Stripe
 
     @unit
     Scenario: A renewal with nothing left to retire changes nothing
