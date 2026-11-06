@@ -88,6 +88,12 @@ export class OrganizationAccessNoticeService {
     if (lastMailedAt !== null && at - lastMailedAt < ACCESS_NOTICE_WINDOW_MS) {
       return { recorded: true, mailed: false };
     }
+    const held = await notices.findHeld({ organizationId: input.organizationId });
+    if (held.some((row) => row.id !== notice.id)) {
+      // A window closed before the sweep ran: what it held goes out now, with this notice.
+      const mailed = await this.mailHeld({ organizationId: input.organizationId, held, at });
+      return { recorded: true, mailed: mailed.has(notice.id) };
+    }
     const [claimed] = await notices.markMailed({ ids: [notice.id], delivery: "immediate", at });
     if (!claimed) return { recorded: true, mailed: false };
     await this.mailOne({ notice, heldWithoutAccess: input.heldWithoutAccess ?? true });
@@ -103,15 +109,32 @@ export class OrganizationAccessNoticeService {
       const { lastMailedAt } = await notices.getMailWindow({ organizationId });
       if (lastMailedAt !== null && at - lastMailedAt < ACCESS_NOTICE_WINDOW_MS) continue;
       const held = await notices.findHeld({ organizationId });
-      const claimedIds = new Set(
-        await notices.markMailed({ ids: held.map((row) => row.id), delivery: "digest", at }),
-      );
-      const claimed = held.filter((row) => claimedIds.has(row.id));
-      if (claimed.length === 0) continue;
-      await this.mailDigest({ organizationId, notices: claimed });
-      digests += 1;
+      const mailed = await this.mailHeld({ organizationId, held, at });
+      if (mailed.size > 0) digests += 1;
     }
     return { digests };
+  }
+
+  /** Claims the held notices and mails the ones this process won as one digest. */
+  private async mailHeld({
+    organizationId,
+    held,
+    at,
+  }: {
+    organizationId: string;
+    held: readonly AccessNoticeRow[];
+    at: number;
+  }): Promise<ReadonlySet<string>> {
+    const claimedIds = new Set(
+      await this.dependencies.notices.markMailed({
+        ids: held.map((row) => row.id),
+        delivery: "digest",
+        at,
+      }),
+    );
+    const claimed = held.filter((row) => claimedIds.has(row.id));
+    if (claimed.length > 0) await this.mailDigest({ organizationId, notices: claimed });
+    return claimedIds;
   }
 
   private async mailOne({

@@ -91,6 +91,27 @@ describe("OrganizationAccessNoticeService", () => {
     });
   });
 
+  describe("when a notice arrives after the window closed but before the sweep", () => {
+    /** @scenario "A notice after the window closed carries the ones still held" */
+    it("mails one digest naming the held person and the new one", async () => {
+      const { clock, mail, service, seatRequest } = notices();
+      await seatRequest("first@acme.example");
+      clock.now += HOUR_MS;
+      await seatRequest("second@acme.example");
+      clock.now = START + ACCESS_NOTICE_WINDOW_MS + HOUR_MS;
+
+      const result = await seatRequest("fourth@acme.example");
+
+      expect(result).toEqual({ recorded: true, mailed: true });
+      expect(mail.seatRequests).toHaveLength(2);
+      expect(mail.digests[0]?.people.map((person) => person.email)).toEqual([
+        "second@acme.example",
+        "fourth@acme.example",
+      ]);
+      expect(await service.sendDueDigests()).toEqual({ digests: 0 });
+    });
+  });
+
   describe("when the identity provider refuses the same person three times in a day", () => {
     /** @scenario "The same person is noticed at most once a day per kind" */
     it("records one notice naming them", async () => {

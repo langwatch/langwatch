@@ -45,7 +45,11 @@ export function seatApprovalPath({
       ? { kind: "upgrade_licence", url: DEFAULT_LICENSE_PURCHASE_URL }
       : contactSales;
   }
-  if (plan.planSource === "license" || plan.overrideAddingLimitations === true) {
+  const accountManaged =
+    plan.planSource === "license" ||
+    plan.type === "ENTERPRISE" ||
+    plan.overrideAddingLimitations === true;
+  if (accountManaged) {
     return contactSales;
   }
   if (plan.planSource === "subscription" && !plan.free && pricingModel === "SEAT_EVENT") {

@@ -86,6 +86,18 @@ describe("seatApprovalPath", () => {
     });
   });
 
+  describe("when the organization holds an Enterprise subscription billed outside Stripe", () => {
+    /** @scenario "An Enterprise subscription billed outside Stripe approves by contacting LangWatch" */
+    it("contacts LangWatch rather than the self-serve upgrade", () => {
+      const path = pathFor({
+        plan: { planSource: "subscription", type: "ENTERPRISE", free: false },
+        pricingModel: "TIERED",
+      });
+
+      expect(path.kind).toBe("contact_sales");
+    });
+  });
+
   describe("when a self-hosted deployment runs on a Growth licence", () => {
     /** @scenario "A self-hosted Growth licence approves by buying more licence seats" */
     it("buys more licence seats", () => {

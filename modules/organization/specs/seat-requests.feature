@@ -131,6 +131,12 @@ Feature: Seat requests when an organization is over its seat limit
       Then the approval path is "contact_sales" naming the organization and one more seat
 
     @unit
+    Scenario: An Enterprise subscription billed outside Stripe approves by contacting LangWatch
+      Given the organization holds an Enterprise subscription with no Stripe seat billing
+      When an administrator lists the open seat requests
+      Then the approval path is "contact_sales"
+
+    @unit
     Scenario: A self-hosted Growth licence approves by buying more licence seats
       Given a self-hosted deployment on a Growth licence
       When an administrator lists the open seat requests
@@ -167,6 +173,13 @@ Feature: Seat requests when an organization is over its seat limit
       When "second@acme.example" and "third@acme.example" open seat requests
       Then nobody is mailed at once
       And when the window closes one digest names both people
+
+    @unit
+    Scenario: A notice after the window closed carries the ones still held
+      Given "second@acme.example" waits for the digest of a window that has closed
+      When "fourth@acme.example" opens a seat request before the digest sweep runs
+      Then one digest names both people at once
+      And nothing is left waiting for another day
 
     @unit
     Scenario: The same person is noticed at most once a day per kind
