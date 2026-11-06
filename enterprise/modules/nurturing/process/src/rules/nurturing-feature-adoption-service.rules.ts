@@ -1,4 +1,4 @@
-import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
+import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 
 /** Decides the calls a team member invite raises. */
 export function fireTeamMemberInvited({
@@ -78,6 +78,30 @@ export function fireExperimentRan({
       userId,
       event: "experiment_ran",
       properties: { experiment_id: experimentId, project_id: projectId },
+    },
+  ];
+}
+
+/** Decides the project's active-day track to the admin; Customer.io drops a replay of its id. */
+export function fireProjectActiveDay({
+  userId,
+  projectId,
+  source,
+  daysSinceSignup,
+  sourceEventId,
+}: NurturingSignalOf<"project_active_day">): CioBatchCall[] {
+  if (!userId) return [];
+  return [
+    {
+      type: "track",
+      userId,
+      event: "project_active_day",
+      properties: {
+        source,
+        project_id: projectId,
+        ...(daysSinceSignup == null ? {} : { days_since_signup: daysSinceSignup }),
+      },
+      messageId: `project_active_day:${sourceEventId}`,
     },
   ];
 }

@@ -18,6 +18,7 @@ import { selfHostedTraits, unixSecondsOf } from "../rules/nurturing-customer-io-
 import { pickCustomerIoDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
 import {
   fireExperimentRan,
+  fireProjectActiveDay,
   fireScenarioCreated,
   fireTeamMemberInvited,
   fireWorkflowCreated,
@@ -273,7 +274,7 @@ export class NurturingDeliveryService {
       case "first_trace_integrated":
         return this.firstTraceToCustomerIo(signal);
       case "project_active_day":
-        return this.projectActiveDay(signal);
+        return this.sendCustomerIoCalls(fireProjectActiveDay(signal));
       case "simulation_run_finished":
         return this.simulationRunFinished(signal);
       case "evaluation_completed":
@@ -415,25 +416,6 @@ export class NurturingDeliveryService {
           sdk_framework: sdkFramework,
           project_id: projectId,
         },
-      },
-    ]);
-  }
-
-  /** The project's active day, to the admin; Customer.io drops a replay of its messageId. */
-  private projectActiveDay(signal: NurturingSignalOf<"project_active_day">): void {
-    const { userId, projectId, source, daysSinceSignup, sourceEventId } = signal;
-    if (!userId) return;
-    this.sendCustomerIoCalls([
-      {
-        type: "track",
-        userId,
-        event: "project_active_day",
-        properties: {
-          source,
-          project_id: projectId,
-          ...(daysSinceSignup == null ? {} : { days_since_signup: daysSinceSignup }),
-        },
-        messageId: `project_active_day:${sourceEventId}`,
       },
     ]);
   }
