@@ -246,3 +246,55 @@ Feature: Redacting personal data out of a span at ingestion
     When the redaction pass asks whether the analysis service is configured
     Then it asks the analysis service with an empty batch that sends nothing
     And it asks again only after an answer failed
+
+  # The PII redaction model: a second analysis service on Presidio's own
+  # exchange, for allowlisted organizations only. It never weakens today's path:
+  # anything other than a clean answer falls back to Presidio, then Google DLP.
+
+  @unit
+  Scenario: An allowlisted organization's strict analysis goes to the PII redaction model
+    Given a deployment that names the PII redaction model
+    And the project's organization is allowlisted for it
+    When a strict batch is analysed
+    Then the model answers it and Presidio is not called
+
+  @unit
+  Scenario: An organization not allowlisted keeps the Presidio path
+    Given a deployment that names the PII redaction model
+    And the project's organization is not allowlisted for it
+    When a strict batch is analysed
+    Then Presidio answers it and the model is not called
+
+  @unit
+  Scenario: A model failure falls back to Presidio, never to unredacted text
+    Given an organization allowlisted for the PII redaction model
+    When the model refuses, runs out of time, or its routing cannot be decided
+    Then the batch is sent to Presidio
+    And when Presidio fails too, the Google DLP fallback is reached as today
+
+  @unit
+  Scenario: A deployment that names no model behaves exactly as today
+    Given neither PII_REDACTION_MODEL_LAMBDA_ARN nor PII_REDACTION_MODEL_ENDPOINT is set
+    When a strict batch is analysed
+    Then Presidio answers it
+    And neither the flag nor the project's organization is read
+
+  @unit
+  Scenario: The model's Lambda answer is read through the Web Adapter prelude
+    Given the model reached through its Lambda alias
+    When a batch is sent
+    Then the invoke is an HTTP event for the Presidio route
+    And only a framed 2xx answer with one result per text is accepted
+    And a missing prelude, a non-2xx status, a function error or a truncated answer is refused
+
+  @unit
+  Scenario: A batch over the synchronous invoke limit stays on Presidio
+    Given the model reached through its Lambda alias
+    When a batch serializes past the six megabyte invoke limit
+    Then it is refused without invoking the function
+
+  @unit
+  Scenario: The model's Lambda alias wins over its address
+    Given the deployment settings for the PII redaction model
+    Then a Lambda alias ARN wins over an HTTP endpoint
+    And an ARN that is not a Lambda function ARN leaves the model unconfigured

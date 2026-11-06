@@ -11,6 +11,9 @@ export class MemoryDataPrivacyChannels {
   static create({ config }: { config: DataPrivacyServerConfig }): DataPrivacyChannels {
     return {
       presidio: MemoryPresidioChannel.create({ endpoint: config.langevalsEndpoint }),
+      piiRedactionModel: MemoryPresidioChannel.create({
+        endpoint: config.piiRedactionModelLambdaArn ?? config.piiRedactionModelEndpoint,
+      }),
       dlp: MemoryGoogleDlpChannel.create(),
     };
   }

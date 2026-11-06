@@ -11,7 +11,10 @@ import {
 } from "../rules/pii-analysis.rules.ts";
 import type { PiiAnalysisMetricsOtelService } from "./pii-analysis-metrics-otel.service.ts";
 
-/** A batch through langevals' Presidio, reached directly (R5, Alex 2026-10-06): `clearPresidio`. */
+/**
+ * A batch through langevals' Presidio, reached directly (R5, 2026-10-06): `clearPresidio`.
+ * The PII redaction model answers the same exchange, so it runs through a second instance.
+ */
 export class PresidioRedactionService {
   static create(input: {
     presidio: PresidioChannel;
@@ -20,20 +23,36 @@ export class PresidioRedactionService {
       "analysisCalled" | "analysisObserved" | "analysisFinished"
     >;
     timeoutMs: number;
+    /** The `method` label each call is counted under. */
+    method?: "presidio" | "pii_redaction_model";
   }): PresidioRedactionService {
-    return new PresidioRedactionService(input.presidio, input.metrics, input.timeoutMs);
+    return new PresidioRedactionService({ ...input, method: input.method ?? "presidio" });
   }
 
   #configured: Promise<boolean> | undefined;
 
-  private constructor(
-    private readonly presidio: PresidioChannel,
-    private readonly metrics: Pick<
+  private readonly presidio: PresidioChannel;
+  private readonly metrics: Pick<
+    PiiAnalysisMetricsOtelService,
+    "analysisCalled" | "analysisObserved" | "analysisFinished"
+  >;
+  private readonly timeoutMs: number;
+  private readonly method: string;
+
+  private constructor(input: {
+    presidio: PresidioChannel;
+    metrics: Pick<
       PiiAnalysisMetricsOtelService,
       "analysisCalled" | "analysisObserved" | "analysisFinished"
-    >,
-    private readonly timeoutMs: number,
-  ) {}
+    >;
+    timeoutMs: number;
+    method: string;
+  }) {
+    this.presidio = input.presidio;
+    this.metrics = input.metrics;
+    this.timeoutMs = input.timeoutMs;
+    this.method = input.method;
+  }
 
   /** Asked once, with an empty batch that sends nothing; a failed answer is asked again. */
   isConfigured(): Promise<boolean> {
@@ -58,7 +77,7 @@ export class PresidioRedactionService {
   }): Promise<(string | null)[]> {
     if (input.texts.length === 0) return [];
 
-    this.metrics.analysisCalled("presidio");
+    this.metrics.analysisCalled(this.method);
     const truncated = input.texts.map((text) => ({
       input: text.slice(0, PII_ANALYSIS_TEXT_BUDGET),
       remaining: text.slice(PII_ANALYSIS_TEXT_BUDGET),

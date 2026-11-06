@@ -88,6 +88,8 @@ export async function createDataPrivacyTestApp({
     enforcement,
     nodeEnvironment: undefined,
     langevalsEndpoint: undefined,
+    piiRedactionModelLambdaArn: undefined,
+    piiRedactionModelEndpoint: undefined,
   };
   return DataPrivacyModule.create({
     repositories: {
