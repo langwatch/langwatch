@@ -321,7 +321,7 @@ describe("ModelProviderDecisionModelService.listPickable", () => {
     const { service } = harness({ stored: OPENAI_DECISIONS, isFlagOn: false });
 
     expect(await service.listPickable({ projectId: "proj_1" })).toEqual([
-      { value: LANGWATCH_DECISION_MODEL_ID, label: "LangWatch Instant Preview" },
+      { value: LANGWATCH_DECISION_MODEL_ID, label: "Instant Preview" },
     ]);
   });
 
@@ -340,7 +340,7 @@ describe("ModelProviderDecisionModelService.listPickable", () => {
       LANGWATCH_DECISION_MODEL_ID,
       OPENAI_DECISIONS,
     ]);
-    expect(offered[1]?.label).toBe("OpenAI Decisions API");
+    expect(offered[1]?.label).toBe("gpt-6-luna");
   });
 
   /** @scenario "A provider is asked for once however many of its models the catalogue holds" */

@@ -111,6 +111,7 @@ class GetApiV1QuerySchemaResponse200ViewsItemColumnsItemGatesItemType1(str, Enum
     SECRETSVIEW = "secrets:view"
     SSOMANAGE = "sso:manage"
     SSOVIEW = "sso:view"
+    SUBSCRIPTIONUPGRADE = "subscription:upgrade"
     TEAMMANAGE = "team:manage"
     TEAMVIEW = "team:view"
     TRACESCREATE = "traces:create"

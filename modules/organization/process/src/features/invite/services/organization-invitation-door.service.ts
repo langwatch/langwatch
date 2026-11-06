@@ -327,6 +327,7 @@ export class OrganizationInvitationDoorService {
       userId: by.id,
       inviteId: invite.id,
       organizationName: invite.organization.name,
+      role: invite.role,
     });
 
     const projectSlug = await this.deps.invitations.findLandingProjectSlug({ invite });
