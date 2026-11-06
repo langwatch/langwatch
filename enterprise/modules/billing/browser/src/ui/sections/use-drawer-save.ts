@@ -43,7 +43,7 @@ export function useDrawerSave({
       },
       {
         onSuccess: (created) => {
-          if (created.length === 0) {
+          if (!Array.isArray(created) || created.length === 0) {
             host.failed({
               error: void 0,
               fallbackTitle: "No invitations were sent",
