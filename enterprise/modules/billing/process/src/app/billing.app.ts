@@ -63,6 +63,7 @@ import { ConnectedSeatChangeService } from "../features/connected-billing/servic
 import { ConnectedUsageCeilingService } from "../features/connected-billing/services/connected-usage-ceiling.service.ts";
 import { LicensePurchaseDeliveryService } from "../features/license-purchase/services/license-purchase-delivery.service.ts";
 import { LicensePurchaseService } from "../features/license-purchase/services/license-purchase.service.ts";
+import { LicenseRenewalService } from "../features/license-purchase/services/license-renewal.service.ts";
 import { LicensingLicenseGeneratorService } from "../features/license-purchase/services/licensing-license-generator.service.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
@@ -143,6 +144,8 @@ type StripeWebhookComposition = Readonly<{
   host: BillingWebhookHost;
   /** Main's licence purchase: signs, records, mails and announces; absent without the key. */
   licensePurchase?: LicensePurchaseHandler;
+  /** Delivers a renewed licence subscription's next term, as a purchase is; absent without the key. */
+  licenseRenewal?: Pick<LicensePurchaseService, "mintRenewal" | "sendRenewal">;
   /** Clears a trial's licence once its subscription activates; licensing owns it. */
   licenses: Pick<LicensingApi, "removeLicense" | "getLicenseStatus">;
 }>;
@@ -234,6 +237,7 @@ export class BillingModule
         host: SlackBillingWebhookHostChannel.create({ notices }),
         licenses: setup.dependencies.licensing,
         licensePurchase,
+        licenseRenewal: licensePurchase,
       },
       subscription: {
         notifier: SlackBillingSubscriptionNotifierChannel.create({ notices }),
@@ -354,6 +358,7 @@ export class BillingModule
       | "organizationPricing"
       | "webhookSubscriptions"
       | "webhookOrganizations"
+      | "licenseRenewalClaims"
       | "seatEventSubscriptions"
       | "organizations"
       | "gatewaySpend"
@@ -658,13 +663,27 @@ export class BillingModule
     isSaas: boolean;
     stripe: BillingStripe;
     nodeEnvironment: string | undefined;
-    repositories: Pick<BillingRepositories, "webhookSubscriptions" | "webhookOrganizations">;
+    repositories: Pick<
+      BillingRepositories,
+      "webhookSubscriptions" | "webhookOrganizations" | "licenseRenewalClaims"
+    >;
     licensePaymentLinkId: string | undefined;
     connectedBilling: ConnectedBillingService;
   }): StripeWebhookReceiptService {
     const prices = BillingPriceCatalogue.create(
       getStripeEnvironmentFromNodeEnv(nodeEnvironment),
     ).prices;
+    const renewalIssuer = webhook.licenseRenewal;
+    const licenseRenewal =
+      licensePaymentLinkId && renewalIssuer
+        ? LicenseRenewalService.create({
+            licensePaymentLinkId,
+            subscriptions: repositories.webhookSubscriptions,
+            stripeSubscriptions: stripe.channels.subscriptions,
+            claims: repositories.licenseRenewalClaims,
+            issuer: renewalIssuer,
+          })
+        : undefined;
     const events = EEWebhookService.create({
       subscriptionRepository: repositories.webhookSubscriptions,
       organizationRepository: repositories.webhookOrganizations,
@@ -673,6 +692,7 @@ export class BillingModule
       licensePaymentLinkId,
       licenses: webhook.licenses,
       licensePurchaseHandler: webhook.licensePurchase,
+      ...(licenseRenewal ? { licenseRenewal } : {}),
       host: webhook.host,
       connectedBilling,
       ...(billingRoles ? { billingRoles } : {}),

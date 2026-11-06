@@ -113,7 +113,7 @@ function NoLicense() {
       testId="connect-no-license"
       icon={<KeyRound />}
       title="Hosted services need a license"
-      description="Activate a license, then come back to choose which hosted services this install may call."
+      description="Activate a license that includes hosted services, then come back to choose which ones this install may call. An offline license includes none."
     >
       <Button asChild size="sm" variant="outline" colorPalette="orange">
         <Link unstyled href="/settings/license">

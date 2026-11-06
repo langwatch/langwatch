@@ -104,6 +104,12 @@ export type BillingPurchasedLineItem = Readonly<{
   quantity: number | null;
 }>;
 
+/** The checkout session a subscription was bought through, and its payment link if any. */
+export type BillingSubscriptionCheckout = Readonly<{
+  checkoutSessionId: string;
+  paymentLinkId: string | null;
+}>;
+
 type BillingInvoiceStatus = "draft" | "open" | "paid" | "uncollectible" | "void";
 
 export type BillingInvoice = Readonly<{

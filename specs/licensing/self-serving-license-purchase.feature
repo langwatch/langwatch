@@ -1,13 +1,8 @@
 Feature: Self-Serving License Purchase
 
-  # Two scenarios below are bound to licensePurchaseHandler unit tests.
-  # The remaining @unimplemented scenarios cover Stripe-webhook-router
-  # behavior (how checkout.session.completed events are dispatched
-  # between license and subscription flows), error-path handling for
-  # missing private key / unreachable Slack / missing email config, and
-  # the configurable payment-link UI button. Each requires either a
-  # webhook-router integration fixture or a license-page component test
-  # — neither exists yet. Aspirational pending those harnesses.
+  # The @unimplemented scenarios cover Stripe-webhook-router dispatch of
+  # checkout.session.completed and the purchase error paths (missing private
+  # key, unreachable Slack, missing email config); none has a bound test yet.
 
   As a user wanting to run LangWatch self-hosted
   I want to purchase a license and receive it automatically
@@ -47,6 +42,60 @@ Feature: Self-Serving License Purchase
     Then the license is still emailed to the buyer
     And the Slack failure is logged but does not block delivery
 
+  # Yearly renewal of a licence subscription
+  @unit
+  Scenario: Renewal of a licence subscription mints the next term's licence
+    Given a subscription bought through the license payment link
+    When Stripe reports its yearly renewal invoice as paid with 7 seats for a period ending on 2028-01-01
+    Then a GROWTH license for 7 seats expiring on 2028-01-01 is generated
+    And it is recorded in the license registry, emailed to the buyer and announced on Slack
+
+  @unit
+  Scenario: Renewal of a licence subscription bought before renewals were handled
+    Given a subscription whose checkout session came through the license payment link
+    And billing holds no record of that subscription
+    When Stripe reports its yearly renewal invoice as paid
+    Then the renewed license is generated and emailed
+
+  @unit
+  Scenario: A redelivered renewal invoice mints nothing more
+    Given the renewal license for an invoice was already delivered
+    When Stripe delivers an event for the same invoice again
+    Then no second license is generated and no second email is sent
+
+  @unit
+  Scenario: A failed renewal delivery is retried by Stripe
+    Given sending the renewal license email fails
+    When Stripe retries the same invoice event
+    Then the renewal license minted on the first attempt is emailed on the retry
+    And no second license is minted for the invoice
+
+  @unit
+  Scenario: Renewal of a subscription not bought through the license payment link is untouched
+    Given a subscription whose checkout session came through another payment link
+    When Stripe reports its renewal invoice as paid
+    Then no license is generated
+    And the subscription invoice flow runs as before
+
+  @unit
+  Scenario: Renewal of a LangWatch Cloud subscription asks Stripe nothing extra
+    Given a subscription billing already holds as a LangWatch Cloud plan
+    When Stripe reports its renewal invoice as paid
+    Then no checkout session is looked up and no license is generated
+
+  @unit
+  Scenario: The first invoice of a licence subscription is not a renewal
+    Given a subscription bought through the license payment link
+    When Stripe reports its first invoice, with billing reason subscription_create, as paid
+    Then no renewal license is generated
+
+  @integration
+  Scenario: Only one delivery claims a renewal invoice
+    Given two deliveries of the same paid renewal invoice
+    When both claim the invoice in billing's store
+    Then only the first holds the claim
+    And once it is delivered a later claim finds it delivered
+
   # Error handling
   @integration @unimplemented
   Scenario: Handle missing private key gracefully
@@ -74,13 +123,13 @@ Feature: Self-Serving License Purchase
     And publishing is enabled
 
   # UI: configurable payment link
-  @integration @unimplemented
+  @integration
   Scenario: Purchase button uses configured payment link URL
     Given the STRIPE_LICENSE_PAYMENT_LINK_URL is set to "https://buy.stripe.com/test123"
     When the license page renders for a user without a license
     Then the "Purchase license" button links to "https://buy.stripe.com/test123"
 
-  @integration @unimplemented
+  @integration
   Scenario: Purchase button hidden when payment link URL is not configured
     Given the STRIPE_LICENSE_PAYMENT_LINK_URL is NOT set
     When the license page renders for a user without a license

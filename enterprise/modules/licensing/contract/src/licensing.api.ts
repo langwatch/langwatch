@@ -170,6 +170,8 @@ export interface LicensingApi {
   }): Promise<ConnectCredentialResolution>;
   /** The `licence_token` door's check on a sync bearer; a refusal throws its code. */
   verifyLicenceToken(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller>;
+  /** The sync door's check: as above, but an expired license may collect its waiting renewal. */
+  verifyLicenceTokenForSync(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller>;
   /** The door's check on an activation bearer: looked up, never claimed (W02-ACTIVATE-DOOR). */
   verifyActivationCode(input: ConnectPresentedCredential): Promise<ConnectActivationCaller>;
   /** One daily sync from the install its door verified; a refusal throws its code. */
