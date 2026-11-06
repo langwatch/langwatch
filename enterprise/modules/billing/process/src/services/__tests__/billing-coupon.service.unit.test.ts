@@ -209,6 +209,11 @@ describe("BillingCouponService", () => {
         request: { ...REQUEST, durationInMonths: undefined },
         field: "durationInMonths",
       },
+      {
+        input: "a repeating coupon of 48 months",
+        request: { ...REQUEST, durationInMonths: 48 },
+        field: "durationInMonths",
+      },
       { input: 'the code "half off!"', request: { ...REQUEST, code: "half off!" }, field: "code" },
       {
         input: "an expiry date in the past",

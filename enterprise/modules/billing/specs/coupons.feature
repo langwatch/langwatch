@@ -120,6 +120,7 @@ Feature: Coupons in the Cloud admin console
         | 0% off                               | The discount must be between 1% and 100%           |
         | 101% off                             | The discount must be between 1% and 100%           |
         | a repeating coupon with no months    | Say how many months the discount lasts             |
+        | a repeating coupon of 48 months      | Use a whole number of months from 1 to 36          |
         | the code "half off!"                 | Codes use letters, digits, dashes and underscores  |
         | an expiry date in the past           | The expiry date must be in the future              |
 
