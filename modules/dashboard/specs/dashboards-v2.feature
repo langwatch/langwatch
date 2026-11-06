@@ -1977,6 +1977,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And an empty list keeps no trace
     And under a list that holds "application", a span of a trace older than the lookup's bound counts, whatever the trace's source
     And under a list that holds "application", a trace older than the lookup's bound counts, whatever its source, so a query that scans further back than the lookup, such as the prompt versions in the changes widget, sees those traces
+    And a trace with a trace_metrics row of "application" and one of another source counts under a list of that other source, and not under ["application"]
     # Why: on a large project the application traces are most of them, so the set of other sources'
     # traces is the small one while the list holds application, and the set of the list's traces is
     # the small one while it does not. Measured on prod, 30 days: analytics ADR-003.

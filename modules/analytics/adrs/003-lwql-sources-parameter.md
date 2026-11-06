@@ -51,12 +51,12 @@ AND k NOT IN (SELECT TenantId, TraceId FROM trace_metrics
               WHERE has(S, 'application') AND Source NOT IN S AND <bound>)
 ```
 
-| List | Excluded set (`NOT IN`) | Included set (`IN`) | Keeps |
-|---|---|---|---|
-| `['application']` | traces of other sources | empty | application traces and traces with no row |
-| `['application', 'langy']` | traces of neither | empty | those two sources' traces and traces with no row |
-| `['langy']` | empty | Langy's traces | Langy's traces only |
-| `[]` | empty | empty | nothing |
+| List                       | Excluded set (`NOT IN`) | Included set (`IN`) | Keeps                                            |
+| -------------------------- | ----------------------- | ------------------- | ------------------------------------------------ |
+| `['application']`          | traces of other sources | empty               | application traces and traces with no row        |
+| `['application', 'langy']` | traces of neither       | empty               | those two sources' traces and traces with no row |
+| `['langy']`                | empty                   | Langy's traces      | Langy's traces only                              |
+| `[]`                       | empty                   | empty               | nothing                                          |
 
 While the list holds `application`, the widget leaves out the traces of the other sources. On a
 large project those are the small set; the chosen ones took 30-day trace-list widgets over the query
