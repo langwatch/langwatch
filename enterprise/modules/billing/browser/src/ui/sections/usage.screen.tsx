@@ -176,7 +176,10 @@ function HostedUsage({
   // When the count itself is unknown the events card already says so.
   const isCountKnown = usage.data !== undefined && usage.data.currentMonthMessagesCount !== null;
   const isBreakdownMissing =
-    isCountKnown && (breakdown.isError || breakdown.data?.projects === null);
+    isCountKnown &&
+    (breakdown.isError ||
+      breakdown.data?.projects === null ||
+      breakdown.data?.isDailyUnavailable === true);
   const unitTitle = usage.data?.usageUnit === "traces" ? "Traces this month" : "Events this month";
 
   return (

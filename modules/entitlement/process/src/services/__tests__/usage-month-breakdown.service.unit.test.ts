@@ -133,6 +133,7 @@ describe("UsageMonthBreakdownService", () => {
       const breakdown = await service.getMonthBreakdown({ organizationId: ORGANIZATION_ID });
 
       expect(breakdown.days).toBeNull();
+      expect(breakdown.isDailyUnavailable).toBe(false);
       expect(breakdown.projects).toEqual([
         { projectId: "project_triage", name: "triage", count: 12 },
       ]);
@@ -170,6 +171,7 @@ describe("UsageMonthBreakdownService", () => {
       const breakdown = await service.getMonthBreakdown({ organizationId: ORGANIZATION_ID });
 
       expect(breakdown.days).toBeNull();
+      expect(breakdown.isDailyUnavailable).toBe(true);
       expect(breakdown.projects).toHaveLength(2);
     });
 
@@ -207,7 +209,12 @@ describe("UsageMonthBreakdownService", () => {
 
       const breakdown = await service.getMonthBreakdown({ organizationId: ORGANIZATION_ID });
 
-      expect(breakdown).toEqual({ resetsOn: "2026-12-01", days: null, projects: null });
+      expect(breakdown).toEqual({
+        resetsOn: "2026-12-01",
+        days: null,
+        isDailyUnavailable: true,
+        projects: null,
+      });
     });
   });
 });

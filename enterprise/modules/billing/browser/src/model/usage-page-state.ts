@@ -3,7 +3,7 @@
  * Pure: the screen renders these and decides nothing itself.
  * @see specs/licensing/usage-page.feature
  */
-import { UNLIMITED_MESSAGES } from "@langwatch/enterprise-billing-contract";
+import { PlanTypes, UNLIMITED_MESSAGES } from "@langwatch/enterprise-billing-contract";
 import type { UsageDay } from "@langwatch/entitlement-contract";
 import numeral from "numeral";
 
@@ -110,7 +110,7 @@ export function monthEvents({
   const formatted = formatCount(count);
   const uncapped = { count: formatted, allowance: null, fillRatio: null, status: "ok" } as const;
   // An account-managed plan's terms live in its contract, not the catalogue.
-  if (plan.type === "ENTERPRISE") return uncapped;
+  if (plan.type === PlanTypes.ENTERPRISE) return uncapped;
   const isSeatEventPaid =
     !plan.free && plan.planSource !== "license" && pricingModel === PricingModel.SEAT_EVENT;
   if (isSeatEventPaid) {

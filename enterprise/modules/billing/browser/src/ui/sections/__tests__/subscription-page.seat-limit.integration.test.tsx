@@ -53,6 +53,10 @@ class TestBillingHost extends BillingHostApi {
     return true;
   }
 
+  canReadMonthBreakdown(): boolean {
+    return true;
+  }
+
   routeQuery(): Readonly<Record<string, string | undefined>> {
     return {};
   }

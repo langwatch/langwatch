@@ -131,7 +131,7 @@ type Output = z.infer<typeof usageStatsSchema>; // ../contract/src/usage.ts:89
 
 // limits.getMonthBreakdown
 type Input = z.infer<typeof entitlementOrganizationScopeSchema>; // ../contract/src/entitlement.schemas.ts:17
-type Output = z.infer<typeof usageMonthBreakdownSchema>; // ../contract/src/usage.ts:123
+type Output = z.infer<typeof usageMonthBreakdownSchema>; // ../contract/src/usage.ts:125
 
 // limits.checkAndSendUsageLimitNotification
 // Input: sendUsageLimitWarningInputSchema, ../contract/src/entitlement.schemas.ts:43

@@ -4,11 +4,17 @@
  * @see specs/licensing/usage-page.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import type { StripeEnvironment } from "@langwatch/enterprise-billing-contract";
 import type { UsageMonthBreakdown } from "@langwatch/entitlement-contract";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  BillingHostApi,
+  BillingHostProvider,
+  type BillingHostOrganization,
+} from "../../../model/billing-host.ts";
 import UsageScreen from "../usage.screen.tsx";
 
 type MockPlan = {
@@ -54,6 +60,7 @@ const TIERED_PLAN: MockPlan = {
 function month(days: Record<string, number>): UsageMonthBreakdown {
   return {
     resetsOn: "2026-12-01",
+    isDailyUnavailable: false,
     days: Array.from({ length: 30 }, (_, index) => {
       const date = `2026-11-${String(index + 1).padStart(2, "0")}`;
       return { date, count: days[date] ?? 0 };
@@ -112,14 +119,48 @@ vi.mock("../../../behavior/use-billing-pricing-service.ts", () => ({
     }),
   }),
 }));
-vi.mock("../../../model/billing-host.ts", () => ({
-  useBillingHost: () => ({
-    organization: () => ({ id: "org-1", name: "QA Org", pricingModel: state.pricingModel }),
-    isDeploymentSettled: () => true,
-    isSaaS: () => true,
-    canReadMonthBreakdown: () => state.isAdmin,
-  }),
-}));
+/** A hosted organization; `isAdmin` decides whether the reader holds `organization:manage`. */
+class TestBillingHost extends BillingHostApi {
+  constructor(private readonly isAdmin: boolean) {
+    super();
+  }
+  organization(): BillingHostOrganization {
+    return {
+      id: "org-1",
+      name: "QA Org",
+      pricingModel: state.pricingModel as BillingHostOrganization["pricingModel"],
+    };
+  }
+  activeTeamId(): string | undefined {
+    return undefined;
+  }
+  canInviteMembers(): boolean {
+    return this.isAdmin;
+  }
+  canReadMonthBreakdown(): boolean {
+    return this.isAdmin;
+  }
+  routeQuery(): Readonly<Record<string, string | undefined>> {
+    return {};
+  }
+  isSaaS(): boolean {
+    return true;
+  }
+  isDeploymentSettled(): boolean {
+    return true;
+  }
+  stripeEnvironment(): StripeEnvironment {
+    return "test";
+  }
+  navigate(): void {}
+  replace(): void {}
+  leaveTo(): void {}
+  applicationOrigin(): string {
+    return "http://localhost";
+  }
+  succeeded(): void {}
+  failed(): void {}
+}
 
 function usageOf({
   plan,
@@ -169,7 +210,11 @@ function given({
 const renderPage = () =>
   render(<UsageScreen />, {
     wrapper: ({ children }) => (
-      <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
+      <DesignSystemProvider forcedTheme="light">
+        <BillingHostProvider value={new TestBillingHost(state.isAdmin)}>
+          {children}
+        </BillingHostProvider>
+      </DesignSystemProvider>
     ),
   });
 
@@ -300,6 +345,18 @@ describe("the usage page", () => {
 
       expect(screen.getByTestId("usage-breakdown-unavailable")).toBeInTheDocument();
       expect(screen.getByTestId("usage-events-count")).toHaveTextContent("31,800");
+    });
+
+    it("says so when only the daily read failed", () => {
+      given({
+        plan: FREE_PLAN,
+        count: 31_800,
+        breakdown: { ...month({}), days: null, isDailyUnavailable: true },
+      });
+      renderPage();
+
+      expect(screen.getByTestId("usage-breakdown-unavailable")).toBeInTheDocument();
+      expect(screen.getAllByTestId("usage-project-row")).toHaveLength(3);
     });
 
     it("says the same when the usage read fails outright", () => {

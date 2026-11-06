@@ -105,14 +105,16 @@ export type ProjectUsageShare = z.infer<typeof projectUsageShareSchema>;
 
 /**
  * The month on the usage page: every day of the UTC month, and the projects that used it, the
- * busiest first. `days` is null when the meter counts by month only (traces) or could not
- * answer; `projects` is null when the counting store could not answer.
+ * busiest first. `days` is null for a monthly meter (traces) or a failed read, which
+ * `isDailyUnavailable` marks; `projects` is null when the counting store could not answer.
  */
 const usageMonthBreakdownSchemaDefinition = z
   .object({
     /** `YYYY-MM-DD`: the first day of next month, when the count starts again. */
     resetsOn: z.string(),
     days: usageDaySchema.array().nullable(),
+    /** True when the organization is metered by day but the daily read failed. */
+    isDailyUnavailable: z.boolean(),
     projects: projectUsageShareSchema.array().nullable(),
   })
   .strict();

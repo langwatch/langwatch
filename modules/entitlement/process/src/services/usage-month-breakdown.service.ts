@@ -19,6 +19,9 @@ const logger = createLogger("langwatch:usage:month-breakdown");
 
 type YearMonth = ReturnType<typeof Temporal.PlainYearMonth.from>;
 
+/** The daily read failed, as opposed to an organization that is not metered by day. */
+const DAILY_UNAVAILABLE = Symbol("daily-unavailable");
+
 type MonthBreakdownSources = {
   counter: Pick<UsageCounter, "getResolvedUsageUnit" | "getCountByProjects">;
   meter: Pick<BillableEventsMeterRepository, "countByDay">;
@@ -48,17 +51,22 @@ export class UsageMonthBreakdownService {
       this.projects({ organizationId }),
     ]);
 
-    return { resetsOn: nextMonth.toPlainDate({ day: 1 }).toString(), days, projects };
+    return {
+      resetsOn: nextMonth.toPlainDate({ day: 1 }).toString(),
+      days: days === DAILY_UNAVAILABLE ? null : days,
+      isDailyUnavailable: days === DAILY_UNAVAILABLE,
+      projects,
+    };
   }
 
-  /** Every day of the month, zero where nothing was metered; null when the meter fails. */
+  /** Every day of the month, zero where nothing was metered. */
   private async days({
     organizationId,
     month,
   }: {
     organizationId: string;
     month: YearMonth;
-  }): Promise<UsageDay[] | null> {
+  }): Promise<UsageDay[] | typeof DAILY_UNAVAILABLE> {
     const window = {
       startDate: `${month.toString()}-01 00:00:00.000`,
       endDate: `${month.add({ months: 1 }).toString()}-01 00:00:00.000`,
@@ -73,7 +81,7 @@ export class UsageMonthBreakdownService {
       });
     } catch (error) {
       logger.warn({ organizationId, error }, "The daily usage meter could not answer");
-      return null;
+      return DAILY_UNAVAILABLE;
     }
   }
 
