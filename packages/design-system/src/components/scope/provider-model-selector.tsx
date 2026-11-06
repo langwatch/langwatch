@@ -196,6 +196,19 @@ function InheritItem({
  */
 function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
   const isDescribed = !!item.subtitle;
+  // The tag sits on the second line when there is one, so the title is never the part cut short.
+  const hint = item.hint ? (
+    <Text
+      fontSize="2xs"
+      color="fg.subtle"
+      flexShrink={0}
+      marginStart="auto"
+      whiteSpace="nowrap"
+      data-testid="model-option-hint"
+    >
+      {item.hint}
+    </Text>
+  ) : null;
   return (
     <Select.Item
       item={item}
@@ -223,28 +236,21 @@ function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
             >
               {item.label}
             </Text>
-            {item.hint && (
-              <Text
-                fontSize="2xs"
-                color="fg.subtle"
-                flexShrink={0}
-                whiteSpace="nowrap"
-                data-testid="model-option-hint"
-              >
-                {item.hint}
-              </Text>
-            )}
+            {!isDescribed && hint}
           </HStack>
           {isDescribed && (
-            <Text
-              fontSize="xs"
-              lineHeight="short"
-              color="fg.muted"
-              truncate
-              data-testid="model-option-subtitle"
-            >
-              {item.subtitle}
-            </Text>
+            <HStack gap={2} minWidth={0}>
+              <Text
+                fontSize="xs"
+                lineHeight="short"
+                color="fg.muted"
+                truncate
+                data-testid="model-option-subtitle"
+              >
+                {item.subtitle}
+              </Text>
+              {hint}
+            </HStack>
           )}
         </Box>
       </HStack>
