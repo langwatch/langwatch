@@ -1,7 +1,7 @@
 import { normalizeSignInErrorCode } from "@langwatch/auth-contract";
 import { Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client.tsx";
@@ -156,7 +156,7 @@ export function IdentifierFirstSignIn() {
     rememberPendingMethod(method);
     // The typed address rides along as the OIDC login hint, trimmed, so the
     // provider's own screen arrives prefilled.
-    void signIn(method.id, { callbackUrl, loginHint: routing.identifier?.trim() || undefined });
+    return signIn(method.id, { callbackUrl, loginHint: routing.identifier?.trim() || undefined });
   };
 
   const decision = routing.decision;
@@ -515,7 +515,8 @@ export function RoutedToConnection({
   onAutoStart,
 }: {
   decision: RoutingDecision;
-  onContinue: (method: SignInMethod) => void;
+  /** Starts the hand-off from the button; its answer is watched like the automatic one's. */
+  onContinue: (method: SignInMethod) => ReturnType<typeof signIn> | void;
   callbackUrl?: string;
   /** Handed to the provider as the OIDC login hint, so its screen arrives prefilled. */
   loginHint?: string;
@@ -534,16 +535,31 @@ export function RoutedToConnection({
   // A refused start never leaves this page, so it stops the spinner and says so.
   const [refusal, setRefusal] = useState<string | null>(null);
 
+  // Each start clears the last refusal; a refusal keeps the card up from then on. A network
+  // failure throws rather than answering, and is a refused start all the same.
+  const watchHandOff = useCallback((handOff: ReturnType<typeof signIn> | void) => {
+    setRefusal(null);
+    if (!handOff) return;
+    const refuse = (message: string) => {
+      setWaitIsVisible(true);
+      setRefusal(message);
+    };
+    void handOff.then(
+      (result) => {
+        if (result && result.ok !== true) refuse(ssoHandOffFailureMessage(result));
+      },
+      () => refuse(ssoHandOffFailureMessage({})),
+    );
+  }, []);
+
   useEffect(() => {
     if (!autoStart || !method || dialed.current) return;
     dialed.current = true;
     // Parked here too: the people routed by address are the dial nobody presses.
     rememberPendingMethod(method);
     onAutoStart?.();
-    void signIn(method.id, { callbackUrl, loginHint }).then((result) => {
-      if (result && result.ok !== true) setRefusal(ssoHandOffFailureMessage(result));
-    });
-  }, [autoStart, method, callbackUrl, loginHint, onAutoStart]);
+    watchHandOff(signIn(method.id, { callbackUrl, loginHint }));
+  }, [autoStart, method, callbackUrl, loginHint, onAutoStart, watchHandOff]);
 
   useEffect(() => {
     const timer = setTimeout(() => setWaitIsVisible(true), HANDOFF_QUIET_MS);
@@ -551,7 +567,7 @@ export function RoutedToConnection({
   }, []);
 
   if (!method) return null;
-  if (autoStart && !waitIsVisible && refusal === null) return null;
+  if (autoStart && !waitIsVisible) return null;
 
   const waiting = autoStart && refusal === null;
   return (
@@ -569,7 +585,7 @@ export function RoutedToConnection({
             : `Log in with ${signInMethodLabel(method)} to continue.`}
         </Text>
       </HStack>
-      <FrontDoorPrimaryButton onClick={() => onContinue(method)}>
+      <FrontDoorPrimaryButton onClick={() => watchHandOff(onContinue(method))}>
         {signInMethodActionLabel(method)}
       </FrontDoorPrimaryButton>
       {/* The way to the other screen, on this stage as on every other. */}

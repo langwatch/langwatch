@@ -380,6 +380,49 @@ describe("given the identifier-first sign-in screen", () => {
       );
     });
 
+    it("stops the spinner and says so when the hand-off fails on the network", async () => {
+      signInMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
+        outcome: "redirect_to_connection",
+        connectionId: "org:acme",
+        methodSet: [oktaMethod],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@acme.com");
+
+      expect(await screen.findByTestId("routed-to-connection-refused")).toHaveTextContent(
+        /ask your administrator/i,
+      );
+      expect(screen.getByTestId("routed-to-connection")).toHaveTextContent(
+        /^Log in with .+ to continue\.$/,
+      );
+    });
+
+    it("clears the refusal while the person retries from the button", async () => {
+      signInMock
+        .mockResolvedValueOnce({ ok: false, code: "discovery_untrusted_origin", status: 400 })
+        .mockReturnValueOnce(new Promise(() => undefined));
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
+        outcome: "redirect_to_connection",
+        connectionId: "org:acme",
+        methodSet: [oktaMethod],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@acme.com");
+      await screen.findByTestId("routed-to-connection-refused");
+      await userEvent.click(screen.getByRole("button", { name: /continue with okta/i }));
+
+      await waitFor(() =>
+        expect(screen.queryByTestId("routed-to-connection-refused")).not.toBeInTheDocument(),
+      );
+      expect(signInMock).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId("routed-to-connection")).toHaveTextContent(/^Taking you to/);
+    });
+
     /** @scenario "A provider my address was routed to is badged once it lets me in" */
     it("parks the provider it dials, so the landing can badge it", async () => {
       routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
