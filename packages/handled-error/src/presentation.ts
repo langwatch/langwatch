@@ -1407,6 +1407,9 @@ const presentations = {
   api_key_already_revoked: {
     title: "This API key is already revoked",
   },
+  api_key_expired: {
+    title: "This API key has expired",
+  },
   /**
    * The caller is signed in and simply may not do this.
    *
@@ -3120,6 +3123,14 @@ const presentations = {
     // charged, and saying so is the first thing anyone wants to know.
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
+  },
+  subscription_already_active: {
+    // fault: customer. A checkout was asked for while a plan is live, so we
+    // started nothing. Plan changes and cancelling go through the billing
+    // portal, which an organization administrator opens.
+    title: "This organization already has a plan",
+    describe: () =>
+      "Nothing was charged. Ask an organization admin to change the plan from the billing settings.",
   },
   subscription_ambiguous: {
     // fault: platform. Two live plans on one account, which only an operator

@@ -21,6 +21,7 @@ export abstract class CustomerIoChannel {
     userId: string;
     event: CioEventName;
     properties?: Record<string, unknown>;
+    messageId?: string;
   }): Promise<void>;
   abstract groupUser(input: {
     userId: string;
@@ -28,4 +29,13 @@ export abstract class CustomerIoChannel {
     traits?: Partial<CioOrgTraits>;
   }): Promise<void>;
   abstract batch(calls: CioBatchCall[]): Promise<void>;
+
+  /**
+   * As trackEvent, but rejects when the channel knows Customer.io did not take the track, for the
+   * one caller that gives a claim back on failure. A channel that cannot tell resolves as
+   * trackEvent does.
+   */
+  trackEventOrThrow(input: Parameters<CustomerIoChannel["trackEvent"]>[0]): Promise<void> {
+    return this.trackEvent(input);
+  }
 }

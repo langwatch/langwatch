@@ -25218,6 +25218,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsView                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "secrets:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoManage                     GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "sso:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoView                       GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "sso:view"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SubscriptionUpgrade           GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "subscription:upgrade"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1TeamManage                    GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "team:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1TeamView                      GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "team:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1TracesCreate                  GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "traces:create"
@@ -25466,6 +25467,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1) Valid()
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SubscriptionUpgrade:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1TeamManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1TeamView:
@@ -25671,6 +25674,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "secrets:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "sso:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "sso:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SubscriptionUpgrade           GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "subscription:upgrade"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1TeamManage                    GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "team:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1TeamView                      GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "team:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1TracesCreate                  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "traces:create"
@@ -25919,6 +25923,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1) V
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SubscriptionUpgrade:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1TeamManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1TeamView:
@@ -26124,6 +26130,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "secrets:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "sso:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "sso:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SubscriptionUpgrade           GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "subscription:upgrade"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1TeamManage                    GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "team:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1TeamView                      GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "team:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1TracesCreate                  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "traces:create"
@@ -26371,6 +26378,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SubscriptionUpgrade:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1TeamManage:
 		return true
@@ -26697,6 +26706,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsView                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "secrets:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoManage                     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "sso:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoView                       GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "sso:view"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SubscriptionUpgrade           GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "subscription:upgrade"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1TeamManage                    GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "team:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1TeamView                      GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "team:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1TracesCreate                  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "traces:create"
@@ -26945,6 +26955,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1) Valid() bool {
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoView:
 		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SubscriptionUpgrade:
+		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1TeamManage:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1TeamView:
@@ -27150,6 +27162,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsView                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "secrets:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoManage                     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "sso:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoView                       GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "sso:view"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SubscriptionUpgrade           GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "subscription:upgrade"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1TeamManage                    GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "team:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1TeamView                      GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "team:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1TracesCreate                  GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "traces:create"
@@ -27397,6 +27410,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoManage:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoView:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SubscriptionUpgrade:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1TeamManage:
 		return true

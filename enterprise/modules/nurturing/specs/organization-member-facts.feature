@@ -140,26 +140,69 @@ Feature: An organization's session facts reach every active member in Customer.i
     Given the person's trace lookup fails
     When an invite_accepted signal for org-1 is delivered
     Then no has_traces trait is sent
-    And the person is tracked joined_via_invite
+    And the person is tracked joined_via_invite and joined_organization
 
   @unit
   Scenario: An SSO person whose trace lookup fails still starts their milestones
     Given the person's trace lookup fails
     When an sso_auto_added signal for org-1 is delivered
     Then Customer.io identifies the person with has_evaluations false and no has_traces or last_trace_at
-    And the person is tracked joined_via_sso
+    And the person is tracked joined_via_sso and joined_organization
 
   @unit
   Scenario: A join event carries the seat the person joined with
     Given an invite_accepted or sso_auto_added signal for org-1 holding the role ADMIN, MEMBER, EXTERNAL or DEVELOPER
     When the signal is delivered
-    Then the joined_via_invite or joined_via_sso event carries seat admin, member, lite_member or developer
+    Then the joined_via_invite, joined_via_sso and joined_organization events carry seat admin, member, lite_member or developer
 
   @unit
   Scenario: A join event with no known role carries no seat
     Given an invite_accepted or sso_auto_added signal for org-1 with no role, or one nurturing cannot name
     When the signal is delivered
-    Then the joined_via_invite or joined_via_sso event carries no seat property
+    Then none of the join events carries a seat property
+
+  @unit
+  Scenario: A join is tracked as joined_organization beside its own event
+    Given an invite_accepted or sso_auto_added signal for org-1 from after joined_organization shipped
+    When the signal is delivered
+    Then the person is tracked joined_organization with join_method invite or sso and message id joined_organization:<user>:<org>
+
+  @unit
+  Scenario: A redelivered or replayed join is tracked once
+    Given the person's join of org-1 was delivered
+    When the same signal is delivered again, even after the delivery window
+    Then joined_organization is not tracked a second time
+
+  @unit
+  Scenario: An invite and an SSO add of the same person and organization are tracked once
+    Given the person's invite_accepted signal for org-1 was delivered
+    When their sso_auto_added signal for org-1 is delivered
+    Then joined_organization is tracked once, and joined_via_sso is still tracked
+
+  @unit
+  Scenario: A person joining a second organization is tracked joined_organization again
+    Given the person's join of org-1 was tracked joined_organization
+    When their invite_accepted signal for org-2 is delivered
+    Then joined_organization is tracked for org-2 as well
+
+  @unit
+  Scenario: A joined_organization that failed to send is tracked when the same join is replayed
+    Given Customer.io answered the joined_organization track for the person and org-1 with an HTTP 500, or the request failed
+    When the same invite_accepted signal is delivered again, and again after that
+    Then joined_organization is tracked once and joined_via_invite is not tracked a second time
+
+  @unit
+  Scenario: A join from before joined_organization existed is not tracked as it
+    Given an invite_accepted signal for org-1 that occurred before 2026-11-06
+    When the signal is delivered
+    Then joined_via_invite is tracked and joined_organization is not
+    And no joined_organization slot is taken, so nothing is held for that person and organization
+
+  @unit
+  Scenario: A join at the cut-off is tracked as joined_organization, one a millisecond earlier is not
+    Given a join that occurred at exactly 2026-11-06T00:00:00.000Z, and one at 1 ms earlier
+    When each is decided
+    Then the first is tracked joined_organization and the second is not
 
   @unit
   Scenario: A large organization's members go out in batches of one hundred
