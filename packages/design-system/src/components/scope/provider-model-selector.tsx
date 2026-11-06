@@ -238,10 +238,8 @@ function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
 }
 
 /**
- * Model selector across providers: one flat list in the caller's order, each row carrying its
- * provider icon (from the model's prefix) so no provider heading is needed.
- * `inheritOption`, when set, prepends an "Inherit" entry that emits `INHERIT_SENTINEL` on pick,
- * and renders as a faint placeholder when `model` is empty.
+ * One flat list in the caller's order, each row with its provider icon, so no headings.
+ * `inheritOption` prepends an "Inherit" entry (emits `INHERIT_SENTINEL`), faint when unset.
  */
 export function ProviderModelSelector({
   model,
