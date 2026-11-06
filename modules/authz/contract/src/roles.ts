@@ -209,7 +209,12 @@ const ORG_ADMIN: readonly AuthzPermission[] = [
   "playground:view",
 ];
 
-const ORG_MEMBER: readonly AuthzPermission[] = ["organization:view", "aiTools:view"];
+/** Every organization role, Lite included: the person with the card may be anyone. */
+const ORG_MEMBER: readonly AuthzPermission[] = [
+  "organization:view",
+  "aiTools:view",
+  "subscription:upgrade",
+];
 
 /** What the platform-operator role carries; no other grant confers these. */
 export const PLATFORM_OPERATOR_PERMISSIONS: readonly AuthzPermission[] = ["ops:view", "ops:manage"];

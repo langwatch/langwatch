@@ -211,6 +211,12 @@ Feature: Proving a domain by publishing a record
     Then the answer is "we could not read it", never a proof
     And a clean not-found stays the one answer that means the file is missing
 
+  @unit
+  Scenario: The file is fetched through the deployment's outbound proxy
+    Given the deployment reaches the internet only through an outbound proxy
+    When LangWatch fetches the file from "acme.com"
+    Then the request leaves through the proxy, after the address is judged public
+
   @integration
   Scenario: One token satisfies either channel
     Given "ana" was given one value for "acme.com"

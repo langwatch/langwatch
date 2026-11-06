@@ -141,6 +141,7 @@ export function ModelChip({
       opacity={inherited ? 0.55 : 1}
       data-testid={`model-chip-${model}`}
       data-invalid={invalid || undefined}
+      data-inherited={inherited || undefined}
     >
       {icon && (
         <Box minWidth={iconSlot} width={iconSlot}>
