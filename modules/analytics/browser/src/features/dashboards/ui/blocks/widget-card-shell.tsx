@@ -60,6 +60,7 @@ export function WidgetCardShell({
       borderRadius="xl"
       background="bg.panel"
       boxShadow="xs"
+      data-testid="widget-card"
     >
       <HStack
         height={`${HEADER_HEIGHT_PX}px`}
@@ -68,7 +69,7 @@ export function WidgetCardShell({
         paddingRight={2}
         gap={1}
       >
-        <Text minWidth={0} truncate textStyle="label">
+        <Text minWidth={0} truncate textStyle="label" data-testid="widget-card-title">
           {name}
         </Text>
         {(description || hasNotes) && (
