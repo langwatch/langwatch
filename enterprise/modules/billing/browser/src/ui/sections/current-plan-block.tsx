@@ -1,7 +1,7 @@
 import { Link } from "@langwatch/browser-host/link";
 /**
- * The active plan: its price, this month's usage against its limits, and the
- * one action that moves it forward (upgrade, manage, or talk to sales).
+ * The active plan read like a bill: its price, this month's usage against its
+ * limits, then the one action that moves it forward (upgrade, manage, or talk to sales).
  * @see specs/licensing/subscription-page.feature
  */
 import { Banner } from "@langwatch/design-system/banner";
@@ -64,7 +64,7 @@ function PlanActions({
 }) {
   if (!onUpgrade && !onManageSubscription && !contactSalesUrl) return null;
   return (
-    <HStack gap={2}>
+    <HStack gap={2} width="full" justify="flex-end" data-testid="current-plan-actions">
       {onUpgrade && (
         <Button
           data-testid="current-plan-upgrade-button"
@@ -142,6 +142,7 @@ export function CurrentPlanBlock({
   deprecatedNotice?: boolean;
   contactSalesUrl?: string;
 }) {
+  const isOverSeats = maxSeats != null && userCount > maxSeats;
   return (
     <Card
       data-testid="current-plan-block"
@@ -159,10 +160,12 @@ export function CurrentPlanBlock({
       badge={
         <HStack gap={2}>
           <StatusChip label="Current" tone="good" />
-          {upgradeRequired && <StatusChip label="Upgrade required" tone="warning" />}
+          {upgradeRequired && (
+            <StatusChip label="Upgrade required" tone="bad" data-testid="upgrade-required-chip" />
+          )}
         </HStack>
       }
-      actions={
+      footer={
         <PlanActions
           onUpgrade={onUpgrade}
           isUpgradeLoading={isUpgradeLoading}
@@ -176,7 +179,14 @@ export function CurrentPlanBlock({
         <SettingList>
           {eventUsage && <EventUsageRow usage={eventUsage} />}
           <SettingRow label="Members / seats">
-            <Text textStyle="bodySm" fontWeight={600} fontVariantNumeric="tabular-nums">
+            <Text
+              textStyle="bodySm"
+              fontWeight={600}
+              fontVariantNumeric="tabular-nums"
+              color={isOverSeats ? "fg.error" : undefined}
+              data-testid="plan-seat-count"
+              data-over-limit={isOverSeats || undefined}
+            >
               {maxSeats != null ? `${userCount} / ${maxSeats}` : userCount}
             </Text>
             {onUserCountClick && (

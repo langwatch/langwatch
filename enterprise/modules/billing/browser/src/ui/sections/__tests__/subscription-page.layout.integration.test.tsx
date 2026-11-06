@@ -286,7 +286,12 @@ describe("<SubscriptionPage/> layout", () => {
       renderSubscriptionPage();
 
       const card = await screen.findByTestId("current-plan-block");
-      fireEvent.click(within(card).getByRole("button", { name: "Upgrade to Growth" }));
+      const upgrade = within(card).getByRole("button", { name: "Upgrade to Growth" });
+      const lastUsageRow = within(card).getByText("Members / seats");
+      expect(
+        lastUsageRow.compareDocumentPosition(upgrade) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      fireEvent.click(upgrade);
 
       await waitFor(() => {
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 1 }));

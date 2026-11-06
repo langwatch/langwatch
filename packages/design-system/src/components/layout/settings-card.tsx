@@ -178,6 +178,7 @@ export function StatusChip({
       colorPalette={palette}
       title={title}
       className={shimmer ? "lw-chip-shimmer" : undefined}
+      data-tone={tone}
       data-testid={testId}
     >
       {label}

@@ -195,8 +195,8 @@ Feature: Subscription Page Plan Management
   Rule: The page leads with the current plan, its usage and the next step
 
     A Free organization usually opens this page because it hit the monthly
-    event limit, so the plan card shows that usage and carries the action that
-    fixes it. The Growth offer follows the plan card. Invoices are a record,
+    event limit, so the plan card shows that usage and, under it, the action
+    that fixes it. The Growth offer follows the plan card. Invoices are a record,
     not a decision, so they come last and take no space when there are none.
 
     @integration
@@ -204,6 +204,7 @@ Feature: Subscription Page Plan Management
       Given my organization is on the Free plan with 1 member
       When I view the subscription page
       Then the current plan card has an "Upgrade to Growth" action
+      And the action sits after the usage rows, like the total on a bill
       And choosing it starts the Growth checkout for 1 seat
 
     @integration
@@ -338,8 +339,8 @@ Feature: Subscription Page Plan Management
       Given my organization is on the Free plan, which includes 2 member seats
       And my organization has 3 members
       When I view the subscription page
-      Then the seat count reads 3/2
-      And I am told an upgrade is required
+      Then the seat count reads 3/2 in the danger colour
+      And I am told an upgrade is required, in the danger tone
       And I see a note that my organization uses more seats than the plan includes
       And I am offered the upgrade
 
