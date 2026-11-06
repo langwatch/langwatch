@@ -68,7 +68,7 @@ export function WidgetCardShell({
         paddingRight={2}
         gap={1}
       >
-        <Text minWidth={0} truncate textStyle="label">
+        <Text minWidth={0} truncate textStyle="label" title={name}>
           {name}
         </Text>
         {(description || hasNotes) && (

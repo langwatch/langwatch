@@ -281,13 +281,13 @@ describe("given a widget on a board", () => {
   });
 
   describe("when its query fails for good before it ever answered", () => {
-    /** @scenario "A widget whose query fails names itself and offers Retry" */
-    it("names the widget, gives the reason, and Retry starts it over", async () => {
+    /** @scenario "A widget whose query fails says so and offers Retry" */
+    it("says it couldn't load, gives the reason, and Retry starts it over", async () => {
       const run = frameRuns(() => Promise.reject(BROKEN));
       render(boardWidget({}));
       await run();
 
-      expect(screen.getByText("Couldn't load Cost per trace")).toBeTruthy();
+      expect(screen.getByText("Couldn't load")).toBeTruthy();
       expect(screen.getByText(BROKEN.message)).toBeTruthy();
       const rendersBefore = frameProps.mock.calls.length;
 
@@ -300,7 +300,7 @@ describe("given a widget on a board", () => {
 
   describe("when its query fails on a limit", () => {
     const BUILT_IN_WORDS =
-      "This project has too much data for this widget in the selected period. This is a LangWatch limit, not a problem with your data.";
+      "This widget hit a LangWatch limit in the selected period. This is not a problem with your data.";
 
     /** @scenario "A built-in widget that fails on a limit says the limit is LangWatch's" */
     it.each([OUT_OF_MEMORY, TIMED_OUT])(
@@ -310,7 +310,7 @@ describe("given a widget on a board", () => {
         render(boardWidget({ limitAudience: { kind: "built_in" } }));
         await run();
 
-        expect(screen.getByText("Couldn't load Cost per trace")).toBeTruthy();
+        expect(screen.getByText("Couldn't load")).toBeTruthy();
         expect(screen.getByText(BUILT_IN_WORDS)).toBeTruthy();
         expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
         expect(screen.queryByRole("button", { name: "Edit code" })).toBeNull();
@@ -325,7 +325,7 @@ describe("given a widget on a board", () => {
       render(boardWidget({ limitAudience: { kind: "editable", onEditWithLangy, onEditCode } }));
       await run();
 
-      expect(screen.getByText("Its query used more memory than a widget may use.")).toBeTruthy();
+      expect(screen.getByText("The query used more memory than a widget may use.")).toBeTruthy();
       fireEvent.click(screen.getByRole("button", { name: "Edit with Langy" }));
       fireEvent.click(screen.getByRole("button", { name: "Edit code" }));
       expect(onEditWithLangy).toHaveBeenCalledOnce();
@@ -339,7 +339,7 @@ describe("given a widget on a board", () => {
       render(boardWidget({ limitAudience: { kind: "editable", onEditCode: vi.fn() } }));
       await run();
 
-      expect(screen.getByText("Its query ran past the time a widget may take.")).toBeTruthy();
+      expect(screen.getByText("The query ran past the time a widget may take.")).toBeTruthy();
     });
 
     /** @scenario "A reader who cannot edit is told to ask someone who can" */
@@ -410,7 +410,7 @@ describe("given a widget on a board", () => {
       rerender(boardWidget({ timeWindow: LAST_30_DAYS }));
       await run();
 
-      expect(screen.getByText("Couldn't load Cost per trace")).toBeTruthy();
+      expect(screen.getByText("Couldn't load")).toBeTruthy();
     });
 
     /** @scenario "Changing to another period of the same length starts the widget over" */
@@ -424,7 +424,7 @@ describe("given a widget on a board", () => {
       rerender(boardWidget({ timeWindow: LAST_7_DAYS, periodKey: "live:auto" }));
       await run();
 
-      expect(screen.getByText("Couldn't load Cost per trace")).toBeTruthy();
+      expect(screen.getByText("Couldn't load")).toBeTruthy();
     });
 
     /** @scenario "A failed card goes back to loading while a new period runs" */
@@ -432,7 +432,7 @@ describe("given a widget on a board", () => {
       const run = frameRuns(() => Promise.reject(BROKEN));
       const { rerender } = render(boardWidget({ timeWindow: LAST_7_DAYS }));
       await run();
-      expect(screen.getByText("Couldn't load Cost per trace")).toBeTruthy();
+      expect(screen.getByText("Couldn't load")).toBeTruthy();
 
       rerender(boardWidget({ timeWindow: LAST_30_DAYS }));
 

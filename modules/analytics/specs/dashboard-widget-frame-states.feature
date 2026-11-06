@@ -34,32 +34,32 @@ Feature: A dashboard widget frame shows what its queries report
       Then the setup view shows no "Ask Langy to help" button
 
     @integration
-    Scenario: A widget whose query fails names itself and offers Retry
+    Scenario: A widget whose query fails says so and offers Retry
       Given a widget named "Cost per trace"
       When its query fails for good before it ever answered
-      Then the card says "Couldn't load Cost per trace" with the reason
+      Then the card says "Couldn't load" with the reason, and its title names the widget
       And Retry starts the widget over, so its queries run again
 
     @integration
     Scenario: A built-in widget that fails on a limit says the limit is LangWatch's
       Given a From LangWatch widget named "Cost per trace" on a read-only board
       When its query fails with "query_memory_exceeded" or "query_timeout"
-      Then the card says "Couldn't load Cost per trace"
-      And it says "This project has too much data for this widget in the selected period. This is a LangWatch limit, not a problem with your data."
+      Then the card says "Couldn't load"
+      And it says "This widget hit a LangWatch limit in the selected period. This is not a problem with your data."
       And it offers Retry and no edit action
 
     @integration
     Scenario: An editable widget that fails on memory says its query used too much
       Given a stored widget on a board the reader can edit, with Langy
       When its query fails with "query_memory_exceeded"
-      Then the card says "Its query used more memory than a widget may use."
+      Then the card says "The query used more memory than a widget may use."
       And it offers "Edit with Langy", "Edit code" and Retry
 
     @integration
     Scenario: An editable widget that fails on time says its query ran too long
       Given a stored widget on a board the reader can edit
       When its query fails with "query_timeout"
-      Then the card says "Its query ran past the time a widget may take."
+      Then the card says "The query ran past the time a widget may take."
 
     @integration
     Scenario: A reader who cannot edit is told to ask someone who can
@@ -326,9 +326,8 @@ Feature: A dashboard widget frame shows what its queries report
     Scenario: Two widgets that failed on a limit are told once above the board
       Given a board of three widgets
       When two of them end on a memory or time limit failure
-      Then a warning says "2 of 3 widgets couldn't load"
-      And it says the project has too much data for them in the selected period
-      And it says the other widgets loaded normally
+      Then a warning says "2 of 3 widgets hit a limit"
+      And it says LangWatch limits the memory and time a widget's query may use, and that this is not a problem with the data
       And it offers no retry for all and no shorter period
 
     @integration
@@ -338,12 +337,11 @@ Feature: A dashboard widget frame shows what its queries report
       Then no warning shows above the board
 
     @integration
-    Scenario: Every widget failing on a limit says none could load
+    Scenario: Every widget failing on a limit says all hit a limit
       Given a board of three widgets
       When all three end on a memory or time limit failure
-      Then a warning says "None of the 3 widgets could load"
-      And it says the project has too much data for them in the selected period
-      And it does not say the other widgets loaded
+      Then a warning says "All 3 widgets hit a limit"
+      And it says LangWatch limits the memory and time a widget's query may use, and that this is not a problem with the data
 
     @integration
     Scenario: The warning goes when a widget recovers

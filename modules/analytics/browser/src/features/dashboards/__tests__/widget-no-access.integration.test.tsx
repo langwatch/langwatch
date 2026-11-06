@@ -188,11 +188,11 @@ describe("given a stored board's widget whose query reads cost", () => {
   });
 
   describe("when the server refuses it for the query's shape", () => {
-    it("fails the widget by name with Retry, and keeps every action", async () => {
+    it("fails the widget with Retry, and keeps every action", async () => {
       storedCard({ answer: refusedForShape });
       await frameRunsItsQuery();
 
-      expect(screen.getByText("Couldn't load Cost per trace")).toBeInTheDocument();
+      expect(screen.getByText("Couldn't load")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Ask Langy about Cost per trace" }),

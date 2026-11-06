@@ -7,22 +7,18 @@ import { Banner } from "@langwatch/design-system/banner";
 
 const MIN_LIMIT_FAILURES = 2;
 
+const LIMIT_WORDS =
+  "LangWatch limits the memory and time a widget's query may use. This is not a problem with your data.";
+
 export function LimitFailedWidgetsBanner({ failed, total }: { failed: number; total: number }) {
   if (failed < MIN_LIMIT_FAILURES) return null;
-  const all = failed >= total;
+  const title =
+    failed >= total
+      ? `All ${total} widgets hit a limit`
+      : `${failed} of ${total} widgets hit a limit`;
   return (
-    <Banner
-      status="warning"
-      title={
-        all
-          ? `None of the ${total} widgets could load`
-          : `${failed} of ${total} widgets couldn't load`
-      }
-      data-testid="limit-failed-widgets-banner"
-    >
-      {all
-        ? "This project has too much data for them in the selected period."
-        : "This project has too much data for them in the selected period. The other widgets loaded normally."}
+    <Banner status="warning" title={title} data-testid="limit-failed-widgets-banner">
+      {LIMIT_WORDS}
     </Banner>
   );
 }

@@ -243,7 +243,6 @@ function WidgetFrameOverWindow({
 
   const cover = faceInPlaceOfChart({
     face,
-    name: widgetName ?? "this widget",
     onRetry: retry,
     onAskLangyToSetUp,
     limitAudience,
@@ -268,7 +267,7 @@ function WidgetFrameOverWindow({
         />
       </Box>
       {cover && (
-        <Box position="absolute" inset={0} data-testid="widget-state-face">
+        <Box position="absolute" inset={0} containerType="size" data-testid="widget-state-face">
           {cover}
         </Box>
       )}
@@ -280,14 +279,12 @@ function WidgetFrameOverWindow({
 /** The face drawn over the frame, or null when the widget's own code draws the card. */
 function faceInPlaceOfChart({
   face,
-  name,
   onRetry,
   onAskLangyToSetUp,
   limitAudience,
   onSetUp,
 }: {
   face: WidgetFace;
-  name: string;
   onRetry: () => void;
   onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
   limitAudience?: WidgetLimitAudience;
@@ -299,12 +296,11 @@ function faceInPlaceOfChart({
     case "failed": {
       const limit = widgetLimitWords({ code: face.error.code, audience: limitAudience });
       if (!limit) {
-        return <WidgetFailedFace name={name} message={face.error.message} onRetry={onRetry} />;
+        return <WidgetFailedFace message={face.error.message} onRetry={onRetry} />;
       }
       const editable = limitAudience?.kind === "editable" ? limitAudience : undefined;
       return (
         <WidgetFailedFace
-          name={name}
           message={limit.message}
           note={limit.note}
           onRetry={onRetry}

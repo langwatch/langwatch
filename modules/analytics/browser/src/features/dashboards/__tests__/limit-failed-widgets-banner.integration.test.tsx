@@ -63,9 +63,10 @@ const WIDGETS = [
 ];
 
 const BANNER = "limit-failed-widgets-banner";
-const TOO_MUCH_DATA = "This project has too much data for them in the selected period.";
+const LIMIT_WORDS =
+  "LangWatch limits the memory and time a widget's query may use. This is not a problem with your data.";
 /** Each card says these only when its failure's code reached it; a lost code reads as unknown. */
-const TIME_LIMIT_WORDS = "Its query ran past the time a widget may take.";
+const TIME_LIMIT_WORDS = "The query ran past the time a widget may take.";
 const UNKNOWN_COLUMN_WORDS = "Check the column names against the dataset's columns.";
 
 /** The status the server answers each code with. */
@@ -140,12 +141,12 @@ afterEach(() => {
 describe("given a board of three widgets", () => {
   describe("when two end on a limit failure", () => {
     /** @scenario "Two widgets that failed on a limit are told once above the board" */
-    it("says two of three could not load, with no action", async () => {
+    it("says two of three hit a limit, with no action", async () => {
       await openBoard({ "w-2": "query_memory_exceeded", "w-3": "query_timeout" });
 
       const banner = await screen.findByTestId(BANNER);
-      expect(banner).toHaveTextContent("2 of 3 widgets couldn't load");
-      expect(banner).toHaveTextContent(`${TOO_MUCH_DATA} The other widgets loaded normally.`);
+      expect(banner).toHaveTextContent("2 of 3 widgets hit a limit");
+      expect(banner).toHaveTextContent(LIMIT_WORDS);
       expect(banner.querySelector("button")).toBeNull();
     });
   });
@@ -155,15 +156,15 @@ describe("given a board of three widgets", () => {
     it("shows no warning", async () => {
       await openBoard({ "w-2": "query_timeout" });
 
-      expect(await screen.findByText("Couldn't load Cost per trace")).toBeTruthy();
+      expect(await screen.findByText("Couldn't load")).toBeTruthy();
       expect(screen.getByText(TIME_LIMIT_WORDS)).toBeTruthy();
       expect(screen.queryByTestId(BANNER)).toBeNull();
     });
   });
 
   describe("when all three end on a limit failure", () => {
-    /** @scenario "Every widget failing on a limit says none could load" */
-    it("says none could load and not that others loaded", async () => {
+    /** @scenario "Every widget failing on a limit says all hit a limit" */
+    it("says all three hit a limit", async () => {
       await openBoard({
         "w-1": "query_timeout",
         "w-2": "query_memory_exceeded",
@@ -171,9 +172,8 @@ describe("given a board of three widgets", () => {
       });
 
       const banner = await screen.findByTestId(BANNER);
-      expect(banner).toHaveTextContent("None of the 3 widgets could load");
-      expect(banner).toHaveTextContent(TOO_MUCH_DATA);
-      expect(banner).not.toHaveTextContent("loaded normally");
+      expect(banner).toHaveTextContent("All 3 widgets hit a limit");
+      expect(banner).toHaveTextContent(LIMIT_WORDS);
     });
   });
 

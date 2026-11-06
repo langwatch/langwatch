@@ -150,12 +150,14 @@ export function WidgetNoAccessFace({ what, ask }: { what: string; ask: string })
   );
 }
 
+// Narrow or short cards drop the spacing and the button icons so the face still fits.
+const TIGHT_FACE = "@container (max-width: 340px) or (max-height: 150px)";
+
 /**
- * Names the widget that failed and offers Retry, so a reader knows which card to try again. A
- * limit failure may add a note and the edit actions, and then Retry steps back.
+ * Says the widget couldn't load and why, and offers Retry; the card's title names it. A limit
+ * failure may add a note and the edit actions, and then Retry steps back.
  */
 export function WidgetFailedFace({
-  name,
   message,
   note,
   onRetry,
@@ -163,7 +165,6 @@ export function WidgetFailedFace({
   onEditCode,
   minorRetry = false,
 }: {
-  name: string;
   /** The error registry's words for what went wrong. */
   message?: string;
   /** A further line, such as who to ask when the reader cannot edit. */
@@ -175,22 +176,48 @@ export function WidgetFailedFace({
   minorRetry?: boolean;
 }) {
   return (
-    <VStack height="full" justify="center" gap={2} paddingX={4} textAlign="center">
-      <Box display="flex" color="fg.error">
-        <TriangleAlert size={18} aria-hidden />
-      </Box>
-      <Text textStyle="label">Couldn&apos;t load {name}</Text>
-      {message && (
-        <Text textStyle="caption" color="fg.muted" maxWidth="320px">
-          {message}
-        </Text>
+    <VStack
+      height="full"
+      justify="center"
+      gap={2}
+      paddingX={4}
+      textAlign="center"
+      css={{ [TIGHT_FACE]: { gap: 1.5, paddingX: 2 } }}
+    >
+      <VStack gap={2} flexShrink={0} css={{ [TIGHT_FACE]: { flexDirection: "row", gap: 1.5 } }}>
+        <Box display="flex" color="fg.error">
+          <TriangleAlert size={18} aria-hidden />
+        </Box>
+        <Text textStyle="label">Couldn&apos;t load</Text>
+      </VStack>
+      {(message || note) && (
+        <VStack gap={1.5} flexShrink={1} minHeight={0} overflow="hidden">
+          {message && (
+            <Text
+              textStyle="caption"
+              color="fg.muted"
+              maxWidth="320px"
+              lineClamp={3}
+              title={message}
+            >
+              {message}
+            </Text>
+          )}
+          {note && (
+            <Text textStyle="caption" color="fg.muted" maxWidth="320px" lineClamp={2} title={note}>
+              {note}
+            </Text>
+          )}
+        </VStack>
       )}
-      {note && (
-        <Text textStyle="caption" color="fg.muted" maxWidth="320px">
-          {note}
-        </Text>
-      )}
-      <HStack gap={1.5} justify="center" wrap="wrap" marginTop={1}>
+      <HStack
+        gap={1.5}
+        justify="center"
+        wrap="wrap"
+        marginTop={1}
+        flexShrink={0}
+        css={{ [TIGHT_FACE]: { marginTop: 0, "& svg": { display: "none" } } }}
+      >
         {onEditWithLangy && (
           <Button size="xs" variant="outline" onClick={onEditWithLangy}>
             <Sparkles size={13} aria-hidden />

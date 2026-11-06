@@ -20,11 +20,11 @@ export interface WidgetLimitWords {
 }
 
 const BUILT_IN_MESSAGE =
-  "This project has too much data for this widget in the selected period. This is a LangWatch limit, not a problem with your data.";
+  "This widget hit a LangWatch limit in the selected period. This is not a problem with your data.";
 
 const EDITABLE_MESSAGE: Readonly<Record<string, string>> = {
-  query_memory_exceeded: "Its query used more memory than a widget may use.",
-  query_timeout: "Its query ran past the time a widget may take.",
+  query_memory_exceeded: "The query used more memory than a widget may use.",
+  query_timeout: "The query ran past the time a widget may take.",
 };
 
 /** Whether `code` is one of the two resource limits that have their own words. */
