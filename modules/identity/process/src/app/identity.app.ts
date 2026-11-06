@@ -715,6 +715,9 @@ export class IdentityModule
       mail: setup.channels.joinRequestMail,
       baseHost: setup.config.publicBaseUrl ?? "",
       plans: setup.dependencies.entitlements,
+      seatRequests: {
+        isSeatRequested: (input) => setup.dependencies.organizations.isSeatRequested(input),
+      },
     });
     const ssoArrival = SsoArrivalService.create({
       joinRequests,

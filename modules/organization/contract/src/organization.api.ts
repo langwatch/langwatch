@@ -460,6 +460,8 @@ export interface OrganizationApi {
   approveSeatRequest(input: SeatRequestScope, by: OrganizationCaller): Promise<SeatRequestResolved>;
   /** Closes the request; the membership stays as it is. */
   declineSeatRequest(input: SeatRequestScope, by: OrganizationCaller): Promise<SeatRequestResolved>;
+  /** Whether this person holds an open seat request in the organization. */
+  isSeatRequested(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
   /** The caller's memberships they cannot use, with whom to contact (ruling R2). */
   getHeldMemberships(by: OrganizationCaller): Promise<HeldMemberships>;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;

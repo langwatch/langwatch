@@ -177,6 +177,20 @@ Feature: Seat requests when an organization is over its seat limit
       And no mail groups the two people together
 
     @unit
+    Scenario: A Lite joiner waiting for a full seat is mailed about once
+      Given "lena@acme.example" joined through the company domain as a Lite Member
+      And she holds an open seat request for a full seat
+      When the administrators are told she joined
+      Then they get the seat request mail about her
+      And no "joined automatically" mail goes out about her
+
+    @unit
+    Scenario: A joiner with a full seat still gets the joined automatically mail
+      Given "mel@acme.example" joined through the company domain on a full seat
+      When the administrators are told she joined
+      Then the "joined automatically" mail goes out about her
+
+    @unit
     Scenario: The same person is noticed at most once a day per kind
       When "late@acme.example" is refused by the identity provider three times in a day
       Then one identity provider refusal notice names "late@acme.example"
@@ -185,6 +199,13 @@ Feature: Seat requests when an organization is over its seat limit
     Scenario: The seat request mail says when the identity provider also refused the person
       When "late@acme.example" opens a seat request from a sign-in "okta" refused
       Then the mail says to assign them to the LangWatch app in Okta
+
+    @unit
+    Scenario: Each mail names the person in its heading and subject
+      When "Gus Growth" opens a seat request
+      Then the mail's heading says "Gus Growth is waiting for a seat" and its subject starts with it
+      When "gus@acme.example" without a name is refused by Okta
+      Then the mail's heading and subject say "gus@acme.example tried to sign in to LangWatch"
 
   Rule: a person with a membership but no access is told why instead of being onboarded
 

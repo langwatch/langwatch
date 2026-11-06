@@ -87,18 +87,19 @@ export const seatRequestProps = z.object({
 
 export type SeatRequestProps = z.infer<typeof seatRequestProps>;
 
-export const seatRequestSubject = ({
-  personName,
-  personEmail,
-  organizationName,
-}: SeatRequestProps) => `${personName ?? personEmail} is waiting for a seat in ${organizationName}`;
+/** "Gus Growth is waiting for a seat", or the address when no name is known. */
+const seatRequestHeading = ({ personName, personEmail }: SeatRequestProps) =>
+  `${personName ?? personEmail} is waiting for a seat`;
+
+export const seatRequestSubject = (props: SeatRequestProps) =>
+  `${seatRequestHeading(props)} in ${props.organizationName}`;
 
 export const SeatRequestEmail = (props: SeatRequestProps) => {
   const person = personLabel({ name: props.personName, email: props.personEmail });
   return (
     <EmailLayout
       preview={seatRequestSubject(props)}
-      heading="Someone is waiting for a seat"
+      heading={seatRequestHeading(props)}
       footNote={recipientNotice}
     >
       <Paragraph>
@@ -119,7 +120,7 @@ export const SeatRequestEmail = (props: SeatRequestProps) => {
 
 export const seatRequestTemplate = defineTemplate({
   id: "seat-request",
-  title: "Someone is waiting for a seat",
+  title: "A person is waiting for a seat",
   sentWhen:
     "A person joins an organization over its seat limit. Sent to its administrators and Billing members.",
   schema: seatRequestProps,
@@ -170,13 +171,14 @@ export const idpRefusedSignInProps = z.object({
 
 export type IdpRefusedSignInProps = z.infer<typeof idpRefusedSignInProps>;
 
+/** "Gus Growth tried to sign in to LangWatch", or the address when no name is known. */
 export const idpRefusedSignInSubject = ({ personName, personEmail }: IdpRefusedSignInProps) =>
-  `${personName ?? personEmail} could not sign in to LangWatch`;
+  `${personName ?? personEmail} tried to sign in to LangWatch`;
 
 export const IdpRefusedSignInEmail = (props: IdpRefusedSignInProps) => (
   <EmailLayout
     preview={idpRefusedSignInSubject(props)}
-    heading="A sign-in was refused"
+    heading={idpRefusedSignInSubject(props)}
     footNote={recipientNotice}
   >
     <Paragraph>
@@ -191,7 +193,7 @@ export const IdpRefusedSignInEmail = (props: IdpRefusedSignInProps) => (
 
 export const idpRefusedSignInTemplate = defineTemplate({
   id: "idp-refused-sign-in",
-  title: "A sign-in was refused",
+  title: "A person tried to sign in to LangWatch",
   sentWhen:
     "The organization's identity provider refused a sign-in LangWatch could tie to an address. Sent to its administrators and Billing members.",
   schema: idpRefusedSignInProps,

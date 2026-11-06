@@ -941,6 +941,10 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#seatRequests.recordRefusedSignIn(input);
   }
 
+  isSeatRequested(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean> {
+    return this.#seatRequests.isSeatRequested(input);
+  }
+
   listOpenSeatRequests(input: Readonly<{ organizationId: string }>): Promise<OpenSeatRequests> {
     return this.#seatRequests.listOpen(input);
   }

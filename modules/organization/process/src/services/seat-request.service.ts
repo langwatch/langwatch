@@ -170,6 +170,17 @@ export class SeatRequestService {
     return { outcome: "refused" };
   }
 
+  async isSeatRequested({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const rows = await this.dependencies.requests.findForUser({ userId });
+    return rows.some((row) => row.organizationId === organizationId && row.status === "OPEN");
+  }
+
   async listOpen({ organizationId }: { organizationId: string }): Promise<OpenSeatRequests> {
     const [rows, approval] = await Promise.all([
       this.dependencies.requests.findOpen({ organizationId }),
