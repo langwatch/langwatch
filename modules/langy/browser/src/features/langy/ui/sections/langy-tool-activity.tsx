@@ -43,7 +43,7 @@ import {
 import { isSayToolPart } from "../../../tools/model/langy-say-tool.ts";
 import { isSecretSnippetToolPart } from "../../../tools/model/langy-secret-snippet-tool.ts";
 import {
-  isSandboxCredentialCode,
+  isSandboxCredentialFault,
   type LangyToolErrorPresentation,
   presentLangyToolError,
 } from "../../model/logic/langy-tool-failure.ts";
@@ -132,6 +132,8 @@ export type FailedToolCall = {
   id: string;
   call: ToolCall;
   presentation: LangyToolErrorPresentation;
+  /** The tool as called (`local_bash`), before a command rename; local-tool checks read it. */
+  sourceToolName: string | undefined;
   /** @see Sequenced */
   order: number;
 };
@@ -368,6 +370,7 @@ function readFailedToolCalls(message: PartsView): FailedToolCall[] {
     if (!renderedToolFailure(part)) return;
     const name = partToolName(part);
     if (!name) return;
+    const sourceToolName = rawToolName(part);
     const described = describeToolCall({ name, input: part.input });
     const call: ToolCall = {
       toolCallId: part.toolCallId,
@@ -383,8 +386,9 @@ function readFailedToolCalls(message: PartsView): FailedToolCall[] {
       presentation: presentLangyToolError({
         title: described.title,
         errorText: part.errorText ?? part.output,
-        toolName: name,
+        toolName: sourceToolName,
       }),
+      sourceToolName,
       order: index,
     });
   });
@@ -769,10 +773,16 @@ const ACCESS_STATUSES = new Set([401, 403]);
  * A failure no retry can fix because access was refused or an app is not connected. A
  * not-found probe is terminal too, but it is the agent looking around, so it folds.
  */
-function refusesAccess(presentation: LangyToolErrorPresentation): boolean {
+function refusesAccess({
+  presentation,
+  toolName,
+}: {
+  presentation: LangyToolErrorPresentation;
+  toolName: string | undefined;
+}): boolean {
   if (!presentation.terminal) return false;
-  // A handled sandbox credential fault is ours to fix; there is nothing for the reader to do.
-  if (isSandboxCredentialCode(presentation.code)) return false;
+  // A sandbox credential fault is ours to fix; a local tool's is the reader's own login.
+  if (isSandboxCredentialFault({ code: presentation.code, toolName })) return false;
   if (presentation.code === "langy_github_not_connected") return true;
   return presentation.httpStatus !== undefined && ACCESS_STATUSES.has(presentation.httpStatus);
 }
@@ -794,7 +804,8 @@ function keepsItsCard({
   isLastStep: boolean;
 }): boolean {
   if (failure.call.state === "output-denied") return true;
-  if (refusesAccess(failure.presentation)) return true;
+  if (refusesAccess({ presentation: failure.presentation, toolName: failure.sourceToolName }))
+    return true;
   if (isReaderDecision({ call: failure.call, presentation: failure.presentation })) return true;
   if (live || interrupted) return false;
   return isLastStep;

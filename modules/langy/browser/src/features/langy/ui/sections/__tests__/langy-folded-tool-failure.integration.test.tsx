@@ -377,6 +377,17 @@ describe("a failed step", () => {
       expect(screen.queryByRole("alert")).toBeNull();
       expect(receiptSteps().getByText("langwatch trace list")).toBeTruthy();
     });
+
+    it("keeps its card when a local tool failed on the reader's own login", () => {
+      const localUnauthorized = {
+        ...(unauthorized as Record<string, unknown>),
+        type: "tool-local_bash",
+        toolCallId: "local-unauthorized-1",
+      } as never;
+      renderActivity({ parts: [localUnauthorized, reply, ls], live: false });
+
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
   });
 
   describe("given a probe for something that does not exist", () => {

@@ -188,9 +188,27 @@ const isAccessDenial = (domain: LangWatchHandledErrorShape): boolean =>
 const isSandboxCredentialFailure = (domain: LangWatchHandledErrorShape): boolean =>
   SANDBOX_CREDENTIAL_CODES.has(normalizedCode(domain));
 
-/** Whether a failure code is the sandbox or CLI credential fault, not the reader's access. */
-export const isSandboxCredentialCode = (code: string | undefined): boolean =>
-  code !== undefined && SANDBOX_CREDENTIAL_CODES.has(code.trim().toLowerCase());
+/**
+ * Tools that run in the folder the developer shared from their own machine
+ * (ADR-129), with their own git identity and their own `gh` login. The same
+ * carve-out the manager's GitHub gate makes.
+ */
+const LOCAL_TOOL_PREFIX = "local_";
+
+/**
+ * Whether a sandbox tool failed on Langy's own CLI credential: ours to fix, not the
+ * reader's access.
+ */
+export const isSandboxCredentialFault = ({
+  code,
+  toolName,
+}: {
+  code: string | undefined;
+  toolName: string | undefined;
+}): boolean =>
+  code !== undefined &&
+  SANDBOX_CREDENTIAL_CODES.has(code.trim().toLowerCase()) &&
+  !toolName?.startsWith(LOCAL_TOOL_PREFIX);
 
 const asCount = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
@@ -283,13 +301,6 @@ function describeFailure({
 
   return { message: domain.message, remediationApplies: true };
 }
-
-/**
- * Tools that run in the folder the developer shared from their own machine
- * (ADR-129), with their own git identity and their own `gh` login. The same
- * carve-out the manager's GitHub gate makes.
- */
-const LOCAL_TOOL_PREFIX = "local_";
 
 /**
  * Rewrites `gh`'s "please run: gh auth login" from the sandbox — telling the customer to log
