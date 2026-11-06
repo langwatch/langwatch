@@ -12,6 +12,8 @@ import {
   type ModelDefaultSnapshot,
   type ModelDefaultSnapshotInput,
   MODEL_ROLES,
+  UNSET_ROLE_FALLBACK,
+  isModelRole,
 } from "@langwatch/model-provider-contract";
 
 import type { ModelDefaultRepository } from "../../../repositories/model-default.repository.ts";
@@ -204,7 +206,7 @@ export class ModelProviderDefaultsService {
     const effective: Record<string, ModelDefaultEffective | null> = {};
     for (const role of roles) {
       const feature = features.find((candidate) => candidate.role === role);
-      effective[role] = this.resolveConfigured({
+      effective[role] = this.resolveWithFallback({
         configs: input.configs,
         chain: input.chain,
         key: feature?.key ?? role,
@@ -213,7 +215,7 @@ export class ModelProviderDefaultsService {
     }
 
     for (const feature of features) {
-      effective[feature.key] = this.resolveConfigured({
+      effective[feature.key] = this.resolveWithFallback({
         configs: input.configs,
         chain: input.chain,
         key: feature.key,
@@ -222,6 +224,22 @@ export class ModelProviderDefaultsService {
     }
 
     return effective;
+  }
+
+  /** The key's own chain first; an empty chain then reads the role's fallback role's chain. */
+  private resolveWithFallback(input: {
+    configs: ModelDefaultConfig[];
+    chain: ModelDefaultScope[];
+    key: string;
+    role: string;
+  }): ModelDefaultEffective | null {
+    const own = this.resolveConfigured(input);
+    const fallback = isModelRole(input.role) ? UNSET_ROLE_FALLBACK[input.role] : undefined;
+    if (own || !fallback) {
+      return own;
+    }
+
+    return this.resolveConfigured({ ...input, key: fallback, role: fallback });
   }
 
   private async resolveInherited(input: {
