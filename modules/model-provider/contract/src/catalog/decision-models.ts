@@ -33,6 +33,7 @@ export type DecisionModelEntry = Readonly<{
   id: string;
   /** The registry provider whose row holds the key; `langwatch` is the hosted classifier. */
   provider: string;
+  /** The model name only, as chat models show; the picker's provider group and icon say whose. */
   label: string;
   description: string;
   /** Absent for the hosted classifier, which the judge reaches through its own client. */
@@ -61,14 +62,14 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: LANGWATCH_DECISION_MODEL_ID,
     provider: "langwatch",
-    label: "LangWatch Instant Preview",
-    description: "Hosted by LangWatch and billed with your plan.",
+    label: "Instant Preview",
+    description: "LangWatch's hosted decision model, billed with your plan.",
   },
   {
     id: "openai/decisions:gpt-6-luna",
     provider: "openai",
-    label: "OpenAI Decisions API",
-    description: "gpt-6-luna, on your OpenAI key.",
+    label: "gpt-6-luna",
+    description: "OpenAI Decisions API, on your OpenAI key.",
     wire: "openai_decisions",
     providerModel: "gpt-6-luna",
     endpoint: "https://api.openai.com/v1/decisions",
@@ -76,7 +77,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "inception/decisions:mercury-decide",
     provider: "inception",
-    label: "Inception Mercury Decide",
+    label: "Mercury Decide",
     description: "Inception's decision model, on your Inception key.",
     wire: "jev",
     providerModel: "mercury-decide",
@@ -85,7 +86,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "perplexity/decisions:pplx-decider-v1.2",
     provider: "perplexity",
-    label: "Perplexity Decider v1.2",
+    label: "Decider v1.2",
     description: "Perplexity's 27B decision model, on your Perplexity key.",
     wire: "jev",
     providerModel: "pplx-decider-v1.2",
@@ -94,7 +95,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "perplexity/decisions:pplx-decider-flash-v1.2",
     provider: "perplexity",
-    label: "Perplexity Decider Flash v1.2",
+    label: "Decider Flash v1.2",
     description: "Perplexity's faster 4B decision model, on your Perplexity key.",
     wire: "jev",
     providerModel: "pplx-decider-flash-v1.2",
@@ -103,7 +104,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "cloudflare/decisions:clef",
     provider: "cloudflare",
-    label: "Cloudflare Clef",
+    label: "Clef",
     description: "Cloudflare Workers AI, on your Cloudflare account.",
     wire: "cloudflare_jev",
     providerModel: "clef",
@@ -114,7 +115,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "cloudflare/decisions:clef-flash",
     provider: "cloudflare",
-    label: "Cloudflare Clef Flash",
+    label: "Clef Flash",
     description: "The faster Clef, on your Cloudflare account.",
     wire: "cloudflare_jev",
     providerModel: "clef-flash",
@@ -125,7 +126,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "typesafe/decisions:jev-1.14.0",
     provider: "typesafe",
-    label: "TypeSafe Jev 1.14",
+    label: "Jev 1.14",
     description: "TypeSafe's Jev, on your TypeSafe key.",
     wire: "jev",
     providerModel: "jev-1.14.0",
@@ -134,8 +135,8 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "azure/decisions:gpt-6-luna",
     provider: "azure",
-    label: "Azure OpenAI Decisions API",
-    description: "gpt-6-luna, on your own Azure OpenAI resource.",
+    label: "gpt-6-luna",
+    description: "Azure OpenAI Decisions API, on your own Azure OpenAI resource.",
     wire: "openai_decisions",
     providerModel: "gpt-6-luna",
     providerModelField: "AZURE_OPENAI_DECISIONS_DEPLOYMENT",
@@ -146,7 +147,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "azure/decisions:microsoft-decision-1",
     provider: "azure",
-    label: "Microsoft Decision 1 (Azure)",
+    label: "Microsoft Decision 1",
     description: "Microsoft's decision model on your own Azure AI Foundry resource.",
     wire: "jev",
     providerModel: "Microsoft-Decision-1",
@@ -158,7 +159,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "openrouter/decisions:typesafe/jev-1.14",
     provider: "openrouter",
-    label: "Jev 1.14 (OpenRouter)",
+    label: "Jev 1.14",
     description: "TypeSafe's Jev through OpenRouter, on your OpenRouter key.",
     wire: "jev",
     providerModel: "typesafe/jev-1.14",
@@ -167,7 +168,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "openrouter/decisions:microsoft/microsoft-decision-1",
     provider: "openrouter",
-    label: "Microsoft Decision 1 (OpenRouter)",
+    label: "Microsoft Decision 1",
     description: "Microsoft's decision model through OpenRouter, on your OpenRouter key.",
     wire: "jev",
     providerModel: "microsoft/microsoft-decision-1",
@@ -176,7 +177,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "openrouter/decisions:liquid/d1.1",
     provider: "openrouter",
-    label: "Liquid d1.1 (OpenRouter)",
+    label: "Liquid d1.1",
     description: "Liquid AI's decision model through OpenRouter, on your OpenRouter key.",
     wire: "jev",
     providerModel: "liquid/d1.1",
@@ -185,7 +186,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "fireworks/decisions:rune",
     provider: "fireworks",
-    label: "Fireworks Rune",
+    label: "Rune",
     description: "Fireworks' decision model, on your Fireworks key.",
     wire: "openai_decisions",
     providerModel: "accounts/fireworks/models/rune",

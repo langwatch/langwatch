@@ -25,8 +25,10 @@ export function CuratedWidgetCard({
   rowSpan,
   timeWindow,
   granularitySeconds,
+  periodKey,
   onAskLangy,
   onEmptyChange,
+  onLimitFailureChange,
 }: {
   widget: BoardTemplateWidget;
   /** The frame's id on this board: the template's id and the widget's key. */
@@ -38,10 +40,14 @@ export function CuratedWidgetCard({
   rowSpan: number;
   timeWindow: { start: number; end: number };
   granularitySeconds: BoardPeriod["granularitySeconds"];
+  /** The reader's chosen period, such as "1h:auto"; only a new choice restarts the widget. */
+  periodKey: string;
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
   onAskLangy?: () => void;
   /** Told whether the card shows none of the widget's data. */
   onEmptyChange?: (empty: boolean) => void;
+  /** Told whether the card's final failure is a resource limit. */
+  onLimitFailureChange?: (limited: boolean) => void;
 }) {
   const { name, definition } = widget;
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
@@ -72,9 +78,12 @@ export function CuratedWidgetCard({
         maxHeight={widgetBodyHeightPx(rowSpan)}
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}
+        periodKey={periodKey}
         onFaceChange={setFace}
+        limitAudience={{ kind: "built_in" }}
         onExportChange={csvExport.onExportChange}
         onEmptyChange={onEmptyChange}
+        onLimitFailureChange={onLimitFailureChange}
       />
     </WidgetCardShell>
   );
