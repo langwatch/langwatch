@@ -20,6 +20,10 @@ import { sessionPollOf, type AuthSessionPoll } from "../rules/auth-session-poll.
 import { issuerMismatchRedirectOf } from "../rules/id-token-issuer-mismatch.rules.ts";
 import { microsoftCallbackRouteOf } from "../rules/legacy-microsoft-callback.rules.ts";
 import { queryCacheEpochOf, type QueryCacheKeyOwner } from "../rules/query-cache-key.rules.ts";
+import {
+  isSamlAssertionConsumerPost,
+  samlResponseOutcomeOf,
+} from "../rules/saml-response-status.rules.ts";
 import { presentedSessionCookie } from "../rules/session-cookie.rules.ts";
 import {
   isSignInCallbackPath,
@@ -217,6 +221,7 @@ export class AuthDoorService {
 
     const pathname = new URL(request.url).pathname;
     const startHint = await this.readSignInStartHint({ request: stated, pathname });
+    const providerRefused = await this.readSamlRefusal({ request: stated, pathname });
 
     const answered = await this.deps.oauthProfileEmails.runWithScope(async () =>
       this.deps.idTokenIssuerRefusals.runWithScope(async () =>
@@ -234,12 +239,29 @@ export class AuthDoorService {
         response: answered,
         errorPageUrl,
         traceId,
+        providerRefused,
       }),
       pathname,
       errorPageUrl,
       traceId,
     });
     return this.carrySignInHint({ request, response: landed, pathname, startHint });
+  }
+
+  /** Whether a SAML Response posted back says the provider refused, read off a copy. */
+  private async readSamlRefusal({
+    request,
+    pathname,
+  }: {
+    request: Request;
+    pathname: string;
+  }): Promise<boolean> {
+    if (!isSamlAssertionConsumerPost({ pathname, method: request.method })) return false;
+    try {
+      return samlResponseOutcomeOf({ formBody: await request.clone().text() }) === "refused";
+    } catch {
+      return false;
+    }
   }
 
   /** The address a provider sign-in start typed, read off a copy so Better Auth reads the body. */
@@ -300,17 +322,20 @@ export class AuthDoorService {
     response,
     errorPageUrl,
     traceId,
+    providerRefused,
   }: {
     request: Request;
     response: Response;
     errorPageUrl: string;
     traceId: string | undefined;
+    providerRefused: boolean;
   }): Promise<Response> {
     const redirect = signInErrorRedirectOf({
       status: response.status,
       location: response.headers.get("location"),
       errorPageUrl,
       traceId,
+      providerRefused,
     });
     if (redirect.kind === "pass") return response;
     let location = redirect.location;

@@ -627,6 +627,25 @@ function refusedCallback({
   });
 }
 
+const SAML_NO_ASSERTION_LOCATION = `${BASE_URL}/auth/error?error=saml_no_assertion&error_description=SAML+response+contains+no+assertions`;
+
+function samlPost({ status, hint }: { status: string; hint?: string }): Request {
+  const xml = `<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"><samlp:Status><samlp:StatusCode Value="${status}"><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:RequestDenied"/></samlp:StatusCode></samlp:Status></samlp:Response>`;
+  const body = new URLSearchParams({
+    SAMLResponse: Buffer.from(xml).toString("base64"),
+    RelayState: "relay-1",
+  });
+  return new Request(`${BASE_URL}/api/auth/sso/saml2/sp/acs/${CONNECTION}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      origin: "https://idp.acme.test",
+      ...(hint === undefined ? {} : { cookie: `${SIGN_IN_HINT_COOKIE}=${hint}` }),
+    },
+    body: body.toString(),
+  });
+}
+
 function classifier(answer: Awaited<ReturnType<IdentityApi["classifyRefusedSignIn"]>>) {
   const calls: Parameters<IdentityApi["classifyRefusedSignIn"]>[0][] = [];
   const refusedSignIns = createApiFixture<IdentityApi>({
@@ -677,6 +696,55 @@ describe("given an identity provider that refused a sign-in started on our page"
 
       expect(locationOf(answered).searchParams.get("error")).toBe("access_denied");
       expect(locationOf(answered).searchParams.get("idp")).toBe("okta");
+    });
+  });
+
+  describe("when a SAML provider posts back a Response whose status refuses", () => {
+    /** @scenario "A SAML refusal posted back is classified like an OIDC refusal" */
+    it("sends the seat-limit code and hands identity the hinted address", async () => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: "org_1",
+        idp: "saml",
+        outcome: "seat_limit",
+      });
+      const world = door({
+        refusedSignIns,
+        betterAuth: async () => ({
+          handler: async () =>
+            new Response(null, { status: 302, headers: { location: SAML_NO_ASSERTION_LOCATION } }),
+        }),
+      });
+
+      const answered = await world.service.betterAuthHandshake(
+        samlPost({ status: "urn:oasis:names:tc:SAML:2.0:status:Responder", hint: sealedHint() }),
+      );
+
+      expect(locationOf(answered).searchParams.get("error")).toBe("seat_limit_reached");
+      expect(calls).toEqual([
+        { refusedBy: { kind: "connection", connectionId: CONNECTION }, email: "new.hire@acme.com" },
+      ]);
+    });
+
+    it("keeps the generic failure when the posted status is Success", async () => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: "org_1",
+        idp: "saml",
+        outcome: "refused",
+      });
+      const world = door({
+        refusedSignIns,
+        betterAuth: async () => ({
+          handler: async () =>
+            new Response(null, { status: 302, headers: { location: SAML_NO_ASSERTION_LOCATION } }),
+        }),
+      });
+
+      const answered = await world.service.betterAuthHandshake(
+        samlPost({ status: "urn:oasis:names:tc:SAML:2.0:status:Success" }),
+      );
+
+      expect(locationOf(answered).searchParams.get("error")).toBe("sign_in_failed");
+      expect(calls).toEqual([]);
     });
   });
 
@@ -821,7 +889,7 @@ describe("given a provider sign-in started on our page with a typed address", ()
 
   describe("when Better Auth accepts the start", () => {
     /** @scenario "The hint is set when a sign-in starts and dropped once the callback answers" */
-    it("sets a signed, httpOnly, SameSite=Lax hint for 15 minutes and still hands Better Auth the body", async () => {
+    it("sets a signed, httpOnly hint for 15 minutes that rides a cross-site SAML post", async () => {
       const world = door();
       const body = { providerId: CONNECTION, loginHint: "New.Hire@acme.com", callbackURL: "/" };
 
@@ -831,7 +899,9 @@ describe("given a provider sign-in started on our page with a typed address", ()
       const cookie = answered.headers.get("set-cookie") ?? "";
       expect(cookie).toMatch(new RegExp(`^${SIGN_IN_HINT_COOKIE.replace(".", "\\.")}=[^;]+;`));
       expect(cookie).toContain("HttpOnly");
-      expect(cookie).toContain("SameSite=Lax");
+      expect(cookie).toContain("SameSite=None");
+      expect(cookie).toContain("Secure");
+      expect(cookie).toContain("Path=/api/auth;");
       expect(cookie).toContain(`Max-Age=${SIGN_IN_HINT_TTL_MS / 1000}`);
       const value = cookie.split(";")[0]!.split("=")[1]!;
       expect(

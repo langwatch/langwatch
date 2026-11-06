@@ -66,8 +66,22 @@ Feature: A sign-in the company's identity provider refused says who refused it
   @unit
   Scenario: The hint is set when a sign-in starts and dropped once the callback answers
     Given the person starts a sign-in with a provider from our sign-in page with their address
-    Then the answer sets a signed, httpOnly, SameSite=Lax hint cookie that expires in 15 minutes
+    Then the answer sets a signed, httpOnly hint cookie scoped to /api/auth that expires in 15 minutes
+    And over https it is SameSite=None and Secure, so a SAML provider's cross-site post carries it
     And when the provider's callback answers, the hint cookie is cleared
+
+  @unit
+  Scenario: A SAML refusal posted back is classified like an OIDC refusal
+    Given the person started a sign-in through a SAML connection with their address
+    When the provider posts back a Response whose top-level status is not Success
+    Then the door classifies it as the provider's refusal, with the hinted address
+    And a Response whose status is Success keeps the generic failure
+
+  @unit
+  Scenario: A SAML Response's status is read from its top-level StatusCode only
+    When the posted SAMLResponse names a top-level status other than Success
+    Then it reads as refused
+    And a Success status, a missing SAMLResponse, bad base64 or an oversized body read as not refused
 
   @unit
   Scenario: The card's reference is the one the log line carries

@@ -48,11 +48,14 @@ export function signInErrorRedirectOf({
   location,
   errorPageUrl,
   traceId,
+  providerRefused = false,
 }: {
   status: number;
   location: string | null;
   errorPageUrl: string;
   traceId: string | undefined;
+  /** The provider said no in a shape Better Auth names otherwise: a SAML Response's status. */
+  providerRefused?: boolean;
 }): SignInErrorRedirect {
   if (status < 300 || status >= 400 || !location) return { kind: "pass" };
   const [target] = errorPageTargetOf({ location, errorPageUrl });
@@ -62,9 +65,14 @@ export function signInErrorRedirectOf({
   // Crosses as itself, but is the tenant's own refusal, so the caller logs it at warn. Only the
   // code is kept: the provider's description is caller-controlled text, so it is neither logged
   // nor left in the address bar.
-  if (code === PROVIDER_REFUSAL_CODE) {
-    const location = rebuiltLocation({ target, errorPageUrl, code, traceId });
-    return { kind: "provider_refused", code, location };
+  if (code === PROVIDER_REFUSAL_CODE || providerRefused) {
+    const location = rebuiltLocation({
+      target,
+      errorPageUrl,
+      code: PROVIDER_REFUSAL_CODE,
+      traceId,
+    });
+    return { kind: "provider_refused", code: PROVIDER_REFUSAL_CODE, location };
   }
   if (signInErrorMayCross(code)) return { kind: "pass" };
 

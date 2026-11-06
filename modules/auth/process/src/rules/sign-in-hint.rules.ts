@@ -100,12 +100,20 @@ export function buildSignInHintCookie({
   secure: boolean;
 }): string {
   const maxAge = Math.floor(SIGN_IN_HINT_TTL_MS / 1000);
-  return `${SIGN_IN_HINT_COOKIE}=${value}; Path=${SIGN_IN_HINT_PATH}; Max-Age=${maxAge}; HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}`;
+  return `${SIGN_IN_HINT_COOKIE}=${value}; Path=${SIGN_IN_HINT_PATH}; Max-Age=${maxAge}; ${hintCookieAttributes({ secure })}`;
+}
+
+/**
+ * A SAML provider posts back cross-site, which a Lax cookie does not ride, so over https the hint
+ * is SameSite=None: still HttpOnly, sealed and short-lived, and it only names a typed address.
+ */
+function hintCookieAttributes({ secure }: { secure: boolean }): string {
+  return secure ? "HttpOnly; SameSite=None; Secure" : "HttpOnly; SameSite=Lax";
 }
 
 /** The `Set-Cookie` that drops a hint once its callback has read it. */
 export function buildClearedSignInHintCookie({ secure }: { secure: boolean }): string {
-  return `${SIGN_IN_HINT_COOKIE}=; Path=${SIGN_IN_HINT_PATH}; Max-Age=0; HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}`;
+  return `${SIGN_IN_HINT_COOKIE}=; Path=${SIGN_IN_HINT_PATH}; Max-Age=0; ${hintCookieAttributes({ secure })}`;
 }
 
 /** The hint cookie's raw value off a `Cookie` header. */
