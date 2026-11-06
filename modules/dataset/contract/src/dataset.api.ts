@@ -204,6 +204,11 @@ export interface DatasetApi {
   listStoragePage(input: DatasetStoragePageInput): Promise<DatasetStorageEntry[]>;
   /** The usage report's figures for these projects. */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<DatasetUsageCount>;
+  /**
+   * Removes every object the projects' datasets keep (chunks, version chunks, single files and
+   * staged uploads), archived ones included, for an erasure that then deletes their rows.
+   */
+  eraseStoredContent(input: { projectIds: readonly string[] }): Promise<{ datasets: number }>;
 
   // Versions (spec: modules/dataset/specs/dataset-versioning.feature).
   /** Newest first, with author names, and whether the layout allows a restore. */

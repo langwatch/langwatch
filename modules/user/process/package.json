@@ -30,6 +30,7 @@
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
