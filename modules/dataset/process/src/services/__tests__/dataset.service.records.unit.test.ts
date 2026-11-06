@@ -11,6 +11,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createDatasetTestApp,
   createDatasetTestAttachments,
   createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
@@ -18,6 +19,7 @@ import {
 import type { DatasetUpdateInput } from "../../repositories/dataset.repository.ts";
 import { MemoryDatasetRecordRepository } from "../../repositories/memory/memory.dataset-record.repository.ts";
 import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
+import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
 import { MemoryDatasetRepository } from "../../repositories/memory/memory.dataset.repository.ts";
 import { DatasetService } from "../dataset.service.ts";
 
@@ -431,6 +433,83 @@ describe("DatasetService", () => {
         expect(result.record.entry).toEqual({ input: "newvalue" });
       });
     });
+  });
+});
+
+describe.each(["s3_jsonl", "single-file"] as const)("verified retries in %s", (layout) => {
+  async function setup() {
+    const repositories = MemoryDatasetRepositories.create();
+    const dataset = await repositories.content.create({
+      projectId: PROJECT_ID,
+      name: "Retries",
+      slug: "retries",
+      columnTypes: [{ name: "input", type: "string" }],
+      contentLayout: layout === "s3_jsonl" ? "s3_jsonl" : "postgres",
+      useS3: layout === "single-file",
+      s3RecordCount: 0,
+      rowCount: 0,
+      chunkCount: 0,
+      chunkOffsets: [],
+      sizeBytes: 0n,
+    });
+    const app = createDatasetTestApp({ repositories });
+    const lookup = { slugOrId: dataset.id, projectId: PROJECT_ID };
+    const input = {
+      ...lookup,
+      entries: [{ id: "trace-0", input: "same" }],
+      skipDuplicates: true,
+      readBackExisting: true,
+      verifyExisting: true,
+    };
+    await app.batchCreateRecords(input);
+
+    return { app, repositories, input, lookup };
+  }
+
+  /** @scenario "A verified retry is atomic and compares complete normalized entries" */
+  it("returns the stored row without appending it again", async () => {
+    const { app, repositories, input, lookup } = await setup();
+    const before = await app.listRecords(lookup);
+
+    const retried = await app.batchCreateRecords(input);
+    const after = await app.listRecords(lookup);
+    const dataset = await repositories.content.getOne({
+      id: input.slugOrId,
+      projectId: PROJECT_ID,
+    });
+
+    expect(after.data).toHaveLength(1);
+    expect(retried).toEqual(before.data);
+    expect(layout === "s3_jsonl" ? dataset.rowCount : dataset.s3RecordCount).toBe(1);
+  });
+
+  /** @scenario "A verified retry is atomic and compares complete normalized entries" */
+  it("rejects conflicting content before writing any new expansion rows", async () => {
+    const { app, repositories, input, lookup } = await setup();
+    const before = await app.listRecords(lookup);
+    const dataset = await repositories.content.getOne({
+      id: input.slugOrId,
+      projectId: PROJECT_ID,
+    });
+    const chunks = vi.spyOn(repositories.chunks, "writeChunks");
+    const singleFile = vi.spyOn(repositories.singleFiles, "putSingleFile");
+
+    await expect(
+      app.batchCreateRecords({
+        ...input,
+        entries: [
+          { id: "trace-1", input: "new expansion" },
+          { id: "trace-0", input: "changed" },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "dataset_record_conflict" });
+
+    expect(chunks).not.toHaveBeenCalled();
+    expect(singleFile).not.toHaveBeenCalled();
+    expect(await app.listRecords(lookup)).toEqual(before);
+    expect(
+      await repositories.content.getOne({ id: input.slugOrId, projectId: PROJECT_ID }),
+    ).toEqual(dataset);
   });
 });
 

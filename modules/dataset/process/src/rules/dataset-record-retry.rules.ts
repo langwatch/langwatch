@@ -13,8 +13,34 @@ export function verifyDatasetRecords(
 ): void {
   const byId = new Map(stored.map((record) => [record.id, record.entry]));
   for (const { id, ...entry } of entries) {
-    if (!isDeepStrictEqual(entry, byId.get(id))) {
-      throw new DatasetRecordConflictError(id);
+    verifyDatasetRecordEntry({ id, entry, storedEntry: byId.get(id) });
+  }
+}
+
+function verifyDatasetRecordEntry(input: {
+  id: string;
+  entry: unknown;
+  storedEntry: unknown;
+}): void {
+  if (!isDeepStrictEqual(input.entry, input.storedEntry)) {
+    throw new DatasetRecordConflictError(input.id);
+  }
+}
+
+export function verifyExistingDatasetRecords(input: {
+  records: readonly { id: string; entry: unknown }[];
+  stored: readonly { id?: string; entry: unknown }[];
+}): void {
+  const byId = new Map(input.stored.map((record) => [record.id, record.entry]));
+  for (const record of input.records) {
+    if (byId.has(record.id)) {
+      verifyDatasetRecordEntry({
+        id: record.id,
+        entry: record.entry,
+        storedEntry: byId.get(record.id),
+      });
+    } else {
+      byId.set(record.id, record.entry);
     }
   }
 }

@@ -30,6 +30,7 @@ import type { DatasetSingleFileRepository } from "../repositories/dataset-single
 import type { DatasetRow } from "../repositories/dataset.repository.ts";
 import { mapPreviousColumnsToNewColumns } from "../rules/dataset-chunk-lines.rules.ts";
 import { assertColumnsCurrent } from "../rules/dataset-columns.rules.ts";
+import { verifyExistingDatasetRecords } from "../rules/dataset-record-retry.rules.ts";
 import {
   matchesDatasetSearch,
   refuseSearchScan,
@@ -188,12 +189,38 @@ export class DatasetSingleFileService implements Omit<
     const { dataset } = input;
     const added = input.input.entries.map(({ id, ...entry }) => ({
       id: id ?? this.generateId(),
-      entry,
+      entry: sanitizedEntry(entry),
     }));
-    await this.appendRecords({ dataset, records: added });
-    return added.map((record) =>
-      this.toDatasetRecord({ id: record.id, entry: sanitizedEntry(record.entry) }, dataset),
-    );
+    const { skipDuplicates, readBackExisting, verifyExisting } = input.input;
+    if (!skipDuplicates && !readBackExisting && !verifyExisting) {
+      await this.appendRecords({ dataset, records: added });
+      return added.map((record) => this.toDatasetRecord(record, dataset));
+    }
+
+    return this.rewrite(dataset, (records, now) => {
+      const existing = new Map(records.map((record) => [record.id, record]));
+      if (verifyExisting) verifyExistingDatasetRecords({ records: added, stored: records });
+      const pending: typeof added = [];
+      for (const record of added) {
+        const stored = existing.get(record.id);
+        if (stored && skipDuplicates) continue;
+        pending.push(record);
+        existing.set(record.id, record);
+      }
+
+      const changed =
+        pending.length > 0
+          ? appendSingleFileRecords({ ...keyOf(dataset), records, added: pending, now })
+          : records;
+      const requested = new Set(added.map((record) => record.id));
+      const written = readBackExisting
+        ? changed.filter((record) => record.id !== void 0 && requested.has(record.id))
+        : changed.slice(records.length);
+      return {
+        records: changed,
+        answer: written.map((record) => this.toDatasetRecord(record, dataset)),
+      };
+    });
   }
 
   /** Records appended after the stored ones, as the previous release appended them. */
@@ -264,7 +291,9 @@ export class DatasetSingleFileService implements Omit<
     const key = keyOf(dataset);
     return this.datasets.withDatasetLock(dataset.id, async (locked) => {
       const current = await locked.getOne({ id: dataset.id, projectId: dataset.projectId });
-      const changed = change(await this.readStored(key), nowInstant().toString(), current);
+      const records = await this.readStored(key);
+      const changed = change(records, nowInstant().toString(), current);
+      if (changed.records === records && changed.columnTypes === void 0) return changed.answer;
       await locked.update({
         id: dataset.id,
         projectId: dataset.projectId,

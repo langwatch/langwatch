@@ -252,8 +252,8 @@ Feature: Shared Dataset service
 
   @unit @integration
   Scenario: A verified retry is atomic and compares complete normalized entries
-    Given an inline dataset with rows from an earlier attempt
-    When a retry reuses an id with changed content or a different dataset
+    Given a dataset in any storage layout with rows from an earlier attempt
+    When a retry reuses an id with changed content
     Then the entire batch is refused as dataset_record_conflict
     And no new rows from that batch remain
     And columns removed from the mapping are included in the comparison
