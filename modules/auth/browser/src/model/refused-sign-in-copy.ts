@@ -1,4 +1,4 @@
-import { parseSignInIdpKind, type SignInIdpKind } from "@langwatch/identity-contract";
+import { describeSignInIdp } from "@langwatch/identity-contract";
 
 import type { SignInRefusalCopy } from "./sign-in-error-code.ts";
 
@@ -8,28 +8,9 @@ import type { SignInRefusalCopy } from "./sign-in-error-code.ts";
  * @see specs/identity/idp-refused-sign-in.feature
  */
 
-/** The product name a person knows their company sign-in by; protocols name nothing useful. */
-const IDP_NAMES: Readonly<Record<SignInIdpKind, string | undefined>> = {
-  okta: "Okta",
-  entra: "Microsoft Entra ID",
-  google: "Google Workspace",
-  onelogin: "OneLogin",
-  jumpcloud: "JumpCloud",
-  ping: "Ping Identity",
-  auth0: "Auth0",
-  oidc: undefined,
-  saml: undefined,
-};
-
-/** The name shown for a caller-controlled `idp`, or undefined when it names none we admit. */
-export function describeIdp(value: string | null | undefined): string | undefined {
-  const kind = parseSignInIdpKind(value);
-  return kind ? IDP_NAMES[kind] : undefined;
-}
-
 /** The access-denied card: the provider refused, not LangWatch, and who can change that. */
 export function describeProviderRefusal(idp: string | null | undefined): SignInRefusalCopy {
-  const name = describeIdp(idp);
+  const name = describeSignInIdp(idp);
   return {
     title: "Sign-in was refused",
     body: name

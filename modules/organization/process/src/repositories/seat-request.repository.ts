@@ -1,8 +1,5 @@
-import type {
-  IdentityProviderKind,
-  SeatRequestSource,
-  SeatRequestStatus,
-} from "@langwatch/organization-contract";
+import type { SignInIdpKind } from "@langwatch/identity-contract";
+import type { SeatRequestSource, SeatRequestStatus } from "@langwatch/organization-contract";
 
 /** One seat request as it is stored; timestamps are epoch milliseconds. */
 export type SeatRequestRow = Readonly<{
@@ -14,7 +11,7 @@ export type SeatRequestRow = Readonly<{
   status: SeatRequestStatus;
   source: SeatRequestSource;
   idpRefused: boolean;
-  idpKind: IdentityProviderKind | null;
+  idpKind: SignInIdpKind | null;
   salesNotifiedAt: number | null;
   openedAt: number;
   resolvedAt: number | null;
@@ -38,7 +35,7 @@ export abstract class SeatRequestRepository {
     name: string | null;
     source: SeatRequestSource;
     idpRefused: boolean;
-    idpKind: IdentityProviderKind | null;
+    idpKind: SignInIdpKind | null;
     at: number;
   }): Promise<SeatRequestOpened>;
   /** Every open request in the organization, oldest first. */

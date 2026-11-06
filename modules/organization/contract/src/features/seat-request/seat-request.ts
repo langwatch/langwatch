@@ -1,30 +1,10 @@
+import { signInIdpKindSchema, type SignInIdpKind } from "@langwatch/identity-contract";
 import type { Named } from "@langwatch/module";
 /**
  * Seat requests: a person asked for a full seat the organization had no room for
  * (modules/organization/specs/seat-requests.feature).
  */
 import { z } from "zod";
-
-/** The identity providers a refused sign-in may name; anything else is "your company's sign-in". */
-export const IDENTITY_PROVIDER_KINDS = [
-  "okta",
-  "entra",
-  "google",
-  "onelogin",
-  "jumpcloud",
-  "ping",
-  "auth0",
-  "oidc",
-  "saml",
-] as const;
-
-const identityProviderKindSchemaDefinition = z.enum(IDENTITY_PROVIDER_KINDS);
-export interface IdentityProviderKindSchema extends Named<
-  typeof identityProviderKindSchemaDefinition
-> {}
-export const identityProviderKindSchema: IdentityProviderKindSchema =
-  identityProviderKindSchemaDefinition;
-export type IdentityProviderKind = z.infer<typeof identityProviderKindSchema>;
 
 /** How the person was left when the request opened. */
 export type SeatRequestSource = "pending" | "lite" | "idp_refused";
@@ -37,7 +17,7 @@ const seatRequestSchemaDefinition = z.object({
   userId: z.string().nullable(),
   source: z.enum(["pending", "lite", "idp_refused"]),
   idpRefused: z.boolean(),
-  idpKind: identityProviderKindSchema.nullable(),
+  idpKind: signInIdpKindSchema.nullable(),
   /** Epoch milliseconds. */
   openedAt: z.number(),
 });
@@ -120,7 +100,7 @@ export type HeldMemberships = z.infer<typeof heldMembershipsSchema>;
 export type RecordRefusedSignInInput = Readonly<{
   organizationId: string;
   email: string;
-  idp: IdentityProviderKind | null;
+  idp: SignInIdpKind | null;
 }>;
 /** `seat_limit` when an arrival would have been held pending: show the seat-limit screen first. */
 export type RefusedSignInOutcome = Readonly<{ outcome: "seat_limit" | "refused" }>;

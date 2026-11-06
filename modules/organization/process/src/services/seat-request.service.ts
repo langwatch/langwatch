@@ -1,10 +1,10 @@
 import type { AuthzGrantCaller } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
+import type { SignInIdpKind } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import {
   type HeldMembership,
   type HeldMemberships,
-  type IdentityProviderKind,
   MemberSeatLimitReachedError,
   type OpenSeatRequests,
   type OrganizationAdmission,
@@ -140,7 +140,7 @@ export class SeatRequestService {
   }: {
     organizationId: string;
     email: string;
-    idp: IdentityProviderKind | null;
+    idp: SignInIdpKind | null;
   }): Promise<RefusedSignInOutcome> {
     const address = email.trim().toLowerCase();
     const [full, lite] = await Promise.all([
@@ -315,7 +315,7 @@ export class SeatRequestService {
     name: string | null;
     source: SeatRequestSource;
     idpRefused: boolean;
-    idpKind: IdentityProviderKind | null;
+    idpKind: SignInIdpKind | null;
   }): Promise<void> {
     const { requests, notices, now, newId } = this.dependencies;
     const opened = await requests.open({ ...input, id: newId(), at: now() });

@@ -1,5 +1,5 @@
+import { parseSignInIdpKind } from "@langwatch/identity-contract";
 import {
-  IDENTITY_PROVIDER_KINDS,
   SeatRequestNotFoundError,
   type SeatRequestSource,
   type SeatRequestStatus,
@@ -148,7 +148,7 @@ function rowOf(row: StoredSeatRequest): SeatRequestRow {
     status: row.status as SeatRequestStatus,
     source: row.source as SeatRequestSource,
     idpRefused: row.idpRefused,
-    idpKind: IDENTITY_PROVIDER_KINDS.find((kind) => kind === row.idpKind) ?? null,
+    idpKind: parseSignInIdpKind(row.idpKind) ?? null,
     salesNotifiedAt: row.salesNotifiedAt?.getTime() ?? null,
     openedAt: row.openedAt.getTime(),
     resolvedAt: row.resolvedAt?.getTime() ?? null,

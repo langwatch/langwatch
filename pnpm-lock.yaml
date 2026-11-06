@@ -6266,6 +6266,9 @@ importers:
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/role-contract':
         specifier: workspace:*
         version: link:../../role/contract
@@ -12695,6 +12698,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../../identity/contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module

@@ -1,3 +1,4 @@
+import { describeSignInIdp } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import type { SeatApprovalPath } from "@langwatch/organization-contract";
 import { Temporal } from "@langwatch/time";
@@ -8,7 +9,6 @@ import type {
   AccessNoticeRow,
   OrganizationAccessNoticeRepository,
 } from "../repositories/organization-access-notice.repository.ts";
-import { IDENTITY_PROVIDER_NAMES } from "../rules/identity-provider-name.rules.ts";
 
 /** Someone told about seat requests: an active administrator or a Billing member. */
 export type AccessNoticeRecipient = Readonly<{ userId: string; email: string }>;
@@ -96,7 +96,7 @@ export class OrganizationAccessNoticeService {
       context.recipients({ organizationId }),
       context.organizationName({ organizationId }),
     ]);
-    const idpName = (notice.idp && IDENTITY_PROVIDER_NAMES[notice.idp]) || null;
+    const idpName = describeSignInIdp(notice.idp) ?? null;
     const approval =
       notice.kind === "seat_request" ? await context.approval({ organizationId }) : null;
     await this.fanOut({
