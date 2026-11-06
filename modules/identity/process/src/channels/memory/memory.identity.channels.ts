@@ -46,7 +46,7 @@ export class MemoryIdentityChannels {
       ssoDomainProofMail: SesSsoDomainProofMailChannel.create({ mailer, baseUrl }),
       ssoDomainProofs: MemorySsoDomainProofChannel.create(),
       ssoDomainProofFiles: MemorySsoDomainProofFileChannel.create(),
-      ssoIssuerDiscovery: issuerDiscovery,
+      ssoRegistrationIssuerDiscovery: issuerDiscovery,
       ssoSignInIssuerDiscovery: issuerDiscovery,
       ssoBreakGlassWarnings: MemorySsoBreakGlassWarningChannel.create(),
     };

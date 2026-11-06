@@ -46,7 +46,7 @@ export interface IdentityChannels {
   readonly ssoDomainProofs: SsoDomainProofChannel;
   readonly ssoDomainProofFiles: SsoDomainProofFileChannel;
   /** Registration's discovery: through the outbound proxy, like the domain proof file. */
-  readonly ssoIssuerDiscovery: SsoIssuerDiscoveryChannel;
+  readonly ssoRegistrationIssuerDiscovery: SsoIssuerDiscoveryChannel;
   /** The per-sign-in trust lookup's discovery: the route the SSO engine's own sign-in
    *  fetches take, so both read the document the same way. */
   readonly ssoSignInIssuerDiscovery: SsoIssuerDiscoveryChannel;

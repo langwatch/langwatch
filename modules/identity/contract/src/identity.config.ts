@@ -4,6 +4,7 @@ import {
   isSaas,
   localPasswords,
   mfaEnrollmentOpen,
+  nodeEnvProxy,
   outboundProxy,
   passkeysEnabled,
   publicBaseUrl,
@@ -33,6 +34,8 @@ export const identityConfig = Config.define((c) => ({
   publicBaseUrl,
   /** The corporate proxy SSO issuer discovery and the domain proof file leave through. */
   outboundProxy,
+  /** Whether global `fetch`, and so the SSO engine's sign-in fetches, goes through that proxy. */
+  nodeEnvProxy,
   /** The sign-in capability switches auth also reads (round 48, A1-a). */
   passkeysEnabled,
   mfaEnrollmentOpen,

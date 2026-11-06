@@ -100,9 +100,10 @@ so it cannot be a connection.
 
 If your installation reaches the internet only through an HTTP proxy, set the
 standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables on the app and
-the workers. LangWatch fetches the discovery document, and the domain
-verification file, through the proxy. It still checks that the address is
-public first, and checks every redirect again.
+the workers. When you register or edit a connection, LangWatch fetches the
+discovery document through the proxy, and it fetches the domain verification
+file through the proxy too. It still checks that the address is public first,
+and checks every redirect again.
 
 `NO_PROXY` only chooses a direct connection: it does not lift that check. An
 identity provider inside your network needs its origin in
@@ -114,18 +115,25 @@ to the address it checked. Configure the proxy to refuse every address that is
 not public: loopback (such as `127.0.0.1` and `::1`), private and link-local
 ranges, and cloud metadata addresses (such as `169.254.169.254`).
 
-Only these two requests use the proxy today, and neither is part of signing in.
-Every request made during sign-in goes direct, never through `HTTPS_PROXY`:
+Only these two requests use the proxy by default, and neither is part of
+signing in. By default, every request made during sign-in goes direct, not
+through `HTTPS_PROXY`:
 
-- the discovery document, which LangWatch reads to learn which addresses your
-  identity provider signs people in from (such as `oauth2.googleapis.com` for
-  Google)
+- the discovery document, read again at every sign-in to learn which addresses
+  your identity provider signs people in from (such as `oauth2.googleapis.com`
+  for Google)
 - the token exchange
 - the signing keys
 - the user info, when the provider has a user info endpoint
 
-So the app and workers must reach your identity provider's discovery, token,
-keys and user info endpoints directly for sign-in to work.
+So by default the app and workers must reach your identity provider's
+discovery, token, keys and user info endpoints directly for sign-in to work.
+
+If you start the app and workers with `NODE_USE_ENV_PROXY=1` (or
+`--use-env-proxy` in `NODE_OPTIONS`), Node sends these sign-in requests through
+`HTTPS_PROXY` too (unless `NO_PROXY` names the host), and LangWatch reads the
+sign-in discovery document through the proxy to match. Then the proxy must
+allow your identity provider's discovery, token, keys and user info endpoints.
 
 ### Microsoft Entra ID
 

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
- * Behind a proxy that refuses the identity provider, the per-sign-in trust lookup
- * still reads its discovery document, directly, as the SSO engine does at sign-in.
+ * @see specs/identity/sso-issuer-endpoint-origins.feature
+ * The per-sign-in trust lookup reads the discovery document on the SSO engine's route.
  */
 import type * as Egress from "@langwatch/egress";
 import { parseOutboundProxyConfig, type SsrfValidationResult } from "@langwatch/egress";
@@ -58,15 +58,17 @@ vi.mock("@langwatch/egress", async (importOriginal) => {
   };
 });
 
-function channelsBehindRefusingProxy() {
+function channelsBehindRefusingProxy({ signInThroughProxy = false } = {}) {
   return issuerDiscoveryChannels({
     proxy: parseOutboundProxyConfig({ HTTPS_PROXY: PROXY }),
+    signInThroughProxy,
     dialableInternalOrigins: () => [],
   });
 }
 
 describe("issuerDiscoveryChannels", () => {
-  describe("given an outbound proxy that refuses the identity provider", () => {
+  describe("given an outbound proxy that refuses the identity provider, and global fetch direct", () => {
+    /** @scenario "Google's endpoints on googleapis.com are trusted for a Google connection" */
     it("trusts the cross-origin endpoints at sign-in, read without the proxy", async () => {
       fetched.length = 0;
       const channels = channelsBehindRefusingProxy();
@@ -88,10 +90,24 @@ describe("issuerDiscoveryChannels", () => {
       fetched.length = 0;
       const channels = channelsBehindRefusingProxy();
 
-      await expect(channels.ssoIssuerDiscovery.discover({ issuer: GOOGLE })).resolves.toEqual({
+      await expect(
+        channels.ssoRegistrationIssuerDiscovery.discover({ issuer: GOOGLE }),
+      ).resolves.toEqual({
         reachable: false,
         reason: "proxy_unreachable",
       });
+      expect(fetched).toEqual([{ proxied: true }]);
+    });
+  });
+
+  describe("given Node sends global fetch through the proxy too", () => {
+    it("reads the sign-in lookup through the proxy, as the SSO engine will", async () => {
+      fetched.length = 0;
+      const channels = channelsBehindRefusingProxy({ signInThroughProxy: true });
+
+      await expect(
+        channels.ssoSignInIssuerDiscovery.discover({ issuer: GOOGLE }),
+      ).resolves.toMatchObject({ reachable: false, reason: "proxy_unreachable" });
       expect(fetched).toEqual([{ proxied: true }]);
     });
   });
