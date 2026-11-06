@@ -1,6 +1,6 @@
-import { Button, Text } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import {
   type JoinableOrganization,
@@ -8,6 +8,11 @@ import {
 } from "../../model/join-before-create.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { FrontDoorPrimaryButton } from "../elements/front-door-primary-button.tsx";
+
+/** How many other organizations show before the list folds behind "Show all". */
+export const VISIBLE_OTHER_ORGANIZATIONS = 3;
+/** From this many organizations in total, the open list gets a name filter. */
+export const SEARCHABLE_FROM = 8;
 
 /** Offer to join existing organization before creating workspace; joining leads. */
 export function JoinBeforeCreateInterstitial({
@@ -77,24 +82,130 @@ export function JoinBeforeCreateInterstitial({
     );
   }
 
+  // The list arrives ordered with the biggest team first, so that one leads.
+  const [leading, ...others] = decision.organizations;
+  if (!leading) return null;
+
   return (
     <AuthCard title="Join your colleagues">
       <Text data-testid="join-before-create">
         Your colleagues are already on LangWatch. Join them instead of starting a separate
         workspace.
       </Text>
-      {decision.organizations.map((organization) => (
-        <FrontDoorPrimaryButton
-          key={organization.id}
-          onClick={() => onJoinOrganization(organization)}
-        >
-          Join {organization.name} ({colleagues(organization.colleagueCount)})
-        </FrontDoorPrimaryButton>
-      ))}
+      <FrontDoorPrimaryButton onClick={() => onJoinOrganization(leading)}>
+        <Text as="span" truncate title={leading.name}>
+          Join {leading.name} ({colleagues(leading.colleagueCount)})
+        </Text>
+      </FrontDoorPrimaryButton>
+      {others.length > 0 ? (
+        <OtherOrganizations
+          organizations={others}
+          total={decision.organizations.length}
+          onJoinOrganization={onJoinOrganization}
+        />
+      ) : null}
       <Button variant="outline" width="full" loading={declining} onClick={onDeclineJoin}>
         Create a new organization
       </Button>
     </AuthCard>
+  );
+}
+
+/**
+ * Every organization after the leading one, as quiet rows rather than more
+ * primary buttons: a domain with dozens of organizations otherwise buries
+ * its real team, and the way out, under a wall of equal calls to action.
+ */
+function OtherOrganizations({
+  organizations,
+  total,
+  onJoinOrganization,
+}: {
+  organizations: readonly JoinableOrganization[];
+  total: number;
+  onJoinOrganization: (organization: JoinableOrganization) => void;
+}) {
+  const [showingAll, setShowingAll] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const folds = organizations.length > VISIBLE_OTHER_ORGANIZATIONS;
+  const searchable = showingAll && total >= SEARCHABLE_FROM;
+  const needle = query.trim().toLowerCase();
+  const shown =
+    !folds || showingAll
+      ? organizations.filter((o) => !searchable || o.name.toLowerCase().includes(needle))
+      : organizations.slice(0, VISIBLE_OTHER_ORGANIZATIONS);
+
+  return (
+    <VStack width="full" align="stretch" gap={2} data-testid="join-other-organizations">
+      <Text textStyle="bodySm" color="fg.muted">
+        Or join another organization
+      </Text>
+      {searchable ? (
+        <Input
+          size="sm"
+          placeholder="Search organizations"
+          aria-label="Search organizations"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      ) : null}
+      <Box
+        as="ul"
+        maxHeight={showingAll ? "264px" : undefined}
+        overflowY={showingAll ? "auto" : undefined}
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+      >
+        {shown.map((organization) => (
+          <Box
+            as="li"
+            key={organization.id}
+            _notLast={{ borderBottomWidth: "1px", borderColor: "border.muted" }}
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              width="full"
+              justifyContent="space-between"
+              borderRadius="0"
+              aria-label={`Join ${organization.name}`}
+              onClick={() => onJoinOrganization(organization)}
+            >
+              <HStack width="full" justify="space-between" gap={3} minWidth={0}>
+                <Text as="span" truncate title={organization.name}>
+                  {organization.name}
+                </Text>
+                <Text as="span" textStyle="xs" color="fg.muted" flexShrink={0}>
+                  {colleagues(organization.colleagueCount)}
+                </Text>
+              </HStack>
+            </Button>
+          </Box>
+        ))}
+        {shown.length === 0 ? (
+          <Text as="li" textStyle="bodySm" color="fg.muted" padding={3} textAlign="center">
+            No organization matches "{query.trim()}"
+          </Text>
+        ) : null}
+      </Box>
+      {folds ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          color="fg.muted"
+          alignSelf="center"
+          aria-expanded={showingAll}
+          onClick={() => {
+            setShowingAll((open) => !open);
+            setQuery("");
+          }}
+        >
+          {showingAll ? "Show fewer" : `Show all ${organizations.length} organizations`}
+        </Button>
+      ) : null}
+    </VStack>
   );
 }
 

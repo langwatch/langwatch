@@ -5,6 +5,7 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import { cleanup, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { JoinBeforeCreateInterstitial } from "../join-before-create-interstitial.tsx";
@@ -77,6 +78,51 @@ describe("given an organization open to requests from the domain", () => {
       const join = await screen.findByRole("button", { name: /Join Acme/ });
       // Spelled out, not abbreviated, and no member of Acme is named.
       expect(join).toHaveTextContent("Join Acme (10+ colleagues)");
+    });
+  });
+});
+
+const openToMany = (count: number): JoinLookupDecision => ({
+  outcome: "ask",
+  organizations: Array.from({ length: count }, (_, index) => ({
+    organizationId: `org_${index}`,
+    name: index === 0 ? "Acme" : `Acme team ${index}`,
+    colleagueCount: index === 0 ? 10 : 1,
+  })),
+});
+
+describe("given many organizations open to requests from the domain", () => {
+  afterEach(() => cleanup());
+
+  describe("when sign-up reaches the join-before-create step", () => {
+    /** @scenario Many organizations stay one clear choice and a short list */
+    it("keeps one primary action and folds the rest behind a toggle", async () => {
+      renderStep({ lookup: openToMany(12) });
+
+      expect(
+        await screen.findByRole("button", { name: "Join Acme (10+ colleagues)" }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Join Acme team 1" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Join Acme team 3" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Join Acme team 4" })).toBeNull();
+      expect(screen.queryByRole("textbox")).toBeNull();
+      expect(screen.getByRole("button", { name: "Create a new organization" })).toBeInTheDocument();
+    });
+
+    it("lists and filters every organization once asked to show all", async () => {
+      const user = userEvent.setup();
+      const { onJoinOrganization } = renderStep({ lookup: openToMany(12) });
+
+      await user.click(await screen.findByRole("button", { name: "Show all 11 organizations" }));
+      expect(screen.getByRole("button", { name: "Join Acme team 11" })).toBeInTheDocument();
+
+      await user.type(screen.getByRole("textbox", { name: "Search organizations" }), "team 11");
+      expect(screen.queryByRole("button", { name: "Join Acme team 1" })).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Join Acme team 11" }));
+      expect(onJoinOrganization).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "org_11", name: "Acme team 11" }),
+      );
     });
   });
 });
