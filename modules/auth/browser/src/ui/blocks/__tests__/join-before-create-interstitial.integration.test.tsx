@@ -6,7 +6,7 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JoinBeforeCreateInterstitial } from "../join-before-create-interstitial.tsx";
 
@@ -118,11 +118,44 @@ describe("given many organizations open to requests from the domain", () => {
 
       await user.type(screen.getByRole("textbox", { name: "Search organizations" }), "team 11");
       expect(screen.queryByRole("button", { name: "Join Acme team 1" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Join Acme team 10" })).toBeNull();
 
       await user.click(screen.getByRole("button", { name: "Join Acme team 11" }));
       expect(onJoinOrganization).toHaveBeenCalledWith(
         expect.objectContaining({ id: "org_11", name: "Acme team 11" }),
       );
+    });
+  });
+
+  describe("when the name filter matches nothing", () => {
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(async () => {
+      user = userEvent.setup();
+      renderStep({ lookup: openToMany(12) });
+      await user.click(await screen.findByRole("button", { name: "Show all 11 organizations" }));
+      await user.type(screen.getByRole("textbox", { name: "Search organizations" }), "globex");
+    });
+
+    /** @scenario A name filter that matches nothing says so and folds back cleanly */
+    it("says no organization matches and offers to clear the search", async () => {
+      expect(screen.getByText('No organization matches "globex".')).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Join Acme team/ })).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Clear search" }));
+      expect(screen.getByRole("textbox", { name: "Search organizations" })).toHaveValue("");
+      expect(screen.getByRole("button", { name: "Join Acme team 11" })).toBeInTheDocument();
+    });
+
+    it("folds back to three rows and clears the query on Show fewer", async () => {
+      await user.click(screen.getByRole("button", { name: "Show fewer" }));
+
+      expect(screen.queryByRole("textbox")).toBeNull();
+      expect(screen.queryByText(/No organization matches/)).toBeNull();
+      expect(screen.getAllByRole("button", { name: /^Join Acme team/ })).toHaveLength(3);
+
+      await user.click(screen.getByRole("button", { name: "Show all 11 organizations" }));
+      expect(screen.getByRole("textbox", { name: "Search organizations" })).toHaveValue("");
     });
   });
 });
