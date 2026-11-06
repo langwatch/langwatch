@@ -5,7 +5,6 @@
  */
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
-import { datasetProcessModule } from "@langwatch/dataset-process";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { bootInstalledProcess } from "@langwatch/process";
@@ -17,16 +16,18 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { processModules } from "../../process-modules.generated.ts";
 import { seedDemoDataset } from "../seed-demo-dataset.ts";
 
 const projectId = "project-demo";
+const datasetModule = processModules.filter((installed) => installed.name === "dataset");
 
 let runtime: Awaited<ReturnType<typeof bootInstalledProcess>>;
 
 beforeEach(async () => {
   runtime = await bootInstalledProcess({
     role: "worker",
-    modules: [datasetProcessModule],
+    modules: datasetModule,
     config: { dataset: { publicBaseUrl: undefined } },
     stores: memoryStores(),
     peers: [
