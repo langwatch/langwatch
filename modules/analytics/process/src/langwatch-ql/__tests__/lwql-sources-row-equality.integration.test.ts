@@ -1,7 +1,7 @@
 /**
- * Each stock query over `traces` or `spans` returns, on a real ClickHouse, the rows its old single
- * lookup returned, apart from the traces AC202g names. Tables shaped as the catalogue's views stand
- * in for them; the queries come from the committed copy of the catalogue's SQL.
+ * Each stock query over `traces` or `spans` returns, on a real ClickHouse, the rows main's SQL for
+ * it returns, apart from the traces AC202g names. Tables shaped as the catalogue's views stand in
+ * for them; the queries come from the committed copies of the catalogue's SQL, here and on main.
  * @see modules/dashboard/specs/dashboards-v2.feature AC202d, AC202g
  * @vitest-environment node
  */
@@ -23,25 +23,36 @@ const SOURCES = "{dashboard_context_sources:Array(String)}";
 const CHOSEN = `has(${SOURCES}, 'application')`;
 const LISTS = [{ list: ["application"] }, { list: ["langy"] }];
 
-const STOCK: readonly { label: string; sql: string }[] = JSON.parse(
-  readFileSync(
-    fileURLToPath(new URL("./fixtures/stock-widget-queries.json", import.meta.url)),
-    "utf8",
-  ),
-);
+type StockQuery = { label: string; sql: string };
+
+function fixture(name: string): readonly StockQuery[] {
+  return JSON.parse(
+    readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), "utf8"),
+  );
+}
+
+const STOCK = fixture("stock-widget-queries.json");
+// `git show origin/main:<this directory>/fixtures/stock-widget-queries.json` at 5b4a4e3f2b,
+// main's single lookups, each with the bound it shipped with.
+const ON_MAIN = new Map(fixture("stock-widget-queries.before.json").map((q) => [q.label, q.sql]));
+// ck-trend/changes as this branch shipped it at a67bf1eb57, its lookup bound one window and a day.
+const [WINDOW_BOUND] = fixture("stock-widget-queries.window-bound.json");
+
+/** Stock queries new since main, whose baseline is the rebuilt single lookup. */
+const NEW_SINCE_MAIN: readonly string[] = [];
 
 /**
- * Rows that differ by design (AC202g), by widget query, with the lists they differ under. The
- * trace older than the bound is no exception: each lookup reaches as far back as its query scans.
+ * Rows that differ by design (AC202g), by widget query and list. Both changes queries scan 90 days
+ * back, and their lookup now reaches as far; main's stopped one window and a day back.
  */
-const AC202G_EXCEPTIONS: Record<string, { lists: readonly string[]; reason: string }> = {
+const AC202G_EXCEPTIONS: Record<string, Readonly<Record<string, string>>> = {
   "ck-trend/changes": {
-    lists: ["application"],
-    reason: "its 90-day scan reaches the old trace with no row and the old two-source trace",
+    application: "none_old, with no row, counts: pv_shared is first seen 85 days back",
+    langy: "langy_old and dual_old are in the bound: pv_langy is first seen 85 days back",
   },
   "ext-cost-per-doc/changes": {
-    lists: ["application"],
-    reason: "its 90-day scan reaches the old trace with no row and the old two-source trace",
+    application: "none_old, with no row, counts: pv_shared is first seen 85 days back",
+    langy: "langy_old and dual_old are in the bound: pv_langy is first seen 85 days back",
   },
 };
 
@@ -84,8 +95,15 @@ function singleLookupForm(sql: string): { sql: string; replaced: number } {
   return { sql: before, replaced };
 }
 
+/** Main's SQL for the query, or the rebuilt single lookup for a query new since main. */
+function baselineOf({ label, sql }: StockQuery): string {
+  return ON_MAIN.get(label) ?? singleLookupForm(sql).sql;
+}
+
 /** Every stock query kept to its sources that reads `traces` or `spans`, from the fixture. */
 const COVERED = STOCK.filter(({ sql }) => sql.includes(SOURCES) && traceViewReads(sql) > 0);
+
+const labelsOf = (queries: readonly StockQuery[]) => queries.map(({ label }) => label);
 
 describe("given the stock queries that keep traces or spans to their sources", () => {
   /** @scenario "AC202d Stock widgets: a widget whose list did not change returns the same rows" */
@@ -103,6 +121,14 @@ describe("given the stock queries that keep traces or spans to their sources", (
     expect(missed).toEqual([]);
     expect(Object.keys(AC202G_EXCEPTIONS).filter((label) => !hasLabel(label))).toEqual([]);
   });
+
+  /** @scenario "AC202d Stock widgets: a widget whose list did not change returns the same rows" */
+  it("takes each one's baseline from main's SQL, which holds no two-set form", () => {
+    expect(labelsOf(COVERED.filter(({ label }) => !ON_MAIN.has(label)))).toEqual(NEW_SINCE_MAIN);
+    expect(labelsOf(COVERED.filter(({ label }) => ON_MAIN.get(label)?.includes(CHOSEN)))).toEqual(
+      [],
+    );
+  });
 });
 
 function hasLabel(label: string): boolean {
@@ -115,10 +141,11 @@ const PERIOD_START = PERIOD_END - 7 * DAY;
 /** Within the changes widgets' 90 days, past every window bound, and before `now() - 90 days`. */
 const OLD = PERIOD_START - 85 * DAY;
 
-const at = (time: number) => new Date(time).toISOString().replace("T", " ").replace("Z", "");
+/** A DateTime literal with no fraction, which a `DateTime` parameter and column both parse. */
+const at = (time: number) => new Date(time).toISOString().slice(0, 19).replace("T", " ");
 const PARAMETERS = {
-  dashboard_context_period_start: at(PERIOD_START).slice(0, 19),
-  dashboard_context_period_end: at(PERIOD_END).slice(0, 19),
+  dashboard_context_period_start: at(PERIOD_START),
+  dashboard_context_period_end: at(PERIOD_END),
   dashboard_context_granularity_seconds: 86_400,
 };
 
@@ -251,6 +278,32 @@ function span({
   };
 }
 
+/** The server's URL on this suite's database: the client takes a URL path over `database`. */
+function urlOnDatabase(): string {
+  const onDatabase = new URL(String(url));
+  onDatabase.pathname = `/${DATABASE}`;
+
+  return onDatabase.toString();
+}
+
+/** The prompts the query's 90-day `traces` read finds, before the widget keeps only new ones. */
+function promptsRead(sql: string): string {
+  const derived = sql.slice(
+    sql.indexOf("FROM (\n") + 5,
+    sql.lastIndexOf("\n)\nWHERE first_at") + 2,
+  );
+
+  return `SELECT name FROM ${derived} WHERE kind = 'prompt' ORDER BY name`;
+}
+
+type Failure = { label: string; error: string };
+
+/** The failures in one line, naming the first and its error, for a log cut short. */
+function failureNote(failures: readonly Failure[]): string {
+  const [first] = failures;
+  return first ? `${failures.length} queries failed; first, ${first.label}: ${first.error}` : "";
+}
+
 describe.skipIf(!url)("given ordinary traces of each source beside the traces AC202g names", () => {
   let admin: ClickHouseClient;
   let client: ClickHouseClient;
@@ -263,13 +316,27 @@ describe.skipIf(!url)("given ordinary traces of each source beside the traces AC
       clickhouse_settings: { max_threads: 1 },
     });
 
-    return JSON.stringify(await result.json());
+    return result.json<Record<string, unknown>>();
+  }
+
+  /** The query's rows in a stable order, or its error, so one failure does not hide the rest. */
+  async function run(args: {
+    sql: string;
+    list: readonly string[];
+  }): Promise<{ rows?: string; error?: string }> {
+    try {
+      const rows = (await rowsOf(args)).map((row) => JSON.stringify(row));
+      return { rows: JSON.stringify(rows.toSorted()) };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message.slice(0, 600) : String(error) };
+    }
   }
 
   beforeAll(async () => {
     admin = createClient({ url });
-    await admin.command({ query: `CREATE DATABASE IF NOT EXISTS ${DATABASE}` });
-    client = createClient({ url, database: DATABASE });
+    await admin.command({ query: `DROP DATABASE IF EXISTS ${DATABASE}` });
+    await admin.command({ query: `CREATE DATABASE ${DATABASE}` });
+    client = createClient({ url: urlOnDatabase() });
 
     const views = new Set(COVERED.flatMap(({ sql }) => namedViews(sql)));
     for (const name of views) {
@@ -294,32 +361,70 @@ describe.skipIf(!url)("given ordinary traces of each source beside the traces AC
 
   /** @scenario "AC202d Stock widgets: a widget whose list did not change returns the same rows" */
   it.each(LISTS)(
-    "returns the single lookup's rows under $list, apart from the AC202g exceptions",
+    "returns main's rows under $list, apart from the AC202g exceptions",
     async ({ list }) => {
+      const failures: Failure[] = [];
       const differing: string[] = [];
-      for (const { label, sql } of COVERED) {
-        const current = await rowsOf({ sql, list });
-        const before = await rowsOf({ sql: singleLookupForm(sql).sql, list });
-        if (current !== before) differing.push(label);
+      for (const query of COVERED) {
+        const current = await run({ sql: query.sql, list });
+        const before = await run({ sql: baselineOf(query), list });
+        if (current.error) failures.push({ label: query.label, error: `now: ${current.error}` });
+        if (before.error) failures.push({ label: query.label, error: `main: ${before.error}` });
+        if (!current.error && !before.error && current.rows !== before.rows) {
+          differing.push(query.label);
+        }
       }
 
       const expected = Object.entries(AC202G_EXCEPTIONS)
-        .filter(([, { lists }]) => lists.includes(list.join()))
+        .filter(([, lists]) => lists[list.join()] !== undefined)
         .map(([label]) => label);
-      expect(differing.sort()).toEqual(expected.sort());
+      expect(failures, failureNote(failures)).toEqual([]);
+      expect(
+        differing.toSorted(),
+        `differing under ${list.join()}: ${differing.join(", ")}`,
+      ).toEqual(expected.toSorted());
     },
   );
 
   /** @scenario "AC202d Stock widgets: a widget whose list did not change returns the same rows" */
   it("seeds traces whose source changes the rows of many stock queries", async () => {
-    let changed = 0;
-    for (const { sql } of COVERED) {
-      const [application, langy] = await Promise.all(
-        LISTS.map(({ list }) => rowsOf({ sql, list })),
-      );
-      if (application !== langy) changed++;
+    const failures: Failure[] = [];
+    const changed: string[] = [];
+    for (const { label, sql } of COVERED) {
+      const [application, langy] = await Promise.all(LISTS.map(({ list }) => run({ sql, list })));
+      const error = application?.error ?? langy?.error;
+      if (error) failures.push({ label, error });
+      else if (application?.rows !== langy?.rows) changed.push(label);
     }
 
-    expect(changed).toBeGreaterThanOrEqual(10);
+    expect(failures, failureNote(failures)).toEqual([]);
+    expect(changed.length, `changed: ${changed.join(", ")}`).toBeGreaterThanOrEqual(10);
+  });
+
+  /** The prompts the query's traces read finds under `list`, by name. */
+  async function prompts({ sql, list }: { sql: string; list: readonly string[] }) {
+    const rows = await rowsOf({ sql: promptsRead(sql), list });
+    return rows.map((row) => row.name);
+  }
+
+  /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
+  it("leaves langy_old's prompt out of ck-trend/changes under application, not langy", async () => {
+    const sql = STOCK.find(({ label }) => label === "ck-trend/changes")?.sql ?? "";
+    expect(sql).toContain("least(");
+
+    expect(await prompts({ sql, list: ["application"] })).toEqual(["pv_dual", "pv_shared"]);
+    expect(await prompts({ sql, list: ["langy"] })).toEqual(["pv_dual", "pv_langy"]);
+  });
+
+  /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
+  it("would read langy_old's prompt under application with the window bound alone", async () => {
+    expect(WINDOW_BOUND?.label).toBe("ck-trend/changes");
+    expect(WINDOW_BOUND?.sql).not.toContain("least(");
+
+    expect(await prompts({ sql: WINDOW_BOUND?.sql ?? "", list: ["application"] })).toEqual([
+      "pv_dual",
+      "pv_langy",
+      "pv_shared",
+    ]);
   });
 });
