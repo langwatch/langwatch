@@ -1,7 +1,8 @@
 /**
  * What the guided connect panel asks per provider: its short name, a one-line hint, and only
  * the credentials needed to get started (the settings drawer keeps the full list).
- * Providers with no readable model list carry the typed model's placeholder.
+ * Providers with no readable model list carry the typed model's placeholder; Azure borrows
+ * OpenAI's chips and takes a typed deployment name only when it differs from the model.
  */
 
 export type GuidedCredentialField = {
@@ -19,6 +20,10 @@ export type GuidedPanelSpec = {
   hint: string;
   fields: GuidedCredentialField[];
   modelPlaceholder?: string;
+  /** Whose catalog the chips come from, when the provider hosts another vendor's models. */
+  modelCatalog?: string;
+  /** Offers a typed deployment name under the chips, for one that differs from the model. */
+  deploymentPlaceholder?: string;
 };
 
 const apiKey = (placeholder: string, key: string): GuidedCredentialField => ({
@@ -51,7 +56,7 @@ export const GUIDED_PANEL_SPECS: Record<string, GuidedPanelSpec> = {
   },
   azure: {
     name: "Azure",
-    hint: "Endpoint, key and your deployment name",
+    hint: "Endpoint, key and the model you deployed",
     fields: [
       {
         key: "AZURE_OPENAI_ENDPOINT",
@@ -61,7 +66,8 @@ export const GUIDED_PANEL_SPECS: Record<string, GuidedPanelSpec> = {
       },
       apiKey("", "AZURE_OPENAI_API_KEY"),
     ],
-    modelPlaceholder: "your deployment name",
+    modelCatalog: "openai",
+    deploymentPlaceholder: "only if it differs from the model",
   },
   bedrock: {
     name: "Bedrock",
@@ -117,6 +123,11 @@ export function guidedPanelSpecFor({
     hint: "API key",
     fields: apiKeyField ? [apiKey("", apiKeyField)] : [],
   };
+}
+
+/** The catalog a provider's guided chips are read from: its own unless it borrows one. */
+export function guidedModelCatalogFor({ providerKey }: { providerKey: string }): string {
+  return GUIDED_PANEL_SPECS[providerKey]?.modelCatalog ?? providerKey;
 }
 
 /** Every required field typed: what makes Connect clickable. */

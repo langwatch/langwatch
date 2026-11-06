@@ -1,5 +1,6 @@
 import { type HandledError, type SerializedHandledError } from "@langwatch/handled-error";
 import {
+  ProviderDeploymentNotFoundError,
   ProviderKeyInvalidError,
   ProviderKeyRestrictedError,
   ProviderRefusedError,
@@ -149,6 +150,17 @@ export async function handleHttpError({
     return refusal(
       new ProviderKeyInvalidError({ provider: context.provider }),
       message ? FAILURE_RANK.explained : FAILURE_RANK.generic,
+    );
+  }
+
+  // Azure answers 404 once the key and endpoint are past: the deployment named is not there.
+  if (context.provider === "azure" && response.status === 404 && context.model) {
+    return refusal(
+      new ProviderDeploymentNotFoundError({
+        provider: context.provider,
+        deployment: context.model,
+      }),
+      FAILURE_RANK.actionable,
     );
   }
 

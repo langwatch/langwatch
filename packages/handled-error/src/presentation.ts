@@ -1703,6 +1703,15 @@ const presentations = {
     describe: () =>
       "The provider didn't recognise it. Check you copied the whole key, and that it belongs to the right account.",
   },
+  provider_deployment_not_found: {
+    // The key and endpoint are fine; only the deployment name is wrong, so the
+    // copy names it rather than sending the customer to mint a new key.
+    title: "That deployment wasn't found",
+    describe: (error) =>
+      typeof error.meta.deployment === "string" && error.meta.deployment
+        ? `The key and endpoint work, but there is no deployment named "${error.meta.deployment}". Pick the model you deployed, or type the deployment name exactly as it appears in Azure.`
+        : "The key and endpoint work, but the deployment wasn't found. Type the deployment name exactly as it appears in Azure.",
+  },
   provider_endpoint_redirected: {
     // Not "we couldn't reach it" — something answered, and it wants us
     // somewhere else. Saying so is the difference between the customer

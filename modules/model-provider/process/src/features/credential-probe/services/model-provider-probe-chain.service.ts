@@ -8,8 +8,11 @@ import {
   AGENT_PLATFORM_API_ROOT,
   AGENT_PLATFORM_PROBE_BODY,
   AGENT_PLATFORM_PROBE_MODEL,
+  AZURE_PROBE_BODY,
   type AuthStrategy,
+  azureChatCompletionsUrl,
   buildModelsEndpointUrl,
+  isReachableRefusal,
   modelsEndpointUrl,
 } from "../../../rules/model-provider-probe-targets.rules.ts";
 import { refused, verified } from "../../../rules/model-provider-probe-upstream.rules.ts";
@@ -36,6 +39,8 @@ export type ProbeContext = {
   hasConfigurableEndpoint: boolean;
   /** Which Google door: the two doors disagree on what a 400 response means for the key. */
   googleDoor?: "gemini-api" | "agent-platform";
+  /** The model the probe asked for by name, so a missing deployment can be named back. */
+  model?: string;
 };
 
 /**
@@ -87,6 +92,7 @@ export function buildProbeCandidates({
   defaultBaseUrl,
   apiRoot,
   agentPlatform,
+  model,
 }: {
   /** The registry key, which decides how the gateway reads the base URL. */
   provider: string;
@@ -98,6 +104,8 @@ export function buildProbeCandidates({
   apiRoot?: string;
   /** The project and location Agent Platform's path is built from. */
   agentPlatform?: { project: string; location: string };
+  /** The model a deployment-addressed provider (Azure) is asked to run. */
+  model?: string;
 }): ProbeRequest[] {
   const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
   const normalisedUrl = modelsEndpointUrl({ provider, baseUrl, defaultBaseUrl });
@@ -115,6 +123,18 @@ export function buildProbeCandidates({
             "x-api-key": apiKey,
             "anthropic-version": "2023-06-01",
           },
+        },
+      ];
+    case "azure":
+      // No models route to list: one chat completion against the chosen deployment
+      // proves the key, the endpoint and the deployment name together.
+      if (!model) return [];
+      return [
+        {
+          url: azureChatCompletionsUrl({ endpoint: baseUrl, deployment: model }),
+          headers: { ...headers, "api-key": apiKey },
+          method: "POST",
+          body: AZURE_PROBE_BODY,
         },
       ];
     case "elevenlabs":
@@ -227,7 +247,9 @@ async function probeOnce({
     };
   }
 
-  if (response.ok) return { accepted: true };
+  if (response.ok || isReachableRefusal({ provider: context.provider, status: response.status })) {
+    return { accepted: true };
+  }
 
   return {
     accepted: false,
