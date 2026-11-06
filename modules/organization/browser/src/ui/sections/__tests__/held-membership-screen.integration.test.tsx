@@ -9,7 +9,67 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing.tsx";
-import { HeldMembershipScreen } from "../held-membership-gate.tsx";
+import HeldMembershipGate, { HeldMembershipScreen } from "../held-membership-gate.tsx";
+
+const { heldRead } = vi.hoisted(() => ({
+  heldRead: { current: {} as Record<string, unknown> },
+}));
+
+vi.mock("../../../behavior/organization-api.ts", () => ({
+  api: {
+    seatRequest: {
+      myHeldMemberships: { useQuery: () => ({ refetch: vi.fn(), ...heldRead.current }) },
+    },
+  },
+}));
+
+const HELD = {
+  organizationId: "org_acme",
+  organizationName: "ACME",
+  reason: "seat_limit" as const,
+  contacts: [{ name: "Ada Admin", email: "ada@acme.example" }],
+};
+
+describe("given onboarding's welcome behind the held-membership gate", () => {
+  afterEach(() => cleanup());
+
+  describe("when the person holds only a held membership", () => {
+    /** @scenario "The waiting screen names who to contact instead of onboarding" */
+    it("shows the waiting screen instead of onboarding", () => {
+      heldRead.current = {
+        isPending: false,
+        isError: false,
+        data: { hasActiveMembership: false, held: [HELD] },
+      };
+      renderWithOrganizationHost(
+        <HeldMembershipGate>
+          <p>Create your organization</p>
+        </HeldMembershipGate>,
+      );
+
+      expect(screen.getByText("ACME is over its seat limit")).toBeInTheDocument();
+      expect(screen.queryByText("Create your organization")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the person also has an active membership, or the read failed", () => {
+    it.each([
+      ["an active membership", { data: { hasActiveMembership: true, held: [HELD] } }],
+      ["a failed read", { isError: true, data: undefined }],
+      ["no held membership", { data: { hasActiveMembership: false, held: [] } }],
+    ])("shows onboarding for %s", (_case, read) => {
+      heldRead.current = { isPending: false, isError: false, ...read };
+      renderWithOrganizationHost(
+        <HeldMembershipGate>
+          <p>Create your organization</p>
+        </HeldMembershipGate>,
+      );
+
+      expect(screen.getByText("Create your organization")).toBeInTheDocument();
+      expect(screen.queryByText("ACME is over its seat limit")).not.toBeInTheDocument();
+    });
+  });
+});
 
 describe("given a person held pending over the seat limit", () => {
   afterEach(() => cleanup());
