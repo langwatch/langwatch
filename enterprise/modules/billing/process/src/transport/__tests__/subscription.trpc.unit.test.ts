@@ -104,9 +104,9 @@ describe("given the mounted subscription router", () => {
   });
 });
 
-describe("given a caller who may read the organization but not manage it", () => {
-  describe("when a change to what the organization pays is asked for", () => {
-    it("refuses the change and still answers the read", async () => {
+describe("given a caller who may read the organization but not upgrade it", () => {
+  describe("when a checkout is asked for", () => {
+    it("refuses the checkout and still answers the read", async () => {
       const viewer = routerFor((permission) => permission === "organization:view").createCaller({
         actor: { id: "user_ana" },
         email: "ana@acme.com",
@@ -120,6 +120,49 @@ describe("given a caller who may read the organization but not manage it", () =>
       await expect(viewer.listInvoices({ organizationId: ORGANIZATION })).resolves.toEqual([]);
       expect(createOrUpdateSubscription).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("given a member who may upgrade but not manage the organization", () => {
+  const member = routerFor(
+    (permission) => permission === "organization:view" || permission === "subscription:upgrade",
+  ).createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
+
+  /** @scenario "A Member starts a checkout for an organization without a subscription" */
+  it("starts a checkout", async () => {
+    createOrUpdateSubscription.mockResolvedValue({ url: "https://checkout" });
+
+    await expect(
+      member.create({
+        organizationId: ORGANIZATION,
+        baseUrl: "https://app",
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+        membersToAdd: 2,
+      }),
+    ).resolves.toEqual({ url: "https://checkout" });
+  });
+
+  /** @scenario "A Member cannot open the billing portal" */
+  it("is refused the billing portal", async () => {
+    await expect(
+      member.manage({ organizationId: ORGANIZATION, baseUrl: "https://app" }),
+    ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+    expect(createBillingPortalSession).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A Member cannot change the seats of a live subscription" */
+  it("is refused a seat change on the live subscription", async () => {
+    await expect(
+      member.addTeamMemberOrEvents({
+        organizationId: ORGANIZATION,
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+        upgradeMembers: true,
+        upgradeTraces: false,
+        totalMembers: 1,
+        totalTraces: 0,
+      }),
+    ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+    expect(updateSubscriptionItems).not.toHaveBeenCalled();
   });
 });
 

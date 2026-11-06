@@ -3121,6 +3121,14 @@ const presentations = {
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
+  subscription_already_active: {
+    // fault: customer. A checkout was asked for while a plan is live, so we
+    // started nothing. Plan changes and cancelling go through the billing
+    // portal, which an organization administrator opens.
+    title: "This organization already has a plan",
+    describe: () =>
+      "Nothing was charged. Ask an organization admin to change the plan from the billing settings.",
+  },
   subscription_ambiguous: {
     // fault: platform. Two live plans on one account, which only an operator
     // can have created and only an operator can resolve. Nothing was charged,

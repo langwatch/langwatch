@@ -170,6 +170,20 @@ export class SubscriptionCreationFailedError extends HandledError {
   }
 }
 
+/** A checkout asked for on a live subscription: changing that one is the billing portal's. */
+export class SubscriptionAlreadyActiveError extends HandledError {
+  declare readonly code: "subscription_already_active";
+
+  constructor() {
+    super(
+      "subscription_already_active",
+      "This organization already has an active subscription; nothing was charged",
+      { httpStatus: 409, fault: "customer" },
+    );
+    this.name = "SubscriptionAlreadyActiveError";
+  }
+}
+
 /** Billing event for unknown subscription; webhook-side drift. */
 export class SubscriptionRecordNotFoundError extends HandledError {
   declare readonly code: "subscription_sync_failed";

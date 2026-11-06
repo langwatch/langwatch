@@ -195,6 +195,13 @@ export const AUTHZ_RESOURCES = {
     actions: ["deploy"],
     scopes: ["project", "team", "organization"],
   },
+  // Starting a paid subscription. Every organization role holds it, so whoever
+  // has the card can pay; changing or cancelling a live one stays
+  // `organization:manage` (specs/licensing/subscription-permissions.feature).
+  subscription: {
+    actions: ["upgrade"],
+    scopes: ["organization"],
+  },
 } as const satisfies Record<
   string,
   {

@@ -190,7 +190,8 @@ function organizationGroup({
       ...(!isLiteMember
         ? [{ label: "Usage & billing", href: "/settings/usage", icon: Gauge }]
         : []),
-      ...(!isLiteMember && isSaaS
+      // Every member may upgrade, Lite included: whoever holds the card pays.
+      ...(isSaaS
         ? [
             {
               label: "Subscription",

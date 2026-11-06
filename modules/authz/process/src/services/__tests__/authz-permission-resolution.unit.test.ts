@@ -297,6 +297,22 @@ describe("given an organization-scoped permission check", () => {
     });
   });
 
+  describe("when a member or a lite member asks to upgrade the subscription", () => {
+    /** @scenario "A Member may upgrade the organization" */
+    it("lets a Member upgrade", async () => {
+      await expect(onOrganization(authzFor(), "subscription:upgrade")).resolves.toMatchObject({
+        permitted: true,
+      });
+    });
+
+    /** @scenario "A Lite Member may upgrade the organization" */
+    it("lets a Lite Member upgrade", async () => {
+      await expect(
+        onOrganization(authzFor({ membership: "EXTERNAL" }), "subscription:upgrade"),
+      ).resolves.toMatchObject({ permitted: true });
+    });
+  });
+
   describe("when a lite member carries a stray organization-scoped admin binding", () => {
     const liteWithAdminBinding = (): AuthzService =>
       authzFor({ membership: "EXTERNAL", bindings: [orgBinding("admin")] });
