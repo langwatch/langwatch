@@ -11,7 +11,7 @@ Evaluators: their definitions, and executing them as code or native checks with 
 | Classification | core (`modules/catalogue.json`)                                                                                |
 | Subjects       | evaluator                                                                                                      |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                    |
-| Api token      | `EvaluatorApi` = `moduleApi<EvaluatorApi>()("evaluator")`, `contract/src/evaluator.api.ts:189` (33 operations) |
+| Api token      | `EvaluatorApi` = `moduleApi<EvaluatorApi>()("evaluator")`, `contract/src/evaluator.api.ts:191` (34 operations) |
 | Other token    | `EvaluatorBrowserApi`, `process/src/transport/evaluator.trpc.ts:33`                                            |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                     |
 
@@ -40,6 +40,6 @@ Anything else evaluator needs belongs to another module and is reached through i
 
 ## Who depends on evaluator
 
-[automation](../automation/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [langy](../langy/README.md), [monitor](../monitor/README.md), [scenario](../scenario/README.md), [suite](../suite/README.md), [trace](../trace/README.md) (as a peer).
+[automation](../automation/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [langy](../langy/README.md), [monitor](../monitor/README.md), [nurturing](../../enterprise/modules/nurturing/README.md), [scenario](../scenario/README.md), [suite](../suite/README.md), [trace](../trace/README.md) (as a peer).
 
 <!-- readme:generated:end -->

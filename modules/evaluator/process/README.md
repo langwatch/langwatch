@@ -54,6 +54,14 @@ Every evaluator in the project.
 getAll(input: { projectId: string }): Promise<Evaluator[]>;
 ```
 
+#### `countActiveForProjects`
+
+How many active evaluators the projects hold; archived ones are not counted.
+
+```typescript
+countActiveForProjects(input: { projectIds: readonly string[] }): Promise<number>;
+```
+
 #### `getAllWithFields`
 
 Every evaluator in the project, with its computed input and output fields.

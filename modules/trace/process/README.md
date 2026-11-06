@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Public Trace operations shared by process peers after boot composition.
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:168`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:181`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -905,6 +905,14 @@ The usage report's figures (ADR-156, section 10).
 
 ```typescript
 countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<TraceUsageCount>;
+```
+
+#### `summarizeUsage`
+
+Nurturing's daily usage sync: the projects' traces, errors and cost since `since`.
+
+```typescript
+summarizeUsage(input: { projectIds: readonly string[]; since: number; }): Promise<TraceUsageSummary>;
 ```
 
 #### `classifyClaudeCall`

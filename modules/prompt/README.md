@@ -11,7 +11,7 @@ Prompts: versioned prompt configurations, their tags and handles, syncing from t
 | Classification | core (`modules/catalogue.json`)                                                                    |
 | Subjects       | prompt, prompt-tag, prompt-version                                                                 |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)        |
-| Api token      | `PromptApi` = `moduleApi<PromptApi>()("prompt")`, `contract/src/prompt.api.ts:248` (52 operations) |
+| Api token      | `PromptApi` = `moduleApi<PromptApi>()("prompt")`, `contract/src/prompt.api.ts:250` (53 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                         |
 
 ## What prompt owns
@@ -36,6 +36,6 @@ Anything else prompt needs belongs to another module and is reached through its 
 
 ## Who depends on prompt
 
-[experiment](../experiment/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [suite](../suite/README.md) (as a peer).
+[experiment](../experiment/README.md), [langy](../langy/README.md), [nurturing](../../enterprise/modules/nurturing/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [suite](../suite/README.md) (as a peer).
 
 <!-- readme:generated:end -->
