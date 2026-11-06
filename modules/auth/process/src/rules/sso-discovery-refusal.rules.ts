@@ -1,7 +1,6 @@
-import { extractEmailDomain, requestPathname } from "@langwatch/auth-contract";
+import { extractEmailDomain, normalizedRequestPathname } from "@langwatch/auth-contract";
 import { z } from "zod";
 
-import { refusedWith } from "./better-auth-error-code.rules.ts";
 import { findConnectionIdsInPath, ssoRequestTargetSchema } from "./sso-request-target.rules.ts";
 
 /** The SSO engine's refusals of an issuer's discovery document (`@better-auth/sso`). */
@@ -23,15 +22,25 @@ export const SSO_DISCOVERY_REFUSAL_CODES = [
 export interface SsoDiscoveryRefusal {
   path: string;
   code: string;
-  reason: string;
+  reason?: string;
   providerId?: string;
   domain?: string;
 }
 
-const refusalSchema = z.object({
-  message: z.string(),
-  body: z.object({ code: z.string() }),
-});
+const discoveryCode = z.enum(SSO_DISCOVERY_REFUSAL_CODES);
+
+/** The engine's discovery refusal, read off an APIError body or a bare `{ code }`. */
+const refusalSchema = z.union([
+  z
+    .object({
+      message: z.string().optional(),
+      body: z.object({ code: discoveryCode, message: z.string().optional() }),
+    })
+    .transform((error) => ({ code: error.body.code, reason: error.body.message ?? error.message })),
+  z
+    .object({ code: discoveryCode, message: z.string().optional() })
+    .transform((error) => ({ code: error.code, reason: error.message })),
+]);
 
 /** The callback refuses by redirecting, with the reason in the address it redirects to. */
 const redirectSchema = z.object({
@@ -52,16 +61,16 @@ export function findSsoDiscoveryRefusals({
   body: unknown;
   returned: unknown;
 }): SsoDiscoveryRefusal[] {
-  const path = requestPathname(url);
+  const path = normalizedRequestPathname(url);
   if (path.endsWith("/sign-in/sso")) {
-    if (!refusedWith(returned, SSO_DISCOVERY_REFUSAL_CODES)) return [];
     const refusal = refusalSchema.safeParse(returned).data;
+    if (!refusal) return [];
     const target = ssoRequestTargetSchema.safeParse(body).data;
     return [
       {
         path,
-        code: refusal?.body.code ?? "discovery_refused",
-        reason: refusal?.message ?? "",
+        code: refusal.code,
+        reason: refusal.reason,
         providerId: target?.providerId,
         domain: target?.domain ?? extractEmailDomain(target?.email) ?? undefined,
       },
@@ -76,7 +85,7 @@ export function findSsoDiscoveryRefusals({
     {
       path,
       code: "discovery_failed",
-      reason: location.searchParams.get("error_description") ?? "",
+      reason: location.searchParams.get("error_description") ?? undefined,
       providerId,
     },
   ];

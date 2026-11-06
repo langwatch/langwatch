@@ -15,6 +15,7 @@ const callbackRedirect = (location: string) =>
 
 describe("findSsoDiscoveryRefusals", () => {
   describe("when the sign-in start is refused with a discovery code", () => {
+    /** @scenario "A refused single sign-on start is recorded for whoever runs the installation" */
     it("names the connection, the code and the reason", () => {
       expect(
         findSsoDiscoveryRefusals({
@@ -44,6 +45,34 @@ describe("findSsoDiscoveryRefusals", () => {
           returned: APIError.from("BAD_REQUEST", { code: "discovery_timeout", message: "slow" }),
         }),
       ).toMatchObject([{ code: "discovery_timeout", domain: "acme.test", providerId: undefined }]);
+    });
+
+    it("matches the path with a trailing slash", () => {
+      expect(
+        findSsoDiscoveryRefusals({
+          url: `${BASE}/sign-in/sso/`,
+          body: { providerId: "connection_1" },
+          returned: APIError.from("BAD_REQUEST", { code: "discovery_timeout", message: "slow" }),
+        }),
+      ).toMatchObject([{ path: "/api/auth/sign-in/sso", code: "discovery_timeout" }]);
+    });
+
+    it("reads the code off a bare { code } refusal", () => {
+      expect(
+        findSsoDiscoveryRefusals({
+          url: `${BASE}/sign-in/sso`,
+          body: { providerId: "connection_1" },
+          returned: { code: "discovery_private_host" },
+        }),
+      ).toEqual([
+        {
+          path: "/api/auth/sign-in/sso",
+          code: "discovery_private_host",
+          reason: undefined,
+          providerId: "connection_1",
+          domain: undefined,
+        },
+      ]);
     });
   });
 
