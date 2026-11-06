@@ -258,6 +258,7 @@ Feature: Actionable documentation and restrained reading surfaces
   @unit
   Scenario: Show the live GitHub star count, refreshed from the build's and kept for an hour
     Given the page shows the star count GitHub reported at build time, and when GitHub reported it
+    And the build signs its request to GitHub when it has a token, so GitHub does not refuse it
     When that count is under a day old
     Then the page shows it without asking GitHub
     When it is over a day old, or the page was built without a count

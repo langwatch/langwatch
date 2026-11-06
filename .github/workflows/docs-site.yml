@@ -172,6 +172,9 @@ jobs:
         timeout-minutes: 10
         run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
       - name: Build the documentation
+        env:
+          # Signs the star count read, which GitHub refuses from shared runner addresses.
+          GITHUB_TOKEN: ${{ github.token }}
         run: pnpm --filter @langwatch/docs-site build ${{ matrix.build-args }}
       - name: Enforce the browser size budget
         if: matrix.mount == 'root'

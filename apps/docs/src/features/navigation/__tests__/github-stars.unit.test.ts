@@ -53,6 +53,26 @@ describe("fetchStars", () => {
     });
   });
 
+  describe("when the build has a GitHub token", () => {
+    /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
+    it("signs the request with it", async () => {
+      githubAnswers({ ok: true, body: { stargazers_count: 7000 } });
+      await fetchStars({ cacheFile, token: "build-token" });
+      const [, init] = vi.mocked(fetch).mock.calls[0] ?? [];
+      expect(new Headers(init?.headers).get("authorization")).toBe("Bearer build-token");
+    });
+  });
+
+  describe("when the build has no GitHub token", () => {
+    /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
+    it("asks without signing", async () => {
+      githubAnswers({ ok: true, body: { stargazers_count: 7000 } });
+      await fetchStars({ cacheFile });
+      const [, init] = vi.mocked(fetch).mock.calls[0] ?? [];
+      expect(new Headers(init?.headers).has("authorization")).toBe(false);
+    });
+  });
+
   describe("when GitHub is down and the cache holds a count with its time", () => {
     /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
     it("reads both back from the cache", async () => {
