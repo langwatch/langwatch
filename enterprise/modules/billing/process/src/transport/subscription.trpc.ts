@@ -1,7 +1,7 @@
 /**
- * The server half of `subscription.*`. Reading takes `organization:view`;
- * anything that changes what the organization pays takes `organization:manage`.
- * Nothing catches: every refusal below is a handled error the shared path maps.
+ * The server half of `subscription.*`. Reading takes `organization:view`, starting a
+ * subscription `subscription:upgrade` (every member), changing a live one
+ * `organization:manage`. Every refusal is a handled error the shared path maps.
  */
 import {
   defineMiddlewareContext,
@@ -104,8 +104,8 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("create")
   .withMiddlewareContext(billingCallerEmailContext)
-  .withPermission("organization:manage")
-  // Starts a checkout for an organization that has no subscription.
+  .withPermission("subscription:upgrade")
+  // Starts a checkout; a live subscription is refused, the portal changes that one.
   .handle(async ({ app, input }, email) => {
     const customerId = await app.getOrCreateCustomerId({
       user: { email },
