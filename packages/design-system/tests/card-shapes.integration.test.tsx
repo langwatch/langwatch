@@ -85,6 +85,9 @@ describe("Card", () => {
     it("borders the rows and puts each row's values at the right end", () => {
       renderWithDesignSystem(
         <SettingList variant="boxed" data-testid="rows">
+          <SettingRow label="Events this month">
+            <span>0</span>
+          </SettingRow>
           <SettingRow label="Members / seats">
             <span>1 / 2</span>
           </SettingRow>
@@ -94,6 +97,9 @@ describe("Card", () => {
       const list = screen.getByTestId("rows");
       expect(list.dataset.settingList).toBe("boxed");
       expect(rulesOf(list)).toContain("border-width:1px");
+      const separator = found(list.querySelector(":scope > [data-setting-row] + *"));
+      expect(rulesOf(list)).toContain("border-color:var(--chakra-colors-border)");
+      expect(rulesOf(separator)).toContain("background:var(--chakra-colors-border)");
       const valueRule = rulesOf(list, "data-setting-value");
       expect(valueRule).toContain("justify-content:flex-end");
     });
