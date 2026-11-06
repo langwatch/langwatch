@@ -189,6 +189,143 @@ Feature: Subscription Page Plan Management
       And I am not told my plan doesn't cover my seats
 
   # ============================================================================
+  # Page layout: the plan and what to do about it come first
+  # ============================================================================
+
+  Rule: The page leads with the current plan, its usage and the next step
+
+    A Free organization usually opens this page because it hit the monthly
+    event limit, so the plan card shows that usage and, under it, the action
+    that fixes it. The Growth offer follows the plan card. Invoices are a record,
+    not a decision, so they come last and take no space when there are none.
+
+    @integration
+    Scenario: A Free plan's card carries the Growth upgrade as its action
+      Given my organization is on the Free plan with 1 member
+      When I view the subscription page
+      Then the current plan card has an "Upgrade to Growth" action
+      And the action sits after the usage rows, like the total on a bill
+      And choosing it starts the Growth checkout for 1 seat
+
+    @integration
+    Scenario: The plan card reads like a bill
+      Given my organization is on the Free plan with 1 member
+      When I view the subscription page
+      Then the "Current" chip sits right after the plan name
+      And the events and seats rows sit together in one bordered box, their figures at the right end
+      And a rule separates that box from the card's action below it
+      And a Free plan's box has no price row
+
+    @integration
+    Scenario: A paid plan's price is the first row of its card
+      Given my organization has an active monthly Growth subscription for 2 seats at €29 each
+      When I view the subscription page
+      Then the card's header holds only the plan name and the "Current" chip
+      And the first row of the bordered box is "Price", reading "€58/mo" then "2 seats × €29"
+
+    @integration
+    Scenario: A one-seat plan's price row does not restate the total
+      Given my organization has an active monthly Growth subscription for 1 seat at €29
+      When I view the subscription page
+      Then the price row reads "€29/mo" with no seats breakdown
+
+    @integration
+    Scenario: An enterprise plan's card has no price row
+      Given my organization has an active enterprise subscription
+      When I view the subscription page
+      Then the card's bordered box has no price row
+
+    @integration
+    Scenario: An annual plan's price row shows the yearly total and the monthly seat price
+      Given my organization has an active annual Growth subscription for 2 seats
+      When I view the subscription page
+      Then the price row shows the yearly total with "/yr"
+      And it shows the seats times the yearly seat price, then the seat price per month
+
+    @integration
+    Scenario: The plan card holds the page's one primary upgrade button
+      Given my organization is on the Free plan with 1 member
+      When I view the subscription page
+      Then the current plan card's "Upgrade to Growth" is the primary button
+      And the Growth offer's "Upgrade now" is a secondary button
+      And both start the same Growth checkout
+
+    @integration
+    Scenario: A paid plan's card carries subscription management as its action
+      Given my organization has an active Growth subscription
+      When I view the subscription page
+      Then the current plan card has a "Manage subscription" action
+      And the current plan card has no upgrade action
+
+    @integration
+    Scenario: The current plan shows this month's events against the plan's limit
+      Given my organization is on the Free plan
+      And my organization sent 12,000 of its 50,000 events this month
+      When I view the subscription page
+      Then the current plan card shows "12,000 / 50,000" events this month
+      And a meter shows how much of the limit is used
+
+    @integration
+    Scenario: A Free plan at its event limit says the limit is reached
+      Given my organization is on the Free plan
+      And my organization used all 50,000 events this month
+      When I view the subscription page
+      Then the current plan card says the event limit is reached
+      And I am offered the Growth upgrade
+
+    @integration
+    Scenario: A Free plan close to its event limit is warned before it is reached
+      Given my organization is on the Free plan
+      And my organization sent 45,000 of its 50,000 events this month
+      When I view the subscription page
+      Then the current plan card says the event limit is close
+      And it does not say the limit is reached
+
+    @integration
+    Scenario: A plan billed per trace names traces in its usage row
+      Given my organization is on the Free plan billed per trace
+      And my organization used all of its traces this month
+      When I view the subscription page
+      Then the usage row reads "Traces this month"
+      And the limit hint says new traces are not processed
+
+    @integration
+    Scenario: A plan billed per event shows the month's events without a limit
+      Given my organization has an active Growth subscription billed per seat and event
+      When I view the subscription page
+      Then the current plan card shows the events sent this month
+      And no event limit or meter is shown
+
+    @integration
+    Scenario: The plan card shows no event figure while the count is unavailable
+      Given my organization is on the Free plan
+      And this month's event count could not be read
+      When I view the subscription page
+      Then the current plan card does not show an event count
+
+    @integration
+    Scenario: The Growth offer comes right after the current plan and invoices come last
+      Given my organization is on the Free plan with 1 member
+      And my organization has paid invoices from an earlier subscription
+      When I view the subscription page
+      Then the Growth offer is the block right after the current plan card
+      And the invoices are the last block on the page
+
+    @integration
+    Scenario: A Free organization with no invoices sees no invoices block
+      Given my organization is on the Free plan with 1 member
+      And my organization has no invoices
+      When I view the subscription page
+      Then I do not see an invoices block
+
+    @integration
+    Scenario: A paid plan with no invoices yet sees a one-line note
+      Given my organization has an active Growth subscription
+      And my organization has no invoices yet
+      When I view the subscription page
+      Then the invoices block says there are no invoices yet on one line
+
+  # ============================================================================
   # An organization above its plan's seats is offered the upgrade
   # ============================================================================
 
@@ -253,10 +390,17 @@ Feature: Subscription Page Plan Management
       Given my organization is on the Free plan, which includes 2 member seats
       And my organization has 3 members
       When I view the subscription page
-      Then the seat count reads 3/2
-      And I am told an upgrade is required
+      Then the seat count reads 3/2 in the danger colour
+      And I am told an upgrade is required, in the danger tone
       And I see a note that my organization uses more seats than the plan includes
       And I am offered the upgrade
+
+    @integration
+    Scenario: A legacy plan within its seats is asked to upgrade without the danger tone
+      Given my organization is on a legacy tiered paid plan
+      And my organization uses no more seats than the plan includes
+      When I view the subscription page
+      Then I am told an upgrade is required, in the warning tone
 
     @integration
     Scenario: The billing page counts Lite Members above the plan as over the limit

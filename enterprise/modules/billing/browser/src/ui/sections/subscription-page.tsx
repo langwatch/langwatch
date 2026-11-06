@@ -10,23 +10,26 @@ import { CONTACT_SALES_URL, type PlanInfo } from "@langwatch/enterprise-licensin
 import { planSeatsAndVolume } from "@langwatch/plans";
 import { useEffect, useState } from "react";
 
-import { billingApi } from "../../behavior/billing-api.ts";
+import { billingApi, type UsageRead } from "../../behavior/billing-api.ts";
 import { useBillingPricingService } from "../../behavior/use-billing-pricing-service.ts";
 import { useBillingPricing } from "../../behavior/use-billing-pricing.ts";
-import { useBillingHost } from "../../model/billing-host.ts";
+import { type BillingHostOrganization, useBillingHost } from "../../model/billing-host.ts";
 import {
   type BillingInterval,
   buildEnterprisePlanFeatures,
   buildPlanCapabilities,
   type Currency,
-  FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
   formatPrice,
   getGrowthFeatures,
   isAnnualTieredPlan,
   parseGrowthSeatPlanType,
 } from "../../model/billing-plans.ts";
+import { shouldShowPlanLimits } from "../../model/plan-management-url.ts";
 import {
   billingSeatCounts,
+  planEventUsage,
+  planPrice,
+  type PlanPrice,
   seatUsageCount,
   subscriptionChangesRequired,
   subscriptionPlanFlags,
@@ -89,7 +92,7 @@ function currentPlanFeaturesFor({
   isEnterprisePlan: boolean;
   isHeldCapabilityPlan: boolean;
   isDeveloperPlan: boolean;
-}): string[] {
+}): string[] | undefined {
   if (isEnterprisePlan) return buildEnterprisePlanFeatures(plan);
   if (isHeldCapabilityPlan) {
     return buildPlanCapabilities(
@@ -100,11 +103,39 @@ function currentPlanFeaturesFor({
       }),
     );
   }
-  if (isDeveloperPlan) return DEVELOPER_FEATURES;
+  // The Growth offer below the card lists what the upgrade adds; the Free card shows usage instead.
+  if (isDeveloperPlan) return undefined;
   return getGrowthFeatures(currency);
 }
 
-/** The current plan's price line; a free, tiered or licensed plan shows none. */
+/** This month's events for the plan card, with the cap only where the plan is held to one. */
+function currentPlanEventUsage({
+  usage,
+  flags,
+  pricingModel,
+  planSource,
+}: {
+  usage:
+    | Pick<UsageRead, "currentMonthMessagesCount" | "messageLimitInfo" | "usageUnit">
+    | undefined;
+  flags: SubscriptionPlanFlags;
+  pricingModel: BillingHostOrganization["pricingModel"];
+  planSource: PlanInfo["planSource"];
+}) {
+  return planEventUsage({
+    currentMonthCount: usage?.currentMonthMessagesCount,
+    messageLimitInfo: usage?.messageLimitInfo,
+    usageUnit: usage?.usageUnit,
+    showLimit: shouldShowPlanLimits({
+      isFree: flags.isDeveloperPlan,
+      isEnterprise: flags.isEnterprisePlan,
+      pricingModel,
+      planSource,
+    }),
+  });
+}
+
+/** The current plan's price row; a free, tiered, licensed or enterprise plan shows none. */
 function currentPlanPricingFor({
   flags,
   plan,
@@ -112,6 +143,7 @@ function currentPlanPricingFor({
   currency,
   periodSuffix,
   monthlyEquivalent,
+  billingPeriod,
 }: {
   flags: SubscriptionPlanFlags;
   plan: PlanInfo;
@@ -119,16 +151,20 @@ function currentPlanPricingFor({
   currency: Currency;
   periodSuffix: string;
   monthlyEquivalent: string;
-}) {
-  if (flags.isTieredPricingModel || flags.isDeveloperPlan || flags.isLicenseOverride) {
-    return undefined;
-  }
-  const seatCount = plan.maxMembers ?? 1;
-  return {
-    totalPrice: `${formatPrice({ cents: seatPricePerPeriodCents * seatCount, currency })}${periodSuffix}`,
-    seatCount,
-    perSeatPrice: monthlyEquivalent,
-  };
+  billingPeriod: BillingInterval;
+}): PlanPrice | undefined {
+  const isUnpriced =
+    flags.isTieredPricingModel ||
+    flags.isDeveloperPlan ||
+    flags.isLicenseOverride ||
+    flags.isEnterprisePlan;
+  if (isUnpriced) return undefined;
+  return planPrice({
+    seatCount: plan.maxMembers ?? 1,
+    seatPrice: formatPrice({ cents: seatPricePerPeriodCents, currency }),
+    total: `${formatPrice({ cents: seatPricePerPeriodCents * (plan.maxMembers ?? 1), currency })}${periodSuffix}`,
+    monthlyEquivalent: billingPeriod === "annual" ? monthlyEquivalent : undefined,
+  });
 }
 
 /** The plan, seat usage and members have all answered. */
@@ -277,28 +313,13 @@ export function SubscriptionPage() {
   });
   if (isPlanLoading || activePlan.isError || !plan) {
     return (
-      <>
-        <SubscriptionPageHeader
-          showPlanPickers={false}
-          billingPeriod={billingPeriod}
-          onBillingPeriodChange={setBillingPeriod}
-          currency={currency}
-          onCurrencyChange={setSelectedCurrency}
-        />
-        <VStack gap={6} width="full" align="stretch" paddingTop={4}>
-          {isPlanLoading ? (
-            <>
-              <SkeletonText noOfLines={1} width="320px" />
-              <Skeleton width="full" height="180px" borderRadius="lg" />
-              <Skeleton width="full" height="140px" borderRadius="lg" />
-            </>
-          ) : (
-            <Banner status="error">
-              Failed to load subscription information. Please try again later.
-            </Banner>
-          )}
-        </VStack>
-      </>
+      <SubscriptionPagePlaceholder
+        isLoading={isPlanLoading}
+        billingPeriod={billingPeriod}
+        onBillingPeriodChange={setBillingPeriod}
+        currency={currency}
+        onCurrencyChange={setSelectedCurrency}
+      />
     );
   }
 
@@ -316,6 +337,7 @@ export function SubscriptionPage() {
     currency: effectiveCurrency,
     periodSuffix,
     monthlyEquivalent,
+    billingPeriod: effectiveBillingPeriod,
   });
   // A held plan is described by what it grants; only a plan we sell gets the tier's pitch.
   const currentPlanFeatures = currentPlanFeaturesFor({
@@ -327,6 +349,13 @@ export function SubscriptionPage() {
   });
 
   const isSelfManagedPaidPlan = !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride;
+  const cardCarriesUpgrade = isDeveloperPlan && !isEnterprisePlan;
+  const eventUsage = currentPlanEventUsage({
+    usage: usage.data,
+    flags,
+    pricingModel: organization.pricingModel,
+    planSource: plan.planSource,
+  });
 
   return (
     <>
@@ -341,29 +370,13 @@ export function SubscriptionPage() {
       />
       <VStack gap={6} width="full" align="stretch" paddingTop={4}>
         <Text color="fg.muted">
-          Your plan, your seats and your invoices. Questions about billing?{" "}
+          Your plan, your usage, your seats and your invoices. Questions about billing?{" "}
           <Link href="mailto:sales@langwatch.ai" color="orange.fg">
             Contact us →
           </Link>
         </Text>
 
         {showSuccess && <SubscriptionSuccessNotice showUpgradeCredit={showUpgradeCredit} />}
-
-        <CurrentPlanBlock
-          planName={currentPlanName}
-          pricing={currentPlanPricing}
-          features={currentPlanFeatures}
-          userCount={seatUsageN}
-          maxSeats={isTieredPricingModel ? undefined : seatUsageM}
-          upgradeRequired={updateRequired}
-          onUserCountClick={() => setIsDrawerOpen(true)}
-          onManageSubscription={isSelfManagedPaidPlan ? handleManageSubscription : undefined}
-          isManageLoading={isManageLoading}
-          deprecatedNotice={isTieredLegacyPaidPlan}
-          // Sales has nothing to sell a customer already holding a signed
-          // enterprise contract, so they get no upgrade call to action.
-          contactSalesUrl={isEnterprisePlan && !isLicenseOverride ? CONTACT_SALES_URL : undefined}
-        />
 
         <SeatLimitCallout
           seatLimitInfo={usage.data?.seatLimitInfo}
@@ -372,9 +385,24 @@ export function SubscriptionPage() {
           onAddSeats={() => setIsDrawerOpen(true)}
         />
 
-        <InvoicesBlock
-          organizationId={organization.id}
-          onViewAllInStripe={handleManageSubscription}
+        <CurrentPlanBlock
+          planName={currentPlanName}
+          pricing={currentPlanPricing}
+          features={currentPlanFeatures}
+          eventUsage={eventUsage}
+          userCount={seatUsageN}
+          maxSeats={isTieredPricingModel ? undefined : seatUsageM}
+          upgradeRequired={updateRequired}
+          isOverPlanSeats={isOverPlanSeats}
+          onUserCountClick={() => setIsDrawerOpen(true)}
+          onUpgrade={cardCarriesUpgrade ? handleUpgrade : undefined}
+          isUpgradeLoading={isUpgradeLoading}
+          onManageSubscription={isSelfManagedPaidPlan ? handleManageSubscription : undefined}
+          isManageLoading={isManageLoading}
+          deprecatedNotice={isTieredLegacyPaidPlan}
+          // Sales has nothing to sell a customer already holding a signed
+          // enterprise contract, so they get no upgrade call to action.
+          contactSalesUrl={isEnterprisePlan && !isLicenseOverride ? CONTACT_SALES_URL : undefined}
         />
 
         {isUpgradePlanRequired && (
@@ -397,6 +425,7 @@ export function SubscriptionPage() {
             onUpgrade={handleUpgrade}
             isLoading={isUpgradeLoading}
             isRequired={updateRequired}
+            isSecondaryAction={cardCarriesUpgrade}
           />
         )}
 
@@ -416,6 +445,12 @@ export function SubscriptionPage() {
 
         {/* Contact Sales - hidden for Enterprise since CTA is in their plan block */}
         {!isEnterprisePlan && <ContactSalesBlock />}
+
+        <InvoicesBlock
+          organizationId={organization.id}
+          onViewAllInStripe={handleManageSubscription}
+          hideWhenEmpty={isDeveloperPlan}
+        />
       </VStack>
 
       <UserManagementDrawer
@@ -431,6 +466,46 @@ export function SubscriptionPage() {
         onSave={handleDrawerSave}
         maxSeats={isTieredPricingModel ? undefined : effectiveMaxSeats}
       />
+    </>
+  );
+}
+
+/** The page while the plan loads, or when it failed to load. */
+function SubscriptionPagePlaceholder({
+  isLoading,
+  billingPeriod,
+  onBillingPeriodChange,
+  currency,
+  onCurrencyChange,
+}: {
+  isLoading: boolean;
+  billingPeriod: BillingInterval;
+  onBillingPeriodChange: (period: BillingInterval) => void;
+  currency: Currency;
+  onCurrencyChange: (currency: Currency) => void;
+}) {
+  return (
+    <>
+      <SubscriptionPageHeader
+        showPlanPickers={false}
+        billingPeriod={billingPeriod}
+        onBillingPeriodChange={onBillingPeriodChange}
+        currency={currency}
+        onCurrencyChange={onCurrencyChange}
+      />
+      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+        {isLoading ? (
+          <>
+            <SkeletonText noOfLines={1} width="320px" />
+            <Skeleton width="full" height="180px" borderRadius="lg" />
+            <Skeleton width="full" height="140px" borderRadius="lg" />
+          </>
+        ) : (
+          <Banner status="error">
+            Failed to load subscription information. Please try again later.
+          </Banner>
+        )}
+      </VStack>
     </>
   );
 }
