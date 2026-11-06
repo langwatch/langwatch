@@ -1,6 +1,7 @@
 /**
  * Set membership over trace_summaries without dedup via TenantId-first predicate.
  */
+import { pMapLimited } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { TraceCost, TraceUsageCount, TraceUsageSummary } from "@langwatch/trace-contract";
 import { z } from "zod";
@@ -8,6 +9,9 @@ import { z } from "zod";
 import { TraceExistenceRepository } from "../trace-existence.repository.ts";
 import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
 import { chNumber, chString } from "./stored-span-row.mapper.ts";
+
+/** An organization's usage reads one query per project: cap them so ClickHouse is not flooded. */
+const USAGE_SUMMARY_CONCURRENCY = 4;
 
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
 const totalRowsSchema = z.array(z.looseObject({ Total: chString }));
@@ -165,8 +169,12 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
     projectIds: readonly string[];
     since: number;
   }): Promise<TraceUsageSummary> {
-    const perProject = await Promise.all(
-      [...new Set(projectIds)].map(async (projectId) => {
+    const uniqueProjectIds = [...new Set(projectIds)];
+    const perProject: TraceUsageSummary[] = Array.from({ length: uniqueProjectIds.length });
+    await pMapLimited({
+      items: uniqueProjectIds.map((projectId, index) => ({ projectId, index })),
+      concurrency: USAGE_SUMMARY_CONCURRENCY,
+      fn: async ({ projectId, index }) => {
         const client = await this.resolveClient(projectId);
         // A ReplacingMergeTree holds a trace once per version until merged: argMax takes the
         // newest.
@@ -192,14 +200,14 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
           format: "JSONEachRow",
         });
         const [row] = usageSummaryRowsSchema.parse(await result.json());
-        return {
+        perProject[index] = {
           traces: row?.Traces ?? 0,
           errors: row?.Errors ?? 0,
           totalCost: row?.TotalCost ?? 0,
           lastFailedTraceAt: row?.LastFailedAt ? row.LastFailedAt : null,
         };
-      }),
-    );
+      },
+    });
     const failedAts = perProject.flatMap((row) =>
       row.lastFailedTraceAt === null ? [] : [row.lastFailedTraceAt],
     );

@@ -39,6 +39,12 @@ Feature: An organization's usage reaches Customer.io once a day
     When the organization's traces are summed
     Then the counts and the cost cover both projects and leave the old trace out
 
+  @unit @integration
+  Scenario: Archived projects are not counted
+    Given an organization with a live project and an archived one
+    When the daily sync runs
+    Then only the live project's evaluators, scenarios and traces are counted
+
   @integration
   Scenario: Archived evaluators are not counted
     Given two active evaluators and one archived

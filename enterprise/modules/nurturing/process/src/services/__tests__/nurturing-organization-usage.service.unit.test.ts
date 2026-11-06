@@ -52,6 +52,7 @@ type Project = Readonly<{
   evaluators?: number;
   scenarios?: number;
   traces?: TraceUsageSummary;
+  archived?: boolean;
 }>;
 
 type Organization = Readonly<{
@@ -161,6 +162,7 @@ async function syncOver(
     organizations: milestones,
     projects: MemoryNurturingProjectDirectoryRepository.create({
       placed: new Map(projects.map((project) => [project.id, project.organizationId])),
+      archived: new Set(projects.filter(({ archived }) => archived).map(({ id }) => id)),
     }),
     claims: MemoryNurturingClaimRepository.create(),
     customerIo: cio.service,
@@ -308,6 +310,38 @@ describe("NurturingOrganizationUsageService", () => {
       await service.syncAll({ now: NOW + 31 * DAY_MS });
 
       expect(cio.groups()).toHaveLength(2);
+    });
+  });
+
+  describe("given an organization with a live project and an archived one", () => {
+    /** @scenario Archived projects are not counted */
+    it("counts only the live project's usage", async () => {
+      const { service, cio, traceReads } = await syncOver([
+        {
+          id: "org-archive",
+          projects: [
+            { id: "project-live", traces: { ...NO_TRACES, traces: 1 } },
+            {
+              id: "project-archived",
+              archived: true,
+              evaluators: 2,
+              scenarios: 3,
+              traces: { traces: 5, errors: 1, totalCost: 2, lastFailedTraceAt: NOW - DAY_MS },
+            },
+          ],
+        },
+      ]);
+
+      await service.syncAll({ now: NOW });
+
+      expect(traceReads.map(({ projectIds }) => projectIds)).toEqual([["project-live"]]);
+      expect(cio.groups()[0]?.traits).toMatchObject({
+        evaluator_count: 0,
+        scenario_count: 0,
+        trace_count: 1,
+        error_count: 0,
+        total_cost: 0,
+      });
     });
   });
 

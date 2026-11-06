@@ -13,13 +13,15 @@ export class MemoryNurturingProjectDirectoryRepository implements NurturingProje
       organizationsCreated: ReadonlyMap<string, number>;
       traced: ReadonlySet<string>;
       personalOwners: ReadonlyMap<string, string>;
+      archived: ReadonlySet<string>;
     }>,
   ) {}
 
   /**
    * `placed` maps each held project to its organization, `created` to its creation (epoch ms),
    * `organizationsCreated` each held organization to its own, `traced` holds the projects that
-   * received their first message, and `personalOwners` maps each personal project to its owner.
+   * received their first message, `personalOwners` maps each personal project to its owner,
+   * and `archived` holds the archived projects.
    */
   static create({
     placed = new Map<string, string>(),
@@ -27,12 +29,14 @@ export class MemoryNurturingProjectDirectoryRepository implements NurturingProje
     organizationsCreated = new Map<string, number>(),
     traced = new Set<string>(),
     personalOwners = new Map<string, string>(),
+    archived = new Set<string>(),
   }: {
     placed?: ReadonlyMap<string, string>;
     created?: ReadonlyMap<string, number>;
     organizationsCreated?: ReadonlyMap<string, number>;
     traced?: ReadonlySet<string>;
     personalOwners?: ReadonlyMap<string, string>;
+    archived?: ReadonlySet<string>;
   } = {}): MemoryNurturingProjectDirectoryRepository {
     return new MemoryNurturingProjectDirectoryRepository({
       placed,
@@ -40,6 +44,7 @@ export class MemoryNurturingProjectDirectoryRepository implements NurturingProje
       organizationsCreated,
       traced,
       personalOwners,
+      archived,
     });
   }
 
@@ -86,7 +91,10 @@ export class MemoryNurturingProjectDirectoryRepository implements NurturingProje
     organizationId,
   }: Readonly<{ organizationId: string }>): Promise<string[]> {
     return [...this.state.placed]
-      .filter(([, placedIn]) => placedIn === organizationId)
+      .filter(
+        ([projectId, placedIn]) =>
+          placedIn === organizationId && !this.state.archived.has(projectId),
+      )
       .map(([projectId]) => projectId);
   }
 }

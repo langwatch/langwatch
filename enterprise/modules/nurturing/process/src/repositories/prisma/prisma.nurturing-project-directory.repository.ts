@@ -100,7 +100,7 @@ export class PrismaNurturingProjectDirectoryRepository implements NurturingProje
     });
     if (teams.length === 0) return [];
     const projects = await this.prisma.project.findMany({
-      where: { teamId: { in: teams.map(({ id }) => id) } },
+      where: { teamId: { in: teams.map(({ id }) => id) }, archivedAt: null },
       select: { id: true },
     });
     return projects.map(({ id }) => id);
