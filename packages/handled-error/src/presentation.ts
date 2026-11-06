@@ -3129,6 +3129,12 @@ const presentations = {
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
+  seat_change_in_progress: {
+    // fault: customer. Another seat change or a seat line repair is still working on this
+    // subscription, so this one did not start rather than race it at the payment provider.
+    title: "Another seat change is still in progress",
+    describe: () => "Nothing changed or was charged. Try again in a few minutes.",
+  },
   seat_quantity_below_in_use: {
     // fault: customer. The seat count asked for is below the minimum (the full
     // seats in use, and never below one), so nothing changed or was charged.
@@ -4107,6 +4113,11 @@ const presentations = {
     title: "This is outside your Developer seat",
     describe: () =>
       "A Developer seat works in your own project only. Ask an admin for a Member seat if you need shared projects.",
+  },
+  developer_seats_unavailable: {
+    // No Developer seat price is configured for the subscription's currency and interval.
+    title: "Developer seats aren't sold on this plan yet",
+    describe: () => "Nothing was charged. Contact us at sales@langwatch.ai to add Developer seats.",
   },
   dataset_column_type_change_unsupported: {
     // Customer fault in the ADR-045 sense: they asked for something the format

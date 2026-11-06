@@ -172,7 +172,20 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
           useQuery: () => setup.mockListInvoices(),
         },
         getLastSubscription: {
-          useQuery: () => setup.mockGetLastSubscription(),
+          useQuery: () => ({ ...setup.mockGetLastSubscription(), refetch: vi.fn() }),
+        },
+        developerSeats: {
+          useQuery: (_input: unknown, opts: { enabled: boolean }) =>
+            opts.enabled ? setup.mockDeveloperSeats() : { data: undefined },
+        },
+        previewDeveloperSeats: {
+          useQuery: (input: { quantity: number }, opts: { enabled: boolean }) =>
+            opts.enabled
+              ? setup.mockPreviewDeveloperSeats(input)
+              : { data: undefined, isLoading: false, isError: false },
+        },
+        setDeveloperSeats: {
+          useMutation: () => ({ mutateAsync: setup.mockSetDeveloperSeats, isPending: false }),
         },
         previewProration: {
           useQuery: () => ({ data: undefined, isLoading: false, isError: false }),
@@ -305,6 +318,7 @@ describe("<SubscriptionPage/> layout", () => {
         lastUsageRow.compareDocumentPosition(upgrade) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
       fireEvent.click(upgrade);
+      fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
       await waitFor(() => {
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 1 }));
@@ -350,6 +364,7 @@ describe("<SubscriptionPage/> layout", () => {
       expect(offerButton).toHaveAttribute("data-emphasis", "secondary");
 
       fireEvent.click(offerButton);
+      fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
       await waitFor(() => {
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 1 }));
       });

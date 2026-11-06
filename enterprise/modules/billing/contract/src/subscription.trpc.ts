@@ -11,6 +11,7 @@ import {
   billingRedirectSchema,
   subscriptionItemsUpdatedSchema,
 } from "./billing-types.ts";
+import { developerSeatQuoteSchema, developerSeatsSchema } from "./developer-seats.ts";
 import { SUBSCRIBABLE_PLANS } from "./plan-types.ts";
 import { currencySchema } from "./pricing.ts";
 
@@ -88,6 +89,24 @@ export const subscriptionTrpc = defineTrpcContract("subscription")
   // The notification channel's own acknowledgement; nothing on this surface
   // reads it, and it is carried unchanged so the wire does not move.
   .withOutput(providerOwnedSchema)
+
+  .query("developerSeats")
+  .withInput(organizationScopeSchema)
+  .withOutput(developerSeatsSchema)
+
+  .query("previewDeveloperSeats")
+  .withInput(z.object({ ...organizationScopeSchema.shape, quantity: z.number().int().min(0) }))
+  .withOutput(developerSeatQuoteSchema)
+
+  .mutation("setDeveloperSeats")
+  .withInput(
+    z.object({
+      ...organizationScopeSchema.shape,
+      quantity: z.number().int().min(0),
+      quotedAt: z.number().int().positive().optional(),
+    }),
+  )
+  .withOutput(subscriptionItemsUpdatedSchema)
 
   .query("listInvoices")
   .withInput(organizationScopeSchema)

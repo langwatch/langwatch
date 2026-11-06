@@ -1,6 +1,6 @@
 /**
- * What the Manage seats drawer says about a seat count change on a Growth plan: added seats
- * are charged now, prorated; lowered seats stay until the period paid for ends.
+ * The seat quote as the provider answers it, the billed seats while lowered seats are kept,
+ * and how a billing day is printed.
  * @see specs/licensing/seat-rotation.feature
  */
 import { format, Temporal } from "@langwatch/time";
@@ -63,66 +63,4 @@ export function billedSeatsWhileKept({
   const inForce =
     Temporal.Instant.from(seatsKeptUntil).epochMilliseconds > nowMs && seatsKept > maxMembers;
   return inForce ? maxMembers : undefined;
-}
-
-export type SeatSummaryRow = { label: string; value: string; muted?: boolean };
-
-export type SeatChangeSummary = {
-  note: string | undefined;
-  rows: SeatSummaryRow[];
-  actionLabel: string;
-};
-
-/** The button that commits the change: "Lower to 3 seats", "Add 1 seat", "Add 2 seats". */
-export function seatChangeActionLabel({ from, to }: { from: number; to: number }): string {
-  if (to < from) return `Lower to ${to} seat${to === 1 ? "" : "s"}`;
-  const added = to - from;
-  return `Add ${added} seat${added === 1 ? "" : "s"}`;
-}
-
-export function seatChangeSummary({
-  from,
-  to,
-  quote,
-}: {
-  from: number;
-  to: number;
-  /** Absent while the quote loads: the rows say what they can without prices. */
-  quote: SeatQuote | undefined;
-}): SeatChangeSummary {
-  const seatsRow: SeatSummaryRow = { label: "Seats", value: `${from} → ${to}` };
-  const actionLabel = seatChangeActionLabel({ from, to });
-  if (!quote) return { note: undefined, rows: [seatsRow], actionLabel };
-
-  const suffix = periodSuffixOf(quote.billingInterval);
-  const newPrice = `${quote.formattedRecurringTotal}${suffix}`;
-
-  if (quote.appliesAt != null) {
-    const day = billingDay(quote.appliesAt);
-    const kept = quote.keptSeats ?? from;
-    const rest = quote.billingInterval === "year" ? "year" : "month";
-    const rows: SeatSummaryRow[] = [seatsRow, { label: `From ${day}`, value: newPrice }];
-    if (quote.formattedKeptRecurringTotal) {
-      rows.push({
-        label: `Until ${day}`,
-        value: `${quote.formattedKeptRecurringTotal}${suffix}`,
-        muted: true,
-      });
-    }
-    const note =
-      to < from
-        ? `You'll keep ${kept} seats until ${day}, then pay for ${to}. No refund for the rest of this ${rest}.`
-        : `Nothing to pay today: you keep ${kept} seats until ${day}, then pay for ${to}.`;
-    return {
-      note,
-      rows,
-      actionLabel,
-    };
-  }
-
-  return {
-    note: `${quote.formattedAmountDue} today for the rest of this billing period, then ${newPrice}.`,
-    rows: [seatsRow, { label: "From today", value: newPrice }],
-    actionLabel,
-  };
 }

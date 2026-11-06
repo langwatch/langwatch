@@ -22,7 +22,7 @@ import {
   mockAddTeamMemberOrEvents,
   mockGetActivePlan,
   mockGetLastSubscription,
-  mockCreateInvitesMutate,
+  mockCreateInvitesMutateAsync,
   mockGetUsage,
   mockOrganization,
   resetMocks,
@@ -176,7 +176,20 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
           useQuery: () => setup.mockListInvoices(),
         },
         getLastSubscription: {
-          useQuery: () => setup.mockGetLastSubscription(),
+          useQuery: () => ({ ...setup.mockGetLastSubscription(), refetch: vi.fn() }),
+        },
+        developerSeats: {
+          useQuery: (_input: unknown, opts: { enabled: boolean }) =>
+            opts.enabled ? setup.mockDeveloperSeats() : { data: undefined },
+        },
+        previewDeveloperSeats: {
+          useQuery: (input: { quantity: number }, opts: { enabled: boolean }) =>
+            opts.enabled
+              ? setup.mockPreviewDeveloperSeats(input)
+              : { data: undefined, isLoading: false, isError: false },
+        },
+        setDeveloperSeats: {
+          useMutation: () => ({ mutateAsync: setup.mockSetDeveloperSeats, isPending: false }),
         },
         previewProration: {
           useQuery: (input: { newTotalSeats: number }, opts: { enabled: boolean }) =>
@@ -285,8 +298,8 @@ describe("<SubscriptionPage/> seat rotation", () => {
 
       fireEvent.click(screen.getByTestId("user-count-link"));
       // Two members fill two of the five seats; dropping two empty seats leaves three.
-      fireEvent.click(await screen.findByTestId("remove-seat-0"));
-      fireEvent.click(screen.getByTestId("remove-seat-0"));
+      fireEvent.click(await screen.findByTestId("drawer-seats-stepper-minus"));
+      fireEvent.click(screen.getByTestId("drawer-seats-stepper-minus"));
 
       expect(
         await screen.findByText(
@@ -303,6 +316,11 @@ describe("<SubscriptionPage/> seat rotation", () => {
       );
 
       fireEvent.click(button("Lower to 3 seats"));
+      fireEvent.click(
+        within(await screen.findByTestId("seat-confirm-dialog")).getByRole("button", {
+          name: "Lower to 3 seats",
+        }),
+      );
 
       await waitFor(() =>
         expect(mutateAsync).toHaveBeenCalledWith(
@@ -317,22 +335,20 @@ describe("<SubscriptionPage/> seat rotation", () => {
       renderSubscriptionPage();
 
       fireEvent.click(screen.getByTestId("user-count-link"));
-      fireEvent.click(await screen.findByRole("button", { name: /Add Seat/ }));
+      fireEvent.click(await screen.findByTestId("drawer-seats-stepper-plus"));
 
-      expect(
-        await screen.findByText(
-          "\u20ac17.98 today for the rest of this billing period, then \u20ac174/mo.",
-        ),
-      ).toBeInTheDocument();
       expect(seatSummary().getByText("5 \u2192 6")).toBeInTheDocument();
-      expect(seatSummary().getByText("From today")).toBeInTheDocument();
+      expect(seatSummary().getByText("\u20ac17.98")).toBeInTheDocument();
+      expect(seatSummary().getByText("\u20ac174/mo")).toBeInTheDocument();
 
-      fireEvent.click(button("Add 1 seat"));
+      fireEvent.click(button("Add 1 seat \u00b7 \u20ac29/mo"));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay \u20ac17.98 and add" }));
 
       await waitFor(() =>
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ totalMembers: 6 })),
       );
     });
+
     /** @scenario "A seat change the payment provider refuses sends no invitations" */
     it("sends no invitation and keeps the drawer open when the seat change fails", async () => {
       mockPreviewProration.mockReturnValue({ data: addQuote, isLoading: false, isError: false });
@@ -340,15 +356,19 @@ describe("<SubscriptionPage/> seat rotation", () => {
       renderSubscriptionPage();
 
       fireEvent.click(screen.getByTestId("user-count-link"));
+      fireEvent.click(await screen.findByTestId("add-invite-row"));
       fireEvent.change(await screen.findByTestId("seat-email-0"), {
         target: { value: "new@acme.example" },
       });
-      fireEvent.click(screen.getByRole("button", { name: /Add Seat/ }));
-      fireEvent.click(button("Add 1 seat"));
+      fireEvent.click(screen.getByTestId("drawer-seats-stepper-plus"));
+      fireEvent.click(button("Add 1 seat \u00b7 \u20ac29/mo"));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay \u20ac17.98 and add" }));
 
       await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
-      await waitFor(() => expect(button("Add 1 seat")).toBeEnabled());
-      expect(mockCreateInvitesMutate).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Pay \u20ac17.98 and add" })).toBeEnabled(),
+      );
+      expect(mockCreateInvitesMutateAsync).not.toHaveBeenCalled();
       expect(screen.getByTestId("seat-email-0")).toHaveValue("new@acme.example");
     });
 
@@ -357,24 +377,26 @@ describe("<SubscriptionPage/> seat rotation", () => {
       renderSubscriptionPage();
 
       fireEvent.click(screen.getByTestId("user-count-link"));
+      fireEvent.click(await screen.findByTestId("add-invite-row"));
       fireEvent.change(await screen.findByTestId("seat-email-0"), {
         target: { value: "new@acme.example" },
       });
-      fireEvent.click(screen.getByRole("button", { name: /Add Seat/ }));
-      fireEvent.click(button("Add 1 seat"));
+      fireEvent.click(screen.getByTestId("drawer-seats-stepper-plus"));
+      fireEvent.click(button("Add 1 seat \u00b7 \u20ac29/mo"));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay \u20ac17.98 and add" }));
 
       await waitFor(() =>
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ totalMembers: 6 })),
       );
       await waitFor(() =>
-        expect(mockCreateInvitesMutate).toHaveBeenCalledWith(
+        expect(mockCreateInvitesMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({
             invites: [expect.objectContaining({ email: "new@acme.example" })],
           }),
-          expect.anything(),
         ),
       );
       expect(screen.queryByTestId("update-seats-block")).toBeNull();
+      await waitFor(() => expect(screen.queryByTestId("seat-confirm-dialog")).toBeNull());
     });
 
     it("ends with no pending seat change after lowering the seats", async () => {
@@ -382,15 +404,21 @@ describe("<SubscriptionPage/> seat rotation", () => {
       renderSubscriptionPage();
 
       fireEvent.click(screen.getByTestId("user-count-link"));
-      fireEvent.click(await screen.findByTestId("remove-seat-0"));
-      fireEvent.click(screen.getByTestId("remove-seat-0"));
+      fireEvent.click(await screen.findByTestId("drawer-seats-stepper-minus"));
+      fireEvent.click(screen.getByTestId("drawer-seats-stepper-minus"));
       fireEvent.click(button("Lower to 3 seats"));
+      fireEvent.click(
+        within(await screen.findByTestId("seat-confirm-dialog")).getByRole("button", {
+          name: "Lower to 3 seats",
+        }),
+      );
 
       await waitFor(() =>
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ totalMembers: 3 })),
       );
-      await waitFor(() => expect(screen.queryByTestId("update-seats-block")).toBeNull());
-      expect(mockCreateInvitesMutate).not.toHaveBeenCalled();
+      await waitFor(() => expect(screen.queryByTestId("seat-confirm-dialog")).toBeNull());
+      expect(screen.queryByTestId("update-seats-block")).toBeNull();
+      expect(mockCreateInvitesMutateAsync).not.toHaveBeenCalled();
     });
 
     describe("when the seats were lowered to 3 and 5 are kept until 1 Dec", () => {
@@ -411,7 +439,7 @@ describe("<SubscriptionPage/> seat rotation", () => {
         renderSubscriptionPage();
 
         fireEvent.click(screen.getByTestId("user-count-link"));
-        fireEvent.click(await screen.findByRole("button", { name: /Add Seat/ }));
+        fireEvent.click(await screen.findByTestId("drawer-seats-stepper-plus"));
 
         expect(
           await screen.findByText(
@@ -423,7 +451,12 @@ describe("<SubscriptionPage/> seat rotation", () => {
           expect.objectContaining({ newTotalSeats: 4 }),
         );
 
-        fireEvent.click(button("Add 1 seat"));
+        fireEvent.click(button("Add 1 seat \u00b7 \u20ac29/mo"));
+        fireEvent.click(
+          within(await screen.findByTestId("seat-confirm-dialog")).getByRole("button", {
+            name: /Add|Confirm|Pay/,
+          }),
+        );
 
         await waitFor(() =>
           expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ totalMembers: 4 })),

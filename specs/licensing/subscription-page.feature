@@ -205,7 +205,7 @@ Feature: Subscription Page Plan Management
       When I view the subscription page
       Then the current plan card has an "Upgrade to Growth" action
       And the action sits after the usage rows, like the total on a bill
-      And choosing it starts the Growth checkout for 1 seat
+      And choosing it opens the seat dialog, starting at 1 seat
 
     @integration
     Scenario: The plan card reads like a bill
@@ -270,7 +270,7 @@ Feature: Subscription Page Plan Management
       When I view the subscription page
       Then the current plan card's "Upgrade to Growth" is the primary button
       And the Growth offer's "Upgrade now" is a secondary button
-      And both start the same Growth checkout
+      And both open the same seat dialog
 
     @integration
     Scenario: A paid plan's card carries subscription management as its action
@@ -457,17 +457,18 @@ Feature: Subscription Page Plan Management
   # A checkout asked for by the plans page starts on arrival
   # ============================================================================
 
-  Rule: Arriving from the plans page "Upgrade now" opens Stripe Checkout
+  Rule: Arriving from the plans page "Upgrade now" opens the seat dialog
 
     The plans page sends the reader here with the interval and currency they
-    picked. The page prices the seats it already counts and leaves for
-    Stripe Checkout, so one click on "Upgrade now" reaches the payment page
-    instead of landing back on the page the reader came from.
+    picked. The page opens the seat dialog in that interval and currency,
+    starting at the seats it already counts; "Continue to checkout" leaves
+    for Stripe Checkout.
 
     @integration
     Scenario: The plans page upgrade opens the Growth checkout
       Given my organization is on the Free plan with 2 members
       When I arrive on the subscription page from the plans page asking for the annual Growth plan in USD
+      And I continue to checkout from the seat dialog
       Then a Growth checkout for 2 seats, billed annually in USD, is created
       And I am sent to the Stripe Checkout page it answers
       And the checkout request is removed from the address, so returning from Stripe does not start another
@@ -484,5 +485,6 @@ Feature: Subscription Page Plan Management
       Given my organization is on the Free plan with 2 members
       And I am not allowed to manage the organization's billing
       When I arrive on the subscription page asking for the Growth checkout
+      And I continue to checkout from the seat dialog
       Then I see why the upgrade could not start
       And I stay on the subscription page

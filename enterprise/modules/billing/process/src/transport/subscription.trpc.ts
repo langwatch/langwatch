@@ -13,6 +13,8 @@ import {
   billingCallerEmailSchema,
   type BillingDisplayInvoice,
   type Currency,
+  type DeveloperSeatQuote,
+  type DeveloperSeats,
   type SubscribablePlan,
   type SubscriptionBillingInterval,
 } from "@langwatch/enterprise-billing-contract";
@@ -68,6 +70,17 @@ export interface BillingSubscriptionApi {
     actorEmail: string | null;
   }): Promise<unknown>;
   listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]>;
+  /** Developer seats the subscription bills, and whether a price is configured to sell more. */
+  developerSeats(input: { organizationId: string }): Promise<DeveloperSeats>;
+  previewDeveloperSeats(input: {
+    organizationId: string;
+    quantity: number;
+  }): Promise<DeveloperSeatQuote>;
+  setDeveloperSeats(input: {
+    organizationId: string;
+    quantity: number;
+    quotedAt?: number;
+  }): Promise<{ success: boolean }>;
 }
 
 export const BillingSubscriptionApi = moduleApi<BillingSubscriptionApi>()("billing");
@@ -170,6 +183,29 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
       ...(input.customerName === undefined ? {} : { customerName: input.customerName }),
       ...(input.customerEmail === undefined ? {} : { customerEmail: input.customerEmail }),
       ...(input.note === undefined ? {} : { note: input.note }),
+    }),
+  )
+
+  .procedure("developerSeats")
+  .withPermission("organization:view")
+  // Developer seats billed, and whether a configured price sells more.
+  .handle(({ app, input }) => app.developerSeats({ organizationId: input.organizationId }))
+
+  .procedure("previewDeveloperSeats")
+  .withPermission("organization:manage")
+  // What a Developer seat change costs, before it is confirmed.
+  .handle(({ app, input }) =>
+    app.previewDeveloperSeats({ organizationId: input.organizationId, quantity: input.quantity }),
+  )
+
+  .procedure("setDeveloperSeats")
+  .withPermission("organization:manage")
+  // Sets the Developer seat line, priced at the instant the customer was quoted.
+  .handle(({ app, input }) =>
+    app.setDeveloperSeats({
+      organizationId: input.organizationId,
+      quantity: input.quantity,
+      ...(input.quotedAt === undefined ? {} : { quotedAt: input.quotedAt }),
     }),
   )
 

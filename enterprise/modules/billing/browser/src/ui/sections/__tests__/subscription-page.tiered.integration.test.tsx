@@ -168,7 +168,20 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
           useQuery: () => setup.mockListInvoices(),
         },
         getLastSubscription: {
-          useQuery: () => setup.mockGetLastSubscription(),
+          useQuery: () => ({ ...setup.mockGetLastSubscription(), refetch: vi.fn() }),
+        },
+        developerSeats: {
+          useQuery: (_input: unknown, opts: { enabled: boolean }) =>
+            opts.enabled ? setup.mockDeveloperSeats() : { data: undefined },
+        },
+        previewDeveloperSeats: {
+          useQuery: (input: { quantity: number }, opts: { enabled: boolean }) =>
+            opts.enabled
+              ? setup.mockPreviewDeveloperSeats(input)
+              : { data: undefined, isLoading: false, isError: false },
+        },
+        setDeveloperSeats: {
+          useMutation: () => ({ mutateAsync: setup.mockSetDeveloperSeats, isPending: false }),
         },
         previewProration: {
           useQuery: () => ({ data: undefined, isLoading: false, isError: false }),
@@ -272,7 +285,7 @@ describe("<SubscriptionPage/>", () => {
         });
       });
 
-      it("hides the update seats block on legacy paid plan with planned users", async () => {
+      it("plans nothing on a legacy paid plan: the drawer has no Done step", async () => {
         mockGetActivePlan.mockReturnValue({
           data: createMockPlan({
             type: "ACCELERATE",
@@ -289,13 +302,8 @@ describe("<SubscriptionPage/>", () => {
         renderSubscriptionPage();
 
         fireEvent.click(screen.getByTestId("user-count-link"));
-        fireEvent.click(await screen.findByRole("button", { name: /Add Seat/i }));
-        fireEvent.click(await screen.findByRole("button", { name: /Done/i }));
-
-        await waitFor(() => {
-          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
-        });
-
+        await screen.findByRole("button", { name: /Add person/i });
+        expect(screen.queryByRole("button", { name: /Done/i })).toBeNull();
         expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
       });
     });
@@ -378,6 +386,7 @@ describe("<SubscriptionPage/>", () => {
           expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
         });
         fireEvent.click(screen.getByRole("button", { name: /Upgrade now/i }));
+        fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
         await waitFor(() => {
           expect(host.failures).toHaveLength(1);
@@ -401,6 +410,7 @@ describe("<SubscriptionPage/>", () => {
         });
 
         fireEvent.click(screen.getByRole("button", { name: /Upgrade now/i }));
+        fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
         await waitFor(() => {
           expect(mockMutateAsync).toHaveBeenCalledWith(

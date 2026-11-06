@@ -219,6 +219,8 @@ const resolveRequiredMappings = (params: {
     const selectedDetail = lookupMappedId ? fetchedPricesById[lookupMappedId] : undefined;
 
     if (!lookupMappedId || !selectedDetail) {
+      // An optional price not yet provisioned in this mode stays unmapped.
+      if (OPTIONAL_STRIPE_PRICE_NAMES.includes(key)) continue;
       errors.push(`Missing required lookup_key mapping for ${key} in ${environment} mode`);
       continue;
     }

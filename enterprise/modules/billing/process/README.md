@@ -225,7 +225,7 @@ interface Output {
 
 ### `subscription`
 
-Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscription.trpc.ts:88`.
+Contract `../contract/src/subscription.trpc.ts:35`, router `src/transport/subscription.trpc.ts:101`.
 
 | Procedure                            | Kind     | Gate                              | Input                     | Output                           |
 | ------------------------------------ | -------- | --------------------------------- | ------------------------- | -------------------------------- |
@@ -235,25 +235,28 @@ Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscr
 | `subscription.previewProration`      | query    | Permission `organization:manage`  | inline                    | `providerOwnedSchema`            |
 | `subscription.getLastSubscription`   | query    | Permission `organization:view`    | `organizationScopeSchema` | `providerOwnedSchema`            |
 | `subscription.prospective`           | mutation | Permission `organization:manage`  | inline                    | `providerOwnedSchema`            |
+| `subscription.developerSeats`        | query    | Permission `organization:view`    | `organizationScopeSchema` | `developerSeatsSchema`           |
+| `subscription.previewDeveloperSeats` | query    | Permission `organization:manage`  | inline                    | `developerSeatQuoteSchema`       |
+| `subscription.setDeveloperSeats`     | mutation | Permission `organization:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
 | `subscription.listInvoices`          | query    | Permission `organization:view`    | `organizationScopeSchema` | inline                           |
 
 ```typescript
 // subscription.addTeamMemberOrEvents
-// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, upgradeMembers… (inline, ../contract/src/subscription.trpc.ts:37)
+// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, upgradeMembers… (inline, ../contract/src/subscription.trpc.ts:38)
 // Output: subscriptionItemsUpdatedSchema, ../contract/src/billing-types.ts:234
 interface Output {
   success: boolean;
 }
 
 // subscription.create
-// Input: z.object({ ...organizationScopeSchema.shape, baseUrl: z.string(), plan: subscribablePlanS… (inline, ../contract/src/subscription.trpc.ts:54)
+// Input: z.object({ ...organizationScopeSchema.shape, baseUrl: z.string(), plan: subscribablePlanS… (inline, ../contract/src/subscription.trpc.ts:55)
 // Output: billingRedirectSchema, ../contract/src/billing-types.ts:218
 interface Output {
   url: string | null;
 }
 
 // subscription.manage
-// Input: inline, ../contract/src/subscription.trpc.ts:67
+// Input: inline, ../contract/src/subscription.trpc.ts:68
 interface Input {
   organizationId: string;
   baseUrl: string;
@@ -264,28 +267,64 @@ interface Output {
 }
 
 // subscription.previewProration
-// Input: inline, ../contract/src/subscription.trpc.ts:71
+// Input: inline, ../contract/src/subscription.trpc.ts:72
 interface Input {
   organizationId: string;
   newTotalSeats: number;
 }
-// Output: providerOwnedSchema, ../contract/src/subscription.trpc.ts:32
+// Output: providerOwnedSchema, ../contract/src/subscription.trpc.ts:33
 type Output = unknown;
 
 // subscription.getLastSubscription
-// Input: organizationScopeSchema, ../contract/src/subscription.trpc.ts:18
+// Input: organizationScopeSchema, ../contract/src/subscription.trpc.ts:19
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:32
+type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:33
 
 // subscription.prospective
-// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, customerName: … (inline, ../contract/src/subscription.trpc.ts:80)
-type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:32
+// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, customerName: … (inline, ../contract/src/subscription.trpc.ts:81)
+type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:33
+
+// subscription.developerSeats
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:19
+// Output: developerSeatsSchema, ../contract/src/developer-seats.ts:55
+interface Output {
+  available: boolean;
+  quantity: number;
+  unitAmountCents: number | null;
+  currency: string;
+  billingInterval: string;
+  periodEndsAt: number | null;
+}
+
+// subscription.previewDeveloperSeats
+// Input: inline, ../contract/src/subscription.trpc.ts:98
+interface Input {
+  organizationId: string;
+  quantity: number;
+}
+// Output: developerSeatQuoteSchema, ../contract/src/developer-seats.ts:70
+interface Output {
+  amountDueCents: number;
+  formattedAmountDue: string;
+  formattedRecurringTotal: string;
+  billingInterval: string;
+  quotedAt: number;
+}
+
+// subscription.setDeveloperSeats
+// Input: inline, ../contract/src/subscription.trpc.ts:103
+interface Input {
+  organizationId: string;
+  quantity: number;
+  quotedAt?: number;
+}
+type Output = z.infer<typeof subscriptionItemsUpdatedSchema>; // ../contract/src/billing-types.ts:234
 
 // subscription.listInvoices
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:18
-// Output: inline, ../contract/src/subscription.trpc.ts:94
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:19
+// Output: inline, ../contract/src/subscription.trpc.ts:113
 type Output = {
   id: string;
   number: string | null;
@@ -359,18 +398,18 @@ Run by the tasks process, before serve.
 | Task                        | Class                              | Declared at                                      |
 | --------------------------- | ---------------------------------- | ------------------------------------------------ |
 | `tiered-free-to-seat-event` | `TieredFreeToSeatEventMigrateTask` | `src/tasks/tiered-free-to-seat-event.task.ts:79` |
-| `stripe-prices-sync`        | `StripePricesSyncTask`             | `src/tasks/stripe-prices-sync.task.ts:467`       |
+| `stripe-prices-sync`        | `StripePricesSyncTask`             | `src/tasks/stripe-prices-sync.task.ts:469`       |
 
 ## Configuration
 
 | Kind   | Leaf                                | Environment variable                           | Declared at                            |
 | ------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
-| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:189`           |
-| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:190`           |
-| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:191`           |
-| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:192`           |
-| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:193`           |
-| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:194`           |
+| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:194`           |
+| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:195`           |
+| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:196`           |
+| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:197`           |
+| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:198`           |
+| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:199`           |
 | config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:13` |
 | config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:15` |
 | config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:23` |
