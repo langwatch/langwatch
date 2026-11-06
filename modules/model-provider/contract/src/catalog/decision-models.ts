@@ -66,7 +66,7 @@ export type DecisionModelEntry = Readonly<{
   id: string;
   /** The registry provider whose row holds the key; `langwatch` is the hosted classifier. */
   provider: string;
-  /** The full name: provider and model, so one model on two providers reads apart in text. */
+  /** The full name: provider, then model or API, so one model on two providers reads apart. */
   label: string;
   /**
    * A picker row's title when it differs from `label`; the row's provider icon names the

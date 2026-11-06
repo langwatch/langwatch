@@ -40,7 +40,7 @@ describe("DECISION_MODELS", () => {
     },
   );
 
-  /** @scenario "A decision model's title names its provider and its model" */
+  /** @scenario "A decision model's full name opens with its provider" */
   it.each(OWN_ENTRIES.map((entry) => [entry.id, entry] as const))(
     "%s's full name opens with its provider's name",
     (_, entry) => {
@@ -62,7 +62,7 @@ describe("DECISION_MODELS", () => {
     expect(labels).toEqual(expect.arrayContaining(["OpenAI Decisions", "Azure OpenAI Decisions"]));
   });
 
-  /** @scenario "A decision model's title names its provider and its model" */
+  /** @scenario "A decision model's full name opens with its provider" */
   it("titles OpenAI's and Azure OpenAI's Decisions models Decisions API in a picker", () => {
     const titles = ["openai/decisions:gpt-6-luna", "azure/decisions:gpt-6-luna"].map((id) => {
       const entry = DECISION_MODELS.find((candidate) => candidate.id === id);

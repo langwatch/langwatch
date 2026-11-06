@@ -357,11 +357,11 @@ Feature: Instant Evals decision model column in Default models
     And it reads "Evals Preview" with the LangWatch mark where nothing is set
 
   @unit
-  Scenario: A decision model's title names its provider and its model
+  Scenario: A decision model's full name opens with its provider
     When a decision model is listed in a picker
-    Then its title names the provider and the model, such as "Inception Mercury Decide"
+    Then its full name opens with the provider, such as "Inception Mercury Decide"
     And OpenAI's and Azure OpenAI's Decisions models read "Decisions API" beside their provider icon
-    And their full names stay "OpenAI Decisions" and "Azure OpenAI Decisions"
+    And their full names, "OpenAI Decisions" and "Azure OpenAI Decisions", name the provider and the API, not the model
     And LangWatch's hosted model reads "Evals Preview", described as "Optimized for evals"
 
   @integration
