@@ -40,7 +40,7 @@ export function CuratedWidgetCard({
   rowSpan: number;
   timeWindow: { start: number; end: number };
   granularitySeconds: BoardPeriod["granularitySeconds"];
-  /** The reader's chosen period, such as "1h:auto"; with it, only a new choice starts the widget over. */
+  /** The reader's chosen period, such as "1h:auto"; only a new choice restarts the widget. */
   periodKey: string;
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
   onAskLangy?: () => void;

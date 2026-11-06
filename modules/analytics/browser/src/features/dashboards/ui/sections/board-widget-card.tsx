@@ -63,7 +63,7 @@ export function BoardWidgetCard({
   /** The board's name, which an exported file is named for. */
   boardName: string;
   period: BoardPeriod;
-  /** The reader's chosen period, such as "1h:auto"; with it, only a new choice starts the widget over. */
+  /** The reader's chosen period, such as "1h:auto"; only a new choice restarts the widget. */
   periodKey: string;
   isWriting: boolean;
   langy?: WidgetCardLangy;
