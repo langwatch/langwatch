@@ -1,8 +1,20 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { CioBatchCall, NurturingSignal, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
+import type {
+  CioBatchCall,
+  NurturingSignal,
+  NurturingSignalOf,
+} from "@langwatch/enterprise-nurturing-contract";
+import { createLogger } from "@langwatch/observability";
 
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
+
+const nurturingLogger = createLogger("langwatch:nurturing");
+
+/** A failure here is swallowed: the join the customer asked for is already done. */
+function reportFailure(error: unknown): void {
+  nurturingLogger.warn({ error }, "a lifecycle signal could not be delivered");
+}
 
 /** A person joins an organization once, so this outlives any realistic replay of the join. */
 const JOINED_WINDOW_SECONDS = 365 * 24 * 60 * 60;
@@ -15,20 +27,11 @@ type TrackCall = Extract<CioBatchCall, { type: "track" }>;
  * organization however they joined and however often the join is replayed.
  */
 export class NurturingJoinedOrganizationService {
-  static create({
-    claims,
-    reportFailure,
-  }: {
-    claims: NurturingClaimRepository;
-    reportFailure: (error: unknown) => void;
-  }): NurturingJoinedOrganizationService {
-    return new NurturingJoinedOrganizationService(claims, reportFailure);
+  static create({ claims }: { claims: NurturingClaimRepository }): NurturingJoinedOrganizationService {
+    return new NurturingJoinedOrganizationService(claims);
   }
 
-  private constructor(
-    private readonly claims: NurturingClaimRepository,
-    private readonly reportFailure: (error: unknown) => void,
-  ) {}
+  private constructor(private readonly claims: NurturingClaimRepository) {}
 
   /**
    * True when this is the person's first join of this organization, by invite or by SSO.
@@ -47,7 +50,7 @@ export class NurturingJoinedOrganizationService {
     try {
       return await this.claims.claim(claimKey(signal), JOINED_WINDOW_SECONDS);
     } catch (error) {
-      this.reportFailure(error);
+      reportFailure(error);
       return NurturingClaimReleaseService.create(this.claims).rethrowAfterReleasing({
         error,
         keys: [deliveredClaim],
@@ -61,14 +64,14 @@ export class NurturingJoinedOrganizationService {
    * stays held after a success.
    */
   afterFailedTrack(call: TrackCall, error: unknown): void {
-    this.reportFailure(error);
+    reportFailure(error);
     if (call.event !== "joined_organization") return;
     const { organization_id: organizationId } = call.properties ?? {};
     if (typeof organizationId !== "string") return;
     void NurturingClaimReleaseService.create(this.claims)
       .releasedAll([claimKey({ userId: call.userId, organizationId })])
       .then((released) => {
-        if (released.length > 0) this.reportFailure(new AggregateError(released));
+        if (released.length > 0) reportFailure(new AggregateError(released));
       });
   }
 }

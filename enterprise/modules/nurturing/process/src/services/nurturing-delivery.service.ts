@@ -91,22 +91,20 @@ export class NurturingDeliveryService {
       /** Who hears an organization's fact, and what a joining person is told of traces. */
       memberFacts: NurturingMemberFactsService;
     }>,
-    private readonly postHogDelivery: NurturingPostHogDeliveryService | undefined,
-    private readonly ownCodingDelivery: NurturingOwnCodingDeliveryService | undefined,
-    private readonly joinedOrganization: NurturingJoinedOrganizationService,
+    private readonly parts: Readonly<{
+      postHogDelivery: NurturingPostHogDeliveryService | undefined;
+      ownCodingDelivery: NurturingOwnCodingDeliveryService | undefined;
+      joinedOrganization: NurturingJoinedOrganizationService;
+    }>,
   ) {}
 
   static create(deps: NurturingDeliveryService["deps"]): NurturingDeliveryService {
-    return new NurturingDeliveryService(
-      deps,
-      deps.posthog && NurturingPostHogDeliveryService.create(deps.posthog),
-      deps.customerIo &&
-        NurturingOwnCodingDeliveryService.create({
-          claims: deps.claims,
-          customerIo: deps.customerIo,
-        }),
-      NurturingJoinedOrganizationService.create({ claims: deps.claims, reportFailure }),
-    );
+    const { claims, customerIo, posthog } = deps;
+    return new NurturingDeliveryService(deps, {
+      postHogDelivery: posthog && NurturingPostHogDeliveryService.create(posthog),
+      ownCodingDelivery: customerIo && NurturingOwnCodingDeliveryService.create({ claims, customerIo }),
+      joinedOrganization: NurturingJoinedOrganizationService.create({ claims }),
+    });
   }
 
   /** `key` names the signal: its kind and source event. A first session also tells its members. */
@@ -115,12 +113,12 @@ export class NurturingDeliveryService {
     const deliveredClaim = `nurturing:${key}`;
     if (!(await this.deps.claims.claim(deliveredClaim, DELIVERED_WINDOW_SECONDS))) return;
     if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
-    const firstJoin = await this.joinedOrganization.isFirstJoin({ signal, deliveredClaim });
+    const firstJoin = await this.parts.joinedOrganization.isFirstJoin({ signal, deliveredClaim });
     const memberBatch = await this.memberBatchOf({ signal, deliveredClaim });
     this.toCustomerIo({ signal, firstJoin });
     this.toPostHogSafely(signal);
     await this.identifyCodingAgentMembers(signal);
-    await this.ownCodingDelivery?.deliver(signal);
+    await this.parts.ownCodingDelivery?.deliver(signal);
     if (memberBatch) this.identifyInBatches(memberBatch);
   }
 
@@ -225,7 +223,7 @@ export class NurturingDeliveryService {
   /** A PostHog channel that throws only logs: analytics never fails the delivery. */
   private toPostHogSafely(signal: NurturingSignal): void {
     try {
-      this.postHogDelivery?.send(signal);
+      this.parts.postHogDelivery?.send(signal);
     } catch (error) {
       reportFailure(error);
     }
@@ -252,7 +250,7 @@ export class NurturingDeliveryService {
         case "track":
           void nurturing
             .trackEvent(call)
-            .catch((error: unknown) => this.joinedOrganization.afterFailedTrack(call, error));
+            .catch((error: unknown) => this.parts.joinedOrganization.afterFailedTrack(call, error));
           break;
         case "group":
           void nurturing
