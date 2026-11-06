@@ -178,7 +178,6 @@ export class UsageStatsService {
       membersCount: seats.fullMembers,
       membersLiteCount: seats.liteMembers,
       membersDeveloperCount: seats.developers,
-      membersHeldCount: seats.heldFullMembers ?? 0,
       messageLimitInfo,
       seatLimitInfo: buildSeatLimitInfo({
         plan: activePlan,

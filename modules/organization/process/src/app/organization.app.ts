@@ -194,7 +194,7 @@ import { OrganizationVisibilityService } from "../services/organization-visibili
 import type { OrganizationDemoProject } from "../services/organization-visibility.service.ts";
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
 import { PrivateDataplaneRecordService } from "../services/private-dataplane-record.service.ts";
-import { SeatHoldService } from "../services/seat-hold.service.ts";
+import { type SeatHoldCheckOutcome, SeatHoldService } from "../services/seat-hold.service.ts";
 import { SeatLimitNoticeService } from "../services/seat-limit-notice.service.ts";
 import { SignUpPolicyService } from "../services/sign-up-policy.service.ts";
 import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
@@ -657,9 +657,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   /**
    * The hourly seat hold check (seat-rotation.feature): ended holds go, and the people waiting
-   * longest take the seats that freed. Answers how many were admitted.
+   * longest take the seats that freed. Answers who it admitted and which organizations failed.
    */
-  runSeatHoldCheck(): Promise<number> {
+  runSeatHoldCheck(): Promise<SeatHoldCheckOutcome> {
     return this.#dependencies.membership.runSeatHoldCheck();
   }
 

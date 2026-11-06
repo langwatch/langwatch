@@ -32,6 +32,15 @@ export type SeatRemovalPreview = Readonly<{
   waiting: WaitingMember | null;
 }>;
 
+/** An organization one seat hold check failed in, retried by the next check. */
+export type SeatHoldCheckFailure = Readonly<{ organizationId: string; error: string }>;
+
+/** What one seat hold check did: who it admitted and the organizations it must retry. */
+export type SeatHoldCheckOutcome = Readonly<{
+  admitted: number;
+  failures: readonly SeatHoldCheckFailure[];
+}>;
+
 type SeatHoldDependencies = {
   memberships: OrganizationMembershipRepository;
   holds: SeatHoldRepository;
@@ -201,9 +210,14 @@ export class SeatHoldService {
     return this.dependencies.holds.findLiveInOrganization({ ...input, now: this.now() });
   }
 
-  /** Deletes every ended hold and answers the organizations a seat may have freed in. */
-  deleteEnded(): Promise<string[]> {
-    return this.dependencies.holds.deleteEnded({ now: this.now() });
+  /** The organizations with a hold ended at `now`, each one a seat may have freed in. */
+  findOrganizationsWithEnded(input: { now: Instant }): Promise<string[]> {
+    return this.dependencies.holds.findOrganizationsWithEnded(input);
+  }
+
+  /** Deletes the organization's holds ended at `now`. */
+  deleteEnded(input: { organizationId: string; now: Instant }): Promise<void> {
+    return this.dependencies.holds.deleteEnded(input);
   }
 
   private holdOf({

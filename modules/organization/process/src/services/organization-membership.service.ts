@@ -47,7 +47,12 @@ import type {
   OrganizationSeatLicense,
   OrganizationPlanUser,
 } from "./organization-seat-license.service.ts";
-import type { SeatHoldService, SeatRemovalPreview } from "./seat-hold.service.ts";
+import type {
+  SeatHoldCheckFailure,
+  SeatHoldCheckOutcome,
+  SeatHoldService,
+  SeatRemovalPreview,
+} from "./seat-hold.service.ts";
 
 /**
  * Whether this person is mid-way through proving a single sign-on connection
@@ -419,23 +424,47 @@ export class OrganizationMembershipService {
   }
 
   /**
-   * The hourly seat hold check: deletes ended holds, then in each organization they were in
-   * gives free full seats to the people waiting longest. Answers how many were admitted.
+   * The hourly seat hold check: in each organization with ended holds, gives free full seats to
+   * the people waiting longest, then deletes those holds. An organization that fails keeps its
+   * ended holds (they no longer count) so the next check retries it; the others go on.
    */
-  async runSeatHoldCheck(): Promise<number> {
+  async runSeatHoldCheck(): Promise<SeatHoldCheckOutcome> {
     const { seatHolds } = this.dependencies;
+    const now = seatHolds.now();
     let admitted = 0;
-    for (const organizationId of await seatHolds.deleteEnded()) {
-      for (const waiting of await seatHolds.findWaitingMembers({ organizationId })) {
-        const given = await this.roles.admitWaitingMember({
+    const failures: SeatHoldCheckFailure[] = [];
+    for (const organizationId of await seatHolds.findOrganizationsWithEnded({ now })) {
+      try {
+        admitted += await this.admitWaitingMembers({ organizationId });
+        await seatHolds.deleteEnded({ organizationId, now });
+      } catch (error) {
+        failures.push({
           organizationId,
-          userId: waiting.userId,
-          actingUserId: null,
-          caller: { type: "system" },
+          error: error instanceof Error ? error.message : String(error),
         });
-        if (!given) break;
-        admitted += 1;
       }
+    }
+    return { admitted, failures };
+  }
+
+  /** Gives free full seats to the people waiting longest; answers how many were admitted. */
+  private async admitWaitingMembers({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number> {
+    let admitted = 0;
+    for (const waiting of await this.dependencies.seatHolds.findWaitingMembers({
+      organizationId,
+    })) {
+      const given = await this.roles.admitWaitingMember({
+        organizationId,
+        userId: waiting.userId,
+        actingUserId: null,
+        caller: { type: "system" },
+      });
+      if (!given) break;
+      admitted += 1;
     }
     return admitted;
   }

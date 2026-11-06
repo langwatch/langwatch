@@ -21,6 +21,7 @@ const quote = {
 describe("seatChangeActionLabel()", () => {
   it("names the count a decrease lowers to and the seats an increase adds", () => {
     expect(seatChangeActionLabel({ from: 5, to: 3 })).toBe("Lower to 3 seats");
+    expect(seatChangeActionLabel({ from: 5, to: 1 })).toBe("Lower to 1 seat");
     expect(seatChangeActionLabel({ from: 5, to: 6 })).toBe("Add 1 seat");
     expect(seatChangeActionLabel({ from: 5, to: 8 })).toBe("Add 3 seats");
   });

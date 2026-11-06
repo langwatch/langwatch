@@ -73,21 +73,25 @@ export class PrismaSeatHoldRepository extends SeatHoldRepository {
     return rows.map(toSeatHold);
   }
 
-  async deleteEnded({ now }: { now: Instant }): Promise<string[]> {
-    const ended = await this.prisma.seatHold.findMany({
+  async findOrganizationsWithEnded({ now }: { now: Instant }): Promise<string[]> {
+    const rows = await this.prisma.seatHold.findMany({
       where: { heldUntil: { lte: toDate(now) } },
-      select: { id: true, organizationId: true },
+      select: { organizationId: true },
+      distinct: ["organizationId"],
     });
-    const organizationIds = [...new Set(ended.map((row) => row.organizationId))];
-    for (const organizationId of organizationIds) {
-      await this.prisma.seatHold.deleteMany({
-        where: {
-          organizationId,
-          id: { in: ended.filter((row) => row.organizationId === organizationId).map((r) => r.id) },
-        },
-      });
-    }
-    return organizationIds;
+    return rows.map((row) => row.organizationId);
+  }
+
+  async deleteEnded({
+    organizationId,
+    now,
+  }: {
+    organizationId: string;
+    now: Instant;
+  }): Promise<void> {
+    await this.prisma.seatHold.deleteMany({
+      where: { organizationId, heldUntil: { lte: toDate(now) } },
+    });
   }
 }
 

@@ -170,6 +170,16 @@ Feature: Seat rotation
       When the seat hold check runs
       Then 4 of 5 full member seats are in use
 
+    @integration
+    Scenario: A seat hold check that fails in one organization retries it and admits in the others
+      Given holds ended in two organizations with someone waiting in each
+      And admitting in the first organization fails
+      When the seat hold check runs
+      Then the person waiting in the second organization is a full member with access
+      And the person waiting in the first organization is still waiting
+      When the seat hold check runs again and admitting works
+      Then the person waiting in the first organization is a full member with access
+
   Rule: the remove dialog says what happens to the seat
     Never suggest removing someone to free a seat.
 
@@ -187,6 +197,15 @@ Feature: Seat rotation
       Given "Bar" took their seat on 3 November
       When an administrator opens the remove dialog for "Bar"
       Then they read "They lose access now. Their seat stays taken until 3 Dec, 30 days after they joined."
+      And the button reads "Remove"
+
+    @integration
+    Scenario: Removing a person without a full seat offers no seat
+      Given "Bar" is a Lite Member
+      And "Qux" is waiting for a full member seat
+      When an administrator opens the remove dialog for "Bar"
+      Then they read "They lose access to everything in it."
+      And no seat is offered to "Qux"
       And the button reads "Remove"
 
   Rule: Stripe Growth adds seats now, prorated, and lowers them from the next cycle

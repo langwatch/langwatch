@@ -75,7 +75,7 @@ export type SeatChangeSummary = {
 
 /** The button that commits the change: "Lower to 3 seats", "Add 1 seat", "Add 2 seats". */
 export function seatChangeActionLabel({ from, to }: { from: number; to: number }): string {
-  if (to < from) return `Lower to ${to} seats`;
+  if (to < from) return `Lower to ${to} seat${to === 1 ? "" : "s"}`;
   const added = to - from;
   return `Add ${added} seat${added === 1 ? "" : "s"}`;
 }

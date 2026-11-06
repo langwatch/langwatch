@@ -52,13 +52,17 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
     revokeBindingsWhere: async () => 0,
     changeBindingRole: async () => {},
   });
+  /** Organizations whose plan lookup fails, to prove one failing admission spares the others. */
+  const unreachablePlans = new Set<string>();
   const plans = createApiFixture<Pick<EntitlementApi, "getActivePlan">>({
-    getActivePlan: async () =>
-      createApiFixture<Plan>({
+    getActivePlan: async ({ organizationId }) => {
+      if (unreachablePlans.has(organizationId)) throw new Error("plan lookup unavailable");
+      return createApiFixture<Plan>({
         overrideAddingLimitations: false,
         maxMembers: 5,
         maxMembersLite: 5,
-      }),
+      });
+    },
   });
   const membershipRepository = PrismaOrganizationMembershipRepository.create({
     database: prisma,
@@ -488,6 +492,52 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
       });
       expect((await membershipOf(organizationId, quux!))?.seatPendingSince).not.toBeNull();
       expect(await prisma.seatHold.count({ where: { organizationId } })).toBe(0);
+    });
+
+    /** @scenario "A seat hold check that fails in one organization retries it and admits in the others" */
+    it("retries an organization whose admission failed without holding up the others", async () => {
+      const failing = await acme({ waiting: ["Qux"] });
+      const healthy = await acme({ waiting: ["Qux"] });
+      for (const org of [failing, healthy]) {
+        await remove(org.organizationId, org.adminId, org.bar);
+        await heldUntil({
+          organizationId: org.organizationId,
+          userId: org.bar,
+          seatTakenAt: daysFromNow(-30),
+          until: new Date(Date.now() - 60 * 60 * 1000),
+        });
+      }
+      unreachablePlans.add(failing.organizationId);
+
+      const first = await memberships.runSeatHoldCheck();
+
+      expect(first.failures.map((failure) => failure.organizationId)).toContain(
+        failing.organizationId,
+      );
+      expect(await membershipOf(healthy.organizationId, healthy.waitingIds[0]!)).toMatchObject({
+        role: OrganizationUserRole.MEMBER,
+        disabledAt: null,
+      });
+      expect(
+        await prisma.seatHold.count({ where: { organizationId: healthy.organizationId } }),
+      ).toBe(0);
+      expect(
+        (await membershipOf(failing.organizationId, failing.waitingIds[0]!))?.seatPendingSince,
+      ).not.toBeNull();
+      expect(
+        await prisma.seatHold.count({ where: { organizationId: failing.organizationId } }),
+      ).toBe(1);
+
+      unreachablePlans.delete(failing.organizationId);
+      await memberships.runSeatHoldCheck();
+
+      expect(await membershipOf(failing.organizationId, failing.waitingIds[0]!)).toMatchObject({
+        role: OrganizationUserRole.MEMBER,
+        disabledAt: null,
+      });
+      expect(
+        await prisma.seatHold.count({ where: { organizationId: failing.organizationId } }),
+      ).toBe(0);
     });
 
     /** @scenario "A hold that ends with nobody waiting just frees the seat" */

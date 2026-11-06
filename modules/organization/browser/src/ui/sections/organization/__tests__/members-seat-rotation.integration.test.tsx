@@ -217,6 +217,29 @@ describe("given Bar took their seat on 3 November", () => {
   });
 });
 
+describe("given Bar is a Lite Member and Qux waits for a seat", () => {
+  beforeEach(() => {
+    state.members = [person("user_foo", "Foo", "ADMIN"), person("user_bar", "Bar", "EXTERNAL")];
+    state.preview = {
+      holdsFullSeat: false,
+      seatFreesAt: null,
+      waiting: { userId: "user_qux", name: "Qux", email: "qux@acme.com" },
+    };
+  });
+
+  describe("when an administrator opens the remove dialog for Bar", () => {
+    /** @scenario "Removing a person without a full seat offers no seat" */
+    it("says they lose access, frees no seat and offers nothing", async () => {
+      const dialog = await openRemoveDialogFor("Bar");
+
+      expect(within(dialog).getByText("They lose access to everything in it.")).toBeInTheDocument();
+      expect(within(dialog).queryByText("Their seat frees up right away.")).toBeNull();
+      expect(within(dialog).queryByTestId("remove-member-give-seat")).toBeNull();
+      expect(within(dialog).getByRole("button", { name: "Remove" })).toBeInTheDocument();
+    });
+  });
+});
+
 describe("given the seat preview cannot be read", () => {
   beforeEach(() => {
     state.previewFails = true;

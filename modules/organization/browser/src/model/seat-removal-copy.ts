@@ -22,14 +22,20 @@ export type SeatRemovalCopy = {
   offer: { userId: string; name: string } | null;
 };
 
-/** What the dialog says about the seat; `null` preview means it has not loaded or failed. */
+/**
+ * What the dialog says about the seat; `null` preview means it has not loaded or failed. A person
+ * without a full seat (a Lite Member or Developer) frees none, so nothing is offered.
+ */
 export function seatRemovalCopy(
   preview: {
+    holdsFullSeat: boolean;
     seatFreesAt: string | null;
     waiting: { userId: string; name: string | null; email: string | null } | null;
   } | null,
 ): SeatRemovalCopy {
-  if (!preview) return { body: "They lose access to everything in it.", offer: null };
+  if (!preview?.holdsFullSeat) {
+    return { body: "They lose access to everything in it.", offer: null };
+  }
   if (preview.seatFreesAt) {
     return {
       body: `They lose access now. Their seat stays taken until ${seatFreesOnLabel(

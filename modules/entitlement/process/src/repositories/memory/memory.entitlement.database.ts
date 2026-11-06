@@ -7,8 +7,6 @@ export type MemoryOrganizationUsage = Readonly<{
   membersLiteCount: number;
   /** Developer seats (ADR-171); absent reads as none. */
   developerCount?: number;
-  /** Full seats still held after a removal (seat-rotation.feature); absent reads as none. */
-  heldMemberCount?: number;
   currentMonthCost: number;
   /** The projects the organization owns, and what each has spent this month. */
   projectCosts: Readonly<Record<string, number>>;

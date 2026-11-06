@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 
+import type { SeatHoldCheckOutcome } from "../services/seat-hold.service.ts";
 import { SEAT_HOLD_CHECK_PROCESS_NAME } from "./seat-hold-check.process.ts";
 
 const logger = createLogger("langwatch:organization:seat-hold-check");
@@ -8,8 +9,8 @@ const logger = createLogger("langwatch:organization:seat-hold-check");
 const CHECK_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface SeatHoldCheckDeps {
-  /** Deletes ended holds and admits the people waiting longest; answers how many it admitted. */
-  check: () => Promise<number>;
+  /** Admits the people waiting longest where holds ended, then deletes those holds. */
+  check: () => Promise<SeatHoldCheckOutcome>;
   deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
   now?: () => number;
 }
@@ -17,8 +18,11 @@ export interface SeatHoldCheckDeps {
 export function runSeatHoldCheck(deps: SeatHoldCheckDeps): () => Promise<void> {
   return async (): Promise<void> => {
     const startedAt = (deps.now ?? Date.now)();
-    const admitted = await deps.check();
+    const { admitted, failures } = await deps.check();
     if (admitted > 0) logger.info({ admitted }, "Seat hold check admitted people waiting");
+    for (const { organizationId, error } of failures) {
+      logger.error({ organizationId, error }, "Seat hold check failed; the next check retries it");
+    }
 
     try {
       await deps.deleteDispatchedBefore({

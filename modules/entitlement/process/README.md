@@ -118,7 +118,7 @@ Contract `../contract/src/entitlement.trpc.ts:23`, router `src/transport/usage-l
 ```typescript
 // limits.getUsage
 type Input = z.infer<typeof entitlementOrganizationScopeSchema>; // ../contract/src/entitlement.schemas.ts:17
-type Output = z.infer<typeof usageStatsSchema>; // ../contract/src/usage.ts:91
+type Output = z.infer<typeof usageStatsSchema>; // ../contract/src/usage.ts:89
 
 // limits.checkAndSendUsageLimitNotification
 // Input: sendUsageLimitWarningInputSchema, ../contract/src/entitlement.schemas.ts:43

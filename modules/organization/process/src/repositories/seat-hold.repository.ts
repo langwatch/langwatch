@@ -48,6 +48,9 @@ export abstract class SeatHoldRepository {
     now: Instant;
   }): Promise<SeatHold[]>;
 
-  /** Deletes every hold ended at `now` and answers the organizations they were in. */
-  abstract deleteEnded(input: { now: Instant }): Promise<string[]>;
+  /** The organizations with a hold ended at `now`, each one a seat may have freed in. */
+  abstract findOrganizationsWithEnded(input: { now: Instant }): Promise<string[]>;
+
+  /** Deletes the organization's holds ended at `now`. */
+  abstract deleteEnded(input: { organizationId: string; now: Instant }): Promise<void>;
 }

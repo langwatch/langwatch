@@ -46,12 +46,25 @@ export class MemorySeatHoldRepository extends SeatHoldRepository {
     );
   }
 
-  async deleteEnded({ now }: { now: Instant }): Promise<string[]> {
-    const isEnded = (hold: SeatHold) => Temporal.Instant.compare(hold.heldUntil, now) <= 0;
-    const ended = this.memory.seatHolds.filter(isEnded);
-    const kept = this.memory.seatHolds.filter((hold) => !isEnded(hold));
-    this.memory.seatHolds.splice(0, this.memory.seatHolds.length, ...kept);
+  async findOrganizationsWithEnded({ now }: { now: Instant }): Promise<string[]> {
+    const ended = this.memory.seatHolds.filter(
+      (hold) => Temporal.Instant.compare(hold.heldUntil, now) <= 0,
+    );
     return [...new Set(ended.map((hold) => hold.organizationId))];
+  }
+
+  async deleteEnded({
+    organizationId,
+    now,
+  }: {
+    organizationId: string;
+    now: Instant;
+  }): Promise<void> {
+    const kept = this.memory.seatHolds.filter(
+      (hold) =>
+        hold.organizationId !== organizationId || Temporal.Instant.compare(hold.heldUntil, now) > 0,
+    );
+    this.memory.seatHolds.splice(0, this.memory.seatHolds.length, ...kept);
   }
 
   #live({ organizationId, now }: { organizationId: string; now: Instant }): SeatHold[] {
