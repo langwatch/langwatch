@@ -195,6 +195,10 @@ const isSandboxCredentialFailure = (domain: LangWatchHandledErrorShape): boolean
  */
 const LOCAL_TOOL_PREFIX = "local_";
 
+/** Whether a failure code is one of the credential codes, whichever tool raised it. */
+export const isCredentialCode = (code: string | undefined): boolean =>
+  code !== undefined && SANDBOX_CREDENTIAL_CODES.has(code.trim().toLowerCase());
+
 /**
  * Whether a sandbox tool failed on Langy's own CLI credential: ours to fix, not the
  * reader's access.
@@ -205,10 +209,7 @@ export const isSandboxCredentialFault = ({
 }: {
   code: string | undefined;
   toolName: string | undefined;
-}): boolean =>
-  code !== undefined &&
-  SANDBOX_CREDENTIAL_CODES.has(code.trim().toLowerCase()) &&
-  !toolName?.startsWith(LOCAL_TOOL_PREFIX);
+}): boolean => isCredentialCode(code) && !toolName?.startsWith(LOCAL_TOOL_PREFIX);
 
 const asCount = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;

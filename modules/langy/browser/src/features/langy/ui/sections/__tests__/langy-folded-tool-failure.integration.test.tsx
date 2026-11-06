@@ -6,11 +6,11 @@
  * @see specs/langy/langy-card-taxonomy.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { UIMessage } from "ai";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let devMode = false;
 
@@ -27,6 +27,7 @@ const { LangyToolActivity } = await import("../langy-tool-activity.tsx");
 
 afterEach(() => {
   devMode = false;
+  vi.useRealTimers();
 });
 
 function failedStep({
@@ -348,6 +349,13 @@ describe("a failed step", () => {
     });
 
     /** @scenario "A failure no retry can fix keeps its card" */
+    it("keeps the card while the turn runs", () => {
+      renderActivity({ parts: [forbidden], live: true });
+
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+
+    /** @scenario "A failure no retry can fix keeps its card" */
     it("keeps the card after the turn answered", () => {
       renderActivity({ parts: [forbidden, reply], live: false });
 
@@ -378,6 +386,15 @@ describe("a failed step", () => {
       expect(receiptSteps().getByText("langwatch trace list")).toBeTruthy();
     });
 
+    /** @scenario "A sandbox credential failure folds into the record" */
+    it("folds into the receipt while the turn runs", () => {
+      renderActivity({ parts: [unauthorized, ls], live: true });
+
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(receiptSteps().getByText("langwatch trace list")).toBeTruthy();
+    });
+
+    /** @scenario "A failure no retry can fix keeps its card" */
     it("keeps its card when a local tool failed on the reader's own login", () => {
       const localUnauthorized = {
         ...(unauthorized as Record<string, unknown>),
@@ -385,6 +402,26 @@ describe("a failed step", () => {
         toolCallId: "local-unauthorized-1",
       } as never;
       renderActivity({ parts: [localUnauthorized, reply, ls], live: false });
+
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+  });
+
+  describe("given a local tool that is not logged in", () => {
+    const notAuthenticated = {
+      type: "tool-local_bash",
+      toolCallId: "local-login-1",
+      state: "output-error",
+      input: { command: "langwatch trace list" },
+      errorText: JSON.stringify({
+        ok: false,
+        error: { code: "not_authenticated", message: "Not logged in.", isHandled: true },
+      }),
+    } as never;
+
+    /** @scenario "A failure no retry can fix keeps its card" */
+    it("keeps its card although the failure carried no HTTP status", () => {
+      renderActivity({ parts: [notAuthenticated, reply], live: false });
 
       expect(screen.getByRole("alert")).toBeTruthy();
     });
@@ -447,11 +484,51 @@ describe("a failed step", () => {
     });
 
     /** @scenario "A failure the person can act on keeps its card" */
+    it("keeps the connection card while the turn runs", () => {
+      renderActivity({ parts: [slackRefusal], live: true });
+
+      expect(screen.getByTestId("slack-connection-card")).toBeTruthy();
+      expect(screen.queryByRole("list", { name: "Finished steps" })).toBeNull();
+    });
+
+    /** @scenario "A failure the person can act on keeps its card" */
     it("keeps the connection card after the turn answered", () => {
       renderActivity({ parts: [slackRefusal, reply], live: false });
 
       expect(screen.getByTestId("slack-connection-card")).toBeTruthy();
       expect(screen.queryByRole("list", { name: "Finished steps" })).toBeNull();
     });
+  });
+});
+
+describe("the receipt of the work", () => {
+  const opened = () => receiptHeader().getAttribute("aria-expanded");
+  const pass = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+  let wrapper: HTMLElement;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    renderActivity({ parts: [ls, reply], live: false });
+    wrapper = receiptHeader().parentElement!;
+  });
+
+  /** @scenario "A receipt the reader only passes over still closes" */
+  it("closes after a pointer only passed over it", () => {
+    fireEvent.pointerEnter(wrapper);
+    pass(5000);
+    expect(opened()).toBe("true");
+
+    fireEvent.pointerLeave(wrapper);
+    pass(2200);
+    expect(opened()).toBe("false");
+  });
+
+  /** @scenario "A receipt the reader only passes over still closes" */
+  it("stays open once the reader clicked into it", () => {
+    fireEvent.click(receiptSteps().getAllByRole("button")[0]!);
+    fireEvent.pointerLeave(wrapper);
+    pass(5000);
+
+    expect(opened()).toBe("true");
   });
 });

@@ -43,6 +43,7 @@ import {
 import { isSayToolPart } from "../../../tools/model/langy-say-tool.ts";
 import { isSecretSnippetToolPart } from "../../../tools/model/langy-secret-snippet-tool.ts";
 import {
+  isCredentialCode,
   isSandboxCredentialFault,
   type LangyToolErrorPresentation,
   presentLangyToolError,
@@ -780,10 +781,13 @@ function refusesAccess({
   presentation: LangyToolErrorPresentation;
   toolName: string | undefined;
 }): boolean {
+  // A local tool's credential failure is the reader's own login, terminal or not.
+  const credential = isCredentialCode(presentation.code);
+  if (credential && !isSandboxCredentialFault({ code: presentation.code, toolName })) return true;
   if (!presentation.terminal) return false;
-  // A sandbox credential fault is ours to fix; a local tool's is the reader's own login.
+  // A sandbox credential fault is ours to fix.
   if (isSandboxCredentialFault({ code: presentation.code, toolName })) return false;
-  if (presentation.code === "langy_github_not_connected") return true;
+  if (presentation.code?.trim().toLowerCase() === "langy_github_not_connected") return true;
   return presentation.httpStatus !== undefined && ACCESS_STATUSES.has(presentation.httpStatus);
 }
 
@@ -833,15 +837,22 @@ function CompletedActivityBatch({
   // it silently skipped three calls on touchscreens or keyboard navigation.
   const [open, setOpen] = useState(true);
   const userToggled = useRef(false);
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
+  const closeTimer = useRef<number>();
+  const pauseClose = () => window.clearTimeout(closeTimer.current);
+  const scheduleClose = () => {
+    pauseClose();
+    closeTimer.current = window.setTimeout(() => {
       if (!userToggled.current) setOpen(false);
     }, 2200);
-    return () => window.clearTimeout(timer);
+  };
+  useEffect(() => {
+    scheduleClose();
+    return pauseClose;
   }, []);
-  // A reader who reaches into the receipt is reading it: it must not close under them.
-  const keepOpen = () => {
+  // A pointer passing over only pauses the close; a click or focus means it is being read.
+  const pin = () => {
     userToggled.current = true;
+    pauseClose();
   };
   const failedCount = failures.length;
   const callCount = groups.reduce((count, group) => count + group.calls.length, failedCount);
@@ -864,9 +875,10 @@ function CompletedActivityBatch({
     <VStack
       align="stretch"
       gap={2}
-      onPointerEnter={keepOpen}
-      onFocusCapture={keepOpen}
-      onClickCapture={keepOpen}
+      onPointerEnter={pauseClose}
+      onPointerLeave={scheduleClose}
+      onFocusCapture={pin}
+      onClickCapture={pin}
     >
       <chakra.button
         type="button"

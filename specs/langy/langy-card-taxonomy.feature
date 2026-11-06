@@ -108,8 +108,15 @@ Feature: Langy's cards read at the right attention weight
     Then that failure stays folded in the record of the work
 
   @integration
+  Scenario: A receipt the reader only passes over still closes
+    Given the record of the work is open
+    When a pointer only passes over it
+    Then it closes shortly after the pointer leaves
+    And when I click or focus into it, it stays open
+
+  @integration
   Scenario: A failure no retry can fix keeps its card
-    Given a step refused because access was refused or GitHub is not connected
+    Given a step refused because access was refused or GitHub is not connected, or a local tool that is not logged in
     When I read the turn, while it runs or after it answered
     Then that failure keeps its card in the conversation
 
