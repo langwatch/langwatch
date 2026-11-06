@@ -154,6 +154,7 @@ import type { LangySessionKeyService } from "../features/session-key/services/la
 import { LangyVirtualKeyGatewayService } from "../features/session-key/services/langy-virtual-key-gateway.service.ts";
 import { LangyVirtualKeyProvisioningService } from "../features/session-key/services/langy-virtual-key-provisioning.service.ts";
 import { LangyTurnSettlementWaiterService } from "../features/turn/services/langy-turn-settlement-waiter.service.ts";
+import type { LangyTurnLocalWork } from "../features/turn/services/langy-turn-shared.service.ts";
 import { LangyTurnsBoundsService } from "../features/turn/services/langy-turns-bounds.service.ts";
 import { LangyUnattendedTurnService } from "../features/turn/services/langy-unattended-turn.service.ts";
 import { LangyUiActionBackendService } from "../features/ui-action/services/langy-ui-action-backend.service.ts";
@@ -312,19 +313,8 @@ export class LangyModule implements LangyApiContract {
       metrics: LangySessionKeyMetricsOtelService.create(),
       bindings: setup.repositories.deleteConfirmations,
     });
-    const built = LangyModule.#composeInfrastructure({
-      setup,
-      // Main's preset: no agent, no turn worker, so a send refuses "Agent not configured".
-      worker: configured ? channel : null,
-      sessionKeys,
-    });
     const commands = LangyConversationCommandSenders.create();
     const conversationEvents = LangyConversationEventLogService.create();
-    const langy = adapter.build({
-      ...built,
-      commands,
-      events: conversationEvents,
-    });
     const workspace = LangyLocalWorkspaceService.create({
       users: setup.dependencies.users,
       github: setup.dependencies.github,
@@ -351,6 +341,19 @@ export class LangyModule implements LangyApiContract {
       events: commands,
       buffer,
       onAnswered: (wait) => confirmationAnswers.recordAnswer(wait),
+    });
+    const built = LangyModule.#composeInfrastructure({
+      setup,
+      // Main's preset: no agent, no turn worker, so a send refuses "Agent not configured".
+      worker: configured ? channel : null,
+      sessionKeys,
+      // Stop ends the cards and commands the turn left on the developer's machine.
+      localWork: runtime,
+    });
+    const langy = adapter.build({
+      ...built,
+      commands,
+      events: conversationEvents,
     });
     const deleteConfirmations = LangyDeleteConfirmationService.create({
       confirmations: setup.repositories.deleteConfirmations,
@@ -539,10 +542,12 @@ export class LangyModule implements LangyApiContract {
     setup,
     worker,
     sessionKeys,
+    localWork,
   }: {
     setup: LangySetup;
     worker: LangyWorker | null;
     sessionKeys: LangySessionKeyService;
+    localWork: LangyTurnLocalWork;
   }): Omit<LangyServiceCompositionOptions, "commands"> {
     const { config, dependencies, repositories } = setup;
     const { publicBaseUrl } = config;
@@ -580,6 +585,7 @@ export class LangyModule implements LangyApiContract {
         metrics: { count: () => undefined },
         accessStore: repositories.turnAccess,
         handoffStore: repositories.turnHandoff,
+        localWork,
       },
       credentials: {
         sessionKeys,
