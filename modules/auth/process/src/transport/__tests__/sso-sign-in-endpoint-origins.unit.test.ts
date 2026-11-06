@@ -121,6 +121,7 @@ describe("given a provider whose token endpoint is on another origin", () => {
   });
 
   describe("when identity names no endpoint origin", () => {
+    /** @scenario "A refused single sign-on start is recorded for whoever runs the installation" */
     it("refuses the sign-in and logs which connection and why", async () => {
       const { status, body } = await signIn(transportTrusting([]));
 

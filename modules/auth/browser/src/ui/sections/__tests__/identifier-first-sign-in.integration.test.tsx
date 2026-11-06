@@ -355,6 +355,7 @@ describe("given the identifier-first sign-in screen", () => {
       expect(signInMock).toHaveBeenCalledTimes(1);
     });
 
+    /** @scenario "A refused hand-off to the identity provider says so instead of waiting" */
     it("stops the spinner and says so when the provider sign-in is refused", async () => {
       signInMock.mockResolvedValueOnce({
         ok: false,
@@ -380,6 +381,7 @@ describe("given the identifier-first sign-in screen", () => {
       );
     });
 
+    /** @scenario "A refused hand-off to the identity provider says so instead of waiting" */
     it("stops the spinner and says so when the hand-off fails on the network", async () => {
       signInMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
       routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
@@ -400,6 +402,7 @@ describe("given the identifier-first sign-in screen", () => {
       );
     });
 
+    /** @scenario "Retrying the hand-off clears the refusal" */
     it("clears the refusal while the person retries from the button", async () => {
       signInMock
         .mockResolvedValueOnce({ ok: false, code: "discovery_untrusted_origin", status: 400 })

@@ -86,6 +86,18 @@ describe("issuerDiscoveryChannels", () => {
       expect(fetched).toEqual([{ proxied: false }]);
     });
 
+    /** @scenario "The sign-in trust lookup takes the route Node's fetch takes" */
+    it("reads the sign-in lookup directly, as the SSO engine will", async () => {
+      fetched.length = 0;
+      const channels = channelsBehindRefusingProxy();
+
+      await expect(
+        channels.ssoSignInIssuerDiscovery.discover({ issuer: GOOGLE }),
+      ).resolves.toMatchObject({ reachable: true });
+      expect(fetched).toEqual([{ proxied: false }]);
+    });
+
+    /** @scenario "Registering a connection reads the discovery document through the outbound proxy" */
     it("keeps registration's discovery on the proxy", async () => {
       fetched.length = 0;
       const channels = channelsBehindRefusingProxy();
@@ -101,6 +113,7 @@ describe("issuerDiscoveryChannels", () => {
   });
 
   describe("given Node sends global fetch through the proxy too", () => {
+    /** @scenario "The sign-in trust lookup takes the route Node's fetch takes" */
     it("reads the sign-in lookup through the proxy, as the SSO engine will", async () => {
       fetched.length = 0;
       const channels = channelsBehindRefusingProxy({ signInThroughProxy: true });
