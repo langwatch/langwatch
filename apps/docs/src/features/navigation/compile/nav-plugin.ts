@@ -27,7 +27,9 @@ export function docsNavPlugin({ docsRoot }: { docsRoot: string }): Plugin {
         for (const slug of Object.keys(nav.pages))
           this.addWatchFile(path.join(docsRoot, `${slug}.mdx`));
         for (const file of SPEC_FILES) this.addWatchFile(path.join(docsRoot, file));
-        nav.site.stars = await readStars();
+        const stars = await readStars();
+        nav.site.stars = stars.count;
+        nav.site.starsReadAt = stars.at;
         return `export default ${JSON.stringify(nav)};`;
       },
     },

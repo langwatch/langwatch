@@ -5,7 +5,7 @@ import { Star } from "lucide-react";
 import type { SiteMeta } from "../../navigation/model.ts";
 import { formatStars, githubLabel } from "../model/github-stars.ts";
 
-export function GithubLink({ site }: { site: Pick<SiteMeta, "github" | "stars"> }) {
+export function GithubLink({ site }: { site: Pick<SiteMeta, "github" | "stars" | "starsReadAt"> }) {
   const stars = site.stars;
   return (
     <Link
@@ -19,6 +19,7 @@ export function GithubLink({ site }: { site: Pick<SiteMeta, "github" | "stars"> 
       textDecoration="none"
       aria-label={githubLabel({ stars })}
       data-docs-github=""
+      data-docs-stars-at={site.starsReadAt ?? undefined}
       _hover={{ color: "fg", textDecoration: "none" }}
     >
       <GitHubIcon size={16} />

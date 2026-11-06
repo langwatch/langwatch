@@ -11,11 +11,11 @@ import { GithubLink } from "../ui/github-link.tsx";
 
 const GITHUB = "https://github.com/langwatch/langwatch";
 
-function render({ stars }: { stars: number | null }) {
+function render({ stars, readAt = null }: { stars: number | null; readAt?: number | null }) {
   document.head.innerHTML = '<meta name="docs-gtm" content="GTM-KJ4S6Z9C">';
   document.body.innerHTML = renderToStaticMarkup(
     <DesignSystemTestProvider>
-      <GithubLink site={{ github: GITHUB, stars }} />
+      <GithubLink site={{ github: GITHUB, stars, starsReadAt: readAt }} />
       <CookieNotice />
     </DesignSystemTestProvider>,
   );
@@ -76,6 +76,25 @@ describe("the rendered GitHub link", () => {
       await refreshStars({ win: answering(7123) as never, now: 1_800_000_000_000 });
       expect(starsShown()?.textContent).toBe("7,123");
       expect(github()?.getAttribute("aria-label")).toContain("7,123");
+    });
+  });
+
+  describe("when the build read its count under a day ago", () => {
+    /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
+    it("keeps the build's count without asking GitHub", async () => {
+      const now = 1_800_000_000_000;
+      render({ stars: 5000, readAt: now - 60 * 60 * 1000 });
+      const asked: string[] = [];
+      const win = {
+        ...answering(7123),
+        fetch: async (url: string) => {
+          asked.push(url);
+          return answering(7123).fetch();
+        },
+      };
+      await refreshStars({ win: win as never, now });
+      expect(asked).toEqual([]);
+      expect(starsShown()?.textContent).toBe("5,000");
     });
   });
 

@@ -257,8 +257,11 @@ Feature: Actionable documentation and restrained reading surfaces
 
   @unit
   Scenario: Show the live GitHub star count, refreshed from the build's and kept for an hour
-    Given the page shows the star count GitHub reported at build time
-    When the page is idle and this browser has no count from the last hour
+    Given the page shows the star count GitHub reported at build time, and when GitHub reported it
+    When that count is under a day old
+    Then the page shows it without asking GitHub
+    When it is over a day old, or the page was built without a count
+    And the page is idle and this browser has no count from the last hour
     Then it asks GitHub once, shows the live count and keeps it in the browser with the time it was read
     And on a page built without a count, an older kept count shows at once while the fresh one loads
     When this browser read the count within the hour
