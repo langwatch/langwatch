@@ -60,6 +60,14 @@ Feature: Seat requests when an organization is over its seat limit
       And no seat request names "nobody@acme.example"
       And an identity provider refusal notice names "nobody@acme.example"
 
+    @unit
+    Scenario: Refused sign-ins stop opening requests and mailing past a daily cap
+      Given every full member seat and every Lite Member seat is in use
+      And 20 different addresses were refused by the identity provider today
+      When the identity provider refuses one more address
+      Then the refusal is still answered "seat_limit"
+      But no seat request opens for it and no administrator is mailed about it
+
   Rule: approving gives the full seat the person asked for
 
     @unit
@@ -180,6 +188,14 @@ Feature: Seat requests when an organization is over its seat limit
       When "late@acme.example" opens a seat request twice
       Then the sales channel is told about the seat request once
 
+    @unit
+    Scenario: Sales still hear about a seat request whose notice could not be recorded
+      Given the organization is on a negotiated licence on LangWatch Cloud
+      And the access notice log is unavailable
+      When "late@acme.example" opens a seat request
+      Then the seat request is open
+      And the sales channel is told about the seat request
+
   Rule: administrators and Billing members are mailed about each person at once
     Organizations see few of these a day, and each one says an employee wants LangWatch, so there
     is no digest; the only limit is one notice per person, kind and day.
@@ -195,6 +211,18 @@ Feature: Seat requests when an organization is over its seat limit
       When "second@acme.example" opens a seat request
       Then "Ada Admin" and "Bill Payer" are each mailed about "second@acme.example" at once
       And no mail groups the two people together
+
+    @unit
+    Scenario: A notice whose mail reached nobody is retried by the next arrival that day
+      Given "late@acme.example" opened a seat request and no mail about it could be sent
+      When "late@acme.example" arrives again the same day
+      Then "Ada Admin" and "Bill Payer" are mailed about "late@acme.example"
+
+    @unit
+    Scenario: A notice that reached one recipient is not mailed again that day
+      Given a seat request mail about "late@acme.example" reached "Bill Payer" but bounced for "Ada Admin"
+      When "late@acme.example" arrives again the same day
+      Then no second mail goes out about "late@acme.example"
 
     @unit
     Scenario: A Lite joiner waiting for a full seat is mailed about once

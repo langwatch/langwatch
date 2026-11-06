@@ -16,14 +16,14 @@ export class MemoryOrganizationAccessNoticeRepository implements OrganizationAcc
   async record(
     input: Parameters<OrganizationAccessNoticeRepository["record"]>[0],
   ): Promise<AccessNoticeRow[]> {
-    const taken = this.rows.some(
+    const taken = this.rows.find(
       (row) =>
         row.organizationId === input.organizationId &&
         row.kind === input.kind &&
         row.email === input.email &&
         row.dayKey === input.dayKey,
     );
-    if (taken) return [];
+    if (taken) return taken.mailedAt === null ? [taken] : [];
     const row: AccessNoticeRow = {
       id: input.id,
       organizationId: input.organizationId,
@@ -50,5 +50,24 @@ export class MemoryOrganizationAccessNoticeRepository implements OrganizationAcc
       marked.push(row.id);
     }
     return marked;
+  }
+
+  async countRefusedForDay(
+    input: Parameters<OrganizationAccessNoticeRepository["countRefusedForDay"]>[0],
+  ): Promise<number> {
+    return this.rows.filter(
+      (row) =>
+        row.organizationId === input.organizationId &&
+        row.dayKey === input.dayKey &&
+        row.idpRefused,
+    ).length;
+  }
+
+  async releaseMailed(
+    input: Parameters<OrganizationAccessNoticeRepository["releaseMailed"]>[0],
+  ): Promise<void> {
+    for (const [index, row] of this.rows.entries()) {
+      if (row.id === input.id) this.rows[index] = { ...row, mailedAt: null };
+    }
   }
 }

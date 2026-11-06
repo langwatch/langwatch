@@ -15,17 +15,26 @@ const START = Date.UTC(2026, 10, 6, 9);
 
 function notices() {
   const clock = { now: START };
+  const outage = { recipients: false, bouncing: new Set<string>() };
   let ids = 0;
   const repository = MemoryOrganizationAccessNoticeRepository.create();
   const mail = MemoryAccessNoticeMailChannel.create();
+  const deliver = mail.sendSeatRequest.bind(mail);
+  mail.sendSeatRequest = async (input) => {
+    if (outage.bouncing.has(input.recipientEmail)) throw new Error("mailbox unavailable");
+    await deliver(input);
+  };
   const service = OrganizationAccessNoticeService.create({
     notices: repository,
     mail,
     context: {
-      recipients: async () => [
-        { userId: "user-ada", email: "ada@acme.example" },
-        { userId: "user-bill", email: "bill@acme.example" },
-      ],
+      recipients: async () => {
+        if (outage.recipients) throw new Error("recipients unavailable");
+        return [
+          { userId: "user-ada", email: "ada@acme.example" },
+          { userId: "user-bill", email: "bill@acme.example" },
+        ];
+      },
       organizationName: async () => "ACME",
       approval: async () => ({ kind: "contact_sales" }),
     },
@@ -43,7 +52,7 @@ function notices() {
       idp: null,
       idpRefused: false,
     });
-  return { clock, mail, service, seatRequest };
+  return { clock, mail, outage, service, seatRequest };
 }
 
 describe("OrganizationAccessNoticeService", () => {
@@ -107,6 +116,59 @@ describe("OrganizationAccessNoticeService", () => {
       });
 
       expect(mail.seatRequests[0]?.idpRefused).toEqual({ idpName: "Okta" });
+    });
+  });
+
+  describe("when no mail about a notice could be sent", () => {
+    /** @scenario "A notice whose mail reached nobody is retried by the next arrival that day" */
+    it("mails it when the same person arrives again that day", async () => {
+      const { clock, mail, outage, seatRequest } = notices();
+      outage.bouncing = new Set(["ada@acme.example", "bill@acme.example"]);
+
+      const first = await seatRequest("late@acme.example");
+      outage.bouncing.clear();
+      clock.now += HOUR_MS;
+      const second = await seatRequest("late@acme.example");
+
+      expect([first, second]).toEqual([
+        { recorded: true, mailed: false },
+        { recorded: true, mailed: true },
+      ]);
+      expect(mail.seatRequests.map((sent) => sent.recipientEmail)).toEqual([
+        "ada@acme.example",
+        "bill@acme.example",
+      ]);
+    });
+
+    /** @scenario "A notice whose mail reached nobody is retried by the next arrival that day" */
+    it("retries a notice whose recipients could not be read", async () => {
+      const { mail, outage, seatRequest } = notices();
+      outage.recipients = true;
+
+      const first = await seatRequest("late@acme.example");
+      outage.recipients = false;
+      const second = await seatRequest("late@acme.example");
+
+      expect([first.mailed, second.mailed]).toEqual([false, true]);
+      expect(mail.seatRequests).toHaveLength(2);
+    });
+  });
+
+  describe("when the mail reached one recipient and bounced for the other", () => {
+    /** @scenario "A notice that reached one recipient is not mailed again that day" */
+    it("keeps the notice as mailed", async () => {
+      const { mail, outage, seatRequest } = notices();
+      outage.bouncing = new Set(["ada@acme.example"]);
+
+      const first = await seatRequest("late@acme.example");
+      outage.bouncing.clear();
+      const second = await seatRequest("late@acme.example");
+
+      expect([first, second]).toEqual([
+        { recorded: true, mailed: true },
+        { recorded: false, mailed: false },
+      ]);
+      expect(mail.seatRequests.map((sent) => sent.recipientEmail)).toEqual(["bill@acme.example"]);
     });
   });
 });

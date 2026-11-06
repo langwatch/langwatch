@@ -79,6 +79,9 @@ export interface SeatRequestPeers {
   }): Promise<void>;
 }
 
+/** Refused sign-ins an organization is told about per UTC day, both kinds together. */
+export const REFUSED_SIGN_IN_DAILY_CAP = 20;
+
 type Dependencies = Readonly<{
   requests: SeatRequestRepository;
   members: OrganizationMembershipRepository;
@@ -143,11 +146,22 @@ export class SeatRequestService {
     idp: SignInIdpKind | null;
   }): Promise<RefusedSignInOutcome> {
     const address = email.trim().toLowerCase();
-    const [full, lite] = await Promise.all([
+    const [full, lite, refusedToday] = await Promise.all([
       this.dependencies.seats.checkLimit({ organizationId, resource: "members" }),
       this.dependencies.seats.checkLimit({ organizationId, resource: "membersLite" }),
+      this.dependencies.notices.refusedSignInsToday({ organizationId }),
     ]);
-    if (!full.allowed && !lite.allowed) {
+    const outcome = !full.allowed && !lite.allowed ? "seat_limit" : "refused";
+    // The address is only what was typed at sign-in start, so a burst of refusals answers the
+    // screen but stops opening requests and mailing administrators for the rest of the day.
+    if (refusedToday >= REFUSED_SIGN_IN_DAILY_CAP) {
+      this.dependencies.logger.warn(
+        { organizationId, refusedToday },
+        "refused sign-in notices hit the daily cap; recording nothing more today",
+      );
+      return { outcome };
+    }
+    if (outcome === "seat_limit") {
       await this.open({
         organizationId,
         email: address,
@@ -320,15 +334,24 @@ export class SeatRequestService {
     const { requests, notices, now, newId } = this.dependencies;
     const opened = await requests.open({ ...input, id: newId(), at: now() });
     if (opened.outcome === "already_open") return;
-    await notices.record({
-      organizationId: input.organizationId,
-      kind: "seat_request",
-      email: input.email,
-      name: input.name,
-      idp: input.idpKind,
-      idpRefused: input.idpRefused,
-      heldWithoutAccess: input.source !== "lite",
-    });
+    // The request is open either way, and a later arrival answers already_open, so sales are
+    // told even when the notice could not be recorded.
+    await notices
+      .record({
+        organizationId: input.organizationId,
+        kind: "seat_request",
+        email: input.email,
+        name: input.name,
+        idp: input.idpKind,
+        idpRefused: input.idpRefused,
+        heldWithoutAccess: input.source !== "lite",
+      })
+      .catch((error: unknown) => {
+        this.dependencies.logger.warn(
+          { organizationId: input.organizationId, error },
+          "could not record the seat request notice",
+        );
+      });
     await this.tellSales({ request: opened.request });
   }
 

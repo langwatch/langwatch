@@ -44,6 +44,11 @@ type Dependencies = Readonly<{
  * The mail behind seat requests and refused sign-ins (ruling R5): each person's notice is mailed at
  * once, and the same person is noticed at most once a day per kind.
  */
+/** The UTC day a notice counts toward, YYYY-MM-DD. */
+function dayKeyOf(at: number): string {
+  return Temporal.Instant.fromEpochMilliseconds(at).toString().slice(0, 10);
+}
+
 export class OrganizationAccessNoticeService {
   static create(dependencies: Dependencies): OrganizationAccessNoticeService {
     return new OrganizationAccessNoticeService(dependencies);
@@ -72,15 +77,36 @@ export class OrganizationAccessNoticeService {
       name: input.name,
       idp: input.idp,
       idpRefused: input.idpRefused,
-      dayKey: Temporal.Instant.fromEpochMilliseconds(at).toString().slice(0, 10),
+      dayKey: dayKeyOf(at),
       at,
     });
     if (!notice) return { recorded: false, mailed: false };
 
     const [claimed] = await notices.markMailed({ ids: [notice.id], at });
     if (!claimed) return { recorded: true, mailed: false };
-    await this.mailOne({ notice, heldWithoutAccess: input.heldWithoutAccess ?? true });
+    const reached = await this.mailOne({
+      notice,
+      heldWithoutAccess: input.heldWithoutAccess ?? true,
+    }).catch((error: unknown) => {
+      this.dependencies.logger.warn(
+        { organizationId: notice.organizationId, kind: notice.kind, error },
+        "access notice could not be composed",
+      );
+      return false;
+    });
+    if (!reached) {
+      await notices.releaseMailed({ id: notice.id });
+      return { recorded: true, mailed: false };
+    }
     return { recorded: true, mailed: true };
+  }
+
+  /** Notices about refused sign-ins the organization recorded today, both kinds together. */
+  refusedSignInsToday({ organizationId }: { organizationId: string }): Promise<number> {
+    return this.dependencies.notices.countRefusedForDay({
+      organizationId,
+      dayKey: dayKeyOf(this.dependencies.now()),
+    });
   }
 
   private async mailOne({
@@ -89,7 +115,7 @@ export class OrganizationAccessNoticeService {
   }: {
     notice: AccessNoticeRow;
     heldWithoutAccess: boolean;
-  }): Promise<void> {
+  }): Promise<boolean> {
     const { context, mail, requestsUrl } = this.dependencies;
     const { organizationId } = notice;
     const [recipients, organizationName] = await Promise.all([
@@ -99,7 +125,7 @@ export class OrganizationAccessNoticeService {
     const idpName = describeSignInIdp(notice.idp) ?? null;
     const approval =
       notice.kind === "seat_request" ? await context.approval({ organizationId }) : null;
-    await this.fanOut({
+    return this.fanOut({
       organizationId,
       what: notice.kind,
       sends: recipients.map((recipient) => {
@@ -123,7 +149,10 @@ export class OrganizationAccessNoticeService {
     });
   }
 
-  /** One bouncing address must not silence the rest; the notice stands whether or not it went. */
+  /**
+   * One bouncing address must not silence the rest: the notice stands once any send went.
+   * Answers false when none did, so the notice is released for a later arrival to retry.
+   */
   private async fanOut({
     organizationId,
     what,
@@ -132,7 +161,7 @@ export class OrganizationAccessNoticeService {
     organizationId: string;
     what: string;
     sends: Promise<unknown>[];
-  }): Promise<void> {
+  }): Promise<boolean> {
     const outcomes = await Promise.allSettled(sends);
     const failed = outcomes.filter((outcome) => outcome.status === "rejected").length;
     if (failed > 0) {
@@ -141,5 +170,6 @@ export class OrganizationAccessNoticeService {
         "some access notices could not be mailed",
       );
     }
+    return sends.length === 0 || failed < sends.length;
   }
 }

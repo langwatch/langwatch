@@ -87,7 +87,8 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
   });
 
   describe("when the same notice is recorded twice in a day and claimed twice", () => {
-    it("stores one row and claims it for mail once", async () => {
+    /** @scenario "A notice whose mail reached nobody is retried by the next arrival that day" */
+    it("stores one row, hands it back while unmailed and claims it for mail once", async () => {
       const record = (id: string) =>
         notices.record({
           id,
@@ -102,10 +103,16 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
         });
 
       const [stored] = await record(`${namespace}-n1`);
-      expect(await record(`${namespace}-n2`)).toEqual([]);
+      expect((await record(`${namespace}-n2`)).map((row) => row.id)).toEqual([stored!.id]);
 
       expect(await notices.markMailed({ ids: [stored!.id], at: 20_000 })).toEqual([stored!.id]);
       expect(await notices.markMailed({ ids: [stored!.id], at: 20_001 })).toEqual([]);
+      expect(await record(`${namespace}-n3`)).toEqual([]);
+
+      await notices.releaseMailed({ id: stored!.id });
+      expect((await record(`${namespace}-n4`)).map((row) => row.id)).toEqual([stored!.id]);
+      expect(await notices.countRefusedForDay({ organizationId, dayKey: "2026-11-06" })).toBe(1);
+      expect(await notices.countRefusedForDay({ organizationId, dayKey: "2026-11-07" })).toBe(0);
     });
   });
 });

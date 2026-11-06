@@ -43,7 +43,16 @@ export class PrismaOrganizationAccessNoticeRepository
       return [rowOf(created)];
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        return [];
+        const unmailed = await this.prisma.organizationAccessNotice.findFirst({
+          where: {
+            organizationId: input.organizationId,
+            kind: input.kind,
+            email: input.email,
+            dayKey: input.dayKey,
+            mailedAt: null,
+          },
+        });
+        return unmailed ? [rowOf(unmailed)] : [];
       }
       throw error;
     }
@@ -61,6 +70,23 @@ export class PrismaOrganizationAccessNoticeRepository
       if (result.count > 0) marked.push(id);
     }
     return marked;
+  }
+
+  async countRefusedForDay(
+    input: Parameters<OrganizationAccessNoticeRepository["countRefusedForDay"]>[0],
+  ): Promise<number> {
+    return this.prisma.organizationAccessNotice.count({
+      where: { organizationId: input.organizationId, dayKey: input.dayKey, idpRefused: true },
+    });
+  }
+
+  async releaseMailed(
+    input: Parameters<OrganizationAccessNoticeRepository["releaseMailed"]>[0],
+  ): Promise<void> {
+    await this.prisma.organizationAccessNotice.updateMany({
+      where: { id: input.id },
+      data: { mailedAt: null },
+    });
   }
 }
 
