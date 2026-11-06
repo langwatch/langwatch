@@ -3125,13 +3125,13 @@ const presentations = {
     describe: () => "Nothing was charged. Try again in a moment.",
   },
   seat_quantity_below_in_use: {
-    // fault: customer. The seat count asked for is lower than the full seats
-    // in use, so nothing changed and nothing was charged.
-    title: "That's fewer seats than you use",
+    // fault: customer. The seat count asked for is below the minimum (the full
+    // seats in use, and never below one), so nothing changed or was charged.
+    title: "That's too few seats",
     describe: (error) => {
-      const minimum = error.meta.minimum;
-      return typeof minimum === "number"
-        ? `Nothing changed. Choose at least ${minimum} seats.`
+      const minimum = num(error, "minimum", 0);
+      return minimum > 0
+        ? `Nothing changed. Choose at least ${minimum} ${minimum === 1 ? "seat" : "seats"}.`
         : "Nothing changed. Choose at least as many seats as are in use.";
     },
   },

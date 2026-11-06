@@ -52,12 +52,12 @@ export class InvalidPlanError extends HandledError {
   }
 }
 
-/** A seat count below the full seats in use; never below one. */
+/** A seat count below the minimum: the full seats in use, and never below one. */
 export class SeatQuantityBelowInUseError extends HandledError {
   declare readonly code: "seat_quantity_below_in_use";
 
   constructor({ requested, minimum }: { requested: number; minimum: number }) {
-    super("seat_quantity_below_in_use", `Seats can't go below the ${minimum} in use`, {
+    super("seat_quantity_below_in_use", `Seats can't go below ${minimum}`, {
       httpStatus: 422,
       fault: "customer",
       meta: { requested, minimum },

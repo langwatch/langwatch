@@ -191,7 +191,7 @@ export class BillingSubscriptionService {
   }): Promise<void> {
     const inUse = await this.seatsInUse.countFullSeatsInUse({ organizationId });
     const minimum = Math.max(1, inUse);
-    if (!Number.isInteger(requested) || requested < minimum) {
+    if (requested < minimum) {
       throw new SeatQuantityBelowInUseError({ requested, minimum });
     }
   }

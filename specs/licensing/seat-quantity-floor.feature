@@ -31,11 +31,6 @@ Feature: Seat count never goes below the seats in use
     And the payment provider is not called
 
   @unit
-  Scenario: A fractional seat count is refused
-    When an administrator sets the seat count to 5.5
-    Then the change is refused with "seat_quantity_below_in_use"
-
-  @unit
   Scenario: An organization with no seats in use still keeps one seat
     Given no full member seats are in use
     When an administrator sets the seat count to 0

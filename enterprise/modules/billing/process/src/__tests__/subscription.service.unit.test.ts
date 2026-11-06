@@ -317,7 +317,12 @@ describe("BillingSubscriptionService", () => {
         });
 
         expect(result).toEqual({ success: true });
-        expect(stripeSubscriptions.updates).toHaveLength(1);
+        expect(itemCalculator.getItemsToUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({ membersToAdd: 5 }),
+        );
+        expect(stripeSubscriptions.updates).toEqual([
+          { subscriptionId: "sub_stripe_1", change: { items: [{ id: "si_1", quantity: 1 }] } },
+        ]);
       });
 
       /** @scenario "A seat change below the seats in use is refused" */
@@ -352,20 +357,6 @@ describe("BillingSubscriptionService", () => {
           }),
         ).rejects.toMatchObject({ code: "seat_quantity_below_in_use" });
         expect(stripeSubscriptions.updates).toEqual([]);
-      });
-
-      /** @scenario "A fractional seat count is refused" */
-      it("refuses a fractional seat count", async () => {
-        await expect(
-          service.updateSubscriptionItems({
-            organizationId: "org_123",
-            plan: PlanTypes.LAUNCH,
-            upgradeMembers: true,
-            upgradeTraces: false,
-            totalMembers: 5.5,
-            totalTraces: 0,
-          }),
-        ).rejects.toMatchObject({ code: "seat_quantity_below_in_use" });
       });
     });
 
