@@ -560,7 +560,15 @@ describe("the checkouts BillingModule counts", () => {
         id: "evt_checkout",
         object: "event",
         type: "checkout.session.completed",
-        data: { object: { id: "cs_1", object: "checkout.session", client_reference_id: null } },
+        data: {
+          object: {
+            id: "cs_1",
+            object: "checkout.session",
+            client_reference_id: null,
+            subscription: "sub_checkout",
+            payment_link: null,
+          },
+        },
       });
 
       await app.createSeatCheckout({

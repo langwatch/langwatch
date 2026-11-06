@@ -45,6 +45,11 @@ Feature: Checkout volume is measured
     Then no checkout series is written
 
   @unit
+  Scenario: A license purchase or a session without a subscription is not counted as completed
+    When the payment provider reports a completed license purchase, or a completed session with no subscription
+    Then no completed checkout is counted
+
+  @unit
   Scenario: Both checkout doors and the completion webhook are counted
     Given billing runs on LangWatch Cloud with a payment provider
     When a Growth seat checkout opens, a checkout for a plan with no price is refused, and a completed checkout is delivered

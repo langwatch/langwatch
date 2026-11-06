@@ -626,14 +626,13 @@ export class BillingModule
     customerEmail: string | null;
   }): Promise<{ url: string | null; subscriptionId: string }> {
     const { customerEmail, ...checkout } = input;
-    // Customer creation stays outside the count, as it does before the subscription door.
-    const customerId = await this.getOrCreateCustomerId({
-      user: { email: customerEmail },
-      organizationId: input.organizationId,
+    return BillingModule.#checkouts.track("seat_checkout", async () => {
+      const customerId = await this.getOrCreateCustomerId({
+        user: { email: customerEmail },
+        organizationId: input.organizationId,
+      });
+      return this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId });
     });
-    return BillingModule.#checkouts.track("seat_checkout", () =>
-      this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId }),
-    );
   }
 
   async listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]> {
@@ -682,7 +681,7 @@ export class BillingModule
       handleEvent: async (event) => {
         const result = await events.handleEvent(event);
         if (event.type === "checkout.session.completed" && result.status === "ok") {
-          BillingModule.#checkouts.completed();
+          BillingModule.#checkouts.completed({ session: event.data.object, licensePaymentLinkId });
         }
         return result;
       },
@@ -757,7 +756,7 @@ export class BillingModule
     this.#reporting = reporting;
     this.#resourceLimitAlerts = resourceLimitAlerts;
     this.#lifecycle = lifecycle;
-    if (isSaas) BillingModule.#checkouts.seedStarts();
+    if (isSaas && subscriptions) BillingModule.#checkouts.seedStarts();
   }
 
   notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void> {

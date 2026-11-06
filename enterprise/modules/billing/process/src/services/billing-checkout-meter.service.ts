@@ -2,6 +2,7 @@
 
 import { HandledError } from "@langwatch/handled-error";
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
+import type Stripe from "stripe";
 
 /** Pinned: the checkout-volume alert reads this series by name. */
 export const BILLING_CHECKOUT_TOTAL_METRIC_NAME = "billing_checkout_total";
@@ -52,11 +53,22 @@ export class BillingCheckoutMeterService {
     for (const flow of BILLING_CHECKOUT_FLOWS) this.checkouts.inc({ stage: "started", flow }, 0);
   }
 
-  completed(): void {
+  /** Counts a completed subscription checkout; license purchases and sessions billing skips are not. */
+  completed({
+    session,
+    licensePaymentLinkId,
+  }: {
+    session: Pick<Stripe.Checkout.Session, "subscription" | "payment_link">;
+    licensePaymentLinkId: string | undefined;
+  }): void {
+    const paymentLink =
+      typeof session.payment_link === "string" ? session.payment_link : session.payment_link?.id;
+    if (!session.subscription) return;
+    if (licensePaymentLinkId && paymentLink === licensePaymentLinkId) return;
     this.checkouts.inc({ stage: "completed" });
   }
 }
 
 function failureReason(error: unknown): string {
-  return error instanceof HandledError ? error.code : "unhandled";
+  return HandledError.isHandled(error) ? error.code : "unhandled";
 }

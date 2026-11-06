@@ -10,6 +10,7 @@ import {
 } from "../billing-checkout-meter.service.ts";
 
 const CHECKOUT_URL = "https://checkout.stripe.com/c/pay/test";
+const LICENSE_LINK = "plink_license";
 
 describe("BillingCheckoutMeterService", () => {
   let metrics = createRecordingMeterProvider();
@@ -105,9 +106,41 @@ describe("BillingCheckoutMeterService", () => {
   describe("when the payment provider reports a completed checkout", () => {
     /** @scenario "A completed checkout is counted" */
     it("counts one completed checkout", () => {
-      BillingCheckoutMeterService.create().completed();
+      BillingCheckoutMeterService.create().completed({
+        session: { subscription: "sub_1", payment_link: null },
+        licensePaymentLinkId: LICENSE_LINK,
+      });
 
       expect(written()).toEqual([{ value: 1, attributes: { stage: "completed" } }]);
+    });
+  });
+
+  describe("when the completed checkout is not a subscription checkout", () => {
+    /** @scenario "A license purchase or a session without a subscription is not counted as completed" */
+    it("counts nothing for a license purchase or a session without a subscription", () => {
+      const meter = BillingCheckoutMeterService.create();
+
+      meter.completed({
+        session: { subscription: "sub_license", payment_link: LICENSE_LINK },
+        licensePaymentLinkId: LICENSE_LINK,
+      });
+      meter.completed({
+        session: { subscription: null, payment_link: null },
+        licensePaymentLinkId: LICENSE_LINK,
+      });
+
+      expect(written()).toEqual([]);
+    });
+  });
+
+  describe("when billing starts", () => {
+    it("writes zero starts for each door", () => {
+      BillingCheckoutMeterService.create().seedStarts();
+
+      expect(written()).toEqual([
+        { value: 0, attributes: { stage: "started", flow: "subscription" } },
+        { value: 0, attributes: { stage: "started", flow: "seat_checkout" } },
+      ]);
     });
   });
 });
