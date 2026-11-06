@@ -6,7 +6,10 @@
  */
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
-import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+import { Toaster, toaster } from "@langwatch/design-system/toaster";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useEffect, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -26,7 +29,15 @@ vi.mock("../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
 }));
 
 import { lwqlResult } from "../../../__tests__/lwql-fixtures.ts";
-import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
+import {
+  AnalyticsHostProvider,
+  type AnalyticsRouteReading,
+} from "../../../model/analytics-host.ts";
+import {
+  ANALYTICS_MEMBER_PERMISSIONS,
+  StubAnalyticsHost,
+  type StubAnalyticsHostOptions,
+} from "../../../testing.tsx";
 import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
@@ -42,20 +53,38 @@ const BOARD = {
   updatedAt: new Date("2026-01-01"),
 };
 
-const widget = ({ id, name, gridRow }: { id: string; name: string; gridRow: number }) => ({
+type StoredQuery = { name: string; sql: string; sources?: string[] };
+
+/** A stored widget; one that reads sources lets the editor empty its list. */
+const widget = ({
   id,
-  dashboardId: BOARD.id,
   name,
-  graph: {
-    version: 1,
-    code: "export default function Widget() { return null; }",
-    queries: [{ name: "main", sql: `SELECT count() AS n FROM traces -- ${id}` }],
-  },
-  gridColumn: 0,
   gridRow,
-  colSpan: 4,
-  rowSpan: 3,
-});
+  readsSources = false,
+}: {
+  id: string;
+  name: string;
+  gridRow: number;
+  readsSources?: boolean;
+}) => {
+  const from = readsSources
+    ? "trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)}"
+    : "traces";
+  const queries: StoredQuery[] = [
+    { name: "main", sql: `SELECT count() AS n FROM ${from} -- ${id}` },
+  ];
+  return {
+    id,
+    dashboardId: BOARD.id,
+    name,
+    graph: { version: 1, code: "export default function Widget() { return null; }", queries },
+    gridColumn: 0,
+    gridRow,
+    colSpan: 4,
+    rowSpan: 3,
+  };
+};
+type StoredWidget = ReturnType<typeof widget>;
 const WIDGETS = [
   widget({ id: "w-1", name: "Volume", gridRow: 0 }),
   widget({ id: "w-2", name: "Cost per trace", gridRow: 3 }),
@@ -79,7 +108,9 @@ const HTTP_STATUS = {
 /** The error code each widget id answers with; a widget not listed answers with rows. */
 type Failures = Record<string, keyof typeof HTTP_STATUS>;
 
-function boardServer(failures: Failures) {
+/** `dashboardWidgets.update` stores what it is sent, as the server does; an unset list is dropped. */
+function boardServer(failures: Failures, widgets: readonly StoredWidget[] = WIDGETS) {
+  const stored = widgets.map((each) => structuredClone(each));
   return (call: UiProcedureCall): Promise<unknown> => {
     switch (call.path) {
       case "boards.getAll":
@@ -87,10 +118,32 @@ function boardServer(failures: Failures) {
       case "boards.listStarred":
         return Promise.resolve([]);
       case "dashboardWidgets.list":
-        return Promise.resolve(WIDGETS.map((each) => structuredClone(each)));
+        return Promise.resolve(structuredClone(stored));
+      case "dashboardWidgets.update": {
+        const { id, code, queries } = call.input as {
+          id: string;
+          code: string;
+          queries: { name: string; sql: string; sources?: string[] | null }[];
+        };
+        const row = stored.find((each) => each.id === id);
+        if (row) {
+          row.graph = {
+            ...row.graph,
+            code,
+            queries: queries.map(({ name, sql, sources }) => ({
+              name,
+              sql,
+              ...(sources ? { sources } : {}),
+            })),
+          };
+        }
+        return Promise.resolve({ success: true });
+      }
+      case "analytics.lwql.readableProjects":
+        return Promise.resolve({ projects: [{ id: HOME_BOARD.projectId, name: "Test Project" }] });
       case "analytics.lwql.query": {
         const { sql } = call.input as { sql: string };
-        const id = WIDGETS.find((each) => sql.endsWith(`-- ${each.id}`))?.id ?? "";
+        const id = stored.find((each) => sql.endsWith(`-- ${each.id}`))?.id ?? "";
         const code = failures[id];
         return code
           ? Promise.reject(new UiProcedureRefusal(code, HTTP_STATUS[code]))
@@ -134,8 +187,90 @@ async function openBoard(failures: Failures) {
   await answerFrames();
 }
 
+/** The host double, with an address that follows each query write as the router's does. */
+class AddressedHost extends StubAnalyticsHost {
+  readonly listeners = new Set<() => void>();
+  private query: Readonly<Record<string, string | undefined>>;
+
+  constructor(options: StubAnalyticsHostOptions) {
+    super(options);
+    this.query = options.route?.query ?? {};
+  }
+
+  override route(): AnalyticsRouteReading {
+    return { params: super.route().params, query: this.query };
+  }
+
+  override setQuery(next: Readonly<Record<string, string | undefined>>): void {
+    super.setQuery(next);
+    this.query = next;
+    for (const listener of this.listeners) listener();
+  }
+}
+
+/** The board under a new host object for each address, as the router hands one; the editor opens. */
+function AddressedBoard({ host }: { host: AddressedHost }) {
+  const [atAddress, setAtAddress] = useState(host);
+  useEffect(() => {
+    const readdress = () => setAtAddress(new Proxy(host, {}));
+    host.listeners.add(readdress);
+    return () => void host.listeners.delete(readdress);
+  }, [host]);
+  return (
+    <AnalyticsHostProvider value={atAddress}>
+      <DashboardBoardScreen />
+    </AnalyticsHostProvider>
+  );
+}
+
+/** Opens the board a member can edit, and runs each card's query once. */
+async function openEditableBoard({
+  failures,
+  widgets,
+}: {
+  failures: Failures;
+  widgets: readonly StoredWidget[];
+}) {
+  const host = new AddressedHost({
+    flags: { release_dashboards: true, release_langy_enabled: true },
+    permissions: [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"],
+    route: { params: { dashboardId: BOARD.id }, query: {} },
+  });
+  renderDashboards({
+    element: (
+      <>
+        <AddressedBoard host={host} />
+        <Toaster />
+      </>
+    ),
+    host,
+    answer: boardServer(failures, widgets),
+  });
+  await answerFrames();
+}
+
+/** Opens the editor on the named widget, on its Queries tab. */
+async function openEditor({
+  user,
+  name,
+}: {
+  user: ReturnType<typeof userEvent.setup>;
+  name: string;
+}) {
+  await user.click(await screen.findByRole("button", { name: `Actions for ${name}` }));
+  await user.click(await screen.findByRole("menuitem", { name: "Edit code" }));
+  await screen.findByRole("tab", { name: "API / MCP" });
+  const drawer = screen
+    .getAllByRole("dialog")
+    .find((dialog) => within(dialog).queryByRole("tab", { name: "API / MCP" }));
+  if (!drawer) throw new Error("the editor did not open");
+  await user.click(within(drawer).getByRole("tab", { name: /^Queries/ }));
+  return drawer;
+}
+
 afterEach(() => {
   cleanup();
+  toaster.remove();
   vi.clearAllMocks();
 });
 
@@ -209,6 +344,31 @@ describe("given a board of three widgets", () => {
       expect(
         screen.getAllByTestId("sandboxed-frame").filter((f) => !before.includes(f)),
       ).toHaveLength(1);
+      expect(screen.queryByTestId(BANNER)).toBeNull();
+    });
+  });
+
+  describe("when a limit-failed widget's sources are emptied", () => {
+    /** @scenario "A widget that ended on a limit stops counting when its card leaves" */
+    it("drops the line once the empty sources view replaces its card", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      await openEditableBoard({
+        failures: { "w-2": "query_memory_exceeded", "w-3": "query_timeout" },
+        widgets: [
+          widget({ id: "w-1", name: "Volume", gridRow: 0 }),
+          widget({ id: "w-2", name: "Cost per trace", gridRow: 3, readsSources: true }),
+          widget({ id: "w-3", name: "Who uses it", gridRow: 6 }),
+        ],
+      });
+      expect(await screen.findByTestId(BANNER)).toHaveTextContent("2 of 3 widgets hit a limit");
+
+      const drawer = await openEditor({ user, name: "Cost per trace" });
+      await user.click(within(drawer).getByRole("button", { name: "Remove application" }));
+      await user.click(within(drawer).getByRole("button", { name: "Save" }));
+      await vi.waitFor(() => expect(screen.queryByRole("tab", { name: "API / MCP" })).toBeNull());
+
+      await vi.waitFor(() => expect(screen.getByTestId("no-sources-picked")).toBeTruthy());
+      expect(screen.getAllByText("Couldn't load")).toHaveLength(1);
       expect(screen.queryByTestId(BANNER)).toBeNull();
     });
   });

@@ -220,6 +220,7 @@ const boardWidget = ({
         maxHeight={300}
         widgetName="Cost per trace"
         timeWindow={{ start: 1_000, end: 2_000 }}
+        periodKey="7d:auto"
         {...props}
       />
     </DesignSystemProvider>
@@ -457,10 +458,10 @@ describe("given a widget on a board", () => {
       const answers = [Promise.resolve(resultWith(report({}))), Promise.reject(BROKEN)];
       answers[1]?.catch(() => undefined);
       const run = frameRuns(() => answers.shift() ?? Promise.reject(BROKEN));
-      const { rerender } = render(boardWidget({ timeWindow: LAST_7_DAYS }));
+      const { rerender } = render(boardWidget({ timeWindow: LAST_7_DAYS, periodKey: "7d:auto" }));
       await run();
 
-      rerender(boardWidget({ timeWindow: LAST_30_DAYS }));
+      rerender(boardWidget({ timeWindow: LAST_30_DAYS, periodKey: "30d:auto" }));
       await run();
 
       expect(screen.getByText("Couldn't load")).toBeTruthy();
@@ -483,11 +484,11 @@ describe("given a widget on a board", () => {
     /** @scenario "A failed card goes back to loading while a new period runs" */
     it("takes a failed card back to loading while the new period runs", async () => {
       const run = frameRuns(() => Promise.reject(BROKEN));
-      const { rerender } = render(boardWidget({ timeWindow: LAST_7_DAYS }));
+      const { rerender } = render(boardWidget({ timeWindow: LAST_7_DAYS, periodKey: "7d:auto" }));
       await run();
       expect(screen.getByText("Couldn't load")).toBeTruthy();
 
-      rerender(boardWidget({ timeWindow: LAST_30_DAYS }));
+      rerender(boardWidget({ timeWindow: LAST_30_DAYS, periodKey: "30d:auto" }));
 
       expect(screen.queryByTestId("widget-state-face")).toBeNull();
       expect(loadingFace()).not.toBeNull();

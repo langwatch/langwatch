@@ -85,7 +85,7 @@ Feature: A dashboard widget frame shows what its queries report
     @e2e @unimplemented
     Scenario: Cards of other sizes show the whole message within their room
       Given a stored widget that fails on a limit, with a message of five lines
-      When the card is at least 341px wide and 158px to 169px high
+      When the card is at least 341px wide and 158px to 177px high
       Then the card shows four lines of the message when there is no note
       And a card at least 278px high shows the message in full
 

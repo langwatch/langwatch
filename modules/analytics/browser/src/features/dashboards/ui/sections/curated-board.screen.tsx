@@ -51,7 +51,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
   const langy = useLangyAsk();
   const empty = useEmptyWidgets();
   const emptyWidgetNames = empty.emptyNames({ widgets: board.widgets, keyOf: ({ key }) => key });
-  const limitFailed = useLimitFailedWidgets();
+  const limitFailedWidgets = useLimitFailedWidgets();
 
   return (
     <BoardPage
@@ -93,7 +93,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
               }
             />
             <LimitFailedWidgetsBanner
-              failed={limitFailed.count({ widgets: board.widgets, keyOf: ({ key }) => key })}
+              failed={limitFailedWidgets.count({ widgets: board.widgets, keyOf: ({ key }) => key })}
               total={board.widgets.length}
             />
             <CuratedWidgetsGrid
@@ -113,7 +113,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
                 empty.report({ key: widget.key, empty: isEmpty })
               }
               onLimitFailureChange={({ widget, limited }) =>
-                limitFailed.report({ key: widget.key, limited })
+                limitFailedWidgets.report({ key: widget.key, limited })
               }
             />
           </VStack>

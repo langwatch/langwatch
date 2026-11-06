@@ -123,7 +123,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const editor = useBoardEditor({ board: subject, period, widgets });
   const empty = useEmptyWidgets();
   const emptyWidgetNames = empty.emptyNames({ widgets, keyOf: ({ id }) => id });
-  const limitFailed = useLimitFailedWidgets();
+  const limitFailedWidgets = useLimitFailedWidgets();
   const askLangyToSetUp = langy.enabled
     ? () => langy.ask(boardSetupDraft({ emptyWidgetNames, board: subject, period }))
     : undefined;
@@ -214,7 +214,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 onAskLangy={askLangyToSetUp}
               />
               <LimitFailedWidgetsBanner
-                failed={limitFailed.count({ widgets, keyOf: ({ id }) => id })}
+                failed={limitFailedWidgets.count({ widgets, keyOf: ({ id }) => id })}
                 total={widgets.length}
               />
               <BoardWidgetsGrid
@@ -230,7 +230,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                   empty.report({ key: widget.id, empty: showsNoData })
                 }
                 onLimitFailureChange={({ widget, limited }) =>
-                  limitFailed.report({ key: widget.id, limited })
+                  limitFailedWidgets.report({ key: widget.id, limited })
                 }
                 langyFor={
                   langy.enabled

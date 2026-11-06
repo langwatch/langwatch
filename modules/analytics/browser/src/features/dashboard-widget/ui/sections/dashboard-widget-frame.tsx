@@ -84,15 +84,22 @@ export function DashboardWidgetFrame(props: DashboardWidgetFrameProps) {
     [period.startDate, period.endDate],
   );
 
-  return <DashboardWidgetFrameOverWindow {...props} timeWindow={timeWindow} />;
+  // No product caller today; a window that rolls on refresh would restart the widget each time.
+  return (
+    <DashboardWidgetFrameOverWindow
+      {...props}
+      timeWindow={timeWindow}
+      periodKey={`${timeWindow.start}:${timeWindow.end}`}
+    />
+  );
 }
 
 /** What a widget over a window its caller owns takes, such as a Dashboards board's period. */
 type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
   readonly timeWindow: { start: number; end: number };
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
-  /** The reader's chosen period; absent, the span and step tell a new period from a refresh. */
-  readonly periodKey?: string;
+  /** The reader's chosen period and step; a new key starts the widget over, a refresh keeps it. */
+  readonly periodKey: string;
   /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
   readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
   /** Who reads the card; with it, a memory or time limit failure gets its own words and actions. */
@@ -118,9 +125,7 @@ export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWi
   const parsed = dashboardWidgetDefinitionSchema.safeParse(props.graph);
   const queries = parsed.success ? JSON.stringify(parsed.data.queries) : "";
   const code = parsed.success ? parsed.data.code : "";
-  const span = props.timeWindow.end - props.timeWindow.start;
-  const period = props.periodKey ?? `${span}:${props.granularitySeconds ?? ""}`;
-  const key = `${props.id}:${queries}:${code}:${period}`;
+  const key = `${props.id}:${queries}:${code}:${props.periodKey}`;
   return <WidgetFrameOverWindow key={key} {...props} parsed={parsed} />;
 }
 
@@ -255,7 +260,8 @@ function WidgetFrameOverWindow({
     onSetUp: (target) => onNavigate({ target, params: {} }),
   });
 
-  // The frame stays mounted under a face, so a retry or a refresh can bring the chart back.
+  // The frame stays mounted under a face, so a refresh of the same period can bring the chart
+  // back. Retry remounts it through its key instead.
   return (
     <Box position="relative" height="full">
       <Box visibility={cover ? "hidden" : "visible"} aria-hidden={cover ? true : undefined}>
