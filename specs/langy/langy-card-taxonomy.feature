@@ -125,6 +125,13 @@ Feature: Langy's cards read at the right attention weight
     Given a step that failed because Langy's own sandbox credential was refused, and a reply after it
     When I read the turn, while it runs or after it answered
     Then that failure is a row in the folded record of the work, not a card
+    And opening it says the failure is on Langy's side, not the reader's access
+
+  @integration
+  Scenario: A refused access keeps its card even when a retry might work
+    Given a step refused with an access-denial code that is not marked final
+    When I read the turn after it answered
+    Then that failure keeps its card in the conversation
 
   @integration
   Scenario: A not-found probe folds into the record

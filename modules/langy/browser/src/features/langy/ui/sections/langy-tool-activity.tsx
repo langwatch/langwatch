@@ -43,9 +43,9 @@ import {
 import { isSayToolPart } from "../../../tools/model/langy-say-tool.ts";
 import { isSecretSnippetToolPart } from "../../../tools/model/langy-secret-snippet-tool.ts";
 import {
-  credentialFault,
   type LangyToolErrorPresentation,
   presentLangyToolError,
+  readerMustAct,
 } from "../../model/logic/langy-tool-failure.ts";
 import {
   commandOf,
@@ -766,29 +766,6 @@ function partitionFailures({
   return { failureCards, foldedFailures };
 }
 
-/** Statuses no retry can fix that only the person can: they lack access, or are not signed in. */
-const ACCESS_STATUSES = new Set([401, 403]);
-
-/**
- * A failure no retry can fix because access was refused or an app is not connected. A
- * not-found probe is terminal too, but it is the agent looking around, so it folds.
- */
-function refusesAccess({
-  presentation,
-  toolName,
-}: {
-  presentation: LangyToolErrorPresentation;
-  toolName: string | undefined;
-}): boolean {
-  // A local credential failure is the reader's own login, terminal or not; a sandbox
-  // one is ours to fix.
-  const fault = credentialFault({ code: presentation.code, toolName });
-  if (fault !== null) return fault === "local";
-  if (!presentation.terminal) return false;
-  if (presentation.code?.trim().toLowerCase() === "langy_github_not_connected") return true;
-  return presentation.httpStatus !== undefined && ACCESS_STATUSES.has(presentation.httpStatus);
-}
-
 /**
  * Whether a failed step stays a card in the conversation rather than a row of the receipt:
  * only when the reader has to act. A denied permission, a decision the card offers, access
@@ -806,7 +783,7 @@ function keepsItsCard({
   isLastStep: boolean;
 }): boolean {
   if (failure.call.state === "output-denied") return true;
-  if (refusesAccess({ presentation: failure.presentation, toolName: failure.sourceToolName }))
+  if (readerMustAct({ presentation: failure.presentation, toolName: failure.sourceToolName }))
     return true;
   if (isReaderDecision({ call: failure.call, presentation: failure.presentation })) return true;
   if (live || interrupted) return false;
@@ -834,13 +811,13 @@ function CompletedActivityBatch({
   // visible by default so a seven-step dataset/evaluation flow cannot look like
   // it silently skipped three calls on touchscreens or keyboard navigation.
   const [open, setOpen] = useState(true);
-  const userToggled = useRef(false);
+  const pinned = useRef(false);
   const closeTimer = useRef<number | undefined>(undefined);
   const pauseClose = () => window.clearTimeout(closeTimer.current);
   const scheduleClose = () => {
     pauseClose();
     closeTimer.current = window.setTimeout(() => {
-      if (!userToggled.current) setOpen(false);
+      if (!pinned.current) setOpen(false);
     }, 2200);
   };
   useEffect(() => {
@@ -849,7 +826,7 @@ function CompletedActivityBatch({
   }, []);
   // A pointer passing over only pauses the close; a click or focus means it is being read.
   const pin = () => {
-    userToggled.current = true;
+    pinned.current = true;
     pauseClose();
   };
   const failedCount = failures.length;
@@ -1016,6 +993,12 @@ function CompletedActivityRow({ group, devMode }: { group: ActivityGroup; devMod
 function FailedActivityRow({ failure, devMode }: { failure: FailedToolCall; devMode: boolean }) {
   const { call, presentation } = failure;
   const described = describeToolCall({ name: call.name, input: call.input });
+  // Copy the raw block already carries (a plain error's own text) is not said twice.
+  const raw = call.errorText ?? "";
+  const { message, detail } = presentation;
+  const messageIsNew = !raw.includes(message);
+  const detailIsNew = detail === undefined || !raw.includes(detail);
+  const explainsBeyondRaw = messageIsNew && detailIsNew;
 
   return (
     <ReceiptRow
@@ -1032,6 +1015,12 @@ function FailedActivityRow({ failure, devMode }: { failure: FailedToolCall; devM
       detail={described.detail}
       opened={
         <>
+          {explainsBeyondRaw ? (
+            <Text textStyle="2xs" color="fg.muted">
+              {presentation.message}
+              {presentation.detail ? ` ${presentation.detail}` : ""}
+            </Text>
+          ) : null}
           <OpenedToolCall call={call} />
           {presentation.code ? <LangyFailureReference code={presentation.code} /> : null}
           {hasToolErrorActions(presentation) ? (

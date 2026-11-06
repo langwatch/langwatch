@@ -179,11 +179,16 @@ const CREDENTIAL_CODES = new Set([
  */
 const PLAN_LIMIT_CODES = new Set(["resource_limit_exceeded"]);
 
-const normalizedCode = (domain: LangWatchHandledErrorShape): string =>
-  domain.code.trim().toLowerCase();
+const normalizeCode = (code: string): string => code.trim().toLowerCase();
 
 const isAccessDenial = (domain: LangWatchHandledErrorShape): boolean =>
-  ACCESS_DENIAL_CODES.has(normalizedCode(domain));
+  ACCESS_DENIAL_CODES.has(normalizeCode(domain.code));
+
+/** The code of the failure that says the LangWatch GitHub App is not installed. */
+const GITHUB_NOT_CONNECTED_CODE = "langy_github_not_connected";
+
+/** Statuses only the person can fix: they lack access, or are not signed in. */
+const ACCESS_STATUSES = new Set([401, 403]);
 
 /**
  * Tools that run in the folder the developer shared from their own machine
@@ -196,7 +201,7 @@ const LOCAL_TOOL_PREFIX = "local_";
  * Whose CLI credential a failure is: "sandbox" is Langy's own key (ours to fix), "local"
  * is the reader's own login on their machine. `null` when it is no credential failure.
  */
-export const credentialFault = ({
+const credentialFault = ({
   code,
   toolName,
 }: {
@@ -204,9 +209,31 @@ export const credentialFault = ({
   toolName: string | undefined;
 }): "sandbox" | "local" | null => {
   if (code === undefined) return null;
-  const known = CREDENTIAL_CODES.has(code.trim().toLowerCase());
+  const known = CREDENTIAL_CODES.has(normalizeCode(code));
   if (!known) return null;
   return toolName?.startsWith(LOCAL_TOOL_PREFIX) ? "local" : "sandbox";
+};
+
+/**
+ * Whether the reader has to act, so the failure keeps its card. A credential failure
+ * keeps it on a local tool and folds in the sandbox; an access-denial code, a terminal
+ * github-not-connected, 401 or 403 keep it. A terminal not-found folds.
+ */
+export const readerMustAct = ({
+  presentation,
+  toolName,
+}: {
+  presentation: LangyToolErrorPresentation;
+  toolName: string | undefined;
+}): boolean => {
+  const { code, httpStatus, terminal } = presentation;
+  const fault = credentialFault({ code, toolName });
+  if (fault !== null) return fault === "local";
+  const normalised = code === undefined ? undefined : normalizeCode(code);
+  if (normalised !== undefined && ACCESS_DENIAL_CODES.has(normalised)) return true;
+  if (!terminal) return false;
+  if (normalised === GITHUB_NOT_CONNECTED_CODE) return true;
+  return httpStatus !== undefined && ACCESS_STATUSES.has(httpStatus);
 };
 
 const asCount = (value: unknown): number | undefined =>
@@ -222,7 +249,7 @@ function limitLabel(limitType: unknown): string | undefined {
 
 /** The plan allowance behind a failure, or null when it was not one. */
 function readPlanLimit(domain: LangWatchHandledErrorShape): LangyToolFailureLimit | null {
-  const code = normalizedCode(domain);
+  const code = normalizeCode(domain.code);
   if (!PLAN_LIMIT_CODES.has(code)) return null;
   const label = limitLabel(domain.meta.limitType);
   if (!label) return null;
@@ -318,7 +345,7 @@ function githubAppNotInstalled({
   if (!/\bgh auth login\b/i.test(raw)) return null;
 
   const copy = explainHandledError({
-    code: "langy_github_not_connected",
+    code: GITHUB_NOT_CONNECTED_CODE,
     meta: {},
     httpStatus: 409,
     fault: "customer",
@@ -333,7 +360,7 @@ function githubAppNotInstalled({
     title: copy.title,
     message: copy.description,
     tips: ["Install it from Settings, under Integrations."],
-    code: "langy_github_not_connected",
+    code: GITHUB_NOT_CONNECTED_CODE,
     terminal: true,
     raw,
   };

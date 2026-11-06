@@ -394,6 +394,16 @@ describe("a failed step", () => {
       expect(receiptSteps().getByText("langwatch trace list")).toBeTruthy();
     });
 
+    /** @scenario "A sandbox credential failure folds into the record" */
+    it("says, once opened, that the failure is on Langy's side", async () => {
+      const user = userEvent.setup();
+      renderActivity({ parts: [unauthorized, reply], live: false });
+
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(screen.getByText(/on our side/)).toBeTruthy();
+    });
+
     /** @scenario "A failure no retry can fix keeps its card" */
     it("keeps its card when a local tool failed on the reader's own login", () => {
       const localUnauthorized = {
@@ -422,6 +432,53 @@ describe("a failed step", () => {
     /** @scenario "A failure no retry can fix keeps its card" */
     it("keeps its card although the failure carried no HTTP status", () => {
       renderActivity({ parts: [notAuthenticated, reply], live: false });
+
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+
+    /** @scenario "A failure no retry can fix keeps its card" */
+    it("keeps its card while the turn runs", () => {
+      renderActivity({ parts: [notAuthenticated], live: true });
+
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+
+    /** @scenario "A failure no retry can fix keeps its card" */
+    it.each(["missing_api_key", "unauthorized", "not_authenticated"])(
+      "keeps its card for the %s credential code",
+      (code) => {
+        const failure = {
+          ...(notAuthenticated as Record<string, unknown>),
+          toolCallId: `local-${code}`,
+          errorText: JSON.stringify({
+            ok: false,
+            error: { code, message: "Login needed.", isHandled: true },
+          }),
+        } as never;
+        renderActivity({ parts: [failure, reply], live: false });
+
+        expect(screen.getByRole("alert")).toBeTruthy();
+      },
+    );
+  });
+
+  describe("given a step refused with an access-denial code that is not marked final", () => {
+    const denied = failedStep({
+      id: "denied-1",
+      command: "langwatch scenario create",
+      errorText: JSON.stringify({
+        ok: false,
+        error: {
+          code: "api_key_permission_denied",
+          message: "API Key does not grant required permission: scenarios:manage",
+          isHandled: false,
+        },
+      }),
+    });
+
+    /** @scenario "A refused access keeps its card even when a retry might work" */
+    it("keeps its card after the turn answered", () => {
+      renderActivity({ parts: [denied, reply], live: false });
 
       expect(screen.getByRole("alert")).toBeTruthy();
     });
