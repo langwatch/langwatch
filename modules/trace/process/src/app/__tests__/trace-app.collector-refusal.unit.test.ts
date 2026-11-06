@@ -4,22 +4,21 @@
  * stub: a refusal is the sender's mistake, so it logs at warn and never raises an error signature.
  */
 import type * as observabilityModule from "@langwatch/observability";
+import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
-import { TraceModule, type TraceAppDependencies } from "../trace.app.ts";
+import type { TraceAppDependencies } from "../trace.app.ts";
 
-const loggerSpies = vi.hoisted(() => ({
-  warn: vi.fn(),
-  info: vi.fn(),
-  error: vi.fn(),
-  debug: vi.fn(),
-}));
+const testLog = createTestLogger();
 vi.mock("@langwatch/observability", async (importOriginal) => ({
   ...(await importOriginal<typeof observabilityModule>()),
-  createLogger: () => loggerSpies,
+  createLogger: () => testLog.logger,
 }));
+
+// After the mock: trace.app builds its logger when the module loads.
+const { TraceModule } = await import("../trace.app.ts");
 
 function app() {
   return TraceModule.fromDependencies(
@@ -31,23 +30,24 @@ function app() {
   );
 }
 
+beforeEach(() => {
+  testLog.lines.length = 0;
+});
+
 describe("TraceModule.collectorReportError", () => {
   describe("when the collector refuses a span that failed validation", () => {
     /** @scenario A refused payload never raises an error signature */
     it("logs at warn with the project and trace, never error", () => {
-      loggerSpies.warn.mockClear();
-      loggerSpies.error.mockClear();
-
       app().collectorReportError(new Error("ZodError on parsing spans"), {
         projectId: "project_1",
         traceId: "trace_1",
       });
 
-      expect(loggerSpies.warn).toHaveBeenCalledWith(
-        expect.objectContaining({ projectId: "project_1", traceId: "trace_1" }),
-        "the collector refused a payload",
-      );
-      expect(loggerSpies.error).not.toHaveBeenCalled();
+      expect(testLog.lines.findLine("warn", "the collector refused a payload")).toMatchObject({
+        projectId: "project_1",
+        traceId: "trace_1",
+      });
+      expect(testLog.lines.filter((line) => line.level >= 50)).toEqual([]);
     });
   });
 });

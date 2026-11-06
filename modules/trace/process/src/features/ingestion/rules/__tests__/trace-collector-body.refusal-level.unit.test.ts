@@ -4,44 +4,47 @@
  * warn, so none of them raises a New Error Signature alert.
  */
 import type * as observabilityModule from "@langwatch/observability";
+import { createTestLogger } from "@langwatch/test-harness";
+import type { Span } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const loggerSpies = vi.hoisted(() => ({
-  warn: vi.fn(),
-  info: vi.fn(),
-  error: vi.fn(),
-  debug: vi.fn(),
-}));
+const testLog = createTestLogger();
 vi.mock("@langwatch/observability", async (importOriginal) => ({
   ...(await importOriginal<typeof observabilityModule>()),
-  createLogger: () => loggerSpies,
+  createLogger: () => testLog.logger,
 }));
 
 const { findEvaluationRejection, findSpanRejection, resolveTraceId } =
   await import("../trace-collector-body.rules.ts");
 
-type CollectorBody = Parameters<typeof findEvaluationRejection>[0];
-type Spans = Parameters<typeof findSpanRejection>[0];
+const NOW_SECONDS = Math.floor(Date.now() / 1000);
 
-const NOW = Date.now();
-const NOW_SECONDS = Math.floor(NOW / 1000);
+/** A span the schema accepts: only the trace id and the timestamps vary between cases. */
+function span(input: { spanId: string; traceId: string; timestamps?: Span["timestamps"] }): Span {
+  const now = Date.now();
+  return {
+    type: "span",
+    span_id: input.spanId,
+    trace_id: input.traceId,
+    timestamps: input.timestamps ?? { started_at: now, finished_at: now },
+  };
+}
 
 function expectRefusedAtWarn(rejection: unknown) {
   expect(rejection).toMatchObject({ rejected: true, status: 400 });
-  expect(loggerSpies.warn).toHaveBeenCalled();
-  expect(loggerSpies.error).not.toHaveBeenCalled();
+  expect(testLog.lines.filter((line) => line.level === 40)).not.toEqual([]);
+  expect(testLog.lines.filter((line) => line.level >= 50)).toEqual([]);
 }
 
 beforeEach(() => {
-  loggerSpies.warn.mockClear();
-  loggerSpies.error.mockClear();
+  testLog.lines.length = 0;
 });
 
 describe("given a body the collector refuses", () => {
   describe("when an evaluation has no passed, score or label", () => {
     /** @scenario Every collector refusal logs at warning level */
     it("logs the refusal at warn, never error", () => {
-      const body = { evaluations: [{ id: "eval-1", name: "check" }] } as unknown as CollectorBody;
+      const body = { evaluations: [{ id: "eval-1", name: "check" }] };
 
       expectRefusedAtWarn(findEvaluationRejection(body, "project_1"));
     });
@@ -59,7 +62,7 @@ describe("given a body the collector refuses", () => {
             timestamps: { started_at: NOW_SECONDS, finished_at: NOW_SECONDS },
           },
         ],
-      } as unknown as CollectorBody;
+      };
 
       expectRefusedAtWarn(findEvaluationRejection(body, "project_1"));
     });
@@ -68,7 +71,7 @@ describe("given a body the collector refuses", () => {
   describe("when no span carries a trace id", () => {
     /** @scenario Every collector refusal logs at warning level */
     it("logs the refusal at warn, never error", () => {
-      const spans = [{ type: "span", span_id: "span-1" }] as unknown as Spans;
+      const spans = [span({ spanId: "span-1", traceId: "" })];
 
       expectRefusedAtWarn(resolveTraceId(spans, { projectId: "project_1", nullableTraceId: null }));
     });
@@ -78,9 +81,9 @@ describe("given a body the collector refuses", () => {
     /** @scenario Every collector refusal logs at warning level */
     it("logs the refusal at warn, never error", () => {
       const spans = [
-        { type: "span", span_id: "span-1", trace_id: "trace-1" },
-        { type: "span", span_id: "span-2", trace_id: "trace-2" },
-      ] as unknown as Spans;
+        span({ spanId: "span-1", traceId: "trace-1" }),
+        span({ spanId: "span-2", traceId: "trace-2" }),
+      ];
 
       expectRefusedAtWarn(
         resolveTraceId(spans, { projectId: "project_1", nullableTraceId: "trace-1" }),
@@ -92,13 +95,12 @@ describe("given a body the collector refuses", () => {
     /** @scenario Every collector refusal logs at warning level */
     it("logs the refusal at warn, never error", () => {
       const spans = [
-        {
-          type: "span",
-          span_id: "span-1",
-          trace_id: "trace-1",
+        span({
+          spanId: "span-1",
+          traceId: "trace-1",
           timestamps: { started_at: NOW_SECONDS, finished_at: NOW_SECONDS },
-        },
-      ] as unknown as Spans;
+        }),
+      ];
 
       expectRefusedAtWarn(findSpanRejection(spans, { projectId: "project_1", traceId: "trace-1" }));
     });
