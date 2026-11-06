@@ -20,6 +20,7 @@ import { OAuthProfileEmailChannel } from "../../channels/http/http.oauth-profile
 import {
   SIGN_IN_HINT_COOKIE,
   SIGN_IN_HINT_TTL_MS,
+  UNFINISHED_SIGN_IN_TTL_MS,
   roundTripBindingOf,
   signInHintSealer,
 } from "../../rules/sign-in-hint.rules.ts";
@@ -1039,7 +1040,7 @@ describe("given a provider sign-in started on our page with a typed address", ()
 
   describe("when Better Auth accepts the start", () => {
     /** @scenario "The hint is set when a sign-in starts and dropped once the callback answers" */
-    it("sets a signed, httpOnly hint for 15 minutes that rides a cross-site SAML post", async () => {
+    it("sets a signed, httpOnly hint for an hour that rides a cross-site SAML post", async () => {
       const world = door();
       world.handler.mockImplementation(async () =>
         Response.json({ url: `https://idp.acme.test/sso?SAMLRequest=x&RelayState=${ROUND_TRIP}` }),
@@ -1055,7 +1056,7 @@ describe("given a provider sign-in started on our page with a typed address", ()
       expect(cookie).toContain("SameSite=None");
       expect(cookie).toContain("Secure");
       expect(cookie).toContain("Path=/api/auth;");
-      expect(cookie).toContain(`Max-Age=${SIGN_IN_HINT_TTL_MS / 1000}`);
+      expect(cookie).toContain(`Max-Age=${UNFINISHED_SIGN_IN_TTL_MS / 1000}`);
       const value = cookie.split(";")[0]!.split("=")[1]!;
       expect(
         signInHintSealer({ secret: HINT_SECRET }).decode({ value, nowMs: NOW_MS }),
@@ -1147,6 +1148,105 @@ describe("given an identity provider that sends refused people to its access err
 
       expect(locationOf(answered).searchParams.get("error")).toBe("access_denied");
       expect(locationOf(answered).searchParams.has("idp")).toBe(false);
+    });
+  });
+});
+
+describe("given a sign-in this browser started that its provider never answered", () => {
+  const unfinishedRead = (hint?: string) =>
+    new Request(`${BASE_URL}/api/auth/sign-in/unfinished`, {
+      headers: hint === undefined ? {} : { cookie: `${SIGN_IN_HINT_COOKIE}=${hint}` },
+    });
+
+  describe("when the sign-in page asks within the hour", () => {
+    /** @scenario "A sign-in that never came back is noticed on the next visit" */
+    it("names the provider to dial and its kind, and tells nobody", async () => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: "org_1",
+        idp: "okta",
+        outcome: "refused",
+      });
+
+      const answered = await door({ refusedSignIns }).service.betterAuthHandshake(
+        unfinishedRead(sealedHint({ issuedAt: NOW_MS - SIGN_IN_HINT_TTL_MS - 60_000 })),
+      );
+
+      await expect(answered.json()).resolves.toEqual({
+        unfinished: { providerId: CONNECTION, idp: "okta" },
+      });
+      expect(answered.headers.get("cache-control")).toBe("no-store");
+      expect(calls).toEqual([
+        { refusedBy: { kind: "connection", connectionId: CONNECTION }, email: null },
+      ]);
+    });
+  });
+
+  describe("when there is no hint, or it is over an hour old", () => {
+    /** @scenario "A sign-in that never came back is noticed on the next visit" */
+    it.each([
+      ["no hint", undefined],
+      ["an expired hint", sealedHint({ issuedAt: NOW_MS - UNFINISHED_SIGN_IN_TTL_MS - 1 })],
+      ["a forged hint", sealedHint({ secret: "another-secret" })],
+    ])("answers none for %s", async (_, hint) => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: "org_1",
+        idp: "okta",
+        outcome: "refused",
+      });
+
+      const answered = await door({ refusedSignIns }).service.betterAuthHandshake(
+        unfinishedRead(hint),
+      );
+
+      await expect(answered.json()).resolves.toEqual({ unfinished: null });
+      expect(calls).toEqual([]);
+    });
+  });
+
+  describe("when a refused callback reads a hint older than 15 minutes", () => {
+    /** @scenario "The hint is set when a sign-in starts and dropped once the callback answers" */
+    it("does not name the person", async () => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: "org_1",
+        idp: "okta",
+        outcome: "refused",
+      });
+
+      await refusing({ refusedSignIns }).service.betterAuthHandshake(
+        refusedCallback({ hint: sealedHint({ issuedAt: NOW_MS - SIGN_IN_HINT_TTL_MS - 60_000 }) }),
+      );
+
+      expect(calls[0]?.email).toBeNull();
+    });
+  });
+
+  describe("when an answer starts a session some other way", () => {
+    /** @scenario "The hint is set when a sign-in starts and dropped once the callback answers" */
+    it("drops the hint, so nothing reads as unfinished afterwards", async () => {
+      const world = door({
+        betterAuth: async () => ({
+          handler: async () =>
+            new Response("{}", {
+              status: 200,
+              headers: { "set-cookie": "better-auth.session_token=abc; Path=/; HttpOnly" },
+            }),
+        }),
+      });
+
+      const answered = await world.service.betterAuthHandshake(
+        new Request(`${BASE_URL}/api/auth/sign-in/email`, {
+          method: "POST",
+          headers: {
+            origin: BASE_URL,
+            "content-type": "application/json",
+            cookie: `${SIGN_IN_HINT_COOKIE}=${sealedHint()}`,
+          },
+          body: JSON.stringify({ email: "sam@acme.com", password: "x" }),
+        }),
+      );
+
+      const cookies = answered.headers.getSetCookie();
+      expect(cookies.some((cookie) => cookie.startsWith(`${SIGN_IN_HINT_COOKIE}=;`))).toBe(true);
     });
   });
 });

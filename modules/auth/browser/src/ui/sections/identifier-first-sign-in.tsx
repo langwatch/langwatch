@@ -15,6 +15,7 @@ import { usePasskeyAutofill } from "../../behavior/use-passkey-autofill.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
+import { useUnfinishedSignIn } from "../../behavior/use-unfinished-sign-in.ts";
 import { ssoHandOffFailureMessage } from "../../model/auth-failure-message.ts";
 import { signUpHref } from "../../model/carried-email.ts";
 import type { FrontDoorDepth } from "../../model/ground-palette.ts";
@@ -28,6 +29,7 @@ import {
 import { signInMethodActionLabel, signInMethodLabel } from "../../model/method-labels.ts";
 import { shouldStartPasskeyOnArrival } from "../../model/method-ranking.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
+import { describeUnfinishedSignIn } from "../../model/refused-sign-in-copy.ts";
 import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
 import { signInGreeting } from "../../model/sign-in-greeting.ts";
 import {
@@ -92,8 +94,6 @@ export function IdentifierFirstSignIn() {
   const { data: session } = useSession();
   const routing = useSignInRouting();
   const { decide } = routing;
-  const askedOnMount = useRef(false);
-  const [instanceMethods, setInstanceMethods] = useState<readonly SignInMethod[]>([]);
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
   // Read once per mount, before this page dials anything itself.
   const [soleAutoDialAllowed] = useState(() => soleConnectionAutoDialAllowed());
@@ -113,6 +113,12 @@ export function IdentifierFirstSignIn() {
   // A passkey ceremony somebody deliberately started, published by the button they pressed.
   const passkeyCeremony = usePasskeyCeremony();
 
+  // Asked once, with no address: the answer is what tells this screen whether
+  // an address is even the next question, and what the instance offers beside
+  // it. A deployment that routes without one never shows the address step,
+  // which is how a single-connection install keeps behaving as it does today.
+  const instanceMethods = useInstanceMethods({ decide, breakGlass, signedIn: Boolean(session) });
+
   // The recommended way in, ahead of the button in the rail below: a passkey
   // offered from the address field's own autofill, where somebody who does not
   // remember making one will still find it.
@@ -129,20 +135,6 @@ export function IdentifierFirstSignIn() {
     promotePendingMethod();
     replaceLocation(safeRedirectTarget(callbackUrl));
   }, [session, callbackUrl]);
-
-  // Asked once, with no address: the answer is what tells this screen whether
-  // an address is even the next question, and what the instance offers beside
-  // it. A deployment that routes without one never shows the address step,
-  // which is how a single-connection install keeps behaving as it does today.
-  useEffect(() => {
-    if (askedOnMount.current || session) return;
-    askedOnMount.current = true;
-    void decide({ identifier: null, breakGlass }).then((decision) => {
-      if (decision?.outcome === "method_picker") {
-        setInstanceMethods(decision.methodSet);
-      }
-    });
-  }, [decide, breakGlass, session]);
 
   // After the instance question above, so the recovered address's answer is the one that stands.
   const recoveredEmail = useExpiredSessionRecovery({
@@ -188,6 +180,12 @@ export function IdentifierFirstSignIn() {
     }),
   });
 
+  // A sign-in that left for a provider and never came back, until they choose what to do next.
+  const unfinishedNotice = useUnfinishedNotice({
+    enabled: !error && submittedIdentifier === null,
+    onUseDifferentEmail: routing.clear,
+  });
+
   // Ahead of everything: a password was accepted, or a ceremony is waiting on a device.
   const takenOver = cardTakenOver({ twoStep, passkeyCeremony });
   if (takenOver) return takenOver;
@@ -215,6 +213,10 @@ export function IdentifierFirstSignIn() {
   // above is already taking them where they were going, and a card that says
   // so would only flash on the way past.
   if (session) return null;
+
+  if (unfinishedNotice) {
+    return <UnfinishedSignInNotice {...unfinishedNotice} dialFederated={dialFederated} />;
+  }
 
   if (decision?.outcome === "redirect_to_connection") {
     return (
@@ -321,6 +323,92 @@ export function IdentifierFirstSignIn() {
           ) : null
         }
       />
+    </AuthCard>
+  );
+}
+
+/** A sign-in still unanswered, or null once there is none or the person set it aside. */
+function useUnfinishedNotice({
+  enabled,
+  onUseDifferentEmail,
+}: {
+  enabled: boolean;
+  onUseDifferentEmail: () => void;
+}): { providerId: string; idp: string | null; setAsideForAnotherEmail: () => void } | null {
+  const unfinished = useUnfinishedSignIn({ enabled });
+  const [setAside, setSetAside] = useState(false);
+  if (!unfinished || setAside || !enabled) return null;
+  return {
+    ...unfinished,
+    setAsideForAnotherEmail: () => {
+      setSetAside(true);
+      onUseDifferentEmail();
+    },
+  };
+}
+
+/** Asks the router once, with no address, for what the instance offers beside the address. */
+function useInstanceMethods({
+  decide,
+  breakGlass,
+  signedIn,
+}: {
+  decide: ReturnType<typeof useSignInRouting>["decide"];
+  breakGlass: boolean;
+  signedIn: boolean;
+}): readonly SignInMethod[] {
+  const askedOnMount = useRef(false);
+  const [instanceMethods, setInstanceMethods] = useState<readonly SignInMethod[]>([]);
+  useEffect(() => {
+    if (askedOnMount.current || signedIn) return;
+    askedOnMount.current = true;
+    void decide({ identifier: null, breakGlass }).then((decision) => {
+      if (decision?.outcome === "method_picker") setInstanceMethods(decision.methodSet);
+    });
+  }, [decide, breakGlass, signedIn]);
+  return instanceMethods;
+}
+
+/**
+ * The provider never sent the person back, most often because it showed its own error page.
+ * Names the provider kind only: no seats, no organization, and nobody was told.
+ */
+function UnfinishedSignInNotice({
+  providerId,
+  idp,
+  dialFederated,
+  setAsideForAnotherEmail,
+}: {
+  providerId: string;
+  idp: string | null;
+  dialFederated: (method: SignInMethod) => ReturnType<typeof signIn>;
+  setAsideForAnotherEmail: () => void;
+}) {
+  const onTryAgain = () => dialFederated({ id: providerId, kind: "federated", connectionId: null });
+  const copy = describeUnfinishedSignIn(idp);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  return (
+    <AuthCard title={copy.title}>
+      <HandledErrorAlert
+        description={refusal ?? undefined}
+        fallbackTitle="Could not start log-in"
+        testId="unfinished-sign-in-refused"
+      />
+      <Text data-testid="unfinished-sign-in">{copy.body}</Text>
+      <FrontDoorPrimaryButton onClick={() => watchHandOff({ handOff: onTryAgain(), setRefusal })}>
+        Try again
+      </FrontDoorPrimaryButton>
+      <Button
+        variant="plain"
+        size="sm"
+        alignSelf="center"
+        textDecoration="underline"
+        textUnderlineOffset="3px"
+        onClick={setAsideForAnotherEmail}
+        data-testid="unfinished-sign-in-different-email"
+      >
+        Use a different email
+      </Button>
     </AuthCard>
   );
 }

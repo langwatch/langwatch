@@ -23,3 +23,12 @@ export const SEAT_LIMIT_REFUSAL: SignInRefusalCopy = {
   title: "Waiting for a seat",
   body: "Your organization is over its seat limits. Please contact an administrator to approve your access.",
 };
+
+/** The notice for a sign-in that left for a provider and never came back. No seats, no names. */
+export function describeUnfinishedSignIn(idp: string | null | undefined): SignInRefusalCopy {
+  const name = describeSignInIdp(idp);
+  return {
+    title: "Your last sign-in didn't finish",
+    body: `${name ? `Your sign-in with ${name}` : "Your company's sign-in"} didn't send you back to LangWatch. If it said you don't have access, ask your IT team to assign you the LangWatch app.`,
+  };
+}

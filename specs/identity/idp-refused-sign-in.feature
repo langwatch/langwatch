@@ -66,11 +66,32 @@ Feature: A sign-in the company's identity provider refused says who refused it
   @unit
   Scenario: The hint is set when a sign-in starts and dropped once the callback answers
     Given the person starts a sign-in with a provider from our sign-in page with their address
-    Then the answer sets a signed, httpOnly hint cookie scoped to /api/auth that expires in 15 minutes
+    Then the answer sets a signed, httpOnly hint cookie scoped to /api/auth that lives for an hour
+    And a refused callback trusts it to name the person for 15 minutes only
     And the hint holds a hash of the state or RelayState the answer sends the person to the provider with
     And an answer that carries neither sets no hint
     And over https it is SameSite=None and Secure, so a SAML provider's cross-site post carries it
-    And when the provider's callback answers, the hint cookie is cleared
+    And when the provider's callback answers or any answer starts a session, the hint cookie is cleared
+
+  @unit
+  Scenario: A sign-in that never came back is noticed on the next visit
+    Given the person started a sign-in with a provider from our sign-in page, with or without an address
+    And the provider never sent them back, for example by showing its own error page
+    When they open the sign-in page again within an hour
+    Then the page reads the unfinished sign-in from the unspent hint
+    And it learns the provider to dial again and the provider kind, never the address
+    And the organization is not told and no mail is sent
+    And with no hint, an expired one or one already spent, there is no unfinished sign-in
+
+  @integration
+  Scenario: The sign-in page says the last sign-in did not finish
+    Given this browser's last sign-in left for a provider and never came back
+    When the person opens the sign-in page
+    Then it says "Your last sign-in didn't finish", naming the provider kind only and never seats
+    And it says to ask the IT team to assign the LangWatch app if the provider said there is no access
+    And "Try again" starts that provider's sign-in again
+    And "Use a different email" goes back to the address step
+    And the error screen does not ask about it
 
   @unit
   Scenario: A refusal that does not echo the sign-in's round trip names nobody

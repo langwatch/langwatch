@@ -21,6 +21,7 @@ const {
   searchParamsRef,
   publicEnvRef,
   priorSessionRef,
+  unfinishedRef,
 } = vi.hoisted(() => ({
   routeMock: vi.fn(),
   routeErrorRef: { current: null as unknown },
@@ -35,6 +36,17 @@ const {
     current: { IS_SAAS: true, HAS_EMAIL_PROVIDER_KEY: true } as Record<string, unknown>,
   },
   priorSessionRef: ((): { current: unknown } => ({ current: undefined }))(),
+  unfinishedRef: {
+    current: null as { providerId: string; idp: string | null } | null,
+    enabled: [] as boolean[],
+  },
+}));
+
+vi.mock("../../../behavior/use-unfinished-sign-in.ts", () => ({
+  useUnfinishedSignIn: ({ enabled }: { enabled: boolean }) => {
+    unfinishedRef.enabled.push(enabled);
+    return enabled ? unfinishedRef.current : null;
+  },
 }));
 
 vi.mock("../../../behavior/auth-api.ts", () => ({
@@ -159,6 +171,8 @@ describe("given the identifier-first sign-in screen", () => {
     searchParamsRef.current = new URLSearchParams("");
     publicEnvRef.current = { IS_SAAS: true, HAS_EMAIL_PROVIDER_KEY: true };
     priorSessionRef.current = undefined;
+    unfinishedRef.current = null;
+    unfinishedRef.enabled.length = 0;
     window.localStorage.clear();
     window.sessionStorage.clear();
     _resetTwoStepChallengeForTests();
@@ -238,6 +252,58 @@ describe("given the identifier-first sign-in screen", () => {
       expect(routeMock).not.toHaveBeenCalledWith(
         expect.objectContaining({ identifier: expect.stringContaining("@") }),
       );
+    });
+  });
+
+  describe("when this browser's last sign-in left for a provider and never came back", () => {
+    /** @scenario "The sign-in page says the last sign-in did not finish" */
+    it("says so naming the provider kind only, and dials it again on Try again", async () => {
+      unfinishedRef.current = { providerId: "ssoc_acme", idp: "okta" };
+      routeMock.mockResolvedValue(localPicker);
+      renderScreen();
+
+      expect(
+        await screen.findByRole("heading", { name: "Your last sign-in didn't finish" }),
+      ).toBeTruthy();
+      const notice = screen.getByTestId("unfinished-sign-in");
+      expect(notice).toHaveTextContent(
+        "Your sign-in with Okta didn't send you back to LangWatch. If it said you don't have access, ask your IT team to assign you the LangWatch app.",
+      );
+      expect(notice).not.toHaveTextContent(/seat/i);
+
+      await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(signInMock).toHaveBeenCalledWith("ssoc_acme", {
+        callbackUrl: undefined,
+        loginHint: undefined,
+      });
+    });
+
+    /** @scenario "The sign-in page says the last sign-in did not finish" */
+    it("goes back to the address step on Use a different email", async () => {
+      unfinishedRef.current = { providerId: "ssoc_acme", idp: null };
+      routeMock.mockResolvedValue(localPicker);
+      renderScreen();
+
+      expect(await screen.findByTestId("unfinished-sign-in")).toHaveTextContent(
+        /^Your company's sign-in didn't send you back/,
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Use a different email" }));
+
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(screen.queryByTestId("unfinished-sign-in")).toBeNull();
+      expect(signInMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The sign-in page says the last sign-in did not finish" */
+    it("is not asked about on the error screen", async () => {
+      searchParamsRef.current = new URLSearchParams("error=access_denied");
+      unfinishedRef.current = { providerId: "ssoc_acme", idp: "okta" };
+      routeMock.mockResolvedValue(localPicker);
+      renderScreen();
+
+      await screen.findByRole("link", { name: /back to sign in/i });
+      expect(unfinishedRef.enabled.every((enabled) => !enabled)).toBe(true);
+      expect(screen.queryByTestId("unfinished-sign-in")).toBeNull();
     });
   });
 

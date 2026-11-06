@@ -71,28 +71,60 @@ describe("extractSignInStartHint", () => {
         "/api/auth/sign-in/sso",
         { providerId: "ssoc_acme", loginHint: " Sam@Acme.com " },
         "ssoc_acme",
+        "connection",
       ],
-      ["/api/auth/sign-in/sso", { providerId: "ssoc_acme", email: "sam@acme.com" }, "ssoc_acme"],
-      ["/api/auth/sign-in/social", { provider: "google", loginHint: "sam@acme.com" }, "google"],
+      [
+        "/api/auth/sign-in/sso",
+        { providerId: "ssoc_acme", email: "sam@acme.com" },
+        "ssoc_acme",
+        "connection",
+      ],
+      [
+        "/api/auth/sign-in/social",
+        { provider: "google", loginHint: "sam@acme.com" },
+        "google",
+        "provider",
+      ],
       [
         "/api/auth/sign-in/social",
         { provider: "azure-ad", loginHint: "sam@acme.com" },
         "microsoft",
+        "provider",
       ],
-      ["/api/auth/sign-in/oauth2", { providerId: "okta", loginHint: "sam@acme.com" }, "okta"],
-    ])("reads %s", (pathname, body, providerId) => {
+      [
+        "/api/auth/sign-in/oauth2",
+        { providerId: "okta", loginHint: "sam@acme.com" },
+        "okta",
+        "provider",
+      ],
+    ])("reads %s", (pathname, body, providerId, source) => {
       expect(extractSignInStartHint({ pathname, body })).toEqual({
         providerId,
+        source,
         email: "sam@acme.com",
       });
     });
   });
 
   describe("when the start carries no address", () => {
+    /** @scenario "A sign-in that never came back is noticed on the next visit" */
     it.each([
-      ["/api/auth/sign-in/sso", { providerId: "ssoc_acme" }],
-      ["/api/auth/sign-in/social", { provider: "google", loginHint: "not-an-address" }],
+      ["/api/auth/sign-in/sso", { providerId: "ssoc_acme" }, "ssoc_acme", "connection"],
+      [
+        "/api/auth/sign-in/social",
+        { provider: "google", loginHint: "not-an-address" },
+        "google",
+        "provider",
+      ],
+    ])("reads the provider alone from %s", (pathname, body, providerId, source) => {
+      expect(extractSignInStartHint({ pathname, body })).toEqual({ providerId, source });
+    });
+  });
+
+  describe("when the start names no provider", () => {
+    it.each([
       ["/api/auth/sign-in/email", { email: "sam@acme.com", password: "x" }],
+      ["/api/auth/sign-in/sso", { email: "sam@acme.com" }],
     ])("reads nothing from %s", (pathname, body) => {
       expect(extractSignInStartHint({ pathname, body })).toBeUndefined();
     });

@@ -3,9 +3,14 @@ import {
   type BrowserSessionResolution,
   type BrowserSessionVerification,
   InvalidAuthOriginError,
+  type UnfinishedSignIn,
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
-import type { RefusedSignInClassification, RefusedSignInInput } from "@langwatch/identity-contract";
+import type {
+  RefusedSignInClassification,
+  RefusedSignInInput,
+  SignInIdpKind,
+} from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { getActiveTraceId } from "@langwatch/observability/tracing";
 import type { Instant } from "@langwatch/time";
@@ -42,6 +47,10 @@ import {
   extractSignInHintCookie,
   extractSignInStartHint,
   extractHintedAddress,
+  isSessionStarted,
+  isUnfinishedSignInRead,
+  type SignInStartHint,
+  UNFINISHED_SIGN_IN_TTL_MS,
   roundTripBindingOf,
   isSignInStartPath,
   type SignInHintSealer,
@@ -218,6 +227,11 @@ export class AuthDoorService {
       return Response.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, { status: 403 });
     }
 
+    if (
+      isUnfinishedSignInRead({ pathname: new URL(request.url).pathname, method: request.method })
+    ) {
+      return this.readUnfinishedSignIn({ request });
+    }
     const refusedConnectionId = extractRefusalPageConnection({
       pathname: new URL(request.url).pathname,
       method: request.method,
@@ -288,14 +302,14 @@ export class AuthDoorService {
     }
   }
 
-  /** The address a provider sign-in start typed, read off a copy so Better Auth reads the body. */
+  /** The provider a sign-in start names, read off a copy so Better Auth reads the body. */
   private async readSignInStartHint({
     request,
     pathname,
   }: {
     request: Request;
     pathname: string;
-  }): Promise<{ providerId: string; email: string } | undefined> {
+  }): Promise<SignInStartHint | undefined> {
     if (!isSignInStartPath({ pathname, method: request.method })) return undefined;
     try {
       const body: unknown = JSON.parse(await request.clone().text());
@@ -307,7 +321,7 @@ export class AuthDoorService {
 
   /**
    * Sets the hint on an accepted sign-in start, bound to the round-trip value its answer sends the
-   * person to the provider with, and drops it once a callback has answered.
+   * person to the provider with, and drops it once a callback has answered or a session started.
    */
   private async carrySignInHint({
     request,
@@ -318,7 +332,7 @@ export class AuthDoorService {
     request: Request;
     response: Response;
     pathname: string;
-    startHint: { providerId: string; email: string } | undefined;
+    startHint: SignInStartHint | undefined;
   }): Promise<Response> {
     const secure = this.deps.baseUrl().startsWith("https:");
     const isCallback = isSignInCallbackPath({ pathname });
@@ -333,7 +347,7 @@ export class AuthDoorService {
         binding: roundTripBindingOf({ value: roundTrip }),
       });
       if (value) cookie = buildSignInHintCookie({ value, secure });
-    } else if (isCallback && carriesHint) {
+    } else if (carriesHint && (isCallback || isSessionStarted({ response }))) {
       cookie = buildClearedSignInHintCookie({ secure });
     }
     if (!cookie) return response;
@@ -389,6 +403,42 @@ export class AuthDoorService {
     const headers = new Headers(response.headers);
     headers.set("location", location);
     return new Response(response.body, { status: response.status, headers });
+  }
+
+  /**
+   * A sign-in this browser started whose provider never answered back, read from the unspent hint:
+   * the provider kind and the id to dial again, never the address. Nobody is told, nothing mailed.
+   */
+  private async readUnfinishedSignIn({ request }: { request: Request }): Promise<Response> {
+    const sealed = extractSignInHintCookie(request.headers.get("cookie"));
+    const hint = sealed
+      ? this.deps.signInHints().decode({
+          value: sealed,
+          nowMs: this.deps.now().epochMilliseconds,
+          maxAgeMs: UNFINISHED_SIGN_IN_TTL_MS,
+        })
+      : undefined;
+    const headers = { "cache-control": "no-store" };
+    if (!hint) return Response.json({ unfinished: null } satisfies UnfinishedSignIn, { headers });
+    let idp: SignInIdpKind | null = null;
+    try {
+      const answer = await withinClassificationTime(
+        this.deps.refusedSignIns.classifyRefusedSignIn({
+          refusedBy:
+            hint.source === "provider"
+              ? { kind: "provider", providerId: hint.providerId }
+              : { kind: "connection", connectionId: hint.providerId },
+          email: null,
+        }),
+      );
+      if (answer !== "timed_out") idp = answer.idp;
+    } catch (error) {
+      logger.warn({ error }, "an unfinished sign-in's provider kind could not be read");
+    }
+    return Response.json(
+      { unfinished: { providerId: hint.providerId, idp } } satisfies UnfinishedSignIn,
+      { headers },
+    );
   }
 
   /**

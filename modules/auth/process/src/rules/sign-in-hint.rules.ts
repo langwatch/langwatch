@@ -13,14 +13,20 @@ import { z } from "zod";
 export const SIGN_IN_HINT_COOKIE = "langwatch.sign_in_hint";
 /** Only the auth door reads it. */
 const SIGN_IN_HINT_PATH = "/api/auth";
+/** How long a refused callback trusts a hint to name the person. */
 export const SIGN_IN_HINT_TTL_MS = 15 * 60 * 1000;
+/** How long the sign-in page may say an unanswered sign-in did not finish; the cookie's life. */
+export const UNFINISHED_SIGN_IN_TTL_MS = 60 * 60 * 1000;
 /** A hint stamped this far ahead of the server's clock is refused, not trusted. */
 const CLOCK_SKEW_MS = 60 * 1000;
 const MAX_EMAIL_LENGTH = 320;
 
 const signInHintSchema = z.object({
-  email: z.string().min(3).max(MAX_EMAIL_LENGTH),
+  /** The address typed before leaving; absent when the sign-in started without one. */
+  email: z.string().min(3).max(MAX_EMAIL_LENGTH).optional(),
   providerId: z.string().min(1).max(200),
+  /** Whether `providerId` names an organization's connection or an installation provider. */
+  source: z.enum(["connection", "provider"]).optional(),
   issuedAt: z.number().int(),
   /** The hash of the round-trip value (`state` or `RelayState`) this sign-in's provider echoes. */
   binding: z.string().min(1).max(100).optional(),
@@ -30,8 +36,8 @@ export type SignInHint = z.infer<typeof signInHintSchema>;
 /** Seals and decodes hints under one deployment secret. */
 export interface SignInHintSealer {
   seal(hint: SignInHint): string;
-  /** The hint a cookie value carries, when its signature holds and it has not expired. */
-  decode(args: { value: string; nowMs: number }): SignInHint | undefined;
+  /** The hint a cookie value carries, when its signature holds and it is under `maxAgeMs` old. */
+  decode(args: { value: string; nowMs: number; maxAgeMs?: number }): SignInHint | undefined;
 }
 
 /** Without a secret nothing is sealed and nothing decodes: the hint is never required. */
@@ -42,10 +48,10 @@ export function signInHintSealer({ secret }: { secret: string | undefined }): Si
       const signature = computeHintSignature({ secret, payload });
       return signature ? `${payload}.${signature.toString("base64url")}` : "";
     },
-    decode: ({ value, nowMs }) => {
+    decode: ({ value, nowMs, maxAgeMs = SIGN_IN_HINT_TTL_MS }) => {
       const payload = extractSignedPayload({ secret, value });
       const hint = payload === undefined ? undefined : parseHintPayload(payload);
-      return hint && isHintFresh({ hint, nowMs }) ? hint : undefined;
+      return hint && isHintFresh({ hint, nowMs, maxAgeMs }) ? hint : undefined;
     },
   };
 }
@@ -77,9 +83,17 @@ function extractSignedPayload({
   return timingSafeEqual(presented, expected) ? payload : undefined;
 }
 
-function isHintFresh({ hint, nowMs }: { hint: SignInHint; nowMs: number }): boolean {
+function isHintFresh({
+  hint,
+  nowMs,
+  maxAgeMs,
+}: {
+  hint: SignInHint;
+  nowMs: number;
+  maxAgeMs: number;
+}): boolean {
   const age = nowMs - hint.issuedAt;
-  return age <= SIGN_IN_HINT_TTL_MS && age >= -CLOCK_SKEW_MS;
+  return age <= maxAgeMs && age >= -CLOCK_SKEW_MS;
 }
 
 function parseHintPayload(payload: string): SignInHint | undefined {
@@ -145,7 +159,9 @@ export function extractHintedAddress({
   providerId: string;
   echoedRoundTrip: string | undefined;
 }): string | null {
-  if (!hint || hint.providerId !== providerId || !hint.binding || !echoedRoundTrip) return null;
+  if (!hint?.email || hint.providerId !== providerId || !hint.binding || !echoedRoundTrip) {
+    return null;
+  }
   const echoed = Buffer.from(roundTripBindingOf({ value: echoedRoundTrip }));
   const bound = Buffer.from(hint.binding);
   return echoed.length === bound.length && timingSafeEqual(echoed, bound) ? hint.email : null;
@@ -159,7 +175,7 @@ export function buildSignInHintCookie({
   value: string;
   secure: boolean;
 }): string {
-  const maxAge = Math.floor(SIGN_IN_HINT_TTL_MS / 1000);
+  const maxAge = Math.floor(UNFINISHED_SIGN_IN_TTL_MS / 1000);
   return `${SIGN_IN_HINT_COOKIE}=${value}; Path=${SIGN_IN_HINT_PATH}; Max-Age=${maxAge}; ${hintCookieAttributes({ secure })}`;
 }
 
@@ -209,22 +225,53 @@ export function isSignInStartPath({
   return method === "POST" && SIGN_IN_START_PATH.test(pathname);
 }
 
-/** The provider and typed address a sign-in start names, or undefined when it names no address. */
+/** What a sign-in start hints at; the address only when one was typed. */
+export interface SignInStartHint {
+  providerId: string;
+  source: "connection" | "provider";
+  email?: string;
+}
+
+/** The provider and any typed address a sign-in start names, or undefined when it names none. */
 export function extractSignInStartHint({
   pathname,
   body,
 }: {
   pathname: string;
   body: unknown;
-}): { providerId: string; email: string } | undefined {
+}): SignInStartHint | undefined {
   const route = SIGN_IN_START_PATH.exec(pathname)?.[1];
   const parsed = signInStartBodySchema.safeParse(body);
   if (!route || !parsed.success) return undefined;
   const { providerId, provider, loginHint, email } = parsed.data;
   const named = route === "social" ? provider : providerId;
+  if (!named) return undefined;
   const address = normaliseAddress(loginHint ?? (route === "sso" ? email : undefined));
-  if (!named || !address) return undefined;
-  return { providerId: route === "social" ? socialCallbackId(named) : named, email: address };
+  return {
+    providerId: route === "social" ? socialCallbackId(named) : named,
+    source: route === "sso" ? "connection" : "provider",
+    ...(address ? { email: address } : {}),
+  };
+}
+
+/** The sign-in page's read of an unfinished sign-in. */
+export const UNFINISHED_SIGN_IN_PATH = "/api/auth/sign-in/unfinished";
+
+export function isUnfinishedSignInRead({
+  pathname,
+  method,
+}: {
+  pathname: string;
+  method: string;
+}): boolean {
+  return method === "GET" && pathname === UNFINISHED_SIGN_IN_PATH;
+}
+
+/** Whether an answer starts a session, after which no earlier sign-in is unfinished. */
+export function isSessionStarted({ response }: { response: Response }): boolean {
+  return response.headers
+    .getSetCookie()
+    .some((cookie) => /^(?:__Secure-)?better-auth\.session_token=[^;]/.test(cookie));
 }
 
 function normaliseAddress(value: string | undefined): string | undefined {
