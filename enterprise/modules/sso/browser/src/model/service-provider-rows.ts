@@ -31,7 +31,7 @@ export function serviceProviderRowsFor({
 }): ServiceProviderRow[] {
   const refusalPage: ServiceProviderRow = {
     label: "Access error page",
-    hint: "Paste this URL into Okta > App > Application Access Error Page",
+    hint: "In Okta: General > App Embed Link > Edit > Application access error page",
     value: addresses.refusalPageUrl,
   };
   if (protocol === "oidc") {

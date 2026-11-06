@@ -82,7 +82,8 @@ export const seatRequestProps = z.object({
   /** Set when the identity provider also refused their sign-in. */
   idpRefused: z.object({ idpName: z.string().nullable() }).nullable(),
   approval: approvalSchema,
-  requestsUrl: z.url(),
+  /** The Users page link, or null when the deployment has no public origin to link from. */
+  requestsUrl: z.url().nullable(),
 });
 
 export type SeatRequestProps = z.infer<typeof seatRequestProps>;
@@ -113,7 +114,9 @@ export const SeatRequestEmail = (props: SeatRequestProps) => {
           {`Their sign-in was also refused by ${idpPhrase(props.idpRefused.idpName).refusedBy}. If they should have access, assign them to the LangWatch app in ${idpPhrase(props.idpRefused.idpName).assignIn}.`}
         </Paragraph>
       )}
-      <PrimaryButton href={props.requestsUrl}>Review the request</PrimaryButton>
+      {props.requestsUrl && (
+        <PrimaryButton href={props.requestsUrl}>Review the request</PrimaryButton>
+      )}
     </EmailLayout>
   );
 };
@@ -146,6 +149,16 @@ export const seatRequestTemplate = defineTemplate({
       idpRefused: { idpName: "Okta" },
       approval: { kind: "contact_sales" },
       requestsUrl: "https://app.langwatch.ai/settings/members?tab=requests",
+    },
+    "no public origin to link from": {
+      recipientEmail: "priya@acme.example",
+      organizationName: "Acme Corp",
+      personName: "Foo Bar",
+      personEmail: "foo@acme.example",
+      heldWithoutAccess: true,
+      idpRefused: null,
+      approval: { kind: "upgrade_plan" },
+      requestsUrl: null,
     },
   },
 });

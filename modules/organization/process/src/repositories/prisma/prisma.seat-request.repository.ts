@@ -139,6 +139,19 @@ export class PrismaSeatRequestRepository
     });
   }
 
+  async release(input: Parameters<SeatRequestRepository["release"]>[0]): Promise<void> {
+    await this.prisma.seatRequest.updateMany({
+      where: {
+        id: input.id,
+        organizationId: input.organizationId,
+        status: "APPROVED",
+        resolvedAt: new Date(input.at),
+        resolvedByUserId: input.resolvedByUserId,
+      },
+      data: { status: "OPEN", resolvedAt: null, resolvedByUserId: null },
+    });
+  }
+
   async claimSalesNotice({ id, at }: { id: string; at: number }): Promise<boolean> {
     return this.serializableTransaction(async (transaction) => {
       const unclaimed = await transaction.seatRequest.findFirst({

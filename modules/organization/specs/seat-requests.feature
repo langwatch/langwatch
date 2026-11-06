@@ -107,6 +107,13 @@ Feature: Seat requests when an organization is over its seat limit
       Then the approval refuses with seat_request_not_found
 
     @unit
+    Scenario: An approval and a decline of the same request never both act
+      Given "late@acme.example" is held pending with an open seat request
+      When one administrator declines it while another approves it
+      Then only the first to close the request acts
+      And the other is refused with seat_request_not_found
+
+    @unit
     Scenario: Declining closes the request and leaves the membership as it is
       Given "late@acme.example" is held pending with an open seat request
       When an administrator declines the seat request
@@ -213,6 +220,12 @@ Feature: Seat requests when an organization is over its seat limit
       When "second@acme.example" opens a seat request
       Then "Ada Admin" and "Bill Payer" are each mailed about "second@acme.example" at once
       And no mail groups the two people together
+
+    @unit
+    Scenario: A seat request mail goes out without a link when no public origin is set
+      Given the deployment has no public origin configured
+      When a seat request mail is sent
+      Then it still goes out, without the "Review the request" button
 
     @unit
     Scenario: A notice whose mail reached nobody is retried by the next arrival that day

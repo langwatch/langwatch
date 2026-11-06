@@ -11,6 +11,7 @@ import {
   OrganizationUserRole,
   type RefusedSignInOutcome,
   type SeatApprovalPath,
+  SeatRequestNotFoundError,
   type SeatRequestResolved,
   type SeatRequestSource,
 } from "@langwatch/organization-contract";
@@ -240,19 +241,27 @@ export class SeatRequestService {
       membership !== null &&
       (membership.role === OrganizationUserRole.MEMBER ||
         membership.role === OrganizationUserRole.ADMIN);
-    if (!(isFull && membership.disabledAt === null)) {
-      await this.assertFullSeatFree({ organizationId, by });
-    }
-
-    const outcome = await this.giveFullSeat({ organizationId, request, membership, isFull, by });
-    await this.dependencies.requests.resolve({
+    // Claimed first, so a concurrent decline or second approval cannot also act on it.
+    const claim = {
       organizationId,
       id: request.id,
-      status: "APPROVED",
       resolvedByUserId: by.id,
       at: this.dependencies.now(),
-    });
-    return { outcome };
+    };
+    if (!(await this.dependencies.requests.resolve({ ...claim, status: "APPROVED" }))) {
+      throw new SeatRequestNotFoundError(request.id);
+    }
+    try {
+      if (!(isFull && membership.disabledAt === null)) {
+        await this.assertFullSeatFree({ organizationId, by });
+      }
+      return {
+        outcome: await this.giveFullSeat({ organizationId, request, membership, isFull, by }),
+      };
+    } catch (error) {
+      await this.dependencies.requests.release(claim);
+      throw error;
+    }
   }
 
   async decline({
@@ -265,13 +274,14 @@ export class SeatRequestService {
     by: OrganizationPlanUser;
   }): Promise<SeatRequestResolved> {
     const request = await this.dependencies.requests.getOpen({ organizationId, id: seatRequestId });
-    await this.dependencies.requests.resolve({
+    const declined = await this.dependencies.requests.resolve({
       organizationId,
       id: request.id,
       status: "DECLINED",
       resolvedByUserId: by.id,
       at: this.dependencies.now(),
     });
+    if (!declined) throw new SeatRequestNotFoundError(request.id);
     return { outcome: "declined" };
   }
 

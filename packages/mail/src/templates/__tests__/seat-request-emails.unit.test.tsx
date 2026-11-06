@@ -72,6 +72,29 @@ describe("sendSeatRequestEmail", () => {
     });
   });
 
+  describe("when the deployment has no public origin to link from", () => {
+    /** @scenario "A seat request mail goes out without a link when no public origin is set" */
+    it("still sends the mail, without the review button", async () => {
+      const mailer = new RecordingMailer();
+
+      await sendSeatRequestEmail({
+        mailer,
+        recipientEmail: "priya@acme.example",
+        organizationName: "Acme Corp",
+        personName: "Gus Growth",
+        personEmail: "gus@acme.example",
+        heldWithoutAccess: true,
+        idpRefused: null,
+        approval: { kind: "upgrade_plan" },
+        requestsUrl: null,
+      });
+
+      expect(mailer.sent).toHaveLength(1);
+      expect(mailer.sent[0]?.html).toContain("Gus Growth is waiting for a seat");
+      expect(mailer.sent[0]?.html).not.toContain("Review the request");
+    });
+  });
+
   describe("when the organization pays per seat through Stripe", () => {
     it("quotes the seat price and says Stripe prorates", async () => {
       const mailer = new RecordingMailer();

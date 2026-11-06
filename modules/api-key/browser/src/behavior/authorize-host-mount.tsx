@@ -206,7 +206,9 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
         mintProjectToken: async ({ expiresAt }) => {
           const { organizationId, projectId } = activeScope;
           if (!organizationId || !projectId) return void 0;
-          const held = (await refetchStanding()).data?.permissions ?? [];
+          const read = await refetchStanding();
+          if (!read.data && read.error) throw read.error;
+          const held = read.data?.permissions ?? [];
           const permissions = cappedDeviceFlowPermissions({ held });
           if (permissions.length === 0) {
             throw new ApiKeyScopeViolationError(

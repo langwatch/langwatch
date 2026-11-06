@@ -153,6 +153,7 @@ Feature: Permission reads come from the session, and a public page holds none
     When a project page loads
     Then the authorize host sends no grant read of its own, leaving the session's read the only one
     And it reads the person's grants only when a project token is minted, capping the token at them
+    And a failed grant read is reported as that failure, not as missing permissions
 
   @unit
   Scenario: Recording a last-seen stamp refetches nothing on the page

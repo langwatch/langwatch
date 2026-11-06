@@ -538,7 +538,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         organizationName,
         approval: (input) => contextOf().noticeApproval(input),
       },
-      requestsUrl: `${setup.config.publicBaseUrl ?? ""}/settings/directory?tab=people`,
+      requestsUrl: setup.config.publicBaseUrl
+        ? `${setup.config.publicBaseUrl}/settings/directory?tab=people`
+        : null,
       now,
       newId: () => generate("accessnotice").toString(),
       logger,

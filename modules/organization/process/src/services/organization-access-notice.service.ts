@@ -33,8 +33,8 @@ type Dependencies = Readonly<{
   notices: OrganizationAccessNoticeRepository;
   mail: AccessNoticeMailChannel;
   context: AccessNoticeContext;
-  /** The Users page's People tab, which lists the seat requests every notice links to. */
-  requestsUrl: string;
+  /** The Users page's People tab, or null when no public origin is set to link from. */
+  requestsUrl: string | null;
   now: () => number;
   newId: () => string;
   logger: Logger;

@@ -243,6 +243,29 @@ describe("given an open seat request", () => {
     });
   });
 
+  describe("when one administrator approves while another declines", () => {
+    /** @scenario "An approval and a decline of the same request never both act" */
+    it("lets exactly one of them act and refuses the other", async () => {
+      const { app, state, arrive, membershipOf, openRequests } = await application();
+      const { userId } = await arrive({ email: "late@acme.example" });
+      const [request] = await openRequests();
+      state.plan = planWith({ freeFull: 1 });
+      const input = { organizationId: ORGANIZATION_ID, seatRequestId: request!.id };
+
+      const settled = await Promise.allSettled([
+        app.declineSeatRequest(input, ADA),
+        app.approveSeatRequest(input, ADA),
+      ]);
+
+      expect(settled.map((one) => one.status)).toEqual(["fulfilled", "rejected"]);
+      expect((settled[1] as PromiseRejectedResult).reason).toMatchObject({
+        code: "seat_request_not_found",
+      });
+      expect(membershipOf(userId)?.disabledAt).not.toBeNull();
+      expect(await openRequests()).toEqual([]);
+    });
+  });
+
   describe("when an administrator declines it", () => {
     /** @scenario "Declining closes the request and leaves the membership as it is" */
     it("closes the request and the person stays held with no access", async () => {

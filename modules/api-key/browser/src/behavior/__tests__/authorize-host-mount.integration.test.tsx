@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * The authorize mount wraps every page, so it reads the person's grants only when a token is minted.
+ * The authorize mount wraps every page, so it reads grants only when a token is minted.
  * Spec: specs/frontend/session-permission-reads.feature
  */
 import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
@@ -10,7 +10,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const { standing, mint } = vi.hoisted(() => ({
   standing: {
     options: [] as unknown[],
-    refetch: vi.fn(async () => ({ data: { permissions: [] as string[] } })),
+    refetch: vi.fn(
+      async (): Promise<{ data?: { permissions: string[] }; error?: Error | null }> => ({
+        data: { permissions: [] },
+      }),
+    ),
   },
   mint: vi.fn(async () => ({ token: "pat_1" })),
 }));
@@ -98,6 +102,17 @@ describe("AuthorizeHostMount", () => {
       expect(mint).toHaveBeenCalledWith(
         expect.objectContaining({ permissions: cappedDeviceFlowPermissions({ held }) }),
       );
+    });
+
+    /** @scenario "A page load reads the person's grants once" */
+    it("reports a failed grant read as that failure, not as missing permissions", async () => {
+      const failure = new Error("grant read failed");
+      standing.refetch.mockResolvedValueOnce({ data: void 0, error: failure });
+      const { host } = mountHost();
+
+      await expect(host().mintProjectToken({ expiresAt: void 0 })).rejects.toBe(failure);
+
+      expect(mint).not.toHaveBeenCalled();
     });
   });
 });

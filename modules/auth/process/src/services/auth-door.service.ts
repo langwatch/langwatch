@@ -44,6 +44,7 @@ import {
   extractEchoedRoundTrip,
   extractRoundTripValue,
   MAX_CALLBACK_FORM_BYTES,
+  MAX_SIGN_IN_START_BYTES,
   extractSignInHintCookie,
   extractSignInStartHint,
   extractHintedAddress,
@@ -312,7 +313,12 @@ export class AuthDoorService {
   }): Promise<SignInStartHint | undefined> {
     if (!isSignInStartPath({ pathname, method: request.method })) return undefined;
     try {
-      const body: unknown = JSON.parse(await request.clone().text());
+      const read = await readBoundedText({
+        request: request.clone(),
+        maxBytes: MAX_SIGN_IN_START_BYTES,
+      });
+      if (read.kind !== "read") return undefined;
+      const body: unknown = JSON.parse(read.text);
       return extractSignInStartHint({ pathname, body });
     } catch {
       return undefined;

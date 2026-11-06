@@ -1079,6 +1079,22 @@ describe("given a provider sign-in started on our page with a typed address", ()
     });
   });
 
+  describe("when the start body is larger than any sign-in start", () => {
+    /** @scenario "An oversized sign-in start is not read for its hint" */
+    it("sets no hint and still hands Better Auth the whole body", async () => {
+      const world = door();
+      world.handler.mockImplementation(async () =>
+        Response.json({ url: `https://idp.acme.test/sso?RelayState=${ROUND_TRIP}` }),
+      );
+      const body = { providerId: CONNECTION, loginHint: "a@acme.com", pad: "a".repeat(32 * 1024) };
+
+      const answered = await world.service.betterAuthHandshake(start(body));
+
+      await expect(world.handler.mock.calls[0]![0].text()).resolves.toBe(JSON.stringify(body));
+      expect(answered.headers.get("set-cookie")).toBeNull();
+    });
+  });
+
   describe("when Better Auth refuses the start", () => {
     it("sets no hint", async () => {
       const world = door({

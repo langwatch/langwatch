@@ -50,6 +50,13 @@ export abstract class SeatRequestRepository {
     resolvedByUserId: string | null;
     at: number;
   }): Promise<boolean>;
+  /** Reopens an approval whose seat could not be given; only the approval made at `at` by `by`. */
+  abstract release(input: {
+    organizationId: string;
+    id: string;
+    resolvedByUserId: string | null;
+    at: number;
+  }): Promise<void>;
   /** Claims the one sales notice of this opening; false when it was claimed already. */
   abstract claimSalesNotice(input: { id: string; at: number }): Promise<boolean>;
   /** Every request naming this person, in any organization. */

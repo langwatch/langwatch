@@ -66,7 +66,7 @@ describe("given an administrator setting up OpenID Connect", () => {
     expect(screen.getByText(ADDRESSES.refusalPageUrl)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Copy Access error page" })).toBeTruthy();
     expect(
-      screen.getByText("Paste this URL into Okta > App > Application Access Error Page"),
+      screen.getByText("In Okta: General > App Embed Link > Edit > Application access error page"),
     ).toBeTruthy();
   });
 });

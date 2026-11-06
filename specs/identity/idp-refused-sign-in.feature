@@ -120,6 +120,12 @@ Feature: A sign-in the company's identity provider refused says who refused it
     Then the door stops reading its copy at that size and reads no status from it
     And Better Auth still receives the whole body
 
+  @unit
+  Scenario: An oversized sign-in start is not read for its hint
+    When a sign-in start body is larger than 16 KiB
+    Then the door stops reading its copy at that size and sets no hint
+    And Better Auth still receives the whole body
+
   # Okta and Keycloak show their own error page for an unassigned person and never call back.
   # Okta lets the admin point the app's "Application Access Error Page" at a URL of ours.
   @unit

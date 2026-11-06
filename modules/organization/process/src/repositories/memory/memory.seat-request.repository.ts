@@ -107,6 +107,20 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
     return true;
   }
 
+  async release(input: Parameters<SeatRequestRepository["release"]>[0]): Promise<void> {
+    const index = this.rows.findIndex(
+      (row) =>
+        row.id === input.id &&
+        row.organizationId === input.organizationId &&
+        row.status === "APPROVED" &&
+        row.resolvedAt === input.at &&
+        row.resolvedByUserId === input.resolvedByUserId,
+    );
+    const row = this.rows[index];
+    if (!row) return;
+    this.rows[index] = { ...row, status: "OPEN", resolvedAt: null, resolvedByUserId: null };
+  }
+
   async claimSalesNotice({ id, at }: { id: string; at: number }): Promise<boolean> {
     const index = this.rows.findIndex(
       (row) => row.id === id && row.status === "OPEN" && row.salesNotifiedAt === null,
