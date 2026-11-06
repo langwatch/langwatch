@@ -39,6 +39,7 @@ import {
   lintDeletedSpellingsInTeaching,
 } from "./quality/deleted-spellings.ts";
 import { lintDependencyCatalog } from "./quality/dependency-catalog.ts";
+import { lintRuntimeDependencies } from "./quality/runtime-dependencies.ts";
 import { lintServiceCeilings } from "./quality/service-ceilings.ts";
 import { lintServiceProjectionBoundaries } from "./quality/service-projection-boundaries.ts";
 import { lintLintRuleSkillPointers, lintTeachingCitations } from "./quality/teaching-citations.ts";
@@ -240,6 +241,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "dependency-catalog",
     spec: "specs/dependency-catalog.feature",
     run: lintDependencyCatalog,
+  }),
+  definePolicy({
+    id: "runtime-dependencies",
+    spec: "specs/tooling/lint-runtime-dependencies.feature",
+    run: lintRuntimeDependencies,
   }),
   definePolicy({
     id: "workspace-seams",

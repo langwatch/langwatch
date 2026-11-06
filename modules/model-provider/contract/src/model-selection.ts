@@ -16,8 +16,11 @@ export type ModelOptionGroup = {
 /** A model LangWatch serves itself, so a project needs no provider of its own to pick it. */
 export type BuiltInModel = { value: string; label: string };
 
-/** The heading built-in models are listed under. */
-export const BUILT_IN_MODELS_GROUP_LABEL = "LangWatch";
+/**
+ * The heading built-in models are listed under. Not "LangWatch": an own decision model in it
+ * runs on the project's provider, which its icon names, as a chat model's does.
+ */
+export const BUILT_IN_MODELS_GROUP_LABEL = "Decision models";
 
 /**
  * The built-in group's key. A constant, never a model id's prefix: an own-key decision model
