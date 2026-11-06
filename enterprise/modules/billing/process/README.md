@@ -237,13 +237,13 @@ Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscr
 
 | Procedure                            | Kind     | Gate                              | Input                     | Output                           |
 | ------------------------------------ | -------- | --------------------------------- | ------------------------- | -------------------------------- |
-| `subscription.addTeamMemberOrEvents` | mutation | Permission `organization:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
+| `subscription.addTeamMemberOrEvents` | mutation | Permission `subscription:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
 | `subscription.create`                | mutation | Permission `subscription:upgrade` | inline                    | `billingRedirectSchema`          |
-| `subscription.manage`                | mutation | Permission `organization:manage`  | inline                    | `billingPortalSessionSchema`     |
-| `subscription.previewProration`      | query    | Permission `organization:manage`  | inline                    | `providerOwnedSchema`            |
+| `subscription.manage`                | mutation | Permission `subscription:manage`  | inline                    | `billingPortalSessionSchema`     |
+| `subscription.previewProration`      | query    | Permission `subscription:manage`  | inline                    | `providerOwnedSchema`            |
 | `subscription.getLastSubscription`   | query    | Permission `organization:view`    | `organizationScopeSchema` | `providerOwnedSchema`            |
-| `subscription.prospective`           | mutation | Permission `organization:manage`  | inline                    | `providerOwnedSchema`            |
-| `subscription.listInvoices`          | query    | Permission `organization:view`    | `organizationScopeSchema` | inline                           |
+| `subscription.prospective`           | mutation | Permission `subscription:manage`  | inline                    | `providerOwnedSchema`            |
+| `subscription.listInvoices`          | query    | Permission `subscription:manage`  | `organizationScopeSchema` | inline                           |
 
 ```typescript
 // subscription.addTeamMemberOrEvents
