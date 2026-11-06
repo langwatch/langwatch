@@ -259,6 +259,18 @@ Feature: Buying seats
       Given Manage seats on Growth adds 2 Developer seats at €5 a month
       When I confirm the change
       Then the subscription carries 2 Developer seats at the price I was quoted
+      And I am told "You now pay for 2 developer seats."
+      And Manage seats opened again reads 2 Developer seats
+
+    @unit
+    Scenario: The message after a seat change names the Developer seats that changed
+      Given a Growth subscription for 4 full seats and 2 Developer seats
+      When the full seats stay at 4 and the Developer seats go to 3
+      Then I am told "You now pay for 3 developer seats."
+      When the full seats stay at 4 and the Developer seats go down to 1
+      Then I am told "From 1 Dec you pay for 1 developer seat."
+      When the full seats go to 5 and the Developer seats go to 3
+      Then I am told "Seat added. You now pay for 5 seats and 3 developer seats."
 
     @integration
     Scenario: The plan card and the seat dialog never show Developer seats

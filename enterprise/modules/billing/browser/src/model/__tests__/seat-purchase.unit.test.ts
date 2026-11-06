@@ -172,6 +172,21 @@ describe("seatChangeToast()", () => {
     );
   });
 
+  /** @scenario "The message after a seat change names the Developer seats that changed" */
+  it("names the Developer seats that changed", () => {
+    const toast = (seats: number, target: number) =>
+      seatChangeToast({
+        paid: 4,
+        seats,
+        emails: [],
+        day: "1 Dec",
+        developer: { current: 2, target },
+      });
+    expect(toast(4, 3)).toBe("You now pay for 3 developer seats.");
+    expect(toast(4, 1)).toBe("From 1 Dec you pay for 1 developer seat.");
+    expect(toast(5, 3)).toBe("Seat added. You now pay for 5 seats and 3 developer seats.");
+  });
+
   it("says when a lower count applies", () => {
     expect(seatChangeToast({ paid: 5, seats: 3, emails: [], day: "1 Dec" })).toBe(
       "From 1 Dec you pay for 3 seats.",

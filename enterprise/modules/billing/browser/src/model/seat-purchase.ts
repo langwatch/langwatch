@@ -484,20 +484,44 @@ export function seatChangeToast({
   seats,
   emails,
   day,
+  developer,
 }: {
   paid: number;
   seats: number;
   emails: string[];
   day: string | undefined;
+  developer?: { current: number; target: number };
 }): string {
-  if (seats < paid) {
-    return `${day ? `From ${day}` : "From the next period"} you pay for ${plural(seats, "seat")}.`;
-  }
-  const delta = seats - paid;
-  const added = delta > 0 ? `${delta === 1 ? "Seat" : `${delta} seats`} added.` : "Seats updated.";
+  const from = day ? `From ${day}` : "From the next period";
+  const dev = developer && developer.target !== developer.current ? developer : undefined;
+  const devSeats = dev ? plural(dev.target, "developer seat") : "";
+  const devLater = dev && dev.target < dev.current ? `${from} you pay for ${devSeats}.` : "";
+  const devNow = dev && dev.target > dev.current ? devSeats : "";
   const invites =
     emails.length === 0
       ? ""
       : ` ${emails.length === 1 ? "Invite" : "Invites"} sent to ${joinEmails(emails)}.`;
-  return `${added} You now pay for ${plural(seats, "seat")}.${invites}`;
+  const text = [fullSeatsLine({ paid, seats, from, devNow }), devLater].filter(Boolean).join(" ");
+  return (text || "Seats updated.") + invites;
+}
+
+/** The full-seat sentence of the toast, carrying Developer seats added now when there are any. */
+function fullSeatsLine({
+  paid,
+  seats,
+  from,
+  devNow,
+}: {
+  paid: number;
+  seats: number;
+  from: string;
+  devNow: string;
+}): string {
+  const now = devNow ? ` You now pay for ${devNow}.` : "";
+  if (seats < paid) return `${from} you pay for ${plural(seats, "seat")}.${now}`;
+  if (seats === paid) return devNow ? `You now pay for ${devNow}.` : "";
+  const delta = seats - paid;
+  const added = delta === 1 ? "Seat" : `${delta} seats`;
+  const also = devNow ? ` and ${devNow}` : "";
+  return `${added} added. You now pay for ${plural(seats, "seat")}${also}.`;
 }

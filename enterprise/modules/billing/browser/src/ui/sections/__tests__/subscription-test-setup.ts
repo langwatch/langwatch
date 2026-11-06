@@ -196,6 +196,8 @@ export const mockGetLastSubscription = vi.fn((): { data: unknown; isLoading: boo
 
 export const mockOpenSeats = vi.fn();
 
+export const mockDeveloperSeatsRefetch = vi.fn(async () => undefined);
+
 /** Developer seats as billing answers them; unavailable until a test configures a price. */
 export const mockDeveloperSeats = vi.fn(
   (): { data: unknown; isLoading: boolean; isError?: boolean } => ({

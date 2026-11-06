@@ -174,8 +174,10 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
           useQuery: () => ({ ...setup.mockGetLastSubscription(), refetch: vi.fn() }),
         },
         developerSeats: {
-          useQuery: (_input: unknown, opts: { enabled: boolean }) =>
-            opts.enabled ? setup.mockDeveloperSeats() : { data: undefined },
+          useQuery: (_input: unknown, opts: { enabled: boolean }) => ({
+            ...(opts.enabled ? setup.mockDeveloperSeats() : { data: undefined }),
+            refetch: setup.mockDeveloperSeatsRefetch,
+          }),
         },
         previewDeveloperSeats: {
           useQuery: (input: { quantity: number }, opts: { enabled: boolean }) =>

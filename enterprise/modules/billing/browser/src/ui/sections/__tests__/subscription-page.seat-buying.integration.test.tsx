@@ -24,6 +24,7 @@ import {
   mockCreateInvitesMutateAsync,
   mockCreateSubscription,
   mockDeveloperSeats,
+  mockDeveloperSeatsRefetch,
   mockGetActivePlan,
   mockGetOrganizationWithMembers,
   mockGetUsage,
@@ -159,8 +160,10 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
           useQuery: () => ({ ...setup.mockGetLastSubscription(), refetch: vi.fn() }),
         },
         developerSeats: {
-          useQuery: (_input: unknown, opts: { enabled: boolean }) =>
-            opts.enabled ? setup.mockDeveloperSeats() : { data: undefined },
+          useQuery: (_input: unknown, opts: { enabled: boolean }) => ({
+            ...(opts.enabled ? setup.mockDeveloperSeats() : { data: undefined }),
+            refetch: setup.mockDeveloperSeatsRefetch,
+          }),
         },
         previewDeveloperSeats: {
           useQuery: (input: { quantity: number }, opts: { enabled: boolean }) =>
@@ -938,7 +941,7 @@ describe("<SubscriptionPage/> buying seats", () => {
     it("sets the Developer seats at the quote on confirm", async () => {
       givenGrowth({ paid: 3, inUse: 3 });
       givenDeveloperPrice();
-      renderPage();
+      const host = renderPage();
       await openManageSeats();
 
       unfold();
@@ -956,6 +959,17 @@ describe("<SubscriptionPage/> buying seats", () => {
         ),
       );
       expect(seatChange).not.toHaveBeenCalled();
+      await waitFor(() =>
+        expect(host.successes).toContainEqual(
+          expect.objectContaining({ title: "You now pay for 2 developer seats." }),
+        ),
+      );
+
+      const refetchesBefore = mockDeveloperSeatsRefetch.mock.calls.length;
+      await openManageSeats();
+      await waitFor(() =>
+        expect(mockDeveloperSeatsRefetch.mock.calls.length).toBeGreaterThan(refetchesBefore),
+      );
     });
   });
 });

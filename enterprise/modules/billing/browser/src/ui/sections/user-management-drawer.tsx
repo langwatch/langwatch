@@ -511,6 +511,11 @@ function useGrowthSeats({
     { organizationId },
     { enabled: open && mode !== undefined },
   );
+  const refetchDeveloperSeats = developerSeats.refetch;
+  const isGrowth = mode !== undefined;
+  useEffect(() => {
+    if (open && isGrowth) void refetchDeveloperSeats();
+  }, [open, isGrowth, refetchDeveloperSeats]);
   const developer = developerPlanOf({ seats: developerSeats.data, target: developerTarget });
   const developerAdded = developer ? developer.target > developer.current : false;
   const seatsChanged = seats !== paid;
@@ -565,7 +570,7 @@ function useGrowthSeats({
           ? { quantity: developer.target, quotedAt: developerQuote.data?.quotedAt }
           : undefined,
         emails,
-        successTitle: seatChangeToast({ paid, seats, emails, day }),
+        successTitle: seatChangeToast({ paid, seats, emails, day, developer }),
       };
     },
   };
