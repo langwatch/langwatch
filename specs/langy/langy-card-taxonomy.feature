@@ -92,6 +92,7 @@ Feature: Langy's cards read at the right attention weight
     When I read the record of the work
     Then its header says "2 actions completed" and "5 tool calls, 3 failed" in a quiet grey
     And when every step failed it says "3 actions failed" with a grey mark, not the green check
+    And a step that worked still counts while it stands beside the record as the latest step
     And nothing in the header is red
 
   @integration
@@ -101,9 +102,11 @@ Feature: Langy's cards read at the right attention weight
     Then the failure the turn ended on keeps its card
     And a failure followed by steps that worked stays folded in the record of the work
 
+  # Known limit: the stop is not stored on the message, so after a follow-up
+  # message or a reload the stopped turn reads as unanswered again.
   @integration
-  Scenario: A stopped turn keeps its failures folded
-    Given a turn I stopped right after a step failed
+  Scenario: A stopped turn keeps its failures folded while it is the latest turn
+    Given a turn I stopped right after a step failed, still the latest turn in this session
     When I read the turn
     Then that failure stays folded in the record of the work
 
@@ -114,9 +117,10 @@ Feature: Langy's cards read at the right attention weight
     Then it closes shortly after the pointer leaves
     And when I click or focus into it, it stays open
 
+  # Known limit: a local tool's plain-text login error with a non-zero exit is not yet read as a failure.
   @integration
   Scenario: A failure no retry can fix keeps its card
-    Given a step refused because access was refused or GitHub is not connected, or a local tool that is not logged in
+    Given a step refused because access was refused or GitHub is not connected, or a local tool whose tool error or JSON error document says it is not logged in
     When I read the turn, while it runs or after it answered
     Then that failure keeps its card in the conversation
 

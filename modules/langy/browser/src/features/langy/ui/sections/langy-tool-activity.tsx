@@ -631,6 +631,7 @@ export function LangyActivityParts({
             node: (
               <CompletedActivityBatch
                 groups={completedGroups}
+                heldGroups={heldGroup ? [heldGroup] : []}
                 failures={receiptFailures}
                 reasoningTitles={reasoningTitles}
                 devMode={devMode}
@@ -796,11 +797,17 @@ function keepsItsCard({
  */
 function CompletedActivityBatch({
   groups,
+  heldGroups = [],
   failures,
   reasoningTitles = [],
   devMode,
 }: {
   groups: ActivityGroup[];
+  /**
+   * Steps that worked but stand beside the receipt as the turn's latest card; the header
+   * still counts them.
+   */
+  heldGroups?: ActivityGroup[];
   /** Failed steps the turn worked past, listed among the steps that worked. */
   failures: FailedToolCall[];
   /** The turn's folded thinking steps — rows of the receipt, expanded only. */
@@ -830,7 +837,8 @@ function CompletedActivityBatch({
     pauseClose();
   };
   const failedCount = failures.length;
-  const callCount = groups.reduce((count, group) => count + group.calls.length, failedCount);
+  const worked = [...groups, ...heldGroups];
+  const callCount = worked.reduce((count, group) => count + group.calls.length, failedCount);
   const steps = [
     ...groups.map((group) => ({
       order: group.order,
@@ -871,7 +879,7 @@ function CompletedActivityBatch({
         _hover={{ borderColor: "border.emphasized" }}
       >
         <ReceiptHeader
-          actionCount={groups.length}
+          actionCount={worked.length}
           callCount={callCount}
           failedCount={failedCount}
           open={open}

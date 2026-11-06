@@ -18,16 +18,19 @@ vi.mock("../../../../../behavior/use-langy-dev-mode.ts", () => ({
   useLangyDevMode: () => [devMode, vi.fn()],
 }));
 
-// The Slack card reads the viewer's connections; here only its presence matters.
-vi.mock("../automations/langy-slack-connection-card.tsx", () => ({
-  LangySlackConnectionCard: () => <div data-testid="slack-connection-card" />,
+// The Slack card's read of the viewer's connections is mocked at its hook seam, still loading.
+vi.mock("../../../behavior/use-langy-automation-data.ts", () => ({
+  useLangySlackConnections: () => ({ connections: undefined, canAdd: false, isLoading: true }),
+  useLangyAutomationNow: () => ({ fresh: undefined, nextFiring: undefined }),
 }));
 
+const { useLangyStore } = await import("../../../../../behavior/langy.store.ts");
 const { LangyToolActivity } = await import("../langy-tool-activity.tsx");
 
 afterEach(() => {
   devMode = false;
   vi.useRealTimers();
+  useLangyStore.setState({ turnPhase: "idle" });
 });
 
 function failedStep({
@@ -302,7 +305,7 @@ describe("a failed step", () => {
   });
 
   describe("given the reader stopped the turn right after a failure", () => {
-    /** @scenario "A stopped turn keeps its failures folded" */
+    /** @scenario "A stopped turn keeps its failures folded while it is the latest turn" */
     it("keeps the failure folded", () => {
       renderActivity({ parts: [ls, failB], live: false, interrupted: true });
 
@@ -544,7 +547,7 @@ describe("a failed step", () => {
     it("keeps the connection card while the turn runs", () => {
       renderActivity({ parts: [slackRefusal], live: true });
 
-      expect(screen.getByTestId("slack-connection-card")).toBeTruthy();
+      expect(screen.getByTestId("langy-slack-connection-card")).toBeTruthy();
       expect(screen.queryByRole("list", { name: "Finished steps" })).toBeNull();
     });
 
@@ -552,7 +555,7 @@ describe("a failed step", () => {
     it("keeps the connection card after the turn answered", () => {
       renderActivity({ parts: [slackRefusal, reply], live: false });
 
-      expect(screen.getByTestId("slack-connection-card")).toBeTruthy();
+      expect(screen.getByTestId("langy-slack-connection-card")).toBeTruthy();
       expect(screen.queryByRole("list", { name: "Finished steps" })).toBeNull();
     });
   });
@@ -614,5 +617,25 @@ describe("the receipt of the work", () => {
     fireEvent.pointerLeave(wrapper);
     pass(2200);
     expect(opened()).toBe("false");
+  });
+
+  describe("given a turn still running whose newest step worked after a failure", () => {
+    beforeEach(() => {
+      useLangyStore.setState({ turnPhase: "active" });
+    });
+
+    /** @scenario "The record of the work counts its failures quietly" */
+    it("does not call the receipt all failed while the step that worked stands beside it", () => {
+      renderActivity({ parts: [failA, ls], live: true });
+
+      expect(receiptHeader().textContent).toMatch(/^1 action completed/);
+    });
+
+    /** @scenario "The record of the work counts its failures quietly" */
+    it("still calls a receipt of only failures all failed", () => {
+      renderActivity({ parts: [failA, failB], live: true });
+
+      expect(receiptHeader().textContent).toMatch(/^1 action failed/);
+    });
   });
 });
