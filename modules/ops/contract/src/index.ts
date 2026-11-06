@@ -95,6 +95,7 @@ export * from "./features/dashboard/ops-latency.ts";
 export * from "./features/dashboard/ops-anomaly.ts";
 export * from "./features/event-log/ops-event-log.ts";
 export * from "./ops-feature-flag.ts";
+export * from "./seat-sharing.ts";
 export * from "./ops-operators.ts";
 export * from "./features/migrations/ops-system-migration.ts";
 export * from "./features/migrations/ops-tenant-migration.events.ts";

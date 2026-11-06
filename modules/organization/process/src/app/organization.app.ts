@@ -105,6 +105,7 @@ import {
   type OrganizationInvitedMemberIds,
   type OrganizationFounding,
   type OrganizationMemberSeats,
+  type OrganizationSeatOccupants,
   type LimitCheckResult,
   type LimitType,
   type ScopeGraphOrganization,
@@ -183,6 +184,7 @@ import type {
   OrganizationSeatLicense,
   OrganizationPlanUser,
 } from "../services/organization-seat-license.service.ts";
+import { OrganizationSeatOccupancyService } from "../services/organization-seat-occupancy.service.ts";
 import { OrganizationSignInPolicyService } from "../services/organization-sign-in-policy.service.ts";
 import { OrganizationSignalsService } from "../services/organization-signals.service.ts";
 import type { OrganizationSignals } from "../services/organization-signals.service.ts";
@@ -240,6 +242,8 @@ type OrganizationInfrastructure = Readonly<{
   seats: OrganizationSeatLicense;
   /** The full and lite seats an organization holds, as a licence and a plan count them. */
   seatCounts: OrganizationSeatRepository;
+  /** Who held a seat in a window, for the Ops seat sharing check. */
+  seatOccupancy: OrganizationSeatOccupancyService;
   /** The invitations this deployment administers. */
   invitations: OrganizationInvitations;
   /**
@@ -451,6 +455,10 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         notices: seatLimits,
       }),
       seatCounts,
+      seatOccupancy: OrganizationSeatOccupancyService.create({
+        seats: seatCounts,
+        departures: setup.repositories.departures,
+      }),
       invitations: OrganizationInvitationsService.create({
         invites: inviteService,
         repository: invites,
@@ -1507,6 +1515,12 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     input: Readonly<{ organizationId: string; subscriptionIds: readonly string[] }>,
   ): Promise<void> {
     return this.#invitationDoor.cancelPaymentPending(input);
+  }
+
+  findSeatOccupantsSince(
+    input: Readonly<{ organizationId: string; since: number }>,
+  ): Promise<OrganizationSeatOccupants> {
+    return this.#infrastructure.seatOccupancy.findSince(input);
   }
 
   async countMemberSeats(

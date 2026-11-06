@@ -182,6 +182,12 @@ export type OrganizationMemberSeats = Readonly<{
   developers: number;
 }>;
 
+/** Who held a seat in a window: the full-seat members now, and the people who left in it. */
+export type OrganizationSeatOccupants = Readonly<{
+  fullSeatHolderIds: readonly string[];
+  departedIds: readonly string[];
+}>;
+
 /** One invitation batch as a transport asks for it, with the mode it chose. */
 export type OrganizationApiCreateInvitationsInput = OrganizationApiCreateInvitesInput &
   Readonly<{ validation: OrganizationInviteValidation }>;
@@ -747,6 +753,13 @@ export interface OrganizationApi {
    * included, disabled memberships excluded. The one count a licence and a plan read.
    */
   countMemberSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationMemberSeats>;
+  /**
+   * The people who held a seat since `since`: today's full-seat members, and everyone
+   * removed or disabled since then. Read by the Ops seat sharing check.
+   */
+  findSeatOccupantsSince(
+    input: Readonly<{ organizationId: string; since: number }>,
+  ): Promise<OrganizationSeatOccupants>;
   /** Whether one more of a limited resource fits the organization's plan, for this caller. */
   checkLimit(
     input: Readonly<{ organizationId: string; limitType: LimitType }>,

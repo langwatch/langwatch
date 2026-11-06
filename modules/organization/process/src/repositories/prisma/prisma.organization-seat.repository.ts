@@ -1,4 +1,4 @@
-import { countMemberSeats } from "@langwatch/entitlement-contract";
+import { countMemberSeats, isFullMember } from "@langwatch/entitlement-contract";
 import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
 import {
   INVITE_STATUS,
@@ -88,6 +88,13 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
         permissions: this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
       })),
     ]);
+  }
+
+  async findFullSeatHolderIds(organizationId: string): Promise<string[]> {
+    const context = await this.getMemberClassificationContext(organizationId);
+    return context.users
+      .filter((user) => isFullMember(user.role, context.userPermissionsMap.get(user.userId)))
+      .map((user) => user.userId);
   }
 
   /**

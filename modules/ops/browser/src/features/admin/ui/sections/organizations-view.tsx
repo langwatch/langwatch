@@ -16,6 +16,7 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Switch } from "@langwatch/design-system/switch";
 import {
   ORGANIZATION_DATASET_ATTACHMENT_MAX_MB,
@@ -31,8 +32,17 @@ import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedb
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { useOpsHost } from "../../../../model/ops-host.ts";
 import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
+import { useSeatSharingChecks } from "../../behavior/use-seat-sharing-checks.ts";
 import { Currency, PRICING_MODEL_LABELS, PricingModel } from "../../model/admin-enums.ts";
-import { AdminDate, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import {
+  SEAT_SHARING_FILTERS,
+  flaggedOrganizationIds,
+  readingsByOrganization,
+  type SeatSharingCheck,
+  type SeatSharingFilter,
+} from "../../model/seat-sharing.ts";
+import { AdminDate, EmptyCell, formatDate, formatDateTime } from "../elements/admin-cells.tsx";
+import { SeatSharingCell } from "../elements/seat-sharing-cell.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 import { LegacySsoDomainNotice } from "./legacy-sso-domain-notice.tsx";
 /**
@@ -70,11 +80,22 @@ export default function OrganizationsView() {
   const [search, setSearch] = useState(initialQueryRef.current);
   const [debouncedSearch] = useDebounce(search, 300);
   const [editing, setEditing] = useState<AdminOrganization | null>(null);
+  // The seat sharing check is Cloud admin's: a self-hosted operator never asks for it.
+  const cloudOps = useOpsHost().cloudOps();
+  const seatSharing = useSeatSharingChecks({ enabled: cloudOps });
+  const lastCheck = seatSharing.data?.[0];
+  const [sharingFilter, setSharingFilter] = useState<SeatSharingFilter>("all");
+  const overSeats = cloudOps && sharingFilter === "over";
+  const readings = readingsByOrganization(lastCheck);
+  const columns = cloudOps ? 9 : 8;
 
   const list = useAdminList<AdminOrganization>("organization", {
     pagination: { page, perPage: PAGE_SIZE },
     sort: { field: "createdAt", order: "DESC" },
-    filter: debouncedSearch ? { query: debouncedSearch } : {},
+    filter: {
+      ...(debouncedSearch ? { query: debouncedSearch } : {}),
+      ...(overSeats ? { id: flaggedOrganizationIds(lastCheck) } : {}),
+    },
   });
 
   return (
@@ -87,6 +108,38 @@ export default function OrganizationsView() {
           setPage(1);
         }}
         searchPlaceholder="Search by ID, name, or slug"
+        summary={
+          cloudOps ? (
+            <SeatSharingSummary
+              check={lastCheck}
+              isLoading={seatSharing.isLoading}
+              failed={seatSharing.isError}
+            />
+          ) : undefined
+        }
+        filters={
+          cloudOps ? (
+            <SegmentedControl
+              size="sm"
+              aria-label="Seat sharing"
+              value={sharingFilter}
+              onValueChange={({ value }) => {
+                const picked = SEAT_SHARING_FILTERS.find((filter) => filter === value);
+                if (!picked) return;
+                setSharingFilter(picked);
+                setPage(1);
+              }}
+              items={[
+                { value: "all", label: "All organizations" },
+                {
+                  value: "over",
+                  label: `Over 2x seats (${flaggedOrganizationIds(lastCheck).length})`,
+                  disabled: !lastCheck,
+                },
+              ]}
+            />
+          ) : undefined
+        }
         isLoading={list.isLoading}
         isFetching={list.isFetching}
         error={list.error}
@@ -104,6 +157,7 @@ export default function OrganizationsView() {
               <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
               <ListTable.ColumnHeader>Slug</ListTable.ColumnHeader>
               <ListTable.ColumnHeader>Plan model</ListTable.ColumnHeader>
+              {cloudOps && <ListTable.ColumnHeader>Seat use, 30 days</ListTable.ColumnHeader>}
               <ListTable.ColumnHeader>Currency</ListTable.ColumnHeader>
               <ListTable.ColumnHeader>SSO domain</ListTable.ColumnHeader>
               <ListTable.ColumnHeader>Created</ListTable.ColumnHeader>
@@ -112,10 +166,14 @@ export default function OrganizationsView() {
           </ListTable.Header>
           <ListTable.Body>
             {list.data?.data.length === 0 && (
-              <ListTable.SpanRow columns={8}>
+              <ListTable.SpanRow columns={columns}>
                 <NoDataInfoBlock
                   icon={<SearchX />}
-                  title="No organizations match your search."
+                  title={
+                    overSeats
+                      ? "No organization is over 2x its seats."
+                      : "No organizations match your search."
+                  }
                   description="Try a different search or clear the filter to see all records."
                 />
               </ListTable.SpanRow>
@@ -128,6 +186,11 @@ export default function OrganizationsView() {
                   {org.slug && <InlineCode variant="neutral">{org.slug}</InlineCode>}
                 </ListTable.Cell>
                 <ListTable.Cell>{PRICING_MODEL_LABELS[org.pricingModel]}</ListTable.Cell>
+                {cloudOps && (
+                  <ListTable.Cell>
+                    <SeatSharingCell reading={readings.get(org.id)} />
+                  </ListTable.Cell>
+                )}
                 <ListTable.Cell>{org.currency}</ListTable.Cell>
                 <ListTable.Cell>{org.ssoDomain ?? <EmptyCell />}</ListTable.Cell>
                 <ListTable.Cell>
@@ -157,6 +220,40 @@ export default function OrganizationsView() {
       <OrganizationEditDrawer organization={editing} onClose={() => setEditing(null)} />
     </>
   );
+}
+
+/** When the check last ran and what it flags; it never stops the list from loading. */
+function SeatSharingSummary({
+  check,
+  isLoading,
+  failed,
+}: {
+  check: SeatSharingCheck | undefined;
+  isLoading: boolean;
+  failed: boolean;
+}) {
+  const status = seatSharingStatus({ check, isLoading, failed });
+  return (
+    <Text fontSize="sm" color={failed ? "fg.error" : "fg.muted"}>
+      {status} Flagged when distinct people active in the last 30 days go over 2x seats. Customers
+      never see this.
+    </Text>
+  );
+}
+
+function seatSharingStatus({
+  check,
+  isLoading,
+  failed,
+}: {
+  check: SeatSharingCheck | undefined;
+  isLoading: boolean;
+  failed: boolean;
+}): string {
+  if (failed) return "The seat sharing check could not be loaded.";
+  if (isLoading) return "Loading the seat sharing check.";
+  if (!check) return "The seat sharing check has not run yet. It runs once a day.";
+  return `Seat sharing checked ${formatDateTime(check.checkedAt)}.`;
 }
 
 interface FormState {

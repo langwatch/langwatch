@@ -15,6 +15,9 @@ export class TestUserApi implements UserApi {
 
   constructor(private readonly overrides: Partial<UserApi> = {}) {}
 
+  findSignedInSince: UserApi["findSignedInSince"] = (input) =>
+    this.overrides.findSignedInSince?.(input) ?? this.unimplemented("findSignedInSince");
+
   hasAccountOnDomain: UserApi["hasAccountOnDomain"] = (input) =>
     this.overrides.hasAccountOnDomain?.(input) ?? this.unimplemented("hasAccountOnDomain");
 

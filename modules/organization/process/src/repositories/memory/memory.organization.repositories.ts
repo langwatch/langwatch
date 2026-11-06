@@ -4,6 +4,7 @@ import type { OrganizationRepositories } from "../organization.repositories.ts";
 import { PrivateClickHouseRoutesRepository } from "../private-clickhouse-routes.repository.ts";
 import { PrivateS3AccountsRepository } from "../private-s3-accounts.repository.ts";
 import { MemoryGroupRepository } from "./memory.group.repository.ts";
+import { MemoryOrganizationDeparturesRepository } from "./memory.organization-departures.repository.ts";
 import { MemoryOrganizationInviteRateLimitRepository } from "./memory.organization-invite-rate-limit.repository.ts";
 import { MemoryOrganizationInviteRepository } from "./memory.organization-invite.repository.ts";
 import { MemoryOrganizationMembershipRepository } from "./memory.organization-membership.repository.ts";
@@ -44,6 +45,7 @@ export function memoryOrganizationRepositories({
     inviteRateLimit: MemoryOrganizationInviteRateLimitRepository.create(),
     invite: MemoryOrganizationInviteRepository.create({ memory }),
     seats: MemoryOrganizationSeatRepository.create({ memory }),
+    departures: MemoryOrganizationDeparturesRepository.create({ memory }),
     userDirectory: MemoryOrganizationUserDirectoryRepository.create({ memory }),
     privateClickHouseRoutes: new MemoryPrivateClickHouseRoutesRepository(),
     privateS3Accounts: new MemoryPrivateS3AccountsRepository(),

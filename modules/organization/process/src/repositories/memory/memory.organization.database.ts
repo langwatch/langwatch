@@ -127,6 +127,13 @@ export interface MemoryOrganizationInviteRow {
   updatedAt: Instant;
 }
 
+/** One member removed or disabled, and when. */
+export interface MemoryMemberDepartureRow {
+  organizationId: string;
+  userId: string;
+  occurredAt: Instant;
+}
+
 /** One team-scoped membership row (the `TeamUser` join table). */
 interface MemoryTeamUserRow {
   teamId: string;
@@ -252,6 +259,8 @@ export class MemoryOrganizationDatabase {
   readonly licensingLicenseKeys = new Map<string, string>();
   readonly teams = new Map<string, MemoryTeamRow>();
   readonly organizationUsers: MemoryOrganizationUserRow[] = [];
+  /** Members removed or disabled, the twin of the member facts the lifecycle stream records. */
+  readonly memberDepartures: MemoryMemberDepartureRow[] = [];
   readonly projects = new Map<string, MemoryProjectRow>();
   readonly groups = new Map<string, MemoryGroupRow>();
   readonly users = new Map<string, MemoryUserRow>();

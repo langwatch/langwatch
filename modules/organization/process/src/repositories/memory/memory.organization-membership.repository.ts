@@ -626,6 +626,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     }
 
     const archivedAt = nowInstant();
+    this.memory.memberDepartures.push({ organizationId, userId, occurredAt: archivedAt });
     const archivedTeamIds: string[] = [];
     for (const team of this.teamsOf(organizationId)) {
       if (team.ownerUserId !== userId || !team.isPersonal || team.archivedAt) continue;
@@ -644,6 +645,13 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     }
     row.disabledAt = input.disabled ? nowInstant() : null;
     row.updatedAt = nowInstant();
+    if (row.disabledAt) {
+      this.memory.memberDepartures.push({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        occurredAt: row.disabledAt,
+      });
+    }
   }
 
   async findPersonalTeamsInScopes(params: {

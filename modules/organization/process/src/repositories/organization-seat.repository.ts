@@ -14,4 +14,6 @@ export abstract class OrganizationSeatRepository {
   abstract getMembersDeveloperCount(organizationId: string): Promise<number>;
   /** All three in one read, for a check that asks after both pools at once. */
   abstract countMemberSeats(organizationId: string): Promise<OrganizationMemberSeats>;
+  /** The people holding a FULL seat right now; invitations hold no person yet. */
+  abstract findFullSeatHolderIds(organizationId: string): Promise<string[]>;
 }

@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:241`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:247`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -836,6 +836,14 @@ The seats an organization holds: full and lite members, live invitations include
 
 ```typescript
 countMemberSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationMemberSeats>;
+```
+
+#### `findSeatOccupantsSince`
+
+The people who held a seat since `since`: today's full-seat members, and everyone removed or disabled since then. Read by the Ops seat sharing check.
+
+```typescript
+findSeatOccupantsSince(input: Readonly<{ organizationId: string; since: number }>): Promise<OrganizationSeatOccupants>;
 ```
 
 #### `checkLimit`
@@ -2282,7 +2290,7 @@ Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedE
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:301`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:305`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |
