@@ -35,6 +35,7 @@ vi.mock("../sandboxed-chart-frame.tsx", () => ({
 
 import type { AnalyticsHostProject } from "../../../../../model/analytics-host.ts";
 import { AnalyticsHostProvider } from "../../../../../model/analytics-host.ts";
+import type { WidgetLimitAudience } from "../../../../../model/dashboard-widget/widget-limit-failure.ts";
 import { StubAnalyticsHost } from "../../../../../testing.tsx";
 import { DashboardRefreshedAtContext } from "../../../../../ui/sections/use-dashboard-auto-refresh.ts";
 import {
@@ -167,6 +168,12 @@ const BROKEN: ChartQueryError = {
   title: "Unknown column",
   message: "The query reads a column that does not exist.",
 };
+const OUT_OF_MEMORY: ChartQueryError = {
+  ...BROKEN,
+  code: "query_memory_exceeded",
+  message: "Narrow the time range, add a filter, or select fewer fields.",
+};
+const TIMED_OUT: ChartQueryError = { ...OUT_OF_MEMORY, code: "query_timeout" };
 const BUSY: ChartQueryError = { ...BROKEN, code: "lwql_busy", retryable: true };
 
 const resultWith = (completeness?: QueryCompleteness) => ({
@@ -199,6 +206,7 @@ const boardWidget = ({
   timeWindow?: { start: number; end: number };
   onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
   onEmptyChange?: (empty: boolean) => void;
+  limitAudience?: WidgetLimitAudience;
 }) => (
   <AnalyticsHostProvider value={host}>
     <DesignSystemProvider forcedTheme="light">
@@ -287,6 +295,78 @@ describe("given a widget on a board", () => {
       expect(screen.queryByTestId("widget-state-face")).toBeNull();
       expect(frameProps.mock.calls.length).toBeGreaterThan(rendersBefore);
     });
+  });
+
+  describe("when its query fails on a limit", () => {
+    const BUILT_IN_WORDS =
+      "This project has too much data for this widget in the selected period. This is a LangWatch limit, not a problem with your data.";
+
+    /** @scenario "A built-in widget that fails on a limit says the limit is LangWatch's" */
+    it.each([OUT_OF_MEMORY, TIMED_OUT])(
+      "tells a built-in card the limit is LangWatch's, for $code",
+      async (error) => {
+        const run = frameRuns(() => Promise.reject(error));
+        render(boardWidget({ limitAudience: { kind: "built_in" } }));
+        await run();
+
+        expect(screen.getByText("Couldn't load Cost per trace")).toBeTruthy();
+        expect(screen.getByText(BUILT_IN_WORDS)).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Edit code" })).toBeNull();
+      },
+    );
+
+    /** @scenario "An editable widget that fails on memory says its query used too much" */
+    it("tells an editable card its query used too much memory and offers the edits", async () => {
+      const onEditWithLangy = vi.fn();
+      const onEditCode = vi.fn();
+      const run = frameRuns(() => Promise.reject(OUT_OF_MEMORY));
+      render(boardWidget({ limitAudience: { kind: "editable", onEditWithLangy, onEditCode } }));
+      await run();
+
+      expect(screen.getByText("Its query used more memory than a widget may use.")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Edit with Langy" }));
+      fireEvent.click(screen.getByRole("button", { name: "Edit code" }));
+      expect(onEditWithLangy).toHaveBeenCalledOnce();
+      expect(onEditCode).toHaveBeenCalledOnce();
+      expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    });
+
+    /** @scenario "An editable widget that fails on time says its query ran too long" */
+    it("tells an editable card its query ran past the time a widget may take", async () => {
+      const run = frameRuns(() => Promise.reject(TIMED_OUT));
+      render(boardWidget({ limitAudience: { kind: "editable", onEditCode: vi.fn() } }));
+      await run();
+
+      expect(screen.getByText("Its query ran past the time a widget may take.")).toBeTruthy();
+    });
+
+    /** @scenario "A reader who cannot edit is told to ask someone who can" */
+    it("tells a reader who cannot edit to ask someone who can", async () => {
+      const run = frameRuns(() => Promise.reject(OUT_OF_MEMORY));
+      render(boardWidget({ limitAudience: { kind: "editable" } }));
+      await run();
+
+      expect(
+        screen.getByText("Ask someone who can edit this dashboard to change the query."),
+      ).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Edit code" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Edit with Langy" })).toBeNull();
+    });
+
+    /** @scenario "A failure that is not a limit keeps its existing message" */
+    it.each<WidgetLimitAudience>([{ kind: "built_in" }, { kind: "editable", onEditCode: vi.fn() }])(
+      "keeps another error's own message for a $kind card",
+      async (limitAudience) => {
+        const run = frameRuns(() => Promise.reject(BROKEN));
+        render(boardWidget({ limitAudience }));
+        await run();
+
+        expect(screen.getByText(BROKEN.message)).toBeTruthy();
+        expect(screen.queryByText(/LangWatch limit/)).toBeNull();
+        expect(screen.queryByRole("button", { name: "Edit code" })).toBeNull();
+      },
+    );
   });
 
   describe("when its query is refused as busy", () => {

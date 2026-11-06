@@ -41,6 +41,40 @@ Feature: A dashboard widget frame shows what its queries report
       And Retry starts the widget over, so its queries run again
 
     @integration
+    Scenario: A built-in widget that fails on a limit says the limit is LangWatch's
+      Given a From LangWatch widget named "Cost per trace" on a read-only board
+      When its query fails with "query_memory_exceeded" or "query_timeout"
+      Then the card says "Couldn't load Cost per trace"
+      And it says "This project has too much data for this widget in the selected period. This is a LangWatch limit, not a problem with your data."
+      And it offers Retry and no edit action
+
+    @integration
+    Scenario: An editable widget that fails on memory says its query used too much
+      Given a stored widget on a board the reader can edit, with Langy
+      When its query fails with "query_memory_exceeded"
+      Then the card says "Its query used more memory than a widget may use."
+      And it offers "Edit with Langy", "Edit code" and Retry
+
+    @integration
+    Scenario: An editable widget that fails on time says its query ran too long
+      Given a stored widget on a board the reader can edit
+      When its query fails with "query_timeout"
+      Then the card says "Its query ran past the time a widget may take."
+
+    @integration
+    Scenario: A reader who cannot edit is told to ask someone who can
+      Given a stored widget on a board the reader cannot edit
+      When its query fails with "query_memory_exceeded"
+      Then the card says "Ask someone who can edit this dashboard to change the query."
+      And it offers no edit action
+
+    @integration
+    Scenario: A failure that is not a limit keeps its existing message
+      Given a built-in widget and a stored widget
+      When a query fails with another code, such as "lwql_unknown_identifier"
+      Then each card shows that error's own message and no limit wording
+
+    @integration
     Scenario: A failure the frame will retry does not fail the card yet
       Given a widget whose query is refused as busy
       When the frame has not used all its retries

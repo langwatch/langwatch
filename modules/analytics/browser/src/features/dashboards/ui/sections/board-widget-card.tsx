@@ -150,6 +150,13 @@ export function BoardWidgetCard({
           timeWindow={timeWindow}
           granularitySeconds={granularitySeconds}
           onFaceChange={setFace}
+          limitAudience={{
+            kind: "editable",
+            ...(langyOnData && onEdit
+              ? { onEditWithLangy: () => onEdit({ withLangy: true }) }
+              : {}),
+            ...(canEditCode && onEdit ? { onEditCode: () => onEdit({ withLangy: false }) } : {}),
+          }}
           onLimitsChange={setLimits}
           onExportChange={csvExport.onExportChange}
           onEmptyChange={onEmptyChange}

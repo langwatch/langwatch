@@ -73,6 +73,7 @@ export function CuratedWidgetCard({
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}
         onFaceChange={setFace}
+        limitAudience={{ kind: "built_in" }}
         onExportChange={csvExport.onExportChange}
         onEmptyChange={onEmptyChange}
       />

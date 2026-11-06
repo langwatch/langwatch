@@ -36,6 +36,10 @@ import {
   noTrafficGuidance,
 } from "../../../../model/dashboard-widget/widget-guidance.ts";
 import {
+  type WidgetLimitAudience,
+  widgetLimitWords,
+} from "../../../../model/dashboard-widget/widget-limit-failure.ts";
+import {
   WidgetFailedFace,
   WidgetLoadingFace,
   WidgetNoAccessFace,
@@ -88,6 +92,8 @@ type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
   /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
   readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+  /** Who reads the card; with it, a memory or time limit failure gets its own words and actions. */
+  readonly limitAudience?: WidgetLimitAudience;
   /** Told which face the frame draws, so the card offers only what that face allows. */
   readonly onFaceChange?: (face: WidgetFace["kind"]) => void;
   /** Told the messages of what the server limited in the run, joined; "" when it limited none. */
@@ -128,6 +134,7 @@ function WidgetFrameOverWindow({
   timeWindow,
   granularitySeconds,
   onAskLangyToSetUp,
+  limitAudience,
   onFaceChange,
   onLimitsChange,
   onExportChange,
@@ -230,6 +237,7 @@ function WidgetFrameOverWindow({
     name: widgetName ?? "this widget",
     onRetry: retry,
     onAskLangyToSetUp,
+    limitAudience,
     onSetUp: (target) => onNavigate({ target, params: {} }),
   });
 
@@ -266,19 +274,37 @@ function faceInPlaceOfChart({
   name,
   onRetry,
   onAskLangyToSetUp,
+  limitAudience,
   onSetUp,
 }: {
   face: WidgetFace;
   name: string;
   onRetry: () => void;
   onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+  limitAudience?: WidgetLimitAudience;
   onSetUp: (target: NavigableTarget) => void;
 }) {
   switch (face.kind) {
     case "no_access":
       return <NoAccessFace missingGates={face.missingGates} />;
-    case "failed":
-      return <WidgetFailedFace name={name} message={face.error.message} onRetry={onRetry} />;
+    case "failed": {
+      const limit = widgetLimitWords({ code: face.error.code, audience: limitAudience });
+      if (!limit) {
+        return <WidgetFailedFace name={name} message={face.error.message} onRetry={onRetry} />;
+      }
+      const editable = limitAudience?.kind === "editable" ? limitAudience : undefined;
+      return (
+        <WidgetFailedFace
+          name={name}
+          message={limit.message}
+          note={limit.note}
+          onRetry={onRetry}
+          onEditWithLangy={editable?.onEditWithLangy}
+          onEditCode={editable?.onEditCode}
+          minorRetry
+        />
+      );
+    }
     case "no_traffic":
       return <NoTrafficFace unit={face.unit} onSetUp={onSetUp} />;
     case "missing":

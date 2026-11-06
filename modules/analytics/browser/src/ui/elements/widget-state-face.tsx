@@ -13,7 +13,7 @@ import {
   VisuallyHidden,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { ArrowRight, Lock, Plug, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowRight, Code2, Lock, Plug, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
 
 /** The widget's queries have not answered yet: a chart-shaped skeleton, and words when slow. */
 export function WidgetLoadingFace({ slow }: { slow: boolean }) {
@@ -150,16 +150,29 @@ export function WidgetNoAccessFace({ what, ask }: { what: string; ask: string })
   );
 }
 
-/** Names the widget that failed and offers Retry, so a reader knows which card to try again. */
+/**
+ * Names the widget that failed and offers Retry, so a reader knows which card to try again. A
+ * limit failure may add a note and the edit actions, and then Retry steps back.
+ */
 export function WidgetFailedFace({
   name,
   message,
+  note,
   onRetry,
+  onEditWithLangy,
+  onEditCode,
+  minorRetry = false,
 }: {
   name: string;
   /** The error registry's words for what went wrong. */
   message?: string;
+  /** A further line, such as who to ask when the reader cannot edit. */
+  note?: string | undefined;
   onRetry: () => void;
+  onEditWithLangy?: (() => void) | undefined;
+  onEditCode?: (() => void) | undefined;
+  /** Retry is the lesser action, not the fix. */
+  minorRetry?: boolean;
 }) {
   return (
     <VStack height="full" justify="center" gap={2} paddingX={4} textAlign="center">
@@ -172,10 +185,29 @@ export function WidgetFailedFace({
           {message}
         </Text>
       )}
-      <Button size="xs" variant="outline" marginTop={1} onClick={onRetry}>
-        <RotateCcw size={13} aria-hidden />
-        Retry
-      </Button>
+      {note && (
+        <Text textStyle="caption" color="fg.muted" maxWidth="320px">
+          {note}
+        </Text>
+      )}
+      <HStack gap={1.5} justify="center" wrap="wrap" marginTop={1}>
+        {onEditWithLangy && (
+          <Button size="xs" variant="outline" onClick={onEditWithLangy}>
+            <Sparkles size={13} aria-hidden />
+            Edit with Langy
+          </Button>
+        )}
+        {onEditCode && (
+          <Button size="xs" variant="outline" onClick={onEditCode}>
+            <Code2 size={13} aria-hidden />
+            Edit code
+          </Button>
+        )}
+        <Button size="xs" variant={minorRetry ? "ghost" : "outline"} onClick={onRetry}>
+          <RotateCcw size={13} aria-hidden />
+          Retry
+        </Button>
+      </HStack>
     </VStack>
   );
 }
