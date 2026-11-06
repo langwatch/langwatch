@@ -807,7 +807,7 @@ type Output = z.infer<typeof modelDefaultSnapshotSchema>; // ../contract/src/mod
 interface Input {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
-  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS" | "INSTANT_EVALS";
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS" | "INSTANT_EVALS" | "JUDGE";
   model: string | null;
 }
 // Output: modelProviderOkAckSchema, ../contract/src/model-provider.trpc-schemas.ts:389

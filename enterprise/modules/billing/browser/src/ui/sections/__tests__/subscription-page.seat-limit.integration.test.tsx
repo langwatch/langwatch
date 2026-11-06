@@ -69,6 +69,10 @@ class TestBillingHost extends BillingHostApi {
     this.navigations.push(to);
   }
 
+  replace(to: string): void {
+    this.navigations.push(to);
+  }
+
   leaveTo(url: string): void {
     this.departures.push(url);
   }
@@ -251,7 +255,9 @@ describe("<SubscriptionPage/> seat limit", () => {
       expect(screen.getByTestId("seat-limit-callout")).toHaveTextContent(
         "Your organization uses 3 member seats and your plan includes 2 member seats. Upgrade to the Growth plan below to keep everyone.",
       );
-      expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
+      expect(screen.getByTestId("upgrade-plan-block")).toHaveTextContent(
+        "Your current plan doesn't cover these seats.",
+      );
     });
   });
 
@@ -296,6 +302,47 @@ describe("<SubscriptionPage/> seat limit", () => {
       });
       expect(screen.queryByText("Upgrade required")).toBeNull();
       expect(screen.queryByTestId("seat-limit-callout")).toBeNull();
+    });
+  });
+
+  describe("when a Free organization has one member", () => {
+    beforeEach(() => {
+      mockGetOrganizationWithMembers.mockReturnValue({
+        data: { ...mockOrganizationMembers, members: [mockOrganizationMembers.members[0]!] },
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      mockGetUsage.mockReturnValue({
+        data: { seatLimitInfo: { status: "ok", message: "" }, membersCount: 1 },
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    /** @scenario "A Free organization with one member is offered the upgrade" */
+    it("offers the Growth upgrade for one seat without adding a seat first", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({ url: null });
+      mockCreateSubscription.mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync,
+        isLoading: false,
+        isPending: false,
+      });
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByText("1 / 2")).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("upgrade-plan-block")).toHaveTextContent(
+        "Get more events, more seats and longer retention.",
+      );
+      expect(screen.queryByText(/doesn't cover these seats/)).toBeNull();
+      expect(screen.queryByText("Upgrade required")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: /Upgrade now/i }));
+
+      await waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 1 }));
+      });
     });
   });
 

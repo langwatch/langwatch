@@ -1,6 +1,6 @@
 Feature: Auth records an app-page-opened fact
 
-  A person who opens the sessions page with a browser login session raises one
+  A person who opens an announced page with a browser login session raises one
   fact for peers. A CLI or API-key caller, and a person who belongs to no
   organization yet, raise nothing.
 

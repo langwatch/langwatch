@@ -310,10 +310,13 @@ describe("NurturingMilestonesService", () => {
       let failuresLeft = 1;
       const projects: NurturingProjectDirectoryRepository = {
         getPlacement: (input) => directory.getPlacement(input),
+        findPersonalOwnerUserIds: (input) => directory.findPersonalOwnerUserIds(input),
         getFirstProjectCreatedAt: async (input) => {
           if (failuresLeft-- > 0) throw new Error("database unavailable");
           return directory.getFirstProjectCreatedAt(input);
         },
+        getOrganizationCreatedAt: (input) => directory.getOrganizationCreatedAt(input),
+        hasTracedProject: (input) => directory.hasTracedProject(input),
       };
       const service = serviceOver({ milestones, projects });
       await service.projectCreated(projectCreatedFact());

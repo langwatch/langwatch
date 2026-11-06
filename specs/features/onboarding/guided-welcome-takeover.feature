@@ -90,10 +90,11 @@ Feature: Guided welcome flow and takeover screens
     Then Next fades in shortly after
 
   @integration
-  Scenario: A user without a first name is greeted as "there"
-    Given my account has no name
+  Scenario: A user without a name is greeted without a placeholder
+    Given my account has no name, or only spaces, or only my email address
     When the hello screen opens
-    Then the greeting starts with "Hello there"
+    Then the greeting types out "Hello, I'm Langy 👋"
+    And it does not call me "there" or by my email address
 
   # ============================================================================
   # Value
@@ -104,6 +105,12 @@ Feature: Guided welcome flow and takeover screens
     Given I said I use LangWatch for my company "ACME"
     When the value screen opens
     Then Langy asks "So tell me, Rogerio, what are the most valuable things we can set up for ACME today?"
+
+  @integration
+  Scenario: The value question leaves the name out when the account has none
+    Given my account has no name
+    When the value screen opens
+    Then Langy asks "So tell me, what are the most valuable things we can set up for ACME today?"
 
   @integration
   Scenario: The value question says "you" when the user is on their own

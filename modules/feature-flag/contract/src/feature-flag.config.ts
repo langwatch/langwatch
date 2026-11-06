@@ -1,4 +1,4 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, type ConfigOf, isSaas } from "@langwatch/config";
 import { z } from "zod";
 
 import { deriveFeatureFlagEnvVarName } from "./feature-flag-environment.ts";
@@ -53,6 +53,8 @@ function isFeatureFlagKey(value: string): value is FeatureFlagKey {
  * leaves into the service's `Map`/`Set` pair.
  */
 export const featureFlagConfig = Config.define((c) => ({
+  /** The shared deployment leaf, read to pick a flag's self-hosted default. */
+  isSaas,
   forceEnable: c.env("FEATURE_FLAG_FORCE_ENABLE", forceEnableSchema),
   overrides: Object.fromEntries(
     FEATURE_FLAGS.filter(isEnvOverridable).map((definition) => [
@@ -74,4 +76,6 @@ export type FeatureFlagServerConfig = ConfigOf<typeof featureFlagConfig>;
 export interface FeatureFlagConfig {
   overrides: ReadonlyMap<string, boolean>;
   forceEnabled: ReadonlySet<string>;
+  /** False on a self-hosted install, where a flag's `selfHostedDefaultValue` applies. */
+  isSaas: boolean;
 }

@@ -13,6 +13,8 @@ import {
 } from "@langwatch/design-system/provider-model-selector";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   buildCustomModelDisplayNames,
   isModelAllowedAsRoleDefault,
@@ -27,6 +29,7 @@ import {
   type ModelDefaultSnapshot,
   type ModelPickerOption,
   type ModelRole,
+  UNSET_ROLE_FALLBACK,
 } from "@langwatch/model-provider-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -58,6 +61,7 @@ const ROLE_BLURB: Record<ModelRole, string> = {
   EMBEDDINGS: "Semantic vectors used by topic clustering and similar features.",
   INSTANT_EVALS:
     "The decision model Instant Evals answer with. LangWatch Instant Preview unless you pick your own.",
+  JUDGE: "The model scenario runs judge with. Uses the Default model unless you pick one.",
 };
 
 /** One empty slot per role, so a per-role map never misses a column. */
@@ -276,6 +280,7 @@ function modelOptionsByRoleFor({
     DEFAULT: [...aliasChatOptions, ...chatOptions],
     FAST: [...aliasChatOptions, ...chatOptions],
     LANGY: [...aliasChatOptions, ...chatOptions],
+    JUDGE: [...aliasChatOptions, ...chatOptions],
     EMBEDDINGS: modelOptionsForMode({
       enabledEntries,
       hasProviderLoadError,
@@ -348,7 +353,7 @@ interface Props {
 export function DefaultModelOverrideDrawer({ editingId }: Props) {
   const host = useModelProviderHost();
   const { closeDrawer } = useDrawer();
-  const { projectId } = host.scope();
+  const { projectId, organizationId } = host.scope();
   const utils = modelProviderApi.useUtils();
   const saveMutation = modelProviderApi.modelProvider.saveDefaultModelsConfig.useMutation();
 
@@ -442,7 +447,18 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       },
       { enabled: !!projectId && scopes.length > 0 && open },
     );
-  const decisionOptions = decisionModelPickerOptions({ pickable: pickableDecisionModels.data });
+  const { enabled: isJudgeRouted } = useFeatureFlag(
+    FrontendFlags.release_instant_evals_judge_router,
+    {
+      projectId: projectId ?? NOT_TARGETED,
+      organizationId,
+      enabled: !!projectId && open,
+    },
+  );
+  const decisionOptions = decisionModelPickerOptions({
+    pickable: pickableDecisionModels.data,
+    isJudgeRouted,
+  });
   const modelOptionsByRole = modelOptionsByRoleFor({
     decisionOptions,
     hasProviderLoadError: projectProviders.isError,
@@ -544,7 +560,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
               role={role}
               config={config}
               features={featuresByRole[role]}
-              inheritedForRole={inherited[role] ?? null}
+              roleInherit={roleInheritOption({ role, inherited, config })}
               inheritedForFeature={inherited}
               expanded={expanded[role]}
               onToggleExpand={() => setExpanded((prev) => ({ ...prev, [role]: !prev[role] }))}
@@ -571,7 +587,7 @@ function RoleRow({
   role,
   config,
   features,
-  inheritedForRole,
+  roleInherit,
   inheritedForFeature,
   expanded,
   onToggleExpand,
@@ -583,9 +599,8 @@ function RoleRow({
   role: ModelRole;
   config: Record<string, string>;
   features: FeatureProjection[];
-  /** Server's cascade answer for this role at the picked scopes. Null
-   *  when no picked scope OR no cascade hit AND no inferable provider. */
-  inheritedForRole: InheritedEntry;
+  /** The role's inherit entry at the picked scopes, its fallback role's included. */
+  roleInherit: InheritOptionShape;
   /** Server's per-key cascade answers; used by feature rows below. */
   inheritedForFeature: Record<string, InheritedEntry>;
   expanded: boolean;
@@ -598,7 +613,6 @@ function RoleRow({
   pickerOptionFor: (modelValue: string) => ModelPickerOption;
 }) {
   const current = config[role] ?? "";
-  const inheritOption = buildInheritOption(inheritedForRole, role);
   const canExpand = features.length > 0;
   const ChevronIcon = expanded ? ChevronDown : ChevronRight;
 
@@ -634,7 +648,7 @@ function RoleRow({
               isLoading: false,
             }}
             onChange={(m) => onSetOverride(role, m)}
-            inheritOption={inheritOption}
+            inheritOption={roleInherit}
             disabled={unsupportedAtScope}
             labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
           />
@@ -682,7 +696,7 @@ function RoleRow({
               override={config[f.key] ?? ""}
               roleLevelOverride={config[role] ?? ""}
               inheritedForFeature={inheritedForFeature[f.key] ?? null}
-              inheritedForRole={inheritedForRole}
+              roleInherit={roleInherit}
               modelOptions={modelOptions}
               onSetOverride={onSetOverride}
               displayNames={displayNames}
@@ -700,7 +714,7 @@ function FeatureRow({
   override,
   roleLevelOverride,
   inheritedForFeature,
-  inheritedForRole,
+  roleInherit,
   modelOptions,
   onSetOverride,
   displayNames,
@@ -711,8 +725,8 @@ function FeatureRow({
   roleLevelOverride: string;
   /** Server cascade answer for this exact feature key. */
   inheritedForFeature: InheritedEntry;
-  /** Server cascade answer for the feature's role (fallback chain). */
-  inheritedForRole: InheritedEntry;
+  /** The feature's role's inherit entry (fallback chain). */
+  roleInherit: InheritOptionShape;
   modelOptions: string[];
   onSetOverride: (key: string, model: string | null) => void;
   /** Configured custom-model display names, keyed by `<provider>/<modelId>`. */
@@ -730,9 +744,7 @@ function FeatureRow({
       label: "Inherit (role default in this config)",
     };
   } else {
-    inheritOption =
-      inheritHitOption(inheritedForFeature) ??
-      buildInheritOption(inheritedForRole, feature.role as ModelRole);
+    inheritOption = inheritHitOption(inheritedForFeature) ?? roleInherit;
   }
   return (
     <HStack gap={2} align="center" data-testid={`feature-row-${feature.key}`}>
@@ -811,6 +823,37 @@ export function buildInheritOption(entry: InheritedEntry, role?: ModelRole): Inh
   const hit = inheritHitOption(entry);
   if (hit) return hit;
   if (role === "INSTANT_EVALS") return { model: LANGWATCH_DECISION_MODEL_ID, label: "Default" };
+  return { label: "Not configured" };
+}
+
+/**
+ * A role row's inherit entry: its own cascade first, then its fallback role (JUDGE reads
+ * DEFAULT) as picked in this config, then as inherited from a wider scope.
+ */
+export function roleInheritOption({
+  role,
+  inherited,
+  config,
+}: {
+  role: ModelRole;
+  inherited: Record<string, InheritedEntry>;
+  config: Record<string, string>;
+}): InheritOptionShape {
+  const own = inheritHitOption(inherited[role] ?? null);
+  if (own) return own;
+  const fallback = UNSET_ROLE_FALLBACK[role];
+  if (!fallback) return buildInheritOption(inherited[role] ?? null, role);
+  const fallbackLabel = MODEL_ROLE_LABEL[fallback];
+  const picked = config[fallback];
+  if (picked) return { model: picked, label: `Inherit (${fallbackLabel} in this config)` };
+  const borrowed = inheritHitOption(inherited[fallback] ?? null);
+  if (borrowed?.model) {
+    const from = inherited[fallback]?.scope;
+    return {
+      model: borrowed.model,
+      label: from ? `Inherit (${fallbackLabel}, from ${from})` : `Inherit (${fallbackLabel})`,
+    };
+  }
   return { label: "Not configured" };
 }
 

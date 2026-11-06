@@ -16,6 +16,7 @@ import {
   type CodingAgentSessionRow,
   type CodingAgentSessionState,
 } from "../../eventing/coding-agent-session.projection.ts";
+import { repositoryKeyOfWith } from "../../rules/coding-agent-repository-key.rules.ts";
 import { toCodingAgentSessionRow } from "../../rules/coding-agent-session-row-mapper.rules.ts";
 import {
   EventingCodingAgentSessionStoreService,
@@ -99,6 +100,11 @@ class FakePersistence implements CodingAgentProjectionPersistence {
   async appendSessionEvents(): Promise<void> {}
 }
 
+const repositoryKeyOf = repositoryKeyOfWith({
+  secret: "server-secret",
+  normalizeHost: (host) => host || "github.com",
+});
+
 const context = (over: Partial<ProjectionStoreContext> = {}): ProjectionStoreContext => ({
   aggregateId: "session-1",
   tenantId,
@@ -113,6 +119,7 @@ function storeWith(
     persistence,
     defaultRetentionDays: () => 30,
     onSessionsStored: hooks.onSessionsStored,
+    repositoryKeyOf,
   });
 }
 
@@ -238,6 +245,8 @@ describe("EventingCodingAgentSessionStoreService durable dedup", () => {
       occurredAt: 1_000,
       firstStoredAt: 1_000,
       auxiliary: false,
+      terminalType: null,
+      repositoryKey: null,
       ...over,
     });
 
@@ -257,6 +266,60 @@ describe("EventingCodingAgentSessionStoreService durable dedup", () => {
         await Promise.resolve();
 
         expect(seen).toEqual([[stored()]]);
+      });
+
+      /** @scenario "A stored session reports its terminal type and a key standing for its repo" */
+      it("reports the terminal type and the repo's key, never the repo itself", async () => {
+        const seen: StoredSession[][] = [];
+        const store = storeWith(new FakePersistence(), {
+          onSessionsStored: async (sessions) => void seen.push(sessions),
+        });
+        const repository = {
+          repositoryHost: "github.com",
+          repositoryOwner: "acme",
+          repositoryName: "payments",
+        };
+
+        await store.store(makeState({ terminalType: "vscode", ...repository }), context());
+        await Promise.resolve();
+
+        expect(seen[0]?.[0]).toMatchObject({
+          terminalType: "vscode",
+          repositoryKey: repositoryKeyOf(repository),
+        });
+        expect(JSON.stringify(seen)).not.toMatch(/acme|payments|github\.com/);
+      });
+
+      /** @scenario "A client's terminal string reaches peers only as one of a closed set" */
+      it("reports a terminal it cannot name as other", async () => {
+        const seen: StoredSession[][] = [];
+        const store = storeWith(new FakePersistence(), {
+          onSessionsStored: async (sessions) => void seen.push(sessions),
+        });
+
+        await store.store(
+          makeState({ terminalType: "my-terminal", repositoryName: "r" }),
+          context(),
+        );
+        await Promise.resolve();
+
+        expect(seen[0]?.[0]?.terminalType).toBe("other");
+      });
+
+      /** @scenario "A repo's key ignores case and differs per repo" */
+      it.each([
+        ["owner", { repositoryName: "payments" }],
+        ["name", { repositoryOwner: "acme" }],
+      ])("reports no repo key for a repo with no %s", async (_missing, repository) => {
+        const seen: StoredSession[][] = [];
+        const store = storeWith(new FakePersistence(), {
+          onSessionsStored: async (sessions) => void seen.push(sessions),
+        });
+
+        await store.store(makeState(repository), context());
+        await Promise.resolve();
+
+        expect(seen[0]?.[0]?.repositoryKey).toBeNull();
       });
 
       /** @scenario "A helper-thread session is reported as auxiliary" */

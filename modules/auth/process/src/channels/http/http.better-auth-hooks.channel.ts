@@ -17,7 +17,11 @@ import {
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi, SignUpVerdict } from "@langwatch/organization-contract";
+import type {
+  OrganizationApi,
+  OrganizationUserRole,
+  SignUpVerdict,
+} from "@langwatch/organization-contract";
 import { fromDate, nowInstant } from "@langwatch/time";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
@@ -134,11 +138,13 @@ const announceSsoAutoJoin = ({
   user,
   org,
   inviteId,
+  role,
 }: {
   announcements: BetterAuthAnnouncements;
   user: { id: string; email: string; name: string };
   org: { id: string; name: string };
   inviteId: string | null;
+  role: OrganizationUserRole;
 }): void => {
   logger.info(
     { userId: user.id, organizationId: org.id, inviteId },
@@ -157,6 +163,7 @@ const announceSsoAutoJoin = ({
     userId: user.id,
     organizationId: org.id,
     organizationName: org.name,
+    role,
   });
 };
 
@@ -182,7 +189,7 @@ const joinSsoOrganization = async ({
   });
 
   if (invite.applied) {
-    announceSsoAutoJoin({ announcements, user, org, inviteId: invite.inviteId });
+    announceSsoAutoJoin({ announcements, user, org, inviteId: invite.inviteId, role: invite.role });
     return;
   }
 
@@ -214,7 +221,7 @@ const joinSsoOrganization = async ({
     );
     return;
   }
-  announceSsoAutoJoin({ announcements, user, org, inviteId: null });
+  announceSsoAutoJoin({ announcements, user, org, inviteId: null, role: admission.seat });
 };
 
 /**

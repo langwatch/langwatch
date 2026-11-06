@@ -1040,7 +1040,7 @@ Contract `../contract/src/batch-record.trpc.ts:25`, router `src/transport/batch-
 
 ```typescript
 // batchRecord.getAllByexperimentIdGroup
-// Input: datasetApiProjectInputSchema, ../../dataset/contract/src/dataset.schemas.ts:67
+// Input: datasetApiProjectInputSchema, ../../dataset/contract/src/dataset.schemas.ts:69
 interface Input {
   projectId: string;
 }
