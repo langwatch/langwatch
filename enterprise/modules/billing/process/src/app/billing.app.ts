@@ -71,6 +71,7 @@ import {
   planLimitInFlight,
   resourceLimitCooldown,
 } from "../services/billing-alert-cooldown.service.ts";
+import { BillingCheckoutMeterService } from "../services/billing-checkout-meter.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
 import { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
@@ -565,7 +566,9 @@ export class BillingModule
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
   }): Promise<{ url: string | null }> {
-    return this.#subscriptionDoor.subscriptions.createOrUpdateSubscription(input);
+    return BillingModule.#checkouts.track("subscription", () =>
+      this.#subscriptionDoor.subscriptions.createOrUpdateSubscription(input),
+    );
   }
 
   async createBillingPortalSession(input: {
@@ -610,11 +613,13 @@ export class BillingModule
     customerEmail: string | null;
   }): Promise<{ url: string | null; subscriptionId: string }> {
     const { customerEmail, ...checkout } = input;
-    const customerId = await this.getOrCreateCustomerId({
-      user: { email: customerEmail },
-      organizationId: input.organizationId,
+    return BillingModule.#checkouts.track("seat_checkout", async () => {
+      const customerId = await this.getOrCreateCustomerId({
+        user: { email: customerEmail },
+        organizationId: input.organizationId,
+      });
+      return this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId });
     });
-    return this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId });
   }
 
   async listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]> {
@@ -622,6 +627,9 @@ export class BillingModule
   }
 
   /** Main's `EEWebhookService` behind the callback, over billing's own rows. */
+  /** Checkout starts, refusals and completions; the series the checkout-volume alert reads. */
+  static readonly #checkouts = BillingCheckoutMeterService.create();
+
   static #composeStripeWebhook({
     webhook,
     isSaas,
@@ -660,7 +668,13 @@ export class BillingModule
       dispatchesEvents: () => isSaas,
       hasSigningSecret: () => stripe.channels.webhooks.isConfigured(),
       constructEvent: (input) => stripe.channels.webhooks.constructEvent(input),
-      handleEvent: (event) => events.handleEvent(event),
+      handleEvent: async (event) => {
+        const result = await events.handleEvent(event);
+        if (event.type === "checkout.session.completed" && result.status === "ok") {
+          BillingModule.#checkouts.completed();
+        }
+        return result;
+      },
     });
   }
 
