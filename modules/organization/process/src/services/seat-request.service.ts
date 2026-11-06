@@ -114,8 +114,8 @@ export class SeatRequestService {
 
   /**
    * Opens a request when an admission asked for a full seat and was left Lite or held (ruling
-   * R1). A repeated admission of a Lite or held member only fills a missing request, so one
-   * whose first opening failed is still seen, and an answered one is never reopened.
+   * R1). A repeated admission of a held member only fills a missing request, so one whose
+   * first opening failed is still seen, and an answered one is never reopened.
    */
   async openForAdmission(input: {
     organizationId: string;
@@ -125,6 +125,8 @@ export class SeatRequestService {
   }): Promise<void> {
     const { organizationId, userId, admission } = input;
     if (admission.seat !== "EXTERNAL") return;
+    // A Lite member signing in again may have been moved there by an admin: only held fills in.
+    if (admission.outcome === "already-present" && !admission.pending) return;
     const requested =
       input.requestedSeat ?? (await this.dependencies.members.readJoinerSeat({ organizationId }));
     if (requested !== "MEMBER") return;

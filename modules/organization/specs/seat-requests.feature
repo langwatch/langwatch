@@ -51,6 +51,12 @@ Feature: Seat requests when an organization is over its seat limit
       Then an open seat request names "late@acme.example"
 
     @unit
+    Scenario: A member an admin moved to Lite is not turned into a seat request
+      Given "lite@acme.example" holds a Lite Member seat with no seat request on file
+      When "lite@acme.example" signs in again
+      Then no seat request is opened for them and no administrator is mailed
+
+    @unit
     Scenario: Arriving again never reopens a seat request that was answered
       Given every full member seat and every Lite Member seat is in use
       And "late@acme.example" is held pending and their seat request was declined

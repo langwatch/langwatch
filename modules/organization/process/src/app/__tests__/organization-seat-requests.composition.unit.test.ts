@@ -92,6 +92,23 @@ describe("given an organization over its seat limit", () => {
     });
   });
 
+  describe("when a Lite member with no seat request signs in again", () => {
+    /** @scenario "A member an admin moved to Lite is not turned into a seat request" */
+    it("opens no request", async () => {
+      const { arrive, openRequests, seatRequests } = await application({ freeLite: 1 });
+      const open = seatRequests.open.bind(seatRequests);
+      seatRequests.open = async () => {
+        throw new Error("no request on file");
+      };
+      await arrive({ email: "lite@acme.example" });
+      seatRequests.open = open;
+
+      await arrive({ email: "lite@acme.example" });
+
+      expect(await openRequests()).toEqual([]);
+    });
+  });
+
   describe("when a held person whose seat request was declined arrives again", () => {
     /** @scenario "Arriving again never reopens a seat request that was answered" */
     it("leaves the declined request closed", async () => {
