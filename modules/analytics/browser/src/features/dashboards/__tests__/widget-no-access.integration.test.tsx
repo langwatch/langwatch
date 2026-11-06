@@ -113,6 +113,7 @@ function storedCard({
         dashboardId="board-1"
         boardName="Weekly review"
         period={PERIOD}
+        periodKey="30d:auto"
         isWriting={false}
         langy={langy}
         onEdit={vi.fn()}
@@ -243,6 +244,7 @@ describe("given a From LangWatch board's widget whose query reads cost", () => {
             rowSpan={4}
             timeWindow={{ start: 1_000, end: 2_000 }}
             granularitySeconds={3600}
+            periodKey="30d:auto"
             onAskLangy={vi.fn()}
           />
         ),
