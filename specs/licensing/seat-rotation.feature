@@ -130,6 +130,13 @@ Feature: Seat rotation
       Then 5 of 5 full member seats are in use
       And "Bar" is listed in Users as "Deactivated, seat frees" on the original day 30 days later
 
+    @integration
+    Scenario: A removed person with a held seat is listed as Deactivated
+      Given "Bar" was removed with a seat held until 3 December
+      When an administrator opens Users
+      Then "Bar" is listed greyed out after the members, with "Deactivated, seat frees 3 Dec"
+      And the list offers no actions on "Bar"
+
   Rule: a seat that frees goes to whoever is waiting
 
     @integration

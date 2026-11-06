@@ -4,7 +4,6 @@
  * Impersonation is deliberately absent. Spec: specs/identity/directory-administration.feature
  */
 
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
@@ -28,6 +27,7 @@ import { ProvenanceChip, ProvenanceExplanation } from "../elements/member-proven
 import { SecondFactorCell } from "../elements/second-factor-cell.tsx";
 import { MemberAccessEditor } from "./member-access-editor.tsx";
 import { PersonIdentityRow } from "./person-identity-row.tsx";
+import { RemoveMemberDialog } from "./remove-member-dialog.tsx";
 
 export function PersonDrawer({ open = true, userId }: UiPersonDrawerProps) {
   const { closeDrawer } = useDrawer();
@@ -213,12 +213,14 @@ function PersonActions({
   const toaster = useOrganizationToaster();
   const showErrorToast = useShowErrorToast();
   const queryClient = api.useUtils();
+  const organizationName = useOrganizationTeamProject().organization?.name;
   const [confirmingRemoval, setConfirmingRemoval] = useState(false);
   useEffect(() => setConfirmingRemoval(false), [person.userId]);
 
   const removeMember = api.organization.deleteMember.useMutation();
   const refreshSeats = () => {
     void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
+    void queryClient.organization.listHeldSeats.invalidate();
     void queryClient.limits.getUsage.invalidate();
     void queryClient.licenseEnforcement.checkLimit.invalidate();
   };
@@ -255,26 +257,27 @@ function PersonActions({
             </Button>
           </HStack>
           <Text fontSize="xs" color="fg.muted">
-            Taking a seat away is reversible and frees a licensed seat. Removing ends their
-            membership of this organization; their account and everything they did stay.
+            Taking a seat away is reversible. Removing ends their membership of this organization;
+            their account and everything they did stay.
           </Text>
         </VStack>
       </SettingsSection>
-      <ConfirmDialog
-        open={confirmingRemoval}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setConfirmingRemoval(false);
-        }}
-        title="Remove from organization"
-        message={`Remove ${
-          person.user.name ?? person.user.email ?? "this member"
-        } from this organization? They lose access to everything in it.`}
-        confirmLabel="Remove"
-        tone="danger"
+      <RemoveMemberDialog
+        organizationId={organizationId}
+        organizationName={organizationName}
+        target={
+          confirmingRemoval
+            ? {
+                userId: person.userId,
+                label: person.user.name ?? person.user.email ?? "this member",
+              }
+            : null
+        }
         loading={removeMember.isPending}
-        onConfirm={() =>
+        onClose={() => setConfirmingRemoval(false)}
+        onConfirm={(removal) =>
           removeMember.mutate(
-            { organizationId, userId: person.userId },
+            { organizationId, ...removal },
             {
               onSuccess: () => {
                 toaster.create({
