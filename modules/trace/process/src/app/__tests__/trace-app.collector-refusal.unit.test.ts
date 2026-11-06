@@ -1,9 +1,9 @@
-import type * as observabilityModule from "@langwatch/observability";
 /**
  * @vitest-environment node
  * The reporter the collector door calls when it refuses a payload is the real one here, not a
  * stub: a refusal is the sender's mistake, so it logs at warn and never raises an error signature.
  */
+import type * as observabilityModule from "@langwatch/observability";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
