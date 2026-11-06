@@ -62,6 +62,13 @@ Feature: Settings Plans Comparison Page
     Then I see a notice that my current pricing model has been discontinued
     And the notice contains a link to /settings/subscription to update my plan
 
+  @integration
+  Scenario: Upgrade now on the Growth column starts the Growth checkout
+    Given my organization is on the Free plan
+    And I picked the annual billing period and the USD currency on /settings/plans
+    When I press "Upgrade now" in the "Growth" column
+    Then I am sent to /settings/subscription asking it to start the annual Growth checkout in USD
+
   @integration @unimplemented
   Scenario: Free plan column shows default limits
     Given I am on /settings/plans
