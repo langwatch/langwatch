@@ -31,6 +31,18 @@ export function parseOutboundProxyConfig(
 }
 
 /**
+ * Whether Node sends its global `fetch` through `HTTPS_PROXY` itself: `NODE_USE_ENV_PROXY=1`, or
+ * `--use-env-proxy` in `NODE_OPTIONS`. Libraries that use global `fetch` follow it.
+ */
+export function globalFetchUsesEnvProxy(source: {
+  NODE_USE_ENV_PROXY?: boolean;
+  NODE_OPTIONS?: string;
+}): boolean {
+  if (source.NODE_USE_ENV_PROXY === true) return true;
+  return (source.NODE_OPTIONS ?? "").split(/\s+/).includes("--use-env-proxy");
+}
+
+/**
  * The proxy that applies to `targetHost`, or undefined when none is
  * configured or the host is excluded via `NO_PROXY`. `HTTPS_PROXY` wins
  * over `HTTP_PROXY` because every gateway here uses TLS.

@@ -240,6 +240,14 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     writePermissions: allActionsOf("organization"),
   },
   {
+    // Write only: starting a paid plan has nothing to read. Every member holds it.
+    key: "subscription",
+    label: "Subscription",
+    accessLevels: ["write"],
+    readPermissions: [],
+    writePermissions: allActionsOf("subscription"),
+  },
+  {
     key: "sso",
     label: "Single sign-on and directory sync",
     accessLevels: ["read", "write"],

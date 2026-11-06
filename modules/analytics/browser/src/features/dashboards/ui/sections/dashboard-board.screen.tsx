@@ -29,6 +29,7 @@ import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
+import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useBoardLangyChip, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
@@ -50,6 +51,7 @@ import { BoardProjectChip } from "../blocks/board-project-chip.tsx";
 import { BoardScopeControl } from "../blocks/board-scope-control.tsx";
 import { BoardUnavailable } from "../blocks/board-unavailable.tsx";
 import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
+import { LimitFailedWidgetsBanner } from "../blocks/limit-failed-widgets-banner.tsx";
 import { ScopeConfirmDialog } from "../blocks/scope-confirm-dialog.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { BoardWidgetEditor } from "./board-widget-editor.tsx";
@@ -121,6 +123,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const editor = useBoardEditor({ board: subject, period, widgets });
   const empty = useEmptyWidgets();
   const emptyWidgetNames = empty.emptyNames({ widgets, keyOf: ({ id }) => id });
+  const limitFailedWidgets = useLimitFailedWidgets();
   const askLangyToSetUp = langy.enabled
     ? () => langy.ask(boardSetupDraft({ emptyWidgetNames, board: subject, period }))
     : undefined;
@@ -210,6 +213,10 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 emptyWidgetNames={emptyWidgetNames}
                 onAskLangy={askLangyToSetUp}
               />
+              <LimitFailedWidgetsBanner
+                failed={limitFailedWidgets.count({ widgets, keyOf: ({ id }) => id })}
+                total={widgets.length}
+              />
               <BoardWidgetsGrid
                 projectId={projectId}
                 projectSlug={saved.projectSlug}
@@ -217,9 +224,13 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 boardName={board.name}
                 widgets={widgets}
                 period={period}
+                periodKey={`${range}:${grain}`}
                 isWriting={boardWidgets.isWriting}
                 onEmptyChange={({ widget, empty: showsNoData }) =>
                   empty.report({ key: widget.id, empty: showsNoData })
+                }
+                onLimitFailureChange={({ widget, limited }) =>
+                  limitFailedWidgets.report({ key: widget.id, limited })
                 }
                 langyFor={
                   langy.enabled

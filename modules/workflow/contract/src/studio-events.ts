@@ -7,7 +7,7 @@ import {
   studioOptimizerParamsSchema,
   studioWorkflowSchema,
 } from "./studio-workflow.ts";
-import type { BaseComponent, StudioWorkflow } from "./studio-workflow.ts";
+import type { BaseComponent, ExecutionState, StudioWorkflow } from "./studio-workflow.ts";
 
 const studioClientEventSchemaDefinition = z.discriminatedUnion("type", [
   z.object({ type: z.literal("is_alive"), payload: z.record(z.string(), z.never()) }),
@@ -83,6 +83,14 @@ export const studioClientEventSchema: StudioClientEventSchema = studioClientEven
 
 export type StudioClientEvent = z.infer<typeof studioClientEventSchema>;
 
+/** One LLM node's token usage on an evaluated row, as the engine reports it. */
+export type StudioNodeUsage = {
+  node_id: string;
+  trace_id: string;
+  metrics: NonNullable<ExecutionState["metrics"]>;
+  duration_ms?: number;
+};
+
 export type StudioServerEvent =
   | { type: "is_alive_response" }
   | {
@@ -108,6 +116,8 @@ export type StudioServerEvent =
       type: "evaluation_state_change";
       payload: {
         evaluation_state: StudioWorkflow["state"]["evaluation"];
+        /** The token usage of the LLM nodes of the row this progress event finished. */
+        usage?: StudioNodeUsage[];
       };
     }
   | {

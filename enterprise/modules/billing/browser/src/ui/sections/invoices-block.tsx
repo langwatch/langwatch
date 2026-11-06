@@ -4,8 +4,8 @@ import { Card } from "@langwatch/design-system/card";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 /**
- * InvoicesBlock — a card of recent Stripe invoices: number, date, amount,
- * status chip, and PDF download link.
+ * InvoicesBlock: recent Stripe invoices (number, date, amount, status, PDF).
+ * With none it is one line, or nothing at all when `hideWhenEmpty`.
  */
 import { HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { type StatusChipTone, StatusChip } from "@langwatch/design-system/settings-card";
@@ -28,12 +28,17 @@ const TONE_OF_PALETTE: Record<string, StatusChipTone> = {
 export function InvoicesBlock({
   organizationId,
   onViewAllInStripe,
+  hideWhenEmpty = false,
 }: {
   organizationId: string;
   onViewAllInStripe?: () => void;
+  /** A plan that never billed has nothing to list, so the block takes no space. */
+  hideWhenEmpty?: boolean;
 }) {
   const invoices = billingApi.subscription.listInvoices.useQuery({ organizationId });
   const rows = !invoices.isLoading && !invoices.isError ? invoices.data : undefined;
+  // Nothing until the list answers: a skeleton that then vanishes only shifts the page.
+  if (hideWhenEmpty && (invoices.isLoading || rows?.length === 0)) return null;
 
   return (
     <SettingsSection
@@ -78,9 +83,9 @@ export function InvoicesBlock({
 
       {rows?.length === 0 && (
         <NoDataInfoBlock
-          icon={<Receipt />}
-          title="No invoices yet"
-          description="Invoices appear here once your subscription has billed."
+          size="line"
+          title="No invoices yet. They appear here once your subscription has billed."
+          testId="invoices-empty"
         />
       )}
 

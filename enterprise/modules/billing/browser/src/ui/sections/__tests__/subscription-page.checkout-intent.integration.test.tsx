@@ -48,6 +48,10 @@ class TestBillingHost extends BillingHostApi {
     return "test-team-id";
   }
 
+  canInviteMembers(): boolean {
+    return true;
+  }
+
   routeQuery(): Readonly<Record<string, string | undefined>> {
     return this.query;
   }

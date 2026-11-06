@@ -11,7 +11,7 @@ import type {
   subscriptionTrpc,
 } from "@langwatch/enterprise-billing-contract";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
-import type { Plan, SeatLimitInfo } from "@langwatch/entitlement-contract";
+import type { MessageLimitInfo, Plan, SeatLimitInfo } from "@langwatch/entitlement-contract";
 
 import type { OrganizationUserRole, PricingModel, TeamUserRole } from "../model/prisma-types.ts";
 
@@ -33,6 +33,8 @@ export type UsageRead = {
   currentMonthMessagesCount: number | null;
   /** Seats used against the plan, counted the way enforcement counts them. */
   seatLimitInfo?: SeatLimitInfo;
+  /** This month's events against the plan's allowance, with pre-formatted figures. */
+  messageLimitInfo?: MessageLimitInfo;
 };
 
 /** A member row, as the seat count and the seat drawer read it. */

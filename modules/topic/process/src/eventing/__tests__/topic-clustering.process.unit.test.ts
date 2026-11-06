@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   nextDailySlot,
   TOPIC_CLUSTERING_PROCESS_NAME,
+  TOPIC_CLUSTERING_TRACE_SETTLE_MS,
 } from "../../rules/topic-clustering-process.rules.ts";
 import type { TopicClusteringProcessingEvent } from "../topic-clustering.events.ts";
 import {
@@ -194,13 +195,19 @@ describe("topicClustering process (runtime-built definition)", () => {
       expect(evolution.intents[0]).toEqual({
         messageKey: runKey("20260717T093000", 1),
         intentType: "run",
-        payload: { runId: "20260717T093000", page: 1, searchAfter: null },
+        payload: {
+          runId: "20260717T093000",
+          page: 1,
+          searchAfter: null,
+          window: { sinceMs: null, untilMs: scheduledFor - TOPIC_CLUSTERING_TRACE_SETTLE_MS },
+        },
       });
       expect(evolution.state.currentRun).toEqual({
         runId: "20260717T093000",
         page: 1,
         updatedAtMs: scheduledFor,
         startedAtMs: scheduledFor,
+        untilMs: scheduledFor - TOPIC_CLUSTERING_TRACE_SETTLE_MS,
       });
       expect(evolution.nextWakeAt).toBe(
         nextDailySlot({ projectId: PROJECT_ID, afterMs: scheduledFor }),
@@ -343,6 +350,7 @@ describe("topicClustering process (runtime-built definition)", () => {
             runId: `manual-${occurredAt}`,
             page: 1,
             searchAfter: null,
+            window: { sinceMs: null, untilMs: occurredAt - TOPIC_CLUSTERING_TRACE_SETTLE_MS },
           },
         },
       ]);
@@ -640,6 +648,100 @@ describe("topicClustering process (runtime-built definition)", () => {
       // Run identity must come from business time, or a redelivery would mint
       // a second run alongside the first.
       expect(late.state.currentRun?.runId).toBe(prompt.state.currentRun?.runId);
+    });
+  });
+
+  describe("given a project that keeps a clustering watermark", () => {
+    const startedAtMs = Date.UTC(2026, 10, 1, 9, 30);
+    const untilMs = startedAtMs - TOPIC_CLUSTERING_TRACE_SETTLE_MS;
+    const walking = (page: number): TopicClusteringProcessState => ({
+      ...bootstrappedState(),
+      clusteredThroughMs: untilMs - DAY_MS,
+      currentRun: { runId: "run-1", page, updatedAtMs: startedAtMs, startedAtMs, untilMs },
+    });
+    const completed = (data: Record<string, unknown>) =>
+      makeEvent({
+        type: "lw.obs.topic_clustering.run_completed",
+        occurredAt: startedAtMs + 60_000,
+        data: {
+          runId: "run-1",
+          page: 2,
+          mode: "incremental",
+          tracesProcessed: 40,
+          topicsCount: 0,
+          subtopicsCount: 0,
+          ...data,
+        },
+      });
+
+    /** @scenario "A finished run moves the clustering watermark so the next run skips what it read" */
+    it("moves the watermark to the finished run's window end and starts the next run from it", () => {
+      const finished = evolveEvent(walking(2), completed({}));
+      expect(finished.state.clusteredThroughMs).toBe(untilMs);
+      expect(finished.state.currentRun).toBeNull();
+
+      const nextSlot = startedAtMs + DAY_MS;
+      const next = evolveWake(finished.state, nextSlot);
+      expect(next.intents[0]?.payload).toEqual({
+        runId: expect.any(String),
+        page: 1,
+        searchAfter: null,
+        window: { sinceMs: untilMs, untilMs: nextSlot - TOPIC_CLUSTERING_TRACE_SETTLE_MS },
+      });
+    });
+
+    /** @scenario "A finished run moves the clustering watermark so the next run skips what it read" */
+    it("carries the run's window onto every continuation page", () => {
+      const evolution = evolveEvent(
+        walking(1),
+        completed({ page: 1, nextSearchAfter: [untilMs - 5_000, "trace-x"] }),
+      );
+      expect(evolution.intents[0]?.payload).toEqual({
+        runId: "run-1",
+        page: 2,
+        searchAfter: [untilMs - 5_000, "trace-x"],
+        window: { sinceMs: untilMs - DAY_MS, untilMs },
+      });
+      expect(evolution.state.clusteredThroughMs).toBe(untilMs - DAY_MS);
+    });
+
+    /** @scenario "A run that clustered nothing leaves the watermark where it was" */
+    it.each(["not_configured", "recently_clustered"])(
+      "keeps the watermark when the walk ended %s",
+      (skippedReason) => {
+        const evolution = evolveEvent(walking(2), completed({ skippedReason }));
+        expect(evolution.state.clusteredThroughMs).toBe(untilMs - DAY_MS);
+      },
+    );
+
+    /** @scenario "A run that clustered nothing leaves the watermark where it was" */
+    it("keeps the watermark when the run fails", () => {
+      const evolution = evolveEvent(
+        walking(2),
+        makeEvent({
+          type: "lw.obs.topic_clustering.run_failed",
+          occurredAt: startedAtMs + 60_000,
+          data: {
+            runId: "run-1",
+            page: 2,
+            error: "boom",
+            errorCode: "clustering_service",
+            isUserActionable: false,
+          },
+        }),
+      );
+      expect(evolution.state.clusteredThroughMs).toBe(untilMs - DAY_MS);
+      expect(evolution.state.currentRun).toBeNull();
+    });
+
+    /** @scenario "A run that clustered nothing leaves the watermark where it was" */
+    it("keeps the watermark when a run recorded before windows existed finishes", () => {
+      const legacy: TopicClusteringProcessState = {
+        ...bootstrappedState(),
+        currentRun: { runId: "run-1", page: 2, updatedAtMs: startedAtMs },
+      };
+      const evolution = evolveEvent(legacy, completed({}));
+      expect(evolution.state.clusteredThroughMs ?? null).toBeNull();
     });
   });
 });

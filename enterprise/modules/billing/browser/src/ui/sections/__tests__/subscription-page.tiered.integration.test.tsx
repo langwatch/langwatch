@@ -46,6 +46,10 @@ class TestBillingHost extends BillingHostApi {
     return "test-team-id";
   }
 
+  canInviteMembers(): boolean {
+    return true;
+  }
+
   routeQuery(): Readonly<Record<string, string | undefined>> {
     return {};
   }
@@ -325,6 +329,14 @@ describe("<SubscriptionPage/>", () => {
       await waitFor(() => {
         expect(screen.getByTestId("tiered-deprecated-notice")).toBeInTheDocument();
       });
+    });
+
+    /** @scenario "A legacy plan within its seats is asked to upgrade without the danger tone" */
+    it("marks the upgrade as required in the warning tone", async () => {
+      renderSubscriptionPage();
+
+      const chip = await screen.findByTestId("upgrade-required-chip");
+      expect(chip).toHaveAttribute("data-tone", "warning");
     });
 
     it("shows legacy tiered capabilities in the current plan block", async () => {

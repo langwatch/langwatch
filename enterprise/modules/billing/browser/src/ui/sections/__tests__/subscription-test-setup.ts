@@ -137,12 +137,30 @@ export type MockSeatLimitInfo = {
   message: string;
 };
 
+export type MockMessageLimitInfo = {
+  status: "ok" | "warning" | "exceeded";
+  current: number;
+  max: number;
+  currentFormatted: string;
+  maxFormatted: string;
+  percentageFormatted: string;
+  message: string;
+};
+
 // Defaults to the usage query not having answered yet, which is the state
 // the page falls back to its own member count in. Suites about the seat
 // limit set real usage data.
 export const mockGetUsage = vi.fn(
   (): {
-    data: { seatLimitInfo: MockSeatLimitInfo; membersCount: number } | undefined;
+    data:
+      | {
+          seatLimitInfo: MockSeatLimitInfo;
+          membersCount: number;
+          currentMonthMessagesCount?: number | null;
+          messageLimitInfo?: MockMessageLimitInfo;
+          usageUnit?: "traces" | "events";
+        }
+      | undefined;
     isLoading: boolean;
     refetch: () => void;
   } => ({

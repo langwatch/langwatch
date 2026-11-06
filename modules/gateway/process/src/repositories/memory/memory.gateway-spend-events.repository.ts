@@ -498,6 +498,7 @@ function usageReadsBack(state: GatewaySpendState, status: string): boolean {
     usage.input_image_tokens,
     usage.output_image_tokens,
     usage.image_count,
+    usage.web_search_requests,
   ].some((quantity) => quantity > 0);
   return CHARGED.has(status) || measured;
 }

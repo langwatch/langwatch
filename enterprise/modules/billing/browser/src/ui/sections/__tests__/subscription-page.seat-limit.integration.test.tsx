@@ -49,6 +49,10 @@ class TestBillingHost extends BillingHostApi {
     return "test-team-id";
   }
 
+  canInviteMembers(): boolean {
+    return true;
+  }
+
   routeQuery(): Readonly<Record<string, string | undefined>> {
     return {};
   }
@@ -251,7 +255,9 @@ describe("<SubscriptionPage/> seat limit", () => {
       await waitFor(() => {
         expect(screen.getByText("3 / 2")).toBeInTheDocument();
       });
+      expect(screen.getByTestId("plan-seat-count")).toHaveAttribute("data-over-limit", "true");
       expect(screen.getByText("Upgrade required")).toBeInTheDocument();
+      expect(screen.getByTestId("upgrade-required-chip")).toHaveAttribute("data-tone", "bad");
       expect(screen.getByTestId("seat-limit-callout")).toHaveTextContent(
         "Your organization uses 3 member seats and your plan includes 2 member seats. Upgrade to the Growth plan below to keep everyone.",
       );

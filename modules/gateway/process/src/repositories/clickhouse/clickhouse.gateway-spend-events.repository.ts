@@ -265,7 +265,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       query: `
         SELECT ${SPEND_ROW_COLUMNS}, SettleReason, PodId, PodSeq,
                TokensCacheWrite1h, TokensInputAudio, TokensOutputAudio,
-               CharsInput, AudioMS,
+               CharsInput, AudioMS, WebSearchRequests,
                Version, CreatedAt, LastEventOccurredAt, EventTimestamp
         FROM ${TABLE} FINAL
         WHERE TenantId = {tenantId:String}
@@ -1111,6 +1111,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       TokensInputImage: quantities.input_image_tokens,
       TokensOutputImage: quantities.output_image_tokens,
       ImageCount: quantities.image_count,
+      WebSearchRequests: quantities.web_search_requests,
     };
   }
 
@@ -1132,6 +1133,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       quantity("TokensInputImage"),
       quantity("TokensOutputImage"),
       quantity("ImageCount"),
+      quantity("WebSearchRequests"),
     ];
     const outcome = row.status === "confirmed" || row.status === "failed";
     if (!outcome && !measured.some((value) => value > 0)) return null;
@@ -1149,6 +1151,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       input_image_tokens: quantity("TokensInputImage"),
       output_image_tokens: quantity("TokensOutputImage"),
       image_count: quantity("ImageCount"),
+      web_search_requests: quantity("WebSearchRequests"),
     };
   }
 

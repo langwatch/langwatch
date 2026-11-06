@@ -1,17 +1,26 @@
 import { Search } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
 
 import { Box, createListCollection, Field, HStack, Input, Text } from "../../primitives.ts";
-import { titleCase } from "../../string-casing.ts";
 import { InputGroup } from "../forms/input-group.tsx";
-import { Select } from "../forms/select.tsx";
+import { scrollToListItem, Select } from "../forms/select.tsx";
 import { inferProvider, ProviderIconGlyph } from "./provider-icons.tsx";
 
 const MODEL_ICON_SIZE = "16px";
 const MODEL_ICON_SIZE_SM = "14px";
 
 /** What a picker entry says and picks; the icon is drawn from the provider prefix of `value`. */
-export type ModelPickerOption = { label: string; value: string; subtitle?: string };
+export type ModelPickerOption = {
+  label: string;
+  value: string;
+  /** One line under the title, cut with an ellipsis. */
+  subtitle?: string;
+  /** Listed and described, but not pickable. */
+  disabled?: boolean;
+  /** A short tag at the end of the title line, such as "Coming soon". */
+  hint?: string;
+};
 
 /** A query result: the options, whether they are still loading, and why they failed. */
 export type ModelPickerQuery = {
@@ -20,30 +29,17 @@ export type ModelPickerQuery = {
   error?: unknown;
 };
 
-type ModelOption = {
-  label: string;
-  value: string;
-  icon: React.ReactNode;
-  /** Optional second line under the label. Used to surface what an alias
-   *  like `openai/latest` currently resolves to. */
-  subtitle?: string;
-};
-
-type GroupedModelOptions = {
-  provider: string;
-  icon: React.ReactNode;
-  models: ModelOption[];
-}[];
+type ModelOption = ModelPickerOption & { icon: React.ReactNode };
 
 /** Sentinel value emitted when the user picks the "Inherit" entry. The
  *  caller maps this back to "clear the override" (which writes nothing
  *  to the saved JSON, so the cascade walks up). */
 export const INHERIT_SENTINEL = "__inherit__";
 
-/** Keeps a group's models whose label or value matches `search` (case-insensitive). */
-function filterGroupModels(group: GroupedModelOptions[number], search: string): ModelOption[] {
+/** Keeps the options whose label or value matches `search` (case-insensitive). */
+function filterModels(models: ModelOption[], search: string): ModelOption[] {
   const needle = search.toLowerCase();
-  return group.models.filter(
+  return models.filter(
     (item) =>
       item.label.toLowerCase().includes(needle) || item.value.toLowerCase().includes(needle),
   );
@@ -78,21 +74,6 @@ function labelFontSize(size: SelectorSize): number {
   return size === "sm" ? 12 : 14;
 }
 
-function groupOptionsByProvider(selectOptions: ModelOption[]): GroupedModelOptions {
-  const byProvider: Record<string, ModelOption[]> = {};
-  for (const option of selectOptions) {
-    const provider = option.value.split("/")[0]!;
-    byProvider[provider] ??= [];
-    byProvider[provider].push(option);
-  }
-
-  return Object.entries(byProvider).map(([provider, models]) => ({
-    provider,
-    icon: providerIconFor(`${provider}/`),
-    models,
-  }));
-}
-
 /**
  * The inherit placeholder in the trigger: the inherited model's icon and
  * family at reduced opacity, so an unpicked field reads as "this is what you
@@ -102,11 +83,14 @@ function InheritValueText({
   labelFor,
   inheritIcon,
   inheritOption,
+  isModelId,
   size,
 }: {
   labelFor: (modelId: string) => string;
   inheritIcon: React.ReactNode;
   inheritOption: { label: string; model?: string };
+  /** A bare model id reads in mono; a named entry such as a decision model does not. */
+  isModelId: boolean;
   size: SelectorSize;
 }) {
   const inheritedModel = inheritOption.model;
@@ -116,7 +100,7 @@ function InheritValueText({
       {inheritIcon && <Box minWidth={iconSlotFor(size)}>{inheritIcon}</Box>}
       <Box
         fontSize={labelFontSize(size)}
-        fontFamily={inheritedModel ? "mono" : undefined}
+        fontFamily={inheritedModel && isModelId ? "mono" : undefined}
         lineClamp={1}
         wordBreak="break-all"
       >
@@ -129,6 +113,7 @@ function InheritValueText({
 function SelectedValueText({
   labelFor,
   isUnknown,
+  isModelId,
   model,
   selectedIcon,
   selectedLabel,
@@ -136,6 +121,7 @@ function SelectedValueText({
 }: {
   labelFor: (modelId: string) => string;
   isUnknown: boolean;
+  isModelId: boolean;
   model: string;
   selectedIcon: React.ReactNode;
   selectedLabel: string | undefined;
@@ -146,7 +132,7 @@ function SelectedValueText({
       {selectedIcon && <Box minWidth={iconSlotFor(size)}>{selectedIcon}</Box>}
       <Box
         fontSize={labelFontSize(size)}
-        fontFamily="mono"
+        fontFamily={isModelId ? "mono" : undefined}
         lineClamp={1}
         wordBreak="break-all"
         color={isUnknown ? "gray.500" : undefined}
@@ -176,19 +162,24 @@ function InheritItem({
   model?: string;
 }) {
   return (
-    <Select.Item item={inheritItem} data-testid="provider-model-selector-inherit">
-      <HStack gap={2}>
+    <Select.Item
+      item={inheritItem}
+      data-testid="provider-model-selector-inherit"
+      paddingY={1.5}
+      flexShrink={0}
+    >
+      <HStack gap={2.5} minWidth={0} flex={1}>
         {inheritIcon && (
           <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
             {inheritIcon}
           </Box>
         )}
-        <Box>
-          <Text fontSize="sm" fontWeight="medium">
+        <Box minWidth={0} flex={1}>
+          <Text fontSize="sm" fontWeight="medium" lineHeight="short" truncate>
             {label}
           </Text>
           {model && (
-            <Text fontSize="xs" color="fg.muted" fontFamily="mono" lineClamp={1}>
+            <Text fontSize="xs" color="fg.muted" fontFamily="mono" lineHeight="short" truncate>
               {labelFor(model)}
             </Text>
           )}
@@ -199,76 +190,77 @@ function InheritItem({
 }
 
 /**
- * Two-line alias items keep icon and label on one HStack so the icon anchors
- * to the label line; the resolved-id subtitle wraps under the text column,
- * indented past the icon slot.
+ * One row: the provider icon, then a title and, when given, a one-line description cut with an
+ * ellipsis. A described row is a named entry (a decision model, an alias) and reads in the body
+ * font; a bare model id reads in mono.
  */
 function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
+  const isDescribed = !!item.subtitle;
+  const hint = item.hint ? (
+    <Text
+      fontSize="2xs"
+      color="fg.subtle"
+      flexShrink={0}
+      marginStart="auto"
+      whiteSpace="nowrap"
+      data-testid="model-option-hint"
+    >
+      {item.hint}
+    </Text>
+  ) : null;
   return (
-    <Select.Item item={item}>
-      <Box>
-        <HStack gap={2} align="center">
-          {item.icon && (
-            <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
-              {item.icon}
-            </Box>
-          )}
-          <Box
-            fontSize={labelFontSize(size)}
-            fontFamily={item.subtitle ? undefined : "mono"}
-            fontWeight={item.subtitle ? "medium" : undefined}
-            paddingY={size === "sm" ? 0 : "2px"}
-          >
-            {item.label}
+    <Select.Item
+      item={item}
+      paddingY={isDescribed ? 1.5 : undefined}
+      // The list is a capped flex column; a row that shrinks would clip its second line.
+      flexShrink={0}
+      // An unpickable row stays readable: its line says how to enable it.
+      _disabled={{ opacity: 1, cursor: "not-allowed" }}
+    >
+      <HStack gap={2.5} align="center" minWidth={0} flex={1}>
+        {item.icon && (
+          <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+            {item.icon}
           </Box>
-        </HStack>
-        {item.subtitle && (
-          <Text
-            fontSize="xs"
-            color="fg.muted"
-            fontFamily="mono"
-            lineClamp={1}
-            paddingLeft={`calc(${MODEL_ICON_SIZE} + var(--chakra-spacing-2))`}
-          >
-            {item.subtitle}
-          </Text>
         )}
-      </Box>
+        <Box minWidth={0} flex={1}>
+          <HStack gap={2} minWidth={0}>
+            <Text
+              fontSize={labelFontSize(size)}
+              fontFamily={isDescribed ? undefined : "mono"}
+              fontWeight={isDescribed ? "medium" : undefined}
+              paddingY={size === "sm" || isDescribed ? 0 : "2px"}
+              lineHeight="short"
+              truncate
+            >
+              {item.label}
+            </Text>
+            {hint}
+          </HStack>
+          {isDescribed && (
+            <HStack gap={2} minWidth={0}>
+              <Text
+                fontSize="xs"
+                lineHeight="short"
+                color="fg.muted"
+                truncate
+                data-testid="model-option-subtitle"
+              >
+                {item.subtitle}
+              </Text>
+            </HStack>
+          )}
+        </Box>
+      </HStack>
     </Select.Item>
   );
 }
 
-function ModelItemGroup({
-  group,
-  size,
-}: {
-  group: GroupedModelOptions[number];
-  size: SelectorSize;
-}) {
-  return (
-    <Select.ItemGroup
-      label={
-        <HStack gap={2}>
-          <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
-            {group.icon}
-          </Box>
-          <Text fontWeight="medium">{titleCase(group.provider)}</Text>
-        </HStack>
-      }
-    >
-      {group.models.map((item) => (
-        <ModelItem key={item.value} item={item} size={size} />
-      ))}
-    </Select.ItemGroup>
-  );
-}
-
 /**
- * Model selector across providers, grouped by provider icon (from each model's prefix).
- * `inheritOption`, when set, prepends an "Inherit" entry that emits `INHERIT_SENTINEL` on pick,
- * and renders as a faint placeholder when `model` is empty.
+ * One flat list in the caller's order, each row with its provider icon, so no headings.
+ * `inheritOption` adds an "Inherit" entry (emits `INHERIT_SENTINEL`) on top, faint when unset.
  */
-export const ProviderModelSelector = React.memo(function ProviderModelSelector({
+export function ProviderModelSelector({
   model,
   query,
   onChange,
@@ -298,36 +290,14 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
 }) {
   const [modelSearch, setModelSearch] = useState("");
 
-  // Create model options with labels and derive icon from each model's provider.
-  // Alias entries (`<provider>/latest`, `<provider>/latest-mini`) get a
-  // human-readable label so the picker reads as "Latest" / "Latest smaller"
-  // instead of the raw alias suffix, plus they carry the resolved model id
-  // as a subtitle so the user sees what they'd actually get.
-  const selectOptions = useMemo(
-    () =>
-      (query.data ?? []).map((option) => ({
-        ...option,
-        icon: providerIconFor(option.value, iconSlotFor(size)),
-      })),
-    [query.data, size],
-  );
-
-  const groupedByProvider: GroupedModelOptions = useMemo(
-    () => groupOptionsByProvider(selectOptions),
-    [selectOptions],
-  );
-
-  // Filter models by search and group by provider
-  const filteredGroups = useMemo(
-    () =>
-      groupedByProvider
-        .map((group) => ({
-          ...group,
-          models: filterGroupModels(group, modelSearch),
-        }))
-        .filter((group) => group.models.length > 0),
-    [groupedByProvider, modelSearch],
-  );
+  // Each option carries the icon of its provider prefix.
+  const withIcon = (option: ModelPickerOption): ModelOption => ({
+    ...option,
+    icon: providerIconFor(option.value, iconSlotFor(size)),
+  });
+  const selectOptions = (query.data ?? []).map(withIcon);
+  const filteredModels = filterModels(selectOptions, modelSearch);
+  const isModelId = (id: string) => !selectOptions.find((option) => option.value === id)?.subtitle;
 
   // Render the inherit placeholder in the trigger when the user hasn't
   // picked anything. Uses the inherited model's icon + family at 0.55
@@ -349,7 +319,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
     : null;
   const allFilteredModels: ModelOption[] = [
     ...(inheritItem ? [inheritItem] : []),
-    ...filteredGroups.flatMap((group) => group.models),
+    ...filteredModels,
   ];
 
   const modelCollection = createListCollection({
@@ -366,12 +336,14 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
       labelFor={labelFor}
       inheritIcon={inheritIcon}
       inheritOption={inheritOption}
+      isModelId={!inheritOption.model || isModelId(inheritOption.model)}
       size={size}
     />
   ) : (
     <SelectedValueText
       labelFor={labelFor}
       isUnknown={isUnknown}
+      isModelId={isModelId(model)}
       model={model}
       selectedIcon={selectedIcon}
       selectedLabel={selectedItem?.label}
@@ -397,17 +369,15 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
           e.preventDefault();
           e.stopPropagation();
         }}
-        onValueChange={(change) => {
-          const selectedValue = change.value[0];
-          if (selectedValue) {
-            // Inherit sentinel rides the same callback as a normal pick;
-            // the caller maps `INHERIT_SENTINEL` to "clear the key" so the
-            // cascade walks up. Direct model pick stays an exact-value
-            // write.
-            onChange(selectedValue);
-          }
+        // Every pick reaches the caller, the ticked row included, so a value shown by default can
+        // be stored. `INHERIT_SENTINEL` rides the same callback; the caller maps it to a clear.
+        onSelect={({ value: selectedValue }) => {
+          if (selectedValue) onChange(selectedValue);
         }}
         loopFocus={true}
+        scrollToIndexFn={scrollToListItem}
+        // A narrow trigger still opens a list wide enough for a title, its tag and a full line.
+        positioning={{ sameWidth: false }}
         highlightedValue={highlightedValue}
         onHighlightChange={(details) => {
           setHighlightedValue(details.highlightedValue);
@@ -423,12 +393,16 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
         >
           <Select.ValueText placeholder={selectValueText}>{() => selectValueText}</Select.ValueText>
         </Select.Trigger>
-        <Select.Content padding={1}>
+        <Select.Content
+          padding={1}
+          minWidth="max(var(--reference-width), 20rem)"
+          maxWidth="min(28rem, calc(100vw - 2rem))"
+          // Only the rows scroll, below the search, so none passes behind it.
+          overflow="hidden"
+        >
           <Field.Root asChild>
             <Box
-              position="sticky"
-              top={0}
-              zIndex="1"
+              flexShrink={0}
               background="bg.panel"
               paddingX={1}
               paddingY={1}
@@ -455,18 +429,20 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
               </InputGroup>
             </Box>
           </Field.Root>
-          {inheritOption && inheritItem && (
-            <InheritItem
-              labelFor={labelFor}
-              inheritIcon={inheritIcon}
-              inheritItem={inheritItem}
-              label={inheritOption.label}
-              model={inheritOption.model}
-            />
-          )}
-          {filteredGroups.map((group) => (
-            <ModelItemGroup key={group.provider} group={group} size={size} />
-          ))}
+          <Select.List data-testid="provider-model-selector-list">
+            {inheritOption && inheritItem && (
+              <InheritItem
+                labelFor={labelFor}
+                inheritIcon={inheritIcon}
+                inheritItem={inheritItem}
+                label={inheritOption.label}
+                model={inheritOption.model}
+              />
+            )}
+            {filteredModels.map((item) => (
+              <ModelItem key={item.value} item={item} size={size} />
+            ))}
+          </Select.List>
         </Select.Content>
       </Select.Root>
       {query.error ? (
@@ -476,4 +452,4 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
       ) : null}
     </>
   );
-});
+}

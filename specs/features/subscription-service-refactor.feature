@@ -31,13 +31,6 @@ Feature: Subscription service refactor
     And the checkout URL is returned
 
   @unit
-  Scenario: EESubscriptionService cancels subscription when downgrading to free
-    Given an organization with an active subscription
-    When createOrUpdateSubscription is called with FREE plan
-    Then the Stripe subscription is cancelled
-    And the subscription status is updated to CANCELLED
-
-  @unit
   Scenario: EESubscriptionService creates billing portal session
     Given a customer ID and organization
     When createBillingPortalSession is called

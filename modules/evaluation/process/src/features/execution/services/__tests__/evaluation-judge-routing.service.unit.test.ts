@@ -13,7 +13,7 @@ function buildRouting({ organizationId }: { organizationId: string | undefined }
 }
 
 describe("EvaluationJudgeRoutingService", () => {
-  /** @scenario "An LLM judge on LangWatch Instant Preview is routed when the flag is on" */
+  /** @scenario "An LLM judge on LangWatch Evals Preview is routed when the flag is on" */
   it("reads the router flag for the project within its organization", async () => {
     const { routing, isEnabled } = buildRouting({ organizationId: "org-1" });
 

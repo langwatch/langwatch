@@ -26,7 +26,7 @@ const {
   routeErrorRef: { current: null as unknown },
   requestSignUpVerificationMock: vi.fn(),
   registerMock: vi.fn(),
-  signInMock: vi.fn(),
+  signInMock: vi.fn(async (): Promise<unknown> => undefined),
   replaceMock: vi.fn(),
   hardNavigateMock: vi.fn(),
   sessionRef: { current: { data: null as unknown } },
@@ -353,6 +353,77 @@ describe("given the identifier-first sign-in screen", () => {
       expect(routeMock).toHaveBeenCalledTimes(2);
       expect(routeMock).toHaveBeenLastCalledWith({ identifier: "sam@acme.com", breakGlass: false });
       expect(signInMock).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A refused hand-off to the identity provider says so instead of waiting" */
+    it("stops the spinner and says so when the provider sign-in is refused", async () => {
+      signInMock.mockResolvedValueOnce({
+        ok: false,
+        error: "Untrusted OIDC discovery URL",
+        code: "discovery_untrusted_origin",
+        status: 400,
+      });
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
+        outcome: "redirect_to_connection",
+        connectionId: "org:acme",
+        methodSet: [oktaMethod],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@acme.com");
+
+      const refused = await screen.findByTestId("routed-to-connection-refused");
+      expect(refused).toHaveTextContent(/ask your administrator/i);
+      expect(refused).not.toHaveTextContent(/untrusted/i);
+      expect(screen.getByTestId("routed-to-connection")).toHaveTextContent(
+        /^Log in with .+ to continue\.$/,
+      );
+    });
+
+    /** @scenario "A refused hand-off to the identity provider says so instead of waiting" */
+    it("stops the spinner and says so when the hand-off fails on the network", async () => {
+      signInMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
+        outcome: "redirect_to_connection",
+        connectionId: "org:acme",
+        methodSet: [oktaMethod],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@acme.com");
+
+      expect(await screen.findByTestId("routed-to-connection-refused")).toHaveTextContent(
+        /ask your administrator/i,
+      );
+      expect(screen.getByTestId("routed-to-connection")).toHaveTextContent(
+        /^Log in with .+ to continue\.$/,
+      );
+    });
+
+    /** @scenario "Retrying the hand-off clears the refusal" */
+    it("clears the refusal while the person retries from the button", async () => {
+      signInMock
+        .mockResolvedValueOnce({ ok: false, code: "discovery_untrusted_origin", status: 400 })
+        .mockReturnValueOnce(new Promise(() => undefined));
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
+        outcome: "redirect_to_connection",
+        connectionId: "org:acme",
+        methodSet: [oktaMethod],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@acme.com");
+      await screen.findByTestId("routed-to-connection-refused");
+      await userEvent.click(screen.getByRole("button", { name: /continue with okta/i }));
+
+      await waitFor(() =>
+        expect(screen.queryByTestId("routed-to-connection-refused")).not.toBeInTheDocument(),
+      );
+      expect(signInMock).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId("routed-to-connection")).toHaveTextContent(/^Taking you to/);
     });
 
     /** @scenario "A provider my address was routed to is badged once it lets me in" */
