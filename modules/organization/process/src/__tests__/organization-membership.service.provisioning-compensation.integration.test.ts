@@ -38,6 +38,7 @@ const noopGrantsWriter = createApiFixture<AuthzGrantsService>({
 const seats: OrganizationSeatLicense = {
   checkLimit: vi.fn(),
   assertRoleChangeAllowed: vi.fn(),
+  withSeat: ({ work }) => work(),
 };
 const seatNotices: OrganizationSeatRevocationNotice = {
   memberDisabled: vi.fn(),

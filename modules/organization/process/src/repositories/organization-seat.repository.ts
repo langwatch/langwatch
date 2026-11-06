@@ -14,4 +14,16 @@ export abstract class OrganizationSeatRepository {
   abstract getMembersDeveloperCount(organizationId: string): Promise<number>;
   /** All three in one read, for a check that asks after both pools at once. */
   abstract countMemberSeats(organizationId: string): Promise<OrganizationMemberSeats>;
+  /**
+   * Runs `work` while no other seat-taking write on the organization runs, so a count read
+   * inside it still holds when the write lands. Never nested: a second hold on the same
+   * organization from inside `work` waits on itself.
+   */
+  abstract withSeatLock<T>(input: { organizationId: string; work: () => Promise<T> }): Promise<T>;
+  /** The same lease for a holder outside this process's `work`, and how often it renews it. */
+  abstract acquireSeatLease(input: {
+    organizationId: string;
+  }): Promise<{ holder: string; renewEveryMs: number }>;
+  abstract renewSeatLease(input: { organizationId: string; holder: string }): Promise<void>;
+  abstract releaseSeatLease(input: { organizationId: string; holder: string }): Promise<void>;
 }

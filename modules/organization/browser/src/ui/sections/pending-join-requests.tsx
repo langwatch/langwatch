@@ -1,8 +1,8 @@
 import { Link } from "@langwatch/browser-host/link";
 /**
- * Colleagues waiting at the door, where an administrator looks every day. Draws nothing for
- * anybody who cannot approve, and nothing while nobody waits.
- * Spec: specs/identity/domain-auto-join.feature
+ * Colleagues waiting at the door or for a seat, where an administrator looks every day. Draws
+ * nothing for anybody who cannot approve, and nothing while nobody waits.
+ * Specs: specs/identity/domain-auto-join.feature, modules/organization/specs/seat-requests.feature
  */
 import { Card } from "@langwatch/design-system/card";
 import {
@@ -19,8 +19,18 @@ import { ArrowRight, UserPlus } from "lucide-react";
 import { useJoinRequests } from "../../behavior/use-join-requests.ts";
 import { useOrganizationHost } from "../../model/organization-host.ts";
 import { JoinRequestsTable } from "../blocks/join-requests-table.tsx";
+import { SeatRequestsCard } from "./seat-requests-card.tsx";
 
 export function PendingJoinRequests() {
+  return (
+    <>
+      <SeatRequestsCard showAllLink />
+      <WaitingToJoin />
+    </>
+  );
+}
+
+function WaitingToJoin() {
   const host = useOrganizationHost();
   const organization = host.organization();
   const canManage = host.hasOrganizationPermission("organization:manage");

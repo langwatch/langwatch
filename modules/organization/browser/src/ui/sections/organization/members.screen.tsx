@@ -141,7 +141,7 @@ function usePeopleListState({
   const { openDrawer } = useDrawer();
   const { cut, selectCut } = useCutFromAddress();
 
-  const invitesFlow = useInviteFlow({ organization, activePlan });
+  const invitesFlow = useInviteFlow({ organization, activePlan, canManage });
   const removal = useMemberRemoval(organization.id);
   const reads = usePeopleListReads({
     organization,
@@ -430,6 +430,10 @@ function MemberListRow({
   onSetDisabled: ReturnType<typeof useMemberDisableAction>["setMemberDisabled"];
   onRequestRemoval: (target: RemovalTarget) => void;
 }) {
+  // One shared read for every row: the query cache answers all but the first.
+  const billingMembers = api.authz.listBillingMembers.useQuery({ organizationId });
+  const holdsBilling = !!billingMembers.data?.some((holder) => holder.userId === member.userId);
+
   return (
     <PersonIdentityRow
       name={member.user.name}
@@ -448,6 +452,11 @@ function MemberListRow({
           {member.role === "DEVELOPER" && (
             <Badge colorPalette="teal" size="sm">
               Developer
+            </Badge>
+          )}
+          {holdsBilling && (
+            <Badge colorPalette="purple" size="sm" data-testid="member-billing-badge">
+              Billing
             </Badge>
           )}
           <MemberStatusChip member={member} />
@@ -705,9 +714,12 @@ function PeopleRows({
 function useInviteFlow({
   organization,
   activePlan,
+  canManage,
 }: {
   organization: OrganizationWithMembersAndTheirTeams;
   activePlan: PlanInfo;
+  /** Invitations are a manager's list; a reader is never asked for them. */
+  canManage: boolean;
 }) {
   const {
     open: isInviteLinkOpen,
@@ -717,7 +729,7 @@ function useInviteFlow({
 
   const pendingInvites = api.invite.getOrganizationPendingInvites.useQuery(
     { organizationId: organization.id },
-    { enabled: !!organization.id },
+    { enabled: !!organization.id && canManage },
   );
 
   const [selectedInvites, setSelectedInvites] = useState<{ inviteCode: string; email: string }[]>(

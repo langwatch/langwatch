@@ -169,6 +169,7 @@ export class SeatEventSubscriptionService {
     billingInterval,
     membersToAdd,
     isUpgradeFromTiered = false,
+    startedByUserId,
   }: {
     organizationId: string;
     customerId: string;
@@ -177,6 +178,7 @@ export class SeatEventSubscriptionService {
     billingInterval: BillingInterval;
     membersToAdd: number;
     isUpgradeFromTiered?: boolean;
+    startedByUserId?: string;
   }): Promise<{ url: string | null; subscriptionId: string }> => {
     // Resolve the currency before touching the database. A checkout we cannot
     // build in the customer's own currency will be rejected outright, and every
@@ -215,6 +217,7 @@ export class SeatEventSubscriptionService {
       lineItems,
       isUpgradeFromTiered,
       subscriptionId: subscription.id,
+      ...(startedByUserId ? { startedByUserId } : {}),
     });
     return { url, subscriptionId: subscription.id };
   };
@@ -228,6 +231,7 @@ export class SeatEventSubscriptionService {
     lineItems,
     isUpgradeFromTiered,
     subscriptionId,
+    startedByUserId,
   }: {
     customerId: string;
     baseUrl: string;
@@ -236,6 +240,7 @@ export class SeatEventSubscriptionService {
     lineItems: ReturnType<typeof createCheckoutLineItems>;
     isUpgradeFromTiered: boolean;
     subscriptionId: string;
+    startedByUserId?: string;
   }): Promise<{ url: string | null }> {
     const selectedOptionsMetadata = {
       selectedCurrency: checkoutCurrency,
@@ -258,7 +263,8 @@ export class SeatEventSubscriptionService {
       customerId,
       currency: checkoutCurrency.toLowerCase(),
       lineItems,
-      metadata: selectedOptionsMetadata,
+      // The starter rides on the session only: its completion grants them the Billing role.
+      metadata: { ...selectedOptionsMetadata, ...(startedByUserId ? { startedByUserId } : {}) },
       subscription: {
         metadata: selectedOptionsMetadata,
         billingCycleAnchor: Math.floor(billingCycleAnchor.epochMilliseconds / 1000),

@@ -130,20 +130,26 @@ export class OrganizationMemberRoleService {
 
     await this.repo.getMembership({ organizationId, userId });
 
-    if (!disabled) {
-      const result = await this.dependencies.seats.checkLimit({
+    if (disabled) {
+      await this.repo.setMemberDisabled({ organizationId, userId, disabled });
+    } else {
+      await this.dependencies.seats.withSeat({
         organizationId,
-        resource: "members",
-        user: actingUser ?? undefined,
+        work: async () => {
+          const result = await this.dependencies.seats.checkLimit({
+            organizationId,
+            resource: "members",
+            user: actingUser ?? undefined,
+          });
+          if (!result.allowed) {
+            throw new MemberSeatLimitReachedError({
+              meta: { limitType: result.limitType, current: result.current, max: result.max },
+            });
+          }
+          await this.repo.setMemberDisabled({ organizationId, userId, disabled });
+        },
       });
-      if (!result.allowed) {
-        throw new MemberSeatLimitReachedError({
-          meta: { limitType: result.limitType, current: result.current, max: result.max },
-        });
-      }
     }
-
-    await this.repo.setMemberDisabled({ organizationId, userId, disabled });
 
     if (disabled) {
       // The seat is gone and the authz snapshot retired below, so the next request is refused
@@ -274,21 +280,25 @@ export class OrganizationMemberRoleService {
       grants: intendedRoleChangeGrants({ organizationId, role, effectiveTeamRoleUpdates }),
     });
 
-    await this.dependencies.seats.assertRoleChangeAllowed({
+    return this.dependencies.seats.withSeat({
       organizationId,
-      currentRole: currentMember.role,
-      userPermissions,
-      role,
-      user: params.planUser,
-    });
-
-    return this.repo.updateMemberRole({
-      organizationId,
-      userId,
-      role,
-      effectiveTeamRoleUpdates,
-      currentUserId,
-      caller,
+      work: async () => {
+        await this.dependencies.seats.assertRoleChangeAllowed({
+          organizationId,
+          currentRole: currentMember.role,
+          userPermissions,
+          role,
+          user: params.planUser,
+        });
+        return this.repo.updateMemberRole({
+          organizationId,
+          userId,
+          role,
+          effectiveTeamRoleUpdates,
+          currentUserId,
+          caller,
+        });
+      },
     });
   }
 

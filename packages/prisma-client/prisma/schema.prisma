@@ -1103,6 +1103,68 @@ model OrganizationUser {
   @@index([departmentId])
 }
 
+/// A person asked for a full seat the organization had no room for (modules/organization/specs/
+/// seat-requests.feature). One row per organization and address; reopening reuses the row.
+model SeatRequest {
+  id               String    @id
+  organizationId   String
+  /// Lowercased address of the person asking.
+  email            String
+  /// Null when only the address is known (a sign-in the identity provider refused).
+  userId           String?
+  name             String?
+  /// OPEN | APPROVED | DECLINED
+  status           String
+  /// pending | lite | idp_refused: how the person was left when the request opened.
+  source           String
+  /// The identity provider also refused this person's sign-in.
+  idpRefused       Boolean   @default(false)
+  /// okta | entra | google | onelogin | jumpcloud | ping | auth0 | oidc | saml
+  idpKind          String?
+  /// When sales were told about this request; reset when it reopens.
+  salesNotifiedAt  DateTime?
+  openedAt         DateTime
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
+
+  @@unique([organizationId, email])
+  @@index([organizationId, status])
+  @@index([userId])
+}
+
+/// Held by the one seat-taking write running on an organization (seat-requests.feature). A
+/// row past expiresAt is free to take; a holder deletes its own row when its write is done.
+model OrganizationSeatLease {
+  organizationId String   @id
+  /// Random per hold, so a release deletes only its own lease.
+  holder         String
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+}
+
+/// The mail log for seat requests and refused sign-ins: at most one row per organization,
+/// kind, address and UTC day, each mailed at once.
+model OrganizationAccessNotice {
+  id             String    @id
+  organizationId String
+  /// seat_request | idp_refused
+  kind           String
+  email          String
+  name           String?
+  idp            String?
+  /// UTC day the notice was recorded on, YYYY-MM-DD.
+  dayKey         String
+  /// Whether the seat request it announces was also refused by the identity provider.
+  idpRefused     Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  /// Set once the notice was handed to the mailer; null if a send never started.
+  mailedAt       DateTime?
+
+  @@unique([organizationId, kind, email, dayKey])
+}
+
 model Team {
   id             String       @id @default(nanoid())
   name           String
