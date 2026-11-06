@@ -1,11 +1,20 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type {
-  NurturingCodingMilestonesRepository,
-  NurturingMilestonesRepository,
-  NurturingOrganizationCounts,
-  NurturingOrganizationRow,
-  NurturingTraceMilestonesRepository,
+import {
+  MAX_CODING_REPOSITORY_KEYS,
+  type NurturingCodingMilestonesRepository,
+  type NurturingMilestonesRepository,
+  type NurturingOrganizationCounts,
+  type NurturingOrganizationRow,
+  type NurturingTraceMilestonesRepository,
 } from "../nurturing-milestones.repository.ts";
+
+/** A row plus the columns only their own writes read, as the Postgres table holds them. */
+type MemoryOrganization = NurturingOrganizationRow &
+  Readonly<{
+    codingTerminalTypes: string[];
+    codingRepositoryKeys: string[];
+    codingFirstDays: number[];
+  }>;
 
 /** The Postgres twin's semantics over nurturing's own organizations. */
 export class MemoryNurturingMilestonesRepository
@@ -14,7 +23,7 @@ export class MemoryNurturingMilestonesRepository
     NurturingCodingMilestonesRepository,
     NurturingTraceMilestonesRepository
 {
-  readonly #organizations = new Map<string, NurturingOrganizationRow>();
+  readonly #organizations = new Map<string, MemoryOrganization>();
   readonly #lastTraceAt = new Map<string, number>();
 
   static create(): MemoryNurturingMilestonesRepository {
@@ -58,6 +67,9 @@ export class MemoryNurturingMilestonesRepository
             codingAgentTypes: [],
             codingActiveDays: 0,
             codingLastActiveDay: null,
+            codingTerminalTypes: [],
+            codingRepositoryKeys: [],
+            codingFirstDays: [],
           },
     );
   }
@@ -119,6 +131,55 @@ export class MemoryNurturingMilestonesRepository
     const codingAgentTypes = [...organization.codingAgentTypes, agentType];
     this.#organizations.set(organizationId, { ...organization, codingAgentTypes });
     return [...codingAgentTypes];
+  }
+
+  async addCodingTerminalType({
+    organizationId,
+    terminalType,
+  }: Parameters<NurturingCodingMilestonesRepository["addCodingTerminalType"]>[0]): Promise<
+    string[]
+  > {
+    const organization = this.#organizations.get(organizationId);
+    if (!organization) return [];
+    if (organization.codingTerminalTypes.includes(terminalType)) {
+      return [...organization.codingTerminalTypes];
+    }
+    const codingTerminalTypes = [...organization.codingTerminalTypes, terminalType];
+    this.#organizations.set(organizationId, { ...organization, codingTerminalTypes });
+    return [...codingTerminalTypes];
+  }
+
+  async addCodingRepository({
+    organizationId,
+    repositoryKey,
+  }: Parameters<NurturingCodingMilestonesRepository["addCodingRepository"]>[0]): Promise<number> {
+    const organization = this.#organizations.get(organizationId);
+    if (!organization) return 0;
+    if (
+      organization.codingRepositoryKeys.includes(repositoryKey) ||
+      organization.codingRepositoryKeys.length >= MAX_CODING_REPOSITORY_KEYS
+    ) {
+      return organization.codingRepositoryKeys.length;
+    }
+    const codingRepositoryKeys = [...organization.codingRepositoryKeys, repositoryKey];
+    this.#organizations.set(organizationId, { ...organization, codingRepositoryKeys });
+    return codingRepositoryKeys.length;
+  }
+
+  async addCodingSessionDayOffset({
+    organizationId,
+    dayOffset,
+  }: Parameters<
+    NurturingCodingMilestonesRepository["addCodingSessionDayOffset"]
+  >[0]): Promise<number> {
+    const organization = this.#organizations.get(organizationId);
+    if (!organization) return 0;
+    if (organization.codingFirstDays.includes(dayOffset)) {
+      return organization.codingFirstDays.length;
+    }
+    const codingFirstDays = [...organization.codingFirstDays, dayOffset];
+    this.#organizations.set(organizationId, { ...organization, codingFirstDays });
+    return codingFirstDays.length;
   }
 
   async recordCodingActiveDay({

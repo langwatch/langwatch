@@ -46,6 +46,29 @@ export const resolveProxyForHost = (
 };
 
 /**
+ * The proxy for a destination with a known scheme: `HTTP_PROXY` carries `http:`,
+ * `HTTPS_PROXY` carries `https:`, each falling back to the other when unset.
+ * Undefined when neither is set or `NO_PROXY` excludes the host.
+ */
+export function resolveProxyForDestination({
+  config,
+  hostname,
+  protocol,
+}: {
+  config: OutboundProxyConfig;
+  hostname: string;
+  protocol: string;
+}): string | undefined {
+  const proxy =
+    protocol === "http:"
+      ? (config.httpProxy ?? config.httpsProxy)
+      : (config.httpsProxy ?? config.httpProxy);
+  if (!proxy) return undefined;
+  if (isProxyBypassed(config, hostname)) return undefined;
+  return proxy;
+}
+
+/**
  * Whether `NO_PROXY` excludes this host. Follows the de-facto convention:
  * comma separated entries, `*` disables proxying entirely, a leading dot or
  * bare domain matches subdomains, and an optional `:port` suffix is ignored.

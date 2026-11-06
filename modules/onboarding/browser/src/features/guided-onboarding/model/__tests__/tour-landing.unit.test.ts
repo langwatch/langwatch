@@ -14,10 +14,17 @@ describe("firstNameOf", () => {
     expect(firstNameOf("Riley Stone")).toBe("Riley");
   });
 
-  it("answers undefined for an email or a blank name", () => {
+  it("trims around a name padded with spaces", () => {
+    expect(firstNameOf("  Riley   Stone ")).toBe("Riley");
+  });
+
+  it("answers undefined for an email or a missing, empty or blank name", () => {
     expect(firstNameOf("riley@acme.com")).toBeUndefined();
     expect(firstNameOf(undefined)).toBeUndefined();
+    expect(firstNameOf(null)).toBeUndefined();
+    expect(firstNameOf("")).toBeUndefined();
     expect(firstNameOf("  ")).toBeUndefined();
+    expect(firstNameOf("\t\n")).toBeUndefined();
   });
 });
 

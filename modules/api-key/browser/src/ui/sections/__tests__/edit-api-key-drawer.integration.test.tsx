@@ -12,7 +12,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithApiKeyHost } from "../../../testing.tsx";
 import { EditApiKeyDrawer } from "../edit-api-key-drawer.tsx";
 
+const { state } = vi.hoisted(() => ({ state: { ceilingLoading: false } }));
+
 // The picker has its own suite in authz; this file pins what the drawer sends.
+// The ceiling is the server's answer; faked here over the seeded bindings.
+vi.mock("../../../behavior/use-grantable-permissions.ts", async () => {
+  const { fakeGrantableHook } = await import("./support/fake-grantable.ts");
+  const answer = fakeGrantableHook({
+    bindings: () => [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" }],
+  });
+  return {
+    useGrantablePermissions: (input: Parameters<typeof answer>[0]) =>
+      state.ceilingLoading && !input.isServiceKey
+        ? { permissions: [], isLoading: true, isError: false, refetch: () => undefined }
+        : answer(input),
+  };
+});
+
 vi.mock("@langwatch/design-system/scope-chip-picker", () => ({ ScopeChipPicker: () => null }));
 
 vi.mock("@langwatch/design-system/provider-scope-chips", () => ({
@@ -103,7 +119,40 @@ function renderDrawer(apiKey: Props["apiKey"]) {
 
 const save = () => screen.getByRole("button", { name: "Save" });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  state.ceilingLoading = false;
+});
+
+describe("given a personal restricted key whose access is still loading", () => {
+  describe("when Save is pressed", () => {
+    it("keeps Save disabled and sends nothing, rather than a key with no permissions", async () => {
+      state.ceilingLoading = true;
+      const onSave = renderDrawer(
+        keyRow({
+          userId: "user-1",
+          userName: "Dev",
+          permissionMode: "restricted",
+          grants: [
+            {
+              id: "rb-1",
+              role: "CUSTOM",
+              customRoleId: null,
+              customRoleName: null,
+              customRolePermissions: ["traces:view"],
+              scopeType: "PROJECT",
+              scopeId: "proj-1",
+              scopeName: "Web App",
+            },
+          ],
+        }),
+      );
+      expect(save()).toBeDisabled();
+      await userEvent.setup().click(save());
+      expect(onSave).not.toHaveBeenCalled();
+    });
+  });
+});
 
 describe("given a service key with all permissions", () => {
   describe("when it is saved unchanged", () => {
@@ -191,6 +240,7 @@ describe("given a service key with all permissions", () => {
           "scenarios": "write",
           "secrets": "write",
           "sso": "write",
+          "subscription": "write",
           "team": "write",
           "traces": "write",
           "triggers": "write",
