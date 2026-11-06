@@ -10,6 +10,9 @@ const logger = createLogger("langwatch:billing:seatLineLease");
  * outlasts any seat change's Stripe calls; a holder that stopped frees the line when it runs out.
  */
 export const SEAT_LINE_LEASE_MS = 5 * 60 * 1000;
+/** Tries at recording a late write's reconcile, a database blip apart, before only logging it. */
+export const RECONCILE_RECORD_ATTEMPTS = 5;
+const RECONCILE_RECORD_BACKOFF_MS = 1000;
 /** How often a waiting seat change asks for the lease again. */
 const SEAT_LINE_POLL_MS = 250;
 /**
@@ -111,17 +114,27 @@ export class SeatLineLeaseService {
 
   /** A write that landed after a takeover: the next repair pass puts the line to the seat count. */
   private async recordLateWrite({ id, quantity }: { id: string; quantity: number }): Promise<void> {
-    try {
-      await this.subscriptions.recordSeatLineReconcile({ id });
-      logger.warn(
-        { subscriptionId: id, quantity },
-        "seat line written after its lease was taken over; reconcile recorded for the repair pass",
-      );
-    } catch (error) {
-      logger.error(
-        { error, subscriptionId: id, quantity },
-        "seat line written after its lease was taken over and the reconcile could not be recorded",
-      );
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= RECONCILE_RECORD_ATTEMPTS; attempt += 1) {
+      if (attempt > 1) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, (attempt - 1) * RECONCILE_RECORD_BACKOFF_MS),
+        );
+      }
+      try {
+        await this.subscriptions.recordSeatLineReconcile({ id });
+        logger.warn(
+          { subscriptionId: id, quantity },
+          "seat line written after its lease was taken over; reconcile recorded for the repair pass",
+        );
+        return;
+      } catch (error) {
+        lastError = error;
+      }
     }
+    logger.error(
+      { error: lastError, subscriptionId: id, quantity },
+      "seat line written after its lease was taken over and the reconcile could not be recorded",
+    );
   }
 }

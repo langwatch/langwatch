@@ -427,7 +427,7 @@ Feature: Seat rotation
       And the lease ran out and a seat change raised the seats to 6 meanwhile
       When the repair's write lands and Stripe shows 3 seats
       Then the repair is not counted as repaired
-      And the subscription records that its seat line should match its seat count
+      And the subscription records that its seat line should match its seat count, retrying a refused record
       When the seat line repair runs after the grace window
       Then the payment provider changes the quantity to 6 with no proration
       And the repair is cleared

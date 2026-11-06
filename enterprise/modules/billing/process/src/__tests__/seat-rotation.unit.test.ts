@@ -529,6 +529,35 @@ describe("Growth seat changes", () => {
       expect(store.seatRepairs.size).toBe(0);
     });
 
+    /** @scenario "A seat line write that lands after a seat change took its lease is put right" */
+    it("retries recording the reconcile when the database refuses it at first", async () => {
+      const refusals = vi
+        .spyOn(MemorySeatEventSubscriptionRepository.prototype, "recordSeatLineReconcile")
+        .mockRejectedValueOnce(new Error("database unavailable"))
+        .mockRejectedValueOnce(new Error("database unavailable"));
+      const send = stripeSubscriptions.updateSubscription.bind(stripeSubscriptions);
+      const stall = { resume: () => {} };
+      const writes = vi
+        .spyOn(stripeSubscriptions, "updateSubscription")
+        .mockImplementationOnce(async (input) => {
+          await new Promise<void>((resolve) => (stall.resume = resolve));
+          return send(input);
+        });
+      const repairing = repairs.repairSeatLines();
+      await vi.advanceTimersByTimeAsync(0);
+      vi.setSystemTime(Date.now() + SEAT_LINE_LEASE_MS + 1);
+      await seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 });
+
+      stall.resume();
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(await repairing).toMatchObject({ repaired: 0, pending: 1 });
+      expect(refusals).toHaveBeenCalledTimes(3);
+      expect(store.seatRepairs.get("sub_db_1")).toMatchObject({ quantity: null });
+      writes.mockRestore();
+      refusals.mockRestore();
+    });
+
     /** @scenario "Seat line writes give up well inside the lease" */
     it("sends every seat line write with a one minute request timeout", async () => {
       const writes = vi.spyOn(stripeSubscriptions, "updateSubscription");
