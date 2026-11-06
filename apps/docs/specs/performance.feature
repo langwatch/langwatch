@@ -132,7 +132,7 @@ Feature: Static documentation with progressive interaction
     Then the rules its markup can match are inlined in its head
     And rules for classes or ids found only on other pages are left out
     And rules a script can add at runtime, theme classes and unscoped rules are kept
-    And the shared stylesheet loads without blocking the first paint
+    And the browser asks for the shared stylesheet only once the page has loaded
 
   @unit
   Scenario: Minify the shared stylesheet for the supported browsers

@@ -5,11 +5,15 @@ import { darkFallbackCss, darkFallbackHead } from "./dark-fallback.ts";
 import { minifyCss } from "./minify.ts";
 import { parseStylesheet } from "./stylesheet.ts";
 
-/* The page paints from the rules inlined in its head; the shared sheet (every server and island
-   rule) loads as `print`, which never blocks rendering, then applies to all media once loaded.
-   Without JavaScript the inlined rules alone style the page. */
+/* The page paints from the rules inlined in its head. The shared sheet (every server and island
+   rule) names its address in `data-href`, so the browser does not ask for it until the page has
+   loaded; this script then sets `href`. Without JavaScript the inlined rules alone style the
+   page. */
+const loadSharedSheet =
+  'addEventListener("load",function(){document.querySelectorAll("link[data-docs-style][data-href]").forEach(function(l){l.href=l.dataset.href;l.removeAttribute("data-href")})})';
+
 export function styleHead({ css, href }: { css: string; href: string }) {
-  return `<style>${css.replaceAll("</style", "<\\/style")}</style><link data-docs-style rel="stylesheet" href="${href}" media="print" onload="this.media='all'">`;
+  return `<style>${css.replaceAll("</style", "<\\/style")}</style><link data-docs-style rel="stylesheet" data-href="${href}"><script>${loadSharedSheet}</script>`;
 }
 
 /**

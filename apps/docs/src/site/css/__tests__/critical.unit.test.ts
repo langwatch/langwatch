@@ -123,11 +123,15 @@ describe("inlinePageStyles", () => {
     const home = result.pages.get("index.html") ?? "";
 
     /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
-    it("inlines the page's rules and links the shared sheet without blocking", () => {
+    it("inlines the page's rules and asks for the shared sheet only after load", () => {
       expect(home).toContain(
         styleHead({ css: "@layer recipes{.css-here{color:red}}", href: `/docs/${result.file}` }),
       );
-      expect(home).toContain('media="print" onload="this.media=\'all\'"');
+      expect(home).toContain(
+        `<link data-docs-style rel="stylesheet" data-href="/docs/${result.file}">`,
+      );
+      expect(home).not.toMatch(/<link[^>]*data-docs-style[^>]*\shref=/);
+      expect(home).toContain('addEventListener("load"');
       expect(home).not.toContain(placeholder);
       expect(home).not.toContain(clientLink);
     });
