@@ -1,7 +1,7 @@
 "use client";
 
-import type { CollectionItem } from "@chakra-ui/react";
-import { Select as ChakraSelect, Portal } from "@chakra-ui/react";
+import type { BoxProps, CollectionItem } from "@chakra-ui/react";
+import { Box, Select as ChakraSelect, Portal } from "@chakra-ui/react";
 import * as React from "react";
 
 import { OverlayDepthContext, useOverlayZIndex } from "../../overlays/depth.ts";
@@ -159,6 +159,37 @@ export const SelectItemGroup = React.forwardRef<HTMLDivElement, SelectItemGroupP
   },
 );
 
+/**
+ * The rows under a fixed header, such as a search field: put it in a `Select.Content` given
+ * `overflow="hidden"`, so only the rows scroll and none passes behind the header. Pair it with
+ * `scrollToListItem` on `Select.Root`, which keeps the highlighted row in view.
+ */
+export const SelectList = React.forwardRef<HTMLDivElement, BoxProps>(
+  function SelectList(props, ref) {
+    return (
+      <Box
+        display="flex"
+        flexDirection="column"
+        flex="1"
+        minHeight={0}
+        overflowY="auto"
+        {...props}
+        ref={ref}
+      />
+    );
+  },
+);
+
+/** `Select.Root`'s `scrollToIndexFn` for rows in a `Select.List`, whose content does not scroll. */
+export const scrollToListItem = ({
+  getElement,
+}: {
+  getElement: () => HTMLElement | null;
+}): void => {
+  // Absent where nothing lays out (jsdom), as Zag's own scroll checks first.
+  getElement()?.scrollIntoView?.({ block: "nearest" });
+};
+
 export const SelectLabel = ChakraSelect.Label;
 export const SelectItemText = ChakraSelect.ItemText;
 
@@ -166,6 +197,7 @@ export const Select: {
   Root: typeof SelectRoot;
   Trigger: typeof SelectTrigger;
   Content: typeof SelectContent;
+  List: typeof SelectList;
   Item: typeof SelectItem;
   ValueText: typeof SelectValueText;
   ItemGroup: typeof SelectItemGroup;
@@ -180,6 +212,7 @@ export const Select: {
   Root: SelectRoot,
   Trigger: SelectTrigger,
   Content: SelectContent,
+  List: SelectList,
   Item: SelectItem,
   ValueText: SelectValueText,
   ItemGroup: SelectItemGroup,

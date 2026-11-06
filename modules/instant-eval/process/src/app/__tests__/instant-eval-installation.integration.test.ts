@@ -249,7 +249,7 @@ function installation({
         "feature-flag": createApiFixture<FeatureFlagApi>({
           isEnabled: async () => isReleased,
         }),
-        // A project runs on LangWatch Instant Preview unless a test names its own model (ADR-182).
+        // A project runs on LangWatch Evals Preview unless a test names its own model (ADR-182).
         "model-provider": createApiFixture<ModelProviderApi>({
           resolveDecisionModel: async () => decisionModel,
         }),

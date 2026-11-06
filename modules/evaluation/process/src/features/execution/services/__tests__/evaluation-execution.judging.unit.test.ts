@@ -477,8 +477,8 @@ describe("EvaluationExecutionService with the judge router", () => {
       mappings: null,
     });
 
-  describe("given the router flag is on and the project runs on LangWatch Instant Preview", () => {
-    /** @scenario "An LLM judge on LangWatch Instant Preview is routed when the flag is on" */
+  describe("given the router flag is on and the project runs on LangWatch Evals Preview", () => {
+    /** @scenario "An LLM judge on LangWatch Evals Preview is routed when the flag is on" */
     it("sends the llm_judge route with the judge call", async () => {
       const { service, calls, isRouted } = buildService({ isRouted: true });
 
