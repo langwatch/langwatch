@@ -572,6 +572,24 @@ function beganTurn(
   };
 }
 
+/**
+ * Was a turn sent from `sentScope` into `projectId` started HERE? A send still waiting for its ids
+ * when the panel moved to another user, organisation or project (or to the personal workspace)
+ * belongs to the place it was sent from.
+ */
+export function isTurnInPanelScope({
+  sentScope,
+  scope,
+  projectId,
+}: {
+  sentScope: LangyScope | null;
+  scope: LangyScope | null;
+  projectId: string;
+}): boolean {
+  if (!isSameScope(sentScope, scope)) return false;
+  return !scope?.projectId || scope.projectId === projectId;
+}
+
 function withConversationConfirmed(s: LangyState, id: string): Partial<LangyState> {
   if (!s.unconfirmedConversations[id]) return s;
   const { [id]: _confirmed, ...rest } = s.unconfirmedConversations;

@@ -88,6 +88,7 @@ import {
 import {
   useLangyHistoryError,
   useLangyListError,
+  useReleaseTurnOfLostConversation,
 } from "../../behavior/panel/use-langy-panel-errors.ts";
 import {
   useLangyDevInspector,
@@ -277,6 +278,7 @@ function LangyPanel({
   const model = useLangyComposerModel({ projectId });
   const makeDefault = useLangyMakeDefault({ resolvedDefault: model.resolvedDefault });
   const engine = useLangyChatEngine({ transport });
+  refs.sendStrandedRef.current = () => engine.applyHistoryToEngine([]);
   const isBusy = engine.status === "submitted" || engine.status === "streaming";
   useLangyWarmWorker({
     projectId,
@@ -397,6 +399,9 @@ function LangyPanel({
     messages: engine.messages,
     retryEngineTurn: engine.retryTurn,
     restoreDraftOnFailure,
+  });
+  useReleaseTurnOfLostConversation({
+    errorKinds: [failure.turnError?.kind, historyError.presentation?.kind],
   });
   useLangyOutlivedTurnError({
     error: engine.error,
