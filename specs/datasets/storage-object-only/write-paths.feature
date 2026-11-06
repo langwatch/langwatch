@@ -83,10 +83,9 @@ Feature: Every write puts dataset rows in object storage
       When a dataset row is inserted without naming where its content lives
       Then the dataset is marked as stored in object storage
 
-    # The demo seed creates its dataset with contentLayout "postgres" and upserts DatasetRecord rows
-    # straight into Postgres (apps/tasks/src/storage-seed/seed-demo-platform.ts:268-290).
-    # becomes @integration
-    @unimplemented
+    # The demo seed creates its dataset through the dataset module
+    # (apps/tasks/src/storage-seed/seed-demo-dataset.ts), so its rows are born in object storage.
+    @integration
     Scenario: The demo platform seed creates its sample dataset in object storage
       When the demo platform is seeded
       Then the sample dataset's rows are readable from object storage
