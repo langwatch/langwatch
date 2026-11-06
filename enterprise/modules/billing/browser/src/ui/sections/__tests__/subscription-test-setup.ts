@@ -183,11 +183,14 @@ export const mockCreateInvites = vi.fn(() => ({
   isPending: false,
 }));
 
-export const mockListInvoices = vi.fn(() => ({
-  data: [] as DisplayInvoice[],
-  isLoading: false,
-  isError: false,
-}));
+export const mockListInvoices = vi.fn(
+  (): {
+    data: DisplayInvoice[] | undefined;
+    isLoading: boolean;
+    isError: boolean;
+    error?: { data: { httpStatus: number } };
+  } => ({ data: [], isLoading: false, isError: false }),
+);
 
 export const mockGetLastSubscription = vi.fn(() => ({
   data: null,
