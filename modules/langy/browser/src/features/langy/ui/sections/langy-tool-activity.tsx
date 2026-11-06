@@ -43,8 +43,7 @@ import {
 import { isSayToolPart } from "../../../tools/model/langy-say-tool.ts";
 import { isSecretSnippetToolPart } from "../../../tools/model/langy-secret-snippet-tool.ts";
 import {
-  isCredentialCode,
-  isSandboxCredentialFault,
+  credentialFault,
   type LangyToolErrorPresentation,
   presentLangyToolError,
 } from "../../model/logic/langy-tool-failure.ts";
@@ -781,12 +780,11 @@ function refusesAccess({
   presentation: LangyToolErrorPresentation;
   toolName: string | undefined;
 }): boolean {
-  // A local tool's credential failure is the reader's own login, terminal or not.
-  const credential = isCredentialCode(presentation.code);
-  if (credential && !isSandboxCredentialFault({ code: presentation.code, toolName })) return true;
+  // A local credential failure is the reader's own login, terminal or not; a sandbox
+  // one is ours to fix.
+  const fault = credentialFault({ code: presentation.code, toolName });
+  if (fault !== null) return fault === "local";
   if (!presentation.terminal) return false;
-  // A sandbox credential fault is ours to fix.
-  if (isSandboxCredentialFault({ code: presentation.code, toolName })) return false;
   if (presentation.code?.trim().toLowerCase() === "langy_github_not_connected") return true;
   return presentation.httpStatus !== undefined && ACCESS_STATUSES.has(presentation.httpStatus);
 }

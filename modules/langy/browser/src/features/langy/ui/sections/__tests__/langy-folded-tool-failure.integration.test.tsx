@@ -535,4 +535,27 @@ describe("the receipt of the work", () => {
 
     expect(opened()).toBe("true");
   });
+
+  /** @scenario "A receipt the reader only passes over still closes" */
+  it("stays open once the reader focused into it", () => {
+    fireEvent.focusIn(receiptHeader());
+    fireEvent.pointerLeave(wrapper);
+    pass(5000);
+
+    expect(opened()).toBe("true");
+  });
+
+  /** @scenario "A receipt the reader only passes over still closes" */
+  it("does not close while a pointer that left came back", () => {
+    fireEvent.pointerEnter(wrapper);
+    fireEvent.pointerLeave(wrapper);
+    pass(1000);
+    fireEvent.pointerEnter(wrapper);
+    pass(5000);
+    expect(opened()).toBe("true");
+
+    fireEvent.pointerLeave(wrapper);
+    pass(2200);
+    expect(opened()).toBe("false");
+  });
 });

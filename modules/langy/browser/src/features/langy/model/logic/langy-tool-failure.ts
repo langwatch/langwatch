@@ -164,10 +164,10 @@ const ACCESS_DENIAL_CODES = new Set([
 ]);
 
 /**
- * The codes that mean Langy's own sandbox key was missing or refused: an
- * internal failure, never the reader's access and never theirs to sign in to.
+ * The codes that mean a CLI credential was missing or refused. In the sandbox that is
+ * Langy's own key: an internal failure, never the reader's to sign in to.
  */
-const SANDBOX_CREDENTIAL_CODES = new Set([
+const CREDENTIAL_CODES = new Set([
   "missing_api_key",
   "unauthorized",
   // The CLI's local "Not logged in" check, which never reaches the server.
@@ -185,9 +185,6 @@ const normalizedCode = (domain: LangWatchHandledErrorShape): string =>
 const isAccessDenial = (domain: LangWatchHandledErrorShape): boolean =>
   ACCESS_DENIAL_CODES.has(normalizedCode(domain));
 
-const isSandboxCredentialFailure = (domain: LangWatchHandledErrorShape): boolean =>
-  SANDBOX_CREDENTIAL_CODES.has(normalizedCode(domain));
-
 /**
  * Tools that run in the folder the developer shared from their own machine
  * (ADR-129), with their own git identity and their own `gh` login. The same
@@ -195,21 +192,22 @@ const isSandboxCredentialFailure = (domain: LangWatchHandledErrorShape): boolean
  */
 const LOCAL_TOOL_PREFIX = "local_";
 
-/** Whether a failure code is one of the credential codes, whichever tool raised it. */
-export const isCredentialCode = (code: string | undefined): boolean =>
-  code !== undefined && SANDBOX_CREDENTIAL_CODES.has(code.trim().toLowerCase());
-
 /**
- * Whether a sandbox tool failed on Langy's own CLI credential: ours to fix, not the
- * reader's access.
+ * Whose CLI credential a failure is: "sandbox" is Langy's own key (ours to fix), "local"
+ * is the reader's own login on their machine. `null` when it is no credential failure.
  */
-export const isSandboxCredentialFault = ({
+export const credentialFault = ({
   code,
   toolName,
 }: {
   code: string | undefined;
   toolName: string | undefined;
-}): boolean => isCredentialCode(code) && !toolName?.startsWith(LOCAL_TOOL_PREFIX);
+}): "sandbox" | "local" | null => {
+  if (code === undefined) return null;
+  const known = CREDENTIAL_CODES.has(code.trim().toLowerCase());
+  if (!known) return null;
+  return toolName?.startsWith(LOCAL_TOOL_PREFIX) ? "local" : "sandbox";
+};
 
 const asCount = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
@@ -275,7 +273,7 @@ function describeFailure({
 
   // The CLI's own text and tips say "run langwatch login": true on a laptop
   // (a local tool), a dead end in a sandbox the reader cannot open.
-  if (isSandboxCredentialFailure(domain) && !toolName?.startsWith(LOCAL_TOOL_PREFIX)) {
+  if (credentialFault({ code: domain.code, toolName }) === "sandbox") {
     return {
       message: "Langy hit an internal error and couldn't complete this step.",
       detail: "This is on our side, not your access. There is nothing for you to set up.",
