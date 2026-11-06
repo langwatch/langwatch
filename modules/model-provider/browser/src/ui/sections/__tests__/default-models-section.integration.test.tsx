@@ -5,7 +5,7 @@
  * Spec: specs/model-providers/role-based-default-models.feature
  */
 
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
@@ -253,6 +253,48 @@ describe("given the Default Models table", () => {
     });
   });
 
+  describe("given the Judge column", () => {
+    /** @scenario "The table shows a Judge column after Instant Evals" */
+    it("is the last role column, after Instant Evals", () => {
+      renderSection();
+
+      const headers = screen.getAllByRole("columnheader").map((header) => header.textContent);
+      expect(headers.indexOf("Judge")).toBe(headers.indexOf("Instant Evals") + 1);
+      expect(screen.getByTestId("config-row-cfg_acme_org-cell-judge")).toBeInTheDocument();
+    });
+
+    /** @scenario "An unset Judge cell shows the Default model faded" */
+    it("shows the Default model, faded as inherited, where Judge is unset", () => {
+      renderSection();
+
+      const cell = screen.getByTestId("config-row-cfg_acme_org-cell-judge");
+      const chip = cell.querySelector('[data-testid="model-chip-openai/gpt-5.5"]');
+      expect(chip).not.toBeNull();
+      expect(chip).toHaveAttribute("data-inherited", "true");
+    });
+
+    it("shows a Judge pick at full strength", () => {
+      mockGetDefaultModels.mockReturnValue({
+        data: {
+          ...FAKE_PAYLOAD,
+          configs: [
+            {
+              ...FAKE_PAYLOAD.configs[0]!,
+              config: { DEFAULT: "openai/gpt-5.5", JUDGE: "anthropic/claude-sonnet-4-6" },
+            },
+          ],
+        },
+        isLoading: false,
+      });
+      renderSection();
+
+      const cell = screen.getByTestId("config-row-cfg_acme_org-cell-judge");
+      const chip = cell.querySelector('[data-testid="model-chip-anthropic/claude-sonnet-4-6"]');
+      expect(chip).not.toBeNull();
+      expect(chip).not.toHaveAttribute("data-inherited");
+    });
+  });
+
   describe("given a config whose role model is a renamed custom model", () => {
     describe("when the section receives the resolved displayNames map", () => {
       it("renders the table chip with the configured display name, not the raw model id", () => {
@@ -263,7 +305,8 @@ describe("given the Default Models table", () => {
 
         renderSection({ displayNames: { [CUSTOM_FULL_ID]: CUSTOM_DISPLAY_NAME } });
 
-        expect(screen.getByTestId(`model-chip-${CUSTOM_FULL_ID}`).textContent).toBe(
+        const defaultCell = screen.getByTestId("config-row-cfg_custom_display_name-cell-default");
+        expect(within(defaultCell).getByTestId(`model-chip-${CUSTOM_FULL_ID}`).textContent).toBe(
           CUSTOM_DISPLAY_NAME,
         );
       });
