@@ -148,6 +148,13 @@ Feature: Permission reads come from the session, and a public page holds none
     And the actions it offers match the session's answer
 
   @integration
+  Scenario: A page load reads the person's grants once
+    Given the authorize host is mounted around every page
+    When a project page loads
+    Then the authorize host sends no grant read of its own, leaving the session's read the only one
+    And it reads the person's grants only when a project token is minted, capping the token at them
+
+  @integration
   Scenario: A migrated screen answers a signed-in reader the same as before
     Given a signed-in reader whose role grants some permissions and not others in the active project
     When a screen that read a permission through the legacy scope hook reads it from its module host instead
