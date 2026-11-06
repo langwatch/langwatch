@@ -150,12 +150,19 @@ export function WidgetNoAccessFace({ what, ask }: { what: string; ask: string })
   );
 }
 
-// Narrow or short cards drop the spacing and the button icons so the face still fits.
-const TIGHT_FACE = "@container (max-width: 340px) or (max-height: 150px)";
+// Narrow or short cards drop the title row's spacing so the face still fits.
+const TIGHT_FACE = "@container (max-width: 340px) or (max-height: 157px)";
+// A clamp counts lines, not height, so each band sets a count its height holds: 158 leaves 102px
+// for text; 98 leaves 46, or 18 under two rows of buttons. Chakra re-sorts container queries, so
+// bands must not overlap on one property.
+const NARROW_FACE = "@container (max-width: 340px) and (min-height: 158px)";
+const SHORT_FACE = "@container (max-height: 157px)";
+const SHORT_WIDE_FACE = "@container (min-width: 241px) and (max-height: 157px)";
+const SHORT_SMALL_FACE = "@container (max-width: 240px) and (max-height: 157px)";
 
 /**
  * Says the widget couldn't load and why, and offers Retry; the card's title names it. A limit
- * failure may add a note and the edit actions, and then Retry steps back.
+ * failure may add a note or the edit actions; beside an edit action, Retry steps back.
  */
 export function WidgetFailedFace({
   message,
@@ -163,7 +170,6 @@ export function WidgetFailedFace({
   onRetry,
   onEditWithLangy,
   onEditCode,
-  minorRetry = false,
 }: {
   /** The error registry's words for what went wrong. */
   message?: string;
@@ -172,9 +178,10 @@ export function WidgetFailedFace({
   onRetry: () => void;
   onEditWithLangy?: (() => void) | undefined;
   onEditCode?: (() => void) | undefined;
-  /** Retry is the lesser action, not the fix. */
-  minorRetry?: boolean;
 }) {
+  const hasEdits = Boolean(onEditWithLangy || onEditCode);
+  // Only the edit row needs the room; Retry alone keeps its icon.
+  const tightIcons = hasEdits ? { "& svg": { display: "none" } } : {};
   return (
     <VStack
       height="full"
@@ -182,7 +189,10 @@ export function WidgetFailedFace({
       gap={2}
       paddingX={4}
       textAlign="center"
-      css={{ [TIGHT_FACE]: { gap: 1.5, paddingX: 2 } }}
+      css={{
+        [NARROW_FACE]: { gap: 1.5, paddingX: 2 },
+        [SHORT_FACE]: { gap: 1, paddingX: 2 },
+      }}
     >
       <VStack gap={2} flexShrink={0} css={{ [TIGHT_FACE]: { flexDirection: "row", gap: 1.5 } }}>
         <Box display="flex" color="fg.error">
@@ -198,13 +208,31 @@ export function WidgetFailedFace({
               color="fg.muted"
               maxWidth="320px"
               lineClamp={3}
+              flexShrink={0}
               title={message}
+              css={{
+                [NARROW_FACE]: { lineClamp: note ? 3 : 5 },
+                [SHORT_WIDE_FACE]: { lineClamp: note || hasEdits ? 1 : 2 },
+                [SHORT_SMALL_FACE]: { lineClamp: hasEdits ? 1 : 2 },
+              }}
             >
               {message}
             </Text>
           )}
           {note && (
-            <Text textStyle="caption" color="fg.muted" maxWidth="320px" lineClamp={2} title={note}>
+            <Text
+              textStyle="caption"
+              color="fg.muted"
+              maxWidth="380px"
+              lineClamp={2}
+              flexShrink={0}
+              title={note}
+              css={{
+                [NARROW_FACE]: { lineClamp: 3 },
+                [SHORT_WIDE_FACE]: { lineClamp: 1 },
+                [SHORT_SMALL_FACE]: { display: "none" },
+              }}
+            >
               {note}
             </Text>
           )}
@@ -216,7 +244,10 @@ export function WidgetFailedFace({
         wrap="wrap"
         marginTop={1}
         flexShrink={0}
-        css={{ [TIGHT_FACE]: { marginTop: 0, "& svg": { display: "none" } } }}
+        css={{
+          [NARROW_FACE]: { marginTop: 0, ...tightIcons },
+          [SHORT_FACE]: { marginTop: 0, gap: 1, ...tightIcons },
+        }}
       >
         {onEditWithLangy && (
           <Button size="xs" variant="outline" onClick={onEditWithLangy}>
@@ -230,7 +261,7 @@ export function WidgetFailedFace({
             Edit code
           </Button>
         )}
-        <Button size="xs" variant={minorRetry ? "ghost" : "outline"} onClick={onRetry}>
+        <Button size="xs" variant={hasEdits ? "ghost" : "outline"} onClick={onRetry}>
           <RotateCcw size={13} aria-hidden />
           Retry
         </Button>

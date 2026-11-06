@@ -306,7 +306,6 @@ function faceInPlaceOfChart({
           onRetry={onRetry}
           onEditWithLangy={editable?.onEditWithLangy}
           onEditCode={editable?.onEditCode}
-          minorRetry
         />
       );
     }
