@@ -225,7 +225,9 @@ const givenOneMember = () => {
   });
 };
 
-const givenGrowthSubscription = () => {
+const givenGrowthSubscription = ({
+  interval = "MONTHLY",
+}: { interval?: "MONTHLY" | "ANNUAL" } = {}) => {
   setMockOrganization({
     id: "test-org-id",
     name: "Test Org",
@@ -235,7 +237,7 @@ const givenGrowthSubscription = () => {
   mockGetActivePlan.mockReturnValue({
     data: createMockPlan({
       planSource: "subscription",
-      type: "GROWTH_SEAT_EUR_MONTHLY",
+      type: `GROWTH_SEAT_EUR_${interval}`,
       name: "Growth",
       free: false,
       maxMembers: 2,
@@ -315,6 +317,7 @@ describe("<SubscriptionPage/> layout", () => {
       expect(rows).toHaveAttribute("data-setting-list", "boxed");
       expect(within(rows).getByText("Events this month")).toBeInTheDocument();
       expect(within(rows).getByText("Members / seats")).toBeInTheDocument();
+      expect(within(rows).queryByText("Price")).toBeNull();
       const footer = card.querySelector("[data-card-footer-divider]");
       expect(footer).not.toBeNull();
       expect(
@@ -497,6 +500,23 @@ describe("<SubscriptionPage/> layout", () => {
     });
   });
 
+  describe("when the organization has an annual Growth subscription", () => {
+    beforeEach(() => {
+      givenGrowthSubscription({ interval: "ANNUAL" });
+      givenUsage({ membersCount: 2 });
+    });
+
+    /** @scenario "An annual plan's price row shows the yearly total and the monthly seat price" */
+    it("shows the yearly total and the per-month seat price", async () => {
+      renderSubscriptionPage();
+
+      const price = await screen.findByTestId("plan-price");
+      expect(price).toHaveTextContent("€640/yr");
+      expect(price).toHaveTextContent("2 seats × €320");
+      expect(price).toHaveTextContent("€26.67/mo per seat");
+    });
+  });
+
   describe("when the organization has an active Growth subscription", () => {
     beforeEach(() => {
       givenGrowthSubscription();
@@ -510,6 +530,21 @@ describe("<SubscriptionPage/> layout", () => {
           status: "exceeded",
         }),
       });
+    });
+
+    /** @scenario "A paid plan's price is the first row of its card" */
+    it("opens the rows box with the monthly total and seats times the seat price", async () => {
+      renderSubscriptionPage();
+
+      const card = await screen.findByTestId("current-plan-block");
+      const rows = within(card).getByTestId("plan-usage-rows");
+      const price = within(rows).getByTestId("plan-price");
+      expect(rows.querySelector("[data-setting-row]")).toBe(price);
+      expect(price).toHaveTextContent("Price");
+      expect(price).toHaveTextContent("€58/mo");
+      expect(price).toHaveTextContent("2 seats × €29");
+      const header = within(card).getByRole("heading", { name: "Growth plan" }).parentElement;
+      expect(header).not.toHaveTextContent("€");
     });
 
     /** @scenario "A paid plan's card carries subscription management as its action" */

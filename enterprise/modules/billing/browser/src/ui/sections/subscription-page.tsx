@@ -28,6 +28,8 @@ import { shouldShowPlanLimits } from "../../model/plan-management-url.ts";
 import {
   billingSeatCounts,
   planEventUsage,
+  planPrice,
+  type PlanPrice,
   seatUsageCount,
   subscriptionChangesRequired,
   subscriptionPlanFlags,
@@ -133,7 +135,7 @@ function currentPlanEventUsage({
   });
 }
 
-/** The current plan's price line; a free, tiered or licensed plan shows none. */
+/** The current plan's price row; a free, tiered or licensed plan shows none. */
 function currentPlanPricingFor({
   flags,
   plan,
@@ -141,6 +143,7 @@ function currentPlanPricingFor({
   currency,
   periodSuffix,
   monthlyEquivalent,
+  billingPeriod,
 }: {
   flags: SubscriptionPlanFlags;
   plan: PlanInfo;
@@ -148,16 +151,17 @@ function currentPlanPricingFor({
   currency: Currency;
   periodSuffix: string;
   monthlyEquivalent: string;
-}) {
+  billingPeriod: BillingInterval;
+}): PlanPrice | undefined {
   if (flags.isTieredPricingModel || flags.isDeveloperPlan || flags.isLicenseOverride) {
     return undefined;
   }
-  const seatCount = plan.maxMembers ?? 1;
-  return {
-    totalPrice: `${formatPrice({ cents: seatPricePerPeriodCents * seatCount, currency })}${periodSuffix}`,
-    seatCount,
-    perSeatPrice: monthlyEquivalent,
-  };
+  return planPrice({
+    seatCount: plan.maxMembers ?? 1,
+    seatPrice: formatPrice({ cents: seatPricePerPeriodCents, currency }),
+    total: `${formatPrice({ cents: seatPricePerPeriodCents * (plan.maxMembers ?? 1), currency })}${periodSuffix}`,
+    monthlyEquivalent: billingPeriod === "annual" ? monthlyEquivalent : undefined,
+  });
 }
 
 /** The plan, seat usage and members have all answered. */
@@ -330,6 +334,7 @@ export function SubscriptionPage() {
     currency: effectiveCurrency,
     periodSuffix,
     monthlyEquivalent,
+    billingPeriod: effectiveBillingPeriod,
   });
   // A held plan is described by what it grants; only a plan we sell gets the tier's pitch.
   const currentPlanFeatures = currentPlanFeaturesFor({

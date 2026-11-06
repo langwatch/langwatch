@@ -214,6 +214,21 @@ Feature: Subscription Page Plan Management
       Then the "Current" chip sits right after the plan name
       And the events and seats rows sit together in one bordered box, their figures at the right end
       And a rule separates that box from the card's action below it
+      And a Free plan's box has no price row
+
+    @integration
+    Scenario: A paid plan's price is the first row of its card
+      Given my organization has an active monthly Growth subscription for 2 seats at €29 each
+      When I view the subscription page
+      Then the card's header holds only the plan name and the "Current" chip
+      And the first row of the bordered box is "Price", reading "€58/mo" then "2 seats × €29"
+
+    @integration
+    Scenario: An annual plan's price row shows the yearly total and the monthly seat price
+      Given my organization has an active annual Growth subscription for 2 seats
+      When I view the subscription page
+      Then the price row shows the yearly total with "/yr"
+      And it shows the seats times the yearly seat price, then the seat price per month
 
     @integration
     Scenario: The plan card holds the page's one primary upgrade button

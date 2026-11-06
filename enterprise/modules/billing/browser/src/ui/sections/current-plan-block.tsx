@@ -11,8 +11,7 @@ import { Box, Button, HStack, SimpleGrid, Text, VStack } from "@langwatch/design
 import { SettingList, SettingRow, StatusChip } from "@langwatch/design-system/settings-card";
 import { Check } from "lucide-react";
 
-import type { PlanEventUsage } from "../../model/subscription-page-state.ts";
-import { PricingSummary } from "../../ui/elements/pricing-summary.tsx";
+import type { PlanEventUsage, PlanPrice } from "../../model/subscription-page-state.ts";
 
 const METER_FILL: Record<PlanEventUsage["status"], string> = {
   ok: "blue.solid",
@@ -124,11 +123,7 @@ export function CurrentPlanBlock({
   contactSalesUrl,
 }: {
   planName: string;
-  pricing?: {
-    totalPrice: string;
-    seatCount: number;
-    perSeatPrice?: string | null;
-  };
+  pricing?: PlanPrice;
   features?: string[];
   eventUsage?: PlanEventUsage;
   userCount: number;
@@ -153,15 +148,6 @@ export function CurrentPlanBlock({
       status="ok"
       badgePlacement="title"
       footerDivider={hasActions}
-      description={
-        pricing && (
-          <PricingSummary
-            totalPrice={pricing.totalPrice}
-            seatCount={pricing.seatCount}
-            perSeatPrice={pricing.perSeatPrice}
-          />
-        )
-      }
       badge={
         <HStack gap={2}>
           <StatusChip label="Current" tone="good" />
@@ -188,6 +174,16 @@ export function CurrentPlanBlock({
     >
       <VStack align="stretch" gap={4}>
         <SettingList variant="boxed" data-testid="plan-usage-rows">
+          {pricing && (
+            <SettingRow label="Price" data-testid="plan-price">
+              <Text textStyle="bodySm" fontWeight={600} fontVariantNumeric="tabular-nums">
+                {pricing.total}
+              </Text>
+              <Text textStyle="bodySm" color="fg.subtle" fontVariantNumeric="tabular-nums">
+                {pricing.breakdown}
+              </Text>
+            </SettingRow>
+          )}
           {eventUsage && <EventUsageRow usage={eventUsage} />}
           <SettingRow label="Members / seats">
             <Text

@@ -172,3 +172,25 @@ export function planEventUsage({
     status: messageLimitInfo.status,
   };
 }
+
+/** The plan card's price row: the period total, then seats times the seat price. */
+export type PlanPrice = {
+  total: string;
+  breakdown: string;
+};
+
+export function planPrice({
+  seatCount,
+  seatPrice,
+  total,
+  monthlyEquivalent,
+}: {
+  seatCount: number;
+  seatPrice: string;
+  total: string;
+  /** Annual plans add the per-month seat price, as the rest of the page does. */
+  monthlyEquivalent?: string;
+}): PlanPrice {
+  const seats = `${seatCount} seat${seatCount === 1 ? "" : "s"} \u00d7 ${seatPrice}`;
+  return { total, breakdown: monthlyEquivalent ? `${seats} · ${monthlyEquivalent}` : seats };
+}
