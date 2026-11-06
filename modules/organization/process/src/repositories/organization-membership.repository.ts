@@ -211,6 +211,13 @@ export interface MemberSeatStanding {
 }
 
 /** A person admission left waiting for a seat. */
+/** A waiting person given a seat whose grant has not landed: the admission to finish. */
+export interface UnfinishedSeatAdmission {
+  organizationId: string;
+  userId: string;
+  grantId: string;
+}
+
 export interface WaitingMember {
   userId: string;
   name: string | null;
@@ -460,6 +467,15 @@ export abstract class OrganizationMembershipRepository {
 
   /** Answers false, writing nothing, when the person no longer waits. */
   abstract admitWaitingMember: (input: AdmitWaitingMemberInput) => Promise<boolean>;
+
+  /**
+   * Enabled full members, across organizations, still carrying the grant intent of an admission
+   * from waiting: their grant or its completion failed after the enable. Oldest first, at most
+   * `limit`.
+   */
+  abstract findUnfinishedSeatAdmissions: (input: {
+    limit: number;
+  }) => Promise<UnfinishedSeatAdmission[]>;
 
   /**
    * The personal teams a set of role-binding scopes reaches, by the name each

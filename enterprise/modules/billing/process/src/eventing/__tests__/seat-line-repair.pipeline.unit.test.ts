@@ -24,7 +24,7 @@ import {
 
 const NOW = Date.parse("2026-11-06T12:00:00Z");
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-const NOTHING_DONE: SeatLineRepairOutcome = { repaired: 0, failed: 0, flagged: 0 };
+const NOTHING_DONE: SeatLineRepairOutcome = { repaired: 0, pending: 0, failed: 0, flagged: 0 };
 
 function built(overrides: Partial<SeatLineRepairDeps> = {}) {
   const deps = {
@@ -105,7 +105,7 @@ describe("given billing's seat line repair declaration", () => {
   describe("when the repair intent runs", () => {
     it("runs one pass and prunes its outbox rows older than a week", async () => {
       const { deps, process } = built({
-        repair: vi.fn(async () => ({ repaired: 1, failed: 1, flagged: 0 })),
+        repair: vi.fn(async () => ({ repaired: 1, pending: 0, failed: 1, flagged: 0 })),
       });
 
       await deliver(process, NOW);

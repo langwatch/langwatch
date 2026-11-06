@@ -13,12 +13,22 @@ export type SeatSubscriptionRow = {
   seatsKeptUntil: Instant | null;
 };
 
-/** A seat line Stripe should be put back to, recorded when putting it back was refused. */
-export type SeatRepairRow = {
+/**
+ * A seat line's way back, written before a seat change lifts it: Stripe should bill `quantity`,
+ * and only while it still bills `liftedQuantity` is the line known to be this change's lift.
+ * `since` tells one record from the next.
+ */
+export type SeatRepairRecord = {
+  quantity: number;
+  liftedQuantity: number;
+  since: Instant;
+};
+
+/** A pending seat line repair with its subscription, as the repair pass reads it. */
+export type SeatRepairRow = SeatRepairRecord & {
   id: string;
   organizationId: string;
   stripeSubscriptionId: string;
-  quantity: number;
   attempts: number;
   flaggedAt: Instant | null;
 };
@@ -36,22 +46,32 @@ export abstract class SeatEventSubscriptionRepository {
   }): Promise<{ id: string }>;
   /** Records the seats a decrease keeps before the provider lowers the line; the count stays. */
   abstract keepSeats(input: { id: string; kept: KeptSeats }): Promise<void>;
-  /** Back to ACTIVE at the new seat count with the seats it keeps, any scheduled end cleared. */
+  /**
+   * Back to ACTIVE at the new seat count with the seats it keeps, any scheduled end cleared, and
+   * every repair recorded at or before `repairsUpTo` cleared: the change left the line right.
+   */
   abstract reactivateWithSeats(input: {
     id: string;
     maxMembers: number;
     kept: KeptSeats | null;
+    repairsUpTo: Instant;
   }): Promise<void>;
-  /** Records the quantity Stripe should bill, replacing an earlier repair and its count. */
-  abstract recordSeatRepair(input: { id: string; quantity: number }): Promise<void>;
-  /** Every subscription with a seat line repair pending, oldest first. */
-  abstract findSeatRepairs(): Promise<SeatRepairRow[]>;
-  /** Clears the repair, only while it still asks for `quantity`: a newer one stays. */
-  abstract clearSeatRepair(input: { id: string; quantity: number }): Promise<void>;
-  /** Counts a failed repair, with the instant it was flagged to Ops once it was. */
-  abstract recordSeatRepairFailure(input: {
+  /** Records the way back before a lift, replacing an earlier repair and its count. */
+  abstract recordSeatRepair(input: {
     id: string;
     quantity: number;
+    liftedQuantity: number;
+  }): Promise<SeatRepairRecord>;
+  /** Every subscription with a seat line repair recorded before `recordedBefore`, oldest first. */
+  abstract findSeatRepairs(input: { recordedBefore: Instant }): Promise<SeatRepairRow[]>;
+  /** Whether `record` is still the subscription's pending repair. */
+  abstract isSeatRepairPending(input: { id: string; record: SeatRepairRecord }): Promise<boolean>;
+  /** Clears the repair, only while it is still `record`: a newer one stays. */
+  abstract clearSeatRepair(input: { id: string; record: SeatRepairRecord }): Promise<void>;
+  /** Counts a failed repair of `record`, with the instant it was flagged to Ops once it was. */
+  abstract recordSeatRepairFailure(input: {
+    id: string;
+    record: SeatRepairRecord;
     attempts: number;
     flaggedAt: Instant | null;
   }): Promise<void>;

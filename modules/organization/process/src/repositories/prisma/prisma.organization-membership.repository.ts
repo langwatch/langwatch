@@ -34,6 +34,7 @@ import type {
   OrganizationWithMembersAndTheirTeams,
   User,
 } from "@langwatch/organization-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 import type {
   Organization,
   OrganizationIntent,
@@ -46,6 +47,7 @@ import {
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
 import { fromDate, type Instant, toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import {
   DEVELOPER_ADMISSION_AUDIT_ACTION,
@@ -100,6 +102,7 @@ import type {
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,
   UpdateTeamMemberRoleInput,
+  UnfinishedSeatAdmission,
   WaitingMember,
 } from "../organization-membership.repository.ts";
 import type { OrganizationSettingsCipher } from "../organization.repository.ts";
@@ -125,6 +128,10 @@ async function teamNameFor({
   });
   return team?.name ?? teamId;
 }
+
+const unfinishedSeatAdmissionsSchema = z.array(
+  z.object({ organizationId: z.string(), userId: z.string(), grantId: z.string() }),
+);
 
 /**
  * The organization's active administrators, locked for the rest of the
@@ -2041,6 +2048,29 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       data: { archivedAt },
     });
     return personalTeamIds;
+  }
+
+  async findUnfinishedSeatAdmissions({
+    limit,
+  }: {
+    limit: number;
+  }): Promise<UnfinishedSeatAdmission[]> {
+    // Only a row given a full seat has a seat date and an intent; a fresh joiner has no seat date.
+    const rows = await this.prisma.$queryRaw`
+      ${skipTenantCheck({
+        // The hourly seat hold check finishes admissions in every organization.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT "organizationId", "userId", "pendingSsoGrantId" AS "grantId"
+      FROM "OrganizationUser"
+      WHERE "pendingSsoGrantId" IS NOT NULL
+        AND "disabledAt" IS NULL
+        AND "fullSeatSince" IS NOT NULL
+        AND "role"::text = ${OrganizationUserRole.MEMBER}
+      ORDER BY "updatedAt" ASC
+      LIMIT ${limit}
+    `;
+    return unfinishedSeatAdmissionsSchema.parse(rows);
   }
 
   async admitWaitingMember(input: AdmitWaitingMemberInput): Promise<boolean> {

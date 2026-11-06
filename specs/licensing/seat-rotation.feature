@@ -211,6 +211,30 @@ Feature: Seat rotation
       And the administrator reads "Member removed. Their seat did not go to the person waiting: enable them in Users to give it."
 
     @integration
+    Scenario: A seat handover whose grant fails after the enable still gives the seat
+      Given "Bar" took their seat 45 days ago
+      And "Qux" is waiting for a full member seat
+      When an administrator removes "Bar", gives the seat to "Qux" and writing the grant of "Qux" fails
+      Then "Bar" is removed
+      And "Qux" is enabled and no longer waiting
+      And the answer names "Qux" as given the seat, with no failed handover
+
+    @integration
+    Scenario: A seat handover whose admission cannot be completed still gives the seat
+      Given "Bar" took their seat 45 days ago
+      And "Qux" is waiting for a full member seat
+      When an administrator removes "Bar", gives the seat to "Qux" and completing the admission of "Qux" fails
+      Then "Qux" is enabled and no longer waiting
+      And the answer names "Qux" as given the seat, with no failed handover
+
+    @integration
+    Scenario: The seat hold check finishes an admission whose grant failed
+      Given "Qux" was given a seat and writing their grant failed
+      When the seat hold check runs
+      Then "Qux" gets their member grant
+      And their admission is completed
+
+    @integration
     Scenario: A role change whose grants fail keeps the seat as it was
       Given "Bar" took their seat on 3 November
       When an administrator changes the role of "Bar" and writing the grants fails
@@ -311,6 +335,75 @@ Feature: Seat rotation
       When an administrator raises the seats to 6 and the payment provider refuses the charge
       And the payment provider also refuses putting the seat line back
       Then the subscription records that Stripe should bill 3 seats
+
+    @unit
+    Scenario: A seat change records the repair before it lifts the seat line
+      Given an organization lowered its seats from 5 to 3 and keeps 5 until the period ends
+      When an administrator raises the seats to 6
+      Then the subscription records that Stripe should bill 3 seats, lifted to 5, before the lift is sent
+      And the record is cleared once the change completes
+
+    @unit
+    Scenario: A seat change whose repair cannot be recorded leaves Stripe alone
+      Given an organization lowered its seats from 5 to 3 and keeps 5 until the period ends
+      When an administrator raises the seats to 6 and recording the repair fails
+      Then the change errors
+      And the payment provider is not asked to change anything
+
+    @unit
+    Scenario: A seat line left lifted by a stopped change is put back
+      Given a seat change recorded that Stripe should bill 3 seats, lifted to 5, and stopped after the lift
+      And the record is older than the grace window
+      When the seat line repair runs
+      Then the payment provider changes the quantity to 3 with no proration
+      And the repair is cleared
+
+    @unit
+    Scenario: A seat line repair waits out a change that may still be running
+      Given a seat change recorded that Stripe should bill 3 seats, lifted to 5, a minute ago
+      When the seat line repair runs
+      Then the payment provider is not asked anything
+      And the repair stays pending
+
+    @unit
+    Scenario: A seat line at the charged count clears its repair without a change
+      Given the subscription records that Stripe should bill 3 seats, lifted to 5
+      And Stripe bills 6 seats because the charge went through before the change stopped
+      When the seat line repair runs
+      Then the payment provider is not asked to change anything
+      And the repair is cleared
+
+    @unit
+    Scenario: A seat line a later change moved is left alone
+      Given the subscription records that Stripe should bill 3 seats, lifted to 5
+      And a later change made Stripe bill 4 seats
+      When the seat line repair runs
+      Then the payment provider is not asked to change anything
+      And the repair is cleared
+
+    @unit
+    Scenario: A seat line repair moves the line on a past due subscription
+      Given the subscription records that Stripe should bill 3 seats while Stripe bills 5
+      And the subscription is past due at Stripe
+      When the seat line repair runs
+      Then the payment provider changes the quantity to 3 with no proration
+      And the repair is cleared
+
+    @unit
+    Scenario: A seat line repair stays pending while Stripe cannot change the subscription
+      Given the subscription records that Stripe should bill 3 seats while Stripe bills 5
+      And the subscription is incomplete at Stripe
+      When the seat line repair runs
+      Then the payment provider is not asked to change anything
+      And the repair stays pending for the next pass
+
+    @unit
+    Scenario: A seat line repair on a canceled subscription is cleared
+      Given the subscription records that Stripe should bill 3 seats while Stripe bills 5
+      And the subscription is canceled at Stripe
+      When the seat line repair runs
+      Then the payment provider is not asked to change anything
+      And the repair is cleared
 
     @unit
     Scenario: A seat line Stripe refused to put back is repaired later

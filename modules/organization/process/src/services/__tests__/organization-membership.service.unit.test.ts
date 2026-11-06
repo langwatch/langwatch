@@ -81,6 +81,7 @@ describe("OrganizationMembershipService", () => {
     writeSeatHold: vi.fn(),
     takeHeldSeat: vi.fn(),
     admitWaitingMember: vi.fn(),
+    findUnfinishedSeatAdmissions: vi.fn().mockResolvedValue([]),
   };
 
   const mockCreations: OrganizationCreationNotice = {

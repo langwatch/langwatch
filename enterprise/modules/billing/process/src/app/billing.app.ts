@@ -1059,7 +1059,7 @@ export class BillingModule
 
   /** Puts back seat lines Stripe refused to roll back; nothing where no subscription door is composed. */
   async repairSeatLines(): Promise<SeatLineRepairOutcome> {
-    if (!this.#subscriptions) return { repaired: 0, failed: 0, flagged: 0 };
+    if (!this.#subscriptions) return { repaired: 0, pending: 0, failed: 0, flagged: 0 };
     return this.#subscriptions.seatLines.repairSeatLines();
   }
 

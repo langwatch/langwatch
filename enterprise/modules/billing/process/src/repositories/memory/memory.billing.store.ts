@@ -73,6 +73,7 @@ type MemoryBillingBudgetLedgerRow = {
 /** A pending seat line repair as the Subscription row's repair columns hold it. */
 type MemorySeatRepair = {
   quantity: number;
+  liftedQuantity: number;
   since: Instant;
   attempts: number;
   flaggedAt: Instant | null;

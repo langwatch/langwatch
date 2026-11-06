@@ -43,6 +43,9 @@ type OrganizationMemberSeatDependencies = {
 
 const logger = createLogger("langwatch:organization:member-seats");
 
+/** Unfinished admissions one seat hold check finishes at most. */
+const UNFINISHED_ADMISSIONS_PER_CHECK = 100;
+
 export class OrganizationMemberSeatService {
   static create(dependencies: OrganizationMemberSeatDependencies): OrganizationMemberSeatService {
     return new OrganizationMemberSeatService(dependencies);
@@ -154,7 +157,8 @@ export class OrganizationMemberSeatService {
 
   /**
    * Gives a full seat to a person admission left waiting: their membership becomes MEMBER and is
-   * enabled. Answers false, changing nothing, when they no longer wait or no full seat fits.
+   * enabled. Answers false, changing nothing, when they no longer wait or no full seat fits. Once
+   * enabled the seat is theirs: a grant that fails after it is left for the seat hold check.
    */
   async admitWaitingMember({
     organizationId,
@@ -167,7 +171,7 @@ export class OrganizationMemberSeatService {
     actingUserId: string | null;
     caller: AuthzGrantCaller;
   }): Promise<boolean> {
-    const { seatHolds, seats, seatNotices, grantCache, admissions } = this.dependencies;
+    const { seatHolds, seats, seatNotices, grantCache } = this.dependencies;
     if (!(await seatHolds.isWaiting({ organizationId, userId }))) return false;
     if (!(await seatHolds.hasLiveHold({ organizationId, userId }))) {
       const fit = await seats.checkLimit({ organizationId, resource: "members" });
@@ -183,6 +187,43 @@ export class OrganizationMemberSeatService {
       seat: await seatHolds.takeOf({ organizationId, userId }),
     });
     if (!enabled) return false;
+    try {
+      await this.finishAdmission({ organizationId, userId, grantId, actingUserId, caller });
+    } catch (error) {
+      logger.error(
+        { error, organizationId, userId },
+        "admitted member's grant failed; the seat hold check finishes it",
+      );
+      return true;
+    }
+    // The member is in from here: a failed notice or cache drop must not report the seat as lost.
+    await Promise.all([
+      seatNotices.memberEnabled({ organizationId, userId, enabledByUserId: actingUserId }),
+      grantCache.invalidateOrganization({ organizationId }),
+    ]).catch((error: unknown) => {
+      logger.error(
+        { error, organizationId },
+        "notice or cache drop after admitting a member failed",
+      );
+    });
+    return true;
+  }
+
+  /** Lands the member grant an admission from waiting intends, then clears the intent. */
+  private async finishAdmission({
+    organizationId,
+    userId,
+    grantId,
+    actingUserId,
+    caller,
+  }: {
+    organizationId: string;
+    userId: string;
+    grantId: string;
+    actingUserId: string | null;
+    caller: AuthzGrantCaller;
+  }): Promise<void> {
+    const { admissions } = this.dependencies;
     await admissions.attachBindings({
       organizationId,
       bindings: [
@@ -204,23 +245,41 @@ export class OrganizationMemberSeatService {
       requireProjection: true,
     });
     await admissions.completeAdmission({ organizationId, userId, grantId });
-    // The member is in from here: a failed notice or cache drop must not report the seat as lost.
-    await Promise.all([
-      seatNotices.memberEnabled({ organizationId, userId, enabledByUserId: actingUserId }),
-      grantCache.invalidateOrganization({ organizationId }),
-    ]).catch((error: unknown) => {
-      logger.error(
-        { error, organizationId },
-        "notice or cache drop after admitting a member failed",
-      );
-    });
-    return true;
+  }
+
+  /** Finishes admissions whose grant failed after the enable; the same grant id keeps it safe. */
+  private async resumeUnfinishedAdmissions(): Promise<SeatHoldCheckFailure[]> {
+    const failures: SeatHoldCheckFailure[] = [];
+    const unfinished = await this.repo
+      .findUnfinishedSeatAdmissions({ limit: UNFINISHED_ADMISSIONS_PER_CHECK })
+      .catch((error: unknown) => {
+        logger.error({ error }, "reading unfinished admissions failed; the next check retries");
+        return [];
+      });
+    for (const { organizationId, userId, grantId } of unfinished) {
+      try {
+        await this.finishAdmission({
+          organizationId,
+          userId,
+          grantId,
+          actingUserId: null,
+          caller: { type: "system" },
+        });
+        await this.dependencies.grantCache.invalidateOrganization({ organizationId });
+      } catch (error) {
+        failures.push({
+          organizationId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return failures;
   }
 
   /**
-   * The hourly seat hold check: in each organization with ended holds, gives free full seats to
-   * the people waiting longest, then deletes those holds. An organization that fails keeps its
-   * ended holds (they no longer count) so the next check retries it; the others go on.
+   * The hourly seat hold check: where holds ended, gives free full seats to the people waiting
+   * longest, then deletes those holds; a failing organization keeps them for the next check. Last,
+   * it finishes admissions whose grant failed after the enable.
    */
   async runSeatHoldCheck(): Promise<SeatHoldCheckOutcome> {
     const { seatHolds } = this.dependencies;
@@ -238,6 +297,7 @@ export class OrganizationMemberSeatService {
         });
       }
     }
+    failures.push(...(await this.resumeUnfinishedAdmissions()));
     return { admitted, failures };
   }
 

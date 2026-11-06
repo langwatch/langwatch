@@ -17,11 +17,13 @@ import { MemoryBillingWebhookSubscriptionRepository } from "../repositories/memo
 import { MemoryBillingStore } from "../repositories/memory/memory.billing.store.ts";
 import { MemorySeatEventSubscriptionRepository } from "../repositories/memory/memory.seat-event-subscription.repository.ts";
 import { MemoryBillingSubscriptionRepository } from "../repositories/memory/memory.subscription.repository.ts";
+import type { BillingSubscriptionStatus } from "../rules/billing-stripe-shapes.rules.ts";
 import { BillingSubscriptionLifecycleService } from "../services/billing-subscription-lifecycle.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import {
   SEAT_REPAIR_FLAG_AFTER_ATTEMPTS,
+  SEAT_REPAIR_GRACE_MS,
   SeatLineRepairService,
 } from "../services/seat-line-repair.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
@@ -58,12 +60,12 @@ describe("Growth seat changes", () => {
   let plans: SaaSPlanProviderService;
   let lifecycle: BillingSubscriptionLifecycleService;
 
-  /** The provider's seat line as it bills `quantity` seats this period. */
-  const seedProvider = (quantity: number) =>
+  /** The provider's seat line as it bills `quantity` seats this period, `status` at Stripe. */
+  const seedProvider = (quantity: number, status: BillingSubscriptionStatus = "active") =>
     stripeSubscriptions.seed({
       subscription: {
         id: "sub_stripe_1",
-        status: "active",
+        status,
         canceledAt: null,
         billingThreshold: null,
         currentPeriodEnd: PERIOD_END_SECONDS,
@@ -312,9 +314,52 @@ describe("Growth seat changes", () => {
       expect(store.subscriptions[0]).toMatchObject({ maxMembers: 3, seatsKept: 5 });
       expect(store.seatRepairs.get("sub_db_1")).toMatchObject({
         quantity: 3,
+        liftedQuantity: 5,
         attempts: 0,
         flaggedAt: null,
       });
+    });
+
+    /** @scenario "A seat change records the repair before it lifts the seat line" */
+    it("records the way back before the lift and clears it once the change completes", async () => {
+      const send = stripeSubscriptions.updateSubscription.bind(stripeSubscriptions);
+      const recordedAtLift: unknown[] = [];
+      vi.spyOn(stripeSubscriptions, "updateSubscription").mockImplementation(async (input) => {
+        recordedAtLift.push(store.seatRepairs.get("sub_db_1"));
+        return send(input);
+      });
+
+      await seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 });
+
+      expect(recordedAtLift[0]).toMatchObject({ quantity: 3, liftedQuantity: 5 });
+      expect(store.seatRepairs.size).toBe(0);
+    });
+
+    /** @scenario "A seat change whose repair cannot be recorded leaves Stripe alone" */
+    it("errors without touching Stripe when the repair cannot be recorded", async () => {
+      const repository = MemorySeatEventSubscriptionRepository.create(store);
+      const unrecorded = SeatEventSubscriptionService.create({
+        stripeSubscriptions,
+        subscriptions: createApiFixture<MemorySeatEventSubscriptionRepository>({
+          findSeatCandidates: (input) => repository.findSeatCandidates(input),
+          keepSeats: (input) => repository.keepSeats(input),
+          recordSeatRepair: async () => {
+            throw new Error("database unavailable");
+          },
+        }),
+        abandoned: { seatCheckoutsAbandoned: vi.fn() },
+        prices,
+        customerCurrency: StripeCustomerCurrencyService.create({
+          customers: MemoryStripeCustomersChannel.create(),
+          stripeErrors: StripeErrorTranslatorService.create(),
+        }),
+      });
+
+      await expect(
+        unrecorded.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 }),
+      ).rejects.toThrow("database unavailable");
+
+      expect(stripeSubscriptions.updates).toEqual([]);
     });
 
     it("quotes the share of the previewed proration above the seats already paid for", async () => {
@@ -374,13 +419,14 @@ describe("Growth seat changes", () => {
         subscriptions: MemorySeatEventSubscriptionRepository.create(store),
         prices,
       });
+      vi.setSystemTime(NOW.add({ milliseconds: SEAT_REPAIR_GRACE_MS + 1 }).epochMilliseconds);
     });
 
     /** @scenario "A seat line Stripe refused to put back is repaired later" */
     it("puts the line back to the recorded quantity with no proration and clears the repair", async () => {
       const outcome = await repairs.repairSeatLines();
 
-      expect(outcome).toEqual({ repaired: 1, failed: 0, flagged: 0 });
+      expect(outcome).toEqual({ repaired: 1, pending: 0, failed: 0, flagged: 0 });
       expect(stripeSubscriptions.updates).toEqual([
         {
           subscriptionId: "sub_stripe_1",
@@ -388,7 +434,7 @@ describe("Growth seat changes", () => {
         },
       ]);
       expect(store.seatRepairs.size).toBe(0);
-      expect(await repairs.repairSeatLines()).toEqual({ repaired: 0, failed: 0, flagged: 0 });
+      expect(await repairs.repairSeatLines()).toMatchObject({ repaired: 0, failed: 0 });
     });
 
     /** @scenario "A seat line Stripe already bills right clears its repair without a change" */
@@ -409,6 +455,84 @@ describe("Growth seat changes", () => {
       expect(store.seatRepairs.size).toBe(0);
     });
 
+    /** @scenario "A seat line at the charged count clears its repair without a change" */
+    it("clears the repair without a change when Stripe bills the charged count", async () => {
+      seedProvider(6);
+
+      await repairs.repairSeatLines();
+
+      expect(stripeSubscriptions.updates).toEqual([]);
+      expect(store.seatRepairs.size).toBe(0);
+    });
+
+    /** @scenario "A seat line a later change moved is left alone" */
+    it("clears the repair without a change when a later change moved the line", async () => {
+      seedProvider(4);
+
+      await repairs.repairSeatLines();
+
+      expect(stripeSubscriptions.updates).toEqual([]);
+      expect(store.seatRepairs.size).toBe(0);
+    });
+
+    /** @scenario "A seat line a later change moved is left alone" */
+    it("leaves the line and the newer record when a change replaces the record mid-pass", async () => {
+      const repository = MemorySeatEventSubscriptionRepository.create(store);
+      const racing = SeatLineRepairService.create({
+        stripeSubscriptions,
+        prices,
+        subscriptions: createApiFixture<MemorySeatEventSubscriptionRepository>({
+          findSeatRepairs: (input) => repository.findSeatRepairs(input),
+          isSeatRepairPending: async (input) => {
+            vi.advanceTimersByTime(1);
+            await repository.recordSeatRepair({ id: "sub_db_1", quantity: 5, liftedQuantity: 7 });
+            return repository.isSeatRepairPending(input);
+          },
+          clearSeatRepair: (input) => repository.clearSeatRepair(input),
+        }),
+      });
+
+      await racing.repairSeatLines();
+
+      expect(stripeSubscriptions.updates).toEqual([]);
+      expect(store.seatRepairs.get("sub_db_1")).toMatchObject({ quantity: 5, liftedQuantity: 7 });
+    });
+
+    /** @scenario "A seat line repair moves the line on a past due subscription" */
+    it("moves the line on a past due subscription", async () => {
+      seedProvider(5, "past_due");
+
+      expect(await repairs.repairSeatLines()).toMatchObject({ repaired: 1 });
+      expect(stripeSubscriptions.updates.map((update) => update.change)).toEqual([
+        { items: [{ id: "si_seat", quantity: 3 }], prorationBehavior: "none" },
+      ]);
+      expect(store.seatRepairs.size).toBe(0);
+    });
+
+    /** @scenario "A seat line repair stays pending while Stripe cannot change the subscription" */
+    it("keeps the repair pending, uncounted, while the subscription is incomplete", async () => {
+      seedProvider(5, "incomplete");
+
+      expect(await repairs.repairSeatLines()).toEqual({
+        repaired: 0,
+        pending: 1,
+        failed: 0,
+        flagged: 0,
+      });
+      expect(stripeSubscriptions.updates).toEqual([]);
+      expect(store.seatRepairs.get("sub_db_1")).toMatchObject({ quantity: 3, attempts: 0 });
+    });
+
+    /** @scenario "A seat line repair on a canceled subscription is cleared" */
+    it("clears the repair without a change once the subscription is canceled", async () => {
+      seedProvider(5, "canceled");
+
+      await repairs.repairSeatLines();
+
+      expect(stripeSubscriptions.updates).toEqual([]);
+      expect(store.seatRepairs.size).toBe(0);
+    });
+
     it("counts a refused repair and retries it on the next pass", async () => {
       stripeSubscriptions.refuse({
         operation: "updateSubscription",
@@ -417,10 +541,10 @@ describe("Growth seat changes", () => {
         times: 1,
       });
 
-      expect(await repairs.repairSeatLines()).toEqual({ repaired: 0, failed: 1, flagged: 0 });
+      expect(await repairs.repairSeatLines()).toMatchObject({ repaired: 0, failed: 1, flagged: 0 });
       expect(store.seatRepairs.get("sub_db_1")).toMatchObject({ quantity: 3, attempts: 1 });
 
-      expect(await repairs.repairSeatLines()).toEqual({ repaired: 1, failed: 0, flagged: 0 });
+      expect(await repairs.repairSeatLines()).toMatchObject({ repaired: 1, failed: 0, flagged: 0 });
       expect(store.seatRepairs.size).toBe(0);
     });
 
@@ -451,6 +575,56 @@ describe("Growth seat changes", () => {
       expect(stripeSubscriptions.updates.map((update) => update.change)).toEqual([
         { items: [{ id: "si_seat", quantity: 3 }], prorationBehavior: "none" },
       ]);
+    });
+  });
+  describe("when a seat change stops after it lifted the seat line", () => {
+    let repairs: SeatLineRepairService;
+
+    beforeEach(async () => {
+      await seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 3 });
+      seedProvider(3);
+      stripeSubscriptions.updates.length = 0;
+      // The lift goes through; the charge never answers, as when the process stops mid-change.
+      const send = stripeSubscriptions.updateSubscription.bind(stripeSubscriptions);
+      const stalled = vi
+        .spyOn(stripeSubscriptions, "updateSubscription")
+        .mockImplementationOnce(send)
+        .mockImplementationOnce(() => new Promise(() => {}));
+      void seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 });
+      await vi.advanceTimersByTimeAsync(0);
+      stalled.mockRestore();
+      seedProvider(5);
+      stripeSubscriptions.updates.length = 0;
+      repairs = SeatLineRepairService.create({
+        stripeSubscriptions,
+        subscriptions: MemorySeatEventSubscriptionRepository.create(store),
+        prices,
+      });
+    });
+
+    /** @scenario "A seat line repair waits out a change that may still be running" */
+    it("leaves a repair younger than the grace window alone", async () => {
+      const reads = stripeSubscriptions.reads.length;
+
+      expect(await repairs.repairSeatLines()).toEqual({
+        repaired: 0,
+        pending: 0,
+        failed: 0,
+        flagged: 0,
+      });
+      expect(stripeSubscriptions.reads).toHaveLength(reads);
+      expect(store.seatRepairs.get("sub_db_1")).toMatchObject({ quantity: 3, liftedQuantity: 5 });
+    });
+
+    /** @scenario "A seat line left lifted by a stopped change is put back" */
+    it("puts the lifted line back once the grace window passed", async () => {
+      vi.setSystemTime(NOW.add({ milliseconds: SEAT_REPAIR_GRACE_MS + 1 }).epochMilliseconds);
+
+      expect(await repairs.repairSeatLines()).toMatchObject({ repaired: 1 });
+      expect(stripeSubscriptions.updates.map((update) => update.change)).toEqual([
+        { items: [{ id: "si_seat", quantity: 3 }], prorationBehavior: "none" },
+      ]);
+      expect(store.seatRepairs.size).toBe(0);
     });
   });
 });

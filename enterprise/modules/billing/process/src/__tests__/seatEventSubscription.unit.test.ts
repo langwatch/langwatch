@@ -60,6 +60,7 @@ const createMockSubscriptions = (): {
   reactivateWithSeats: vi.fn(),
   recordSeatRepair: vi.fn(),
   findSeatRepairs: vi.fn().mockResolvedValue([]),
+  isSeatRepairPending: vi.fn().mockResolvedValue(false),
   clearSeatRepair: vi.fn(),
   recordSeatRepairFailure: vi.fn(),
 });
@@ -782,6 +783,7 @@ describe("seatEventSubscription", () => {
           id: "sub_db_1",
           maxMembers: 8,
           kept: null,
+          repairsUpTo: expect.anything(),
         });
       });
     });

@@ -1734,6 +1734,7 @@ export interface LwqlPrismaRows {
     readonly seatsKept: "Int?";
     readonly seatsKeptUntil: "DateTime?";
     readonly seatRepairQuantity: "Int?";
+    readonly seatRepairLiftedQuantity: "Int?";
     readonly seatRepairSince: "DateTime?";
     readonly seatRepairAttempts: "Int?";
     readonly seatRepairFlaggedAt: "DateTime?";

@@ -49,8 +49,13 @@ describe.skipIf(!DB_URL)("PrismaSeatEventSubscriptionRepository seat line repair
     });
     return id;
   };
+  /** Every repair of this run, however young. */
   const pendingOfRun = async () =>
-    (await subscriptions.findSeatRepairs()).filter((row) => row.id.startsWith(run));
+    (
+      await subscriptions.findSeatRepairs({
+        recordedBefore: Temporal.Now.instant().add({ hours: 1 }),
+      })
+    ).filter((row) => row.id.startsWith(run));
 
   afterAll(async () => {
     await prisma.subscription.deleteMany({ where: { organizationId } });
@@ -62,45 +67,80 @@ describe.skipIf(!DB_URL)("PrismaSeatEventSubscriptionRepository seat line repair
   it("records a repair, counts its failures with the Ops flag, and clears it", async () => {
     const id = await seed("lifecycle");
 
-    await subscriptions.recordSeatRepair({ id, quantity: 3 });
+    const record = await subscriptions.recordSeatRepair({ id, quantity: 3, liftedQuantity: 5 });
     expect(await pendingOfRun()).toEqual([
       {
         id,
         organizationId,
         stripeSubscriptionId: `${id}_stripe`,
         quantity: 3,
+        liftedQuantity: 5,
+        since: record.since,
         attempts: 0,
         flaggedAt: null,
       },
     ]);
+    expect(await subscriptions.isSeatRepairPending({ id, record })).toBe(true);
 
     const flaggedAt = Temporal.Instant.from("2026-11-06T12:00:00Z");
-    await subscriptions.recordSeatRepairFailure({ id, quantity: 3, attempts: 5, flaggedAt });
+    await subscriptions.recordSeatRepairFailure({ id, record, attempts: 5, flaggedAt });
     expect(await pendingOfRun()).toEqual([expect.objectContaining({ id, attempts: 5, flaggedAt })]);
 
-    await subscriptions.clearSeatRepair({ id, quantity: 3 });
+    await subscriptions.clearSeatRepair({ id, record });
     expect(await pendingOfRun()).toEqual([]);
     expect(await prisma.subscription.findUniqueOrThrow({ where: { id } })).toMatchObject({
       seatRepairQuantity: null,
+      seatRepairLiftedQuantity: null,
       seatRepairSince: null,
       seatRepairAttempts: null,
       seatRepairFlaggedAt: null,
     });
   });
 
-  /** @scenario "A later seat change replaces a pending repair" */
-  it("keeps a newer repair when an older pass clears, and a seat change clears any", async () => {
+  /** @scenario "A seat line repair waits out a change that may still be running" */
+  it("lists only repairs recorded before the given instant", async () => {
+    const id = await seed("young");
+
+    const record = await subscriptions.recordSeatRepair({ id, quantity: 3, liftedQuantity: 5 });
+
+    const before = await subscriptions.findSeatRepairs({ recordedBefore: record.since });
+    expect(before.filter((row) => row.id === id)).toEqual([]);
+    await subscriptions.clearSeatRepair({ id, record });
+  });
+
+  /** @scenario "A seat line a later change moved is left alone" */
+  it("keeps a newer repair when an older pass clears, and a seat change clears older ones", async () => {
     const id = await seed("newer");
 
-    await subscriptions.recordSeatRepair({ id, quantity: 3 });
-    await subscriptions.recordSeatRepair({ id, quantity: 4 });
-    await subscriptions.clearSeatRepair({ id, quantity: 3 });
-    await subscriptions.recordSeatRepairFailure({ id, quantity: 3, attempts: 9, flaggedAt: null });
+    const older = await subscriptions.recordSeatRepair({ id, quantity: 3, liftedQuantity: 5 });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const newer = await subscriptions.recordSeatRepair({ id, quantity: 4, liftedQuantity: 6 });
+    await subscriptions.clearSeatRepair({ id, record: older });
+    await subscriptions.recordSeatRepairFailure({
+      id,
+      record: older,
+      attempts: 9,
+      flaggedAt: null,
+    });
+    expect(await subscriptions.isSeatRepairPending({ id, record: older })).toBe(false);
     expect(await pendingOfRun()).toEqual([
-      expect.objectContaining({ id, quantity: 4, attempts: 0 }),
+      expect.objectContaining({ id, quantity: 4, liftedQuantity: 6, attempts: 0 }),
     ]);
 
-    await subscriptions.reactivateWithSeats({ id, maxMembers: 4, kept: null });
+    await subscriptions.reactivateWithSeats({
+      id,
+      maxMembers: 4,
+      kept: null,
+      repairsUpTo: older.since,
+    });
+    expect(await pendingOfRun()).toEqual([expect.objectContaining({ id, quantity: 4 })]);
+
+    await subscriptions.reactivateWithSeats({
+      id,
+      maxMembers: 4,
+      kept: null,
+      repairsUpTo: newer.since,
+    });
     expect(await pendingOfRun()).toEqual([]);
   });
 });

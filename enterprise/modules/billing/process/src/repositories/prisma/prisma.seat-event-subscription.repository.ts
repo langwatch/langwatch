@@ -8,6 +8,7 @@ import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
 import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
+  type SeatRepairRecord,
   type SeatRepairRow,
   type SeatSubscriptionRow,
 } from "../seat-event-subscription.repository.ts";
@@ -15,6 +16,7 @@ import {
 /** The repair columns of a subscription with no seat line repair pending. */
 const NO_SEAT_REPAIR = {
   seatRepairQuantity: null,
+  seatRepairLiftedQuantity: null,
   seatRepairSince: null,
   seatRepairAttempts: null,
   seatRepairFlaggedAt: null,
@@ -95,10 +97,12 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
     id,
     maxMembers,
     kept,
+    repairsUpTo,
   }: {
     id: string;
     maxMembers: number;
     kept: KeptSeats | null;
+    repairsUpTo: Instant;
   }): Promise<void> {
     await this.prisma.subscription.update({
       where: { id },
@@ -108,44 +112,71 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
         endDate: null,
         seatsKept: kept?.seats ?? null,
         seatsKeptUntil: kept ? toDate(kept.until) : null,
-        ...NO_SEAT_REPAIR,
       },
+    });
+    await this.prisma.subscription.updateMany({
+      where: { id, seatRepairSince: { lte: toDate(repairsUpTo) } },
+      data: NO_SEAT_REPAIR,
     });
   }
 
-  async recordSeatRepair({ id, quantity }: { id: string; quantity: number }): Promise<void> {
+  async recordSeatRepair({
+    id,
+    quantity,
+    liftedQuantity,
+  }: {
+    id: string;
+    quantity: number;
+    liftedQuantity: number;
+  }): Promise<SeatRepairRecord> {
+    // Whole milliseconds, as the column keeps them, so the record matches its row exactly.
+    const since = fromDate(toDate(nowInstant()));
     await this.prisma.subscription.update({
       where: { id },
       data: {
         seatRepairQuantity: quantity,
-        seatRepairSince: toDate(nowInstant()),
+        seatRepairLiftedQuantity: liftedQuantity,
+        seatRepairSince: toDate(since),
         seatRepairAttempts: 0,
         seatRepairFlaggedAt: null,
       },
     });
+    return { quantity, liftedQuantity, since };
   }
 
-  async findSeatRepairs(): Promise<SeatRepairRow[]> {
+  async findSeatRepairs({ recordedBefore }: { recordedBefore: Instant }): Promise<SeatRepairRow[]> {
     const rows = await this.prisma.subscription.findMany({
-      where: { seatRepairQuantity: { not: null }, stripeSubscriptionId: { not: null } },
+      where: {
+        seatRepairQuantity: { not: null },
+        seatRepairLiftedQuantity: { not: null },
+        seatRepairSince: { lt: toDate(recordedBefore) },
+        stripeSubscriptionId: { not: null },
+      },
       orderBy: { seatRepairSince: "asc" },
       select: {
         id: true,
         organizationId: true,
         stripeSubscriptionId: true,
         seatRepairQuantity: true,
+        seatRepairLiftedQuantity: true,
+        seatRepairSince: true,
         seatRepairAttempts: true,
         seatRepairFlaggedAt: true,
       },
     });
     return rows.flatMap((row) =>
-      row.seatRepairQuantity !== null && row.stripeSubscriptionId !== null
+      row.seatRepairQuantity !== null &&
+      row.seatRepairLiftedQuantity !== null &&
+      row.seatRepairSince !== null &&
+      row.stripeSubscriptionId !== null
         ? [
             {
               id: row.id,
               organizationId: row.organizationId,
               stripeSubscriptionId: row.stripeSubscriptionId,
               quantity: row.seatRepairQuantity,
+              liftedQuantity: row.seatRepairLiftedQuantity,
+              since: fromDate(row.seatRepairSince),
               attempts: row.seatRepairAttempts ?? 0,
               flaggedAt: row.seatRepairFlaggedAt ? fromDate(row.seatRepairFlaggedAt) : null,
             },
@@ -154,30 +185,51 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
     );
   }
 
-  async clearSeatRepair({ id, quantity }: { id: string; quantity: number }): Promise<void> {
+  async isSeatRepairPending({
+    id,
+    record,
+  }: {
+    id: string;
+    record: SeatRepairRecord;
+  }): Promise<boolean> {
+    const count = await this.prisma.subscription.count({ where: sameRepair({ id, record }) });
+    return count > 0;
+  }
+
+  async clearSeatRepair({ id, record }: { id: string; record: SeatRepairRecord }): Promise<void> {
     await this.prisma.subscription.updateMany({
-      where: { id, seatRepairQuantity: quantity },
+      where: sameRepair({ id, record }),
       data: NO_SEAT_REPAIR,
     });
   }
 
   async recordSeatRepairFailure({
     id,
-    quantity,
+    record,
     attempts,
     flaggedAt,
   }: {
     id: string;
-    quantity: number;
+    record: SeatRepairRecord;
     attempts: number;
     flaggedAt: Instant | null;
   }): Promise<void> {
     await this.prisma.subscription.updateMany({
-      where: { id, seatRepairQuantity: quantity },
+      where: sameRepair({ id, record }),
       data: {
         seatRepairAttempts: attempts,
         seatRepairFlaggedAt: flaggedAt ? toDate(flaggedAt) : null,
       },
     });
   }
+}
+
+/** The subscription while `record` is still its pending repair. */
+function sameRepair({ id, record }: { id: string; record: SeatRepairRecord }) {
+  return {
+    id,
+    seatRepairQuantity: record.quantity,
+    seatRepairLiftedQuantity: record.liftedQuantity,
+    seatRepairSince: toDate(record.since),
+  };
 }

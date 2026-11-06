@@ -52,6 +52,7 @@ import type {
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,
   UpdateTeamMemberRoleInput,
+  UnfinishedSeatAdmission,
   WaitingMember,
 } from "../organization-membership.repository.ts";
 import type { SeatHold, SeatTransition } from "../seat-hold.repository.ts";
@@ -742,6 +743,28 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       archivedTeamIds.push(team.id);
     }
     return archivedTeamIds;
+  }
+
+  async findUnfinishedSeatAdmissions({
+    limit,
+  }: {
+    limit: number;
+  }): Promise<UnfinishedSeatAdmission[]> {
+    return this.memory.organizationUsers
+      .filter(
+        (row) =>
+          row.pendingSsoGrantId != null &&
+          row.disabledAt === null &&
+          row.fullSeatSince != null &&
+          row.role === OrganizationUserRole.MEMBER,
+      )
+      .toSorted((a, b) => a.updatedAt.epochMilliseconds - b.updatedAt.epochMilliseconds)
+      .slice(0, limit)
+      .map((row) => ({
+        organizationId: row.organizationId,
+        userId: row.userId,
+        grantId: row.pendingSsoGrantId ?? "",
+      }));
   }
 
   async admitWaitingMember(input: AdmitWaitingMemberInput): Promise<boolean> {

@@ -18758,7 +18758,16 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "The seat quantity Stripe should bill after it refused putting a lifted seat line back; null once repaired."
+          "documentation": "The seat quantity Stripe should bill if a seat change stops after lifting the seat line; null once settled."
+        },
+        {
+          "name": "seatRepairLiftedQuantity",
+          "columnName": "seatRepairLiftedQuantity",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The quantity the change lifted the line to; the repair moves the line back only while Stripe still bills it."
         },
         {
           "name": "seatRepairSince",

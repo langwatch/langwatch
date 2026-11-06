@@ -3,11 +3,12 @@ import {
   type GrowthSeatPlanType,
 } from "@langwatch/enterprise-billing-contract";
 import { generate } from "@langwatch/ksuid";
-import { type Instant, nowInstant } from "@langwatch/time";
+import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
 import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
+  type SeatRepairRecord,
   type SeatRepairRow,
   type SeatSubscriptionRow,
 } from "../seat-event-subscription.repository.ts";
@@ -108,10 +109,12 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
     id,
     maxMembers,
     kept,
+    repairsUpTo,
   }: {
     id: string;
     maxMembers: number;
     kept: KeptSeats | null;
+    repairsUpTo: Instant;
   }): Promise<void> {
     const index = this.store.subscriptions.findIndex((subscription) => subscription.id === id);
     const current = this.store.subscriptions[index];
@@ -124,51 +127,90 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
       seatsKept: kept?.seats ?? null,
       seatsKeptUntil: kept?.until ?? null,
     };
-    this.store.seatRepairs.delete(id);
+    const pending = this.store.seatRepairs.get(id);
+    if (pending && Temporal.Instant.compare(pending.since, repairsUpTo) <= 0) {
+      this.store.seatRepairs.delete(id);
+    }
   }
 
-  async recordSeatRepair({ id, quantity }: { id: string; quantity: number }): Promise<void> {
-    this.store.seatRepairs.set(id, { quantity, since: nowInstant(), attempts: 0, flaggedAt: null });
+  async recordSeatRepair({
+    id,
+    quantity,
+    liftedQuantity,
+  }: {
+    id: string;
+    quantity: number;
+    liftedQuantity: number;
+  }): Promise<SeatRepairRecord> {
+    const since = Temporal.Instant.fromEpochMilliseconds(nowInstant().epochMilliseconds);
+    this.store.seatRepairs.set(id, {
+      quantity,
+      liftedQuantity,
+      since,
+      attempts: 0,
+      flaggedAt: null,
+    });
+    return { quantity, liftedQuantity, since };
   }
 
-  async findSeatRepairs(): Promise<SeatRepairRow[]> {
-    const rows: (SeatRepairRow & { since: Instant })[] = [];
+  async findSeatRepairs({ recordedBefore }: { recordedBefore: Instant }): Promise<SeatRepairRow[]> {
+    const rows: SeatRepairRow[] = [];
     for (const [id, repair] of this.store.seatRepairs) {
       const subscription = this.store.subscriptions.find((row) => row.id === id);
       if (!subscription?.stripeSubscriptionId) continue;
+      if (Temporal.Instant.compare(repair.since, recordedBefore) >= 0) continue;
       rows.push({
         id,
         organizationId: subscription.organizationId,
         stripeSubscriptionId: subscription.stripeSubscriptionId,
         quantity: repair.quantity,
+        liftedQuantity: repair.liftedQuantity,
+        since: repair.since,
         attempts: repair.attempts,
         flaggedAt: repair.flaggedAt,
-        since: repair.since,
       });
     }
-    return rows
-      .toSorted((a, b) => a.since.epochMilliseconds - b.since.epochMilliseconds)
-      .map(({ since: _since, ...row }) => row);
+    return rows.toSorted((a, b) => a.since.epochMilliseconds - b.since.epochMilliseconds);
   }
 
-  async clearSeatRepair({ id, quantity }: { id: string; quantity: number }): Promise<void> {
-    const pending = this.store.seatRepairs.get(id);
-    if (pending?.quantity === quantity) this.store.seatRepairs.delete(id);
+  async isSeatRepairPending({
+    id,
+    record,
+  }: {
+    id: string;
+    record: SeatRepairRecord;
+  }): Promise<boolean> {
+    return this.sameRepair({ id, record });
+  }
+
+  async clearSeatRepair({ id, record }: { id: string; record: SeatRepairRecord }): Promise<void> {
+    if (this.sameRepair({ id, record })) this.store.seatRepairs.delete(id);
   }
 
   async recordSeatRepairFailure({
     id,
-    quantity,
+    record,
     attempts,
     flaggedAt,
   }: {
     id: string;
-    quantity: number;
+    record: SeatRepairRecord;
     attempts: number;
     flaggedAt: Instant | null;
   }): Promise<void> {
     const current = this.store.seatRepairs.get(id);
-    if (current?.quantity !== quantity) return;
+    if (!current || !this.sameRepair({ id, record })) return;
     this.store.seatRepairs.set(id, { ...current, attempts, flaggedAt });
+  }
+
+  /** Whether `record` is still the subscription's pending repair. */
+  private sameRepair({ id, record }: { id: string; record: SeatRepairRecord }): boolean {
+    const current = this.store.seatRepairs.get(id);
+    return (
+      current !== undefined &&
+      current.quantity === record.quantity &&
+      current.liftedQuantity === record.liftedQuantity &&
+      current.since.equals(record.since)
+    );
   }
 }

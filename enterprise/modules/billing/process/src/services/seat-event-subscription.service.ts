@@ -25,6 +25,7 @@ import {
 } from "../rules/seat-event-quote.rules.ts";
 import { planSeatChange, type SeatChangePlan, seatsKeptAt } from "../rules/seat-kept.rules.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
+import { SeatLineMoveService } from "./seat-line-move.service.ts";
 import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.service.ts";
 
 const logger = createLogger("langwatch:billing:seatEventSubscription");
@@ -35,6 +36,7 @@ export class SeatEventSubscriptionService {
   private readonly abandoned: Pick<BillingLifecycleAnnouncerService, "seatCheckoutsAbandoned">;
   private readonly prices: StripePriceMap;
   private readonly customerCurrency: StripeCustomerCurrencyService;
+  private readonly seatLine: SeatLineMoveService;
 
   private constructor({
     stripeSubscriptions,
@@ -54,6 +56,7 @@ export class SeatEventSubscriptionService {
     this.abandoned = abandoned;
     this.prices = prices;
     this.customerCurrency = customerCurrency;
+    this.seatLine = SeatLineMoveService.create({ stripeSubscriptions, subscriptions });
   }
 
   static create(options: {
@@ -332,55 +335,21 @@ export class SeatEventSubscriptionService {
 
     // An increase charges the proration now; a decrease applies from the next cycle with
     // no credit. Either reactivates a subscription scheduled for cancellation.
-    const moveTo = (quantity: number, prorationBehavior: "always_invoice" | "none") =>
-      this.stripeSubscriptions.updateSubscription({
-        subscriptionId: subscription.stripeSubscriptionId,
-        change: seatChange({
-          subscription: stripeSubscription,
-          seatItem,
-          quantity,
-          prorationDate,
-          prorationBehavior,
-        }),
-      });
-    let lifted = false;
-    try {
-      for (const step of plan.steps) {
-        await moveTo(step.quantity, step.prorationBehavior);
-        lifted = step.prorationBehavior === "none" && plan.steps.length > 1;
-      }
-    } catch (error) {
-      // A charge refused after the lift puts the line back, so the next cycle bills as before.
-      if (lifted && seatItem.quantity != null) {
-        const billedBefore = seatItem.quantity;
-        await moveTo(billedBefore, "none").catch(async (rollbackError: unknown) => {
-          // Stripe would bill the lifted count next cycle; the seat line repair puts it back.
-          logger.error(
-            {
-              error: rollbackError,
-              organizationId,
-              subscriptionId: subscription.stripeSubscriptionId,
-              billedBefore,
-            },
-            "seat line left lifted: the charge and putting the line back both failed; repair recorded",
-          );
-          await this.subscriptions
-            .recordSeatRepair({ id: subscription.id, quantity: billedBefore })
-            .catch((recordError: unknown) => {
-              logger.error(
-                { error: recordError, organizationId, billedBefore },
-                "seat line left lifted and its repair could not be recorded",
-              );
-            });
-        });
-      }
-      throw error;
-    }
+    const { repairsUpTo } = await this.seatLine.move({
+      id: subscription.id,
+      organizationId,
+      stripeSubscription,
+      seatItem,
+      billed: seatItem.quantity ?? subscription.maxMembers ?? 0,
+      plan,
+      prorationDate,
+    });
 
     await this.subscriptions.reactivateWithSeats({
       id: subscription.id,
       maxMembers: totalMembers,
       kept: plan.kept,
+      repairsUpTo,
     });
 
     return { success: true };

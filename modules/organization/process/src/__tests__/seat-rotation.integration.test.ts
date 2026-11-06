@@ -61,6 +61,8 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
     changeBindingRole: grantWrite(undefined),
   });
   const attachedBindings: { organizationId: string; userId: string; role: string }[] = [];
+  /** Which step of an admission's grant fails, as a ledger outage after the enable would. */
+  let admissionFailure: "attach" | "complete" | null = null;
   /** Organizations whose plan lookup fails, to prove one failing admission spares the others. */
   const unreachablePlans = new Set<string>();
   const plans = createApiFixture<Pick<EntitlementApi, "getActivePlan">>({
@@ -99,6 +101,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
     admissions: {
       // As the grant ledger does: a binding needs a live (enabled) membership.
       attachBindings: async ({ organizationId, bindings }) => {
+        if (admissionFailure === "attach") throw new Error("grant ledger unavailable");
         for (const binding of bindings) {
           if (!("userId" in binding.principal)) continue;
           const userId = binding.principal.userId;
@@ -110,7 +113,15 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
         }
         return { attached: [], duplicates: [] };
       },
-      completeAdmission: async () => true,
+      // As authz does: clears the intent the grant answered.
+      completeAdmission: async ({ organizationId, userId, grantId }) => {
+        if (admissionFailure === "complete") throw new Error("admission store unavailable");
+        const cleared = await prisma.organizationUser.updateMany({
+          where: { organizationId, userId, pendingSsoGrantId: grantId },
+          data: { pendingSsoGrantId: null },
+        });
+        return cleared.count === 1;
+      },
     },
     workspaceNotices: { personalWorkspaceArchived: async () => {} },
     memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
@@ -189,7 +200,13 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
   const membershipOf = (organizationId: string, userId: string) =>
     prisma.organizationUser.findUnique({
       where: { userId_organizationId: { userId, organizationId } },
-      select: { role: true, disabledAt: true, fullSeatSince: true, seatPendingSince: true },
+      select: {
+        role: true,
+        disabledAt: true,
+        fullSeatSince: true,
+        seatPendingSince: true,
+        pendingSsoGrantId: true,
+      },
     });
 
   const remove = (organizationId: string, adminId: string, userId: string, giveTo?: string) =>
@@ -573,6 +590,68 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
       }
       expect(await membershipOf(organizationId, bar)).toBeNull();
       expect((await membershipOf(organizationId, qux))?.seatPendingSince).not.toBeNull();
+    });
+
+    /** @scenario "A seat handover whose grant fails after the enable still gives the seat" */
+    it("answers the seat as given when the grant fails after the enable", async () => {
+      const { organizationId, adminId, bar, waitingIds } = await acme({ waiting: ["Qux"] });
+      const qux = waitingIds[0]!;
+      admissionFailure = "attach";
+      try {
+        const result = await remove(organizationId, adminId, bar, qux);
+
+        expect(result).toEqual({ seatGivenToUserId: qux, seatHandoverFailed: false });
+      } finally {
+        admissionFailure = null;
+      }
+      expect(await membershipOf(organizationId, bar)).toBeNull();
+      expect(await membershipOf(organizationId, qux)).toMatchObject({
+        role: OrganizationUserRole.MEMBER,
+        disabledAt: null,
+        seatPendingSince: null,
+        pendingSsoGrantId: expect.any(String),
+      });
+    });
+
+    /** @scenario "A seat handover whose admission cannot be completed still gives the seat" */
+    it("answers the seat as given when completing the admission fails", async () => {
+      const { organizationId, adminId, bar, waitingIds } = await acme({ waiting: ["Qux"] });
+      const qux = waitingIds[0]!;
+      admissionFailure = "complete";
+      try {
+        const result = await remove(organizationId, adminId, bar, qux);
+
+        expect(result).toEqual({ seatGivenToUserId: qux, seatHandoverFailed: false });
+      } finally {
+        admissionFailure = null;
+      }
+      expect(attachedBindings).toContainEqual({ organizationId, userId: qux, role: "MEMBER" });
+      expect(await membershipOf(organizationId, qux)).toMatchObject({
+        disabledAt: null,
+        seatPendingSince: null,
+        pendingSsoGrantId: expect.any(String),
+      });
+    });
+
+    /** @scenario "The seat hold check finishes an admission whose grant failed" */
+    it("lands the grant and completes the admission on the next seat hold check", async () => {
+      const { organizationId, adminId, bar, waitingIds } = await acme({ waiting: ["Qux"] });
+      const qux = waitingIds[0]!;
+      admissionFailure = "attach";
+      try {
+        await remove(organizationId, adminId, bar, qux);
+      } finally {
+        admissionFailure = null;
+      }
+      expect(attachedBindings).not.toContainEqual({ organizationId, userId: qux, role: "MEMBER" });
+
+      const outcome = await memberships.runSeatHoldCheck();
+
+      expect(outcome.failures.map((failure) => failure.organizationId)).not.toContain(
+        organizationId,
+      );
+      expect(attachedBindings).toContainEqual({ organizationId, userId: qux, role: "MEMBER" });
+      expect((await membershipOf(organizationId, qux))?.pendingSsoGrantId).toBeNull();
     });
 
     /** @scenario "Enabling a person waiting for a seat admits them" */
