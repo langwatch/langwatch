@@ -7234,6 +7234,23 @@ model ConnectedStatement {
   @@index([accountId])
 }
 
+/// One renewed licence per paid Stripe invoice of a self-serve licence
+/// subscription (specs/licensing/self-serving-license-purchase.feature). A
+/// redelivered invoice event finds the row and mints nothing. A claim never
+/// delivered is taken over once `claimedAt` is older than the claim lease.
+model LicenseRenewalClaim {
+  stripeInvoiceId      String    @id
+  stripeSubscriptionId String
+  /// Fences completion and release to the delivery that holds the claim.
+  claimToken           String
+  claimedAt            DateTime
+  /// The signed licence between minting and mailing, so a retry mails it again instead of minting another; cleared once delivered.
+  issuedLicense        Json?
+  deliveredAt          DateTime?
+  /// The `licenseId` inside the delivered licence.
+  licenseId            String?
+}
+
 /// The identity this install presents to LangWatch (ADR-139, section 2).
 ///
 /// Exactly one row, minted on first use and never rewritten. It survives

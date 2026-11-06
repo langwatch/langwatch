@@ -55,6 +55,16 @@ export abstract class OrganizationInviteRepository {
     email: string;
     organizationId: string;
   }): Promise<boolean>;
+  /** Whether the address holds a live (not payment-pending) invite that has not expired. */
+  abstract hasPendingInviteForEmail(input: {
+    email: string;
+    organizationId: string;
+  }): Promise<boolean>;
+  /** Deletes the address's invites held for a seat checkout that has not been paid. */
+  abstract deletePaymentPendingInvitesForEmail(input: {
+    email: string;
+    organizationId: string;
+  }): Promise<number>;
   /** The stored address of each of these that is already a member. */
   abstract findMemberEmails(input: { organizationId: string; emails: string[] }): Promise<string[]>;
   abstract findTeamIdsInOrganization(input: {
