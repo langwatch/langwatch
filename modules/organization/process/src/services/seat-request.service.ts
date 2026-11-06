@@ -5,7 +5,6 @@ import type { Logger } from "@langwatch/observability";
 import {
   type HeldMembership,
   type HeldMemberships,
-  MemberSeatLimitReachedError,
   type OpenSeatRequests,
   type OrganizationAdmission,
   OrganizationUserRole,
@@ -22,7 +21,6 @@ import type {
   SeatRequestRow,
 } from "../repositories/seat-request.repository.ts";
 import { type SeatApprovalPlan, seatApprovalPath } from "../rules/seat-approval-path.rules.ts";
-import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import type {
   AccessNoticeApproval,
   AccessNoticeRecipient,
@@ -32,6 +30,7 @@ import type {
   OrganizationSeatLicense,
   OrganizationPlanUser,
 } from "./organization-seat-license.service.ts";
+import { SeatRequestApprovalService } from "./seat-request-approval.service.ts";
 
 /** One person to contact about a held seat, in the order they are named. */
 type SeatContact = Readonly<{ userId: string; name: string | null; email: string | null }>;
@@ -107,7 +106,11 @@ export class SeatRequestService {
     return new SeatRequestService(dependencies);
   }
 
-  private constructor(private readonly dependencies: Dependencies) {}
+  private constructor(private readonly dependencies: Dependencies) {
+    this.approval = SeatRequestApprovalService.create(dependencies);
+  }
+
+  private readonly approval: SeatRequestApprovalService;
 
   /**
    * Opens a request when an admission asked for a full seat and was left Lite or held (ruling
@@ -220,54 +223,12 @@ export class SeatRequestService {
   }
 
   /** Gives the full seat; refuses member_seat_limit_reached while no full seat is free. */
-  async approve({
-    organizationId,
-    seatRequestId,
-    by,
-  }: {
+  approve(input: {
     organizationId: string;
     seatRequestId: string;
     by: OrganizationPlanUser;
   }): Promise<SeatRequestResolved> {
-    const request = await this.dependencies.requests.getOpen({ organizationId, id: seatRequestId });
-    const membership = request.userId
-      ? await this.dependencies.members
-          .getMembership({ organizationId, userId: request.userId })
-          .catch((error: unknown) => {
-            if (HandledError.isHandled(error) && error.code === "member_not_found") return null;
-            throw error;
-          })
-      : null;
-    const isFull =
-      membership !== null &&
-      (membership.role === OrganizationUserRole.MEMBER ||
-        membership.role === OrganizationUserRole.ADMIN);
-    // Claimed first, so a concurrent decline or second approval cannot also act on it.
-    const claim = {
-      organizationId,
-      id: request.id,
-      resolvedByUserId: by.id,
-      at: this.dependencies.now(),
-    };
-    if (!(await this.dependencies.requests.resolve({ ...claim, status: "APPROVED" }))) {
-      throw new SeatRequestNotFoundError(request.id);
-    }
-    // The early check spares a doomed write; the writes giveFullSeat calls each re-check the
-    // seat under the organization's seat lock, so of two approvals for the last seat one wins.
-    try {
-      if (!(isFull && membership.disabledAt === null)) {
-        await this.assertFullSeatFree({ organizationId, by });
-      }
-      return {
-        outcome: await this.giveFullSeat({ organizationId, request, membership, isFull, by }),
-      };
-    } catch (error) {
-      await this.dependencies.requests.release(claim);
-      const refusal = readSeatRefusal(error);
-      if (refusal.kind === "seat-limit")
-        throw new MemberSeatLimitReachedError({ meta: refusal.limit });
-      throw error;
-    }
+    return this.approval.approve(input);
   }
 
   async decline({
@@ -416,81 +377,6 @@ export class SeatRequestService {
         organizationName,
       }),
     };
-  }
-
-  private async assertFullSeatFree({
-    organizationId,
-    by,
-  }: {
-    organizationId: string;
-    by: OrganizationPlanUser;
-  }): Promise<void> {
-    const result = await this.dependencies.seats.checkLimit({
-      organizationId,
-      resource: "members",
-      user: by,
-    });
-    if (!result.allowed) {
-      throw new MemberSeatLimitReachedError({
-        meta: { limitType: result.limitType, current: result.current, max: result.max },
-      });
-    }
-  }
-
-  /** Lite becomes full, a held row becomes full and is enabled, an address alone is invited. */
-  private async giveFullSeat({
-    organizationId,
-    request,
-    membership,
-    isFull,
-    by,
-  }: {
-    organizationId: string;
-    request: SeatRequestRow;
-    membership: { role: OrganizationUserRole; disabledAt: unknown } | null;
-    isFull: boolean;
-    by: OrganizationPlanUser;
-  }): Promise<SeatRequestResolved["outcome"]> {
-    const { memberships, peers } = this.dependencies;
-    if (!membership || !request.userId) {
-      await peers.inviteMember({ organizationId, email: request.email, invitedBy: by });
-      return "invited";
-    }
-    const userId = request.userId;
-    const held = membership.disabledAt !== null;
-    // A grant lands only on a live membership, so a held row is enabled before its role moves.
-    if (held) {
-      await memberships.setMemberDisabled({
-        organizationId,
-        userId,
-        disabled: false,
-        actingUser: by,
-      });
-    }
-    if (!isFull) {
-      try {
-        // The approver's seat decision stands for the organization: the grant is the system's.
-        await memberships.changeMemberRole({
-          organizationId,
-          userId,
-          role: OrganizationUserRole.MEMBER,
-          currentUserId: by.id,
-          caller: { type: "system" },
-        });
-      } catch (error) {
-        if (held) {
-          await memberships.setMemberDisabled({
-            organizationId,
-            userId,
-            disabled: true,
-            actingUser: null,
-          });
-        }
-        throw error;
-      }
-    }
-    if (held) return "enabled";
-    return isFull ? "already_member" : "promoted";
   }
 
   private async memberOf({
