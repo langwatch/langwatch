@@ -152,7 +152,7 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     .procedure("setMemberBillingRole")
     .withPermission("organization:manage")
     .handle(async ({ app, input, actor }) => {
-      await app.setBillingRole({ ...input, actor: toLedgerActor(actor) });
+      await app.setBillingRole({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) });
       return { success: true as const };
     })
     .build();

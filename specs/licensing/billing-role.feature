@@ -53,6 +53,12 @@ Feature: Billing role
     When the Billing holders are listed
     Then the member is not listed
 
+  Scenario: Granting or revoking Billing never reaches beyond the caller
+    Given a caller who holds organization:manage but not subscription:manage
+    When they grant or revoke Billing for a member
+    Then it is refused with the missing permissions named
+    And no Billing grant is written or revoked
+
   Scenario: Only an administrator can change Billing
     Given the procedure that grants or revokes Billing
     Then it declares organization:manage

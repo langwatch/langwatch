@@ -40,6 +40,7 @@ export class BillingStarterRoleService {
       organizationId,
       userId: startedByUserId,
       holds: true,
+      caller: { type: "system" },
       actor: BILLING_CHECKOUT_ACTOR,
       commandId: `billing-checkout:${eventId}`,
       source: "checkout",

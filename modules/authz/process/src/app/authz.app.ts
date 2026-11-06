@@ -282,12 +282,6 @@ export class AuthzModule implements AuthzApi {
       ledger,
       newGrantId: newAuthzGrantId,
     });
-    const billingRoles = AuthzBillingRoleService.create({
-      grants: repositories.billingGrants,
-      standings: repositories.userStandings,
-      ledger,
-      newGrantId: newAuthzGrantId,
-    });
     const userStandings = AuthzUserStandingService.create({
       standings: repositories.userStandings,
       platformOperators,
@@ -308,6 +302,13 @@ export class AuthzModule implements AuthzApi {
       cacheEnabled: config.cacheEnabled,
       demoProjectId: config.demoProjectId,
       aggregateReads,
+    });
+    const billingRoles = AuthzBillingRoleService.create({
+      grants: repositories.billingGrants,
+      standings: repositories.userStandings,
+      ledger,
+      permissions,
+      newGrantId: newAuthzGrantId,
     });
     const grants = AuthzGrantWriteService.create({
       repository: EventingAuthzGrantRepository.create({
@@ -397,7 +398,8 @@ export class AuthzModule implements AuthzApi {
       });
     } catch (error) {
       if (AuthzScopeNotFoundError.is(error)) {
-        return { scope: null, permissions: [...(await this.platformPermissionsOf(by))] };
+        const platform = await this.platformPermissionsOf(by);
+        return { scope: null, permissions: [...platform], organizationPermissions: [...platform] };
       }
       throw error;
     }
@@ -409,16 +411,24 @@ export class AuthzModule implements AuthzApi {
         scope: { tier: "project", id: scope.id },
       });
       if (organizationRole !== "ADMIN") {
-        return { scope: { type: scope.type, id: scope.id }, permissions: [] };
+        return {
+          scope: { type: scope.type, id: scope.id },
+          permissions: [],
+          organizationPermissions: [],
+        };
       }
     }
-    const [scoped, platform] = await Promise.all([
-      this.effectivePermissions({ principal: { type: "user", id: by.id }, scope }),
+    const [{ permissions, organizationPermissions }, platform] = await Promise.all([
+      this.#permissions.effectivePermissionsWithOrganization({
+        principal: { type: "user", id: by.id },
+        scope,
+      }),
       this.platformPermissionsOf(by),
     ]);
     return {
       scope: { type: scope.type, id: scope.id },
-      permissions: [...scoped, ...platform],
+      permissions: [...permissions, ...platform],
+      organizationPermissions: [...organizationPermissions, ...platform],
     };
   }
 

@@ -6,6 +6,8 @@ import type { Named } from "@langwatch/module";
  */
 import { z } from "zod";
 
+import { authzGrantCallerSchema } from "./authz.commands.ts";
+
 const authzListBillingMembersInputSchemaDefinition = z
   .object({ organizationId: z.string().min(1) })
   .strict();
@@ -31,6 +33,8 @@ const authzSetBillingRoleInputSchemaDefinition = z
     userId: z.string().min(1),
     /** True grants the role (a holder keeps the grant they have); false revokes every one. */
     holds: z.boolean(),
+    /** The escalation ceiling: a person or key never grants or takes away what it lacks. */
+    caller: authzGrantCallerSchema,
     actor: ledgerActorSchema,
     /** A retry passes the id it sent first; absent, the writer mints one. */
     commandId: z.string().min(1).optional(),
