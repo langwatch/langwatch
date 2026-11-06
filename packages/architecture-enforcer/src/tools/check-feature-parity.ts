@@ -683,7 +683,6 @@ const LEGACY_INERT: string[] = [
   "specs/datasets/storage-object-only/other-postgres-copies.feature",
   "specs/datasets/storage-object-only/postgres-layout-code-removal.feature",
   "specs/datasets/storage-object-only/records-table-retirement.feature",
-  "specs/datasets/storage-object-only/self-hosting-and-docs.feature",
   "specs/datasets/storage-object-only/single-file-conversion.feature",
   "specs/datasets/storage-object-only/storage-progress-observability.feature",
   "specs/datasets/storage-object-only/write-paths.feature",

@@ -4,11 +4,9 @@ import { clickhouseRouteFamilyOf } from "./clickhouse-routes.ts";
 import { storesOwner, type StoresConfig } from "./config-owner.ts";
 import type { ObjectStorageAzureConfig, ObjectStorageConfig, ProcessConfig } from "./config.ts";
 import { buildProcessStores, type ProcessStores } from "./create-members.ts";
+import { DEFAULT_LOCAL_STORAGE_ROOT } from "./local-storage-root.ts";
 import { objectStoragePrivateFamilyOf } from "./object-storage-private-accounts.ts";
 import type { PipelineParticipation } from "./pipeline-selection.ts";
-
-/** The documented single-replica root, when a filesystem deployment names none. */
-const DEFAULT_LOCAL_STORAGE_ROOT = "/var/lib/langwatch/objects";
 
 type StorageSecrets = Readonly<{
   accessKeyId: string | undefined;
