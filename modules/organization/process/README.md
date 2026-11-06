@@ -336,6 +336,14 @@ Closes the request; the membership stays as it is.
 declineSeatRequest(input: SeatRequestScope, by: OrganizationCaller): Promise<SeatRequestResolved>;
 ```
 
+#### `isSeatRequested`
+
+Whether this person holds an open seat request in the organization.
+
+```typescript
+isSeatRequested(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
+```
+
 #### `getHeldMemberships`
 
 The caller's memberships they cannot use, with whom to contact (ruling R2).
@@ -2178,27 +2186,27 @@ Contract `../contract/src/features/seat-request/seat-request.trpc.ts:14`, router
 ```typescript
 // seatRequest.listOpen
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
-type Output = z.infer<typeof openSeatRequestsSchema>; // ../contract/src/features/seat-request/seat-request.ts:75
+type Output = z.infer<typeof openSeatRequestsSchema>; // ../contract/src/features/seat-request/seat-request.ts:55
 
 // seatRequest.approve
-// Input: seatRequestScopeSchema, ../contract/src/features/seat-request/seat-request.ts:83
+// Input: seatRequestScopeSchema, ../contract/src/features/seat-request/seat-request.ts:63
 interface Input {
   organizationId: string;
   seatRequestId: string;
 }
-// Output: seatRequestResolvedSchema, ../contract/src/features/seat-request/seat-request.ts:93
+// Output: seatRequestResolvedSchema, ../contract/src/features/seat-request/seat-request.ts:73
 interface Output {
   outcome: "enabled" | "promoted" | "invited" | "already_member" | "declined";
 }
 
 // seatRequest.decline
-type Input = z.infer<typeof seatRequestScopeSchema>; // ../contract/src/features/seat-request/seat-request.ts:83
-type Output = z.infer<typeof seatRequestResolvedSchema>; // ../contract/src/features/seat-request/seat-request.ts:93
+type Input = z.infer<typeof seatRequestScopeSchema>; // ../contract/src/features/seat-request/seat-request.ts:63
+type Output = z.infer<typeof seatRequestResolvedSchema>; // ../contract/src/features/seat-request/seat-request.ts:73
 
 // seatRequest.myHeldMemberships
 // Input: inline, ../contract/src/features/seat-request/seat-request.trpc.ts:28
 type Input = Record<string, unknown>;
-// Output: heldMembershipsSchema, ../contract/src/features/seat-request/seat-request.ts:116
+// Output: heldMembershipsSchema, ../contract/src/features/seat-request/seat-request.ts:96
 interface Output {
   hasActiveMembership: boolean;
   held: {
