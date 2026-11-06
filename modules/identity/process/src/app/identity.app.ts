@@ -631,7 +631,8 @@ export class IdentityModule
     const ssoIssuers = SsoIssuerDirectoryService.create({
       connections: setup.repositories.ssoConnections,
       endpointOrigins: SsoIssuerEndpointOriginsService.create({
-        discovery: issuerDiscovery,
+        // Read at every sign-in, so on the route the engine's own sign-in fetches take.
+        discovery: setup.channels.ssoSignInIssuerDiscovery,
         resolveHost: systemHostAddresses,
         dialableInternalOrigins: dialableIdpOrigins,
       }),

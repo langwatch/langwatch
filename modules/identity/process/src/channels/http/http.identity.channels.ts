@@ -1,5 +1,5 @@
 import { AuthApi } from "@langwatch/auth-contract";
-import { parseOutboundProxyConfig } from "@langwatch/egress";
+import { type OutboundProxyConfig, parseOutboundProxyConfig } from "@langwatch/egress";
 import type { IdentityServerConfig } from "@langwatch/identity-contract";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
@@ -61,12 +61,37 @@ export class HttpIdentityChannels {
         proxy,
       }),
       // Auth owns the operator's IdP allowlist; asked per discovery, not at boot.
-      ssoIssuerDiscovery: HttpsSsoIssuerDiscoveryChannel.create({
-        policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
+      ...issuerDiscoveryChannels({
         proxy,
         dialableInternalOrigins: () => bound.authReads.findDialableIdentityProviderOrigins(),
       }),
       ssoBreakGlassWarnings: LoggedSsoBreakGlassWarningChannel.create(),
     };
   }
+}
+
+/**
+ * Issuer discovery on two routes. Registration goes through the outbound proxy; the per-sign-in
+ * trust lookup goes direct, as the SSO engine's own sign-in fetches do, so the origins it trusts
+ * come from the same document the engine is about to read.
+ */
+export function issuerDiscoveryChannels({
+  proxy,
+  dialableInternalOrigins,
+}: {
+  proxy: OutboundProxyConfig;
+  dialableInternalOrigins: () => readonly string[];
+}): Pick<IdentityChannels, "ssoIssuerDiscovery" | "ssoSignInIssuerDiscovery"> {
+  const policy = SSO_DOMAIN_PROOF_PUBLIC_EGRESS;
+  return {
+    ssoIssuerDiscovery: HttpsSsoIssuerDiscoveryChannel.create({
+      policy,
+      proxy,
+      dialableInternalOrigins,
+    }),
+    ssoSignInIssuerDiscovery: HttpsSsoIssuerDiscoveryChannel.create({
+      policy,
+      dialableInternalOrigins,
+    }),
+  };
 }
