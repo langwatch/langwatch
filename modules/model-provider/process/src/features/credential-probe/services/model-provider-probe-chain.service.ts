@@ -93,6 +93,7 @@ export function buildProbeCandidates({
   apiRoot,
   agentPlatform,
   model,
+  azureApiVersion,
 }: {
   /** The registry key, which decides how the gateway reads the base URL. */
   provider: string;
@@ -106,6 +107,8 @@ export function buildProbeCandidates({
   agentPlatform?: { project: string; location: string };
   /** The model a deployment-addressed provider (Azure) is asked to run. */
   model?: string;
+  /** Azure's api-version override, when the credential carries one. */
+  azureApiVersion?: string;
 }): ProbeRequest[] {
   const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
   const normalisedUrl = modelsEndpointUrl({ provider, baseUrl, defaultBaseUrl });
@@ -131,7 +134,11 @@ export function buildProbeCandidates({
       if (!model) return [];
       return [
         {
-          url: azureChatCompletionsUrl({ endpoint: baseUrl, deployment: model }),
+          url: azureChatCompletionsUrl({
+            endpoint: baseUrl,
+            deployment: model,
+            apiVersion: azureApiVersion,
+          }),
           headers: { ...headers, "api-key": apiKey },
           method: "POST",
           body: AZURE_PROBE_BODY,

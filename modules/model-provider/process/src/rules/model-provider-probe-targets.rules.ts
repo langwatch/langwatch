@@ -91,14 +91,18 @@ export function isReachableRefusal({
 export function azureChatCompletionsUrl({
   endpoint,
   deployment,
+  apiVersion,
 }: {
   endpoint: string;
   deployment: string;
+  /** The row's AZURE_OPENAI_API_VERSION, so the check runs where execution will. */
+  apiVersion?: string;
 }): string {
   const root = endpoint.trim().replace(/\/+$/, "");
+  const version = apiVersion?.trim() || DEFAULT_AZURE_API_VERSION;
   return (
     `${root}/openai/deployments/${encodeURIComponent(deployment)}/chat/completions` +
-    `?api-version=${DEFAULT_AZURE_API_VERSION}`
+    `?api-version=${encodeURIComponent(version)}`
   );
 }
 
