@@ -147,6 +147,30 @@ describe("<ProviderModelSelector/>", () => {
     });
   });
 
+  describe("given leading options and an inherit entry", () => {
+    const PREVIEW: ModelPickerOption = {
+      label: "Scenario Judge Preview",
+      value: "langwatch/scenario-judge-preview",
+      subtitle: "Optimized for scenario judge",
+      disabled: true,
+      hint: "Coming soon",
+    };
+
+    it("lists the leading options above the inherit entry, with their hint", () => {
+      renderSelector({
+        options: [MINI],
+        leadingOptions: [PREVIEW],
+        inheritOption: { label: "Inherit (from organization)" },
+      });
+
+      const values = within(listbox())
+        .getAllByRole("option", { hidden: true })
+        .map((option) => option.getAttribute("data-value"));
+      expect(values).toEqual([PREVIEW.value, INHERIT_SENTINEL, MINI.value]);
+      expect(within(listbox()).queryByText("Coming soon")).not.toBeNull();
+    });
+  });
+
   describe("given a saved model that is not among the options", () => {
     it("labels it through labelFor", () => {
       renderSelector({ options: [MINI], model: "gone/old-model", labelFor: () => "Old model" });

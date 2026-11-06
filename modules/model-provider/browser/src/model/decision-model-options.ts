@@ -8,12 +8,17 @@ import {
   DECISION_MODELS,
   findDecisionModel,
   findModelProviderDefinition,
+  isOwnDecisionModelId,
   LANGWATCH_DECISION_MODEL_ID,
+  LANGWATCH_DECISION_PREVIEWS,
   type BuiltInModel,
   type DecisionModelEntry,
+  type LangWatchDecisionPreview,
   type ModelPickerOption,
   type ModelRole,
 } from "@langwatch/model-provider-contract";
+
+import { MODEL_ROLE_LABEL } from "./default-model-cascade.ts";
 
 /** Every decision model's label keyed by its id, so a chip or picker shows the label. */
 export const DECISION_MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = Object.fromEntries(
@@ -53,10 +58,43 @@ function ownModelOption({
   };
 }
 
+/** Why a LangWatch decision model is listed but cannot fill this column. */
+function previewHint(preview: LangWatchDecisionPreview): string {
+  if (preview.fills.length === 0) return "Coming soon";
+  return `${preview.fills.map((role) => MODEL_ROLE_LABEL[role]).join(", ")} only`;
+}
+
 /**
- * The decision model picker: Evals Preview first, then the catalogue in order. Only what the
- * server says would run can be picked; with own models on, the rest are listed unpickable with a
- * hint. `pickable` undefined means not loaded (or no scope picked), so Evals Preview alone.
+ * LangWatch's decision models in one column's picker: pickable where the catalogue says it fills
+ * that column, otherwise listed with why not. The judge router flag (ADR-190) shows the rest;
+ * off, only the ones that fill the column are listed.
+ */
+export function langwatchDecisionOptions({
+  role,
+  isJudgeRouted,
+}: {
+  role: ModelRole;
+  isJudgeRouted: boolean;
+}): ModelPickerOption[] {
+  const shown = LANGWATCH_DECISION_PREVIEWS.filter(
+    (preview) => isJudgeRouted || preview.fills.includes(role),
+  );
+  return shown.map((preview) => {
+    const isRouted = isJudgeRouted && preview.id === LANGWATCH_DECISION_MODEL_ID;
+    const option = {
+      label: preview.label,
+      value: preview.id,
+      subtitle: isRouted ? ROUTED_HOSTED_DECISION_MODEL_SUBTITLE : preview.description,
+    };
+    if (preview.fills.includes(role)) return option;
+    return { ...option, disabled: true, hint: previewHint(preview) };
+  });
+}
+
+/**
+ * The decision model picker: LangWatch's models first, then the own-key catalogue in order. Only
+ * what the server says would run can be picked; with own models on, the rest say which key to
+ * add. `pickable` undefined means not loaded (or no scope picked), so no own models yet.
  */
 export function decisionModelPickerOptions({
   pickable,
@@ -69,27 +107,33 @@ export function decisionModelPickerOptions({
 }): ModelPickerOption[] {
   const offered = new Set((pickable ?? []).map((model) => model.value));
   const listsOwnModels = isOwnModelEnabled && pickable !== undefined;
-  return DECISION_MODELS.flatMap((entry): ModelPickerOption[] => {
-    if (entry.id === LANGWATCH_DECISION_MODEL_ID) {
-      const subtitle = isJudgeRouted ? ROUTED_HOSTED_DECISION_MODEL_SUBTITLE : entry.description;
-      return [{ label: entry.label, value: entry.id, subtitle }];
-    }
-    return listsOwnModels ? [ownModelOption({ entry, offered })] : [];
-  });
+  const ownModels = listsOwnModels
+    ? DECISION_MODELS.filter((entry) => isOwnDecisionModelId(entry.id))
+    : [];
+  return [
+    ...langwatchDecisionOptions({ role: "INSTANT_EVALS", isJudgeRouted }),
+    ...ownModels.map((entry) => ownModelOption({ entry, offered })),
+  ];
 }
 
 /**
- * Every role picker lists decision models before LLMs; Instant Evals lists decision models only.
- * Which of them a role may hold stays the contract's role rule, applied where the row is drawn.
+ * One column's picker: the options above the inherit entry, then the rest. Instant Evals lists
+ * decision models only; Judge lists LangWatch's decision models on top, then the LLMs.
  */
-export function rolePickerModels({
+export function rolePickerOptions({
   role,
-  decisionModels,
-  llmModels,
+  decisionOptions,
+  llmOptions,
+  isJudgeRouted,
 }: {
   role: ModelRole;
-  decisionModels: readonly string[];
-  llmModels: readonly string[];
-}): string[] {
-  return role === "INSTANT_EVALS" ? [...decisionModels] : [...decisionModels, ...llmModels];
+  decisionOptions: ModelPickerOption[];
+  llmOptions: ModelPickerOption[];
+  isJudgeRouted: boolean;
+}): { leading: ModelPickerOption[]; options: ModelPickerOption[] } {
+  if (role === "INSTANT_EVALS") return { leading: [], options: decisionOptions };
+  if (role === "JUDGE") {
+    return { leading: langwatchDecisionOptions({ role, isJudgeRouted }), options: llmOptions };
+  }
+  return { leading: [], options: llmOptions };
 }

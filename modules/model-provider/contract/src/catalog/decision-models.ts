@@ -4,8 +4,41 @@
  * `<provider>/decisions:<model>` so none collides with a chat model of the same name.
  */
 
+import type { ModelRole } from "./model-feature-registry.ts";
+
 /** Same id as `INSTANT_EVAL_JUDGE_MODEL_ID`; a contract never imports another module's contract. */
 export const LANGWATCH_DECISION_MODEL_ID = "langwatch/instant-evals";
+
+const EVALS_PREVIEW = { label: "Evals Preview", description: "Optimized for evals" } as const;
+
+/** One of LangWatch's own decision models, named for what it is optimized for. */
+export type LangWatchDecisionPreview = Readonly<{
+  id: string;
+  label: string;
+  description: string;
+  /** The Default models columns it can fill; empty while it is not hosted yet. */
+  fills: readonly ModelRole[];
+}>;
+
+/**
+ * LangWatch's decision models, first in the decision and Judge pickers. Only Evals Preview is
+ * hosted; the others are listed as coming soon. Making one pickable is adding its column here.
+ */
+export const LANGWATCH_DECISION_PREVIEWS: readonly LangWatchDecisionPreview[] = [
+  { id: LANGWATCH_DECISION_MODEL_ID, ...EVALS_PREVIEW, fills: ["INSTANT_EVALS"] },
+  {
+    id: "langwatch/scenario-judge-preview",
+    label: "Scenario Judge Preview",
+    description: "Optimized for scenario judge",
+    fills: [],
+  },
+  {
+    id: "langwatch/search-preview",
+    label: "Search Preview",
+    description: "Optimized for search",
+    fills: [],
+  },
+];
 
 /** The one feature the `INSTANT_EVALS` role carries. */
 export const INSTANT_EVAL_DECISION_FEATURE_KEY = "instant_eval.judge";
@@ -62,8 +95,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: LANGWATCH_DECISION_MODEL_ID,
     provider: "langwatch",
-    label: "Evals Preview",
-    description: "Optimized for evals",
+    ...EVALS_PREVIEW,
   },
   {
     id: "openai/decisions:gpt-6-luna",

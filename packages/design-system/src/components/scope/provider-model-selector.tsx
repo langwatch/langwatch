@@ -18,6 +18,8 @@ export type ModelPickerOption = {
   subtitle?: string;
   /** Listed and described, but not pickable. */
   disabled?: boolean;
+  /** A short tag at the end of the title line, such as "Coming soon". */
+  hint?: string;
 };
 
 /** A query result: the options, whether they are still loading, and why they failed. */
@@ -210,16 +212,29 @@ function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
           </Box>
         )}
         <Box minWidth={0} flex={1}>
-          <Text
-            fontSize={labelFontSize(size)}
-            fontFamily={isDescribed ? undefined : "mono"}
-            fontWeight={isDescribed ? "medium" : undefined}
-            paddingY={size === "sm" || isDescribed ? 0 : "2px"}
-            lineHeight="short"
-            truncate
-          >
-            {item.label}
-          </Text>
+          <HStack gap={2} minWidth={0}>
+            <Text
+              fontSize={labelFontSize(size)}
+              fontFamily={isDescribed ? undefined : "mono"}
+              fontWeight={isDescribed ? "medium" : undefined}
+              paddingY={size === "sm" || isDescribed ? 0 : "2px"}
+              lineHeight="short"
+              truncate
+            >
+              {item.label}
+            </Text>
+            {item.hint && (
+              <Text
+                fontSize="2xs"
+                color="fg.subtle"
+                flexShrink={0}
+                whiteSpace="nowrap"
+                data-testid="model-option-hint"
+              >
+                {item.hint}
+              </Text>
+            )}
+          </HStack>
           {isDescribed && (
             <Text
               fontSize="xs"
@@ -239,7 +254,8 @@ function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
 
 /**
  * One flat list in the caller's order, each row with its provider icon, so no headings.
- * `inheritOption` prepends an "Inherit" entry (emits `INHERIT_SENTINEL`), faint when unset.
+ * `inheritOption` adds an "Inherit" entry (emits `INHERIT_SENTINEL`), faint when unset;
+ * `leadingOptions` sit above it.
  */
 export function ProviderModelSelector({
   model,
@@ -248,6 +264,7 @@ export function ProviderModelSelector({
   size = "full",
   disabled = false,
   inheritOption,
+  leadingOptions = [],
   labelFor = (modelId) => modelId,
 }: {
   model: string;
@@ -266,17 +283,23 @@ export function ProviderModelSelector({
     /** Short label above the model, e.g. "Inherit (from organization)" or "Not configured". */
     label: string;
   };
+  /** Options listed above the inherit entry, such as LangWatch's own decision models. */
+  leadingOptions?: ModelPickerOption[];
   /** Label for a model id not among the options (a value saved before its provider went). */
   labelFor?: (modelId: string) => string;
 }) {
   const [modelSearch, setModelSearch] = useState("");
 
   // Each option carries the icon of its provider prefix.
-  const selectOptions: ModelOption[] = (query.data ?? []).map((option) => ({
+  const withIcon = (option: ModelPickerOption): ModelOption => ({
     ...option,
     icon: providerIconFor(option.value, iconSlotFor(size)),
-  }));
-  const filteredModels = filterModels(selectOptions, modelSearch);
+  });
+  const leading = leadingOptions.map(withIcon);
+  const rest = (query.data ?? []).map(withIcon);
+  const selectOptions = [...leading, ...rest];
+  const filteredLeading = filterModels(leading, modelSearch);
+  const filteredModels = filterModels(rest, modelSearch);
   const isModelId = (id: string) => !selectOptions.find((option) => option.value === id)?.subtitle;
 
   // Render the inherit placeholder in the trigger when the user hasn't
@@ -298,6 +321,7 @@ export function ProviderModelSelector({
       }
     : null;
   const allFilteredModels: ModelOption[] = [
+    ...filteredLeading,
     ...(inheritItem ? [inheritItem] : []),
     ...filteredModels,
   ];
@@ -407,6 +431,9 @@ export function ProviderModelSelector({
               </InputGroup>
             </Box>
           </Field.Root>
+          {filteredLeading.map((item) => (
+            <ModelItem key={item.value} item={item} size={size} />
+          ))}
           {inheritOption && inheritItem && (
             <InheritItem
               labelFor={labelFor}

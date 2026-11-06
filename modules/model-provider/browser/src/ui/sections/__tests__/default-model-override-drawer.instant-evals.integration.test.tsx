@@ -87,6 +87,7 @@ const PAYLOAD = {
 };
 
 const OWN_MODEL_FLAG = "release_instant_evals_own_decision_model";
+const JUDGE_ROUTER_FLAG = "release_instant_evals_judge_router";
 const HOSTED = { value: "langwatch/instant-evals", label: "Evals Preview" };
 const OPENAI_DECISIONS = {
   value: "openai/decisions:gpt-6-luna",
@@ -144,7 +145,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
     it("offers only Evals Preview, never a chat model, an own model or an add-a-key hint", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
-      const options = instantEvalsOptions();
+      const options = pickable(instantEvalsOptions());
       expect(options).toHaveLength(1);
       expect(options[0]).toHaveTextContent("Evals Preview");
       const listbox = instantEvalsListbox();
@@ -184,6 +185,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
 
     /** @scenario "The decision model picker is one flat list with LangWatch's models first" */
     it("lists Evals Preview first and checked, with no heading or Default row, every row described", () => {
+      flagsOn.add(JUDGE_ROUTER_FLAG);
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const listbox = instantEvalsListbox();
@@ -194,11 +196,24 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       const options = instantEvalsOptions();
       expect(options[0]).toHaveTextContent("Evals Preview");
       expect(options[0]).toHaveAttribute("aria-selected", "true");
-      expect(options[0]).toHaveTextContent("Optimized for evals");
+      expect(options[1]).toHaveTextContent("Scenario Judge Preview");
+      expect(options[2]).toHaveTextContent("Search Preview");
+      expect(options[1]).toHaveAttribute("aria-disabled", "true");
+      expect(options[1]).toHaveTextContent("Coming soon");
+      expect(options[0]).toHaveTextContent("Optimized for evals, routed");
       for (const option of options) {
         expect(option.querySelector("svg, img")).not.toBeNull();
         expect(option.querySelector('[data-testid="model-option-subtitle"]')).not.toBeNull();
       }
+    });
+
+    it("lists no coming-soon preview with the judge router flag off", () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const listbox = instantEvalsListbox();
+      expect(within(listbox).getByText("Evals Preview")).toBeInTheDocument();
+      expect(within(listbox).queryByText("Scenario Judge Preview")).not.toBeInTheDocument();
+      expect(within(listbox).queryByText("Search Preview")).not.toBeInTheDocument();
     });
 
     /** @scenario "A decision model whose provider has no key says how to enable it" */
@@ -255,7 +270,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       const [input, options] = mockListDecisionModels.mock.lastCall ?? [];
       expect(input).toMatchObject({ scopes: [] });
       expect(options).toMatchObject({ enabled: false });
-      const offered = instantEvalsOptions();
+      const offered = pickable(instantEvalsOptions());
       expect(offered).toHaveLength(1);
       expect(offered[0]).toHaveTextContent("Evals Preview");
     });

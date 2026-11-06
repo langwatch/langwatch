@@ -82,12 +82,21 @@ Feature: Judge column in Default models
 
   @unit
   Scenario: The Judge picker lists decision models before LLMs
-    Given a decision model the Judge column may hold
+    Given the judge router flag is on for my organization
     When the Judge picker's choices are built
-    Then that decision model comes before every LLM
+    Then "Evals Preview", "Scenario Judge Preview" and "Search Preview" come first, each with its "Optimized for" line
+    And the LLMs follow
 
   @integration
   Scenario: The Judge picker offers only models that can judge a scenario
+    Given the judge router flag is on for my organization
     When I open the Judge picker
-    Then every LLM reads as its provider icon and model id, with no description and no provider heading
-    And no Instant Evals decision model is offered, since none can judge a scenario yet
+    Then the three LangWatch decision models sit on top, above the inherit row, and cannot be picked yet
+    And every LLM reads as its provider icon and model id, with no description and no provider heading
+
+  @integration
+  Scenario: With the router flag off the Judge picker lists no LangWatch model
+    Given the judge router flag is off for my organization
+    When I open the Judge picker
+    Then no LangWatch decision model is listed
+    And the inherit row comes first, then the LLMs

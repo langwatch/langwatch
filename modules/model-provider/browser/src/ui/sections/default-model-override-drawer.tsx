@@ -38,7 +38,7 @@ import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import {
   DECISION_MODEL_DISPLAY_NAMES,
   decisionModelPickerOptions,
-  rolePickerModels,
+  rolePickerOptions,
 } from "../../model/decision-model-options.ts";
 import { MODEL_ROLE_LABEL } from "../../model/default-model-cascade.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
@@ -273,21 +273,20 @@ function modelOptionsByRoleFor({
     ...aliasChatOptionsFor(new Set(enabledEntries.map(([key]) => key))),
     ...modelOptionsForMode({ enabledEntries, hasProviderLoadError, isLoading, mode: "chat" }),
   ];
-  const decisionModels = decisionOptions.map((option) => option.value);
-  const ordered = (role: ModelRole) => rolePickerModels({ role, decisionModels, llmModels });
 
   return {
-    DEFAULT: ordered("DEFAULT"),
-    FAST: ordered("FAST"),
-    LANGY: ordered("LANGY"),
-    JUDGE: ordered("JUDGE"),
+    DEFAULT: llmModels,
+    FAST: llmModels,
+    LANGY: llmModels,
+    JUDGE: llmModels,
     EMBEDDINGS: modelOptionsForMode({
       enabledEntries,
       hasProviderLoadError,
       isLoading,
       mode: "embedding",
     }),
-    INSTANT_EVALS: ordered("INSTANT_EVALS"),
+    // Decision models only, never the chat catalogue (ADR-182 decision 2).
+    INSTANT_EVALS: decisionOptions.map((option) => option.value),
   };
 }
 
@@ -572,6 +571,9 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
               onSetOverride={setOverride}
               displayNames={displayNames}
               pickerOptionFor={pickerOptionFor}
+              pickerFor={(llmOptions) =>
+                rolePickerOptions({ role, decisionOptions, llmOptions, isJudgeRouted })
+              }
             />
           ))}
         </VStack>
@@ -599,6 +601,7 @@ function RoleRow({
   onSetOverride,
   displayNames,
   pickerOptionFor,
+  pickerFor,
 }: {
   role: ModelRole;
   config: Record<string, string>;
@@ -615,8 +618,16 @@ function RoleRow({
   displayNames: Record<string, string>;
   /** The picker entry for one model id: its label and the line under it. */
   pickerOptionFor: (modelValue: string) => ModelPickerOption;
+  /** This row's picker from its LLM entries: what sits above the inherit entry, then the rest. */
+  pickerFor: (llmOptions: ModelPickerOption[]) => {
+    leading: ModelPickerOption[];
+    options: ModelPickerOption[];
+  };
 }) {
   const current = config[role] ?? "";
+  const picker = pickerFor(
+    roleSelectModelOptions({ options: modelOptions, role }).map(pickerOptionFor),
+  );
   // Unset already runs on this listed model, so it shows checked and picking it stays unset.
   const unsetDefault = roleInherit.isUnsetDefault ? roleInherit.model : undefined;
   const canExpand = features.length > 0;
@@ -649,10 +660,8 @@ function RoleRow({
         <Box width="240px" flexShrink={0}>
           <ProviderModelSelector
             model={current || unsetDefault || ""}
-            query={{
-              data: roleSelectModelOptions({ options: modelOptions, role }).map(pickerOptionFor),
-              isLoading: false,
-            }}
+            query={{ data: picker.options, isLoading: false }}
+            leadingOptions={picker.leading}
             onChange={(m) => onSetOverride(role, m === unsetDefault ? null : m)}
             inheritOption={unsetDefault ? undefined : roleInherit}
             disabled={unsupportedAtScope}

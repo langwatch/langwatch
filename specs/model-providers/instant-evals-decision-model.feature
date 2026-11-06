@@ -382,6 +382,7 @@ Feature: Instant Evals decision model column in Default models
     Given the flag is on for my organization
     When I edit the Instant Evals column
     Then "Evals Preview" is the first row, checked while the column is unset
+    And with the judge router flag on, "Scenario Judge Preview" and "Search Preview" follow it, listed but not pickable yet
     And no row is a provider heading or a separate "Default" row
     And every row shows its provider icon, its title and a one-line description
 

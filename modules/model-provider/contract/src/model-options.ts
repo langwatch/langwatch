@@ -31,6 +31,8 @@ export type ModelPickerOption = {
   subtitle?: string;
   /** Listed but not pickable: a decision model whose provider has no key yet. */
   disabled?: boolean;
+  /** A short tag beside the title, such as "Coming soon". */
+  hint?: string;
 };
 
 /**

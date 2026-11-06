@@ -18,9 +18,15 @@ const mockListAllForProjectForFrontend = vi.fn();
 const mockListDecisionModels = vi.fn();
 
 // The drawer asks the judge router flag; off unless a case turns it on.
+// The drawer asks the judge router and own decision model flags; off unless a case turns one on.
+const flagsOn = new Set<string>();
 vi.mock("@langwatch/feature-flag-client", () => ({
-  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+  useFeatureFlag: (flag: { name: string }) => ({
+    enabled: flagsOn.has(flag.name),
+    isLoading: false,
+  }),
 }));
+const JUDGE_ROUTER_FLAG = "release_instant_evals_judge_router";
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
@@ -125,7 +131,10 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
     });
     mockListDecisionModels.mockReturnValue({ data: [], isLoading: false });
   });
-  afterEach(() => cleanup());
+  afterEach(() => {
+    flagsOn.clear();
+    cleanup();
+  });
 
   /** @scenario "The drawer has an editable Judge row under Instant Evals" */
   it("puts Judge under Instant Evals with the Default row's chat models and the scenario judge", () => {
@@ -142,30 +151,45 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
   });
 
   /** @scenario "The Judge picker offers only models that can judge a scenario" */
-  it("lists LLMs by icon and model id with no description, and no Instant Evals model", () => {
-    mockListDecisionModels.mockReturnValue({
-      data: [
-        { value: "langwatch/instant-evals", label: "Evals Preview" },
-        { value: "openai/decisions:gpt-6-luna", label: "OpenAI Decisions (gpt-6-luna)" },
-      ],
-      isLoading: false,
-    });
+  it("puts LangWatch's decision models above the inherit row, unpickable, then plain LLM rows", () => {
+    flagsOn.add(JUDGE_ROUTER_FLAG);
     renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
     const listbox = judgeListbox();
     expect(listbox.querySelector('[data-part="item-group-label"]')).toBeNull();
-    expect(within(listbox).queryByText("Evals Preview")).not.toBeInTheDocument();
-    expect(within(listbox).queryByText(/OpenAI Decisions/)).not.toBeInTheDocument();
-    const options = within(listbox)
-      .getAllByRole("option", { hidden: true })
-      .filter((option) => option.dataset.testid !== "provider-model-selector-inherit")
+    const rows = within(listbox).getAllByRole("option", { hidden: true });
+    expect(rows.slice(0, 3).map((row) => row.querySelector("p")?.textContent)).toEqual([
+      "Evals Preview",
+      "Scenario Judge Preview",
+      "Search Preview",
+    ]);
+    expect(rows[0]).toHaveTextContent("Optimized for evals, routed");
+    expect(rows[1]).toHaveTextContent("Optimized for scenario judge");
+    expect(rows[1]).toHaveTextContent("Coming soon");
+    for (const row of rows.slice(0, 3)) expect(row).toHaveAttribute("aria-disabled", "true");
+    expect(rows[3]?.dataset.testid).toBe("provider-model-selector-inherit");
+
+    const llmRows = rows
+      .slice(4)
       // A "Latest" alias keeps the model it resolves to as its line; a model id has none.
-      .filter((option) => !isLatestAlias(option.dataset.value ?? ""));
-    expect(options.length).toBeGreaterThan(0);
-    for (const option of options) {
-      expect(option.querySelector("svg, img")).not.toBeNull();
-      expect(option.querySelector('[data-testid="model-option-subtitle"]')).toBeNull();
+      .filter((row) => !isLatestAlias(row.dataset.value ?? ""));
+    expect(llmRows.length).toBeGreaterThan(0);
+    for (const row of llmRows) {
+      expect(row.querySelector("svg, img")).not.toBeNull();
+      expect(row.querySelector('[data-testid="model-option-subtitle"]')).toBeNull();
+      expect(row).not.toHaveAttribute("aria-disabled", "true");
     }
+  });
+
+  /** @scenario "With the router flag off the Judge picker lists no LangWatch model" */
+  it("lists no LangWatch model with the router flag off, the inherit row first", () => {
+    renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+    const listbox = judgeListbox();
+    expect(within(listbox).queryByText(/Preview$/)).not.toBeInTheDocument();
+    const rows = within(listbox).getAllByRole("option", { hidden: true });
+    expect(rows[0]?.dataset.testid).toBe("provider-model-selector-inherit");
+    expect(rows.some((row) => (row.dataset.value ?? "").startsWith("langwatch/"))).toBe(false);
   });
 
   /** @scenario "An unset Judge row inherits the Default model" */
