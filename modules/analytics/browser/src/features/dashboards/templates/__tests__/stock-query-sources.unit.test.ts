@@ -16,10 +16,53 @@ describe("given a stock query over a view that names only a row's trace", () => 
     const sql = readSources("SELECT count() AS n FROM spans WHERE OccurredAt >= now()");
 
     expect(sql).toContain(
-      "(spans.TenantId, spans.TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics",
+      "(spans.TenantId, spans.TraceId) NOT IN (SELECT TenantId, TraceId FROM trace_metrics",
     );
-    expect(sql).not.toMatch(/[^,] TraceId IN \(SELECT TraceId/);
+    expect(sql).not.toMatch(/[^,] TraceId (NOT )?IN \(SELECT TraceId/);
     expect(sql).not.toContain("SELECT *");
+  });
+
+  /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as being in the chosen sources" */
+  it.each([
+    ["traces", "traces"],
+    ["spans", "spans"],
+    ["traces AS t", "t"],
+    ["analytics.spans s", "s"],
+  ])("leaves out the traces of other sources from %s", (from, alias) => {
+    expect(readSources(`SELECT 1 FROM ${from} GROUP BY x`)).toBe(
+      `SELECT 1 FROM ${from} WHERE notEmpty(${SOURCES}) AND ` +
+        `(${alias}.TenantId, ${alias}.TraceId) NOT IN ` +
+        `(SELECT TenantId, TraceId FROM trace_metrics WHERE Source NOT IN ${SOURCES}) GROUP BY x`,
+    );
+  });
+
+  /** @scenario "AC202h Stock widgets: evaluation and annotation widgets still read the traces of the chosen sources" */
+  it.each([
+    ["evaluations", "evaluations"],
+    ["annotations", "annotations"],
+    ["evaluations AS e", "e"],
+    ["analytics.annotations a", "a"],
+  ])("looks the chosen sources up from %s", (from, alias) => {
+    expect(readSources(`SELECT 1 FROM ${from} GROUP BY x`)).toBe(
+      `SELECT 1 FROM ${from} WHERE (${alias}.TenantId, ${alias}.TraceId) IN ` +
+        `(SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN ${SOURCES}) GROUP BY x`,
+    );
+  });
+
+  /** @scenario "AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter" */
+  it.each([
+    ["spans", "NOT IN"],
+    ["evaluations", "IN"],
+  ])("keeps the lookup from %s bounded by the period, one window back plus a day", (view, form) => {
+    const start = "{dashboard_context_period_start:DateTime}";
+    const end = "{dashboard_context_period_end:DateTime}";
+
+    expect(
+      readSources(`SELECT 1 FROM ${view} WHERE OccurredAt >= ${start} AND OccurredAt < ${end}`),
+    ).toContain(
+      `WHERE Source ${form} ${SOURCES} AND OccurredAt >= ` +
+        `subtractDays(subtractSeconds(${start}, dateDiff('second', ${start}, ${end})), 1))`,
+    );
   });
 });
 
@@ -44,6 +87,13 @@ describe("given a query over a view that keeps an origin", () => {
 
     expect(sql).toBe(
       `SELECT n FROM (SELECT count() AS n FROM trace_metrics WHERE trace_metrics.Source IN ${SOURCES} AND ( a)) WHERE n > 1`,
+    );
+  });
+
+  /** @scenario "AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter" */
+  it("keeps the Source column in the list on evaluation_metrics too", () => {
+    expect(readSources("SELECT 1 FROM evaluation_metrics GROUP BY x")).toBe(
+      `SELECT 1 FROM evaluation_metrics WHERE evaluation_metrics.Source IN ${SOURCES} GROUP BY x`,
     );
   });
 });

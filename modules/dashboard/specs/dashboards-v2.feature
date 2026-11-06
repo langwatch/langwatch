@@ -1900,8 +1900,11 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # and AC204b stand as written; the earlier text is in git at c5743d82.
   # The helper (decided): a `Source` column the LWQL views expose, computed at read time from
   # `Origin` (lwql-view-catalog.rules.ts sourceColumns); no ClickHouse migration. It reads: a missing, empty or NULL origin reads "application", an origin outside the ten
-  # listed reads "other", a listed origin reads as itself. A view keyed by TraceId is reached
-  # through `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {…})`. A view with
+  # listed reads "other", a listed origin reads as itself. A stock query over `traces` or `spans`
+  # is reached through `notEmpty({…}) AND (TenantId, TraceId) NOT IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source NOT IN {…})`
+  # (AC202g). One over `evaluations` or `annotations` keeps
+  # `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {…})` (AC202h;
+  # why: analytics ADR-003). A view with
   # neither column carries no origin, so a query reading only such views stores no list (AC202f).
 
   @unit
@@ -1940,7 +1943,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC202d Stock widgets: a widget whose list did not change returns the same rows
     Given a From LangWatch board run over seeded traces of every origin before and after this change
     When a widget's declared list equals the origins it counted before
-    Then its rows are byte-equal to the rows before
+    Then its rows are byte-equal to the rows before, apart from the traces and spans AC202g names
     And a widget that changed differs only by rows of the origins its change-table row names
     # Evidence: the same board run on the before and after builds over seeded traces, the two answers diffed, and a haven browser screenshot of the board
 
@@ -1959,6 +1962,25 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then its queries store no sources list
     And its card reads "Sources don't apply: this widget reads a view that keeps no origin"
     # Evidence: a haven browser screenshot of the card
+
+  @integration
+  Scenario: AC202g Stock widgets: a trace with no trace_metrics row counts as being in the chosen sources
+    Given spans of a trace with no trace_metrics row, of an application trace, of a Langy trace and of a simulation trace
+    When a stock query over `traces` or `spans` reads those rows through their trace, bound to ["application"]
+    Then it counts the trace with no row and the application trace, and neither of the others
+    And a list of several sources keeps the trace with no row and the traces of each listed source
+    And a list holding every source keeps every trace
+    And a source name no trace has keeps only the trace with no row
+    And a span of a trace older than the lookup's bound counts, whatever the trace's source
+    # Why: leaving out the traces of other sources keeps the lookup's set small on a large project,
+    # where the set of the chosen list took 30-day widgets over the query memory limit.
+
+  @unit @integration
+  Scenario: AC202h Stock widgets: evaluation and annotation widgets still read the traces of the chosen sources
+    Given a stock query over `evaluations` or `annotations`
+    Then it reads the origin through `IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {…})`
+    And an evaluation on a trace of the list counts, and one on a trace of another source does not
+    And an evaluation on a trace with no trace_metrics row, on a trace older than the lookup's bound, or with a NULL TraceId does not count
 
   @unit @integration
   Scenario: AC203 Sources: a query reading the parameter is kept to the list it stores
