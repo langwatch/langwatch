@@ -71,6 +71,13 @@ Feature: Join before create - the choice happens before an organization is minte
     And creating a new organization stays visible as the explicit secondary choice
 
   @integration
+  Scenario: A few organizations list as rows with nothing to unfold
+    Given four organizations open to requests from "acme.com"
+    When "sam" completes verification
+    Then joining the organization with the most members is the only primary action
+    And the other three are listed as quiet rows, with no "Show all" toggle and no name filter
+
+  @integration
   Scenario: A name filter that matches nothing says so and folds back cleanly
     Given twelve organizations open to requests from "acme.com"
     And "sam" has asked to show all of them
