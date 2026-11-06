@@ -26,7 +26,7 @@ export function UsageSeatsCard({ fullSeats, lite }: { fullSeats: string; lite: L
       data-testid="usage-seats-card"
       title="Seats"
       actions={
-        <Link href={USERS_HREF} data-testid="usage-manage-users">
+        <Link href={USERS_HREF} textStyle="bodySm" data-testid="usage-manage-users">
           <HStack as="span" gap={1}>
             Manage in Users <ArrowRight size={14} aria-hidden />
           </HStack>
