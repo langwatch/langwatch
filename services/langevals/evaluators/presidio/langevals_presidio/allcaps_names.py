@@ -185,16 +185,26 @@ def _is_listed_name(word: str) -> bool:
 
 
 def normalisation_justifies_span(
-    *, original: str, normalised: str, start: int, end: int, vectors: Any
+    *,
+    original: str,
+    normalised: str,
+    start: int,
+    end: int,
+    vectors: Any,
+    precedes_person: bool = False,
 ) -> bool:
     """Whether a span found only after normalisation is shaped and worded like a name.
 
     It needs one Titlecase word (WHITFIELD), or only listed and unseen words
     (HUNG NGO, CEM TAN). Many listed names are also English words, so beside
     an everyday word they do not count: RAM MODULE and ZORBEX ULTRA are refused.
+
+    A single word is the acronym shape and is refused, unless `precedes_person`:
+    a comma and a person the first pass found follow it (GONZALEZ, Maria). The
+    name-shape and name-word rules still apply to it.
     """
     span = original[start:end]
-    if len(span.split()) < MIN_SPAN_WORDS:
+    if len(span.split()) < MIN_SPAN_WORDS and not precedes_person:
         return False
     if not has_name_shaped_rewrite(original=span, normalised=normalised[start:end]):
         return False

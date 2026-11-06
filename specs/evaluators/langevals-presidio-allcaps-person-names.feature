@@ -313,6 +313,14 @@ Feature: A name written in capitals is still redacted
       When the content is analysed for personal information
       Then the whole name is reported as a person
 
+    @unit
+    Scenario: A capitalised surname before a comma and a forename is harvested
+      Given a surname written wholly in capitals, then a comma, then an ordinary forename the first pass reports
+      And person and location detection are both switched on
+      When the content is analysed for personal information
+      Then the surname is reported as well as the forename
+      And a lone capitalised word with no person after it is still not reported
+
   Rule: One person is counted once
 
     @unit
