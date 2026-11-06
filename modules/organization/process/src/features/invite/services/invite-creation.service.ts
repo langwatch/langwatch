@@ -324,7 +324,6 @@ export class InviteCreationService {
           transaction,
           invites: validInvites.map((invite) => ({ ...invite, requestedBy: requestedBy ?? null })),
           organization,
-          isStrict,
         }),
       {
         timeoutMs: INVITE_BATCH_TXN_TIMEOUT_MS,
@@ -387,19 +386,18 @@ export class InviteCreationService {
   }
 
   /**
-   * Writes the prepared invites inside the caller's transaction, skipping the
-   * ones an existing invite already covers (or refusing them in strict mode).
+   * Writes the prepared invites inside the caller's transaction. An address with a live invite
+   * is refused, never skipped, so the caller is not told it sent what it did not. An invite held
+   * for an unpaid seat checkout is not shown to the admin, so a direct invite replaces it.
    */
   private async persistInvites({
     transaction,
     invites,
     organization,
-    isStrict,
   }: {
     transaction: OrganizationInviteRepository;
     invites: CreateAdminInviteInput[];
     organization: Organization;
-    isStrict: boolean;
   }): Promise<{ invite: OrganizationInvite; organization: Organization }[]> {
     const txInviteService = this.onRepository(transaction);
     const records: {
@@ -408,18 +406,11 @@ export class InviteCreationService {
     }[] = [];
 
     for (const invite of invites) {
-      const hasOpenInvite = await txInviteService.hasOpenInvite({
-        email: invite.email,
-        organizationId: invite.organizationId,
-      });
-
-      if (hasOpenInvite) {
-        if (isStrict) {
-          throw new DuplicateInviteError(invite.email);
-        }
-
-        continue;
+      const address = { email: invite.email, organizationId: invite.organizationId };
+      if (await transaction.hasPendingInviteForEmail(address)) {
+        throw new DuplicateInviteError(invite.email);
       }
+      await transaction.deletePaymentPendingInvitesForEmail(address);
 
       records.push({
         invite: await txInviteService.createInviteRow(invite),
@@ -460,7 +451,7 @@ export class InviteCreationService {
 
     return {
       // Stored trimmed, because the reads look the address up as it was
-      // typed: `hasOpenInvite` and the pending-invite lookup both miss
+      // typed: the duplicate check and the pending-invite lookup both miss
       // a row written as " a@b.com ", so the duplicate check never fires and
       // SSO onboarding never finds the invite it should adopt.
       email,

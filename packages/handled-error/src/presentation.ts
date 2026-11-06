@@ -2205,8 +2205,8 @@ const presentations = {
     describe: (error) => {
       const email = str(error, "email", "");
       return email
-        ? `${email} already has a pending invite. Revoke it first to send a new one.`
-        : "A pending invite for this address already exists. Revoke it first to send a new one.";
+        ? `${email} already has a pending invite. Resend it from the Invited list instead.`
+        : "A pending invite for this address already exists. Resend it from the Invited list instead.";
     },
   },
   invite_already_accepted: {
