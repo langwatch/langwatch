@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { nowInstant } from "@langwatch/time";
+
 import {
   MAX_CODING_REPOSITORY_KEYS,
   type NurturingCodingMilestonesRepository,
@@ -7,6 +9,10 @@ import {
   type NurturingOrganizationRow,
   type NurturingTraceMilestonesRepository,
 } from "../nurturing-milestones.repository.ts";
+import type {
+  NurturingUsageOrganization,
+  NurturingUsageOrganizationsRepository,
+} from "../nurturing-usage-organizations.repository.ts";
 
 /** A row plus the columns only their own writes read, as the Postgres table holds them. */
 type MemoryOrganization = NurturingOrganizationRow &
@@ -21,13 +27,44 @@ export class MemoryNurturingMilestonesRepository
   implements
     NurturingMilestonesRepository,
     NurturingCodingMilestonesRepository,
-    NurturingTraceMilestonesRepository
+    NurturingTraceMilestonesRepository,
+    NurturingUsageOrganizationsRepository
 {
   readonly #organizations = new Map<string, MemoryOrganization>();
   readonly #lastTraceAt = new Map<string, number>();
+  /** Epoch ms of the row's last write that recordOrganization makes, as `updatedAt` holds it. */
+  readonly #updatedAt = new Map<string, number>();
 
-  static create(): MemoryNurturingMilestonesRepository {
-    return new MemoryNurturingMilestonesRepository();
+  private constructor(private readonly clock: Readonly<{ nowMs: () => number }>) {}
+
+  static create(
+    clock: Readonly<{ nowMs: () => number }> = { nowMs: () => nowInstant().epochMilliseconds },
+  ): MemoryNurturingMilestonesRepository {
+    return new MemoryNurturingMilestonesRepository(clock);
+  }
+
+  async listRecentlyActive({
+    since,
+    afterId,
+    limit,
+  }: Parameters<
+    NurturingUsageOrganizationsRepository["listRecentlyActive"]
+  >[0]): Promise<NurturingUsageOrganization[]> {
+    const isActive = (organizationId: string) => {
+      const lastTraceAt = this.#lastTraceAt.get(organizationId);
+      if (lastTraceAt !== undefined) return lastTraceAt >= since;
+      return (this.#updatedAt.get(organizationId) ?? 0) >= since;
+    };
+    return [...this.#organizations.values()]
+      .flatMap(({ organizationId, adminUserId }) =>
+        adminUserId &&
+        isActive(organizationId) &&
+        (afterId === undefined || organizationId > afterId)
+          ? [{ organizationId, adminUserId }]
+          : [],
+      )
+      .toSorted((left, right) => (left.organizationId < right.organizationId ? -1 : 1))
+      .slice(0, limit);
   }
 
   async recordLastTrace({
@@ -53,6 +90,7 @@ export class MemoryNurturingMilestonesRepository
     seeded,
   }: Parameters<NurturingMilestonesRepository["recordOrganization"]>[0]): Promise<void> {
     const known = this.#organizations.get(organizationId);
+    if (!known || adminUserId) this.#updatedAt.set(organizationId, this.clock.nowMs());
     this.#organizations.set(
       organizationId,
       known

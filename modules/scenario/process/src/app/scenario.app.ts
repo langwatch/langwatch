@@ -675,6 +675,11 @@ export class ScenarioModule implements ScenarioApi {
     return this.#dependencies.scenarios.count(input);
   }
 
+  /** How many active scenarios the projects hold; archived ones are not counted. */
+  countActiveForProjects(input: { projectIds: readonly string[] }): Promise<number> {
+    return this.#dependencies.scenarios.countActiveForProjects(input);
+  }
+
   /** One live scenario; throws `ScenarioNotFoundError` when it does not exist or is archived. */
   getById(input: ScenarioIdInput): Promise<Scenario> {
     return this.#dependencies.scenarios.getById(input);
@@ -721,14 +726,18 @@ export class ScenarioModule implements ScenarioApi {
     userId: string;
   }): void {
     const { scenario, projectId, userId } = input;
-    const onboardingVariant = Promise.resolve(projectId)
+    // An organization that cannot be read leaves the milestone without its variant, as before
+    // the experiment, and counts the project's scenarios alone.
+    const admin = Promise.resolve(projectId)
       .then((id) => this.#dependencies.projects.resolveOrgAdmin(id))
-      .then(
-        (admin) => admin.onboardingVariant,
-        // A variant that cannot be read leaves the milestone without it, as before the experiment.
-        () => null,
-      );
-    void Promise.all([this.#dependencies.scenarios.count({ projectId }), onboardingVariant])
+      .catch(() => null);
+    const onboardingVariant = admin.then((resolved) => resolved?.onboardingVariant ?? null);
+    const counted = admin.then((resolved) =>
+      resolved?.organizationId
+        ? this.#organizationScenarioCount(resolved.organizationId)
+        : this.#dependencies.scenarios.count({ projectId }),
+    );
+    void Promise.all([counted, onboardingVariant])
       .then(([scenarioCount, variant]) => {
         if (!this.#lifecycleCommands) {
           throw new Error("scenario_lifecycle pipeline senders are not connected yet");
@@ -746,6 +755,12 @@ export class ScenarioModule implements ScenarioApi {
       .catch((error: unknown) => {
         lifecycleLogger.error({ error, projectId }, "failed to record a created scenario");
       });
+  }
+
+  /** The organization's active scenarios across its projects, as its Customer.io profile counts. */
+  async #organizationScenarioCount(organizationId: string): Promise<number> {
+    const projectIds = await this.#dependencies.projects.listIdsByOrganization({ organizationId });
+    return this.#dependencies.scenarios.countActiveForProjects({ projectIds });
   }
 
   /** The scenario lifecycle pipeline this module registers, built once by {@link create}. */

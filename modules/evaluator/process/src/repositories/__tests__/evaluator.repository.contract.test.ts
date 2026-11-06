@@ -164,6 +164,20 @@ function contractCases(backend: Backend): void {
     });
   });
 
+  describe("when two evaluators are active and a third is archived", () => {
+    /** @scenario Archived evaluators are not counted */
+    it("counts the two active ones only", async () => {
+      await create({ id: backend.id("e1"), name: "E1" });
+      await create({ id: backend.id("e2"), name: "E2" });
+      const archived = await create({ id: backend.id("e3"), name: "E3" });
+      await backend.repository().archive({ id: archived.id, projectId: backend.projectId() });
+
+      await expect(
+        backend.repository().countActiveByProjects({ projectIds: [backend.projectId()] }),
+      ).resolves.toBe(2);
+    });
+  });
+
   describe("when a copy sits in another project", () => {
     it("lists the copy and reads its source across the project boundary", async () => {
       const source = await create();

@@ -1,4 +1,10 @@
-import type { TraceCost, TraceUsageCount } from "@langwatch/trace-contract";
+import {
+  NormalizedStatusCode,
+  type SpanInsertData,
+  type TraceCost,
+  type TraceUsageCount,
+  type TraceUsageSummary,
+} from "@langwatch/trace-contract";
 
 import { TraceExistenceRepository } from "../trace-existence.repository.ts";
 import type { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
@@ -60,6 +66,38 @@ export class MemoryTraceExistenceRepository extends TraceExistenceRepository {
     return {
       traces: new Set(spans.map((span) => `${span.tenantId}/${span.traceId}`)).size,
       spans: spans.length,
+    };
+  }
+
+  /**
+   * The store keeps the last write of each span, so a rewritten trace counts once at its newest
+   * cost. A trace occurs at its first span, and errs when any of its spans did.
+   */
+  async summarizeUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since: number;
+  }): Promise<TraceUsageSummary> {
+    const byTrace = new Map<string, SpanInsertData[]>();
+    for (const span of this.#store.findByTenants({ tenantIds: projectIds })) {
+      const key = `${span.tenantId}/${span.traceId}`;
+      byTrace.set(key, [...(byTrace.get(key) ?? []), span]);
+    }
+    const traces = [...byTrace.values()]
+      .map((spans) => ({
+        occurredAt: Math.min(...spans.map((span) => span.startTimeUnixMs)),
+        failed: spans.some((span) => span.statusCode === NormalizedStatusCode.ERROR),
+        cost: spans.reduce((sum, span) => sum + (span.cost ?? 0), 0),
+      }))
+      .filter((trace) => trace.occurredAt >= since);
+    const failedAts = traces.filter((trace) => trace.failed).map((trace) => trace.occurredAt);
+    return {
+      traces: traces.length,
+      errors: failedAts.length,
+      totalCost: traces.reduce((sum, trace) => sum + trace.cost, 0),
+      lastFailedTraceAt: failedAts.length > 0 ? Math.max(...failedAts) : null,
     };
   }
 }

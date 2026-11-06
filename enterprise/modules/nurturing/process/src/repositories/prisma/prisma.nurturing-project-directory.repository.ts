@@ -90,4 +90,17 @@ export class PrismaNurturingProjectDirectoryRepository implements NurturingProje
     });
     return traced !== null;
   }
+
+  async listProjectIds({ organizationId }: Readonly<{ organizationId: string }>): Promise<string[]> {
+    const teams = await this.prisma.team.findMany({
+      where: { organizationId },
+      select: { id: true },
+    });
+    if (teams.length === 0) return [];
+    const projects = await this.prisma.project.findMany({
+      where: { teamId: { in: teams.map(({ id }) => id) } },
+      select: { id: true },
+    });
+    return projects.map(({ id }) => id);
+  }
 }

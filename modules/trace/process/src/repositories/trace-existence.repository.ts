@@ -1,4 +1,4 @@
-import type { TraceCost, TraceUsageCount } from "@langwatch/trace-contract";
+import type { TraceCost, TraceUsageCount, TraceUsageSummary } from "@langwatch/trace-contract";
 
 /**
  * Which of a set of candidate ids the project actually holds a trace for.
@@ -23,4 +23,10 @@ export abstract class TraceExistenceRepository {
     projectIds: readonly string[];
     since?: number;
   }): Promise<TraceUsageCount>;
+
+  /** Nurturing's usage figures: each trace once, at its newest version, added up over projects. */
+  abstract summarizeUsage(input: {
+    projectIds: readonly string[];
+    since: number;
+  }): Promise<TraceUsageSummary>;
 }

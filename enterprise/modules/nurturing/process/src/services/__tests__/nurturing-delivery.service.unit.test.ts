@@ -290,7 +290,8 @@ describe("NurturingDeliveryService", () => {
     };
 
     /** @scenario "an active-day signal reaches PostHog with its source, its signup age and the experiment property" */
-    it("tracks the source, the signup age and the experiment property, and sends Customer.io nothing", async () => {
+    /** @scenario A project's active day is tracked to the organization admin in Customer.io once */
+    it("tracks the source, the signup age and the experiment property, and Customer.io one track to the admin", async () => {
       const { posthog, cio, delivery } = deliveryOverBothSinks();
 
       await delivery.deliver({
@@ -311,6 +312,40 @@ describe("NurturingDeliveryService", () => {
           },
         },
       ]);
+      expect(cio.sent).toEqual([
+        {
+          path: "/v1/track",
+          body: {
+            userId: "admin-1",
+            event: "project_active_day",
+            properties: { source: "trace", project_id: "project-1", days_since_signup: 3 },
+            messageId: "project_active_day:event-6",
+          },
+        },
+      ]);
+    });
+
+    it("sends nothing to either sink when the same signal is delivered again", async () => {
+      const { posthog, cio, delivery } = deliveryOverBothSinks();
+      const input = { key: "project_active_day:event-6", signal: activeDay };
+
+      await delivery.deliver(input);
+      await delivery.deliver(input);
+      await settle();
+
+      expect(posthog.tracked).toHaveLength(1);
+      expect(cio.sent).toHaveLength(1);
+    });
+
+    it("sends Customer.io nothing when the organization has no admin", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "project_active_day:event-8",
+        signal: { ...activeDay, sourceEventId: "event-8", userId: "" },
+      });
+      await settle();
+
       expect(cio.sent).toEqual([]);
     });
 

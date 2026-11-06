@@ -32,10 +32,12 @@ export class MemoryNurturingRepositories {
   static readonly requires = [] as const;
 
   static create(): NurturingRepositories {
+    const milestones = MemoryNurturingMilestonesRepository.create();
     return {
-      milestones: MemoryNurturingMilestonesRepository.create(),
+      milestones,
       projects: MemoryNurturingProjectDirectoryRepository.create(),
       claims: MemoryNurturingClaimRepository.create(),
+      usageOrganizations: milestones,
     };
   }
 }

@@ -2,7 +2,7 @@
  * Set membership over trace_summaries without dedup via TenantId-first predicate.
  */
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { TraceCost, TraceUsageCount } from "@langwatch/trace-contract";
+import type { TraceCost, TraceUsageCount, TraceUsageSummary } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 import { TraceExistenceRepository } from "../trace-existence.repository.ts";
@@ -11,6 +11,14 @@ import { chNumber, chString } from "./stored-span-row.mapper.ts";
 
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
 const totalRowsSchema = z.array(z.looseObject({ Total: chString }));
+const usageSummaryRowsSchema = z.array(
+  z.looseObject({
+    Traces: chNumber,
+    Errors: chNumber,
+    TotalCost: chNumber,
+    LastFailedAt: chNumber,
+  }),
+);
 const traceCostRowsSchema = z.array(
   z.looseObject({ TraceId: chString, TotalCost: chNumber.nullable() }),
 );
@@ -147,6 +155,58 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
     return {
       traces: perProject.reduce((sum, row) => sum + row.traces, 0),
       spans: perProject.reduce((sum, row) => sum + row.spans, 0),
+    };
+  }
+
+  async summarizeUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since: number;
+  }): Promise<TraceUsageSummary> {
+    const perProject = await Promise.all(
+      [...new Set(projectIds)].map(async (projectId) => {
+        const client = await this.resolveClient(projectId);
+        // A ReplacingMergeTree holds a trace once per version until merged: argMax takes the newest.
+        const result = await client.query({
+          query: `
+            SELECT
+              count() AS Traces,
+              countIf(HasError) AS Errors,
+              sum(Cost) AS TotalCost,
+              maxIf(OccurredAtMs, HasError) AS LastFailedAt
+            FROM (
+              SELECT
+                TraceId,
+                argMax(ContainsErrorStatus, UpdatedAt) AS HasError,
+                argMax(coalesce(TotalCost, 0), UpdatedAt) AS Cost,
+                toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) AS OccurredAtMs
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+                AND OccurredAt >= fromUnixTimestamp64Milli({since:Int64})
+              GROUP BY TraceId
+            )`,
+          query_params: { tenantId: projectId, since },
+          format: "JSONEachRow",
+        });
+        const [row] = usageSummaryRowsSchema.parse(await result.json());
+        return {
+          traces: row?.Traces ?? 0,
+          errors: row?.Errors ?? 0,
+          totalCost: row?.TotalCost ?? 0,
+          lastFailedTraceAt: row?.LastFailedAt ? row.LastFailedAt : null,
+        };
+      }),
+    );
+    const failedAts = perProject.flatMap((row) =>
+      row.lastFailedTraceAt === null ? [] : [row.lastFailedTraceAt],
+    );
+    return {
+      traces: perProject.reduce((sum, row) => sum + row.traces, 0),
+      errors: perProject.reduce((sum, row) => sum + row.errors, 0),
+      totalCost: perProject.reduce((sum, row) => sum + row.totalCost, 0),
+      lastFailedTraceAt: failedAts.length > 0 ? Math.max(...failedAts) : null,
     };
   }
 }

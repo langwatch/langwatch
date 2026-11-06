@@ -161,6 +161,10 @@ export class ScenarioService {
     return this.options.repository.count(scenarioProjectIdInputSchema.parse(input));
   }
 
+  countActiveForProjects(input: { projectIds: readonly string[] }): Promise<number> {
+    return this.options.repository.countActiveByProjects({ projectIds: [...input.projectIds] });
+  }
+
   async update(input: ScenarioUpdateInput): Promise<Scenario> {
     const parsed = await this.withResolvedTestSuite(scenarioUpdateInputSchema.parse(input));
     let fields = parsed.fields;

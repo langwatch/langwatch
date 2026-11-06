@@ -136,6 +136,18 @@ export interface CioOrgTraits {
   self_hosted_last_report_at?: number;
   /** Comma list of the signals raised so far, in the order they were raised. */
   self_hosted_signals?: string;
+
+  // Daily usage sync: counts across the organization's projects; traces over the last 30 days.
+  prompt_count: number;
+  evaluator_count: number;
+  scenario_count: number;
+  trace_count: number;
+  error_count: number;
+  /** USD over the same 30 days. */
+  total_cost: number;
+  /** Absent when no trace in the window failed. */
+  last_failed_trace_at?: number;
+  usage_synced_at: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,6 +180,8 @@ export type CioEventName =
   | "guided_onboarding_path_completed"
   /** Any signed-in usage, at most once per hour per person. */
   | "app_active"
+  /** A project's first trace or connected scenario run of the UTC day, to the admin. */
+  | "project_active_day"
   | "self_hosted_seats_crossed_threshold"
   | "self_hosted_sustained_ingestion"
   | "self_hosted_licensed_feature_without_license"

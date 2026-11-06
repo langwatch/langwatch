@@ -4,6 +4,7 @@
  * @see specs/features/customer-io-nurturing-integration.feature
  */
 import { createTenantId, type EventingCommandSender } from "@langwatch/eventing";
+import type { OrgAdminResolution } from "@langwatch/project-contract";
 import {
   SCENARIO_CREATED_EVENT_TYPE,
   SCENARIO_CREATED_EVENT_VERSION,
@@ -47,6 +48,16 @@ function recordingSender(): {
   };
 }
 
+function orgAdmin(organizationId: string | null): OrgAdminResolution {
+  return {
+    userId: "admin-1",
+    organizationId,
+    firstMessage: false,
+    onboardingVariant: "guided",
+    organizationCreatedAt: null,
+  };
+}
+
 function createdEvent(): ScenarioCreatedEvent {
   const [event] = new RecordScenarioCreatedCommand().handle({
     tenantId: createTenantId(PROJECT_ID),
@@ -75,16 +86,11 @@ describe("the scenario lifecycle pipeline", () => {
   });
 
   describe("when a scenario is created through the app", () => {
-    it("sends the command with how many scenarios the project now holds", async () => {
+    it("sends the command with how many scenarios the organization now holds", async () => {
       const { app } = await createScenarioRestTestApp({
         projects: {
-          resolveOrgAdmin: async () => ({
-            userId: "admin-1",
-            organizationId: "org-1",
-            firstMessage: false,
-            onboardingVariant: "guided",
-            organizationCreatedAt: null,
-          }),
+          resolveOrgAdmin: async () => orgAdmin("org-1"),
+          listIdsByOrganization: async () => [PROJECT_ID],
         },
       });
       const { sender, sent } = recordingSender();
@@ -123,6 +129,55 @@ describe("the scenario lifecycle pipeline", () => {
 
       await vi.waitFor(() => expect(sent).toHaveLength(1));
       expect(sent[0]).toMatchObject({ scenarioCount: 1, onboardingVariant: null });
+    });
+
+    /** @scenario A created scenario records the organization's scenario count across its projects */
+    it("counts the scenarios of every project of the organization", async () => {
+      const otherProject = `${PROJECT_ID}_b`;
+      const { app } = await createScenarioRestTestApp({
+        projects: {
+          resolveOrgAdmin: async () => orgAdmin("org-1"),
+          listIdsByOrganization: async () => [PROJECT_ID, otherProject],
+        },
+      });
+      const { sender, sent } = recordingSender();
+      app.connectLifecycleCommands({ recordScenarioCreated: sender });
+      const by = { id: "user-1", label: "user" } as const;
+      const scenario = (projectId: string, name: string) => ({
+        projectId,
+        name,
+        situation: name,
+        criteria: [],
+        labels: [],
+      });
+
+      await app.create(scenario(PROJECT_ID, "A1"), by);
+      await app.create(scenario(PROJECT_ID, "A2"), by);
+      await app.create(scenario(otherProject, "B1"), by);
+      const fourth = await app.create(scenario(otherProject, "B2"), by);
+
+      await vi.waitFor(() => expect(sent).toHaveLength(4));
+      expect(sent.find(({ scenarioId }) => scenarioId === fourth.id)).toMatchObject({
+        projectId: otherProject,
+        scenarioCount: 4,
+      });
+    });
+
+    /** @scenario A created scenario whose organization cannot be resolved records the project's count */
+    it("falls back to the project's count when the project names no organization", async () => {
+      const { app } = await createScenarioRestTestApp({
+        projects: { resolveOrgAdmin: async () => orgAdmin(null) },
+      });
+      const { sender, sent } = recordingSender();
+      app.connectLifecycleCommands({ recordScenarioCreated: sender });
+
+      await app.create(
+        { projectId: PROJECT_ID, name: "Login", situation: "logs in", criteria: [], labels: [] },
+        { id: "user-1", label: "user" },
+      );
+
+      await vi.waitFor(() => expect(sent).toHaveLength(1));
+      expect(sent[0]).toMatchObject({ scenarioCount: 1, onboardingVariant: "guided" });
     });
   });
 });

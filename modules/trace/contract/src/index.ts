@@ -64,6 +64,7 @@ export {
   type TraceRenderedSpanMessages,
   type TraceSuggestionTarget,
   type TraceUsageCount,
+  type TraceUsageSummary,
   type ScenarioRoleMetrics,
   type ScenarioRoleMetricsInput,
 } from "./trace.api.ts";

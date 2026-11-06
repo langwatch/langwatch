@@ -266,6 +266,10 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     return this.#dependencies.evaluators.getAll(input);
   }
 
+  countActiveForProjects(input: { projectIds: readonly string[] }): Promise<number> {
+    return this.#dependencies.evaluators.countActiveForProjects(input);
+  }
+
   /** Every evaluator in the project, with its computed input fields. */
   async getAllWithFields(input: { projectId: string }): Promise<EvaluatorWithFields[]> {
     return this.#enrich({
