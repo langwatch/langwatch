@@ -78,6 +78,7 @@ export const APP_ERROR_CODES = [
   "anomaly_rule_not_found",
   "api_key_admin_required",
   "api_key_already_revoked",
+  "api_key_expired",
   "api_key_invalid",
   "api_key_not_found",
   "api_key_not_in_organization",
