@@ -11,7 +11,7 @@ import {
   VIEWS_WITH_ORIGIN,
 } from "../../model/sources-parameter.ts";
 
-/** The trace views that leave out the traces of other sources, rather than list the chosen ones. */
+/** The trace views that leave out other sources' traces while the list holds application. */
 const COMPLEMENT_VIEWS: readonly string[] = ["traces", "spans"];
 
 /** Words that can follow a view name without being its alias. */
@@ -159,13 +159,18 @@ function sourcesPredicate({
   }
 
   const key = `(${alias}.TenantId, ${alias}.TraceId)`;
-  const lookup = (operator: string) =>
-    `(SELECT TenantId, TraceId FROM trace_metrics WHERE Source ${operator} ${SOURCES_PLACEHOLDER}${bound})`;
+  const chosen = `has(${SOURCES_PLACEHOLDER}, 'application')`;
+  const lookup = ({ guard, operator }: { guard?: string; operator: string }) =>
+    `(SELECT TenantId, TraceId FROM trace_metrics WHERE ${guard ? `${guard} AND ` : ""}` +
+    `Source ${operator} ${SOURCES_PLACEHOLDER}${bound})`;
 
-  // Why each view has its form, and an empty list its false branch: analytics ADR-003.
-  return COMPLEMENT_VIEWS.includes(view)
-    ? `notEmpty(${SOURCES_PLACEHOLDER}) AND ${key} NOT IN ${lookup("NOT IN")}`
-    : `${key} IN ${lookup("IN")}`;
+  if (!COMPLEMENT_VIEWS.includes(view)) return `${key} IN ${lookup({ operator: "IN" })}`;
+
+  // The list is bound at run time, so the switch sits in each set's own WHERE: the side whose
+  // guard is false reads no row, so only one set ever fills. Why: analytics ADR-003.
+  const excluded = lookup({ guard: chosen, operator: "NOT IN" });
+  const included = lookup({ guard: `NOT ${chosen}`, operator: "IN" });
+  return `(${chosen} OR ${key} IN ${included}) AND ${key} NOT IN ${excluded}`;
 }
 
 /** `sql` with every view it names that can follow sources kept to them by its select's WHERE. */

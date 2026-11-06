@@ -1,6 +1,6 @@
 # ADR-003: A LangWatchQL statement counts the trace origins it reads from a reserved parameter
 
-**Date:** 2026-10-09 (rewritten 2026-10-29)
+**Date:** 2026-10-09 (rewritten 2026-10-29, trace lookup revised 2026-11-06)
 
 **Status:** Accepted
 
@@ -39,21 +39,49 @@ ClickHouse migration is made. A statement keeps its rows with
 reaches the origin through `trace_metrics`, keyed by tenant so another project's trace never
 decides. The stock widgets write that lookup in one of two fixed forms, by the view they read.
 
-`traces` and `spans` use the complement: `notEmpty({dashboard_context_sources:Array(String)}) AND
-(TenantId, TraceId) NOT IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source NOT IN
-{dashboard_context_sources:Array(String)})`. On a large project the set of traces of other
-sources is the small one, and the measured failures, widgets over the query memory limit, are on
-trace-list widgets. So a trace with no `trace_metrics` row counts as being in the chosen sources,
-and so does a span whose trace is older than the lookup's time bound, whatever its source. A list
-of every source gives an empty set, so every trace counts. `notEmpty` is there because the
-complement of an empty list would otherwise keep the traces with no row.
+`traces` and `spans` hold two sets, each with the switch in its own WHERE. Writing `S` for
+`{dashboard_context_sources:Array(String)}`, `k` for `(TenantId, TraceId)` and `<bound>` for the
+lookup's time bound:
 
-Consequences: traces older than the bound count whatever their source. For the changes widget,
-which scans traces 90 days back, an older application prompt no longer reads as new, and a prompt
-used earlier only by another source can read as not new. A trace with rows of two sources (its
-anchor moved) drops under either source alone. A list that leaves out the largest source makes the
-excluded set large, so that list can hit the memory limit where the old form did not; this has not
-been measured.
+```sql
+(has(S, 'application')
+  OR k IN (SELECT TenantId, TraceId FROM trace_metrics
+           WHERE NOT has(S, 'application') AND Source IN S AND <bound>))
+AND k NOT IN (SELECT TenantId, TraceId FROM trace_metrics
+              WHERE has(S, 'application') AND Source NOT IN S AND <bound>)
+```
+
+| List | Excluded set (`NOT IN`) | Included set (`IN`) | Keeps |
+|---|---|---|---|
+| `['application']` | traces of other sources | empty | application traces and traces with no row |
+| `['application', 'langy']` | traces of neither | empty | those two sources' traces and traces with no row |
+| `['langy']` | empty | Langy's traces | Langy's traces only |
+| `[]` | empty | empty | nothing |
+
+While the list holds `application`, the widget leaves out the traces of the other sources. On a
+large project those are the small set; the chosen ones took 30-day trace-list widgets over the
+query memory limit. A trace with no `trace_metrics` row is an unstamped trace, which is
+`application`'s, so it counts, and so does a trace older than the lookup's bound, whatever its
+source. While the list leaves `application` out, the widget keeps the traces of the list, and a
+trace with no row drops. Measured on prod, 30 days, one large project, a limit of about 1 GB: under
+`['application']` the excluded set used 571 MB where the included set failed at the limit; under
+`['langy']` the excluded set used 937 MB where the included set used 40 MB. Those figures are for the
+old single forms; the combined form is not yet measured on prod.
+
+Why the switch sits inside each subquery: the list is bound at run time, so the SQL cannot choose
+its form. An outer `if`, `AND` or `OR` round two subqueries may not stop either set being built: a
+local check on ClickHouse 25.10.2 with a 150 MB cap, run by hand and not in CI, read nothing from a
+30-million-row subquery with the guard and hit `MEMORY_LIMIT_EXCEEDED` without it. Each subquery's
+WHERE starts with a condition on the bound list alone, a constant, so the side that does not apply
+reads to no row and its set is empty. Only one set ever holds rows. No `notEmpty` guard is needed:
+an empty list fills neither set, so `has` is false, the `IN` is false, and no row is kept.
+
+Consequences: while the list holds `application`, traces older than the bound count whatever their
+source. For the changes widget, which scans traces 90 days back, an older application prompt no
+longer reads as new, and a prompt used earlier only by another source can read as not new. While it
+does not, a trace older than the bound drops, as an evaluation does. A trace with rows of two
+sources (its anchor moved) drops under either source alone while the list holds `application`, and
+counts under either one while it does not.
 
 `evaluations` and `annotations` keep `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM
 trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)})`. Their trace id can be

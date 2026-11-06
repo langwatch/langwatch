@@ -1901,8 +1901,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # The helper (decided): a `Source` column the LWQL views expose, computed at read time from
   # `Origin` (lwql-view-catalog.rules.ts sourceColumns); no ClickHouse migration. It reads: a missing, empty or NULL origin reads "application", an origin outside the ten
   # listed reads "other", a listed origin reads as itself. A stock query over `traces` or `spans`
-  # is reached through `notEmpty({…}) AND (TenantId, TraceId) NOT IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source NOT IN {…})`
-  # (AC202g). One over `evaluations` or `annotations` keeps
+  # leaves out the traces of other sources, `NOT IN (… WHERE Source NOT IN {…})`, while the list holds
+  # application, and keeps the traces of the list, `IN (… WHERE Source IN {…})`, while it does not; each
+  # set's own WHERE carries the switch, so only one is filled (AC202g). One over `evaluations` or `annotations` keeps
   # `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {…})` (AC202h;
   # why: analytics ADR-003). A view with
   # neither column carries no origin, so a query reading only such views stores no list (AC202f).
@@ -1964,17 +1965,21 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Evidence: a haven browser screenshot of the card
 
   @integration
-  Scenario: AC202g Stock widgets: a trace with no trace_metrics row counts as being in the chosen sources
+  Scenario: AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace
+    # Changed (2026-11-06): a list without "application" now keeps only its own sources' traces.
     Given spans of a trace with no trace_metrics row, of an application trace, of a Langy trace and of a simulation trace
     When a stock query over `traces` or `spans` reads those rows through their trace, bound to ["application"]
     Then it counts the trace with no row and the application trace, and neither of the others
-    And a list of several sources keeps the trace with no row and the traces of each listed source
+    And a list of several sources that holds "application" keeps the trace with no row and the traces of each listed source
     And a list holding every source keeps every trace
-    And a source name no trace has keeps only the trace with no row
-    And a span of a trace older than the lookup's bound counts, whatever the trace's source
-    And a trace older than the lookup's bound counts, whatever its source, so a query that scans further back than the lookup, such as the prompt versions in the changes widget, sees those traces
-    # Why: leaving out the traces of other sources keeps the lookup's set small on a large project,
-    # where the set of the chosen list took 30-day widgets over the query memory limit.
+    And a list without "application", such as ["langy"], keeps the traces of its sources and not the trace with no row
+    And a source name no trace has keeps no trace
+    And an empty list keeps no trace
+    And under a list that holds "application", a span of a trace older than the lookup's bound counts, whatever the trace's source
+    And under a list that holds "application", a trace older than the lookup's bound counts, whatever its source, so a query that scans further back than the lookup, such as the prompt versions in the changes widget, sees those traces
+    # Why: on a large project the application traces are most of them, so the set of other sources'
+    # traces is the small one while the list holds application, and the set of the list's traces is
+    # the small one while it does not. Measured on prod, 30 days: analytics ADR-003.
 
   @unit @integration
   Scenario: AC202h Stock widgets: evaluation and annotation widgets still read the traces of the chosen sources

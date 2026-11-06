@@ -32,18 +32,19 @@ const PERIOD = {
 
 /** The lookup the catalogue stores for `view`, guard and bound included, over this database. */
 function storedLookup(view: string): string {
+  const lookup = `\\(${view}\\.TenantId, .*?, 1\\)\\)`;
   const stored = new RegExp(
-    `(?:notEmpty\\(\\{[^}]*\\}\\) AND )?\\(${view}\\.TenantId, .*?, 1\\)\\)`,
+    `(?:\\(has\\(\\{[^}]*\\}, 'application'\\) OR )?${lookup}(?:\\) AND ${lookup})?`,
   );
 
-  const lookup = STOCK_SQL.match(stored)?.[0];
-  if (!lookup)
+  const found = STOCK_SQL.match(stored)?.[0];
+  if (!found)
     throw new Error(`no stored lookup for the "${view}" view in the stock widget fixture`);
 
-  return lookup
+  return found
     .replaceAll(`${view}.`, "")
-    .replace("FROM trace_metrics", `FROM ${DATABASE}.trace_metrics`)
-    .replace("Source", sourceOfOrigin("Origin"));
+    .replaceAll("FROM trace_metrics", `FROM ${DATABASE}.trace_metrics`)
+    .replace(/\bSource\b/g, sourceOfOrigin("Origin"));
 }
 
 const BY_TRACE = storedLookup("spans");
@@ -189,37 +190,48 @@ describe.skipIf(!url)("given traces of the application and of Langy, each with s
   });
 
   describe("given spans of a trace with no trace_metrics row beside traces that have one", () => {
-    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as being in the chosen sources" */
+    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
     it("counts the trace with no row under the application list", async () => {
       expect(await mixedSpans({ sources: ["application"], trace: "none1" })).toBe(2);
       expect(await mixedSpans({ sources: ["application"], trace: "app2" })).toBe(1);
       expect(await mixedSpans({ sources: ["application"] })).toBe(3);
     });
 
-    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as being in the chosen sources" */
+    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
     it("does not count a trace of another source", async () => {
       expect(await mixedSpans({ sources: ["application"], trace: "chat1" })).toBe(0);
       expect(await mixedSpans({ sources: ["application"], trace: "sim1" })).toBe(0);
     });
 
-    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as being in the chosen sources" */
+    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
     it("keeps every listed source and the trace with no row under a list of several", async () => {
       const sources = ["application", "langy"];
 
       expect(await mixedSpans({ sources })).toBe(4);
+      expect(await mixedSpans({ sources, trace: "none1" })).toBe(2);
       expect(await mixedSpans({ sources, trace: "chat1" })).toBe(1);
       expect(await mixedSpans({ sources, trace: "sim1" })).toBe(0);
     });
 
-    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as being in the chosen sources" */
+    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
+    it("keeps only the listed source's traces, not the trace with no row, under a list without application", async () => {
+      const sources = ["langy"];
+
+      expect(await mixedSpans({ sources })).toBe(1);
+      expect(await mixedSpans({ sources, trace: "chat1" })).toBe(1);
+      expect(await mixedSpans({ sources, trace: "none1" })).toBe(0);
+      expect(await mixedSpans({ sources, trace: "app2" })).toBe(0);
+    });
+
+    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
     it("keeps every trace when the list holds every source", async () => {
       expect(await mixedSpans({ sources: [...TRACE_SOURCES] })).toBe(5);
     });
 
-    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as being in the chosen sources" */
-    it("keeps only the trace with no row under a source name no trace has", async () => {
-      expect(await mixedSpans({ sources: ["no_such_source"] })).toBe(2);
-      expect(await mixedSpans({ sources: ["no_such_source"], trace: "none1" })).toBe(2);
+    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
+    it("keeps no trace under a source name no trace has, not even the trace with no row", async () => {
+      expect(await mixedSpans({ sources: ["no_such_source"] })).toBe(0);
+      expect(await mixedSpans({ sources: ["no_such_source"], trace: "none1" })).toBe(0);
     });
 
     /** @scenario "AC200m Sources: a query with no source picked counts nothing and says so" */
@@ -228,16 +240,16 @@ describe.skipIf(!url)("given traces of the application and of Langy, each with s
       expect(await mixedSpans({ sources: [], trace: "none1" })).toBe(0);
     });
 
-    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as being in the chosen sources" */
-    it("counts a span of a trace older than the lookup bound, whatever its source", async () => {
+    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
+    it("counts a span of a trace older than the lookup bound under a list with application", async () => {
       const spans = { table: "old_trace_spans", lookup: BY_TRACE, sources: ["application"] };
 
       expect(await kept({ ...spans, trace: "old_langy" })).toBe(1);
       expect(await kept({ ...spans, trace: "chat1" })).toBe(0);
     });
 
-    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as being in the chosen sources" */
-    it("counts a trace older than the lookup bound, whatever its source", async () => {
+    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
+    it("counts a trace older than the lookup bound under a list with application", async () => {
       const traces = {
         table: "old_trace_spans",
         lookup: TRACES_BY_TRACE,
@@ -246,6 +258,13 @@ describe.skipIf(!url)("given traces of the application and of Langy, each with s
 
       expect(await kept({ ...traces, trace: "old_langy" })).toBe(1);
       expect(await kept({ ...traces, trace: "chat1" })).toBe(0);
+    });
+
+    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
+    it("drops a trace older than the lookup bound under a list without application", async () => {
+      const traces = { table: "old_trace_spans", lookup: TRACES_BY_TRACE, sources: ["langy"] };
+
+      expect(await kept({ ...traces, trace: "old_langy" })).toBe(0);
     });
   });
 

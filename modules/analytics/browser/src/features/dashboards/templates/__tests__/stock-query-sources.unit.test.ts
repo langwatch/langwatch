@@ -22,17 +22,22 @@ describe("given a stock query over a view that names only a row's trace", () => 
     expect(sql).not.toContain("SELECT *");
   });
 
-  /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as being in the chosen sources" */
+  /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
   it.each([
     ["traces", "traces"],
     ["spans", "spans"],
     ["traces AS t", "t"],
     ["analytics.spans s", "s"],
-  ])("leaves out the traces of other sources from %s", (from, alias) => {
+  ])("guards each of the two sets for %s by whether the list holds application", (from, alias) => {
+    const key = `(${alias}.TenantId, ${alias}.TraceId)`;
+    const chosen = `has(${SOURCES}, 'application')`;
+
     expect(readSources(`SELECT 1 FROM ${from} GROUP BY x`)).toBe(
-      `SELECT 1 FROM ${from} WHERE notEmpty(${SOURCES}) AND ` +
-        `(${alias}.TenantId, ${alias}.TraceId) NOT IN ` +
-        `(SELECT TenantId, TraceId FROM trace_metrics WHERE Source NOT IN ${SOURCES}) GROUP BY x`,
+      `SELECT 1 FROM ${from} WHERE (${chosen} OR ${key} IN ` +
+        `(SELECT TenantId, TraceId FROM trace_metrics WHERE NOT ${chosen} AND Source IN ${SOURCES})) ` +
+        `AND ${key} NOT IN ` +
+        `(SELECT TenantId, TraceId FROM trace_metrics WHERE ${chosen} AND Source NOT IN ${SOURCES}) ` +
+        `GROUP BY x`,
     );
   });
 
@@ -51,19 +56,25 @@ describe("given a stock query over a view that names only a row's trace", () => 
 
   /** @scenario "AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter" */
   it.each([
-    ["spans", "NOT IN"],
-    ["evaluations", "IN"],
-  ])("keeps the lookup from %s bounded by the period, one window back plus a day", (view, form) => {
-    const start = "{dashboard_context_period_start:DateTime}";
-    const end = "{dashboard_context_period_end:DateTime}";
+    ["spans", ["NOT IN", "IN"]],
+    ["evaluations", ["IN"]],
+  ])(
+    "keeps each lookup from %s bounded by the period, one window back plus a day",
+    (view, forms) => {
+      const start = "{dashboard_context_period_start:DateTime}";
+      const end = "{dashboard_context_period_end:DateTime}";
+      const sql = readSources(
+        `SELECT 1 FROM ${view} WHERE OccurredAt >= ${start} AND OccurredAt < ${end}`,
+      );
 
-    expect(
-      readSources(`SELECT 1 FROM ${view} WHERE OccurredAt >= ${start} AND OccurredAt < ${end}`),
-    ).toContain(
-      `WHERE Source ${form} ${SOURCES} AND OccurredAt >= ` +
-        `subtractDays(subtractSeconds(${start}, dateDiff('second', ${start}, ${end})), 1))`,
-    );
-  });
+      for (const form of forms) {
+        expect(sql).toContain(
+          ` Source ${form} ${SOURCES} AND OccurredAt >= ` +
+            `subtractDays(subtractSeconds(${start}, dateDiff('second', ${start}, ${end})), 1))`,
+        );
+      }
+    },
+  );
 });
 
 describe("given a query over a view that keeps an origin", () => {
