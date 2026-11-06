@@ -2,12 +2,14 @@ import {
   GROWTH_SEAT_PLAN_TYPES,
   type GrowthSeatPlanType,
 } from "@langwatch/enterprise-billing-contract";
+import { generate } from "@langwatch/ksuid";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
+  type SeatLineClaim,
   type SeatRepairRecord,
   type SeatRepairRow,
   type SeatSubscriptionRow,
@@ -220,6 +222,29 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
         seatRepairAttempts: attempts,
         seatRepairFlaggedAt: flaggedAt ? toDate(flaggedAt) : null,
       },
+    });
+  }
+
+  async claimSeatLine({ id, leaseMs }: { id: string; leaseMs: number }): Promise<SeatLineClaim> {
+    const token = generate("billing").toString();
+    const now = nowInstant();
+    const { count } = await this.prisma.subscription.updateMany({
+      where: {
+        id,
+        OR: [{ seatLineLeaseUntil: null }, { seatLineLeaseUntil: { lte: toDate(now) } }],
+      },
+      data: {
+        seatLineLeaseToken: token,
+        seatLineLeaseUntil: toDate(now.add({ milliseconds: leaseMs })),
+      },
+    });
+    return count === 1 ? { claimed: true, token } : { claimed: false };
+  }
+
+  async releaseSeatLine({ id, token }: { id: string; token: string }): Promise<void> {
+    await this.prisma.subscription.updateMany({
+      where: { id, seatLineLeaseToken: token },
+      data: { seatLineLeaseToken: null, seatLineLeaseUntil: null },
     });
   }
 }

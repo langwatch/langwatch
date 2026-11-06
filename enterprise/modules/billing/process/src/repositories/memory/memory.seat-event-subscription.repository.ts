@@ -8,6 +8,7 @@ import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
+  type SeatLineClaim,
   type SeatRepairRecord,
   type SeatRepairRow,
   type SeatSubscriptionRow,
@@ -201,6 +202,20 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
     const current = this.store.seatRepairs.get(id);
     if (!current || !this.sameRepair({ id, record })) return;
     this.store.seatRepairs.set(id, { ...current, attempts, flaggedAt });
+  }
+
+  async claimSeatLine({ id, leaseMs }: { id: string; leaseMs: number }): Promise<SeatLineClaim> {
+    const now = nowInstant();
+    const held = this.store.seatLineLeases.get(id);
+    if (held && Temporal.Instant.compare(held.until, now) > 0) return { claimed: false };
+    const token = generate("billing").toString();
+    this.store.seatLineLeases.set(id, { token, until: now.add({ milliseconds: leaseMs }) });
+    return { claimed: true, token };
+  }
+
+  async releaseSeatLine({ id, token }: { id: string; token: string }): Promise<void> {
+    const held = this.store.seatLineLeases.get(id);
+    if (held?.token === token) this.store.seatLineLeases.delete(id);
   }
 
   /** Whether `record` is still the subscription's pending repair. */

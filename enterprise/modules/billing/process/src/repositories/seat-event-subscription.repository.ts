@@ -33,6 +33,9 @@ export type SeatRepairRow = SeatRepairRecord & {
   flaggedAt: Instant | null;
 };
 
+/** What claiming a subscription's seat line found: the lease's fencing token, or another holder. */
+export type SeatLineClaim = { claimed: true; token: string } | { claimed: false };
+
 /** The subscription rows a growth-seat checkout and a seat change write. */
 export abstract class SeatEventSubscriptionRepository {
   /** The organization's ACTIVE and CANCELLED subscriptions, newest first. */
@@ -75,4 +78,8 @@ export abstract class SeatEventSubscriptionRepository {
     attempts: number;
     flaggedAt: Instant | null;
   }): Promise<void>;
+  /** Takes the seat line lease unless another holder's has not run out; it lasts `leaseMs`. */
+  abstract claimSeatLine(input: { id: string; leaseMs: number }): Promise<SeatLineClaim>;
+  /** Gives the lease back, only while `token` still holds it. */
+  abstract releaseSeatLine(input: { id: string; token: string }): Promise<void>;
 }

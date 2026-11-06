@@ -4604,6 +4604,9 @@ model Subscription {
   seatRepairAttempts    Int?
   /// Set once the seat line repair has failed often enough that Ops should look at it.
   seatRepairFlaggedAt   DateTime?
+  /// The lease a seat change or seat line repair holds while it reads and moves the seat line.
+  seatLineLeaseToken    String?
+  seatLineLeaseUntil    DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]

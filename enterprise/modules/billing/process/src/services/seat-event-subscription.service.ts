@@ -7,6 +7,7 @@ import {
   isGrowthSeatPrice,
   NoActiveSubscriptionError,
   resolveGrowthSeatPlanType,
+  SeatChangeInProgressError,
   type StripePriceMap,
   SubscriptionItemNotFoundError,
   SubscriptionNotLinkedError,
@@ -25,10 +26,15 @@ import {
 } from "../rules/seat-event-quote.rules.ts";
 import { planSeatChange, type SeatChangePlan, seatsKeptAt } from "../rules/seat-kept.rules.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
+import { SeatCheckoutSessionService } from "./seat-checkout-session.service.ts";
+import { SeatLineLeaseService } from "./seat-line-lease.service.ts";
 import { SeatLineMoveService } from "./seat-line-move.service.ts";
 import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.service.ts";
 
 const logger = createLogger("langwatch:billing:seatEventSubscription");
+
+/** How long a seat change waits for another change or a repair on the same subscription. */
+const SEAT_CHANGE_WAIT_MS = 15_000;
 
 export class SeatEventSubscriptionService {
   private readonly stripeSubscriptions: StripeSubscriptionsChannel;
@@ -37,6 +43,8 @@ export class SeatEventSubscriptionService {
   private readonly prices: StripePriceMap;
   private readonly customerCurrency: StripeCustomerCurrencyService;
   private readonly seatLine: SeatLineMoveService;
+  private readonly lease: SeatLineLeaseService;
+  private readonly checkoutSessions: SeatCheckoutSessionService;
 
   private constructor({
     stripeSubscriptions,
@@ -57,6 +65,8 @@ export class SeatEventSubscriptionService {
     this.prices = prices;
     this.customerCurrency = customerCurrency;
     this.seatLine = SeatLineMoveService.create({ stripeSubscriptions, subscriptions });
+    this.lease = SeatLineLeaseService.create({ subscriptions });
+    this.checkoutSessions = SeatCheckoutSessionService.create({ stripeSubscriptions });
   }
 
   static create(options: {
@@ -138,8 +148,11 @@ export class SeatEventSubscriptionService {
   }
 
   /** The subscription, its provider record, and the seat line to change. */
-  private async loadSeatChangeTarget(organizationId: string) {
-    const subscription = await this.findSeatSubscription(organizationId);
+  private async loadSeatChangeTarget(
+    organizationId: string,
+    found?: Awaited<ReturnType<SeatEventSubscriptionService["findSeatSubscription"]>>,
+  ) {
+    const subscription = found ?? (await this.findSeatSubscription(organizationId));
 
     const stripeSubscription = await this.stripeSubscriptions.getSubscription({
       subscriptionId: subscription.stripeSubscriptionId,
@@ -211,7 +224,7 @@ export class SeatEventSubscriptionService {
       billingInterval,
     });
 
-    const { url } = await this.openCheckoutSession({
+    const { url } = await this.checkoutSessions.open({
       customerId,
       baseUrl,
       checkoutCurrency,
@@ -222,60 +235,6 @@ export class SeatEventSubscriptionService {
     });
     return { url, subscriptionId: subscription.id };
   };
-
-  /** The provider checkout session, anchored to the 1st of next month. */
-  private async openCheckoutSession({
-    customerId,
-    baseUrl,
-    checkoutCurrency,
-    billingInterval,
-    lineItems,
-    isUpgradeFromTiered,
-    subscriptionId,
-  }: {
-    customerId: string;
-    baseUrl: string;
-    checkoutCurrency: Currency;
-    billingInterval: BillingInterval;
-    lineItems: ReturnType<typeof createCheckoutLineItems>;
-    isUpgradeFromTiered: boolean;
-    subscriptionId: string;
-  }): Promise<{ url: string | null }> {
-    const selectedOptionsMetadata = {
-      selectedCurrency: checkoutCurrency,
-      selectedBillingInterval: billingInterval,
-    };
-
-    // Anchor billing cycle to the 1st of next month for all plans.
-    // Customer pays prorated amount for the partial period (checkout → anchor),
-    // then full price (monthly or annual) starting on the 1st.
-    const now = nowInstant().toZonedDateTimeISO("UTC");
-    const billingCycleAnchor = Temporal.PlainDateTime.from({
-      year: now.year,
-      month: now.month,
-      day: 1,
-    })
-      .toZonedDateTime("UTC")
-      .add({ months: 1 })
-      .toInstant();
-    const session = await this.stripeSubscriptions.createCheckoutSession({
-      customerId,
-      currency: checkoutCurrency.toLowerCase(),
-      lineItems,
-      metadata: selectedOptionsMetadata,
-      subscription: {
-        metadata: selectedOptionsMetadata,
-        billingCycleAnchor: Math.floor(billingCycleAnchor.epochMilliseconds / 1000),
-        prorationBehavior: "create_prorations",
-      },
-      successUrl: `${baseUrl}/settings/subscription?success${isUpgradeFromTiered ? "&upgraded_from=tiered" : ""}`,
-      cancelUrl: `${baseUrl}/settings/subscription`,
-      clientReferenceId: `subscription_setup_${subscriptionId}`,
-      allowPromotionCodes: true,
-    });
-
-    return { url: session.url };
-  }
 
   /**
    * Cancels the PENDING subscriptions abandoned checkouts left behind, and the
@@ -325,7 +284,31 @@ export class SeatEventSubscriptionService {
     // First, so an expired quote is refused before the provider is touched.
     const prorationDate = resolveProrationDate(quotedAt);
 
-    const target = await this.loadSeatChangeTarget(organizationId);
+    // One change or repair at a time per subscription, from its Stripe read to its last write.
+    const found = await this.findSeatSubscription(organizationId);
+    const held = await this.lease.hold({
+      id: found.id,
+      waitMs: SEAT_CHANGE_WAIT_MS,
+      work: () => this.changeSeats({ organizationId, found, totalMembers, prorationDate }),
+    });
+    if (!held.held) throw new SeatChangeInProgressError();
+
+    return { success: true };
+  }
+
+  /** The seat change itself, run while it holds the subscription's seat line. */
+  private async changeSeats({
+    organizationId,
+    found,
+    totalMembers,
+    prorationDate,
+  }: {
+    organizationId: string;
+    found: Awaited<ReturnType<SeatEventSubscriptionService["findSeatSubscription"]>>;
+    totalMembers: number;
+    prorationDate: number;
+  }): Promise<void> {
+    const target = await this.loadSeatChangeTarget(organizationId, found);
     const { subscription, stripeSubscription, seatItem } = target;
     const plan = this.planChange({ target, requested: totalMembers });
 
@@ -351,8 +334,6 @@ export class SeatEventSubscriptionService {
       kept: plan.kept,
       repairsUpTo,
     });
-
-    return { success: true };
   }
 
   /** How a requested seat count reaches the provider, from what it bills and keeps now. */

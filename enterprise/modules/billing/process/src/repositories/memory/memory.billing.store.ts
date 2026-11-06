@@ -100,6 +100,8 @@ export class MemoryBillingStore {
   readonly subscriptions: BillingSubscriptionRecord[] = [];
   /** The Subscription row's seat line repair columns, keyed by subscription id while one is pending. */
   readonly seatRepairs = new Map<string, MemorySeatRepair>();
+  /** The Subscription row's seat line lease columns, keyed by subscription id while one is held. */
+  readonly seatLineLeases = new Map<string, { token: string; until: Instant }>();
   readonly checkpoints = new Map<string, BillingCheckpoint>();
   readonly organizationOfTenant = new Map<string, string>();
   /** Project's rows and gateway's ledger, as their shares show them to billing. */

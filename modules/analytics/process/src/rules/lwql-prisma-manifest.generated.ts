@@ -1738,6 +1738,8 @@ export interface LwqlPrismaRows {
     readonly seatRepairSince: "DateTime?";
     readonly seatRepairAttempts: "Int?";
     readonly seatRepairFlaggedAt: "DateTime?";
+    readonly seatLineLeaseToken: "String?";
+    readonly seatLineLeaseUntil: "DateTime?";
   };
   readonly Invoice: {
     readonly id: "String";

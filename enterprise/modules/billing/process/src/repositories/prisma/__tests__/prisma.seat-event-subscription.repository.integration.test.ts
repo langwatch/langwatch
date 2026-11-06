@@ -143,4 +143,22 @@ describe.skipIf(!DB_URL)("PrismaSeatEventSubscriptionRepository seat line repair
     });
     expect(await pendingOfRun()).toEqual([]);
   });
+
+  /** @scenario "A seat line repair skips a subscription a seat change is working on" */
+  it("lets one holder take the seat line until it releases it or the lease runs out", async () => {
+    const id = await seed("lease");
+
+    const first = await subscriptions.claimSeatLine({ id, leaseMs: 60_000 });
+    expect(first.claimed).toBe(true);
+    expect(await subscriptions.claimSeatLine({ id, leaseMs: 60_000 })).toEqual({ claimed: false });
+
+    await subscriptions.releaseSeatLine({ id, token: "someone-else" });
+    expect(await subscriptions.claimSeatLine({ id, leaseMs: 60_000 })).toEqual({ claimed: false });
+
+    if (first.claimed) await subscriptions.releaseSeatLine({ id, token: first.token });
+    const expiring = await subscriptions.claimSeatLine({ id, leaseMs: 1 });
+    expect(expiring.claimed).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect((await subscriptions.claimSeatLine({ id, leaseMs: 60_000 })).claimed).toBe(true);
+  });
 });

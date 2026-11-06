@@ -3,7 +3,10 @@
  * seat service, the subscription webhook and the plan the seat limit reads, on memory twins.
  * @see specs/licensing/seat-rotation.feature
  */
-import { type StripePriceMap } from "@langwatch/enterprise-billing-contract";
+import {
+  SeatChangeInProgressError,
+  type StripePriceMap,
+} from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi, LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
@@ -21,6 +24,7 @@ import type { BillingSubscriptionStatus } from "../rules/billing-stripe-shapes.r
 import { BillingSubscriptionLifecycleService } from "../services/billing-subscription-lifecycle.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
+import { SEAT_LINE_LEASE_MS } from "../services/seat-line-lease.service.ts";
 import {
   SEAT_REPAIR_FLAG_AFTER_ATTEMPTS,
   SEAT_REPAIR_GRACE_MS,
@@ -206,6 +210,8 @@ describe("Growth seat changes", () => {
         stripeSubscriptions,
         subscriptions: createApiFixture<MemorySeatEventSubscriptionRepository>({
           findSeatCandidates: (input) => repository.findSeatCandidates(input),
+          claimSeatLine: (input) => repository.claimSeatLine(input),
+          releaseSeatLine: (input) => repository.releaseSeatLine(input),
           keepSeats: (input) => repository.keepSeats(input),
           reactivateWithSeats: async () => {
             throw new Error("database unavailable");
@@ -320,6 +326,23 @@ describe("Growth seat changes", () => {
       });
     });
 
+    /** @scenario "A seat change refused while another one keeps running" */
+    it("refuses a seat change while another holds the seat line past the wait", async () => {
+      await MemorySeatEventSubscriptionRepository.create(store).claimSeatLine({
+        id: "sub_db_1",
+        leaseMs: SEAT_LINE_LEASE_MS,
+      });
+
+      const change = seats
+        .updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 })
+        .catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(20_000);
+
+      expect(await change).toBeInstanceOf(SeatChangeInProgressError);
+
+      expect(stripeSubscriptions.updates).toEqual([]);
+    });
+
     /** @scenario "A seat change records the repair before it lifts the seat line" */
     it("records the way back before the lift and clears it once the change completes", async () => {
       const send = stripeSubscriptions.updateSubscription.bind(stripeSubscriptions);
@@ -342,6 +365,8 @@ describe("Growth seat changes", () => {
         stripeSubscriptions,
         subscriptions: createApiFixture<MemorySeatEventSubscriptionRepository>({
           findSeatCandidates: (input) => repository.findSeatCandidates(input),
+          claimSeatLine: (input) => repository.claimSeatLine(input),
+          releaseSeatLine: (input) => repository.releaseSeatLine(input),
           keepSeats: (input) => repository.keepSeats(input),
           recordSeatRepair: async () => {
             throw new Error("database unavailable");
@@ -483,6 +508,8 @@ describe("Growth seat changes", () => {
         prices,
         subscriptions: createApiFixture<MemorySeatEventSubscriptionRepository>({
           findSeatRepairs: (input) => repository.findSeatRepairs(input),
+          claimSeatLine: (input) => repository.claimSeatLine(input),
+          releaseSeatLine: (input) => repository.releaseSeatLine(input),
           isSeatRepairPending: async (input) => {
             vi.advanceTimersByTime(1);
             await repository.recordSeatRepair({ id: "sub_db_1", quantity: 5, liftedQuantity: 7 });
@@ -496,6 +523,53 @@ describe("Growth seat changes", () => {
 
       expect(stripeSubscriptions.updates).toEqual([]);
       expect(store.seatRepairs.get("sub_db_1")).toMatchObject({ quantity: 5, liftedQuantity: 7 });
+    });
+
+    /** @scenario "A seat change waits for a seat line repair on the same subscription" */
+    it("runs a seat change only after a repair that read Stripe has finished", async () => {
+      const read = stripeSubscriptions.getSubscription.bind(stripeSubscriptions);
+      let resumeRepair = () => {};
+      const paused = vi
+        .spyOn(stripeSubscriptions, "getSubscription")
+        .mockImplementationOnce(async (input) => {
+          const subscription = await read(input);
+          await new Promise<void>((resolve) => (resumeRepair = resolve));
+          return subscription;
+        });
+
+      const repairing = repairs.repairSeatLines();
+      await vi.advanceTimersByTimeAsync(0);
+      paused.mockRestore();
+      const changing = seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(stripeSubscriptions.updates).toEqual([]);
+
+      resumeRepair();
+      expect(await repairing).toMatchObject({ repaired: 1 });
+      await vi.advanceTimersByTimeAsync(1000);
+      await changing;
+
+      expect(stripeSubscriptions.updates.map((update) => update.change)).toEqual([
+        { items: [{ id: "si_seat", quantity: 3 }], prorationBehavior: "none" },
+        expect.objectContaining({
+          items: [{ id: "si_seat", quantity: 6 }],
+          prorationBehavior: "always_invoice",
+        }),
+      ]);
+    });
+
+    /** @scenario "A seat line repair skips a subscription a seat change is working on" */
+    it("leaves the repair pending while a seat change holds the seat line", async () => {
+      await MemorySeatEventSubscriptionRepository.create(store).claimSeatLine({
+        id: "sub_db_1",
+        leaseMs: SEAT_LINE_LEASE_MS,
+      });
+      const reads = stripeSubscriptions.reads.length;
+
+      expect(await repairs.repairSeatLines()).toMatchObject({ repaired: 0, pending: 1 });
+      expect(stripeSubscriptions.reads).toHaveLength(reads);
+      expect(stripeSubscriptions.updates).toEqual([]);
+      expect(store.seatRepairs.get("sub_db_1")).toMatchObject({ quantity: 3, liftedQuantity: 5 });
     });
 
     /** @scenario "A seat line repair moves the line on a past due subscription" */

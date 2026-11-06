@@ -390,6 +390,29 @@ Feature: Seat rotation
       And the repair is cleared
 
     @unit
+    Scenario: A seat change waits for a seat line repair on the same subscription
+      Given the subscription records that Stripe should bill 3 seats while Stripe bills 5
+      And the seat line repair has read Stripe and not yet moved the line
+      When an administrator raises the seats to 6
+      Then the seat change starts only after the repair finished
+      And Stripe ends at 6 seats
+
+    @unit
+    Scenario: A seat line repair skips a subscription a seat change is working on
+      Given the subscription records that Stripe should bill 3 seats while Stripe bills 5
+      And a seat change is working on the subscription
+      When the seat line repair runs
+      Then the payment provider is not asked anything
+      And the repair stays pending for the next pass
+
+    @unit
+    Scenario: A seat change refused while another one keeps running
+      Given a seat change is working on the subscription and does not finish
+      When an administrator raises the seats
+      Then the change is refused with "seat_change_in_progress"
+      And the payment provider is not asked to change anything
+
+    @unit
     Scenario: A seat line repair moves the line on a past due subscription
       Given the subscription records that Stripe should bill 3 seats while Stripe bills 5
       And the subscription is past due at Stripe

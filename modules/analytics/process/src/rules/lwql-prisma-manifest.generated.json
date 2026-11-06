@@ -18797,6 +18797,24 @@
           "documentation": "Set once the seat line repair has failed often enough that Ops should look at it."
         },
         {
+          "name": "seatLineLeaseToken",
+          "columnName": "seatLineLeaseToken",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The lease a seat change or seat line repair holds while it reads and moves the seat line."
+        },
+        {
+          "name": "seatLineLeaseUntil",
+          "columnName": "seatLineLeaseUntil",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "organization",
           "columnName": "organization",
           "type": "Organization",

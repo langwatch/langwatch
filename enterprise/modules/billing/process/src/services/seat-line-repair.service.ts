@@ -8,16 +8,14 @@ import type {
   SeatRepairRow,
 } from "../repositories/seat-event-subscription.repository.ts";
 import type { BillingSubscription } from "../rules/billing-stripe-shapes.rules.ts";
+import { SeatLineLeaseService } from "./seat-line-lease.service.ts";
 
 const logger = createLogger("langwatch:billing:seatLineRepair");
 
 /** Failed repairs before the subscription is flagged to Ops; the pass keeps retrying after. */
 export const SEAT_REPAIR_FLAG_AFTER_ATTEMPTS = 5;
 
-/**
- * Repairs younger than this are skipped: their seat change may still be running. A change whose
- * Stripe calls outlast it can still be raced; Stripe's client gives up on a call well before.
- */
+/** Repairs younger than this are skipped: their seat change may still be running. */
 export const SEAT_REPAIR_GRACE_MS = 5 * 60 * 1000;
 
 /** Subscriptions Stripe ended: nothing bills next cycle, so there is nothing to put back. */
@@ -28,7 +26,7 @@ const UNCHANGEABLE_STATUSES = new Set(["incomplete"]);
 /** What one repair pass did. */
 export type SeatLineRepairOutcome = {
   repaired: number;
-  /** Left for a later pass: Stripe cannot change the subscription yet. */
+  /** Left for a later pass: Stripe cannot change the subscription yet, or a change holds it. */
   pending: number;
   failed: number;
   flagged: number;
@@ -46,6 +44,7 @@ export class SeatLineRepairService {
   >;
   private readonly subscriptions: SeatEventSubscriptionRepository;
   private readonly prices: StripePriceMap;
+  private readonly lease: SeatLineLeaseService;
 
   private constructor({
     stripeSubscriptions,
@@ -59,6 +58,7 @@ export class SeatLineRepairService {
     this.stripeSubscriptions = stripeSubscriptions;
     this.subscriptions = subscriptions;
     this.prices = prices;
+    this.lease = SeatLineLeaseService.create({ subscriptions });
   }
 
   static create(options: {
@@ -75,7 +75,13 @@ export class SeatLineRepairService {
     const recordedBefore = nowInstant().subtract({ milliseconds: SEAT_REPAIR_GRACE_MS });
     for (const repair of await this.subscriptions.findSeatRepairs({ recordedBefore })) {
       try {
-        if ((await this.repair(repair)) === "pending") {
+        // A seat change or another pass holding the line: this pass leaves it for the next.
+        const held = await this.lease.hold({
+          id: repair.id,
+          waitMs: 0,
+          work: () => this.repair(repair),
+        });
+        if (!held.held || held.value === "pending") {
           outcome.pending += 1;
           continue;
         }
