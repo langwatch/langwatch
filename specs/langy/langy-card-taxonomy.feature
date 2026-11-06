@@ -73,28 +73,51 @@ Feature: Langy's cards read at the right attention weight
     Given a step that failed and a reply Langy wrote after it
     When I read the finished turn
     Then that failure is no card of its own in the conversation
-    And it is a row in the folded record of the work, with the steps that worked
-    And the row says the step failed, never that Langy carried on
-    And opening the row shows the card it always showed, with its details and copy
+    And it is a row in the folded record of the work, among the steps that worked
+    And the row reads like a step that worked, tagged "failed", never that Langy carried on
+    And opening the row shows the command and its error text, as a step that worked shows its result
+    And the error's code and its trace, logs and docs links show there when it has them
 
   @integration
   Scenario: A step that fails while the turn is running folds into the record too
     Given a step that failed while Langy is still working
     When I watch the turn
-    Then that failure is a row in the folded record of the work, not a card
+    Then that failure is one quiet line tagged "failed", not a card
+    And it stays in view until the next step starts
+    And then it folds into the record of the work
 
   @integration
   Scenario: The record of the work counts its failures quietly
-    Given three steps that failed while Langy was working
+    Given two steps that worked and three that failed
     When I read the record of the work
-    Then its header says "3 failed" in the same quiet grey as the call count
+    Then its header says "2 actions completed" and "5 tool calls, 3 failed" in a quiet grey
+    And when every step failed it says "3 actions failed" with a grey mark, not the green check
     And nothing in the header is red
 
   @integration
-  Scenario: A step the turn never recovered from keeps its card
-    Given a step that failed and no reply after it
+  Scenario: Only the last failed step of an unanswered turn keeps its card
+    Given a turn that ended on a failed step, with no reply after it
     When I read the finished turn
-    Then that failure keeps its card
+    Then the failure the turn ended on keeps its card
+    And a failure followed by steps that worked stays folded in the record of the work
+
+  @integration
+  Scenario: A stopped turn keeps its failures folded
+    Given a turn I stopped right after a step failed
+    When I read the turn
+    Then that failure stays folded in the record of the work
+
+  @integration
+  Scenario: A failure no retry can fix keeps its card
+    Given a step refused because access was refused or GitHub is not connected
+    When I read the turn, while it runs or after it answered
+    Then that failure keeps its card in the conversation
+
+  @integration
+  Scenario: A not-found probe folds into the record
+    Given a step that looked for something that does not exist, and a reply after it
+    When I read the turn, while it runs or after it answered
+    Then that failure is a row in the folded record of the work, not a card
 
   @integration
   Scenario: A step the person denied keeps its card
@@ -104,6 +127,6 @@ Feature: Langy's cards read at the right attention weight
 
   @integration
   Scenario: A failure the person can act on keeps its card
-    Given a step refused because the plan is out of room
-    When I watch the turn
-    Then the card that offers the upgrade stays in the conversation
+    Given a step refused because the plan is out of room, or a Slack automation with no connection
+    When I read the turn, while it runs or after it answered
+    Then the card that lets me act stays in the conversation

@@ -5,7 +5,7 @@
  * Spec: specs/langy/langy-capability-cards.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -253,7 +253,10 @@ describe("given a turn whose first step failed", () => {
     );
 
     // The turn answered, so the failure is the receipt's first row, not a card.
-    const failure = screen.getByRole("button", { name: /failed/, expanded: false });
+    const failure = within(screen.getByRole("list", { name: "Finished steps" })).getByRole(
+      "button",
+      { name: /failed/ },
+    );
     expect(screen.getByLabelText("Langy activity").firstElementChild?.contains(failure)).toBe(true);
     expect(screen.queryByRole("alert")).toBeNull();
     expect(inOrder(failure, blockHolding("ls modules"), screen.getByText(CLOSING))).toBe(true);

@@ -49,6 +49,8 @@ export interface LangyToolErrorPresentation {
   limit?: LangyToolFailureLimit;
   /** True when no retry and no different arguments will change the answer. */
   terminal?: boolean;
+  /** The HTTP status the platform answered with, when the failure was a handled one. */
+  httpStatus?: number;
   /** What the user can do about it, in the platform's own words. */
   tips?: string[];
   docsUrl?: string;
@@ -375,6 +377,7 @@ function buildDomainPresentation({
     // Levels 1 and 2 alike. A code we have copy for still names itself, so the
     // reader can quote it; a code we do not is the only handle anyone has.
     code: domain.code,
+    ...(domain.httpStatus ? { httpStatus: domain.httpStatus } : {}),
     ...(limit ? { limit } : {}),
     ...(isTerminalFailure(domain) ? { terminal: true } : {}),
     // The platform's own next steps (ADR-045's remediation channel), shown as written —

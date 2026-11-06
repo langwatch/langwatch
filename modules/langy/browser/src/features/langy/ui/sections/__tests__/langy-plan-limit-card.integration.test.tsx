@@ -60,7 +60,9 @@ const limitFailure = JSON.stringify({
   },
 });
 
-const turn = (): UIMessage =>
+const reply = { type: "text", text: "You are out of scenarios on this plan." };
+
+const turn = ({ answered = false }: { answered?: boolean } = {}): UIMessage =>
   ({
     id: "assistant-limit",
     role: "assistant",
@@ -74,13 +76,14 @@ const turn = (): UIMessage =>
         },
         errorText: limitFailure,
       },
+      ...(answered ? [reply] : []),
     ],
   }) as UIMessage;
 
-const renderTurn = () =>
+const renderTurn = ({ answered = false }: { answered?: boolean } = {}) =>
   render(
     <DesignSystemProvider forcedTheme="light">
-      <LangyToolActivity message={turn()} />
+      <LangyToolActivity message={turn({ answered })} live={!answered} />
     </DesignSystemProvider>,
   );
 
@@ -104,7 +107,14 @@ describe("a tool call refused on a plan limit", () => {
   it("keeps its card in the conversation while the turn is still running", () => {
     renderTurn();
     expect(screen.getByRole("alert")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /tool call/ })).toBeNull();
+    expect(screen.queryByRole("list", { name: "Finished steps" })).toBeNull();
+  });
+
+  /** @scenario "A failure the person can act on keeps its card" */
+  it("keeps its card in the conversation after the turn answered", () => {
+    renderTurn({ answered: true });
+    expect(screen.getByRole("alert").textContent).toContain("all 3 are in use");
+    expect(screen.queryByRole("list", { name: "Finished steps" })).toBeNull();
   });
 
   it("never shows the platform's internal vocabulary", () => {
