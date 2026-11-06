@@ -93,7 +93,7 @@ export function rateSpendNanoUsd({
         inputCharacters: usage.input_chars,
         // The one conversion of the duration quantity: integer milliseconds everywhere else.
         audioSeconds: usage.audio_ms / 1000,
-        webSearchRequests: usage.web_search_requests ?? 0,
+        webSearchRequests: usage.web_search_requests,
       })
     : 0;
   const costNanoUsd = Math.round((usd ?? 0) * NANO_USD_PER_USD);
