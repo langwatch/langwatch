@@ -4,6 +4,8 @@
  * refuses for a member with a gated column. A view with no origin is left as written (AC202f).
  */
 
+import type { TraceSource } from "@langwatch/analytics-contract";
+
 import {
   SOURCE_VIEWS,
   SOURCES_PLACEHOLDER,
@@ -12,7 +14,13 @@ import {
 } from "../../model/sources-parameter.ts";
 
 /** The trace views that leave out other sources' traces while the list holds application. */
-const COMPLEMENT_VIEWS: readonly string[] = ["traces", "spans"];
+const COMPLEMENT_VIEWS = [
+  "traces",
+  "spans",
+] as const satisfies readonly (typeof TRACE_VIEWS)[number][];
+
+/** The source `trace_metrics` gives a trace with a null or empty Origin (`sourceOfOrigin`). */
+const UNSTAMPED_SOURCE = "application" satisfies TraceSource;
 
 /** Words that can follow a view name without being its alias. */
 const NOT_AN_ALIAS = new Set([
@@ -159,12 +167,13 @@ function sourcesPredicate({
   }
 
   const key = `(${alias}.TenantId, ${alias}.TraceId)`;
-  const chosen = `has(${SOURCES_PLACEHOLDER}, 'application')`;
+  const chosen = `has(${SOURCES_PLACEHOLDER}, '${UNSTAMPED_SOURCE}')`;
   const lookup = ({ guard, operator }: { guard?: string; operator: string }) =>
     `(SELECT TenantId, TraceId FROM trace_metrics WHERE ${guard ? `${guard} AND ` : ""}` +
     `Source ${operator} ${SOURCES_PLACEHOLDER}${bound})`;
 
-  if (!COMPLEMENT_VIEWS.includes(view)) return `${key} IN ${lookup({ operator: "IN" })}`;
+  if (!(COMPLEMENT_VIEWS as readonly string[]).includes(view))
+    return `${key} IN ${lookup({ operator: "IN" })}`;
 
   // The list is bound at run time, so the switch sits in each set's own WHERE: the side whose
   // guard is false reads no row, so only one set ever fills. Why: analytics ADR-003.

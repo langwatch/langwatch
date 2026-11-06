@@ -59,14 +59,15 @@ AND k NOT IN (SELECT TenantId, TraceId FROM trace_metrics
 | `[]` | empty | empty | nothing |
 
 While the list holds `application`, the widget leaves out the traces of the other sources. On a
-large project those are the small set; the chosen ones took 30-day trace-list widgets over the
-query memory limit. A trace with no `trace_metrics` row is an unstamped trace, which is
-`application`'s, so it counts, and so does a trace older than the lookup's bound, whatever its
-source. While the list leaves `application` out, the widget keeps the traces of the list, and a
-trace with no row drops. Measured on prod, 30 days, one large project, a limit of about 1 GB: under
-`['application']` the excluded set used 571 MB where the included set failed at the limit; under
-`['langy']` the excluded set used 937 MB where the included set used 40 MB. Those figures are for the
-old single forms; the combined form is not yet measured on prod.
+large project those are the small set; the chosen ones took 30-day trace-list widgets over the query
+memory limit. A trace with no `trace_metrics` row is an unstamped trace, which is `application`'s,
+so it counts. Until its row is written, a brand-new trace of another source also has no row, so it
+counts too while the list holds `application`. So does a trace older than the lookup's bound,
+whatever its source. While the list leaves `application` out, the widget keeps the traces of the
+list, and a trace with no row drops. Measured on prod, 30 days, one large project, a limit of about
+1 GB: under `['application']` the excluded set used 571 MB where the included set failed at the
+limit; under `['langy']` the excluded set used 937 MB where the included set used 40 MB. Those
+figures are for the old single forms; the combined form is not yet measured on prod.
 
 Why the switch sits inside each subquery: the list is bound at run time, so the SQL cannot choose
 its form. An outer `if`, `AND` or `OR` round two subqueries may not stop either set being built: a

@@ -1964,7 +1964,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And its card reads "Sources don't apply: this widget reads a view that keeps no origin"
     # Evidence: a haven browser screenshot of the card
 
-  @integration
+  @unit @integration
   Scenario: AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace
     # Changed (2026-11-06): a list without "application" now keeps only its own sources' traces.
     Given spans of a trace with no trace_metrics row, of an application trace, of a Langy trace and of a simulation trace

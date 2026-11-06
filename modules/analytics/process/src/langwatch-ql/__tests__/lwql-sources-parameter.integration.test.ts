@@ -299,4 +299,25 @@ describe.skipIf(!url)("given traces of the application and of Langy, each with s
       expect(await count(`${from} ${nullRow}`, [...TRACE_SOURCES])).toBe(0);
     });
   });
+
+  // Seeded here, after every whole-table count above has run, so those counts stay as written.
+  describe("given a trace with one application and one langy trace_metrics row", () => {
+    beforeAll(async () => {
+      await client.command({
+        query: `INSERT INTO ${DATABASE}.trace_metrics (TenantId, TraceId, Origin) VALUES ('t', 'dual1', 'application'), ('t', 'dual1', 'langy')`,
+      });
+      await client.command({
+        query: `CREATE TABLE ${DATABASE}.dual_spans (TenantId String, TraceId String) ENGINE = Memory`,
+      });
+      await client.command({ query: `INSERT INTO ${DATABASE}.dual_spans VALUES ('t', 'dual1')` });
+    });
+
+    /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
+    it("drops the trace under application and keeps it under langy", async () => {
+      const spans = { table: "dual_spans", lookup: BY_TRACE, trace: "dual1" };
+
+      expect(await kept({ ...spans, sources: ["application"] })).toBe(0);
+      expect(await kept({ ...spans, sources: ["langy"] })).toBe(1);
+    });
+  });
 });
