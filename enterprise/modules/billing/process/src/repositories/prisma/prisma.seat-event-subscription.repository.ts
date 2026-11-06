@@ -3,8 +3,9 @@ import {
   type GrowthSeatPlanType,
 } from "@langwatch/enterprise-billing-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { nowInstant, toDate } from "@langwatch/time";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
+import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
   type SeatSubscriptionRow,
@@ -22,16 +23,27 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
     return new PrismaSeatEventSubscriptionRepository(prisma);
   }
 
-  findSeatCandidates({
+  async findSeatCandidates({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<SeatSubscriptionRow[]> {
-    return this.prisma.subscription.findMany({
+    const rows = await this.prisma.subscription.findMany({
       where: { organizationId, status: { in: ["ACTIVE", "CANCELLED"] } },
       orderBy: { createdAt: "desc" },
-      select: { id: true, status: true, stripeSubscriptionId: true },
+      select: {
+        id: true,
+        status: true,
+        stripeSubscriptionId: true,
+        maxMembers: true,
+        seatsKept: true,
+        seatsKeptUntil: true,
+      },
     });
+    return rows.map((row) => ({
+      ...row,
+      seatsKeptUntil: row.seatsKeptUntil ? fromDate(row.seatsKeptUntil) : null,
+    }));
   }
 
   async cancelPendingSeatCheckouts({
@@ -63,10 +75,24 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
     });
   }
 
-  async reactivateWithSeats({ id, maxMembers }: { id: string; maxMembers: number }): Promise<void> {
+  async reactivateWithSeats({
+    id,
+    maxMembers,
+    kept,
+  }: {
+    id: string;
+    maxMembers: number;
+    kept: KeptSeats | null;
+  }): Promise<void> {
     await this.prisma.subscription.update({
       where: { id },
-      data: { status: "ACTIVE", maxMembers, endDate: null },
+      data: {
+        status: "ACTIVE",
+        maxMembers,
+        endDate: null,
+        seatsKept: kept?.seats ?? null,
+        seatsKeptUntil: kept ? toDate(kept.until) : null,
+      },
     });
   }
 }

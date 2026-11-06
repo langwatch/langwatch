@@ -26,6 +26,7 @@ export const prismaTableCatalogue = {
   "JoinRequest": "JoinRequest",
   "TeamUser": "TeamUser",
   "OrganizationUser": "OrganizationUser",
+  "SeatHold": "SeatHold",
   "Team": "Team",
   "Organization": "Organization",
   "IssuedLicense": "IssuedLicense",
@@ -571,7 +572,20 @@ export const prismaModelFieldCatalogue = {
     "departmentId",
     "disabledAt",
     "pendingSsoGrantId",
-    "membershipStamp"
+    "membershipStamp",
+    "fullSeatSince",
+    "seatPendingSince"
+  ],
+  "SeatHold": [
+    "id",
+    "organizationId",
+    "userId",
+    "email",
+    "name",
+    "seatTakenAt",
+    "heldUntil",
+    "reason",
+    "createdAt"
   ],
   "Team": [
     "id",
@@ -2171,6 +2185,8 @@ export const prismaModelFieldCatalogue = {
     "maxDashboards",
     "maxCustomGraphs",
     "maxAutomations",
+    "seatsKept",
+    "seatsKeptUntil",
     "organization",
     "invoices"
   ],
@@ -3221,6 +3237,7 @@ export const prismaRelationCatalogue = {
     "user": "User",
     "organization": "Organization"
   },
+  "SeatHold": {},
   "Team": {
     "members": "TeamUser",
     "organization": "Organization",

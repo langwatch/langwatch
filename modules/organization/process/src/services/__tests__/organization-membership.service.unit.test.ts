@@ -18,6 +18,7 @@ import {
 } from "../organization-membership.service.ts";
 import type { OrganizationCreationNotice } from "../organization-provisioning.service.ts";
 import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
+import { withSeatHolds } from "./support/seat-holds.ts";
 
 const mockInvalidateOrganization = vi.fn();
 const mockCheckLimit = vi.fn();
@@ -75,6 +76,10 @@ describe("OrganizationMembershipService", () => {
     updateMemberRole: vi.fn(),
     updateTeamMemberRole: vi.fn(),
     getAuditLogs: vi.fn(),
+    findSeatStandings: vi.fn().mockResolvedValue([]),
+    findWaitingMembers: vi.fn().mockResolvedValue([]),
+    writeSeatHold: vi.fn(),
+    takeHeldSeat: vi.fn(),
   };
 
   const mockCreations: OrganizationCreationNotice = {
@@ -122,7 +127,7 @@ describe("OrganizationMembershipService", () => {
     service = OrganizationMembershipService.create({
       workspaceNotices: { personalWorkspaceArchived },
       memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
-      repository: mockRepo,
+      ...withSeatHolds({ repository: mockRepo }),
       creations: mockCreations,
       seats,
       seatNotices,
@@ -494,7 +499,7 @@ describe("OrganizationMembershipService", () => {
       OrganizationMembershipService.create({
         workspaceNotices: { personalWorkspaceArchived },
         memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
-        repository: mockRepo,
+        ...withSeatHolds({ repository: mockRepo }),
         creations: mockCreations,
         seats,
         seatNotices,
@@ -651,6 +656,8 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           userId: "user-456",
           actingUserId: "admin-789",
+          // The repository reads no seat standing here, so no seat is held.
+          seatHold: null,
         });
       });
     });
@@ -755,6 +762,7 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           userId: "user-456",
           disabled: true,
+          seat: { kind: "unchanged" },
         });
         expect(mockInvalidateOrganization).toHaveBeenCalledWith({ organizationId: "org-123" });
       });
@@ -840,7 +848,7 @@ describe("OrganizationMembershipService", () => {
         const unrecorded = OrganizationMembershipService.create({
           workspaceNotices: { personalWorkspaceArchived },
           memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
-          repository: mockRepo,
+          ...withSeatHolds({ repository: mockRepo }),
           creations: mockCreations,
           seats,
           seatNotices: {
@@ -946,6 +954,7 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           userId: "user-456",
           disabled: true,
+          seat: { kind: "unchanged" },
         });
         // Disabling frees a seat, so consulting the seat limit here would
         // refuse the very action that makes room. Named, or a regression that
@@ -1017,6 +1026,7 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           userId: "user-456",
           disabled: false,
+          seat: { kind: "unchanged" },
         });
       });
     });

@@ -20,6 +20,8 @@ const ACTIVE = {
   status: "active",
   canceled_at: null,
   billing_thresholds: null,
+  current_period_end: 1_701_388_800,
+  currency: "eur",
   items: {
     data: [
       {
@@ -37,7 +39,11 @@ const ACTIVE_HELD: BillingSubscription = {
   status: "active",
   canceledAt: null,
   billingThreshold: null,
-  items: [{ id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month" }],
+  items: [
+    { id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month", quantity: 2 },
+  ],
+  currentPeriodEnd: 1_701_388_800,
+  currency: "eur",
 };
 
 const PREVIEW = {
@@ -292,9 +298,17 @@ describe("Billing's subscription shapes over the provider", () => {
       canceledAt: 1_699_000_000,
       billingThreshold: { amountGte: 75_000, resetBillingCycleAnchor: false },
       items: [
-        { id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month" },
-        { id: "si_events", priceId: "price_events", unitAmount: null, interval: null },
+        { id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month", quantity: 2 },
+        {
+          id: "si_events",
+          priceId: "price_events",
+          unitAmount: null,
+          interval: null,
+          quantity: null,
+        },
       ],
+      currentPeriodEnd: 1_701_388_800,
+      currency: "eur",
     });
   });
 

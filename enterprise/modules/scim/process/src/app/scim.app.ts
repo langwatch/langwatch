@@ -347,6 +347,7 @@ export class ScimModule implements ScimApiContract {
           grants: dependencies.authorization,
           lifecycle,
           organization: dependencies.authorization,
+          seats: channels.members,
         }),
       }),
       platformOperators: dependencies.authorization,

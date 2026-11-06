@@ -1,10 +1,16 @@
 import type { GrowthSeatPlanType } from "@langwatch/enterprise-billing-contract";
+import type { Instant } from "@langwatch/time";
+
+import type { KeptSeats } from "../rules/seat-kept.rules.ts";
 
 /** The subscription fields a seat change reads. */
 export type SeatSubscriptionRow = {
   id: string;
   status: string;
   stripeSubscriptionId: string | null;
+  maxMembers: number | null;
+  seatsKept: number | null;
+  seatsKeptUntil: Instant | null;
 };
 
 /** The subscription rows a growth-seat checkout and a seat change write. */
@@ -18,6 +24,10 @@ export abstract class SeatEventSubscriptionRepository {
     plan: GrowthSeatPlanType;
     maxMembers: number;
   }): Promise<{ id: string }>;
-  /** Back to ACTIVE at the new seat count, any scheduled end cleared. */
-  abstract reactivateWithSeats(input: { id: string; maxMembers: number }): Promise<void>;
+  /** Back to ACTIVE at the new seat count with the seats it keeps, any scheduled end cleared. */
+  abstract reactivateWithSeats(input: {
+    id: string;
+    maxMembers: number;
+    kept: KeptSeats | null;
+  }): Promise<void>;
 }

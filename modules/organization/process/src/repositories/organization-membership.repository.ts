@@ -19,6 +19,7 @@ import type { Instant } from "@langwatch/time";
 
 import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service.ts";
+import type { SeatHold, SeatTransition } from "./seat-hold.repository.ts";
 
 export type OrganizationMemberWithUser = OrganizationWithMembersAndTheirTeams["members"][number];
 
@@ -145,6 +146,8 @@ export interface DeleteMemberInput {
    * organization service itself.
    */
   actingUserId?: string | null;
+  /** The full seat the removal leaves counted, written in the same transaction. */
+  seatHold?: SeatHold | null;
 }
 
 /**
@@ -156,6 +159,8 @@ export interface SetMemberDisabledInput {
   organizationId: string;
   userId: string;
   disabled: boolean;
+  /** What the change does to the person's full seat; absent leaves it as it stands. */
+  seat?: SeatTransition;
 }
 
 /**
@@ -179,6 +184,29 @@ export interface UpdateMemberRoleInput {
   currentUserId: string | null;
   /** Whose holdings bound the grants this change writes (authz refuses anything beyond them). */
   caller: AuthzGrantCaller;
+  /** What the change does to the person's full seat; absent leaves it as it stands. */
+  seat?: SeatTransition;
+}
+
+/** A membership as the seat hold rule reads it (seat-rotation.feature). */
+export interface MemberSeatStanding {
+  role: OrganizationUserRole;
+  disabledAt: Instant | null;
+  createdAt: Instant;
+  /** When the full seat held now was taken; null reads as `createdAt`. */
+  fullSeatSince: Instant | null;
+  /** Set while admission keeps the person waiting for a seat. */
+  seatPendingSince: Instant | null;
+  email: string | null;
+  name: string | null;
+}
+
+/** A person admission left waiting for a seat. */
+export interface WaitingMember {
+  userId: string;
+  name: string | null;
+  email: string | null;
+  waitingSince: Instant;
 }
 
 /**
@@ -386,7 +414,32 @@ export abstract class OrganizationMembershipRepository {
     pending: boolean;
     /** Where a join request was made, for the Developer admission audit row. */
     origin?: "web" | "cli";
+    /** A full seat taken back from the person's hold: its date, and the hold goes. */
+    seatTakenAt?: Instant;
   }) => Promise<OrganizationAdmission>;
+
+  /** The person's seat standing: one entry, or none where they are not a member. */
+  abstract findSeatStandings: (input: {
+    organizationId: string;
+    userId: string;
+  }) => Promise<MemberSeatStanding[]>;
+
+  /** Writes or replaces the person's seat hold; the membership row is left as it stands. */
+  abstract writeSeatHold: (input: { hold: SeatHold }) => Promise<void>;
+
+  /**
+   * Takes a held seat back: the membership's full seat dates from `since`, and the holds of
+   * `holdUserIds` in the organization go.
+   */
+  abstract takeHeldSeat: (input: {
+    organizationId: string;
+    userId: string;
+    since: Instant;
+    holdUserIds: readonly string[];
+  }) => Promise<void>;
+
+  /** The people admission left waiting for a seat, longest waiting first. */
+  abstract findWaitingMembers: (input: { organizationId: string }) => Promise<WaitingMember[]>;
 
   /** Every membership row the person holds, disabled ones included. */
   abstract countMembershipsForUser: (input: { userId: string }) => Promise<number>;

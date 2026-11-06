@@ -3,7 +3,7 @@ import {
   type OrganizationMemberSeats,
   OrganizationUserRole,
 } from "@langwatch/organization-contract";
-import { nowInstant, type Instant } from "@langwatch/time";
+import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import { OrganizationSeatRepository } from "../organization-seat.repository.ts";
@@ -62,7 +62,7 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
   }
 
   async getMemberCount(organizationId: string): Promise<number> {
-    return this.#count(organizationId, isFullMember);
+    return (await this.countMemberSeats(organizationId)).fullMembers;
   }
 
   async getMembersLiteCount(organizationId: string): Promise<number> {
@@ -74,27 +74,60 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
   }
 
   async countMemberSeats(organizationId: string): Promise<OrganizationMemberSeats> {
+    const fullUserIds = new Set(
+      this.#members(organizationId, isFullMember).map((member) => member.userId),
+    );
+    // A full seat stays counted until its hold ends, unless a live full invitation takes it back.
+    const now = nowInstant();
+    const permissionsOf = this.#permissionsOf(organizationId);
+    const invitedEmails = new Set(
+      [...this.memory.invites.values()]
+        .filter(
+          (invite) =>
+            invite.organizationId === organizationId &&
+            isLive(invite, now) &&
+            inviteHoldsSeat(invite, permissionsOf, isFullMember),
+        )
+        .map((invite) => invite.email.toLowerCase()),
+    );
+    const heldFullMembers = this.memory.seatHolds.filter(
+      (hold) =>
+        hold.organizationId === organizationId &&
+        Temporal.Instant.compare(hold.heldUntil, now) > 0 &&
+        !fullUserIds.has(hold.userId) &&
+        !(hold.email && invitedEmails.has(hold.email.toLowerCase())),
+    ).length;
     return {
-      fullMembers: this.#count(organizationId, isFullMember),
+      fullMembers: this.#count(organizationId, isFullMember) + heldFullMembers,
       liteMembers: this.#count(organizationId, isLiteMember),
       developers: this.#count(organizationId, isDeveloper),
+      heldFullMembers,
     };
   }
 
-  #count(organizationId: string, predicate: SeatPredicate): number {
-    const permissionsOf: PermissionsOf = (customRoleId) => {
+  #permissionsOf(organizationId: string): PermissionsOf {
+    return (customRoleId) => {
       const role = customRoleId ? this.memory.customRoles.get(customRoleId) : undefined;
       if (role?.organizationId !== organizationId) return undefined;
       return permissionsSchema.safeParse(role.permissions).data ?? [];
     };
-    // Disabled memberships and deactivated people hold no seat (seat-reconciliation.feature).
-    const memberSeats = this.memory.organizationUsers.filter(
+  }
+
+  /** Disabled memberships and deactivated people hold no seat (seat-reconciliation.feature). */
+  #members(organizationId: string, predicate: SeatPredicate): MemoryOrganizationUserRow[] {
+    const permissionsOf = this.#permissionsOf(organizationId);
+    return this.memory.organizationUsers.filter(
       (member) =>
         member.organizationId === organizationId &&
         member.disabledAt === null &&
         (this.memory.users.get(member.userId)?.deactivatedAt ?? null) === null &&
         predicate(member.role, this.#memberPermissions(member, permissionsOf)),
-    ).length;
+    );
+  }
+
+  #count(organizationId: string, predicate: SeatPredicate): number {
+    const permissionsOf = this.#permissionsOf(organizationId);
+    const memberSeats = this.#members(organizationId, predicate).length;
     const now = nowInstant();
     const inviteSeats = [...this.memory.invites.values()].filter(
       (invite) =>

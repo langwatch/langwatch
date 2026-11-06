@@ -33,6 +33,7 @@ export * from "./personal-workspace-features.trpc.ts";
 export * from "./ui-scope.ts";
 export * from "./admission-seat.ts";
 export * from "./seat-fit.ts";
+export * from "./seat-hold.ts";
 export * from "./member-provenance.ts";
 export * from "./scope-graph.ts";
 export * from "./organization-drawers.ts";

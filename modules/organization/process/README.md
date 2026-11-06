@@ -6,13 +6,13 @@ The server half of [organization](../README.md). Organisations and who is in the
 
 ## Installation
 
-`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withMigrations(…)`, `src/organization.module.ts:29`.
+`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withEventing(seatHoldCheckEventing).withMigrations(…)`, `src/organization.module.ts:30`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:241`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:252`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -56,6 +56,46 @@ findPendingInvitationsByEmail(input: Readonly<{ email: string }>): Promise<Pendi
 
 ```typescript
 deleteMember(input: Readonly<{ organizationId: string; userId: string }>, by: OrganizationCaller | null): Promise<void>;
+```
+
+#### `removeMember`
+
+Removes a member; when their seat frees at once and a full seat fits, gives it to the person waiting the caller named (seat-rotation.feature).
+
+```typescript
+removeMember(input: OrganizationApiRemoveMemberInput, by: OrganizationCaller): Promise<OrganizationMemberRemoved>;
+```
+
+#### `getSeatRemovalPreview`
+
+What removing this member does to their seat, and who waits for it: the remove dialog.
+
+```typescript
+getSeatRemovalPreview(input: Readonly<{ organizationId: string; userId: string }>): Promise<OrganizationSeatRemovalPreview>;
+```
+
+#### `listHeldSeats`
+
+The seats removed, disabled or demoted people still hold: the Users list's greyed rows.
+
+```typescript
+listHeldSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationHeldSeats>;
+```
+
+#### `holdSeatOfDepartingMember`
+
+Keeps the full seat of a member about to leave by a path that deletes the membership row itself (directory offboarding), so leaving and coming back costs the same seat. Asked before that path runs; nothing when the seat frees at once (seat-rotation.feature).
+
+```typescript
+holdSeatOfDepartingMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<void>;
+```
+
+#### `takeBackHeldSeat`
+
+A person admitted back within their seat hold, by a path that writes the membership row itself (directory provisioning), takes the held seat: its date stays and the hold goes.
+
+```typescript
+takeBackHeldSeat(input: Readonly<{ organizationId: string; userId: string }>): Promise<void>;
 ```
 
 #### `setMemberDisabled`
@@ -1916,28 +1956,30 @@ type Input = z.infer<typeof limitScopeSchema>; // ../contract/src/license-enforc
 
 ### `organization`
 
-Contract `../contract/src/organization.trpc.ts:88`, router `src/transport/organization.trpc.ts:80`.
+Contract `../contract/src/organization.trpc.ts:94`, router `src/transport/organization.trpc.ts:80`.
 
-| Procedure                                              | Kind     | Gate                                                                                                                                  | Input                                            | Output                                |
-| ------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------- |
-| `organization.createAndAssign`                         | mutation | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | `organizationApiCreateAndAssignInputSchema`      | `organizationCreatedSchema`           |
-| `organization.deleteMember`                            | mutation | Permission `organization:manage`                                                                                                      | `organizationApiMemberScopeSchema`               | `organizationWriteAckSchema`          |
-| `organization.setMemberDisabled`                       | mutation | Permission `organization:manage`                                                                                                      | `organizationApiSetMemberDisabledInputSchema`    | `organizationWriteAckSchema`          |
-| `organization.getAll`                                  | query    | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | `organizationApiGetAllInputSchema`               | `organizationFullyLoadedListSchema`   |
-| `organization.getScopeGraph`                           | query    | No permission: answers the scope skeleton of the caller's own memberships; no single scope holds it                                   | `organizationApiScopeGraphInputSchema`           | `scopeGraphSchema`                    |
-| `organization.update`                                  | mutation | Permission `organization:manage`                                                                                                      | `organizationApiUpdateInputSchema`               | `organizationWriteAckSchema`          |
-| `organization.getOrganizationWithMembersAndTheirTeams` | query    | Permission `organization:view`                                                                                                        | `organizationApiWithMembersInputSchema`          | `organizationMemberDirectorySchema`   |
-| `organization.getDirectoryCounts`                      | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`                     | `organizationDirectoryCountsSchema`   |
-| `organization.getMemberById`                           | query    | Permission `organization:manage`                                                                                                      | `organizationApiMemberScopeSchema`               | `organizationMemberRecordSchema`      |
-| `organization.getInvitedMemberIds`                     | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`                     | `organizationInvitedMemberIdsSchema`  |
-| `organization.updateTeamMemberRole`                    | mutation | Permission `organization:manage, via teamId`; Entitlement `enterprise` (feature `RBAC`)                                               | `organizationApiUpdateTeamMemberRoleInputSchema` | `organizationWriteAckSchema`          |
-| `organization.getAllOrganizationMembers`               | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`                     | `organizationUserRowsSchema`          |
-| `organization.updateMemberRole`                        | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                           | `organizationApiUpdateMemberRoleInputSchema`     | `organizationMemberRoleChangedSchema` |
-| `organization.getAuditLogs`                            | query    | Permission `auditLog:view, via organizationId`; Entitlement `enterprise` (feature `AUDIT_LOGS`)                                       | `organizationApiAuditLogsInputSchema`            | `organizationAuditLogPageSchema`      |
+| Procedure                                              | Kind     | Gate                                                                                                                                  | Input                                            | Output                                 |
+| ------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------- |
+| `organization.createAndAssign`                         | mutation | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | `organizationApiCreateAndAssignInputSchema`      | `organizationCreatedSchema`            |
+| `organization.deleteMember`                            | mutation | Permission `organization:manage`                                                                                                      | `organizationApiRemoveMemberInputSchema`         | `organizationMemberRemovedSchema`      |
+| `organization.getSeatRemovalPreview`                   | query    | Permission `organization:manage`                                                                                                      | `organizationApiMemberScopeSchema`               | `organizationSeatRemovalPreviewSchema` |
+| `organization.listHeldSeats`                           | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`                     | `organizationHeldSeatsSchema`          |
+| `organization.setMemberDisabled`                       | mutation | Permission `organization:manage`                                                                                                      | `organizationApiSetMemberDisabledInputSchema`    | `organizationWriteAckSchema`           |
+| `organization.getAll`                                  | query    | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | `organizationApiGetAllInputSchema`               | `organizationFullyLoadedListSchema`    |
+| `organization.getScopeGraph`                           | query    | No permission: answers the scope skeleton of the caller's own memberships; no single scope holds it                                   | `organizationApiScopeGraphInputSchema`           | `scopeGraphSchema`                     |
+| `organization.update`                                  | mutation | Permission `organization:manage`                                                                                                      | `organizationApiUpdateInputSchema`               | `organizationWriteAckSchema`           |
+| `organization.getOrganizationWithMembersAndTheirTeams` | query    | Permission `organization:view`                                                                                                        | `organizationApiWithMembersInputSchema`          | `organizationMemberDirectorySchema`    |
+| `organization.getDirectoryCounts`                      | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`                     | `organizationDirectoryCountsSchema`    |
+| `organization.getMemberById`                           | query    | Permission `organization:manage`                                                                                                      | `organizationApiMemberScopeSchema`               | `organizationMemberRecordSchema`       |
+| `organization.getInvitedMemberIds`                     | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`                     | `organizationInvitedMemberIdsSchema`   |
+| `organization.updateTeamMemberRole`                    | mutation | Permission `organization:manage, via teamId`; Entitlement `enterprise` (feature `RBAC`)                                               | `organizationApiUpdateTeamMemberRoleInputSchema` | `organizationWriteAckSchema`           |
+| `organization.getAllOrganizationMembers`               | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`                     | `organizationUserRowsSchema`           |
+| `organization.updateMemberRole`                        | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                           | `organizationApiUpdateMemberRoleInputSchema`     | `organizationMemberRoleChangedSchema`  |
+| `organization.getAuditLogs`                            | query    | Permission `auditLog:view, via organizationId`; Entitlement `enterprise` (feature `AUDIT_LOGS`)                                       | `organizationApiAuditLogsInputSchema`            | `organizationAuditLogPageSchema`       |
 
 ```typescript
 // organization.createAndAssign
-type Input = z.infer<typeof organizationApiCreateAndAssignInputSchema>; // ../contract/src/organization.trpc.ts:58
+type Input = z.infer<typeof organizationApiCreateAndAssignInputSchema>; // ../contract/src/organization.trpc.ts:64
 // Output: organizationCreatedSchema, ../contract/src/organization.responses.ts:29
 interface Output {
   success: true;
@@ -1953,14 +1995,47 @@ interface Output {
 }
 
 // organization.deleteMember
+// Input: organizationApiRemoveMemberInputSchema, ../contract/src/seat-hold.ts:19
+interface Input {
+  organizationId: string;
+  userId: string;
+  giveSeatToUserId?: string | null;
+}
+// Output: organizationMemberRemovedSchema, ../contract/src/seat-hold.ts:32
+interface Output {
+  success: true;
+  seatGivenToUserId: string | null;
+}
+
+// organization.getSeatRemovalPreview
 // Input: organizationApiMemberScopeSchema, ../contract/src/organization.trpc-schemas.ts:26
 interface Input {
   userId: string;
   organizationId: string;
 }
-// Output: organizationWriteAckSchema, ../contract/src/organization.responses.ts:14
+// Output: organizationSeatRemovalPreviewSchema, ../contract/src/seat-hold.ts:55
 interface Output {
-  success: true;
+  holdsFullSeat: boolean;
+  seatFreesAt: unknown | null;
+  waiting: {
+    userId: string;
+    name: string | null;
+    email: string | null;
+  } | null;
+}
+
+// organization.listHeldSeats
+type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
+// Output: organizationHeldSeatsSchema, ../contract/src/seat-hold.ts:78
+interface Output {
+  heldSeats: {
+    userId: string;
+    name: string | null;
+    email: string | null;
+    seatTakenAt: unknown;
+    seatFreesAt: unknown;
+    reason: "REMOVED" | "DISABLED" | "DEMOTED";
+  }[];
 }
 
 // organization.setMemberDisabled
@@ -1970,14 +2045,17 @@ interface Input {
   organizationId: string;
   disabled: boolean;
 }
-type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:14
+// Output: organizationWriteAckSchema, ../contract/src/organization.responses.ts:14
+interface Output {
+  success: true;
+}
 
 // organization.getAll
 // Input: organizationApiGetAllInputSchema, ../contract/src/organization.trpc-schemas.ts:116
 interface Input {
   isDemo?: boolean;
 }
-// Output: organizationFullyLoadedListSchema, ../contract/src/organization.trpc.ts:73
+// Output: organizationFullyLoadedListSchema, ../contract/src/organization.trpc.ts:79
 type Output = unknown[];
 
 // organization.getScopeGraph
@@ -2270,6 +2348,14 @@ Declared at `src/eventing/organization-private-dataplane.pipeline.ts:33`.
 | --------------- | -------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | process manager | `privateDataplaneRecorder` | every 5 min (`PRIVATE_DATAPLANE_RECORD_INTERVAL_MS = 5 * 60 * 1000`); intents `record` (outbox) | `src/eventing/organization-private-dataplane.pipeline.ts:38` |
 
+### Pipeline `organization_seat_hold_check` (aggregate `global`)
+
+Declared at `src/eventing/seat-hold-check.pipeline.ts:39`.
+
+| Kind            | Name            | Handles                                                                              | Declared at                                   |
+| --------------- | --------------- | ------------------------------------------------------------------------------------ | --------------------------------------------- |
+| process manager | `seatHoldCheck` | every 1 h (`SEAT_HOLD_CHECK_INTERVAL_MS = 60 * 60 * 1000`); intents `check` (outbox) | `src/eventing/seat-hold-check.pipeline.ts:45` |
+
 ### Pipeline `organization_seat_limit` (aggregate `organization_seat_limit`)
 
 Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedEventSchema`.
@@ -2282,7 +2368,7 @@ Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedE
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:301`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:308`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |

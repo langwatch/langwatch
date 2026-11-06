@@ -14,6 +14,7 @@ import type {
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
 import type { OrganizationCreationNotice } from "../organization-provisioning.service.ts";
 import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
+import { withSeatHolds } from "./support/seat-holds.ts";
 
 const refuse = (what: string) => () => Promise.reject(new Error(`${what} is not asked here`));
 
@@ -38,7 +39,10 @@ function installed() {
   const service = OrganizationMembershipService.create({
     workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
     memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
-    repository: MemoryOrganizationMembershipRepository.create({ memory }),
+    ...withSeatHolds({
+      repository: MemoryOrganizationMembershipRepository.create({ memory }),
+      memory,
+    }),
     creations,
     seats,
     seatNotices,

@@ -17,9 +17,11 @@ import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";
 import { nowInstant } from "@langwatch/time";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { billingApi } from "../../behavior/billing-api.ts";
 import { type BillingInterval, type Currency, formatPrice } from "../../model/billing-plans.ts";
+import { seatChangeSummary, seatQuoteOf } from "../../model/seat-change-summary.ts";
 import {
   countFullMembers,
   type DrawerSaveResult,
@@ -28,6 +30,7 @@ import {
   type PlannedUser,
   type SubscriptionUser,
 } from "../../model/subscription-types.ts";
+import { SeatChangeSummaryBlock } from "../blocks/seat-change-summary-block.tsx";
 
 let plannedUserSequence = 0;
 
@@ -41,6 +44,15 @@ function invalidEmailErrors(plannedUsers: PlannedUser[]): Record<string, string>
   }
   return errors;
 }
+
+/** A Growth plan whose seat count the drawer changes at the payment provider. */
+export type DrawerSeatChange = {
+  organizationId: string;
+  /** The seats the plan grants now. */
+  currentSeats: number;
+  /** Resolves true once the provider took the change; a failure was already reported. */
+  onCommit: (input: { newSeats: number; quotedAt: number | undefined }) => Promise<boolean>;
+};
 
 /** One badge per seat. A Developer (ADR-171) is neither a Full seat nor a capped Lite seat. */
 const SEAT_BADGE: Record<MemberType, { tone: string; label: string }> = {
@@ -61,6 +73,7 @@ export function UserManagementDrawer({
   isLoading,
   onSave,
   maxSeats,
+  seatChange,
 }: {
   open: boolean;
   onClose: () => void;
@@ -73,6 +86,8 @@ export function UserManagementDrawer({
   isLoading: boolean;
   onSave: (result: DrawerSaveResult) => void;
   maxSeats?: number;
+  /** Set on a Growth plan: a changed count is quoted and committed from the drawer. */
+  seatChange?: DrawerSeatChange;
 }) {
   const [editableUsers, setEditableUsers] = useState<SubscriptionUser[]>([]);
   const [localPlannedUsers, setLocalPlannedUsers] = useState<PlannedUser[]>([]);
@@ -107,12 +122,12 @@ export function UserManagementDrawer({
   }, [open, users, plannedUsers, pendingInvitesWithMemberType, maxSeats]);
 
   // Reset state when closing without saving
-  const handleClose = useCallback(() => {
+  const handleClose = () => {
     setEditableUsers([]);
     setLocalPlannedUsers([]);
     setEmailErrors({});
     onClose();
-  }, [onClose]);
+  };
 
   const handleAddSeat = () => {
     const newPlannedUser: PlannedUser = {
@@ -136,11 +151,12 @@ export function UserManagementDrawer({
     });
   };
 
-  const handleSave = () => {
+  /** Hands the drawer's rows to the page; false when an address needs fixing first. */
+  const saveRows = (): boolean => {
     const errors = invalidEmailErrors(localPlannedUsers);
     if (Object.keys(errors).length > 0) {
       setEmailErrors(errors);
-      return;
+      return false;
     }
 
     const autoRows = localPlannedUsers.filter((u) => u.id.startsWith("auto-"));
@@ -153,7 +169,11 @@ export function UserManagementDrawer({
       newSeats: manualRows,
       deletedSeatCount: Math.max(0, deletedAutoCount),
     });
-    onClose();
+    return true;
+  };
+
+  const handleSave = () => {
+    if (saveRows()) onClose();
   };
 
   const totalFullMembersInDrawer =
@@ -164,14 +184,25 @@ export function UserManagementDrawer({
   const periodSuffix = billingPeriod === "annual" ? "/yr" : "/mo";
   const priceLabel = billingPeriod === "annual" ? "Annual Price:" : "Monthly Price:";
 
+  const seatStep = useDrawerSeatChange({
+    open,
+    seatChange: isLoading ? undefined : seatChange,
+    newSeats: totalFullMembersInDrawer,
+    saveRows,
+    onCommitted: onClose,
+  });
+
   return (
     <Drawer
       open={open}
       onClose={handleClose}
       size="lg"
       title="Manage seats"
+      busy={seatStep?.isCommitting}
       footer={{
-        summary: (
+        summary: seatStep ? (
+          <SeatChangeSummaryBlock summary={seatStep.summary} />
+        ) : (
           <VStack
             data-testid="drawer-footer-breakdown"
             align="stretch"
@@ -200,7 +231,7 @@ export function UserManagementDrawer({
           </VStack>
         ),
         cancel: { label: "Cancel", onClick: handleClose },
-        primaryAction: { label: "Done", onClick: handleSave },
+        primaryAction: seatStep?.action ?? { label: "Done", onClick: handleSave },
       }}
     >
       {isLoading ? (
@@ -272,6 +303,58 @@ export function UserManagementDrawer({
       )}
     </Drawer>
   );
+}
+
+/**
+ * A changed seat count on a Growth plan: its quote, what the drawer says about it, and the
+ * action that commits it. Undefined while the count matches the plan or the plan has no quote.
+ */
+function useDrawerSeatChange({
+  open,
+  seatChange,
+  newSeats,
+  saveRows,
+  onCommitted,
+}: {
+  open: boolean;
+  seatChange: DrawerSeatChange | undefined;
+  newSeats: number;
+  saveRows: () => boolean;
+  onCommitted: () => void;
+}) {
+  const [isCommitting, setIsCommitting] = useState(false);
+  const isChanged = seatChange !== undefined && newSeats !== seatChange.currentSeats;
+  const quoteQuery = billingApi.subscription.previewProration.useQuery(
+    { organizationId: seatChange?.organizationId ?? "", newTotalSeats: Math.max(1, newSeats) },
+    { enabled: open && isChanged && newSeats > 0 },
+  );
+  if (!seatChange || !isChanged) return undefined;
+
+  const quote = seatQuoteOf(quoteQuery.data);
+  const summary = seatChangeSummary({ from: seatChange.currentSeats, to: newSeats, quote });
+  const commit = async () => {
+    if (!saveRows()) return;
+    setIsCommitting(true);
+    try {
+      if (await seatChange.onCommit({ newSeats, quotedAt: quote?.quotedAt })) onCommitted();
+    } finally {
+      setIsCommitting(false);
+    }
+  };
+  const pendingReason = quoteQuery.isError
+    ? "The price for this change did not load"
+    : "Loading the price for this change";
+
+  return {
+    summary,
+    isCommitting,
+    action: {
+      label: summary.actionLabel,
+      onClick: () => void commit(),
+      loading: isCommitting,
+      disabledReason: quote ? undefined : pendingReason,
+    },
+  };
 }
 
 function CurrentMembersSection({

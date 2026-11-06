@@ -189,6 +189,9 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         getLastSubscription: {
           useQuery: () => setup.mockGetLastSubscription(),
         },
+        previewProration: {
+          useQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+        },
       },
       useUtils: vi.fn(() => ({
         organization: {

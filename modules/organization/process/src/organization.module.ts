@@ -8,6 +8,7 @@ import { organizationChannels } from "./channels/organization-channels.registry.
 import { organizationAuditEventing } from "./eventing/organization-audit.pipeline.ts";
 import { organizationLifecycleEventing } from "./eventing/organization-lifecycle.pipeline.ts";
 import { privateDataplaneRecorderEventing } from "./eventing/organization-private-dataplane.pipeline.ts";
+import { seatHoldCheckEventing } from "./eventing/seat-hold-check.pipeline.ts";
 import { seatLimitEventing } from "./eventing/seat-limit.pipeline.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
 import { OrganizationPresenceSettingBackfillService } from "./services/organization-presence-setting-backfill.service.ts";
@@ -52,6 +53,7 @@ export const organizationProcessModule: PublishedProcessModule<
   .withEventing(organizationLifecycleEventing)
   .withEventing(organizationAuditEventing)
   .withEventing(privateDataplaneRecorderEventing)
+  .withEventing(seatHoldCheckEventing)
   // Old images record no presence fact: run once none serves (ADR-173 §3).
   .withMigrations(({ app }) => [
     defineMigrationStep({

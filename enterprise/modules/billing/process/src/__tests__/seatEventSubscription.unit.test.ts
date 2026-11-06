@@ -31,6 +31,9 @@ const prices = {
 
 // ── Mock factories ──────────────────────────────────────────────────────────
 
+/** 1 Dec 2099, the end of the period already invoiced. */
+const PERIOD_END_SECONDS = Math.floor(Date.UTC(2099, 11, 1) / 1000);
+
 /** A subscription as the provider holds it, with only the fields these paths read. */
 const subscriptionOf = (fields: Partial<BillingSubscription>): BillingSubscription => ({
   id: "sub_stripe_1",
@@ -38,6 +41,7 @@ const subscriptionOf = (fields: Partial<BillingSubscription>): BillingSubscripti
   canceledAt: null,
   billingThreshold: null,
   items: [],
+  currentPeriodEnd: PERIOD_END_SECONDS,
   ...fields,
 });
 
@@ -54,6 +58,9 @@ const createMockSubscriptions = (): {
   createPendingSeatCheckout: vi.fn().mockResolvedValue({ id: "sub_new_1" }),
   reactivateWithSeats: vi.fn(),
 });
+
+/** A row with no seats kept from an earlier decrease. */
+const NO_KEPT = { maxMembers: null, seatsKept: null, seatsKeptUntil: null };
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
@@ -94,6 +101,7 @@ describe("seatEventSubscription", () => {
     id: "sub_db_1",
     stripeSubscriptionId: "sub_stripe_1",
     status: SubscriptionStatus.ACTIVE,
+    ...NO_KEPT,
   };
 
   const seatSubscription = ({
@@ -102,18 +110,20 @@ describe("seatEventSubscription", () => {
     interval = "month",
     unitAmount = 2500,
     priceId = "price_seat_usd_monthly",
+    quantity,
   }: {
     id?: string;
     canceledAt?: number | null;
     interval?: string;
     unitAmount?: number | null;
     priceId?: string;
+    quantity?: number;
   } = {}) =>
     subscriptionOf({
       id,
       status: "active",
       canceledAt,
-      items: [{ id: "si_seat", priceId, unitAmount, interval }],
+      items: [{ id: "si_seat", priceId, unitAmount, interval, quantity }],
     });
 
   describe("previewProration()", () => {
@@ -295,25 +305,26 @@ describe("seatEventSubscription", () => {
         expect(result.amountDueCents).toBe(140000);
       });
 
-      /** @scenario "Reducing seats previews a credit rather than an amount owed" */
-      it("reports a seat reduction as a signed credit", async () => {
-        stripeSubscriptions.seedPreview({
-          preview: previewOf({
-            currency: "usd",
-            total: -2500,
-            // Stripe clamps a negative invoice here, which is exactly why the
-            // credit case cannot read this field.
-            amountDue: 0,
-          }),
-        });
+      /** @scenario "Reducing seats previews nothing due today and when the lower count applies" */
+      it("quotes no charge today, the next-period price and the day it applies", async () => {
+        stripeSubscriptions.seed({ subscription: seatSubscription({ quantity: 5 }) });
 
         const result = await service.previewProration({
           organizationId: "org_1",
-          newTotalSeats: 1,
+          newTotalSeats: 3,
         });
 
-        expect(result.amountDueCents).toBe(-2500);
-        expect(result.formattedCreditApplied).toBeNull();
+        expect(result).toMatchObject({
+          amountDueCents: 0,
+          formattedAmountDue: "$0",
+          formattedCreditApplied: null,
+          formattedRecurringTotal: "$75",
+          appliesAt: PERIOD_END_SECONDS * 1000,
+          keptSeats: 5,
+          formattedKeptRecurringTotal: "$125",
+        });
+        // A decrease charges nothing now, so there is no invoice to preview.
+        expect(stripeSubscriptions.previews).toEqual([]);
       });
 
       /** @scenario "Due today is the amount the card is charged, not the invoice total" */
@@ -468,7 +479,7 @@ describe("seatEventSubscription", () => {
       /** @scenario "An active subscription with no billing-provider link is named as such" */
       it("raises subscription_not_linked instead of the retryable sync error", async () => {
         subscriptions.findSeatCandidates.mockResolvedValue([
-          { id: "sub_db_1", stripeSubscriptionId: null, status: "ACTIVE" },
+          { id: "sub_db_1", stripeSubscriptionId: null, status: "ACTIVE", ...NO_KEPT },
         ]);
 
         await expect(
@@ -490,8 +501,9 @@ describe("seatEventSubscription", () => {
             id: "sub_db_tombstone",
             stripeSubscriptionId: "sub_stripe_dead",
             status: "CANCELLED",
+            ...NO_KEPT,
           },
-          { id: "sub_db_live", stripeSubscriptionId: null, status: "ACTIVE" },
+          { id: "sub_db_live", stripeSubscriptionId: null, status: "ACTIVE", ...NO_KEPT },
         ]);
 
         await expect(
@@ -512,11 +524,12 @@ describe("seatEventSubscription", () => {
         // Preferring the linked row would charge the older plan even when the
         // newer one was added to supersede it.
         subscriptions.findSeatCandidates.mockResolvedValue([
-          { id: "sub_db_new", stripeSubscriptionId: null, status: "ACTIVE" },
+          { id: "sub_db_new", stripeSubscriptionId: null, status: "ACTIVE", ...NO_KEPT },
           {
             id: "sub_db_old",
             stripeSubscriptionId: "sub_stripe_old",
             status: "ACTIVE",
+            ...NO_KEPT,
           },
         ]);
 
@@ -536,11 +549,13 @@ describe("seatEventSubscription", () => {
             id: "sub_db_a",
             stripeSubscriptionId: "sub_stripe_a",
             status: "ACTIVE",
+            ...NO_KEPT,
           },
           {
             id: "sub_db_b",
             stripeSubscriptionId: "sub_stripe_b",
             status: "ACTIVE",
+            ...NO_KEPT,
           },
         ]);
 
@@ -563,11 +578,13 @@ describe("seatEventSubscription", () => {
             id: "sub_db_new",
             stripeSubscriptionId: "sub_stripe_dead",
             status: "CANCELLED",
+            ...NO_KEPT,
           },
           {
             id: "sub_db_old",
             stripeSubscriptionId: "sub_stripe_live",
             status: "ACTIVE",
+            ...NO_KEPT,
           },
         ]);
         stripeSubscriptions.seed({ subscription: seatSubscription({ id: "sub_stripe_live" }) });
@@ -597,6 +614,7 @@ describe("seatEventSubscription", () => {
             id: "sub_db_1",
             stripeSubscriptionId: "sub_stripe_1",
             status: "CANCELLED",
+            ...NO_KEPT,
           },
         ]);
         stripeSubscriptions.seed({ subscription: seatSubscription() });
@@ -758,6 +776,7 @@ describe("seatEventSubscription", () => {
         expect(subscriptions.reactivateWithSeats).toHaveBeenCalledWith({
           id: "sub_db_1",
           maxMembers: 8,
+          kept: null,
         });
       });
     });
@@ -805,7 +824,7 @@ describe("seatEventSubscription", () => {
       /** @scenario "An unlinked subscription blocks the seat update itself" */
       it("raises subscription_not_linked so the seat update cannot pass as a success", async () => {
         subscriptions.findSeatCandidates.mockResolvedValue([
-          { id: "sub_db_1", stripeSubscriptionId: null, status: "ACTIVE" },
+          { id: "sub_db_1", stripeSubscriptionId: null, status: "ACTIVE", ...NO_KEPT },
         ]);
 
         await expect(

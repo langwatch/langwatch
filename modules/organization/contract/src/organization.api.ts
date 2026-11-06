@@ -108,6 +108,12 @@ import type {
   PersonalWorkspaceFeaturesInput,
 } from "./personal-workspace.ts";
 import type { ScopeGraphOrganization } from "./scope-graph.ts";
+import type {
+  OrganizationApiRemoveMemberInput,
+  OrganizationHeldSeats,
+  OrganizationMemberRemoved,
+  OrganizationSeatRemovalPreview,
+} from "./seat-hold.ts";
 
 export interface OrganizationCaller {
   readonly id: string;
@@ -175,11 +181,16 @@ export type OrganizationWithMembersAndTheirTeams = Organization & {
  */
 export type OrganizationInviteValidation = "strict" | "lenient";
 
-/** An organization's seats: full, lite and Developer (ADR-171), live invitations included. */
+/**
+ * An organization's seats: full, lite and Developer (ADR-171), live invitations included.
+ * `fullMembers` includes the seats held after a removal (seat-rotation.feature); `heldFullMembers`
+ * is that part alone, absent where a source counts no holds.
+ */
 export type OrganizationMemberSeats = Readonly<{
   fullMembers: number;
   liteMembers: number;
   developers: number;
+  heldFullMembers?: number;
 }>;
 
 /** One invitation batch as a transport asks for it, with the mode it chose. */
@@ -282,6 +293,33 @@ export interface OrganizationApi {
     input: Readonly<{ organizationId: string; userId: string }>,
     by: OrganizationCaller | null,
   ): Promise<void>;
+  /**
+   * Removes a member; when their seat frees at once and a full seat fits, gives it to the person
+   * waiting the caller named (seat-rotation.feature).
+   */
+  removeMember(
+    input: OrganizationApiRemoveMemberInput,
+    by: OrganizationCaller,
+  ): Promise<OrganizationMemberRemoved>;
+  /** What removing this member does to their seat, and who waits for it: the remove dialog. */
+  getSeatRemovalPreview(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<OrganizationSeatRemovalPreview>;
+  /** The seats removed, disabled or demoted people still hold: the Users list's greyed rows. */
+  listHeldSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationHeldSeats>;
+  /**
+   * Keeps the full seat of a member about to leave by a path that deletes the membership row
+   * itself (directory offboarding), so leaving and coming back costs the same seat. Asked
+   * before that path runs; nothing when the seat frees at once (seat-rotation.feature).
+   */
+  holdSeatOfDepartingMember(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<void>;
+  /**
+   * A person admitted back within their seat hold, by a path that writes the membership row
+   * itself (directory provisioning), takes the held seat: its date stays and the hold goes.
+   */
+  takeBackHeldSeat(input: Readonly<{ organizationId: string; userId: string }>): Promise<void>;
   setMemberDisabled(
     input: Readonly<{ organizationId: string; userId: string; disabled: boolean }>,
     by: OrganizationCaller | null,

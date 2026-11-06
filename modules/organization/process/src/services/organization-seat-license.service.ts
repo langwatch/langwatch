@@ -111,15 +111,17 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
     organizationId: string;
     plan: Plan;
   }): Promise<void> {
-    // A move onto a Developer seat enters a pool no plan meters (ADR-171).
+    // A move onto a Developer seat enters a pool no plan meters (ADR-171), and a demotion from a
+    // full seat is never refused for a full Lite pool: it frees a seat (seat-rotation.feature).
     if (
       input.change === "no-change" ||
       input.change === "to-developer" ||
+      input.change === "full-to-lite" ||
       input.plan.overrideAddingLimitations
     )
       return;
 
-    const resource = input.change === "lite-to-full" ? "members" : "membersLite";
+    const resource = "members";
     const max = this.allowance(input.plan, resource);
     const { current, free } = await this.seatsFor({ ...input, resource });
     if (!free) {

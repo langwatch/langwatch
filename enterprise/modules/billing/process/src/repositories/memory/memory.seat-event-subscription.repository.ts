@@ -5,6 +5,7 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
 
+import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
   type SeatSubscriptionRow,
@@ -32,7 +33,14 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
           (subscription.status === "ACTIVE" || subscription.status === "CANCELLED"),
       )
       .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds)
-      .map(({ id, status, stripeSubscriptionId }) => ({ id, status, stripeSubscriptionId }));
+      .map(({ id, status, stripeSubscriptionId, maxMembers, seatsKept, seatsKeptUntil }) => ({
+        id,
+        status,
+        stripeSubscriptionId,
+        maxMembers,
+        seatsKept,
+        seatsKeptUntil,
+      }));
   }
 
   async cancelPendingSeatCheckouts({
@@ -78,14 +86,31 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
       maxMembersLite: null,
       maxMessagesPerMonth: null,
       lastPaymentFailedDate: null,
+      seatsKept: null,
+      seatsKeptUntil: null,
     });
     return { id };
   }
 
-  async reactivateWithSeats({ id, maxMembers }: { id: string; maxMembers: number }): Promise<void> {
+  async reactivateWithSeats({
+    id,
+    maxMembers,
+    kept,
+  }: {
+    id: string;
+    maxMembers: number;
+    kept: KeptSeats | null;
+  }): Promise<void> {
     const index = this.store.subscriptions.findIndex((subscription) => subscription.id === id);
     const current = this.store.subscriptions[index];
     if (!current) throw new Error(`No subscription "${id}" exists.`);
-    this.store.subscriptions[index] = { ...current, status: "ACTIVE", maxMembers, endDate: null };
+    this.store.subscriptions[index] = {
+      ...current,
+      status: "ACTIVE",
+      maxMembers,
+      endDate: null,
+      seatsKept: kept?.seats ?? null,
+      seatsKeptUntil: kept?.until ?? null,
+    };
   }
 }

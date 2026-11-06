@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { OrganizationMembershipRepository } from "../../repositories/organization-membership.repository.ts";
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
 import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
+import { withSeatHolds } from "./support/seat-holds.ts";
 
 const TARGET = { organizationId: "org-1", teamId: "team-1", userId: "user-2" };
 
@@ -26,9 +27,11 @@ function serviceWhere(options: {
   const service = OrganizationMembershipService.create({
     workspaceNotices: { personalWorkspaceArchived: () => Promise.resolve() },
     memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
-    repository: createApiFixture<OrganizationMembershipRepository>({
-      findTeamGrants,
-      findCustomRolePermissions,
+    ...withSeatHolds({
+      repository: createApiFixture<OrganizationMembershipRepository>({
+        findTeamGrants,
+        findCustomRolePermissions,
+      }),
     }),
     creations: { created: vi.fn(), reportError: vi.fn() },
     seats: { checkLimit: vi.fn(), assertRoleChangeAllowed },

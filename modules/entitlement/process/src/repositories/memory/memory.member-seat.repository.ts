@@ -21,10 +21,12 @@ export class MemoryMemberSeatRepository implements MemberSeatRepository {
     organizationId,
   }: Readonly<{ organizationId: string }>): Promise<OrganizationMemberSeats> {
     const usage = this.#database.find(organizationId);
+    const heldFullMembers = usage?.heldMemberCount ?? 0;
     return {
-      fullMembers: usage?.memberCount ?? 0,
+      fullMembers: (usage?.memberCount ?? 0) + heldFullMembers,
       liteMembers: usage?.membersLiteCount ?? 0,
       developers: usage?.developerCount ?? 0,
+      heldFullMembers,
     };
   }
 }

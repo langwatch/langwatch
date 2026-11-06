@@ -189,7 +189,7 @@ export const mockListInvoices = vi.fn(() => ({
   isError: false,
 }));
 
-export const mockGetLastSubscription = vi.fn(() => ({
+export const mockGetLastSubscription = vi.fn((): { data: unknown; isLoading: boolean } => ({
   data: null,
   isLoading: false,
 }));

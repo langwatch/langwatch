@@ -47,6 +47,7 @@ import type {
   OrganizationSeatLicense,
   OrganizationPlanUser,
 } from "./organization-seat-license.service.ts";
+import type { SeatHoldService, SeatRemovalPreview } from "./seat-hold.service.ts";
 
 /**
  * Whether this person is mid-way through proving a single sign-on connection
@@ -76,6 +77,8 @@ export class OrganizationMembershipService {
     memberNotices: OrganizationMemberChangeNotice;
     /** Authz's escalation rule, asked before a role change writes anything. */
     ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
+    /** The 30-day seat hold (seat-rotation.feature). */
+    seatHolds: SeatHoldService;
   }): OrganizationMembershipService {
     return new OrganizationMembershipService(dependencies);
   }
@@ -93,6 +96,8 @@ export class OrganizationMembershipService {
       memberNotices: OrganizationMemberChangeNotice;
       /** Authz's escalation rule, asked before a role change writes anything. */
       ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
+      /** The 30-day seat hold (seat-rotation.feature). */
+      seatHolds: SeatHoldService;
     },
   ) {
     this.roles = OrganizationMemberRoleService.create(dependencies);
@@ -375,6 +380,64 @@ export class OrganizationMembershipService {
     params: Parameters<OrganizationMemberAdmissionService["deleteMember"]>[0],
   ): ReturnType<OrganizationMemberAdmissionService["deleteMember"]> {
     return this.admission.deleteMember(params);
+  }
+
+  /**
+   * Removes a member and, when the seat frees at once and a full seat fits, gives it to the
+   * person waiting the caller named (seat-rotation.feature). Answers who got the seat.
+   */
+  async removeMember(params: {
+    organizationId: string;
+    userId: string;
+    actingUserId: string | null;
+    giveSeatToUserId?: string | null;
+    caller: AuthzGrantCaller;
+  }): Promise<{ seatGivenToUserId: string | null }> {
+    const { organizationId, userId, actingUserId, giveSeatToUserId, caller } = params;
+    await this.admission.deleteMember({ organizationId, userId, actingUserId });
+    if (!giveSeatToUserId) return { seatGivenToUserId: null };
+    const admitted = await this.roles.admitWaitingMember({
+      organizationId,
+      userId: giveSeatToUserId,
+      actingUserId,
+      caller,
+    });
+    return { seatGivenToUserId: admitted ? giveSeatToUserId : null };
+  }
+
+  /** What removing this member does to their seat, and who waits for it. */
+  seatRemovalPreview(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<SeatRemovalPreview> {
+    return this.dependencies.seatHolds.removalPreview(params);
+  }
+
+  /** The seats removed, disabled or demoted people still hold, ending soonest first. */
+  findHeldSeats(params: { organizationId: string }): ReturnType<SeatHoldService["findHeld"]> {
+    return this.dependencies.seatHolds.findHeld(params);
+  }
+
+  /**
+   * The hourly seat hold check: deletes ended holds, then in each organization they were in
+   * gives free full seats to the people waiting longest. Answers how many were admitted.
+   */
+  async runSeatHoldCheck(): Promise<number> {
+    const { seatHolds } = this.dependencies;
+    let admitted = 0;
+    for (const organizationId of await seatHolds.deleteEnded()) {
+      for (const waiting of await seatHolds.findWaitingMembers({ organizationId })) {
+        const given = await this.roles.admitWaitingMember({
+          organizationId,
+          userId: waiting.userId,
+          actingUserId: null,
+          caller: { type: "system" },
+        });
+        if (!given) break;
+        admitted += 1;
+      }
+    }
+    return admitted;
   }
 
   createMembership(

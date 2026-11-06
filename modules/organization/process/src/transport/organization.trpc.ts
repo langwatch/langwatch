@@ -103,10 +103,18 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   .withMiddlewareContext(organizationSessionPersonContext)
   .withPermission("organization:manage")
   .handle(async ({ app, input, actor }, person) => {
-    await app.deleteMember(input, callerOf(actor, person));
+    const { seatGivenToUserId } = await app.removeMember(input, callerOf(actor, person));
 
-    return { success: true as const };
+    return { success: true as const, seatGivenToUserId };
   })
+
+  .procedure("getSeatRemovalPreview")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.getSeatRemovalPreview(input))
+
+  .procedure("listHeldSeats")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.listHeldSeats(input))
 
   /**
    * Disables or re-enables a membership so an organization can reconcile down

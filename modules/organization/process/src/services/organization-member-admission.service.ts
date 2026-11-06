@@ -13,6 +13,7 @@ import {
 import type { OrganizationMembershipRepository } from "../repositories/organization-membership.repository.ts";
 import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import type { OrganizationSeatLicense } from "./organization-seat-license.service.ts";
+import type { SeatHoldService } from "./seat-hold.service.ts";
 
 /** The grant half of an admission, answered by the authorization peer. */
 export type OrganizationAdmissions = Pick<AuthzApi, "attachBindings" | "completeAdmission">;
@@ -49,6 +50,7 @@ export class OrganizationMemberAdmissionService {
     seats: Pick<OrganizationSeatLicense, "checkLimit">;
     workspaceNotices: PersonalWorkspaceArchiveNotice;
     memberNotices: OrganizationMemberChangeNotice;
+    seatHolds: SeatHoldService;
   }): OrganizationMemberAdmissionService {
     return new OrganizationMemberAdmissionService(dependencies);
   }
@@ -61,6 +63,8 @@ export class OrganizationMemberAdmissionService {
       seats: Pick<OrganizationSeatLicense, "checkLimit">;
       workspaceNotices: PersonalWorkspaceArchiveNotice;
       memberNotices: OrganizationMemberChangeNotice;
+      /** The 30-day seat hold a removal leaves and a return takes back (seat-rotation.feature). */
+      seatHolds: SeatHoldService;
     },
   ) {}
 
@@ -85,10 +89,16 @@ export class OrganizationMemberAdmissionService {
       userId: params.userId,
     });
 
+    const release = await this.dependencies.seatHolds.releaseOf({
+      organizationId: params.organizationId,
+      userId: params.userId,
+      reason: "REMOVED",
+    });
     const teamIds = await this.repo.deleteMember({
       organizationId: params.organizationId,
       userId: params.userId,
       actingUserId: params.actingUserId ?? null,
+      seatHold: release?.kind === "released" ? release.hold : null,
     });
     await this.dependencies.memberNotices.memberRemoved({
       organizationId: params.organizationId,
@@ -121,7 +131,14 @@ export class OrganizationMemberAdmissionService {
   }): Promise<OrganizationAdmission> {
     const grantId = newAuthzGrantId();
     const requested = seat ?? (await this.repo.readJoinerSeat({ organizationId }));
-    const decided = await this.decideSeat({ organizationId, userId, requested });
+    // A person back within their hold takes the held seat, not a second one.
+    const [hold] =
+      requested === "MEMBER"
+        ? await this.dependencies.seatHolds.findLiveHolds({ organizationId, userId })
+        : [];
+    const decided = hold
+      ? admissionSeat({ requested, fullSeatFree: true, liteSeatFree: true })
+      : await this.decideSeat({ organizationId, userId, requested });
     const admission = await this.repo.createMembership({
       organizationId,
       userId,
@@ -130,6 +147,7 @@ export class OrganizationMemberAdmissionService {
       seat: decided.role,
       pending: decided.pending,
       ...(origin === undefined ? {} : { origin }),
+      ...(hold ? { seatTakenAt: hold.seatTakenAt } : {}),
     });
     if (
       admission.outcome !== "created" ||

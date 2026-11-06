@@ -23,6 +23,7 @@ import type { ScimRepository } from "../../scim.repository.ts";
 /** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
 const openSeats = {
   countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+  findLiveHoldUserIds: async () => [],
 };
 
 const now = new Date("2026-08-25T12:00:00.000Z");

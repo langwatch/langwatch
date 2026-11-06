@@ -14,10 +14,42 @@ describe("countMemberSeats", () => {
         { role: OrganizationUserRole.EXTERNAL, permissions: undefined },
         { role: OrganizationUserRole.DEVELOPER, permissions: ["project:update"] },
       ]),
-    ).toEqual({ fullMembers: 3, liteMembers: 2, developers: 1 });
+    ).toEqual({ fullMembers: 3, liteMembers: 2, developers: 1, heldFullMembers: 0 });
   });
 
   it("answers no seats for nobody", () => {
-    expect(countMemberSeats([])).toEqual({ fullMembers: 0, liteMembers: 0, developers: 0 });
+    expect(countMemberSeats([])).toEqual({
+      fullMembers: 0,
+      liteMembers: 0,
+      developers: 0,
+      heldFullMembers: 0,
+    });
+  });
+
+  it("counts a held seat as full unless its person holds a full seat again", () => {
+    expect(
+      countMemberSeats(
+        [
+          { role: OrganizationUserRole.MEMBER, permissions: undefined, userId: "back" },
+          { role: OrganizationUserRole.EXTERNAL, permissions: undefined, userId: "demoted" },
+        ],
+        [{ userId: "back" }, { userId: "demoted" }, { userId: "removed" }, { userId: "removed" }],
+      ),
+    ).toEqual({ fullMembers: 3, liteMembers: 1, developers: 0, heldFullMembers: 2 });
+  });
+
+  it("counts a held seat once when its person is invited back on a full seat", () => {
+    expect(
+      countMemberSeats(
+        [
+          {
+            role: OrganizationUserRole.MEMBER,
+            permissions: undefined,
+            email: "Back@Example.com",
+          },
+        ],
+        [{ userId: "back", email: "back@example.com" }],
+      ),
+    ).toEqual({ fullMembers: 1, liteMembers: 0, developers: 0, heldFullMembers: 0 });
   });
 });

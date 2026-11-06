@@ -7,10 +7,19 @@ import { MemoryScimSyncSummaryChannel } from "./memory/memory.scim-sync-summary.
 import type { ScimSyncSummaryChannel } from "./scim-sync-summary.channel.ts";
 import { SlackScimSyncSummaryChannel } from "./slack/slack.scim-sync-summary.channel.ts";
 
+/**
+ * What SCIM asks of organization, which owns the membership row and its seat: a deleted
+ * directory user leaves through it, and the seat hold is kept and taken back through it.
+ */
+export type ScimMembers = Pick<
+  OrganizationApi,
+  "deleteMember" | "holdSeatOfDepartingMember" | "takeBackHeldSeat"
+>;
+
 /** Every channel bound to a module that SCIM holds, as the container hands them to the class. */
 export interface ScimChannels {
   /** A deleted directory user leaves through organization, which owns the membership row. */
-  readonly members: Pick<OrganizationApi, "deleteMember">;
+  readonly members: ScimMembers;
   /** Absent where SLACK_CHANNEL_SIGNUPS is unset: each push summary is skipped with a warning. */
   readonly syncSummaries: ScimSyncSummaryChannel | undefined;
 }

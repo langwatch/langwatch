@@ -1097,10 +1097,40 @@ model OrganizationUser {
   /// removing and rejoining therefore cannot revive a delayed old attach.
   membershipStamp String @default(dbgenerated("gen_random_uuid()::text"))
 
+  /// When this membership started holding the full seat it holds now; null means createdAt.
+  /// Anchors the 30-day seat hold (specs/licensing/seat-rotation.feature).
+  fullSeatSince DateTime?
+
+  /// Set when admission wrote this membership disabled because no seat was free: the person
+  /// is waiting for one. Cleared when the membership is enabled.
+  seatPendingSince DateTime?
+
   @@id([userId, organizationId])
   @@index([organizationId])
   @@index([userId])
   @@index([departmentId])
+}
+
+/// A full seat still counted after the person who took it stopped holding it (removed,
+/// disabled or demoted), until 30 days after they took it (specs/licensing/seat-rotation.feature).
+/// One per organization and person; a return within the hold takes the seat back.
+model SeatHold {
+  id             String   @id
+  organizationId String
+  userId         String
+  /// Display copy for the Users list, kept because a removed person has no membership row.
+  email          String?
+  name           String?
+  /// When the person took the seat this hold keeps.
+  seatTakenAt    DateTime
+  /// seatTakenAt plus 30 days; expired holds are ignored by every count and deleted hourly.
+  heldUntil      DateTime
+  /// REMOVED | DISABLED | DEMOTED
+  reason         String
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, userId])
+  @@index([heldUntil])
 }
 
 model Team {
@@ -4563,6 +4593,9 @@ model Subscription {
   maxDashboards         Int?
   maxCustomGraphs       Int?
   maxAutomations        Int?
+  /// Seats paid for this period that stay usable after a seat decrease, until seatsKeptUntil.
+  seatsKept             Int?
+  seatsKeptUntil        DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]

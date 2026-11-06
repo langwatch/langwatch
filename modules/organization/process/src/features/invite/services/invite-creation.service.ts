@@ -118,6 +118,7 @@ export class InviteCreationService {
     newInvites: {
       role: OrganizationUserRole;
       teams?: { customRoleId?: string }[];
+      email?: string;
     }[];
     user?: PlanProviderUser;
   }): Promise<void> {
@@ -134,12 +135,26 @@ export class InviteCreationService {
       customRoles.map((r) => [r.id, (r.permissions as string[] | null) ?? []]),
     );
 
-    const { fullMembers: newFullMembers, liteMembers: newLiteMembers } =
+    const classify = (invites: typeof newInvites) =>
       classifyInvitesByMemberType({
-        invites: newInvites,
+        invites,
         customRoleMap,
         isViewOnlyCustomRole: (permissions) => this.deps.seats.isViewOnlyCustomRole(permissions),
       });
+    // A person invited back within their seat hold takes that seat, already counted, not another.
+    const heldEmails = new Set(
+      (
+        (await this.deps.seats.findHeldEmails?.({
+          organizationId,
+          emails: newInvites.flatMap((invite) => (invite.email ? [invite.email] : [])),
+        })) ?? []
+      ).map((email) => email.toLowerCase()),
+    );
+    const { liteMembers: newLiteMembers, fullMembers: newSeatsAsked } = classify(newInvites);
+    const { fullMembers: heldSeatsTakenBack } = classify(
+      newInvites.filter((invite) => invite.email && heldEmails.has(invite.email.toLowerCase())),
+    );
+    const newFullMembers = newSeatsAsked - heldSeatsTakenBack;
 
     if (!subscriptionLimits.overrideAddingLimitations) {
       // A pool this batch adds nobody to is not checked: a Developer-only batch
@@ -311,6 +326,7 @@ export class InviteCreationService {
       newInvites: invites.map((invite) => ({
         role: invite.role,
         teams: invite.teams,
+        email: invite.email,
       })),
       user,
     });

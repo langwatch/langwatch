@@ -3,6 +3,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { admissionSeat, seatsFree } from "@langwatch/organization-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 
+import type { ScimMembers } from "../channels/scim-channels.registry.ts";
 import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import { isUniqueViolation } from "../rules/scim-user.rules.ts";
@@ -18,6 +19,8 @@ type ScimAdmissionDependencies = {
   plans: Pick<EntitlementApi, "getActivePlan">;
   connections: ScimHeldConnections;
   membershipAccess: ScimMembershipAccessService;
+  /** Organization takes a held seat back for a person provisioned again within their hold. */
+  members: Pick<ScimMembers, "takeBackHeldSeat">;
 };
 
 /** Who a directory push may bring into an organization, and the seat and role they enter on. */
@@ -56,11 +59,19 @@ export class ScimAdmissionService {
     organizationId: string;
   }): Promise<void> {
     const asserted = await this.directoryAssertedOrganizationRole({ userId, organizationId });
-    const [plan, seats] = await Promise.all([
+    const [plan, seats, holds] = await Promise.all([
       this.options.plans.getActivePlan({ organizationId, user: { id: userId } }),
       this.options.seats.countMemberSeats({ organizationId }),
+      this.options.seats.findLiveHoldUserIds({ organizationId, userId }),
     ]);
-    const { role, pending } = admissionSeat({ requested: asserted, ...seatsFree({ plan, seats }) });
+    // A person back within their seat hold takes that seat, already counted, not another
+    // (seat-rotation.feature).
+    const isHeld = holds.length > 0;
+    const counted = isHeld ? { ...seats, fullMembers: seats.fullMembers - 1 } : seats;
+    const { role, pending } = admissionSeat({
+      requested: asserted,
+      ...seatsFree({ plan, seats: counted }),
+    });
     try {
       await this.options.prisma.addMembership({ userId, organizationId, role, pending });
     } catch (error) {
@@ -68,6 +79,9 @@ export class ScimAdmissionService {
     }
 
     await this.options.membershipAccess.reconcileOrganizationMembership({ userId, organizationId });
+    if (isHeld && !pending) {
+      await this.options.members.takeBackHeldSeat({ organizationId, userId });
+    }
   }
 
   /**

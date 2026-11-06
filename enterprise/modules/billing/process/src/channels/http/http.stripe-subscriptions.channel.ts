@@ -148,7 +148,10 @@ function subscriptionOf(subscription: Stripe.Subscription): BillingSubscription 
       priceId: item.price.id,
       unitAmount: item.price.unit_amount ?? null,
       interval: item.price.recurring?.interval ?? null,
+      quantity: item.quantity ?? null,
     })),
+    currentPeriodEnd: subscription.current_period_end,
+    currency: subscription.currency,
   };
 }
 

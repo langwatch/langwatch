@@ -84,6 +84,33 @@ async function leaveToAnsweredUrl({
   }
 }
 
+type SeatChangeMutation = ReturnType<
+  typeof billingApi.subscription.addTeamMemberOrEvents.useMutation
+>["mutateAsync"];
+
+/** Sends a seat count to billing; a failure is reported to the host and answers false. */
+async function applySeatChange({
+  mutateAsync,
+  host,
+  input,
+  onApplied,
+}: {
+  mutateAsync: SeatChangeMutation;
+  host: BillingHost;
+  input: Parameters<SeatChangeMutation>[0];
+  onApplied: () => void;
+}): Promise<boolean> {
+  try {
+    assertSeatChangeWentThrough(await mutateAsync(input));
+    onApplied();
+    host.succeeded({ title: "Seats updated successfully" });
+    return true;
+  } catch (error) {
+    host.failed({ error, fallbackTitle: "Couldn't update your seats" });
+    return false;
+  }
+}
+
 export function useSubscriptionActions({
   organizationId,
   currency,
@@ -142,33 +169,43 @@ export function useSubscriptionActions({
     });
   };
 
+  /** Commits a seat count; a failure is toasted and answers false. */
+  const commitSeats = async ({
+    newSeats,
+    quotedAt,
+  }: {
+    newSeats: number;
+    quotedAt: number | undefined;
+  }): Promise<boolean> => {
+    if (!organizationId) return false;
+    return applySeatChange({
+      mutateAsync: addTeamMemberOrEvents.mutateAsync,
+      host,
+      input: {
+        organizationId,
+        plan: seatChangePlan({ activePlanType, currency, billingPeriod }),
+        upgradeMembers: true,
+        upgradeTraces: false,
+        totalMembers: newSeats,
+        totalTraces: 0,
+        quotedAt,
+      },
+      onApplied: () => {
+        onSeatsUpdated();
+        void organizationWithMembers.refetch();
+      },
+    });
+  };
+
   const handleUpdateSeats = () => {
     if (!organizationId) return;
-
-    const updateTotalMembers = totalFullMembers;
 
     upgradeModal?.openSeats({
       organizationId,
       currentSeats: currentMaxMembers ?? totalFullMembers,
-      newSeats: updateTotalMembers,
+      newSeats: totalFullMembers,
       onConfirm: async (quotedAt) => {
-        try {
-          const result = await addTeamMemberOrEvents.mutateAsync({
-            organizationId,
-            plan: seatChangePlan({ activePlanType, currency, billingPeriod }),
-            upgradeMembers: true,
-            upgradeTraces: false,
-            totalMembers: updateTotalMembers,
-            totalTraces: 0,
-            quotedAt,
-          });
-          assertSeatChangeWentThrough(result);
-          onSeatsUpdated();
-          host.succeeded({ title: "Seats updated successfully" });
-          void organizationWithMembers.refetch();
-        } catch (error) {
-          host.failed({ error, fallbackTitle: "Couldn't update your seats" });
-        }
+        await commitSeats({ newSeats: totalFullMembers, quotedAt });
       },
     });
   };
@@ -187,6 +224,7 @@ export function useSubscriptionActions({
   return {
     handleUpgrade,
     handleUpdateSeats,
+    commitSeats,
     handleManageSubscription,
     isUpgradeLoading: createSubscription.isPending || upgradeWithInvites.isPending,
     isUpdateSeatsLoading: addTeamMemberOrEvents.isPending,

@@ -37,11 +37,30 @@ export const quotedAmounts = (
   };
 };
 
+/**
+ * The quote for a charged step. When kept seats are lifted back without proration first,
+ * the preview prices the whole move, so only the share above the seats paid for is due;
+ * proration is linear in quantity, and credit is drawn down to the smaller total.
+ */
+export const chargedAmounts = ({
+  preview,
+  share,
+}: {
+  preview: AlwaysInvoicePreview;
+  share: { added: number; moved: number } | null;
+}): { prorationCents: number; creditAppliedCents: number } => {
+  const whole = quotedAmounts(preview);
+  if (!share || share.moved <= 0) return whole;
+  const totalCents = Math.round((preview.total * share.added) / share.moved);
+  const creditAppliedCents = Math.max(0, Math.min(whole.creditAppliedCents, totalCents));
+  return { prorationCents: totalCents - creditAppliedCents, creditAppliedCents };
+};
+
 type SeatChange = {
   cancelAtPeriodEnd?: false;
   items: { id: string; quantity: number }[];
-  prorationBehavior: "always_invoice";
-  prorationDate: number;
+  prorationBehavior: "always_invoice" | "none";
+  prorationDate?: number;
 };
 
 /**
@@ -53,22 +72,25 @@ export const seatChange = ({
   seatItem,
   quantity,
   prorationDate,
+  prorationBehavior = "always_invoice",
 }: {
   subscription: Pick<BillingSubscription, "canceledAt">;
   seatItem: Pick<BillingSubscriptionItem, "id">;
   quantity: number;
   prorationDate: number;
+  /** `none` moves the line from the next cycle with no credit and no charge. */
+  prorationBehavior?: "always_invoice" | "none";
 }): SeatChange => {
-  const change: SeatChange = {
-    items: [{ id: seatItem.id, quantity }],
-    prorationBehavior: "always_invoice",
-    // Prorations are priced by the moment they are applied, so a quote issued
-    // at one instant and confirmed at another are two different amounts. The
-    // quote issues this timestamp and the confirmation sends it back, which
-    // makes the charge reproduce the number the customer read rather than
-    // merely resemble it.
-    prorationDate,
-  };
+  const change: SeatChange =
+    prorationBehavior === "none"
+      ? { items: [{ id: seatItem.id, quantity }], prorationBehavior }
+      : {
+          items: [{ id: seatItem.id, quantity }],
+          prorationBehavior,
+          // The quote issues this instant and the confirmation sends it back,
+          // so the charge reproduces the number the customer read.
+          prorationDate,
+        };
   if (subscription.canceledAt) {
     change.cancelAtPeriodEnd = false;
   }
@@ -100,13 +122,19 @@ export const resolveProrationDate = (quotedAt: number | undefined): number => {
 
 /** What the seat-change dialog shows before the customer confirms. */
 export type SeatEventProrationQuote = {
-  /** Signed: removing seats previews a negative amount. */
+  /** Zero for a decrease: it applies from the next cycle, with no credit. */
   amountDueCents: number;
   formattedAmountDue: string;
   /** Null rather than a formatted zero, so an account with no credit says nothing. */
   formattedCreditApplied: string | null;
   formattedRecurringTotal: string;
   billingInterval: string;
-  /** The instant this quote priced, in epoch milliseconds, sent back on confirm. */
+  /** The instant this quote priced, in epoch seconds, sent back on confirm. */
   quotedAt: number;
+  /** Epoch milliseconds the new count starts billing; null when it applies today. */
+  appliesAt: number | null;
+  /** Seats paid for that stay usable until `appliesAt`; null when nothing is kept. */
+  keptSeats: number | null;
+  /** What the kept seats cost per period, shown until `appliesAt`. */
+  formattedKeptRecurringTotal: string | null;
 };

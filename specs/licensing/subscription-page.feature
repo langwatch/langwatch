@@ -247,7 +247,7 @@ Feature: Subscription Page Plan Management
 
     @integration
     Scenario: An enterprise subscription's card offers sales contact as an orange outline
-      Given the plan card of an enterprise subscription
+      Given the plan card of an enterprise subscription that shows no fixed seat count
       When it is drawn in a browser
       Then "Contact us to upgrade" draws an orange outline
 

@@ -80,6 +80,8 @@ const usageStatsSchemaDefinition = z
     membersLiteCount: z.number(),
     /** Developer seats (ADR-171): shown beside the metered seats, never capped. */
     membersDeveloperCount: z.number(),
+    /** Full seats held after a removal, inside `membersCount` (seat-rotation.feature). */
+    membersHeldCount: z.number().optional(),
     messageLimitInfo: messageLimitInfoSchema,
     seatLimitInfo: seatLimitInfoSchema,
     usageUnit: usageUnitSchema,
