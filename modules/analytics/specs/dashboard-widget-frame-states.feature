@@ -313,3 +313,40 @@ Feature: A dashboard widget frame shows what its queries report
       When the reader looks at the card
       Then the card keeps its title and shows the no access state
       And it offers no Ask Langy
+
+  Rule: A board says once when several widgets failed on a limit
+
+    @integration
+    Scenario: Two widgets that failed on a limit are told once above the board
+      Given a board of three widgets
+      When two of them end on a memory or time limit failure
+      Then a warning says "2 of 3 widgets couldn't load"
+      And it says the project has too much data for them in the selected period
+      And it says the other widgets loaded normally
+      And it offers no retry for all and no shorter period
+
+    @integration
+    Scenario: One widget that failed on a limit leaves the board without the line
+      Given a board of three widgets
+      When one of them ends on a memory or time limit failure
+      Then no warning shows above the board
+
+    @integration
+    Scenario: Every widget failing on a limit says none could load
+      Given a board of three widgets
+      When all three end on a memory or time limit failure
+      Then a warning says "None of the 3 widgets could load"
+      And it says the project has too much data for them in the selected period
+      And it does not say the other widgets loaded
+
+    @integration
+    Scenario: The warning goes when a widget recovers
+      Given a board whose two widgets failed on a limit
+      When one of them is retried and loads
+      Then the warning goes
+
+    @integration
+    Scenario: Failures that are not limits are not counted
+      Given a board of three widgets
+      When two of them fail for another reason, or one fails on a limit and one for another reason
+      Then no warning shows above the board

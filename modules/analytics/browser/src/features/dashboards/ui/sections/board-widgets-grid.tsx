@@ -25,6 +25,7 @@ export function BoardWidgetsGrid({
   onDelete,
   onPlacementsCommit,
   onEmptyChange,
+  onLimitFailureChange,
 }: {
   projectId: string;
   projectSlug: string;
@@ -42,6 +43,8 @@ export function BoardWidgetsGrid({
   onPlacementsCommit?: (placements: ChartGridPlacement[]) => void;
   /** Told whether each widget shows none of its data. */
   onEmptyChange?: (input: { widget: BoardWidget; empty: boolean }) => void;
+  /** Told whether each widget's final failure is a resource limit. */
+  onLimitFailureChange?: (input: { widget: BoardWidget; limited: boolean }) => void;
 }) {
   const byId = new Map(widgets.map((widget) => [widget.id, widget]));
 
@@ -68,6 +71,9 @@ export function BoardWidgetsGrid({
             onDuplicate={onDuplicate && (() => onDuplicate(widget))}
             onDelete={onDelete && (() => onDelete(widget))}
             onEmptyChange={onEmptyChange && ((empty) => onEmptyChange({ widget, empty }))}
+            onLimitFailureChange={
+              onLimitFailureChange && ((limited) => onLimitFailureChange({ widget, limited }))
+            }
           />
         );
       }}

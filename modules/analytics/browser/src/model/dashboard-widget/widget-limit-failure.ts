@@ -27,6 +27,11 @@ const EDITABLE_MESSAGE: Readonly<Record<string, string>> = {
   query_timeout: "Its query ran past the time a widget may take.",
 };
 
+/** Whether `code` is one of the two resource limits that have their own words. */
+export function isWidgetLimitFailure(code: string): boolean {
+  return code in EDITABLE_MESSAGE;
+}
+
 /** The limit wording for `code`, or null when the failure keeps its existing message. */
 export function widgetLimitWords({
   code,

@@ -37,6 +37,7 @@ import {
 } from "../../../../model/dashboard-widget/widget-guidance.ts";
 import {
   type WidgetLimitAudience,
+  isWidgetLimitFailure,
   widgetLimitWords,
 } from "../../../../model/dashboard-widget/widget-limit-failure.ts";
 import {
@@ -96,6 +97,8 @@ type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
   readonly limitAudience?: WidgetLimitAudience;
   /** Told which face the frame draws, so the card offers only what that face allows. */
   readonly onFaceChange?: (face: WidgetFace["kind"]) => void;
+  /** Told whether the card's final failure is a resource limit, so a board can say so once. */
+  readonly onLimitFailureChange?: (limited: boolean) => void;
   /** Told the messages of what the server limited in the run, joined; "" when it limited none. */
   readonly onLimitsChange?: (limits: string) => void;
   /** Handed what "Export CSV" would write now: the rows the widget's queries last returned. */
@@ -136,6 +139,7 @@ function WidgetFrameOverWindow({
   onAskLangyToSetUp,
   limitAudience,
   onFaceChange,
+  onLimitFailureChange,
   onLimitsChange,
   onExportChange,
   onEmptyChange,
@@ -165,6 +169,8 @@ function WidgetFrameOverWindow({
   const face = useMemo(() => widgetFace(records), [records]);
   usePublishWidgetCompleteness(face.kind === "chart" ? face.completeness : null);
   useEffect(() => onFaceChange?.(face.kind), [onFaceChange, face.kind]);
+  const limitFailed = face.kind === "failed" && isWidgetLimitFailure(face.error.code);
+  useEffect(() => onLimitFailureChange?.(limitFailed), [onLimitFailureChange, limitFailed]);
   const limitsLine = limits.join(" · ");
   useEffect(() => onLimitsChange?.(limitsLine), [onLimitsChange, limitsLine]);
 

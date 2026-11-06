@@ -25,6 +25,7 @@ export function CuratedWidgetsGrid({
   period,
   onAskLangy,
   onEmptyChange,
+  onLimitFailureChange,
 }: {
   projectId: string;
   projectSlug: string;
@@ -36,6 +37,8 @@ export function CuratedWidgetsGrid({
   onAskLangy?: (widget: BoardTemplateWidget) => void;
   /** Told whether each widget shows none of its data. */
   onEmptyChange?: (input: { widget: BoardTemplateWidget; empty: boolean }) => void;
+  /** Told whether each widget's final failure is a resource limit. */
+  onLimitFailureChange?: (input: { widget: BoardTemplateWidget; limited: boolean }) => void;
 }) {
   const { periodStart, periodEnd, granularitySeconds } = period;
   const timeWindow = useMemo(
@@ -67,6 +70,9 @@ export function CuratedWidgetsGrid({
             granularitySeconds={granularitySeconds}
             onAskLangy={onAskLangy && (() => onAskLangy(widget))}
             onEmptyChange={onEmptyChange && ((empty) => onEmptyChange({ widget, empty }))}
+            onLimitFailureChange={
+              onLimitFailureChange && ((limited) => onLimitFailureChange({ widget, limited }))
+            }
           />
         );
       }}

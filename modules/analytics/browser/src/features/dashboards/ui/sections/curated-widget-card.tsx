@@ -27,6 +27,7 @@ export function CuratedWidgetCard({
   granularitySeconds,
   onAskLangy,
   onEmptyChange,
+  onLimitFailureChange,
 }: {
   widget: BoardTemplateWidget;
   /** The frame's id on this board: the template's id and the widget's key. */
@@ -42,6 +43,8 @@ export function CuratedWidgetCard({
   onAskLangy?: () => void;
   /** Told whether the card shows none of the widget's data. */
   onEmptyChange?: (empty: boolean) => void;
+  /** Told whether the card's final failure is a resource limit. */
+  onLimitFailureChange?: (limited: boolean) => void;
 }) {
   const { name, definition } = widget;
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
@@ -76,6 +79,7 @@ export function CuratedWidgetCard({
         limitAudience={{ kind: "built_in" }}
         onExportChange={csvExport.onExportChange}
         onEmptyChange={onEmptyChange}
+        onLimitFailureChange={onLimitFailureChange}
       />
     </WidgetCardShell>
   );

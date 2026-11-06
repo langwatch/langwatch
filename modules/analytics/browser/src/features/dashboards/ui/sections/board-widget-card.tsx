@@ -53,6 +53,7 @@ export function BoardWidgetCard({
   onDuplicate,
   onDelete,
   onEmptyChange,
+  onLimitFailureChange,
 }: {
   widget: BoardWidget;
   projectId: string;
@@ -72,6 +73,8 @@ export function BoardWidgetCard({
   onDelete?: () => void;
   /** Told whether the card shows none of the widget's data. */
   onEmptyChange?: (empty: boolean) => void;
+  /** Told whether the card's final failure is a resource limit. */
+  onLimitFailureChange?: (limited: boolean) => void;
 }) {
   const host = useAnalyticsHost();
   const readable = useReadableProjects({ projectId: host.project()?.id ?? "" });
@@ -160,6 +163,7 @@ export function BoardWidgetCard({
           onLimitsChange={setLimits}
           onExportChange={csvExport.onExportChange}
           onEmptyChange={onEmptyChange}
+          onLimitFailureChange={onLimitFailureChange}
           {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
         />
       )}
