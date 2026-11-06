@@ -54,7 +54,7 @@ export async function fetchStars({
     const cause = error instanceof Error ? error.cause : undefined;
     failure = [error, cause]
       .filter((part) => part !== undefined)
-      .map((part) => (part instanceof Error ? part.message : String(part)))
+      .map((part) => (part instanceof Error ? part.message : JSON.stringify(part)))
       .join(": ");
   }
   console.warn(`[docs-site] star count not read (${failure}); using the last one kept`);
