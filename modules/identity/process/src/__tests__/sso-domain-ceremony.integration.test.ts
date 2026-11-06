@@ -40,6 +40,7 @@ import type { SsoConnectionLedger } from "../features/sso-connection/rules/sso-c
 import { SsoConnectionGuardsService } from "../features/sso-connection/services/sso-connection-guards.service.ts";
 import { SsoConnectionService } from "../features/sso-connection/services/sso-connection.service.ts";
 import { SsoDomainCeremonyService } from "../features/sso-domain/services/sso-domain-ceremony.service.ts";
+import { OUTBOUND_PROXY_REASONS } from "../rules/outbound-proxy.rules.ts";
 import { sha256Hex } from "../rules/pkce.rules.ts";
 import { licensingFixture, StubPlatformOperators } from "./support/in-memory-connections.ts";
 
@@ -524,6 +525,25 @@ describe("checking what the domain publishes", () => {
         }),
       ),
     ).toBe("sso_domain_lookup_failed");
+  });
+
+  it("blames the outbound proxy setting, not the domain, when the proxy is misconfigured", async () => {
+    await issue();
+    files.answer = { outcome: "unreachable", reason: OUTBOUND_PROXY_REASONS.misconfigured };
+
+    await expect(
+      ceremony.checkDomainFile({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        domain: DOMAIN,
+        actor: ANA,
+      }),
+    ).rejects.toMatchObject({
+      code: "sso_domain_lookup_failed",
+      reasons: [
+        { message: expect.stringMatching(/outbound proxy setting is not a valid proxy URL/) },
+      ],
+    });
   });
 
   it("refuses a check for a domain no record is outstanding for", async () => {

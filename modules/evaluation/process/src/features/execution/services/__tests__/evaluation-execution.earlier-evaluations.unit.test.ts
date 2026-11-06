@@ -69,6 +69,7 @@ function buildService({ earlier }: { earlier: TraceEvaluationData[] }) {
       },
     },
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
+    judgeRouting: { isRouted: async () => false },
     installEnvironment: {},
   });
   return { service, trace, findTraceEvaluations, authorizeInternal };
