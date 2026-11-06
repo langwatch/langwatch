@@ -234,7 +234,7 @@ function BillingRoleSection({
           <Text fontSize="sm">Pays for the organization</Text>
         </Switch>
         <Text fontSize="xs" color="fg.muted">
-          Changes the plan and seats, sees invoices, and approves seat requests. Takes no seat.
+          Changes the plan and seats, sees invoices, and approves seat requests.
         </Text>
       </VStack>
     </SettingsSection>
