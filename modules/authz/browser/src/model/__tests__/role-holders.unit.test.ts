@@ -99,7 +99,7 @@ describe("given a custom role held directly and through a group", () => {
   const custom = { role: "CUSTOM" as const, customRoleId: "role_1", customRoleName: "Analyst" };
 
   describe("when the people holding it are counted", () => {
-    /** @scenario A custom role card names who holds it and where */
+    /** @scenario A custom role's drawer names who holds it and where */
     it("counts a custom role by its own identifier, each person once", () => {
       const rows = [
         assignment({ id: "c1", ...custom }),
@@ -143,7 +143,7 @@ describe("given a custom role assigned in one place to two people", () => {
   ];
 
   describe("when the scopes it is in force on are gathered", () => {
-    /** @scenario A custom role card names who holds it and where */
+    /** @scenario A custom role's drawer names who holds it and where */
     it("names each place once, however many people hold it there", () => {
       expect(scopesOfCustomRole({ assignments: rows, customRoleId: "role_1" })).toEqual([
         { scopeType: "PROJECT", scopeId: "proj_1", scopeName: "support-copilot" },

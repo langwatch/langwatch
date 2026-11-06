@@ -77,24 +77,60 @@ export class AuthzDecisionService {
     principal: AuthzPrincipalRef;
     scope: AuthzScopeRef;
   }): Promise<AuthzPermission[]> {
+    const { heldAt } = await this.collectForScope({ principal, scope });
+
+    return heldAt(scope);
+  }
+
+  /**
+   * The set at the scope plus the set at its organization, both decided against ONE collected
+   * snapshot: a member with no grant on the project still holds the organization floor.
+   */
+  async effectivePermissionsWithOrganization({
+    principal,
+    scope,
+  }: {
+    principal: AuthzPrincipalRef;
+    scope: AuthzScopeRef;
+  }): Promise<{ permissions: AuthzPermission[]; organizationPermissions: AuthzPermission[] }> {
+    const { heldAt } = await this.collectForScope({ principal, scope });
+    const permissions = heldAt(scope);
+    if (scope.type === "organization") return { permissions, organizationPermissions: permissions };
+
+    return {
+      permissions,
+      organizationPermissions: heldAt({ type: "organization", id: scopeOrganizationId(scope) }),
+    };
+  }
+
+  /** One snapshot load, then a pure registry walk at any scope of the same organization. */
+  private async collectForScope({
+    principal,
+    scope,
+  }: {
+    principal: AuthzPrincipalRef;
+    scope: AuthzScopeRef;
+  }): Promise<{ heldAt: (at: AuthzScopeRef) => AuthzPermission[] }> {
     const organizationId = scopeOrganizationId(scope);
     const [{ grants, ownerGrants }, resourceGrants] = await Promise.all([
       this.snapshots.collectWithOwnerCeiling({ principal, organizationId }),
       this.snapshots.findResourceGrantsFor(scope),
     ]);
     const demo = this.snapshots.findDemoProjectId();
+    const heldAt = (at: AuthzScopeRef): AuthzPermission[] =>
+      ALL_PERMISSIONS.filter(
+        (permission) =>
+          this.engine.decideWithCeiling({
+            keyGrants: grants,
+            ownerGrants,
+            permission,
+            scope: at,
+            demoProjectId: demo,
+            resourceGrants: at === scope ? resourceGrants : undefined,
+          }).allowed,
+      );
 
-    return ALL_PERMISSIONS.filter(
-      (permission) =>
-        this.engine.decideWithCeiling({
-          keyGrants: grants,
-          ownerGrants,
-          permission,
-          scope,
-          demoProjectId: demo,
-          resourceGrants,
-        }).allowed,
-    );
+    return { heldAt };
   }
 
   /**

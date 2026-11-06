@@ -1,5 +1,4 @@
 import { Link } from "@langwatch/browser-host/link";
-import { UpgradeRequired } from "@langwatch/design-system/access-state";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The Directory page's status band: which sources are connected, when the last
@@ -8,21 +7,13 @@ import { UpgradeRequired } from "@langwatch/design-system/access-state";
  * Spec: specs/identity/directory-administration.feature
  */
 import { Card } from "@langwatch/design-system/card";
-import {
-  Box,
-  Button,
-  Grid,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Grid, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatusChip, type StatusChipTone } from "@langwatch/design-system/settings-card";
 import { StatTileFigure } from "@langwatch/design-system/stat-tile";
 import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-client";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { nowInstant, readableDate } from "@langwatch/time";
-import { Boxes, Clock, Plug, Users, UserX } from "lucide-react";
+import { Boxes, Clock, Lock, Plug, Users, UserX } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useDirectoryFacts } from "../../behavior/use-directory-facts.ts";
@@ -108,18 +99,18 @@ export default function DirectorySummary({
   );
 }
 
-/** A plan state, not a failure: said as an upsell, as the directory band does on main. */
+/** A plan state, not a failure: one quiet line, so the page never reads as Enterprise-only. */
 function EnterpriseGate() {
   return (
-    <UpgradeRequired
-      feature="Directory sync"
-      data-testid="directory-enterprise-gate"
-      actions={
-        <Button asChild colorPalette="orange" size="sm">
-          <Link href="/settings/plans">Compare plans</Link>
-        </Button>
-      }
-    />
+    <HStack gap={2} color="fg.muted" fontSize="sm" data-testid="directory-enterprise-gate">
+      <Lock size={14} aria-hidden />
+      <Text>Sync people from your identity provider on Enterprise.</Text>
+      <Text asChild color="orange.fg">
+        <Link unstyled href="/settings/plans">
+          Compare plans
+        </Link>
+      </Text>
+    </HStack>
   );
 }
 

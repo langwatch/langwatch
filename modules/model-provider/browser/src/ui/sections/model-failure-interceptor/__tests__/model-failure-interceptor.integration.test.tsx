@@ -24,7 +24,10 @@ function failedCall({ data }: { data: Record<string, unknown> }): Error {
 const mutate = vi.fn(async (_path: string, _input: unknown): Promise<unknown> => ({ ok: true }));
 
 function failureHost(): UiFailureHost {
-  return { rpc: { query: vi.fn(), mutate, subscribe: vi.fn() }, navigate: vi.fn() };
+  return {
+    rpc: { query: vi.fn(), mutate, record: vi.fn(), subscribe: vi.fn() },
+    navigate: vi.fn(),
+  };
 }
 
 beforeEach(() => {

@@ -238,7 +238,17 @@ const RESOURCE_COPY = {
   },
   subscription: {
     label: "Subscription",
-    blurb: "The organization's paid plan on the cloud.",
+    blurb: "The organization's paid plan, its seats and its invoices.",
+    area: "Organization",
+  },
+  seatRequests: {
+    label: "Seat requests",
+    blurb: "Requests to give a seat to someone the seat limit held back.",
+    area: "Organization",
+  },
+  members: {
+    label: "Members",
+    blurb: "Who is in the organization and which roles they hold.",
     area: "Organization",
   },
   featureFlags: {

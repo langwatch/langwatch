@@ -12,6 +12,7 @@ import {
 } from "@langwatch/api/web";
 import type {
   AuthzApplyMemberBindingsInput,
+  AuthzBillingMember,
   AuthzChangeGrantRoleInput,
   AuthzCreateGrantInput,
   AuthzListManagedBindingsForOrganizationInput,
@@ -27,6 +28,7 @@ import type {
   EnrichedAuditLog,
   groupTrpc,
   licenseEnforcementTrpc,
+  seatRequestTrpc,
   OrganizationDirectoryCounts,
   OrganizationInvite,
   OrganizationMemberDirectory,
@@ -199,9 +201,10 @@ export type DepartmentAssignments = {
   projects: DepartmentAssignment[];
 };
 
-/** `licenseEnforcement.*` and `group.*` derive from organization contracts; the rest is here. */
+/** `licenseEnforcement.*`, `group.*` and `seatRequest.*` derive from organization contracts. */
 export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
-  ContractApiMap<typeof groupTrpc> & {
+  ContractApiMap<typeof groupTrpc> &
+  ContractApiMap<typeof seatRequestTrpc> & {
     organization: {
       /**
        * `pageOffset`/`pageSize` are real offset paging — a Prisma `skip` read,
@@ -516,6 +519,17 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
       applyMemberGrants: {
         mutation: {
           input: Omit<AuthzApplyMemberBindingsInput, "caller" | "actor">;
+          output: { success: true };
+        };
+      };
+      /** Who pays for the organization; every role reads it. */
+      listBillingMembers: {
+        query: { input: { organizationId: string }; output: AuthzBillingMember[] };
+      };
+      /** Grants or revokes Billing on one member; administrators only. */
+      setMemberBillingRole: {
+        mutation: {
+          input: { organizationId: string; userId: string; holds: boolean };
           output: { success: true };
         };
       };

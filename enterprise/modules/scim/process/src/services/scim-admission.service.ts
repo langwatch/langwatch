@@ -3,18 +3,18 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { admissionSeat, seatsFree } from "@langwatch/organization-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 
-import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import { isUniqueViolation } from "../rules/scim-user.rules.ts";
 import type { ScimHeldConnections } from "./scim-directory-identity.service.ts";
 import type { ScimGrantsService } from "./scim-grants.service.ts";
 import type { ScimMembershipAccessService } from "./scim-membership-access.service.ts";
+import type { ScimSeats } from "./scim-seat-lease.service.ts";
 
 type ScimAdmissionDependencies = {
   prisma: ScimRepository;
   grants: ScimGrantsService;
   provenOffboarding: boolean;
-  seats: ScimSeatRepository;
+  seats: ScimSeats;
   plans: Pick<EntitlementApi, "getActivePlan">;
   connections: ScimHeldConnections;
   membershipAccess: ScimMembershipAccessService;
@@ -56,16 +56,20 @@ export class ScimAdmissionService {
     organizationId: string;
   }): Promise<void> {
     const asserted = await this.directoryAssertedOrganizationRole({ userId, organizationId });
-    const [plan, seats] = await Promise.all([
-      this.options.plans.getActivePlan({ organizationId, user: { id: userId } }),
-      this.options.seats.countMemberSeats({ organizationId }),
-    ]);
-    const { role, pending } = admissionSeat({ requested: asserted, ...seatsFree({ plan, seats }) });
-    try {
-      await this.options.prisma.addMembership({ userId, organizationId, role, pending });
-    } catch (error) {
-      if (!isUniqueViolation(error)) throw error;
-    }
+    const plan = await this.options.plans.getActivePlan({ organizationId, user: { id: userId } });
+    await this.options.seats.withSeatLock({
+      organizationId,
+      work: async () => {
+        const seats = await this.options.seats.countMemberSeats({ organizationId });
+        const free = seatsFree({ plan, seats });
+        const { role, pending } = admissionSeat({ requested: asserted, ...free });
+        try {
+          await this.options.prisma.addMembership({ userId, organizationId, role, pending });
+        } catch (error) {
+          if (!isUniqueViolation(error)) throw error;
+        }
+      },
+    });
 
     await this.options.membershipAccess.reconcileOrganizationMembership({ userId, organizationId });
   }

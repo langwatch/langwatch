@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * What LangWatch is, to somebody about to configure their identity provider
- * (D09). Only the chosen protocol's values: OpenID Connect needs one address
- * and SAML three, and all four at once read as a wall of URLs where every
- * reader had to work out which lines were theirs.
+ * (D09). Only the chosen protocol's values, plus the access error page both share: all
+ * of them at once read as a wall of URLs where every reader had to work out which were theirs.
  */
 import type { SsoConnectionType } from "@langwatch/identity-contract";
 
-/** The four addresses a deployment answers with. The server owns them. */
+/** The addresses a deployment answers with. The server owns them. */
 export interface ServiceProviderAddresses {
   redirectUrl: string;
   assertionConsumerServiceUrl: string;
   entityId: string;
   metadataUrl: string;
+  refusalPageUrl: string;
 }
 
 /** One value to paste elsewhere, with what it is for in the reader's words. */
@@ -29,6 +29,11 @@ export function serviceProviderRowsFor({
   protocol: SsoConnectionType;
   addresses: ServiceProviderAddresses;
 }): ServiceProviderRow[] {
+  const refusalPage: ServiceProviderRow = {
+    label: "Access error page",
+    hint: "In Okta: General > App Embed Link > Edit > Application access error page",
+    value: addresses.refusalPageUrl,
+  };
   if (protocol === "oidc") {
     return [
       {
@@ -36,6 +41,7 @@ export function serviceProviderRowsFor({
         hint: "Where your identity provider sends people back to",
         value: addresses.redirectUrl,
       },
+      refusalPage,
     ];
   }
 
@@ -55,6 +61,7 @@ export function serviceProviderRowsFor({
       hint: "Import this address if your identity provider takes one",
       value: addresses.metadataUrl,
     },
+    refusalPage,
   ];
 }
 

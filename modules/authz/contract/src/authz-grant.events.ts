@@ -2,7 +2,7 @@ import { grantConditionSchema, ledgerActorSchema } from "@langwatch/authorizatio
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { PROJECT_READER_ROLE_KEY } from "./roles.ts";
+import { BILLING_ROLE_KEY, PROJECT_READER_ROLE_KEY } from "./roles.ts";
 
 export const AUTHZ_ENGINE_MIGRATION_NAME = "authz-engine" as const;
 
@@ -66,6 +66,7 @@ export const GRANT_EVENT_SOURCES = [
   "read-through-mint",
   "migration",
   "aggregate-reconciler",
+  "checkout",
 ] as const;
 export const grantEventSourceSchema = z.enum(GRANT_EVENT_SOURCES);
 export type GrantEventSource = z.infer<typeof grantEventSourceSchema>;
@@ -124,13 +125,20 @@ export const grantShapeRefinement = {
     }
     if ((grant.condition !== undefined) !== isSharedProjectRead) return false;
     if ((grant.roleKey === PROJECT_READER_ROLE_KEY) !== isSharedProjectRead) return false;
+    // Billing is a person's, held on their organization alone.
+    if (
+      grant.roleKey === BILLING_ROLE_KEY &&
+      (grant.principal.type !== "user" || grant.scope.type !== "ORGANIZATION")
+    ) {
+      return false;
+    }
     return (
       isResourceScope === (grant.resource !== undefined) &&
       isResourceScope === (grant.roleKey === null)
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a condition with an empty where; only that shared read carries a condition or the `project-reader` role",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a condition with an empty where; only that shared read carries a condition or the `project-reader` role; the `billing` role is held by a user at ORGANIZATION scope only",
   path: ["resource"] as const,
 };
 

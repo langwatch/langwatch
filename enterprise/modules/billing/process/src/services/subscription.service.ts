@@ -205,6 +205,7 @@ export class BillingSubscriptionService {
     customerId,
     currency,
     billingInterval,
+    startedByUserId,
   }: {
     organizationId: string;
     baseUrl: string;
@@ -214,6 +215,8 @@ export class BillingSubscriptionService {
     customerId: string;
     currency?: Currency;
     billingInterval?: BillingInterval;
+    /** Carried on the checkout so its completion can give this person the Billing role. */
+    startedByUserId?: string;
   }): Promise<{ url: string | null }> {
     if (isGrowthSeatEventPlan(plan) && this.seatEventService) {
       const pricingModel = await this.organizationRepository.findPricingModel(organizationId);
@@ -227,6 +230,7 @@ export class BillingSubscriptionService {
         billingInterval: billingInterval ?? "monthly",
         membersToAdd,
         isUpgradeFromTiered: pricingModel === "TIERED",
+        ...(startedByUserId ? { startedByUserId } : {}),
       });
       return { url };
     }
@@ -252,6 +256,7 @@ export class BillingSubscriptionService {
       membersToAdd,
       customerId,
       baseUrl,
+      ...(startedByUserId ? { startedByUserId } : {}),
     });
   }
 
@@ -384,6 +389,7 @@ export class BillingSubscriptionService {
     membersToAdd,
     customerId,
     baseUrl,
+    startedByUserId,
   }: {
     organizationId: string;
     plan: PlanType;
@@ -391,6 +397,7 @@ export class BillingSubscriptionService {
     membersToAdd: number;
     customerId: string;
     baseUrl: string;
+    startedByUserId?: string;
   }): Promise<{ url: string | null }> {
     if (!isStripePriceName(plan as StripePriceName)) {
       logger.error(
@@ -431,6 +438,7 @@ export class BillingSubscriptionService {
       cancelUrl: `${baseUrl}/settings/subscription`,
       clientReferenceId: `subscription_setup_${subscription.id}`,
       allowPromotionCodes: true,
+      ...(startedByUserId ? { metadata: { startedByUserId } } : {}),
     });
 
     return { url: session.url };

@@ -52,6 +52,8 @@ export type WebScreen = Readonly<{
   load?: () => Promise<unknown>;
   /** The grant the shell's router checks before this screen renders (§10). */
   requires?: string;
+  /** Where `requires` is asked: the active project by default, or the organization itself. */
+  requiresAt?: "organization";
   /** Release flags that must all be on for this screen to exist; off answers not-found. */
   flags?: readonly ReleaseFlagToken[];
 }>;

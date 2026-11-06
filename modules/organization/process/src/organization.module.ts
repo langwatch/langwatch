@@ -19,6 +19,7 @@ import { organizationManagementRest } from "./transport/organization-management.
 import { organizationTrpcTransport } from "./transport/organization.trpc.ts";
 import { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
 import { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-workspace-features.trpc.ts";
+import { seatRequestTrpcTransport } from "./transport/seat-request.trpc.ts";
 import { teamsRest } from "./transport/team.rest.ts";
 import { teamTrpcTransport } from "./transport/team.trpc.ts";
 
@@ -37,6 +38,7 @@ export const organizationProcessModule: PublishedProcessModule<
     groupTrpcTransport,
     licenseEnforcementTrpcTransport,
     personalWorkspaceFeaturesTrpcTransport,
+    seatRequestTrpcTransport,
     organizationManagementRest,
     organizationsProvisioningRest,
     groupsRest,

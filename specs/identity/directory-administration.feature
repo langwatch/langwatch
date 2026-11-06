@@ -11,6 +11,17 @@ Feature: Directory administration
   Rule: people, invitations and requests are three cuts of one list
 
     @integration
+    Scenario: A member who cannot manage the organization reads only the people
+      When "sam" opens the directory page
+      Then he sees the people tab and no other tab
+      And nothing on the page offers him a change
+
+    @integration
+    Scenario: A reader without the directory view is told which permission it takes
+      When a reader who holds no members:view opens the directory page
+      Then the page names members:view and draws no tab
+
+    @integration
     Scenario: The directory's people tab opens on everybody
       When "ana" opens the directory page
       Then she sees the people tab open, listing members, invitations and

@@ -341,6 +341,14 @@ Feature: Subscription Page Plan Management
       Then I do not see an invoices block
 
     @integration
+    Scenario: A member who does not pay sees no invoices block and no error
+      Given my organization has invoices
+      And reading them is refused because my role does not manage the subscription
+      When I view the subscription page
+      Then I do not see an invoices block
+      And no error banner is shown for the refused read
+
+    @integration
     Scenario: A paid plan with no invoices yet sees a one-line note
       Given my organization has an active Growth subscription
       And my organization has no invoices yet
