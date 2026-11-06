@@ -1,8 +1,11 @@
 import type { Dataset, DatasetRecord, DatasetWithRecords } from "@langwatch/dataset-contract";
+import { createLogger } from "@langwatch/observability";
 
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
-import { isChunkLine } from "../rules/dataset-chunk-lines.rules.ts";
+import { type ChunkLine, isChunkLine } from "../rules/dataset-chunk-lines.rules.ts";
 import { entryBytesOf } from "../rules/dataset-row-limits.rules.ts";
+
+const logger = createLogger("langwatch:datasets:mutations");
 
 /** Reads rows out of a dataset stored as s3_jsonl chunks, one chunk in memory at a time. */
 export class DatasetChunkReadService {
@@ -24,21 +27,86 @@ export class DatasetChunkReadService {
     ids: readonly string[];
     storage: DatasetChunkRepository;
   }): Promise<Record<string, unknown>[]> {
+    const records = await this.findRecords({ dataset, projectId, ids, storage });
+    return records.flatMap(({ entry }) => {
+      if (typeof entry === "object" && entry !== null) return [{ ...entry }];
+      return [];
+    });
+  }
+
+  async findRecords({
+    dataset,
+    projectId,
+    ids,
+    storage,
+  }: {
+    dataset: Pick<Dataset, "id" | "chunkCount">;
+    projectId: string;
+    ids: readonly string[];
+    storage: DatasetChunkRepository;
+  }): Promise<ChunkLine[]> {
     const remaining = new Set(ids);
-    const entries: Record<string, unknown>[] = [];
+    const records: ChunkLine[] = [];
     const chunkCount = dataset.chunkCount ?? 0;
     for (let index = 0; index < chunkCount && remaining.size > 0; index++) {
       const rows = await storage.readChunk({ projectId, datasetId: dataset.id, index });
       for (const line of rows) {
         if (!isChunkLine(line) || !remaining.has(line.id)) continue;
         remaining.delete(line.id);
-        if (typeof line.entry === "object" && line.entry !== null) {
-          entries.push({ ...line.entry });
+        records.push(line);
+      }
+    }
+
+    return records;
+  }
+
+  /** Pre-lock hints are revalidated by the mutation while it holds the dataset lock. */
+  async locateIds({
+    storage,
+    projectId,
+    datasetId,
+    ids,
+    chunkCount,
+  }: {
+    storage: DatasetChunkRepository;
+    projectId: string;
+    datasetId: string;
+    ids: Set<string>;
+    chunkCount: number;
+  }): Promise<
+    | { outcome: "located"; affectedIndices: number[]; locatedIds: Set<string> }
+    | { outcome: "unavailable" }
+  > {
+    const affected = new Set<number>();
+    const locatedIds = new Set<string>();
+    const remaining = new Set(ids);
+    for (let index = 0; index < chunkCount && remaining.size > 0; index++) {
+      let rows: unknown[];
+      try {
+        rows = await storage.readChunk({ projectId, datasetId, index });
+      } catch {
+        logger.warn(
+          { projectId, datasetId, index },
+          "off-lock chunk read failed during id locate; abandoning fast-path hint, falling back to full in-lock scan",
+        );
+
+        return { outcome: "unavailable" };
+      }
+
+      for (const line of rows) {
+        if (isChunkLine(line) && remaining.has(line.id)) {
+          affected.add(index);
+          locatedIds.add(line.id);
+          remaining.delete(line.id);
         }
       }
     }
 
-    return entries;
+    return {
+      outcome: "located",
+      affectedIndices: [...affected].toSorted((a, b) => a - b),
+      locatedIds,
+    };
   }
 
   /**
