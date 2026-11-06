@@ -123,3 +123,48 @@ export function subscriptionChangesRequired({
       isUpgradeSeatsRequired || planUpgradeRequired || (isOverPlanSeats && !isEnterprisePlan),
   };
 }
+
+/** This month's events on the plan card: the count, and the cap with a meter where one applies. */
+export type PlanEventUsage = {
+  label: string;
+  value: string;
+  /** Share of the cap used, or null when the plan has no cap to measure against. */
+  fillRatio: number | null;
+  status: "ok" | "warning" | "exceeded";
+};
+
+export function planEventUsage({
+  currentMonthCount,
+  messageLimitInfo,
+  usageUnit,
+  showLimit,
+}: {
+  /** Null when the counting store could not answer: no figure is shown rather than a false zero. */
+  currentMonthCount: number | null | undefined;
+  messageLimitInfo:
+    | {
+        status: PlanEventUsage["status"];
+        current: number;
+        max: number;
+        currentFormatted: string;
+        maxFormatted: string;
+      }
+    | undefined;
+  usageUnit: string | undefined;
+  /** Whether the plan's cap is a limit the reader works against (see shouldShowPlanLimits). */
+  showLimit: boolean;
+}): PlanEventUsage | undefined {
+  if (!messageLimitInfo || currentMonthCount == null) return undefined;
+  const label = usageUnit === "traces" ? "Traces this month" : "Events this month";
+  const capped =
+    showLimit && messageLimitInfo.max > 0 && messageLimitInfo.maxFormatted !== "Unlimited";
+  if (!capped) {
+    return { label, value: messageLimitInfo.currentFormatted, fillRatio: null, status: "ok" };
+  }
+  return {
+    label,
+    value: `${messageLimitInfo.currentFormatted} / ${messageLimitInfo.maxFormatted}`,
+    fillRatio: messageLimitInfo.current / messageLimitInfo.max,
+    status: messageLimitInfo.status,
+  };
+}

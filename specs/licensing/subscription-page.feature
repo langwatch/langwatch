@@ -189,6 +189,83 @@ Feature: Subscription Page Plan Management
       And I am not told my plan doesn't cover my seats
 
   # ============================================================================
+  # Page layout: the plan and what to do about it come first
+  # ============================================================================
+
+  Rule: The page leads with the current plan, its usage and the next step
+
+    A Free organization usually opens this page because it hit the monthly
+    event limit, so the plan card shows that usage and carries the action that
+    fixes it. The Growth offer follows the plan card. Invoices are a record,
+    not a decision, so they come last and take no space when there are none.
+
+    @integration
+    Scenario: A Free plan's card carries the Growth upgrade as its action
+      Given my organization is on the Free plan with 1 member
+      When I view the subscription page
+      Then the current plan card has an "Upgrade to Growth" action
+      And choosing it starts the Growth checkout for 1 seat
+
+    @integration
+    Scenario: A paid plan's card carries subscription management as its action
+      Given my organization has an active Growth subscription
+      When I view the subscription page
+      Then the current plan card has a "Manage subscription" action
+      And the current plan card has no upgrade action
+
+    @integration
+    Scenario: The current plan shows this month's events against the plan's limit
+      Given my organization is on the Free plan
+      And my organization sent 12,000 of its 50,000 events this month
+      When I view the subscription page
+      Then the current plan card shows "12,000 / 50,000" events this month
+      And a meter shows how much of the limit is used
+
+    @integration
+    Scenario: A Free plan at its event limit says the limit is reached
+      Given my organization is on the Free plan
+      And my organization used all 50,000 events this month
+      When I view the subscription page
+      Then the current plan card says the event limit is reached
+      And I am offered the Growth upgrade
+
+    @integration
+    Scenario: A plan billed per event shows the month's events without a limit
+      Given my organization has an active Growth subscription billed per seat and event
+      When I view the subscription page
+      Then the current plan card shows the events sent this month
+      And no event limit or meter is shown
+
+    @integration
+    Scenario: The plan card shows no event figure while the count is unavailable
+      Given my organization is on the Free plan
+      And this month's event count could not be read
+      When I view the subscription page
+      Then the current plan card does not show an event count
+
+    @integration
+    Scenario: The Growth offer comes right after the current plan and invoices come last
+      Given my organization is on the Free plan with 1 member
+      And my organization has paid invoices from an earlier subscription
+      When I view the subscription page
+      Then the Growth offer is the block right after the current plan card
+      And the invoices are the last block on the page
+
+    @integration
+    Scenario: A Free organization with no invoices sees no invoices block
+      Given my organization is on the Free plan with 1 member
+      And my organization has no invoices
+      When I view the subscription page
+      Then I do not see an invoices block
+
+    @integration
+    Scenario: A paid plan with no invoices yet sees a one-line note
+      Given my organization has an active Growth subscription
+      And my organization has no invoices yet
+      When I view the subscription page
+      Then the invoices block says there are no invoices yet on one line
+
+  # ============================================================================
   # An organization above its plan's seats is offered the upgrade
   # ============================================================================
 
