@@ -40,11 +40,7 @@ import type { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
-import {
-  findRegisteredRefusals,
-  refusedWith,
-  SSO_DISCOVERY_REFUSAL_CODES,
-} from "../../rules/better-auth-error-code.rules.ts";
+import { findRegisteredRefusals } from "../../rules/better-auth-error-code.rules.ts";
 import { getAccountIssuer } from "../../rules/provider-account-issuer.rules.ts";
 import {
   ID_TOKEN_MAX_AGE_SECONDS,
@@ -55,6 +51,7 @@ import {
   isLockoutCountedPath,
 } from "../../rules/sign-in-identifier-hash.rules.ts";
 import { withSocialProviderBases } from "../../rules/social-provider-bases.rules.ts";
+import { findSsoDiscoveryRefusals } from "../../rules/sso-discovery-refusal.rules.ts";
 import { resolveTrustedOrigins } from "../../rules/trusted-origins.rules.ts";
 import type {
   BetterAuthAnnouncements,
@@ -308,18 +305,18 @@ async function countSignInAttempt({
   }
 }
 
-/**
- * The SSO engine's refusal of a provider's discovery document reaches only the browser. The
- * person signing in cannot fix an unreadable or untrusted provider; an administrator can.
- */
-export function logSsoDiscoveryRefusal(ctx: { context?: { returned?: unknown } }): void {
+/** Logs the SSO engine's discovery refusals, which otherwise reach only the browser. */
+export function logSsoDiscoveryRefusal(ctx: {
+  request?: { url?: string };
+  body?: unknown;
+  context?: { returned?: unknown };
+}): void {
+  const url = ctx.request?.url;
+  if (url === undefined) return;
   const returned = ctx.context?.returned;
-  if (!(returned instanceof APIError) || !refusedWith(returned, SSO_DISCOVERY_REFUSAL_CODES))
-    return;
-  logger.warn(
-    { code: returned.body?.code, reason: returned.message },
-    "an sso sign-in was refused",
-  );
+  for (const refusal of findSsoDiscoveryRefusals({ url, body: ctx.body, returned })) {
+    logger.warn(refusal, "an sso sign-in was refused");
+  }
 }
 
 /**

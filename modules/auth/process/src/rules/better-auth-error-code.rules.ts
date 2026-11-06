@@ -29,22 +29,6 @@ export function refusedWith(error: unknown, codes: readonly string[]): boolean {
   return parsed.success && codes.includes(parsed.data);
 }
 
-/** The SSO engine's refusals of an issuer's discovery document (`@better-auth/sso`), which
- *  name the endpoint and the reason only in the answer to the browser. */
-export const SSO_DISCOVERY_REFUSAL_CODES = [
-  "discovery_timeout",
-  "discovery_unexpected_error",
-  "discovery_not_found",
-  "discovery_invalid_url",
-  "discovery_untrusted_origin",
-  "discovery_private_host",
-  "oidc_endpoint_redirect",
-  "discovery_invalid_json",
-  "discovery_incomplete",
-  "issuer_mismatch",
-  "unsupported_token_auth_method",
-] as const;
-
 /** One better-auth refusal on one route family, and the handled error it answers as. */
 type BetterAuthRefusal = Readonly<{
   family: string;
