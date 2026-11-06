@@ -64,7 +64,11 @@ import {
 } from "@langwatch/identity-contract";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { OrganizationApi, type InviteLanding } from "@langwatch/organization-contract";
+import {
+  OrganizationApi,
+  type InviteLanding,
+  type OrganizationUserRole,
+} from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
@@ -1544,6 +1548,7 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
     userId: string;
     organizationId: string;
     organizationName: string;
+    role: OrganizationUserRole;
   }): void {
     this.lifecycle.ssoAutoAdded(input);
   }

@@ -4,7 +4,8 @@
 
 import { expandLatestAlias } from "@langwatch/model-provider-contract";
 
-/** The project-default feature key each simulation role resolves against. */
+/** The project-default feature key each simulation role resolves against; the judge's
+ * feature belongs to the Judge column, which reads the Default column when unset. */
 export const SIMULATOR_MODEL_FEATURE_KEY = "scenarios.user_simulator";
 export const JUDGE_MODEL_FEATURE_KEY = "scenarios.judge";
 
