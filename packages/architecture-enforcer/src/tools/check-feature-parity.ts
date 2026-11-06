@@ -677,6 +677,17 @@ const LEGACY_INERT: string[] = [
   "specs/workflows/studio-llm-node-drawer.feature",
   "specs/workflows/studio-local-state.feature",
   "specs/workflows/studio-usage-limits.feature",
+  // PLANNED, NOT YET BUILT: dataset content in object storage only. Every scenario is
+  // @unimplemented and names the tag it becomes; the change that binds a file's first scenario
+  // removes its entry here.
+  "specs/datasets/storage-object-only/content-move-and-cleanup.feature",
+  "specs/datasets/storage-object-only/other-postgres-copies.feature",
+  "specs/datasets/storage-object-only/postgres-layout-code-removal.feature",
+  "specs/datasets/storage-object-only/records-table-retirement.feature",
+  "specs/datasets/storage-object-only/self-hosting-and-docs.feature",
+  "specs/datasets/storage-object-only/single-file-conversion.feature",
+  "specs/datasets/storage-object-only/storage-progress-observability.feature",
+  "specs/datasets/storage-object-only/write-paths.feature",
 ];
 
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
