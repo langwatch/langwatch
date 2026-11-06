@@ -545,7 +545,9 @@ jobs:
           retention-days: 7
 
   e2e-complete:
-    needs: [changes, e2e, e2e-cloud-billing]
+    # e2e-cloud-billing stays advisory until its journeys have proved stable; it reports
+    # as its own check rather than blocking every pull request.
+    needs: [changes, e2e]
     if: always()
     runs-on: ubuntu-latest
     steps:
