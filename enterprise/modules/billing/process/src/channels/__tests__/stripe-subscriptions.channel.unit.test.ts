@@ -312,7 +312,7 @@ describe("Billing's subscription shapes over the provider", () => {
     });
   });
 
-  it("sends a seat change and a billing threshold as Stripe's update parameters", async () => {
+  it("sends a seat change and a billing threshold as Stripe's update parameters and timeout", async () => {
     const { calls, subscriptions } = recordingProvider();
 
     await subscriptions.updateSubscription({
@@ -323,6 +323,7 @@ describe("Billing's subscription shapes over the provider", () => {
         prorationDate: 1_700_000_000,
         cancelAtPeriodEnd: false,
       },
+      timeoutMs: 60_000,
     });
     await subscriptions.updateSubscription({
       subscriptionId: "sub_1",
@@ -340,6 +341,7 @@ describe("Billing's subscription shapes over the provider", () => {
             proration_date: 1_700_000_000,
             cancel_at_period_end: false,
           },
+          { timeout: 60_000 },
         ],
       },
       {
@@ -347,6 +349,7 @@ describe("Billing's subscription shapes over the provider", () => {
         args: [
           "sub_1",
           { billing_thresholds: { amount_gte: 75_000, reset_billing_cycle_anchor: false } },
+          undefined,
         ],
       },
     ]);

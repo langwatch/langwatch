@@ -8,6 +8,7 @@ import {
   type StripePriceMap,
 } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi, LicenseStatus } from "@langwatch/enterprise-licensing-contract";
+import type * as Observability from "@langwatch/observability";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type Stripe from "stripe";
@@ -24,7 +25,10 @@ import type { BillingSubscriptionStatus } from "../rules/billing-stripe-shapes.r
 import { BillingSubscriptionLifecycleService } from "../services/billing-subscription-lifecycle.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
-import { SEAT_LINE_LEASE_MS } from "../services/seat-line-lease.service.ts";
+import {
+  SEAT_LINE_LEASE_MS,
+  SEAT_LINE_WRITE_TIMEOUT_MS,
+} from "../services/seat-line-lease.service.ts";
 import {
   SEAT_REPAIR_FLAG_AFTER_ATTEMPTS,
   SEAT_REPAIR_GRACE_MS,
@@ -56,6 +60,19 @@ const PROVIDER_AT_THREE = {
   ended_at: null,
   items: { data: [{ price: { id: prices.GROWTH_SEAT_EUR_MONTHLY }, quantity: 3 }] },
 } as Stripe.Subscription;
+
+const leaseLog = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn() }));
+
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual = await importOriginal<typeof Observability>();
+  return {
+    ...actual,
+    createLogger: (name: string) =>
+      name === "langwatch:billing:seatLineLease"
+        ? { ...leaseLog, info: vi.fn(), debug: vi.fn() }
+        : actual.createLogger(name),
+  };
+});
 
 describe("Growth seat changes", () => {
   let store: MemoryBillingStore;
@@ -483,6 +500,54 @@ describe("Growth seat changes", () => {
         prices,
       });
       vi.setSystemTime(NOW.add({ milliseconds: SEAT_REPAIR_GRACE_MS + 1 }).epochMilliseconds);
+    });
+
+    /** @scenario "A seat line repair whose write lands after a seat change took its lease reports it" */
+    it("reports a write that landed after a seat change took its lease", async () => {
+      const send = stripeSubscriptions.updateSubscription.bind(stripeSubscriptions);
+      const stall = { resume: () => {} };
+      const writes = vi
+        .spyOn(stripeSubscriptions, "updateSubscription")
+        .mockImplementationOnce(async (input) => {
+          await new Promise<void>((resolve) => (stall.resume = resolve));
+          const sent = await send(input);
+          seedProvider(3);
+          return sent;
+        });
+      const repairing = repairs.repairSeatLines();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(writes).toHaveBeenCalledTimes(1);
+      vi.setSystemTime(Date.now() + SEAT_LINE_LEASE_MS + 1);
+      await seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 });
+      const changeWrites = stripeSubscriptions.updates.length;
+
+      stall.resume();
+
+      expect(await repairing).toMatchObject({ repaired: 0, pending: 1, failed: 0 });
+      expect(changeWrites).toBeGreaterThan(0);
+      expect(stripeSubscriptions.updates.at(-1)?.change).toEqual({
+        items: [{ id: "si_seat", quantity: 3 }],
+        prorationBehavior: "none",
+      });
+      expect(leaseLog.error).toHaveBeenCalledWith(
+        { subscriptionId: "sub_db_1", quantity: 3 },
+        expect.stringContaining("may have been overwritten"),
+      );
+      writes.mockRestore();
+    });
+
+    /** @scenario "Seat line writes give up well inside the lease" */
+    it("sends every seat line write with a one minute request timeout", async () => {
+      const writes = vi.spyOn(stripeSubscriptions, "updateSubscription");
+
+      await repairs.repairSeatLines();
+      await seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 });
+
+      const timeouts = writes.mock.calls.map(([input]) => input.timeoutMs);
+      expect(timeouts.length).toBeGreaterThan(1);
+      expect(timeouts).toEqual(timeouts.map(() => 60 * 1000));
+      expect(2 * SEAT_LINE_WRITE_TIMEOUT_MS).toBeLessThan(SEAT_LINE_LEASE_MS);
+      writes.mockRestore();
     });
 
     /** @scenario "A seat line Stripe refused to put back is repaired later" */

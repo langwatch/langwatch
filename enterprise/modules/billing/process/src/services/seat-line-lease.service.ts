@@ -12,15 +12,30 @@ const logger = createLogger("langwatch:billing:seatLineLease");
 export const SEAT_LINE_LEASE_MS = 5 * 60 * 1000;
 /** How often a waiting seat change asks for the lease again. */
 const SEAT_LINE_POLL_MS = 250;
+/**
+ * Stripe request timeout for one seat line write. With the client's one network retry a write
+ * gives up within about two minutes, well inside the lease it renewed just before.
+ */
+export const SEAT_LINE_WRITE_TIMEOUT_MS = 60 * 1000;
 
 /** What holding the seat line found: the work's answer, or another holder kept or took it. */
 export type SeatLineHold<T> = { held: true; value: T } | { held: false };
 
-/** Asked before every Stripe write: renews the lease, or stops the work when it was lost. */
-export type SeatLineGuard = { beforeWrite: () => Promise<void> };
+/**
+ * Wraps every Stripe write: renews the lease before it and checks it after. Lost before, the work
+ * stops unwritten; lost after, it reads the line back, reports a write that may have overwritten
+ * the newer holder's, and stops.
+ */
+export type SeatLineGuard = {
+  write: <R>(input: {
+    quantity: number;
+    send: () => Promise<R>;
+    readQuantity: () => Promise<number | null | undefined>;
+  }) => Promise<R>;
+};
 
-/** The lease ran out and another holder took it; the work stops without writing. */
-class SeatLineLeaseLostError extends Error {
+/** The lease ran out and another holder took it; the work stops there. */
+export class SeatLineLeaseLostError extends Error {
   constructor() {
     super("The seat line lease was taken over");
     this.name = "SeatLineLeaseLostError";
@@ -68,21 +83,26 @@ export class SeatLineLeaseService {
     }
     if (!claim.claimed) return { held: false };
     const { token } = claim;
-    // Between this renewal and the Stripe call it guards, a stalled holder can still outlive
-    // the fresh lease; the lease is minutes long and the gap is one awaited round trip.
-    const beforeWrite = async () => {
-      const renewed = await this.subscriptions.renewSeatLine({
-        id,
-        token,
-        leaseMs: SEAT_LINE_LEASE_MS,
-      });
-      if (!renewed) throw new SeatLineLeaseLostError();
+    const renew = () =>
+      this.subscriptions.renewSeatLine({ id, token, leaseMs: SEAT_LINE_LEASE_MS });
+    // Stripe has no conditional update: a write that stalls past the lease can still land after
+    // a takeover. SEAT_LINE_WRITE_TIMEOUT_MS bounds that, and the check after it reports it.
+    const guard: SeatLineGuard = {
+      write: async ({ quantity, send, readQuantity }) => {
+        if (!(await renew())) throw new SeatLineLeaseLostError();
+        const sent = await send();
+        if (!(await renew())) {
+          await this.reportLateWrite({ id, quantity, readQuantity });
+          throw new SeatLineLeaseLostError();
+        }
+        return sent;
+      },
     };
     try {
-      return { held: true, value: await work({ beforeWrite }) };
+      return { held: true, value: await work(guard) };
     } catch (error) {
       if (!(error instanceof SeatLineLeaseLostError)) throw error;
-      logger.warn({ subscriptionId: id }, "seat line lease taken over; stopped before writing");
+      logger.warn({ subscriptionId: id }, "seat line lease taken over; the work stopped");
       return { held: false };
     } finally {
       await this.subscriptions.releaseSeatLine({ id, token }).catch((error: unknown) => {
@@ -90,5 +110,30 @@ export class SeatLineLeaseService {
         logger.warn({ error, subscriptionId: id }, "seat line lease release failed");
       });
     }
+  }
+
+  /** A write that landed after a takeover: an error unless Stripe shows a newer write after it. */
+  private async reportLateWrite({
+    id,
+    quantity,
+    readQuantity,
+  }: {
+    id: string;
+    quantity: number;
+    readQuantity: () => Promise<number | null | undefined>;
+  }): Promise<void> {
+    const current = await readQuantity().catch(() => "unread" as const);
+    if (current === "unread" || current === quantity) {
+      logger.error(
+        { subscriptionId: id, quantity },
+        "seat line written after its lease was taken over and Stripe still shows that write; " +
+          "the newer seat change may have been overwritten, check the seat line",
+      );
+      return;
+    }
+    logger.warn(
+      { subscriptionId: id, quantity, current },
+      "seat line written after its lease was taken over; a newer write followed it",
+    );
   }
 }

@@ -34,12 +34,18 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
   async updateSubscription({
     subscriptionId,
     change,
+    timeoutMs,
   }: {
     subscriptionId: string;
     change: BillingSubscriptionChange;
+    timeoutMs?: number;
   }): Promise<BillingSubscription> {
     return subscriptionOf(
-      await this.stripe.subscriptions.update(subscriptionId, updateParamsOf(change)),
+      await this.stripe.subscriptions.update(
+        subscriptionId,
+        updateParamsOf(change),
+        timeoutMs === undefined ? undefined : { timeout: timeoutMs },
+      ),
     );
   }
 

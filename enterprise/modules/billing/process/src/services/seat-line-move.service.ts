@@ -12,9 +12,15 @@ import type {
 } from "../rules/billing-stripe-shapes.rules.ts";
 import { seatChange } from "../rules/seat-event-quote.rules.ts";
 import type { SeatChangePlan } from "../rules/seat-kept.rules.ts";
-import type { SeatLineGuard } from "./seat-line-lease.service.ts";
+import {
+  SEAT_LINE_WRITE_TIMEOUT_MS,
+  type SeatLineGuard,
+  SeatLineLeaseLostError,
+} from "./seat-line-lease.service.ts";
 
 const logger = createLogger("langwatch:billing:seatLineMove");
+
+type SeatLineWrites = Pick<StripeSubscriptionsChannel, "getSubscription" | "updateSubscription">;
 
 /**
  * Sends a seat change plan's steps to Stripe. A plan that lifts the line first records the way
@@ -23,7 +29,7 @@ const logger = createLogger("langwatch:billing:seatLineMove");
  */
 export class SeatLineMoveService {
   private constructor(
-    private readonly stripeSubscriptions: Pick<StripeSubscriptionsChannel, "updateSubscription">,
+    private readonly stripeSubscriptions: SeatLineWrites,
     private readonly subscriptions: SeatEventSubscriptionRepository,
   ) {}
 
@@ -31,7 +37,7 @@ export class SeatLineMoveService {
     stripeSubscriptions,
     subscriptions,
   }: {
-    stripeSubscriptions: Pick<StripeSubscriptionsChannel, "updateSubscription">;
+    stripeSubscriptions: SeatLineWrites;
     subscriptions: SeatEventSubscriptionRepository;
   }): SeatLineMoveService {
     return new SeatLineMoveService(stripeSubscriptions, subscriptions);
@@ -71,19 +77,27 @@ export class SeatLineMoveService {
           liftedQuantity: lift.quantity,
         })
       : null;
-    const moveTo = async (quantity: number, prorationBehavior: "always_invoice" | "none") => {
-      await guard.beforeWrite();
-      return this.stripeSubscriptions.updateSubscription({
-        subscriptionId: stripeSubscription.id,
-        change: seatChange({
-          subscription: stripeSubscription,
-          seatItem,
-          quantity,
-          prorationDate,
-          prorationBehavior,
-        }),
+    const subscriptionId = stripeSubscription.id;
+    const moveTo = (quantity: number, prorationBehavior: "always_invoice" | "none") =>
+      guard.write({
+        quantity,
+        send: () =>
+          this.stripeSubscriptions.updateSubscription({
+            subscriptionId,
+            change: seatChange({
+              subscription: stripeSubscription,
+              seatItem,
+              quantity,
+              prorationDate,
+              prorationBehavior,
+            }),
+            timeoutMs: SEAT_LINE_WRITE_TIMEOUT_MS,
+          }),
+        readQuantity: async () => {
+          const current = await this.stripeSubscriptions.getSubscription({ subscriptionId });
+          return current.items.find((item) => item.id === seatItem.id)?.quantity;
+        },
       });
-    };
 
     let lifted = false;
     try {
@@ -92,7 +106,10 @@ export class SeatLineMoveService {
         lifted = step === lift;
       }
     } catch (error) {
-      if (lifted && record) await this.rollBack({ id, organizationId, record, moveTo });
+      // A lost lease belongs to the newer holder now; the recorded repair re-checks the line.
+      const leaseLost = error instanceof SeatLineLeaseLostError;
+      if (lifted && record && !leaseLost)
+        await this.rollBack({ id, organizationId, record, moveTo });
       throw error;
     }
     return { repairsUpTo: record?.since ?? startedAt };

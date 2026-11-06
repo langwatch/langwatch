@@ -421,6 +421,22 @@ Feature: Seat rotation
       And the repair stays pending for the next pass
 
     @unit
+    Scenario: A seat line repair whose write lands after a seat change took its lease reports it
+      Given the subscription records that Stripe should bill 3 seats while Stripe bills 5
+      And the seat line repair renewed its lease and sent its write, which stalls
+      And the lease ran out and a seat change raised the seats to 6 meanwhile
+      When the repair's write lands and Stripe shows 3 seats
+      Then an error reports that the seat line may have overwritten the newer change
+      And the repair is not counted as repaired
+
+    @unit
+    Scenario: Seat line writes give up well inside the lease
+      Given the subscription records that Stripe should bill 3 seats while Stripe bills 5
+      When the seat line repair and then a seat change move the line
+      Then every Stripe seat line write carries a request timeout of one minute
+      And two attempts at that timeout fit inside the five minute lease
+
+    @unit
     Scenario: A seat change refused while another one keeps running
       Given a seat change is working on the subscription and does not finish
       When an administrator raises the seats

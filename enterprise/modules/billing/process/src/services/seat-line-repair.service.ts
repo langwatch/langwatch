@@ -8,7 +8,11 @@ import type {
   SeatRepairRow,
 } from "../repositories/seat-event-subscription.repository.ts";
 import type { BillingSubscription } from "../rules/billing-stripe-shapes.rules.ts";
-import { type SeatLineGuard, SeatLineLeaseService } from "./seat-line-lease.service.ts";
+import {
+  SEAT_LINE_WRITE_TIMEOUT_MS,
+  type SeatLineGuard,
+  SeatLineLeaseService,
+} from "./seat-line-lease.service.ts";
 
 const logger = createLogger("langwatch:billing:seatLineRepair");
 
@@ -115,13 +119,21 @@ export class SeatLineRepairService {
     const seatItem = this.seatItemOf(subscription);
     if (seatItem.quantity !== repair.liftedQuantity) return "settled";
     if (UNCHANGEABLE_STATUSES.has(subscription.status)) return "pending";
-    await guard.beforeWrite();
-    await this.stripeSubscriptions.updateSubscription({
-      subscriptionId: repair.stripeSubscriptionId,
-      change: {
-        items: [{ id: seatItem.id, quantity: repair.quantity }],
-        prorationBehavior: "none",
-      },
+    const subscriptionId = repair.stripeSubscriptionId;
+    await guard.write({
+      quantity: repair.quantity,
+      send: () =>
+        this.stripeSubscriptions.updateSubscription({
+          subscriptionId,
+          change: {
+            items: [{ id: seatItem.id, quantity: repair.quantity }],
+            prorationBehavior: "none",
+          },
+          timeoutMs: SEAT_LINE_WRITE_TIMEOUT_MS,
+        }),
+      readQuantity: async () =>
+        this.seatItemOf(await this.stripeSubscriptions.getSubscription({ subscriptionId }))
+          .quantity,
     });
     return "settled";
   }

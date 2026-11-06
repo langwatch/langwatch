@@ -114,6 +114,7 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
   }: {
     subscriptionId: string;
     change: BillingSubscriptionChange;
+    timeoutMs?: number;
   }): Promise<BillingSubscription> {
     this.throwIfRefused("updateSubscription");
     const subscription = this.find(subscriptionId);
