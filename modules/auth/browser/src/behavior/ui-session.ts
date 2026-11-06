@@ -217,15 +217,6 @@ export function useBrowserUiSession({
     userId,
     isPublicRoute,
   });
-  // On a project page the read above is the project's; organization checks also ask the
-  // organization itself, where every member holds the floor (members:view) without a project.
-  const organizationPermissions = useUiEffectivePermissions({
-    transport,
-    projectId: undefined,
-    organizationId: projectId ? organizationId : undefined,
-    userId,
-    isPublicRoute,
-  });
 
   const refresh = useRefreshUiSession();
 
@@ -234,7 +225,7 @@ export function useBrowserUiSession({
     scope,
     permissions: isPublicRoute
       ? NO_PERMISSIONS_ON_A_PUBLIC_PAGE
-      : readPermissions(scope, permissions, projectId ? organizationPermissions : undefined),
+      : readPermissions(scope, permissions),
   };
 
   return BrowserUiSession.create({ snapshot, refresh });
@@ -261,20 +252,18 @@ function readSession(query: UseQueryResult<UiSessionResponse>): UiSessionReading
 }
 
 /**
- * One grant read answers both, as on main: organization permissions follow it
- * (scope knot Q2). A project write on an aggregate is refused (ADR-177 decision 8).
+ * One grant read answers both: organization permissions also hold its organization set, so a
+ * member with no project grant keeps the organization floor. A project write on an aggregate is
+ * refused (ADR-177 decision 8).
  */
 function readPermissions(
   scope: UiActiveScopeReading,
   grantRead: UseQueryResult<UiEffectivePermissionsRead>,
-  organizationRead?: UseQueryResult<UiEffectivePermissionsRead>,
 ): UiSessionSnapshot["permissions"] {
   const status = permissionStatus(scope.status, grantRead);
-  const grants = new Set(grantRead.isError ? [] : grantRead.data?.permissions);
-  const organizationGrants = new Set([
-    ...grants,
-    ...(organizationRead?.isError ? [] : (organizationRead?.data?.permissions ?? [])),
-  ]);
+  const read = grantRead.isError ? undefined : grantRead.data;
+  const grants = new Set(read?.permissions);
+  const organizationGrants = new Set([...grants, ...(read?.organizationPermissions ?? [])]);
   const canInOrganization = (requested: string) =>
     scope.status === "ready" && permissionSatisfiedBy({ granted: organizationGrants, requested });
   const can = (requested: string) =>

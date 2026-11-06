@@ -34,11 +34,13 @@ import type { Authorized, AuthzDecision, AuthzPrincipalRef, AuthzScopeRef } from
 export interface AuthzCaller {
   readonly id: string;
 }
+/** `organizationPermissions` is the same caller's set at the scope's organization. */
 export type EffectivePermissions =
-  | Readonly<{ scope: null; permissions: string[] }>
+  | Readonly<{ scope: null; permissions: string[]; organizationPermissions: string[] }>
   | Readonly<{
       scope: Readonly<{ type: AuthzScopeRef["type"]; id: string }>;
       permissions: Queries.AuthzEffectivePermissionsOutput;
+      organizationPermissions: Queries.AuthzEffectivePermissionsOutput;
     }>;
 
 /**

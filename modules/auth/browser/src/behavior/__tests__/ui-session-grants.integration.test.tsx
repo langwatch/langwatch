@@ -120,7 +120,7 @@ describe("given an aggregate project", () => {
 
 describe("given grants answered for the scope the reader is standing in", () => {
   /** @scenario "Organization permissions follow the active project's grant" */
-  it("lets the project grant answer the organization check", async () => {
+  it("lets the project grant answer the organization check, from the one grant read", async () => {
     const reads: string[] = [];
     const view = renderGrants({
       transport: answeringTransport((path, input) => {
@@ -131,7 +131,7 @@ describe("given grants answered for the scope the reader is standing in", () => 
 
     await waitFor(() => expect(view.getByTestId("can-org").textContent).toBe("true"));
     expect(view.getByTestId("can-project").textContent).toBe("true");
-    expect(reads).toContain(JSON.stringify({ projectId: "proj-app" }));
+    expect(reads).toEqual([JSON.stringify({ projectId: "proj-app" })]);
   });
 
   describe("when the scope goes back to resolving", () => {

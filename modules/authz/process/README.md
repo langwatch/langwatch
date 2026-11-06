@@ -45,7 +45,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable authorization boundary. This is deliberately a structural interface: callers can use an installed AuthzModule without receiving its services, repositories, or transport adapters.
 
-Peers call these through the token, declared at `../contract/src/authz.api.ts:49`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/authz.api.ts:51`; nothing else in this package is public.
 
 #### `isDemoProject`
 
@@ -812,18 +812,19 @@ Contract `src/transport/authz.trpc.ts:34`, router `src/transport/authz.trpc.ts:9
 
 ```typescript
 // authz.effectivePermissions
-// Input: authzOwnStandingInputSchema, ../contract/src/authz.queries.ts:670
+// Input: authzOwnStandingInputSchema, ../contract/src/authz.queries.ts:671
 interface Input {
   projectId?: string;
   organizationId?: string;
 }
-// Output: authzOwnStandingSchema, ../contract/src/authz.queries.ts:654
+// Output: authzOwnStandingSchema, ../contract/src/authz.queries.ts:655
 interface Output {
   scope: {
     type: "project" | "team" | "organization" | "resource";
     id: string;
   } | null;
   permissions: string[];
+  organizationPermissions: string[];
 }
 
 // authz.listGrants
@@ -896,7 +897,7 @@ interface Output {
 }
 
 // authz.listBillingMembers
-// Input: authzListBillingMembersInputSchema, ../contract/src/authz-billing-role.commands.ts:16
+// Input: authzListBillingMembersInputSchema, ../contract/src/authz-billing-role.commands.ts:18
 interface Input {
   organizationId: string;
 }

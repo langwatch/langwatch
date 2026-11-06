@@ -241,7 +241,7 @@ describe("given a screen that asks what the reader may do", () => {
   });
 
   describe("when a screen asks about many permissions on every render", () => {
-    it("asks the server once per scope read, not once per question", async () => {
+    it("asks the server once for the scope, not once per question", async () => {
       const { transport, callsTo } = recordingTransport({ permissions: ["datasets:manage"] });
 
       const view = renderSession({
@@ -260,19 +260,21 @@ describe("given a screen that asks what the reader may do", () => {
       await waitFor(() =>
         expect(view.getByTestId("answers").textContent).toContain("datasets:view=true"),
       );
-      expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(2);
+      expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(1);
     });
 
-    it("asks about the resolved project, and about its organization for organization checks", async () => {
+    /** @scenario "The project page's one grant read carries the organization's permissions too" */
+    it("sends exactly one grant read on a project page, about the resolved project, as main did", async () => {
       const { transport, callsTo } = recordingTransport();
 
       const view = renderSession({ transport, authClient: signedInAsJane });
 
       await waitFor(() => expect(view.getByTestId("user").textContent).toBe(JANE));
-      await waitFor(() => expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(2));
-      expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE).map((call) => call.input)).toEqual(
-        expect.arrayContaining([{ projectId: "proj-app" }, { organizationId: expect.any(String) }]),
-      );
+      await waitFor(() => expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(1));
+      await new Promise((settle) => setTimeout(settle, 50));
+      expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE).map((call) => call.input)).toEqual([
+        { projectId: "proj-app" },
+      ]);
     });
   });
 });
