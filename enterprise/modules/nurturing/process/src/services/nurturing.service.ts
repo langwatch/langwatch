@@ -39,6 +39,16 @@ export class NurturingService {
     await this.channel.trackEvent({ userId, event, properties, messageId });
   }
 
+  /** As trackEvent, but rejects when Customer.io did not take the track. */
+  async trackEventOrThrow({
+    userId,
+    event,
+    properties,
+    messageId,
+  }: Parameters<NurturingService["trackEvent"]>[0]): Promise<void> {
+    await this.channel.trackEventOrThrow({ userId, event, properties, messageId });
+  }
+
   async groupUser({
     userId,
     groupId,

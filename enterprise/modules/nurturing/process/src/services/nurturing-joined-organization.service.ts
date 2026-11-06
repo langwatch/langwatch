@@ -43,7 +43,7 @@ export class NurturingJoinedOrganizationService {
     const claimKey = `nurturing:joined_organization:${signal.userId}:${signal.organizationId}`;
     if (!(await claims.claim(claimKey, JOINED_WINDOW_SECONDS))) return;
     try {
-      await customerIo.trackEvent(call);
+      await customerIo.trackEventOrThrow(call);
     } catch (error) {
       const released = await NurturingClaimReleaseService.create(claims).releasedAll([claimKey]);
       nurturingLogger.warn(

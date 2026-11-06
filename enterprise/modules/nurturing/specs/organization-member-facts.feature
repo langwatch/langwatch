@@ -187,7 +187,7 @@ Feature: An organization's session facts reach every active member in Customer.i
 
   @unit
   Scenario: A joined_organization that failed to send is tracked when the same join is replayed
-    Given the joined_organization track for the person and org-1 was rejected, or threw before it went out
+    Given Customer.io answered the joined_organization track for the person and org-1 with an HTTP 500, or the request failed
     When the same invite_accepted signal is delivered again, and again after that
     Then joined_organization is tracked once and joined_via_invite is not tracked a second time
 

@@ -10,7 +10,6 @@ import { Temporal } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { CustomerIoChannel } from "../../channels/customer-io.channel.ts";
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
@@ -31,32 +30,6 @@ type Call = {
   messageId?: string;
 };
 
-/**
- * A Customer.io whose first joined_organization track fails, by rejecting or by throwing before
- * any request goes out, and that records the events it took.
- */
-class FailsFirstJoinedOrganization extends CustomerIoChannel {
-  readonly sent: string[] = [];
-  #failed = false;
-  readonly #how: "rejects" | "throws";
-  constructor(how: "rejects" | "throws") {
-    super();
-    this.#how = how;
-  }
-  async identifyUser(): Promise<void> {}
-  async groupUser(): Promise<void> {}
-  async batch(): Promise<void> {}
-  trackEvent({ event }: { event: string }): Promise<void> {
-    if (event === "joined_organization" && !this.#failed) {
-      this.#failed = true;
-      if (this.#how === "throws") throw new Error("the track could not be built");
-      return Promise.reject(new Error("customer.io is down"));
-    }
-    this.sent.push(event);
-    return Promise.resolve();
-  }
-}
-
 /** A claim repository whose clock the test moves, with the real window semantics. */
 class ClockedClaims implements NurturingClaimRepository {
   now = T0;
@@ -72,16 +45,31 @@ class ClockedClaims implements NurturingClaimRepository {
   }
 }
 
-/** Customer.io over a recording fetch: a batch's items are unpacked into one call each. */
-function customerIo() {
+/** How the first joined_organization request fails: a 500 reply, or a fetch that throws. */
+type JoinedOrganizationFailure = "an HTTP 500" | "a network error";
+
+/**
+ * Customer.io over a recording fetch: a batch's items are unpacked into one call each. A failed
+ * joined_organization request is not recorded, as Customer.io never took it.
+ */
+function customerIo({
+  failFirstJoinedOrganization,
+}: { failFirstJoinedOrganization?: JoinedOrganizationFailure } = {}) {
   const calls: Call[] = [];
   let batchRequests = 0;
+  let failure = failFirstJoinedOrganization;
   const service = NurturingService.create({
     channel: HttpCustomerIoChannel.create({
       config: { customerIoApiKey: "key", customerIoRegion: "us" },
       fetchFn: async (url: string | URL | Request, init?: RequestInit) => {
         const path = new URL(url instanceof Request ? url.url : url).pathname;
         const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
+        if (failure && path === "/v1/track" && body.event === "joined_organization") {
+          const failed = failure;
+          failure = undefined;
+          if (failed === "a network error") throw new TypeError("fetch failed");
+          return new Response("customer.io is down", { status: 500 });
+        }
         if (path === "/v1/batch") {
           batchRequests += 1;
           for (const item of body.batch) calls.push({ path: `/v1/${item.type}`, ...item });
@@ -114,17 +102,16 @@ async function organizationWithMembers({
   ]),
   traced = new Set<string>(),
   organizationsOfPerson = [],
-  customerIoService,
+  failFirstJoinedOrganization,
 }: {
   members?: readonly string[];
   placed?: ReadonlyMap<string, string>;
   traced?: ReadonlySet<string>;
   organizationsOfPerson?: readonly string[];
-  /** Replaces the recording HTTP Customer.io, for a channel that rejects. */
-  customerIoService?: NurturingService;
+  failFirstJoinedOrganization?: JoinedOrganizationFailure;
 } = {}) {
   const claims = new ClockedClaims();
-  const cio = customerIo();
+  const cio = customerIo({ failFirstJoinedOrganization });
   const milestones = MemoryNurturingMilestonesRepository.create();
   const projects = MemoryNurturingProjectDirectoryRepository.create({ placed, traced });
   const getAllMembers = vi.fn(async () => members.map((id) => ({ id })) as never);
@@ -143,7 +130,7 @@ async function organizationWithMembers({
   const delivery = NurturingDeliveryService.create({
     claims,
     memberFacts,
-    customerIo: customerIoService ?? cio.service,
+    customerIo: cio.service,
     posthog: undefined,
     users: createApiFixture<UserApi>({
       findById: async () => ({ email: "jane@example.com", name: "Jane" }) as never,
@@ -480,23 +467,23 @@ describe("NurturingDeliveryService organization facts", () => {
     });
 
     /** @scenario "A joined_organization that failed to send is tracked when the same join is replayed" */
-    it.each(["rejects", "throws"] as const)(
-      "gives the slot back when the track %s, so a replay of the same invite sends it once",
-      async (how) => {
-        const channel = new FailsFirstJoinedOrganization(how);
-        const { deliver } = await organizationWithMembers({
-          customerIoService: NurturingService.create({ channel }),
+    it.each(["an HTTP 500", "a network error"] as const)(
+      "gives the slot back when Customer.io answers the track with %s, so a replay of the same invite sends it once",
+      async (failure) => {
+        const { cio, deliver } = await organizationWithMembers({
+          failFirstJoinedOrganization: failure,
         });
+        const events = () => cio.tracks().map(({ event }) => event);
 
         await deliver(inviteAccepted);
         await settle();
-        expect(channel.sent).toEqual(["joined_via_invite"]);
+        expect(events()).toEqual(["joined_via_invite"]);
 
         await deliver(inviteAccepted);
         await deliver(inviteAccepted);
         await settle();
 
-        expect(channel.sent).toEqual(["joined_via_invite", "joined_organization"]);
+        expect(events()).toEqual(["joined_via_invite", "joined_organization"]);
       },
     );
 
