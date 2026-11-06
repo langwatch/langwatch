@@ -299,8 +299,8 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
                 Models
               </Text>
               <Text fontSize="xs" color="fg.muted">
-                Choose the models that role-play the user and judge the runs. Both default to your
-                project&apos;s Default model.
+                Choose the models that role-play the user and judge the runs. They default to your
+                project&apos;s Default and Judge models.
               </Text>
               <SimulationModelSelect
                 label="User simulator"

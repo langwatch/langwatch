@@ -16,23 +16,37 @@ export const DECISION_MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = Ob
   DECISION_MODELS.map((entry) => [entry.id, entry.label]),
 );
 
+/** LangWatch Instant Preview's line when the judge router answers for it (ADR-190). */
+export const ROUTED_HOSTED_DECISION_MODEL_SUBTITLE =
+  "LLM-judge evaluations are routed by the LangWatch Judge: a decision model answers what it is sure of, " +
+  "an LLM the rest. Judged queries are not. Billed with your plan.";
+
 /** Whether the column can show a stored id; an id the catalogue dropped reads as unset. */
 export function isShownDecisionModel(id: string | null | undefined): id is string {
   return !!id && !!findDecisionModel(id);
 }
 
 /**
- * The column's picker entries: exactly the decision models the server says would run for the
- * project, in catalogue order, LangWatch Instant Preview first. The server weighs the flag and
- * the keys, so a pick here always runs. `pickable` undefined means not loaded yet.
+ * The column's picker entries: the decision models the server says would run, in catalogue
+ * order, LangWatch Instant Preview first, so a pick here always runs. `pickable` undefined means
+ * not loaded yet. With the judge router flag, Instant Preview says it routes.
  */
 export function decisionModelPickerOptions({
   pickable,
+  isJudgeRouted,
 }: {
   pickable: readonly BuiltInModel[] | undefined;
+  isJudgeRouted: boolean;
 }): ModelPickerOption[] {
   const offered = new Set((pickable ?? []).map((model) => model.value));
   return DECISION_MODELS.filter(
     (entry) => entry.id === LANGWATCH_DECISION_MODEL_ID || offered.has(entry.id),
-  ).map((entry) => ({ label: entry.label, value: entry.id, subtitle: entry.description }));
+  ).map((entry) => ({
+    label: entry.label,
+    value: entry.id,
+    subtitle:
+      isJudgeRouted && entry.id === LANGWATCH_DECISION_MODEL_ID
+        ? ROUTED_HOSTED_DECISION_MODEL_SUBTITLE
+        : entry.description,
+  }));
 }

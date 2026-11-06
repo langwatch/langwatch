@@ -17083,7 +17083,8 @@
                                           "sso:view",
                                           "sso:manage",
                                           "agents:deploy",
-                                          "evaluators:deploy"
+                                          "evaluators:deploy",
+                                          "subscription:upgrade"
                                         ]
                                       }
                                     ]
@@ -17306,7 +17307,8 @@
                                     "sso:view",
                                     "sso:manage",
                                     "agents:deploy",
-                                    "evaluators:deploy"
+                                    "evaluators:deploy",
+                                    "subscription:upgrade"
                                   ]
                                 }
                               ]
@@ -17929,7 +17931,8 @@
                                                   "sso:view",
                                                   "sso:manage",
                                                   "agents:deploy",
-                                                  "evaluators:deploy"
+                                                  "evaluators:deploy",
+                                                  "subscription:upgrade"
                                                 ]
                                               }
                                             ]
@@ -18152,7 +18155,8 @@
                                             "sso:view",
                                             "sso:manage",
                                             "agents:deploy",
-                                            "evaluators:deploy"
+                                            "evaluators:deploy",
+                                            "subscription:upgrade"
                                           ]
                                         }
                                       ]
@@ -18596,7 +18600,8 @@
                                         "sso:view",
                                         "sso:manage",
                                         "agents:deploy",
-                                        "evaluators:deploy"
+                                        "evaluators:deploy",
+                                        "subscription:upgrade"
                                       ]
                                     }
                                   ]
