@@ -1092,3 +1092,61 @@ describe("given a provider sign-in started on our page with a typed address", ()
     });
   });
 });
+
+describe("given an identity provider that sends refused people to its access error page", () => {
+  const refusalPage = (connectionId: string) =>
+    new Request(`${BASE_URL}/api/auth/sso/refused/${connectionId}`);
+
+  describe("when the admin set the connection's refusal page URL there", () => {
+    /** @scenario "A provider's access error page can send the person to our refusal card" */
+    it("lands on the refusal card with the provider kind and names nobody", async () => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: "org_1",
+        idp: "okta",
+        outcome: "refused",
+      });
+      let betterAuthCalled = false;
+      const { service } = door({
+        refusedSignIns,
+        betterAuth: async () => ({
+          handler: async () => {
+            betterAuthCalled = true;
+            return new Response(null, { status: 404 });
+          },
+        }),
+      });
+
+      const answered = await service.betterAuthHandshake(refusalPage(CONNECTION));
+
+      expect(answered.status).toBe(302);
+      expect(`${locationOf(answered).origin}${locationOf(answered).pathname}`).toBe(
+        `${BASE_URL}/auth/error`,
+      );
+      expect(locationOf(answered).searchParams.get("error")).toBe("access_denied");
+      expect(locationOf(answered).searchParams.get("idp")).toBe("okta");
+      expect(locationOf(answered).searchParams.get("trace")).toBeTruthy();
+      expect(calls).toEqual([
+        { refusedBy: { kind: "connection", connectionId: CONNECTION }, email: null },
+      ]);
+      expect(betterAuthCalled).toBe(false);
+    });
+  });
+
+  describe("when the URL names no connection that classifies", () => {
+    /** @scenario "A provider's access error page can send the person to our refusal card" */
+    it("still lands on the plain refusal", async () => {
+      const refusedSignIns = createApiFixture<IdentityApi>({
+        classifyRefusedSignIn: async () => {
+          throw new Error("lookup failed");
+        },
+      });
+
+      const answered = await door({ refusedSignIns }).service.betterAuthHandshake(
+        refusalPage("unknown"),
+      );
+
+      expect(locationOf(answered).searchParams.get("error")).toBe("access_denied");
+      expect(locationOf(answered).searchParams.has("idp")).toBe(false);
+    });
+  });
+});

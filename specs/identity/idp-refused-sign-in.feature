@@ -99,6 +99,16 @@ Feature: A sign-in the company's identity provider refused says who refused it
     Then the door stops reading its copy at that size and reads no status from it
     And Better Auth still receives the whole body
 
+  # Okta and Keycloak show their own error page for an unassigned person and never call back.
+  # Okta lets the admin point the app's "Application Access Error Page" at a URL of ours.
+  @unit
+  Scenario: A provider's access error page can send the person to our refusal card
+    Given the admin set the connection's refusal page URL as the app's access error page
+    When the provider sends a refused person to that URL
+    Then the person is sent to the sign-in error screen with the code "access_denied" and the provider kind
+    And the organization is not told and no mail is sent, since nothing names the person
+    And a refusal page URL naming no known connection still lands on the plain refusal
+
   @unit
   Scenario: A refused sign-in's redirect never waits long on classifying it
     Given classifying a refusal has not answered within 3 seconds

@@ -26,6 +26,7 @@ import {
 } from "../rules/saml-response-status.rules.ts";
 import { presentedSessionCookie } from "../rules/session-cookie.rules.ts";
 import {
+  extractRefusalPageConnection,
   isSignInCallbackPath,
   refusedSignInLocationOf,
   signInErrorRedirectOf,
@@ -217,6 +218,14 @@ export class AuthDoorService {
       return Response.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, { status: 403 });
     }
 
+    const refusedConnectionId = extractRefusalPageConnection({
+      pathname: new URL(request.url).pathname,
+      method: request.method,
+    });
+    if (refusedConnectionId !== undefined) {
+      return this.landOnRefusalCard({ connectionId: refusedConnectionId });
+    }
+
     const betterAuth = await this.deps.betterAuth();
     // Better Auth counts the caller the platform resolved, never one a header claims.
     const stated = requestStatingCaller({
@@ -380,6 +389,44 @@ export class AuthDoorService {
     const headers = new Headers(response.headers);
     headers.set("location", location);
     return new Response(response.body, { status: response.status, headers });
+  }
+
+  /**
+   * The refusal page an admin set on their identity provider: the same card as a refused
+   * callback, naming the provider kind only. No mail, since no round trip names the person.
+   */
+  private async landOnRefusalCard({ connectionId }: { connectionId: string }): Promise<Response> {
+    const reference = getActiveTraceId() ?? this.deps.newReferenceId();
+    let verdict: RefusedSignInClassification | undefined;
+    try {
+      const answer = await withinClassificationTime(
+        this.deps.refusedSignIns.classifyRefusedSignIn({
+          refusedBy: { kind: "connection", connectionId },
+          email: null,
+        }),
+      );
+      if (answer !== "timed_out") verdict = answer;
+    } catch (error) {
+      logger.error(
+        { error, reference, connectionId },
+        "a refusal page visit could not be classified; the person was sent the plain refusal",
+      );
+    }
+    logger.warn(
+      {
+        reference,
+        connectionId,
+        organizationId: verdict?.organizationId ?? null,
+        idp: verdict?.idp ?? null,
+      },
+      "an identity provider sent a refused person to its refusal page; the person was told why",
+    );
+    const location = refusedSignInLocationOf({
+      location: `${this.deps.baseUrl()}/auth/error`,
+      verdict: verdict && { idp: verdict.idp, outcome: "refused" },
+      reference,
+    });
+    return new Response(null, { status: 302, headers: { location, "cache-control": "no-store" } });
   }
 
   /**

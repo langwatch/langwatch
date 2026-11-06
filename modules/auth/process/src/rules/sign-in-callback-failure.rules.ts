@@ -16,6 +16,31 @@ export function isSignInCallbackPath({ pathname }: { pathname: string }): boolea
   return SIGN_IN_CALLBACK_PATH.test(pathname);
 }
 
+/** The page an identity provider sends a refused person to, set per connection by its admin. */
+const REFUSAL_PAGE_PATH = /^\/api\/auth\/sso\/refused\/([^/]+)$/;
+
+/**
+ * The connection a refusal page visit names, or undefined when this is not one. It carries no
+ * round trip, so it never names the person: the card shows the provider kind only.
+ * @see specs/identity/idp-refused-sign-in.feature
+ */
+export function extractRefusalPageConnection({
+  pathname,
+  method,
+}: {
+  pathname: string;
+  method: string;
+}): string | undefined {
+  if (method !== "GET" && method !== "HEAD") return undefined;
+  const segment = REFUSAL_PAGE_PATH.exec(pathname)?.[1];
+  if (!segment) return undefined;
+  try {
+    return decodeURIComponent(segment) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The error screen with the generic code, and the trace id that ties it to the log line. */
 export function signInFailureLocation({
   errorPageUrl,
@@ -117,7 +142,6 @@ function rebuiltLocation({
   return rebuilt.toString();
 }
 
-/** The redirect target when it is the sign-in error page itself; a relative Location resolves. */
 /**
  * The redirect's target and whether it is the error screen. On a callback, an `error` sent to the
  * app's root counts too: Better Auth falls back there when it cannot read the RelayState. Other

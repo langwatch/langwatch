@@ -69,6 +69,21 @@ LangWatch sign-in form. To reach the local sign-in, open
   <img src="/images/access/sso-active-dark.png" alt="An active SAML connection with verified-domain admission and completed setup checks" className="hidden dark:block" />
 </Frame>
 
+### People your provider refuses
+
+When your identity provider refuses someone, for example because they are not
+assigned to the LangWatch app, LangWatch shows a screen saying the company
+sign-in refused them and that their IT team can assign them the app.
+
+Some providers, Okta included, show their own error page instead of sending
+the person back to LangWatch. The setup page lists an **Access error page**
+address for the connection, in the form
+`https://<your-langwatch>/api/auth/sso/refused/<connection>`. In Okta, open
+the app, then **General > App Settings**, set **Application access error
+page** to a custom URL and paste this address. Okta then sends refused people
+to the LangWatch screen. This address names no person, so LangWatch does not
+notify your administrators about visits to it.
+
 To change the provider, open the same page and prepare a replacement. Read the
 state shown on the page before removing the old connection. The removal action
 explains whether the connection is still being prepared, active or already

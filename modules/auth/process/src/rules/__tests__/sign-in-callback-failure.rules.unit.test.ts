@@ -3,6 +3,7 @@ import { GENERIC_SIGN_IN_ERROR_CODE } from "@langwatch/auth-contract";
 import { describe, expect, it } from "vitest";
 
 import {
+  extractRefusalPageConnection,
   isSignInCallbackPath,
   signInErrorRedirectOf,
   signInFailureLocation,
@@ -195,5 +196,25 @@ describe("signInErrorRedirectOf", () => {
       });
       expect(fromCallback("https://app.test/")).toEqual({ kind: "pass" });
     });
+  });
+});
+
+describe("extractRefusalPageConnection", () => {
+  /** @scenario "A provider's access error page can send the person to our refusal card" */
+  it("reads the connection off a GET of its refusal page", () => {
+    expect(
+      extractRefusalPageConnection({ pathname: "/api/auth/sso/refused/ssoc%20a", method: "GET" }),
+    ).toBe("ssoc a");
+  });
+
+  /** @scenario "A provider's access error page can send the person to our refusal card" */
+  it.each([
+    ["/api/auth/sso/refused/ssoc_a", "POST"],
+    ["/api/auth/sso/refused/", "GET"],
+    ["/api/auth/sso/refused/a/b", "GET"],
+    ["/api/auth/sso/refused/%E0%A4%A", "GET"],
+    ["/api/auth/sso/callback/ssoc_a", "GET"],
+  ])("names no connection for %s over %s", (pathname, method) => {
+    expect(extractRefusalPageConnection({ pathname, method })).toBeUndefined();
   });
 });
