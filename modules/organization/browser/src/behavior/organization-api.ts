@@ -310,7 +310,7 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
       deleteMember: {
         mutation: {
           input: { organizationId: string; userId: string; giveSeatToUserId?: string | null };
-          output: { success: true; seatGivenToUserId: string | null };
+          output: { success: true; seatGivenToUserId: string | null; seatHandoverFailed: boolean };
         };
       };
 

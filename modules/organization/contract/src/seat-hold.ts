@@ -21,9 +21,13 @@ export type OrganizationApiRemoveMemberInput = z.infer<
   typeof organizationApiRemoveMemberInputSchema
 >;
 
-/** The removal happened; who got the freed seat, if anyone. */
+/** The removal happened; who got the freed seat, if anyone, and whether giving it failed. */
 const organizationMemberRemovedSchemaDefinition = z
-  .object({ success: z.literal(true), seatGivenToUserId: z.string().nullable() })
+  .object({
+    success: z.literal(true),
+    seatGivenToUserId: z.string().nullable(),
+    seatHandoverFailed: z.boolean(),
+  })
   .strict();
 export interface OrganizationMemberRemovedSchema extends Named<
   typeof organizationMemberRemovedSchemaDefinition

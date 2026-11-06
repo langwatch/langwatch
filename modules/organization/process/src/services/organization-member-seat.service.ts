@@ -2,16 +2,21 @@
  * The seat a membership write takes or leaves (specs/licensing/seat-rotation.feature): what an
  * enable or a role change does to it, and the people waiting who take a freed full seat.
  */
-import type { AuthzGrantCaller } from "@langwatch/authz-contract";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
+import { newAuthzGrantId, type AuthzGrantCaller } from "@langwatch/authz-contract";
 import { getRoleChangeType, isFullMember } from "@langwatch/entitlement-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   MemberSeatLimitReachedError,
-  OrganizationUserRole,
+  type OrganizationUserRole,
 } from "@langwatch/organization-contract";
 
 import type { OrganizationMembershipRepository } from "../repositories/organization-membership.repository.ts";
 import type { SeatTransition } from "../repositories/seat-hold.repository.ts";
-import type { OrganizationMemberAdmissionService } from "./organization-member-admission.service.ts";
+import type {
+  OrganizationAdmissions,
+  OrganizationMemberAdmissionService,
+} from "./organization-member-admission.service.ts";
 import type {
   OrganizationGrantCache,
   OrganizationSeatRevocationNotice,
@@ -33,7 +38,10 @@ type OrganizationMemberSeatDependencies = {
   grantCache: OrganizationGrantCache;
   seatHolds: SeatHoldService;
   admission: Pick<OrganizationMemberAdmissionService, "deleteMember">;
+  admissions: OrganizationAdmissions;
 };
+
+const logger = createLogger("langwatch:organization:member-seats");
 
 export class OrganizationMemberSeatService {
   static create(dependencies: OrganizationMemberSeatDependencies): OrganizationMemberSeatService {
@@ -117,7 +125,8 @@ export class OrganizationMemberSeatService {
 
   /**
    * Removes a member and, when the seat frees at once and a full seat fits, gives it to the
-   * person waiting the caller named. Answers who got the seat.
+   * person waiting the caller named. The removal stands even when the handover fails: the answer
+   * says so, and the person keeps waiting for the next free seat.
    */
   async removeMember(params: {
     organizationId: string;
@@ -125,17 +134,22 @@ export class OrganizationMemberSeatService {
     actingUserId: string | null;
     giveSeatToUserId?: string | null;
     caller: AuthzGrantCaller;
-  }): Promise<{ seatGivenToUserId: string | null }> {
+  }): Promise<{ seatGivenToUserId: string | null; seatHandoverFailed: boolean }> {
     const { organizationId, userId, actingUserId, giveSeatToUserId, caller } = params;
     await this.dependencies.admission.deleteMember({ organizationId, userId, actingUserId });
-    if (!giveSeatToUserId) return { seatGivenToUserId: null };
-    const admitted = await this.admitWaitingMember({
-      organizationId,
-      userId: giveSeatToUserId,
-      actingUserId,
-      caller,
-    });
-    return { seatGivenToUserId: admitted ? giveSeatToUserId : null };
+    if (!giveSeatToUserId) return { seatGivenToUserId: null, seatHandoverFailed: false };
+    try {
+      const admitted = await this.admitWaitingMember({
+        organizationId,
+        userId: giveSeatToUserId,
+        actingUserId,
+        caller,
+      });
+      return { seatGivenToUserId: admitted ? giveSeatToUserId : null, seatHandoverFailed: false };
+    } catch (error) {
+      logger.error({ error, organizationId }, "seat handover after a removal failed");
+      return { seatGivenToUserId: null, seatHandoverFailed: true };
+    }
   }
 
   /**
@@ -153,25 +167,53 @@ export class OrganizationMemberSeatService {
     actingUserId: string | null;
     caller: AuthzGrantCaller;
   }): Promise<boolean> {
-    const { seatHolds, seats, seatNotices, grantCache } = this.dependencies;
+    const { seatHolds, seats, seatNotices, grantCache, admissions } = this.dependencies;
     if (!(await seatHolds.isWaiting({ organizationId, userId }))) return false;
     if (!(await seatHolds.hasLiveHold({ organizationId, userId }))) {
       const fit = await seats.checkLimit({ organizationId, resource: "members" });
       if (!fit.allowed) return false;
     }
-    // The role first, while the membership is still disabled: access comes with the enable.
-    await this.repo.updateMemberRole({
+    // One write turns the waiting row into an enabled MEMBER carrying its grant intent; the grant
+    // needs a live membership, so it lands after, and an unfinished one resumes (ADR-129).
+    const grantId = newAuthzGrantId();
+    const enabled = await this.repo.admitWaitingMember({
       organizationId,
       userId,
-      role: OrganizationUserRole.MEMBER,
-      effectiveTeamRoleUpdates: [],
-      currentUserId: actingUserId,
-      caller,
+      pendingAdmissionId: grantId,
       seat: await seatHolds.takeOf({ organizationId, userId }),
     });
-    await this.repo.setMemberDisabled({ organizationId, userId, disabled: false });
-    await seatNotices.memberEnabled({ organizationId, userId, enabledByUserId: actingUserId });
-    await grantCache.invalidateOrganization({ organizationId });
+    if (!enabled) return false;
+    await admissions.attachBindings({
+      organizationId,
+      bindings: [
+        {
+          bindingId: grantId,
+          principal: { userId },
+          role: "MEMBER",
+          customRoleId: null,
+          scopeType: "ORGANIZATION",
+          scopeId: organizationId,
+        },
+      ],
+      caller,
+      actor: actingUserId
+        ? { type: "user", id: actingUserId }
+        : { type: "system", id: SYSTEM_ACTORS.organizationService },
+      source: "grants-service",
+      onDuplicate: "skip",
+      requireProjection: true,
+    });
+    await admissions.completeAdmission({ organizationId, userId, grantId });
+    // The member is in from here: a failed notice or cache drop must not report the seat as lost.
+    await Promise.all([
+      seatNotices.memberEnabled({ organizationId, userId, enabledByUserId: actingUserId }),
+      grantCache.invalidateOrganization({ organizationId }),
+    ]).catch((error: unknown) => {
+      logger.error(
+        { error, organizationId },
+        "notice or cache drop after admitting a member failed",
+      );
+    });
     return true;
   }
 

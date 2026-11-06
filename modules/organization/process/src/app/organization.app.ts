@@ -602,14 +602,15 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     input: OrganizationApiRemoveMemberInput,
     by: OrganizationCaller,
   ): Promise<OrganizationMemberRemoved> {
-    const { seatGivenToUserId } = await this.#dependencies.membership.removeMember({
-      organizationId: input.organizationId,
-      userId: input.userId,
-      actingUserId: by.id,
-      giveSeatToUserId: input.giveSeatToUserId ?? null,
-      caller: this.#grantCaller(by),
-    });
-    return { success: true, seatGivenToUserId };
+    const { seatGivenToUserId, seatHandoverFailed } =
+      await this.#dependencies.membership.removeMember({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        actingUserId: by.id,
+        giveSeatToUserId: input.giveSeatToUserId ?? null,
+        caller: this.#grantCaller(by),
+      });
+    return { success: true, seatGivenToUserId, seatHandoverFailed };
   }
 
   async getSeatRemovalPreview(

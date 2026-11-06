@@ -159,23 +159,34 @@ export function UserManagementDrawer({
     return false;
   };
 
-  /** Hands the drawer's rows to the page, which may send invitations. */
-  const applyRows = () => {
+  /**
+   * Hands the drawer's rows to the page, which may send invitations. Once the provider
+   * billed the new count there is nothing left to plan: every address is an invitation.
+   */
+  const applyRows = ({ seatsCommitted }: { seatsCommitted: boolean }) => {
     const autoRows = localPlannedUsers.filter((u) => u.id.startsWith("auto-"));
     const manualRows = localPlannedUsers.filter((u) => u.id.startsWith("planned-"));
-    const autoRowsWithEmail = autoRows.filter((u) => u.email.trim() !== "");
-    const deletedAutoCount = initialAutoFillCount - autoRows.length;
+    const withEmail = (rows: PlannedUser[]) =>
+      rows.filter((u) => u.email.trim() !== "").map((u) => u.email);
 
+    if (seatsCommitted) {
+      onSave({
+        inviteEmails: [...withEmail(autoRows), ...withEmail(manualRows)],
+        newSeats: [],
+        deletedSeatCount: 0,
+      });
+      return;
+    }
     onSave({
-      inviteEmails: autoRowsWithEmail.map((u) => u.email),
+      inviteEmails: withEmail(autoRows),
       newSeats: manualRows,
-      deletedSeatCount: Math.max(0, deletedAutoCount),
+      deletedSeatCount: Math.max(0, initialAutoFillCount - autoRows.length),
     });
   };
 
   const handleSave = () => {
     if (!validateRows()) return;
-    applyRows();
+    applyRows({ seatsCommitted: false });
     onClose();
   };
 
@@ -326,7 +337,7 @@ function useDrawerSeatChange({
   newSeats: number;
   validateRows: () => boolean;
   /** Runs only once the provider took the change, so a failed commit leaves the page as it was. */
-  applyRows: () => void;
+  applyRows: (input: { seatsCommitted: boolean }) => void;
   onCommitted: () => void;
 }) {
   const [isCommitting, setIsCommitting] = useState(false);
@@ -344,7 +355,7 @@ function useDrawerSeatChange({
     setIsCommitting(true);
     try {
       if (!(await seatChange.onCommit({ newSeats, quotedAt: quote?.quotedAt }))) return;
-      applyRows();
+      applyRows({ seatsCommitted: true });
       onCommitted();
     } finally {
       setIsCommitting(false);

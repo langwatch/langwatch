@@ -95,6 +95,7 @@ import type {
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
   OrganizationMembershipRepository,
+  AdmitWaitingMemberInput,
   SetMemberDisabledInput,
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,
@@ -2040,6 +2041,35 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       data: { archivedAt },
     });
     return personalTeamIds;
+  }
+
+  async admitWaitingMember(input: AdmitWaitingMemberInput): Promise<boolean> {
+    const { organizationId, userId, pendingAdmissionId, seat } = input;
+    return this.prisma.$transaction(async (tx) => {
+      const admitted = await tx.organizationUser.updateMany({
+        where: {
+          organizationId,
+          userId,
+          disabledAt: { not: null },
+          seatPendingSince: { not: null },
+        },
+        data: {
+          role: OrganizationUserRole.MEMBER,
+          disabledAt: null,
+          seatPendingSince: null,
+          pendingSsoGrantId: pendingAdmissionId,
+        },
+      });
+      if (admitted.count === 0) return false;
+      const seatColumns = await applySeatTransition({ tx, organizationId, userId, seat });
+      if ("fullSeatSince" in seatColumns) {
+        await tx.organizationUser.update({
+          where: { userId_organizationId: { userId, organizationId } },
+          data: seatColumns,
+        });
+      }
+      return true;
+    });
   }
 
   async setMemberDisabled(input: SetMemberDisabledInput): Promise<void> {

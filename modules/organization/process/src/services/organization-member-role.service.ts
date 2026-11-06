@@ -125,6 +125,20 @@ export class OrganizationMemberRoleService {
 
     await this.repo.getMembership({ organizationId, userId });
 
+    // A person waiting for a seat has no grant yet: enabling them is admitting them.
+    if (
+      !disabled &&
+      (await this.dependencies.seatHolds.isWaiting({ organizationId, userId })) &&
+      (await this.dependencies.memberSeats.admitWaitingMember({
+        organizationId,
+        userId,
+        actingUserId: actingUser?.id ?? null,
+        caller: { type: "system" },
+      }))
+    ) {
+      return;
+    }
+
     const seat = disabled
       ? await this.dependencies.seatHolds.releaseOf({ organizationId, userId, reason: "DISABLED" })
       : await this.dependencies.memberSeats.seatOnEnable({

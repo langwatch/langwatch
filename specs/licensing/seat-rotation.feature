@@ -175,6 +175,23 @@ Feature: Seat rotation
       And 4 of 5 full member seats are in use
 
     @integration
+    Scenario: Enabling a person waiting for a seat admits them
+      Given "Bar" took their seat 45 days ago
+      And "Qux" is waiting for a full member seat
+      When an administrator removes "Bar"
+      And the administrator enables "Qux"
+      Then "Qux" is a full member with access
+
+    @integration
+    Scenario: A failed seat handover still removes the member
+      Given "Bar" took their seat 45 days ago
+      And "Qux" is waiting for a full member seat
+      When an administrator removes "Bar", gives the seat to "Qux" and giving it fails
+      Then "Bar" is removed
+      And "Qux" is still waiting
+      And the administrator reads "Member removed. Their seat did not go to the person waiting: enable them in Users to give it."
+
+    @integration
     Scenario: A role change whose grants fail keeps the seat as it was
       Given "Bar" took their seat on 3 November
       When an administrator changes the role of "Bar" and writing the grants fails

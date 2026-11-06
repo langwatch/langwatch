@@ -80,6 +80,7 @@ describe("OrganizationMembershipService", () => {
     findWaitingMembers: vi.fn().mockResolvedValue([]),
     writeSeatHold: vi.fn(),
     takeHeldSeat: vi.fn(),
+    admitWaitingMember: vi.fn(),
   };
 
   const mockCreations: OrganizationCreationNotice = {

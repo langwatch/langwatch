@@ -286,6 +286,8 @@ const organizationMemberDirectorySchemaDefinition = z.object({
       updatedAt: z.date(),
       departmentId: z.string().nullable(),
       disabledAt: z.date().nullable(),
+      /** Set while the person waits for a full seat; such a row is disabled until admitted. */
+      seatPendingSince: z.date().nullable(),
       user: z.object({
         id: z.string().min(1),
         name: z.string().nullable(),

@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   preview: null as unknown,
   previewFails: false,
   removals: [] as unknown[],
+  removalAnswer: { success: true, seatGivenToUserId: null, seatHandoverFailed: false } as unknown,
 }));
 
 vi.mock("../../../../behavior/organization-api.ts", () => {
@@ -39,11 +40,14 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
       return { data, isSuccess: data !== null, isError: false, error: null, refetch: vi.fn() };
     },
     useMutation: () => ({
-      mutate: (input: unknown) => state.removals.push({ path, input }),
+      mutate: (input: unknown, options?: { onSuccess?: (data: unknown) => void }) => {
+        state.removals.push({ path, input });
+        if (path === "organization.deleteMember") options?.onSuccess?.(state.removalAnswer);
+      },
       mutateAsync: vi.fn(),
       isPending: false,
     }),
-    invalidate: vi.fn(),
+    invalidate: vi.fn(async () => {}),
     fetch: vi.fn(),
   });
   const namespace = (prefix: string): Record<string, unknown> =>
@@ -111,18 +115,18 @@ const person = (userId: string, name: string, role: string) => ({
   },
 });
 
-const renderUsers = () =>
-  renderWithOrganizationHost(
-    <MembersScreen />,
-    new FakeOrganizationHost({ grants: new Set(["organization:manage"]) }),
-  );
+const renderUsers = (query: Record<string, string> = {}) => {
+  const host = new FakeOrganizationHost({ grants: new Set(["organization:manage"]), query });
+  renderWithOrganizationHost(<MembersScreen />, host);
+  return host;
+};
 
 /** Opens the remove dialog for one member from their row menu. */
 async function openRemoveDialogFor(name: string) {
-  renderUsers();
+  const host = renderUsers();
   await userEvent.click(screen.getByRole("button", { name: `Actions for ${name}` }));
   await userEvent.click(await screen.findByTestId("members-row-delete"));
-  return screen.findByRole("alertdialog");
+  return { dialog: await screen.findByRole("alertdialog"), host };
 }
 
 beforeEach(() => {
@@ -131,6 +135,7 @@ beforeEach(() => {
   state.preview = null;
   state.previewFails = false;
   state.removals = [];
+  state.removalAnswer = { success: true, seatGivenToUserId: null, seatHandoverFailed: false };
 });
 
 afterEach(() => {
@@ -150,7 +155,7 @@ describe("given Bar took their seat 45 days ago and Qux waits for a seat", () =>
   describe("when an administrator opens the remove dialog for Bar", () => {
     /** @scenario "Removing a long-held seat with someone waiting" */
     it("says the seat frees now and offers it to Qux, ticked", async () => {
-      const dialog = await openRemoveDialogFor("Bar");
+      const { dialog } = await openRemoveDialogFor("Bar");
 
       expect(within(dialog).getByText("Remove Bar from ACME?")).toBeInTheDocument();
       expect(within(dialog).getByText("Their seat frees up right away.")).toBeInTheDocument();
@@ -165,7 +170,7 @@ describe("given Bar took their seat 45 days ago and Qux waits for a seat", () =>
 
     /** @scenario "Removing a long-held seat with someone waiting" */
     it("gives the seat to Qux on confirm", async () => {
-      const dialog = await openRemoveDialogFor("Bar");
+      const { dialog } = await openRemoveDialogFor("Bar");
 
       await userEvent.click(
         within(dialog).getByRole("button", { name: "Remove and give the seat to Qux" }),
@@ -179,7 +184,7 @@ describe("given Bar took their seat 45 days ago and Qux waits for a seat", () =>
 
     /** @scenario "The removal can leave the freed seat empty" */
     it("removes without giving the seat away once the box is unticked", async () => {
-      const dialog = await openRemoveDialogFor("Bar");
+      const { dialog } = await openRemoveDialogFor("Bar");
 
       await userEvent.click(within(dialog).getByText("Give them this seat?"));
       await userEvent.click(await within(dialog).findByRole("button", { name: "Remove" }));
@@ -189,6 +194,87 @@ describe("given Bar took their seat 45 days ago and Qux waits for a seat", () =>
         input: { organizationId: "org-1", userId: "user_bar", giveSeatToUserId: null },
       });
     });
+  });
+});
+
+describe("given giving Bar's freed seat to Qux fails", () => {
+  beforeEach(() => {
+    state.preview = {
+      holdsFullSeat: true,
+      seatFreesAt: null,
+      waiting: { userId: "user_qux", name: "Qux", email: "qux@acme.com" },
+    };
+    state.removalAnswer = { success: true, seatGivenToUserId: null, seatHandoverFailed: true };
+  });
+
+  /** @scenario "A failed seat handover still removes the member" */
+  it("says Bar was removed and the seat did not go to the person waiting", async () => {
+    const { dialog, host } = await openRemoveDialogFor("Bar");
+
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Remove and give the seat to Qux" }),
+    );
+
+    await waitFor(() =>
+      expect(host.successes).toContainEqual({
+        title: "Member removed",
+        description:
+          "Their seat did not go to the person waiting: enable them in Users to give it.",
+      }),
+    );
+    expect(host.successes.map((notice) => notice.title)).not.toContain(
+      "Member removed successfully",
+    );
+  });
+});
+
+describe("given Qux is waiting for a full member seat", () => {
+  beforeEach(() => {
+    state.members = [
+      person("user_foo", "Foo", "ADMIN"),
+      person("user_bar", "Bar", "MEMBER"),
+      {
+        ...person("user_qux", "Qux", "MEMBER"),
+        disabledAt: "2026-11-01T12:00:00.000Z",
+        seatPendingSince: "2026-11-01T12:00:00.000Z",
+      },
+      { ...person("user_baz", "Baz", "MEMBER"), disabledAt: "2026-10-01T12:00:00.000Z" },
+    ];
+  });
+
+  it("lists Qux as waiting for a seat, not disabled, and counts them as waiting", () => {
+    renderUsers();
+
+    const waitingRow = screen.getByText("Qux").closest("[data-testid='member-row']");
+    expect(waitingRow).not.toBeNull();
+    expect(
+      within(waitingRow as HTMLElement).getByTestId("member-waiting-for-seat"),
+    ).toHaveTextContent("Waiting for a seat");
+    expect(within(waitingRow as HTMLElement).queryByTestId("member-disabled")).toBeNull();
+    expect(screen.getByRole("button", { name: /^Waiting to join, 1 person/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Members, 3 people/ })).toBeInTheDocument();
+  });
+
+  it("shows Qux under the Waiting to join cut and not under Members", () => {
+    renderUsers({ people: "waiting" });
+    expect(screen.getByText("Qux")).toBeInTheDocument();
+    expect(screen.queryByText("Bar")).toBeNull();
+    cleanup();
+
+    renderUsers({ people: "members" });
+    expect(screen.queryByText("Qux")).toBeNull();
+    expect(screen.getByText("Baz")).toBeInTheDocument();
+  });
+
+  it("offers to give Qux a seat from their row", async () => {
+    renderUsers();
+
+    await userEvent.click(screen.getByRole("button", { name: "Actions for Qux" }));
+    await userEvent.click(await screen.findByTestId("members-row-enable"));
+
+    expect(state.removals).toContainEqual(
+      expect.objectContaining({ input: expect.objectContaining({ userId: "user_qux" }) }),
+    );
   });
 });
 
@@ -204,7 +290,7 @@ describe("given Bar took their seat on 3 November", () => {
   describe("when an administrator opens the remove dialog for Bar", () => {
     /** @scenario "Removing a recent seat" */
     it("says the seat stays taken until 3 Dec, offers nothing, and reads Remove", async () => {
-      const dialog = await openRemoveDialogFor("Bar");
+      const { dialog } = await openRemoveDialogFor("Bar");
 
       expect(
         within(dialog).getByText(
@@ -230,7 +316,7 @@ describe("given Bar is a Lite Member and Qux waits for a seat", () => {
   describe("when an administrator opens the remove dialog for Bar", () => {
     /** @scenario "Removing a person without a full seat offers no seat" */
     it("says they lose access, frees no seat and offers nothing", async () => {
-      const dialog = await openRemoveDialogFor("Bar");
+      const { dialog } = await openRemoveDialogFor("Bar");
 
       expect(within(dialog).getByText("They lose access to everything in it.")).toBeInTheDocument();
       expect(within(dialog).queryByText("Their seat frees up right away.")).toBeNull();
@@ -246,7 +332,7 @@ describe("given the seat preview cannot be read", () => {
   });
 
   it("still confirms a plain removal", async () => {
-    const dialog = await openRemoveDialogFor("Bar");
+    const { dialog } = await openRemoveDialogFor("Bar");
 
     expect(within(dialog).getByText("They lose access to everything in it.")).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "Remove" }));

@@ -352,7 +352,19 @@ export class SeatEventSubscriptionService {
     } catch (error) {
       // A charge refused after the lift puts the line back, so the next cycle bills as before.
       if (lifted && seatItem.quantity != null) {
-        await moveTo(seatItem.quantity, "none").catch(() => undefined);
+        const billedBefore = seatItem.quantity;
+        await moveTo(billedBefore, "none").catch((rollbackError: unknown) => {
+          // Stripe now bills the lifted count from the next cycle; this record is how it is found.
+          logger.error(
+            {
+              error: rollbackError,
+              organizationId,
+              subscriptionId: subscription.stripeSubscriptionId,
+              billedBefore,
+            },
+            "seat line left lifted: the charge and putting the line back both failed",
+          );
+        });
       }
       throw error;
     }

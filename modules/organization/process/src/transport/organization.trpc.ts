@@ -103,9 +103,12 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   .withMiddlewareContext(organizationSessionPersonContext)
   .withPermission("organization:manage")
   .handle(async ({ app, input, actor }, person) => {
-    const { seatGivenToUserId } = await app.removeMember(input, callerOf(actor, person));
+    const { seatGivenToUserId, seatHandoverFailed } = await app.removeMember(
+      input,
+      callerOf(actor, person),
+    );
 
-    return { success: true as const, seatGivenToUserId };
+    return { success: true as const, seatGivenToUserId, seatHandoverFailed };
   })
 
   .procedure("getSeatRemovalPreview")
@@ -390,6 +393,7 @@ function memberDirectoryOnWire(
       updatedAt: toDate(member.updatedAt),
       departmentId: member.departmentId,
       disabledAt: member.disabledAt && toDate(member.disabledAt),
+      seatPendingSince: member.seatPendingSince ? toDate(member.seatPendingSince) : null,
       user: {
         id: member.user.id,
         name: member.user.name,

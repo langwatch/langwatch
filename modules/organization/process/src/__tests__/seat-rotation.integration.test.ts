@@ -60,6 +60,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
     revokeBindingsWhere: grantWrite(0),
     changeBindingRole: grantWrite(undefined),
   });
+  const attachedBindings: { organizationId: string; userId: string; role: string }[] = [];
   /** Organizations whose plan lookup fails, to prove one failing admission spares the others. */
   const unreachablePlans = new Set<string>();
   const plans = createApiFixture<Pick<EntitlementApi, "getActivePlan">>({
@@ -96,7 +97,19 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
     testArrivals: { standingFor: async () => ({ testing: false }) as const },
     ceiling: { assertWithinCaller: async () => {} },
     admissions: {
-      attachBindings: async () => ({ attached: [], duplicates: [] }),
+      // As the grant ledger does: a binding needs a live (enabled) membership.
+      attachBindings: async ({ organizationId, bindings }) => {
+        for (const binding of bindings) {
+          if (!("userId" in binding.principal)) continue;
+          const userId = binding.principal.userId;
+          const member = await prisma.organizationUser.findUnique({
+            where: { userId_organizationId: { userId, organizationId } },
+          });
+          if (!member || member.disabledAt) throw new Error("no live membership to bind");
+          attachedBindings.push({ organizationId, userId, role: binding.role });
+        }
+        return { attached: [], duplicates: [] };
+      },
       completeAdmission: async () => true,
     },
     workspaceNotices: { personalWorkspaceArchived: async () => {} },
@@ -526,12 +539,13 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
 
       const result = await remove(organizationId, adminId, bar, qux);
 
-      expect(result).toEqual({ seatGivenToUserId: qux });
+      expect(result).toEqual({ seatGivenToUserId: qux, seatHandoverFailed: false });
       expect(await membershipOf(organizationId, qux)).toMatchObject({
         role: OrganizationUserRole.MEMBER,
         disabledAt: null,
         seatPendingSince: null,
       });
+      expect(attachedBindings).toContainEqual({ organizationId, userId: qux, role: "MEMBER" });
       expect(await fullSeatsInUse(organizationId)).toBe(5);
     });
 
@@ -543,6 +557,43 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
 
       expect((await membershipOf(organizationId, waitingIds[0]!))?.seatPendingSince).not.toBeNull();
       expect(await fullSeatsInUse(organizationId)).toBe(4);
+    });
+
+    /** @scenario "A failed seat handover still removes the member" */
+    it("keeps the removal and the person waiting when giving the seat fails", async () => {
+      const { organizationId, adminId, bar, waitingIds } = await acme({ waiting: ["Qux"] });
+      const qux = waitingIds[0]!;
+      unreachablePlans.add(organizationId);
+      try {
+        const result = await remove(organizationId, adminId, bar, qux);
+
+        expect(result).toEqual({ seatGivenToUserId: null, seatHandoverFailed: true });
+      } finally {
+        unreachablePlans.delete(organizationId);
+      }
+      expect(await membershipOf(organizationId, bar)).toBeNull();
+      expect((await membershipOf(organizationId, qux))?.seatPendingSince).not.toBeNull();
+    });
+
+    /** @scenario "Enabling a person waiting for a seat admits them" */
+    it("gives a waiting person their grant when an administrator enables them", async () => {
+      const { organizationId, adminId, bar, waitingIds } = await acme({ waiting: ["Qux"] });
+      const qux = waitingIds[0]!;
+      await remove(organizationId, adminId, bar);
+
+      await memberships.setMemberDisabled({
+        organizationId,
+        userId: qux,
+        disabled: false,
+        actingUser: { id: adminId },
+      });
+
+      expect(await membershipOf(organizationId, qux)).toMatchObject({
+        role: OrganizationUserRole.MEMBER,
+        disabledAt: null,
+        seatPendingSince: null,
+      });
+      expect(attachedBindings).toContainEqual({ organizationId, userId: qux, role: "MEMBER" });
     });
 
     /** @scenario "A hold that ends admits the person waiting longest" */
@@ -565,6 +616,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
         role: OrganizationUserRole.MEMBER,
         disabledAt: null,
       });
+      expect(attachedBindings).toContainEqual({ organizationId, userId: qux, role: "MEMBER" });
       expect((await membershipOf(organizationId, quux!))?.seatPendingSince).not.toBeNull();
       expect(await prisma.seatHold.count({ where: { organizationId } })).toBe(0);
     });

@@ -48,6 +48,7 @@ import {
   type PeopleCut,
   peopleCutItems,
   peopleCutShows,
+  waitsForSeat,
 } from "../../../model/people-cuts.ts";
 import type { OrganizationUserRole } from "../../../model/prisma-types.ts";
 import { heldSeatChipLabel } from "../../../model/seat-removal-copy.ts";
@@ -187,7 +188,7 @@ function PeopleList({
           onSelectCut={people.selectCut}
           memberCount={people.sortedMembers.length}
           openInviteCount={people.openInvites.length}
-          requestCount={people.joinRequests.requests.length}
+          requestCount={people.joinRequests.requests.length + people.seatWaiters.length}
           onInvite={people.openDrawer}
         />
 
@@ -209,6 +210,7 @@ function PeopleList({
           cut={people.cut}
           organizationId={organization.id}
           members={people.sortedMembers}
+          seatWaiters={people.seatWaiters}
           invites={people.invites}
           openInvites={people.openInvites}
           teams={teams}
@@ -314,7 +316,7 @@ function MemberRowActions({
               onClick={() => onSetDisabled(member.userId, false)}
             >
               <Undo2 size={16} />
-              Give their seat back
+              {waitsForSeat(member) ? "Give them a seat" : "Give their seat back"}
             </Menu.Item>
           ) : (
             <Menu.Item
@@ -381,6 +383,15 @@ function MemberStatusChip({ member }: { member: Member }) {
         tone="warning"
         title="This account has been deactivated here. Your identity provider may still list them."
         data-testid="member-deactivated"
+      />
+    );
+  }
+  if (waitsForSeat(member)) {
+    return (
+      <IdentityChip
+        label="Waiting for a seat"
+        title="They joined while every full seat was taken. Enable them to give them a seat."
+        data-testid="member-waiting-for-seat"
       />
     );
   }
@@ -638,6 +649,7 @@ function PeopleRows({
   showDepartment,
   twoStep,
   joinRequests,
+  seatWaiters,
   heldSeats,
   heldSeatByMember,
   canDeleteMember,
@@ -662,6 +674,7 @@ function PeopleRows({
   showDepartment: boolean;
   twoStep: ReturnType<typeof useTwoStepRequirement>;
   joinRequests: ReturnType<typeof useJoinRequests>;
+  seatWaiters: Member[];
   heldSeats: HeldSeat[];
   heldSeatByMember: Map<string, HeldSeat>;
   canDeleteMember: (memberId: string) => boolean;
@@ -673,26 +686,27 @@ function PeopleRows({
   onResendInvite: ReturnType<typeof useInviteActions>["resendInvite"];
   onRevokeInvite: ReturnType<typeof useInviteActions>["revokeInvite"];
 }) {
-  const memberRows = peopleCutShows({ cut, list: "members" })
-    ? members.map((member) => (
-        <MemberListRow
-          key={`member:${member.userId}`}
-          member={member}
-          heldSeat={heldSeatByMember.get(member.userId)}
-          organizationId={organizationId}
-          provenance={provenance?.[member.userId]}
-          department={department}
-          departmentNameById={departmentNameById}
-          showDepartment={showDepartment}
-          twoStep={twoStep}
-          canDisable={canDisableMember(member.userId)}
-          canDelete={canDeleteMember(member.userId)}
-          onOpen={() => onOpenPerson(member.userId)}
-          onSetDisabled={onSetDisabled}
-          onRequestRemoval={onRequestRemoval}
-        />
-      ))
-    : [];
+  const memberRow = (member: Member) => (
+    <MemberListRow
+      key={`member:${member.userId}`}
+      member={member}
+      heldSeat={heldSeatByMember.get(member.userId)}
+      organizationId={organizationId}
+      provenance={provenance?.[member.userId]}
+      department={department}
+      departmentNameById={departmentNameById}
+      showDepartment={showDepartment}
+      twoStep={twoStep}
+      canDisable={canDisableMember(member.userId)}
+      canDelete={canDeleteMember(member.userId)}
+      onOpen={() => onOpenPerson(member.userId)}
+      onSetDisabled={onSetDisabled}
+      onRequestRemoval={onRequestRemoval}
+    />
+  );
+  const memberRows = peopleCutShows({ cut, list: "members" }) ? members.map(memberRow) : [];
+  // People admitted while every full seat was taken wait with those asking to join.
+  const seatWaiterRows = peopleCutShows({ cut, list: "waiting" }) ? seatWaiters.map(memberRow) : [];
 
   // A held seat's person is greyed after the members until the seat frees (seat-rotation.feature).
   const heldSeatRows = peopleCutShows({ cut, list: "members" })
@@ -728,7 +742,7 @@ function PeopleRows({
 
   return (
     <IdentityRowList data-testid="people-list" empty={emptyPeopleCutText(cut)}>
-      {[...memberRows, ...heldSeatRows, ...inviteRows, ...requestRows]}
+      {[...memberRows, ...heldSeatRows, ...inviteRows, ...seatWaiterRows, ...requestRows]}
     </IdentityRowList>
   );
 }
@@ -843,13 +857,23 @@ function useMemberRemoval(organizationId: string) {
     deleteMemberMutation.mutate(
       { organizationId, userId, giveSeatToUserId },
       {
-        onSuccess: () => {
-          toaster.create({
-            title: "Member removed successfully",
-            description: "The member has been removed from the organization.",
-            type: "success",
-            duration: 5000,
-          });
+        onSuccess: (removed) => {
+          toaster.create(
+            removed?.seatHandoverFailed
+              ? {
+                  title: "Member removed",
+                  description:
+                    "Their seat did not go to the person waiting: enable them in Users to give it.",
+                  type: "warning",
+                  duration: 8000,
+                }
+              : {
+                  title: "Member removed successfully",
+                  description: "The member has been removed from the organization.",
+                  type: "success",
+                  duration: 5000,
+                },
+          );
           invalidateMembership({ userId, organizationId });
         },
         onError: () => {
@@ -896,13 +920,15 @@ function usePeopleListReads({
     enabled: !!organization.id && canManage,
   });
 
-  const sortedMembers = useMemo(
+  const everyMember = useMemo(
     () =>
       [...organization.members].toSorted((a, b) =>
         (a.user.name ?? a.user.email ?? "").localeCompare(b.user.name ?? b.user.email ?? ""),
       ),
     [organization.members],
   );
+  const sortedMembers = everyMember.filter((member) => !waitsForSeat(member));
+  const seatWaiters = everyMember.filter((member) => waitsForSeat(member));
 
   const canDeleteMember = (memberId: string) =>
     canManage && organization.members.length > 1 && memberId !== userId;
@@ -938,6 +964,7 @@ function usePeopleListReads({
   return {
     provenance,
     sortedMembers,
+    seatWaiters,
     canDeleteMember,
     canDisableMember,
     invites,

@@ -163,6 +163,15 @@ export interface SetMemberDisabledInput {
   seat?: SeatTransition;
 }
 
+/** A waiting person given a full seat: their row becomes an enabled MEMBER awaiting its grant. */
+export interface AdmitWaitingMemberInput {
+  organizationId: string;
+  userId: string;
+  /** The grant the admission attaches next, so an unfinished one resumes (ADR-129). */
+  pendingAdmissionId: string;
+  seat: SeatTransition;
+}
+
 /**
  * Input for updating a member's organization role and cascading team roles.
  */
@@ -448,6 +457,9 @@ export abstract class OrganizationMembershipRepository {
   abstract deleteMember: (input: DeleteMemberInput) => Promise<string[]>;
 
   abstract setMemberDisabled: (input: SetMemberDisabledInput) => Promise<void>;
+
+  /** Answers false, writing nothing, when the person no longer waits. */
+  abstract admitWaitingMember: (input: AdmitWaitingMemberInput) => Promise<boolean>;
 
   /**
    * The personal teams a set of role-binding scopes reaches, by the name each

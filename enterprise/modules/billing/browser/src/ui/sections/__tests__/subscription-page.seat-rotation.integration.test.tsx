@@ -352,6 +352,47 @@ describe("<SubscriptionPage/> seat rotation", () => {
       expect(screen.getByTestId("seat-email-0")).toHaveValue("new@acme.example");
     });
 
+    it("ends with no pending seat change and invites the new address after adding a seat", async () => {
+      mockPreviewProration.mockReturnValue({ data: addQuote, isLoading: false, isError: false });
+      renderSubscriptionPage();
+
+      fireEvent.click(screen.getByTestId("user-count-link"));
+      fireEvent.change(await screen.findByTestId("seat-email-0"), {
+        target: { value: "new@acme.example" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: /Add Seat/ }));
+      fireEvent.click(button("Add 1 seat"));
+
+      await waitFor(() =>
+        expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ totalMembers: 6 })),
+      );
+      await waitFor(() =>
+        expect(mockCreateInvitesMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            invites: [expect.objectContaining({ email: "new@acme.example" })],
+          }),
+          expect.anything(),
+        ),
+      );
+      expect(screen.queryByTestId("update-seats-block")).toBeNull();
+    });
+
+    it("ends with no pending seat change after lowering the seats", async () => {
+      mockPreviewProration.mockReturnValue({ data: lowerQuote, isLoading: false, isError: false });
+      renderSubscriptionPage();
+
+      fireEvent.click(screen.getByTestId("user-count-link"));
+      fireEvent.click(await screen.findByTestId("remove-seat-0"));
+      fireEvent.click(screen.getByTestId("remove-seat-0"));
+      fireEvent.click(button("Lower to 3 seats"));
+
+      await waitFor(() =>
+        expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ totalMembers: 3 })),
+      );
+      await waitFor(() => expect(screen.queryByTestId("update-seats-block")).toBeNull());
+      expect(mockCreateInvitesMutate).not.toHaveBeenCalled();
+    });
+
     describe("when the seats were lowered to 3 and 5 are kept until 1 Dec", () => {
       beforeEach(() => {
         mockGetLastSubscription.mockReturnValue({

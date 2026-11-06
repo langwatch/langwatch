@@ -286,6 +286,25 @@ describe("Growth seat changes", () => {
       expect(store.subscriptions[0]).toMatchObject({ maxMembers: 3, seatsKept: 5 });
     });
 
+    it("reports the refused charge when putting the line back fails too", async () => {
+      stripeSubscriptions.refuse({
+        operation: "updateSubscription",
+        error: new Error("card declined"),
+        allowed: 1,
+        times: 2,
+      });
+
+      await expect(
+        seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 }),
+      ).rejects.toThrow("card declined");
+
+      // The lifted line stays; the kept seats recorded first still cover what Stripe bills.
+      expect(stripeSubscriptions.updates.map((update) => update.change)).toEqual([
+        { items: [{ id: "si_seat", quantity: 5 }], prorationBehavior: "none" },
+      ]);
+      expect(store.subscriptions[0]).toMatchObject({ maxMembers: 3, seatsKept: 5 });
+    });
+
     it("quotes the share of the previewed proration above the seats already paid for", async () => {
       // The preview prices the move from 3 to 6, the lift the move from 3 to 5; one seat is due.
       stripeSubscriptions.seedPreview({

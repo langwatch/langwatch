@@ -47,6 +47,7 @@ import type {
   OrganizationMemberWithUser,
   OrganizationMembershipRepository,
   OrganizationProvisioningSummary,
+  AdmitWaitingMemberInput,
   SetMemberDisabledInput,
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,
@@ -743,6 +744,18 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return archivedTeamIds;
   }
 
+  async admitWaitingMember(input: AdmitWaitingMemberInput): Promise<boolean> {
+    const row = this.membershipRow(input);
+    if (!row || row.disabledAt === null || row.seatPendingSince == null) return false;
+    row.role = OrganizationUserRole.MEMBER;
+    row.disabledAt = null;
+    row.seatPendingSince = null;
+    row.pendingSsoGrantId = input.pendingAdmissionId;
+    this.applySeatTransition({ row, seat: input.seat });
+    row.updatedAt = nowInstant();
+    return true;
+  }
+
   async setMemberDisabled(input: SetMemberDisabledInput): Promise<void> {
     const row = this.membershipRow(input);
     if (!row) throw new MemberNotFoundError(input.userId);
@@ -982,6 +995,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     organizationId: string;
     role: OrganizationUserRole;
     disabledAt: Instant | null;
+    seatPendingSince?: Instant | null;
     createdAt: Instant;
     updatedAt: Instant;
   }): OrganizationMemberWithUser {
@@ -1010,6 +1024,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       organizationId: row.organizationId,
       role: row.role,
       disabledAt: row.disabledAt,
+      seatPendingSince: row.seatPendingSince ?? null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       departmentId: null,
