@@ -127,6 +127,20 @@ describe("given many organizations open to requests from the domain", () => {
     });
   });
 
+  describe("when only a few other organizations are open", () => {
+    /** @scenario A few organizations list as rows with nothing to unfold */
+    it("lists every other organization as a row with no toggle and no filter", async () => {
+      renderStep({ lookup: openToMany(4) });
+
+      expect(
+        await screen.findByRole("button", { name: "Join Acme (10+ colleagues)" }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: /^Join Acme team/ })).toHaveLength(3);
+      expect(screen.queryByRole("button", { name: /^Show all/ })).toBeNull();
+      expect(screen.queryByRole("textbox")).toBeNull();
+    });
+  });
+
   describe("when the name filter matches nothing", () => {
     let user: ReturnType<typeof userEvent.setup>;
 
