@@ -397,6 +397,13 @@ Feature: Instant Evals decision model column in Default models
     And once it is stored, the inherit entry is listed so the pin can be cleared
 
   @integration
+  Scenario: The Instant Evals feature picker lists Evals Preview once, with no Default row
+    Given neither the Instant Evals column nor its feature is set at any scope
+    When I open the Instant Evals feature picker
+    Then "Evals Preview" is listed once and checked
+    And no "Default" row that reads "Evals Preview" is listed beside it
+
+  @integration
   Scenario: A model two providers offer is told apart by its provider
     Given the flag is on for my organization
     And my project has an OpenAI key and an Azure OpenAI key

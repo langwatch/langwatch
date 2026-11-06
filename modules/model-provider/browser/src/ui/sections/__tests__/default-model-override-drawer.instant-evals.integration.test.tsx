@@ -282,6 +282,46 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
     });
   });
 
+  describe("given the Instant Evals feature row is open and nothing is set", () => {
+    beforeEach(() => {
+      mockGetDefaultModels.mockReturnValue({
+        data: {
+          ...PAYLOAD,
+          features: [
+            {
+              key: "instant_eval.judge",
+              role: "INSTANT_EVALS",
+              displayName: "Instant Evals",
+              description: "The decision model Instant Evals and their judged columns run on.",
+            },
+          ],
+        },
+        isLoading: false,
+      });
+    });
+
+    /** @scenario "The Instant Evals feature picker lists Evals Preview once, with no Default row" */
+    it("shows Evals Preview checked, with no Default row beside it", () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+      fireEvent.click(screen.getByTestId("role-row-instant_evals-expand"));
+
+      const trigger = within(screen.getByTestId("feature-row-instant_eval.judge")).getByRole(
+        "combobox",
+      );
+      expect(trigger).toHaveTextContent("Evals Preview");
+      const listbox = document.getElementById(trigger.getAttribute("aria-controls") ?? "");
+      if (!listbox) throw new Error("no listbox for the Instant Evals feature row");
+      expect(
+        within(listbox).queryByTestId("provider-model-selector-inherit"),
+      ).not.toBeInTheDocument();
+      const hosted = within(listbox)
+        .getAllByRole("option", { hidden: true })
+        .filter((option) => within(option).queryByText("Evals Preview"));
+      expect(hosted).toHaveLength(1);
+      expect(hosted[0]).toHaveAttribute("aria-selected", "true");
+    });
+  });
+
   describe("given OpenAI and Azure both offer gpt-6-luna", () => {
     beforeEach(() => {
       flagsOn.add(OWN_MODEL_FLAG);

@@ -757,6 +757,9 @@ function FeatureRow({
   } else {
     inheritOption = inheritHitOption(inheritedForFeature) ?? roleInherit;
   }
+  // As on the role row: an unset key already runs on this listed model, so it shows checked and
+  // the inherit entry returns only to clear a stored value.
+  const unsetDefault = inheritOption.isUnsetDefault ? inheritOption.model : undefined;
   return (
     <HStack gap={2} align="center" data-testid={`feature-row-${feature.key}`}>
       {/* Feature description tooltip lives on the label. Layout
@@ -771,7 +774,7 @@ function FeatureRow({
       <Box flex={1} />
       <Box width="240px" flexShrink={0}>
         <ProviderModelSelector
-          model={override}
+          model={override || unsetDefault || ""}
           query={{
             data: featureRowModelOptions({
               options: modelOptions,
@@ -780,7 +783,7 @@ function FeatureRow({
             isLoading: false,
           }}
           onChange={(m) => onSetOverride(feature.key, m)}
-          inheritOption={inheritOption ?? undefined}
+          inheritOption={unsetDefault && !override ? undefined : inheritOption}
           labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
         />
       </Box>
@@ -833,7 +836,7 @@ export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | un
 /**
  * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With no cascade
  * hit it reads "Not configured" with no model attached, so an edit can clear a pinned key
- * back to inherit; the Instant Evals column instead falls back to LangWatch Instant Preview.
+ * back to inherit; the Instant Evals column instead falls back to LangWatch Evals Preview.
  */
 export function buildInheritOption(entry: InheritedEntry, role?: ModelRole): InheritOptionShape {
   const hit = inheritHitOption(entry);
