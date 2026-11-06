@@ -435,6 +435,10 @@ export class DatasetVersionService {
     }
   }
 
+  /**
+   * Writes the version's rows as the dataset's chunks under its lock. A dataset still in the
+   * records table moves to object storage on the way: its table rows stay for the cleanup.
+   */
   async #replaceContent({
     dataset,
     columns,
@@ -445,41 +449,39 @@ export class DatasetVersionService {
     rows: readonly DatasetVersionRow[];
   }): Promise<void> {
     const { projectId, id: datasetId } = dataset;
-    if (dataset.contentLayout === "s3_jsonl") {
-      await this.deps.content.withDatasetLock(datasetId, async (tx) => {
-        const writer = StreamingChunkWriterService.create({
-          storage: this.deps.chunks,
-          projectId,
-          datasetId,
-        });
-        for (const row of rows) await writer.push(row.entry, { id: row.id });
-        const meta = await writer.finalize();
-        await this.deps.chunks.deleteChunksFrom({
-          projectId,
-          datasetId,
-          fromIndex: meta.chunkCount,
-        });
-        await tx.updateContent({
+    const moves = dataset.contentLayout !== "s3_jsonl";
+    await this.deps.content.withDatasetLock(datasetId, async (tx) => {
+      const writer = StreamingChunkWriterService.create({
+        storage: this.deps.chunks,
+        projectId,
+        datasetId,
+      });
+      for (const row of rows) await writer.push(row.entry, { id: row.id });
+      const meta = await writer.finalize();
+      await this.deps.chunks.deleteChunksFrom({ projectId, datasetId, fromIndex: meta.chunkCount });
+      const content = {
+        rowCount: meta.rowCount,
+        sizeBytes: BigInt(meta.sizeBytes),
+        chunkCount: meta.chunkCount,
+        chunkOffsets: meta.chunkOffsets,
+        columnTypes: columns,
+      };
+      if (moves) {
+        await tx.update({
           id: datasetId,
           projectId,
-          content: {
-            rowCount: meta.rowCount,
-            sizeBytes: BigInt(meta.sizeBytes),
-            chunkCount: meta.chunkCount,
-            chunkOffsets: meta.chunkOffsets,
-            columnTypes: columns,
-          },
+          data: { ...content, contentLayout: "s3_jsonl" },
         });
-      });
-      return;
-    }
-
-    const entries = rows.map((row) => ({ ...row.entry, id: row.id }));
-    await this.deps.records.withDatasetLock({ datasetId, projectId }, async (records) => {
-      await records.replaceAll({ datasetId, projectId, entries });
-      await records.setColumnTypes(columns);
+        return;
+      }
+      await tx.updateContent({ id: datasetId, projectId, content });
     });
-    logger.info({ projectId, datasetId, rows: rows.length }, "Restored a dataset version in place");
+    if (moves) {
+      logger.info(
+        { projectId, datasetId, rows: rows.length },
+        "Restored a dataset version into object storage",
+      );
+    }
   }
 
   #address(version: DatasetVersion): { projectId: string; datasetId: string; versionId: string } {

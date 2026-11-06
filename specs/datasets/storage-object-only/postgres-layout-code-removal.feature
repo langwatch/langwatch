@@ -13,7 +13,7 @@
 #     (dataset-copy.service.ts); column edit re-key (dataset-upsert.service.ts:119-170); upload
 #     append (dataset-upload.service.ts:162-178); version snapshot and restore
 #     (dataset-version.service.ts:407-433, :477-481);
-#   - repositories: prisma/memory dataset-record, dataset-record-content, dataset-migration;
+#   - repositories: prisma/memory dataset-record and dataset-migration;
 #     the single-file service, rules and repositories (object storage and filesystem);
 #   - config: DATASET_STORAGE_LOCAL / LOCAL_STORAGE_PATH for single files
 #     (modules/dataset/contract/src/dataset.config.ts:13-16).

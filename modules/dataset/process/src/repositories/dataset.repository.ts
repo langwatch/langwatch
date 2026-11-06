@@ -2,6 +2,7 @@ import {
   datasetSchema,
   type Dataset,
   type DatasetColumns,
+  type DatasetContentLayout,
   type DatasetStorageEntry,
   type DatasetStoragePageInput,
   type DatasetSummary,
@@ -49,6 +50,8 @@ export type DatasetCreateInput = {
   name: string;
   slug: string;
   columnTypes: DatasetColumns;
+  /** Named on every create: the column's database default is the records table. */
+  contentLayout: DatasetContentLayout;
 };
 
 export type DatasetUpdateInput = {

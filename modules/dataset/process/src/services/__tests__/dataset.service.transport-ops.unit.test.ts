@@ -94,6 +94,7 @@ describe("DatasetService operations the transports call", () => {
         name: "One",
         slug: "one",
         columnTypes: [],
+        contentLayout: "s3_jsonl",
       });
       const datasets = serviceOver({ database });
       const archive = vi
