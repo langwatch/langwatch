@@ -61,6 +61,27 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
     super();
   }
 
+  /** The tail of each organization's queue; a hold starts once the one before it settled. */
+  readonly #seatQueues = new Map<string, Promise<unknown>>();
+
+  async withSeatLock<T>({
+    organizationId,
+    work,
+  }: {
+    organizationId: string;
+    work: () => Promise<T>;
+  }): Promise<T> {
+    const previous = this.#seatQueues.get(organizationId) ?? Promise.resolve();
+    const held = previous.then(work);
+    const settled = held.catch(() => undefined);
+    this.#seatQueues.set(organizationId, settled);
+    try {
+      return await held;
+    } finally {
+      if (this.#seatQueues.get(organizationId) === settled) this.#seatQueues.delete(organizationId);
+    }
+  }
+
   async getMemberCount(organizationId: string): Promise<number> {
     return this.#count(organizationId, isFullMember);
   }

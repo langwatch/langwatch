@@ -85,6 +85,7 @@ describe("OrganizationMembershipService", () => {
   const seats: OrganizationSeatLicense = {
     checkLimit: mockCheckLimit,
     assertRoleChangeAllowed: mockAssertRoleChangeAllowed,
+    withSeat: ({ work }) => work(),
   };
   const seatNotices: OrganizationSeatRevocationNotice = {
     memberDisabled: mockMemberDisabled,

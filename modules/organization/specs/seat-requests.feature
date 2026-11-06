@@ -101,6 +101,22 @@ Feature: Seat requests when an organization is over its seat limit
       Then the approval refuses with member_seat_limit_reached
       And the seat request stays open
 
+    @integration
+    Scenario: Two approvals for the last free full seat at once: exactly one wins
+      Given "first@acme.example" and "second@acme.example" are each held pending with an open seat request
+      And exactly one full member seat is free
+      When two administrators approve the two requests at the same moment
+      Then exactly one of them becomes a full member with access
+      And the other approval refuses with member_seat_limit_reached
+      And that other seat request stays open
+
+    @integration
+    Scenario: Two single sign-on arrivals for the last free full seat at once: exactly one gets it
+      Given exactly one full member seat is free
+      When "first@acme.example" and "second@acme.example" arrive by single sign-on at the same moment asking for a full seat
+      Then exactly one of them is a full member
+      And the other is a Lite Member
+
     @unit
     Scenario: Approving a seat request that is not open is refused
       When an administrator approves a seat request that does not exist

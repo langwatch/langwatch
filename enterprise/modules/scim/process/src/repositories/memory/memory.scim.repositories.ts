@@ -36,4 +36,9 @@ class MemoryScimSeatRepository implements ScimSeatRepository {
   ): Promise<OrganizationMemberSeats> {
     return { fullMembers: 0, liteMembers: 0, developers: 0 };
   }
+
+  /** No seats are held here, so there is nothing to race for. */
+  async withSeatLock<T>({ work }: Readonly<{ work: () => Promise<T> }>): Promise<T> {
+    return work();
+  }
 }

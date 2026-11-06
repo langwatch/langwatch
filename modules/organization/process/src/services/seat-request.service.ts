@@ -22,6 +22,7 @@ import type {
   SeatRequestRow,
 } from "../repositories/seat-request.repository.ts";
 import { type SeatApprovalPlan, seatApprovalPath } from "../rules/seat-approval-path.rules.ts";
+import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import type {
   AccessNoticeApproval,
   AccessNoticeRecipient,
@@ -251,6 +252,8 @@ export class SeatRequestService {
     if (!(await this.dependencies.requests.resolve({ ...claim, status: "APPROVED" }))) {
       throw new SeatRequestNotFoundError(request.id);
     }
+    // The early check spares a doomed write; the writes giveFullSeat calls each re-check the
+    // seat under the organization's seat lock, so of two approvals for the last seat one wins.
     try {
       if (!(isFull && membership.disabledAt === null)) {
         await this.assertFullSeatFree({ organizationId, by });
@@ -260,6 +263,9 @@ export class SeatRequestService {
       };
     } catch (error) {
       await this.dependencies.requests.release(claim);
+      const refusal = readSeatRefusal(error);
+      if (refusal.kind === "seat-limit")
+        throw new MemberSeatLimitReachedError({ meta: refusal.limit });
       throw error;
     }
   }

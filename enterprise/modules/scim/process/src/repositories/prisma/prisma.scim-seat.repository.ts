@@ -1,5 +1,6 @@
 import { countMemberSeats } from "@langwatch/entitlement-contract";
-import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
+import { type OrganizationMemberSeats, seatLockKey } from "@langwatch/organization-contract";
+import { withAdvisoryLock } from "@langwatch/prisma-client";
 import {
   INVITE_STATUS,
   OrganizationUserRole,
@@ -31,6 +32,16 @@ export class PrismaScimSeatRepository implements ScimSeatRepository {
   }
 
   private constructor(private readonly prisma: PrismaScimSeatDatabase) {}
+
+  async withSeatLock<T>({
+    organizationId,
+    work,
+  }: Readonly<{ organizationId: string; work: () => Promise<T> }>): Promise<T> {
+    if (!("$transaction" in this.prisma)) {
+      throw new Error("The seat lock needs the root client, not a transaction");
+    }
+    return withAdvisoryLock({ prisma: this.prisma, key: seatLockKey({ organizationId }), work });
+  }
 
   async countMemberSeats({
     organizationId,

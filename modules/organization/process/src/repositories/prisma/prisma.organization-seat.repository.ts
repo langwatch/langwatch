@@ -1,5 +1,6 @@
 import { countMemberSeats } from "@langwatch/entitlement-contract";
-import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
+import { type OrganizationMemberSeats, seatLockKey } from "@langwatch/organization-contract";
+import { withAdvisoryLock } from "@langwatch/prisma-client";
 import {
   INVITE_STATUS,
   OrganizationUserRole,
@@ -13,6 +14,12 @@ import { OrganizationSeatRepository } from "../organization-seat.repository.ts";
 
 /** Only what this repository needs, named so a caller never names Prisma's own types. */
 type PrismaOrganizationSeatDatabase = PrismaClient | Prisma.TransactionClient;
+
+function canHoldLocks(
+  database: PrismaOrganizationSeatDatabase,
+): database is PrismaOrganizationSeatDatabase & Pick<PrismaClient, "$transaction"> {
+  return "$transaction" in database;
+}
 
 /** An invitation's team assignments as stored; anything else reads as none. */
 const teamAssignmentsSchema = z.array(
@@ -73,6 +80,20 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
    */
   async getMembersDeveloperCount(organizationId: string): Promise<number> {
     return (await this.countMemberSeats(organizationId)).developers;
+  }
+
+  /** A transaction-scoped advisory lock on the organization, tried and retried (prisma-client). */
+  async withSeatLock<T>({
+    organizationId,
+    work,
+  }: {
+    organizationId: string;
+    work: () => Promise<T>;
+  }): Promise<T> {
+    if (!canHoldLocks(this.prisma)) {
+      throw new Error("The seat lock needs the root client, not a transaction");
+    }
+    return withAdvisoryLock({ prisma: this.prisma, key: seatLockKey({ organizationId }), work });
   }
 
   /** Every seat in one read: full, lite and Developer, live invitations included. */

@@ -1801,11 +1801,18 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       teamId: input.teamId,
     });
 
-    if (!isOrganizationApiCustomRole(input.role)) {
-      await this.#assertBuiltInTeamRoleAllowed({ organizationId, input });
+    if (isOrganizationApiCustomRole(input.role)) {
+      await this.updateTeamMemberRole(input, by);
+      return;
     }
 
-    await this.updateTeamMemberRole(input, by);
+    await this.#infrastructure.seats.withSeat({
+      organizationId,
+      work: async () => {
+        await this.#assertBuiltInTeamRoleAllowed({ organizationId, input });
+        await this.updateTeamMemberRole(input, by);
+      },
+    });
   }
 
   /**

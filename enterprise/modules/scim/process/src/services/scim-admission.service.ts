@@ -56,16 +56,20 @@ export class ScimAdmissionService {
     organizationId: string;
   }): Promise<void> {
     const asserted = await this.directoryAssertedOrganizationRole({ userId, organizationId });
-    const [plan, seats] = await Promise.all([
-      this.options.plans.getActivePlan({ organizationId, user: { id: userId } }),
-      this.options.seats.countMemberSeats({ organizationId }),
-    ]);
-    const { role, pending } = admissionSeat({ requested: asserted, ...seatsFree({ plan, seats }) });
-    try {
-      await this.options.prisma.addMembership({ userId, organizationId, role, pending });
-    } catch (error) {
-      if (!isUniqueViolation(error)) throw error;
-    }
+    const plan = await this.options.plans.getActivePlan({ organizationId, user: { id: userId } });
+    await this.options.seats.withSeatLock({
+      organizationId,
+      work: async () => {
+        const seats = await this.options.seats.countMemberSeats({ organizationId });
+        const free = seatsFree({ plan, seats });
+        const { role, pending } = admissionSeat({ requested: asserted, ...free });
+        try {
+          await this.options.prisma.addMembership({ userId, organizationId, role, pending });
+        } catch (error) {
+          if (!isUniqueViolation(error)) throw error;
+        }
+      },
+    });
 
     await this.options.membershipAccess.reconcileOrganizationMembership({ userId, organizationId });
   }

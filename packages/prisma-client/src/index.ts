@@ -1,3 +1,4 @@
+export { AdvisoryLockBusyError, type AdvisoryLockDeps, withAdvisoryLock } from "./advisory-lock.ts";
 export {
   PrismaConfigService,
   type PrismaConfiguration,

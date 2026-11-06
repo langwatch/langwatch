@@ -21,3 +21,11 @@ export function seatsFree({
     liteSeatFree: lifted || seats.liteMembers < plan.maxMembersLite,
   };
 }
+
+/**
+ * The one lock every seat-taking write on an organization holds while it counts and writes,
+ * so two writes for the last free seat cannot both see it free. SCIM admission takes it too.
+ */
+export function seatLockKey({ organizationId }: Readonly<{ organizationId: string }>): string {
+  return `seat-org:${organizationId}`;
+}
