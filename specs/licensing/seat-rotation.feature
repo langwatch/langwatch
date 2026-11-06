@@ -421,13 +421,32 @@ Feature: Seat rotation
       And the repair stays pending for the next pass
 
     @unit
-    Scenario: A seat line repair whose write lands after a seat change took its lease reports it
+    Scenario: A seat line write that lands after a seat change took its lease is put right
       Given the subscription records that Stripe should bill 3 seats while Stripe bills 5
       And the seat line repair renewed its lease and sent its write, which stalls
       And the lease ran out and a seat change raised the seats to 6 meanwhile
       When the repair's write lands and Stripe shows 3 seats
-      Then an error reports that the seat line may have overwritten the newer change
-      And the repair is not counted as repaired
+      Then the repair is not counted as repaired
+      And the subscription records that its seat line should match its seat count
+      When the seat line repair runs after the grace window
+      Then the payment provider changes the quantity to 6 with no proration
+      And the repair is cleared
+
+    @unit
+    Scenario: A seat line already at the seat count clears its reconcile without a change
+      Given the subscription records that its seat line should match its seat count of 6
+      And Stripe bills 6 seats
+      When the seat line repair runs
+      Then the payment provider is not asked to change anything
+      And the repair is cleared
+
+    @unit
+    Scenario: The seat count a seat line reconciles to ignores the provider's own updates
+      Given a seat change set the seats to 6
+      And a provider update event then reported 3 seats
+      And the subscription records that its seat line should match its seat count
+      When the seat line repair runs
+      Then the payment provider changes the quantity to 6 with no proration
 
     @unit
     Scenario: Seat line writes give up well inside the lease

@@ -4596,7 +4596,10 @@ model Subscription {
   /// Seats paid for this period that stay usable after a seat decrease, until seatsKeptUntil.
   seatsKept             Int?
   seatsKeptUntil        DateTime?
-  /// The seat quantity Stripe should bill if a seat change stops after lifting the seat line; null once settled.
+  /// The seat quantity the last finished seat change set the seat line to; provider events never write it.
+  seatLineQuantity      Int?
+  /// The seat quantity Stripe should bill if a seat change stops after lifting the seat line; null with
+  /// seatRepairSince set means the line goes back to seatLineQuantity.
   seatRepairQuantity    Int?
   /// The quantity the change lifted the line to; the repair moves the line back only while Stripe still bills it.
   seatRepairLiftedQuantity Int?

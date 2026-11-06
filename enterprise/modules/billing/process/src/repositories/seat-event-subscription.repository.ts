@@ -14,15 +14,18 @@ export type SeatSubscriptionRow = {
 };
 
 /**
- * A seat line's way back, written before a seat change lifts it: Stripe should bill `quantity`,
- * and only while it still bills `liftedQuantity` is the line known to be this change's lift.
- * `since` tells one record from the next.
+ * A pending seat line repair; `since` tells one record from the next. A lift record (both counts
+ * set) moves the line to `quantity` only while Stripe still bills `liftedQuantity`. A reconcile
+ * record (both null) moves the line to the seat quantity the last finished seat change set.
  */
 export type SeatRepairRecord = {
-  quantity: number;
-  liftedQuantity: number;
+  quantity: number | null;
+  liftedQuantity: number | null;
   since: Instant;
 };
+
+/** The way back a seat change records before it lifts the line. */
+export type SeatLiftRecord = SeatRepairRecord & { quantity: number; liftedQuantity: number };
 
 /** A pending seat line repair with its subscription, as the repair pass reads it. */
 export type SeatRepairRow = SeatRepairRecord & {
@@ -50,8 +53,8 @@ export abstract class SeatEventSubscriptionRepository {
   /** Records the seats a decrease keeps before the provider lowers the line; the count stays. */
   abstract keepSeats(input: { id: string; kept: KeptSeats }): Promise<void>;
   /**
-   * Back to ACTIVE at the new seat count with the seats it keeps, any scheduled end cleared, and
-   * every repair recorded at or before `repairsUpTo` cleared: the change left the line right.
+   * Back to ACTIVE at the new seat count, which becomes the seat line's target, with the seats it
+   * keeps, any scheduled end cleared, and every repair recorded at or before `repairsUpTo` cleared.
    */
   abstract reactivateWithSeats(input: {
     id: string;
@@ -64,7 +67,11 @@ export abstract class SeatEventSubscriptionRepository {
     id: string;
     quantity: number;
     liftedQuantity: number;
-  }): Promise<SeatRepairRecord>;
+  }): Promise<SeatLiftRecord>;
+  /** Records that the line goes back to the last seat change's quantity, replacing any repair. */
+  abstract recordSeatLineReconcile(input: { id: string }): Promise<SeatRepairRecord>;
+  /** The seat quantity the last finished seat change set the line to, else the plan's seats. */
+  abstract findSeatLineTarget(input: { id: string }): Promise<number | null>;
   /** Every subscription with a seat line repair recorded before `recordedBefore`, oldest first. */
   abstract findSeatRepairs(input: { recordedBefore: Instant }): Promise<SeatRepairRow[]>;
   /** Whether `record` is still the subscription's pending repair. */

@@ -72,8 +72,8 @@ type MemoryBillingBudgetLedgerRow = {
 
 /** A pending seat line repair as the Subscription row's repair columns hold it. */
 type MemorySeatRepair = {
-  quantity: number;
-  liftedQuantity: number;
+  quantity: number | null;
+  liftedQuantity: number | null;
   since: Instant;
   attempts: number;
   flaggedAt: Instant | null;
@@ -100,6 +100,8 @@ export class MemoryBillingStore {
   readonly subscriptions: BillingSubscriptionRecord[] = [];
   /** The Subscription row's seat line repair columns, keyed by subscription id while one is pending. */
   readonly seatRepairs = new Map<string, MemorySeatRepair>();
+  /** The Subscription row's seatLineQuantity, keyed by subscription id once a seat change set it. */
+  readonly seatLineTargets = new Map<string, number>();
   /** The Subscription row's seat line lease columns, keyed by subscription id while one is held. */
   readonly seatLineLeases = new Map<string, { token: string; until: Instant }>();
   readonly checkpoints = new Map<string, BillingCheckpoint>();

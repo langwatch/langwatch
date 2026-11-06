@@ -9,6 +9,7 @@ import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
   type SeatLineClaim,
+  type SeatLiftRecord,
   type SeatRepairRecord,
   type SeatRepairRow,
   type SeatSubscriptionRow,
@@ -92,6 +93,7 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
       seatsKept: null,
       seatsKeptUntil: null,
     });
+    this.store.seatLineTargets.set(id, input.maxMembers);
     return { id };
   }
 
@@ -128,6 +130,7 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
       seatsKept: kept?.seats ?? null,
       seatsKeptUntil: kept?.until ?? null,
     };
+    this.store.seatLineTargets.set(id, maxMembers);
     const pending = this.store.seatRepairs.get(id);
     if (pending && Temporal.Instant.compare(pending.since, repairsUpTo) <= 0) {
       this.store.seatRepairs.delete(id);
@@ -142,7 +145,30 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
     id: string;
     quantity: number;
     liftedQuantity: number;
-  }): Promise<SeatRepairRecord> {
+  }): Promise<SeatLiftRecord> {
+    const since = this.writeSeatRepair({ id, quantity, liftedQuantity });
+    return { quantity, liftedQuantity, since };
+  }
+
+  async recordSeatLineReconcile({ id }: { id: string }): Promise<SeatRepairRecord> {
+    const since = this.writeSeatRepair({ id, quantity: null, liftedQuantity: null });
+    return { quantity: null, liftedQuantity: null, since };
+  }
+
+  async findSeatLineTarget({ id }: { id: string }): Promise<number | null> {
+    const subscription = this.store.subscriptions.find((row) => row.id === id);
+    return this.store.seatLineTargets.get(id) ?? subscription?.maxMembers ?? null;
+  }
+
+  private writeSeatRepair({
+    id,
+    quantity,
+    liftedQuantity,
+  }: {
+    id: string;
+    quantity: number | null;
+    liftedQuantity: number | null;
+  }): Instant {
     const since = Temporal.Instant.fromEpochMilliseconds(nowInstant().epochMilliseconds);
     this.store.seatRepairs.set(id, {
       quantity,
@@ -151,7 +177,7 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
       attempts: 0,
       flaggedAt: null,
     });
-    return { quantity, liftedQuantity, since };
+    return since;
   }
 
   async findSeatRepairs({ recordedBefore }: { recordedBefore: Instant }): Promise<SeatRepairRow[]> {

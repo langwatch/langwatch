@@ -10,6 +10,7 @@ import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
   type SeatLineClaim,
+  type SeatLiftRecord,
   type SeatRepairRecord,
   type SeatRepairRow,
   type SeatSubscriptionRow,
@@ -83,7 +84,7 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
     maxMembers: number;
   }): Promise<{ id: string }> {
     return this.prisma.subscription.create({
-      data: { ...input, status: "PENDING" },
+      data: { ...input, seatLineQuantity: input.maxMembers, status: "PENDING" },
       select: { id: true },
     });
   }
@@ -111,6 +112,7 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
       data: {
         status: "ACTIVE",
         maxMembers,
+        seatLineQuantity: maxMembers,
         endDate: null,
         seatsKept: kept?.seats ?? null,
         seatsKeptUntil: kept ? toDate(kept.until) : null,
@@ -130,7 +132,33 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
     id: string;
     quantity: number;
     liftedQuantity: number;
-  }): Promise<SeatRepairRecord> {
+  }): Promise<SeatLiftRecord> {
+    const since = await this.writeSeatRepair({ id, quantity, liftedQuantity });
+    return { quantity, liftedQuantity, since };
+  }
+
+  async recordSeatLineReconcile({ id }: { id: string }): Promise<SeatRepairRecord> {
+    const since = await this.writeSeatRepair({ id, quantity: null, liftedQuantity: null });
+    return { quantity: null, liftedQuantity: null, since };
+  }
+
+  async findSeatLineTarget({ id }: { id: string }): Promise<number | null> {
+    const row = await this.prisma.subscription.findUnique({
+      where: { id },
+      select: { seatLineQuantity: true, maxMembers: true },
+    });
+    return row?.seatLineQuantity ?? row?.maxMembers ?? null;
+  }
+
+  private async writeSeatRepair({
+    id,
+    quantity,
+    liftedQuantity,
+  }: {
+    id: string;
+    quantity: number | null;
+    liftedQuantity: number | null;
+  }): Promise<Instant> {
     // Whole milliseconds, as the column keeps them, so the record matches its row exactly.
     const since = fromDate(toDate(nowInstant()));
     await this.prisma.subscription.update({
@@ -143,14 +171,12 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
         seatRepairFlaggedAt: null,
       },
     });
-    return { quantity, liftedQuantity, since };
+    return since;
   }
 
   async findSeatRepairs({ recordedBefore }: { recordedBefore: Instant }): Promise<SeatRepairRow[]> {
     const rows = await this.prisma.subscription.findMany({
       where: {
-        seatRepairQuantity: { not: null },
-        seatRepairLiftedQuantity: { not: null },
         seatRepairSince: { lt: toDate(recordedBefore) },
         stripeSubscriptionId: { not: null },
       },
@@ -167,10 +193,7 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
       },
     });
     return rows.flatMap((row) =>
-      row.seatRepairQuantity !== null &&
-      row.seatRepairLiftedQuantity !== null &&
-      row.seatRepairSince !== null &&
-      row.stripeSubscriptionId !== null
+      row.seatRepairSince !== null && row.stripeSubscriptionId !== null
         ? [
             {
               id: row.id,

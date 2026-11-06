@@ -32,6 +32,14 @@ const { rows } = vi.hoisted(() => {
       },
       {
         ...base,
+        id: "sub-reconcile",
+        stripeSubscriptionId: "sub_stripe_reconcile",
+        seatRepairQuantity: null,
+        seatLineQuantity: 6,
+        seatRepairFlaggedAt: "2026-11-06T12:00:00.000Z",
+      },
+      {
+        ...base,
         id: "sub-retrying",
         stripeSubscriptionId: "sub_stripe_retrying",
         seatRepairQuantity: 4,
@@ -59,6 +67,7 @@ describe("Feature: Ops subscriptions list", () => {
       renderWithOpsHost(<SubscriptionsView />, { host: fakeOpsHost({ isOpsAdmin: true }) });
 
       expect(screen.getByText("Seat line needs repair: 3 seats")).toBeInTheDocument();
+      expect(screen.getByText("Seat line needs repair: 6 seats")).toBeInTheDocument();
       expect(screen.queryByText(/Seat line needs repair: 4/)).not.toBeInTheDocument();
     });
   });

@@ -37,9 +37,9 @@ export type SeatLineRepairOutcome = {
 };
 
 /**
- * Puts a line a seat change left lifted back to the recorded quantity with no proration
- * (specs/licensing/seat-rotation.feature). Only a line still at the recorded lift moves; any other
- * count is a charge that went through or a later change, cleared without touching Stripe.
+ * Puts a seat line right with no proration (specs/licensing/seat-rotation.feature). A lift record
+ * moves only a line still at the recorded lift; any other count is a charge that went through or a
+ * later change, cleared untouched. A reconcile record moves the line to the last change's count.
  */
 export class SeatLineRepairService {
   private readonly stripeSubscriptions: Pick<
@@ -117,25 +117,29 @@ export class SeatLineRepairService {
     });
     if (ENDED_STATUSES.has(subscription.status)) return "settled";
     const seatItem = this.seatItemOf(subscription);
-    if (seatItem.quantity !== repair.liftedQuantity) return "settled";
+    if (repair.liftedQuantity !== null && seatItem.quantity !== repair.liftedQuantity) {
+      return "settled";
+    }
+    const quantity = repair.quantity ?? (await this.seatLineTarget(repair.id));
+    if (seatItem.quantity === quantity) return "settled";
     if (UNCHANGEABLE_STATUSES.has(subscription.status)) return "pending";
-    const subscriptionId = repair.stripeSubscriptionId;
     await guard.write({
-      quantity: repair.quantity,
+      quantity,
       send: () =>
         this.stripeSubscriptions.updateSubscription({
-          subscriptionId,
-          change: {
-            items: [{ id: seatItem.id, quantity: repair.quantity }],
-            prorationBehavior: "none",
-          },
+          subscriptionId: repair.stripeSubscriptionId,
+          change: { items: [{ id: seatItem.id, quantity }], prorationBehavior: "none" },
           timeoutMs: SEAT_LINE_WRITE_TIMEOUT_MS,
         }),
-      readQuantity: async () =>
-        this.seatItemOf(await this.stripeSubscriptions.getSubscription({ subscriptionId }))
-          .quantity,
     });
     return "settled";
+  }
+
+  /** The seat count a reconcile puts the line to; with none known the repair fails toward Ops. */
+  private async seatLineTarget(id: string): Promise<number> {
+    const target = await this.subscriptions.findSeatLineTarget({ id });
+    if (target === null) throw new Error("The subscription has no seat count to reconcile to");
+    return target;
   }
 
   private seatItemOf(subscription: BillingSubscription) {

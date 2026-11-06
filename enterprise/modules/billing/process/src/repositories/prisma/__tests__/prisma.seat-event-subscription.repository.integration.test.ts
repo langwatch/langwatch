@@ -145,6 +145,30 @@ describe.skipIf(!DB_URL)("PrismaSeatEventSubscriptionRepository seat line repair
     expect(await pendingOfRun()).toEqual([]);
   });
 
+  /** @scenario "The seat count a seat line reconciles to ignores the provider's own updates" */
+  it("records a reconcile and reads the seat change's count as its target", async () => {
+    const id = await seed("reconcile");
+    expect(await subscriptions.findSeatLineTarget({ id })).toBe(3);
+
+    await subscriptions.reactivateWithSeats({
+      id,
+      maxMembers: 6,
+      kept: null,
+      repairsUpTo: Temporal.Now.instant(),
+    });
+    // A provider update event writes maxMembers only; the target stays the change's count.
+    await prisma.subscription.update({ where: { id }, data: { maxMembers: 3 } });
+    expect(await subscriptions.findSeatLineTarget({ id })).toBe(6);
+
+    const record = await subscriptions.recordSeatLineReconcile({ id });
+    expect(await pendingOfRun()).toEqual([
+      expect.objectContaining({ id, quantity: null, liftedQuantity: null, since: record.since }),
+    ]);
+    expect(await subscriptions.isSeatRepairPending({ id, record })).toBe(true);
+    await subscriptions.clearSeatRepair({ id, record });
+    expect(await pendingOfRun()).toEqual([]);
+  });
+
   /** @scenario "A seat line repair skips a subscription a seat change is working on" */
   it("lets one holder take, renew and release the seat line until the lease runs out", async () => {
     const id = await seed("lease");

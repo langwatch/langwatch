@@ -59,6 +59,8 @@ const createMockSubscriptions = (): {
   keepSeats: vi.fn(),
   reactivateWithSeats: vi.fn(),
   recordSeatRepair: vi.fn(),
+  recordSeatLineReconcile: vi.fn(),
+  findSeatLineTarget: vi.fn().mockResolvedValue(null),
   findSeatRepairs: vi.fn().mockResolvedValue([]),
   isSeatRepairPending: vi.fn().mockResolvedValue(false),
   claimSeatLine: vi.fn().mockResolvedValue({ claimed: true, token: "lease_1" }),

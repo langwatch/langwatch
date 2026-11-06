@@ -18752,13 +18752,22 @@
           "documentation": ""
         },
         {
+          "name": "seatLineQuantity",
+          "columnName": "seatLineQuantity",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The seat quantity the last finished seat change set the seat line to; provider events never write it."
+        },
+        {
           "name": "seatRepairQuantity",
           "columnName": "seatRepairQuantity",
           "type": "Int",
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "The seat quantity Stripe should bill if a seat change stops after lifting the seat line; null once settled."
+          "documentation": "The seat quantity Stripe should bill if a seat change stops after lifting the seat line; null with\nseatRepairSince set means the line goes back to seatLineQuantity."
         },
         {
           "name": "seatRepairLiftedQuantity",

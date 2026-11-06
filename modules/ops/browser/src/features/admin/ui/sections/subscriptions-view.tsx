@@ -56,6 +56,8 @@ interface AdminSubscription {
   maxAutomations: number | null;
   /** The seat quantity billing could not put back at Stripe, flagged once its retries ran out. */
   seatRepairQuantity?: number | null;
+  /** The seat quantity the last seat change set; a repair with no quantity puts the line to it. */
+  seatLineQuantity?: number | null;
   seatRepairFlaggedAt?: string | null;
   organization?: { id: string; name: string; slug: string };
   createdAt: string;
@@ -232,7 +234,8 @@ export default function SubscriptionsView() {
 
 /** Billing's flag for a seat line Stripe still bills wrong after its repair retries. */
 function SeatRepairBadge({ subscription }: { subscription: AdminSubscription }) {
-  const quantity = subscription.seatRepairQuantity;
+  const quantity =
+    subscription.seatRepairQuantity ?? subscription.seatLineQuantity ?? subscription.maxMembers;
   if (!subscription.seatRepairFlaggedAt || quantity == null) return null;
   return (
     <Badge size="sm" colorPalette="red">

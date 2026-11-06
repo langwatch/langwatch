@@ -8,7 +8,6 @@ import {
   type StripePriceMap,
 } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi, LicenseStatus } from "@langwatch/enterprise-licensing-contract";
-import type * as Observability from "@langwatch/observability";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type Stripe from "stripe";
@@ -60,19 +59,6 @@ const PROVIDER_AT_THREE = {
   ended_at: null,
   items: { data: [{ price: { id: prices.GROWTH_SEAT_EUR_MONTHLY }, quantity: 3 }] },
 } as Stripe.Subscription;
-
-const leaseLog = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn() }));
-
-vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual = await importOriginal<typeof Observability>();
-  return {
-    ...actual,
-    createLogger: (name: string) =>
-      name === "langwatch:billing:seatLineLease"
-        ? { ...leaseLog, info: vi.fn(), debug: vi.fn() }
-        : actual.createLogger(name),
-  };
-});
 
 describe("Growth seat changes", () => {
   let store: MemoryBillingStore;
@@ -502,8 +488,8 @@ describe("Growth seat changes", () => {
       vi.setSystemTime(NOW.add({ milliseconds: SEAT_REPAIR_GRACE_MS + 1 }).epochMilliseconds);
     });
 
-    /** @scenario "A seat line repair whose write lands after a seat change took its lease reports it" */
-    it("reports a write that landed after a seat change took its lease", async () => {
+    /** @scenario "A seat line write that lands after a seat change took its lease is put right" */
+    it("records a reconcile for a late write and the next pass restores the newer count", async () => {
       const send = stripeSubscriptions.updateSubscription.bind(stripeSubscriptions);
       const stall = { resume: () => {} };
       const writes = vi
@@ -519,21 +505,28 @@ describe("Growth seat changes", () => {
       expect(writes).toHaveBeenCalledTimes(1);
       vi.setSystemTime(Date.now() + SEAT_LINE_LEASE_MS + 1);
       await seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 });
-      const changeWrites = stripeSubscriptions.updates.length;
+      expect(stripeSubscriptions.updates.length).toBeGreaterThan(0);
 
       stall.resume();
 
       expect(await repairing).toMatchObject({ repaired: 0, pending: 1, failed: 0 });
-      expect(changeWrites).toBeGreaterThan(0);
       expect(stripeSubscriptions.updates.at(-1)?.change).toEqual({
         items: [{ id: "si_seat", quantity: 3 }],
         prorationBehavior: "none",
       });
-      expect(leaseLog.error).toHaveBeenCalledWith(
-        { subscriptionId: "sub_db_1", quantity: 3 },
-        expect.stringContaining("may have been overwritten"),
-      );
+      expect(store.seatRepairs.get("sub_db_1")).toMatchObject({
+        quantity: null,
+        liftedQuantity: null,
+      });
       writes.mockRestore();
+      stripeSubscriptions.updates.length = 0;
+
+      vi.setSystemTime(Date.now() + SEAT_REPAIR_GRACE_MS + 1);
+      expect(await repairs.repairSeatLines()).toMatchObject({ repaired: 1, failed: 0 });
+      expect(stripeSubscriptions.updates.map((update) => update.change)).toEqual([
+        { items: [{ id: "si_seat", quantity: 6 }], prorationBehavior: "none" },
+      ]);
+      expect(store.seatRepairs.size).toBe(0);
     });
 
     /** @scenario "Seat line writes give up well inside the lease" */
@@ -775,6 +768,49 @@ describe("Growth seat changes", () => {
       ]);
     });
   });
+  describe("when a seat line is recorded to match its seat count", () => {
+    let repairs: SeatLineRepairService;
+    let repository: MemorySeatEventSubscriptionRepository;
+
+    beforeEach(async () => {
+      await seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 });
+      seedProvider(6);
+      stripeSubscriptions.updates.length = 0;
+      repository = MemorySeatEventSubscriptionRepository.create(store);
+      repairs = SeatLineRepairService.create({
+        stripeSubscriptions,
+        subscriptions: repository,
+        prices,
+      });
+    });
+
+    /** @scenario "A seat line already at the seat count clears its reconcile without a change" */
+    it("clears the reconcile without a change when Stripe bills the seat count", async () => {
+      await repository.recordSeatLineReconcile({ id: "sub_db_1" });
+      vi.setSystemTime(Date.now() + SEAT_REPAIR_GRACE_MS + 1);
+
+      expect(await repairs.repairSeatLines()).toMatchObject({ repaired: 1 });
+      expect(stripeSubscriptions.updates).toHaveLength(0);
+      expect(store.seatRepairs.size).toBe(0);
+    });
+
+    /** @scenario "The seat count a seat line reconciles to ignores the provider's own updates" */
+    it("reconciles to the seat change's count after a provider event reported another", async () => {
+      seedProvider(3);
+      const synced = lifecycle.handleSubscriptionUpdated({ subscription: PROVIDER_AT_THREE });
+      await vi.advanceTimersByTimeAsync(2000);
+      await synced;
+      expect(store.subscriptions[0]?.maxMembers).toBe(3);
+      await repository.recordSeatLineReconcile({ id: "sub_db_1" });
+      vi.setSystemTime(Date.now() + SEAT_REPAIR_GRACE_MS + 1);
+
+      expect(await repairs.repairSeatLines()).toMatchObject({ repaired: 1 });
+      expect(stripeSubscriptions.updates.map((update) => update.change)).toEqual([
+        { items: [{ id: "si_seat", quantity: 6 }], prorationBehavior: "none" },
+      ]);
+    });
+  });
+
   describe("when a seat change stops after it lifted the seat line", () => {
     let repairs: SeatLineRepairService;
 

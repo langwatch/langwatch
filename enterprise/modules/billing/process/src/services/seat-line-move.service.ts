@@ -4,7 +4,7 @@ import { type Instant, nowInstant } from "@langwatch/time";
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type {
   SeatEventSubscriptionRepository,
-  SeatRepairRecord,
+  SeatLiftRecord,
 } from "../repositories/seat-event-subscription.repository.ts";
 import type {
   BillingSubscription,
@@ -93,10 +93,6 @@ export class SeatLineMoveService {
             }),
             timeoutMs: SEAT_LINE_WRITE_TIMEOUT_MS,
           }),
-        readQuantity: async () => {
-          const current = await this.stripeSubscriptions.getSubscription({ subscriptionId });
-          return current.items.find((item) => item.id === seatItem.id)?.quantity;
-        },
       });
 
     let lifted = false;
@@ -124,7 +120,7 @@ export class SeatLineMoveService {
   }: {
     id: string;
     organizationId: string;
-    record: SeatRepairRecord;
+    record: SeatLiftRecord;
     moveTo: (quantity: number, prorationBehavior: "none") => Promise<unknown>;
   }): Promise<void> {
     try {
