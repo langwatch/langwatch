@@ -46,6 +46,10 @@ class TestBillingHost extends BillingHostApi {
     return "test-team-id";
   }
 
+  canInviteMembers(): boolean {
+    return true;
+  }
+
   routeQuery(): Readonly<Record<string, string | undefined>> {
     return {};
   }
@@ -63,6 +67,10 @@ class TestBillingHost extends BillingHostApi {
   }
 
   navigate(to: string): void {
+    this.navigations.push(to);
+  }
+
+  replace(to: string): void {
     this.navigations.push(to);
   }
 
@@ -229,14 +237,14 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.queryByTestId("tiered-pricing-alert")).not.toBeInTheDocument();
       });
 
-      it("hides upgrade plan block on free plan without seat changes", async () => {
+      it("offers the upgrade plan block on free plan without seat changes", async () => {
         renderSubscriptionPage();
 
         await waitFor(() => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
 
-        expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
+        expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
       });
 
       it("shows legacy paid plan name as current plan title", async () => {

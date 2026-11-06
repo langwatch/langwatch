@@ -29,7 +29,7 @@ describe("useInstantEvalAccess", () => {
     /** @scenario "The search bar takes release from the server, never from its own read of the flag" */
     it("is not available though the browser's flag read says on, and offers what the server names", () => {
       accessQueryMock.mockReturnValue({
-        data: { released: false, offer: "enable", viaConnect: false },
+        data: { released: false, hostedReleased: false, offer: "enable", viaConnect: false },
         isLoading: false,
       });
 
@@ -46,7 +46,7 @@ describe("useInstantEvalAccess", () => {
   describe("given the server says the project is released", () => {
     it("is available", () => {
       accessQueryMock.mockReturnValue({
-        data: { released: true, offer: "enable", viaConnect: false },
+        data: { released: true, hostedReleased: true, offer: "enable", viaConnect: false },
         isLoading: false,
       });
 
