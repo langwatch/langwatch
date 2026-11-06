@@ -22,7 +22,8 @@ export const authzWeb = defineBrowserModule("authz")
       path: "/settings/roles",
       within: "settings",
       label: "Roles & access",
-      requires: "organization:manage",
+      // Every role reads it; its edits ask organization:manage on their own.
+      requires: "members:view",
       load: () => import("./ui/sections/roles.screen.tsx"),
     },
   });
