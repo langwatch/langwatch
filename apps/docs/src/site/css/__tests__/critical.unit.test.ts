@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { criticalCss, markupNames, scriptedNames } from "../critical.ts";
-import { inlinePageStyles, styleHead } from "../page-styles.ts";
+import { inlinePageStyles } from "../page-styles.ts";
 import { parseStylesheet, serializeStylesheet } from "../stylesheet.ts";
 
 const SHEET = [
