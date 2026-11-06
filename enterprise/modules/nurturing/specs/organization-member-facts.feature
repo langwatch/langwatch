@@ -180,6 +180,12 @@ Feature: An organization's session facts reach every active member in Customer.i
     Then joined_organization is tracked once, and joined_via_sso is still tracked
 
   @unit
+  Scenario: A joined_organization that failed to send is tracked on the person's next join
+    Given the joined_organization track for the person and org-1 failed
+    When the person's next join signal for org-1 is delivered
+    Then joined_organization is tracked once, and not again after that
+
+  @unit
   Scenario: A join from before joined_organization existed is not tracked as it
     Given an invite_accepted signal for org-1 that occurred before 2026-11-06
     When the signal is delivered

@@ -75,6 +75,13 @@ const DELIVERED_WINDOW_SECONDS = 7 * 24 * 60 * 60;
 /** A person joins an organization once, so this outlives any realistic replay of the join. */
 const JOINED_WINDOW_SECONDS = 365 * 24 * 60 * 60;
 
+/** The person-and-organization slot that lets joined_organization go out once. */
+function joinedOrganizationClaimKey(
+  signal: Pick<NurturingSignalOf<"invite_accepted">, "userId" | "organizationId">,
+): string {
+  return `nurturing:joined_organization:${signal.userId}:${signal.organizationId}`;
+}
+
 /**
  * Sends each recorded signal once, as main sent it: Customer.io through the
  * moved billing rules, PostHog as main's trackServerEvent. A sink that fails
@@ -245,7 +252,7 @@ export class NurturingDeliveryService {
     deliveredClaim: string;
   }): Promise<boolean> {
     if (signal.kind !== "invite_accepted" && signal.kind !== "sso_auto_added") return true;
-    const key = `nurturing:joined_organization:${signal.userId}:${signal.organizationId}`;
+    const key = joinedOrganizationClaimKey(signal);
     try {
       return await this.deps.claims.claim(key, JOINED_WINDOW_SECONDS);
     } catch (error) {
@@ -257,6 +264,23 @@ export class NurturingDeliveryService {
     }
   }
 
+  /**
+   * A joined_organization that failed to send gives its person-and-organization slot back, so the
+   * next join signal of theirs can send it; the slot stays held after a success.
+   */
+  private giveBackJoinOnFailure(
+    signal: Pick<NurturingSignalOf<"invite_accepted">, "userId" | "organizationId">,
+  ): (call: Extract<CioBatchCall, { type: "track" }>) => void {
+    return (call) => {
+      if (call.event !== "joined_organization") return;
+      void NurturingClaimReleaseService.create(this.deps.claims)
+        .releasedAll([joinedOrganizationClaimKey(signal)])
+        .then((released) => {
+          if (released.length > 0) reportFailure(new AggregateError(released));
+        });
+    };
+  }
+
   /** True when this signal's debounce window already sent for its tenant or person. */
   private async withinCustomerIoDebounce(signal: NurturingSignal): Promise<boolean> {
     const debounce = pickCustomerIoDebounce(signal);
@@ -265,7 +289,10 @@ export class NurturingDeliveryService {
   }
 
   /** Runs a rule's decision against the configured Customer.io sink, one call at a time. */
-  private sendCustomerIoCalls(calls: CioBatchCall[]): void {
+  private sendCustomerIoCalls(
+    calls: CioBatchCall[],
+    onTrackFailed?: (call: Extract<CioBatchCall, { type: "track" }>) => void,
+  ): void {
     const nurturing = this.deps.customerIo;
     if (!nurturing) return;
     for (const call of calls) {
@@ -283,7 +310,10 @@ export class NurturingDeliveryService {
               properties: call.properties,
               messageId: call.messageId,
             })
-            .catch(reportFailure);
+            .catch((error: unknown) => {
+              reportFailure(error);
+              onTrackFailed?.(call);
+            });
           break;
         case "group":
           void nurturing
@@ -328,11 +358,13 @@ export class NurturingDeliveryService {
         return this.sendWithTraces({
           ...signal,
           callsFor: (traces) => fireInviteAccepted({ signal, traces, firstJoin }),
+          onTrackFailed: this.giveBackJoinOnFailure(signal),
         });
       case "sso_auto_added":
         return this.sendWithTraces({
           ...signal,
           callsFor: (traces) => fireSsoAutoAdded({ signal, traces, firstJoin }),
+          onTrackFailed: this.giveBackJoinOnFailure(signal),
         });
       case "session_started":
         return this.sendCustomerIoCalls(fireActivity(signal));
@@ -376,13 +408,15 @@ export class NurturingDeliveryService {
     userId,
     organizationId,
     callsFor,
+    onTrackFailed,
   }: {
     userId: string;
     organizationId: string;
     callsFor: (traces: KnownTraces | null) => CioBatchCall[];
+    onTrackFailed?: (call: Extract<CioBatchCall, { type: "track" }>) => void;
   }): void {
     void this.tracesOrNull({ userId, organizationId })
-      .then((traces) => this.sendCustomerIoCalls(callsFor(traces)))
+      .then((traces) => this.sendCustomerIoCalls(callsFor(traces), onTrackFailed))
       .catch(reportFailure);
   }
 
