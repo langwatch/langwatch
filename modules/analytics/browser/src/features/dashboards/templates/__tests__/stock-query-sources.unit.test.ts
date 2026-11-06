@@ -77,6 +77,47 @@ describe("given a stock query over a view that names only a row's trace", () => 
   );
 });
 
+describe("given a stock query that scans further back than the period start", () => {
+  const start = "{dashboard_context_period_start:DateTime}";
+  const end = "{dashboard_context_period_end:DateTime}";
+  const window = `subtractDays(subtractSeconds(${start}, dateDiff('second', ${start}, ${end})), 1)`;
+  const scanning = (from: string) =>
+    readSources(`SELECT 1 FROM traces WHERE OccurredAt >= ${from} AND OccurredAt < ${end}`);
+
+  /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
+  it("reaches each lookup back N days when the query subtracts N days from the start", () => {
+    const sql = scanning(`subtractDays(${start}, 90)`);
+
+    for (const form of ["NOT IN", "IN"]) {
+      expect(sql).toContain(
+        ` Source ${form} ${SOURCES} AND OccurredAt >= ` +
+          `least(${window}, subtractDays(${start}, 90)))`,
+      );
+    }
+  });
+
+  /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
+  it("keeps the window bound when the query subtracts no more than a day", () => {
+    for (const from of [start, `subtractDays(${start}, 1)`]) {
+      const sql = scanning(from);
+
+      expect(sql).toContain(` Source NOT IN ${SOURCES} AND OccurredAt >= ${window})`);
+      expect(sql).not.toContain("least(");
+    }
+  });
+
+  /** @scenario "AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace" */
+  it("reaches back the most days when the query subtracts several", () => {
+    const sql = readSources(
+      `SELECT countIf(OccurredAt >= subtractDays(${start}, 30)) AS n FROM traces ` +
+        `WHERE OccurredAt >= subtractDays(${start}, 90) AND OccurredAt < ${end}`,
+    );
+
+    expect(sql).toContain(`least(${window}, subtractDays(${start}, 90)))`);
+    expect(sql).not.toContain(`least(${window}, subtractDays(${start}, 30))`);
+  });
+});
+
 describe("given a query over a view that keeps an origin", () => {
   /** @scenario "AC202 Stock widgets: every stock query that names an origin-bearing view reads the sources parameter" */
   it("adds the condition to an existing WHERE, parenthesising what was there", () => {

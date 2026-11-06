@@ -1966,7 +1966,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit @integration
   Scenario: AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace
-    # Changed (2026-11-06): a list without "application" now keeps only its own sources' traces.
+    # Changed (2026-11-06): a list without "application" now keeps only its own sources' traces,
+    # and the lookup reaches as far back as the query scans.
     Given spans of a trace with no trace_metrics row, of an application trace, of a Langy trace and of a simulation trace
     When a stock query over `traces` or `spans` reads those rows through their trace, bound to ["application"]
     Then it counts the trace with no row and the application trace, and neither of the others
@@ -1975,8 +1976,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And a list without "application", such as ["langy"], keeps the traces of its sources and not the trace with no row
     And a source name no trace has keeps no trace
     And an empty list keeps no trace
-    And under a list that holds "application", a span of a trace older than the lookup's bound counts, whatever the trace's source
-    And under a list that holds "application", a trace older than the lookup's bound counts, whatever its source, so a query that scans further back than the lookup, such as the prompt versions in the changes widget, sees those traces
+    And the lookup reaches as far back as the query scans: one window back plus a day, or N days when the query scans from "subtractDays({dashboard_context_period_start:DateTime}, N)" and N days reach further
+    And so a trace the query scans counts by its own source, such as an older prompt version's trace in the changes widget, which scans 90 days back
+    And under a list that holds "application", a trace or span older than the lookup's bound counts, whatever the trace's source, but no stock query scans that far back
     And a trace with a trace_metrics row of "application" and one of another source counts under a list of that other source, and not under ["application"]
     # Why: on a large project the application traces are most of them, so the set of other sources'
     # traces is the small one while the list holds application, and the set of the list's traces is

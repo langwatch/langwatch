@@ -1,6 +1,6 @@
 # ADR-003: A LangWatchQL statement counts the trace origins it reads from a reserved parameter
 
-**Date:** 2026-10-09 (rewritten 2026-10-29, trace lookup revised 2026-11-06)
+**Date:** 2026-10-09 (rewritten 2026-10-29, trace lookup and its bound revised 2026-11-06)
 
 **Status:** Accepted
 
@@ -62,12 +62,12 @@ While the list holds `application`, the widget leaves out the traces of the othe
 large project those are the small set; the chosen ones took 30-day trace-list widgets over the query
 memory limit. A trace with no `trace_metrics` row is an unstamped trace, which is `application`'s,
 so it counts. Until its row is written, a brand-new trace of another source also has no row, so it
-counts too while the list holds `application`. So does a trace older than the lookup's bound,
-whatever its source. While the list leaves `application` out, the widget keeps the traces of the
-list, and a trace with no row drops. Measured on prod, 30 days, one large project, a limit of about
-1 GB: under `['application']` the excluded set used 571 MB where the included set failed at the
-limit; under `['langy']` the excluded set used 937 MB where the included set used 40 MB. Those
-figures are for the old single forms; the combined form is not yet measured on prod.
+counts too while the list holds `application`. While the list leaves `application` out, the widget
+keeps the traces of the list, and a trace with no row drops. Measured on prod, 30 days, one large
+project, a limit of about 1 GB: under `['application']` the excluded set used 571 MB where the
+included set failed at the limit; under `['langy']` the excluded set used 937 MB where the included
+set used 40 MB. Those figures are for the old single forms; the combined form is not yet measured
+on prod.
 
 Why the switch sits inside each subquery: the list is bound at run time, so the SQL cannot choose
 its form. An outer `if`, `AND` or `OR` round two subqueries may not stop either set being built: a
@@ -77,12 +77,20 @@ WHERE starts with a condition on the bound list alone, a constant, so the side t
 reads to no row and its set is empty. Only one set ever holds rows. No `notEmpty` guard is needed:
 an empty list fills neither set, so `has` is false, the `IN` is false, and no row is kept.
 
-Consequences: while the list holds `application`, traces older than the bound count whatever their
-source. For the changes widget, which scans traces 90 days back, an older application prompt no
-longer reads as new, and a prompt used earlier only by another source can read as not new. While it
-does not, a trace older than the bound drops, as an evaluation does. A trace with rows of two
-sources (its anchor moved) drops under either source alone while the list holds `application`, and
-counts under either one while it does not.
+The bound reaches as far back as the query scans, so every trace a query scans counts by its own
+source. It is one window back plus a day, which covers a query that compares with the previous
+period. A query that scans from `subtractDays({dashboard_context_period_start:DateTime}, N)` with a
+literal `N` gets `least(<one window back plus a day>, subtractDays(<period start>, N))`, the largest
+`N` when it has several; one day or less adds nothing. The changes widgets (`ck-trend`,
+`ext-cost-per-doc`) scan 90 days, so a prompt used earlier only by a Langy trace reads as new
+under `['application']` and as not new under `['langy']`. A trace older than the bound is outside
+the query's scan too. The lookup alone would count it while the list holds `application` and drop
+it while it does not, as it drops an evaluation.
+
+Consequences: a trace with rows of two sources (its anchor moved) drops under either source alone
+while the list holds `application`, and counts under either one while it does not. Each stock query
+over `traces` or `spans` returns the rows of the single lookup, apart from those traces and the
+traces with no row (`lwql-sources-row-equality.integration.test.ts`).
 
 `evaluations` and `annotations` keep `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM
 trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)})`. Their trace id can be

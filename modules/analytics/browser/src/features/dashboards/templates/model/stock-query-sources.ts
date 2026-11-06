@@ -73,14 +73,25 @@ const TOKEN =
 
 type Insertion = { after: number; text: string };
 
-/** Bounds the trace lookup by the period, one window back plus a day, so it prunes by time. */
+/** The days a query scans back from the period start, as `subtractDays(start, N)` literals. */
+const DAYS_BEFORE_START =
+  /subtractDays\(\{dashboard_context_period_start:DateTime\},\s*(\d+)\s*\)/g;
+
+/**
+ * Bounds the trace lookup by the period, so it prunes by time, as far back as the query scans:
+ * one window back plus a day, or the most days the query subtracts from the period start when
+ * that reaches further. One day or less never does. Why: analytics ADR-003.
+ */
 function lookupBound(sql: string): string {
   if (!sql.includes(PERIOD_START) || !sql.includes(PERIOD_END)) return "";
 
-  return (
-    ` AND OccurredAt >= subtractDays(subtractSeconds(${PERIOD_START}, ` +
-    `dateDiff('second', ${PERIOD_START}, ${PERIOD_END})), 1)`
-  );
+  const oneWindowBack =
+    `subtractDays(subtractSeconds(${PERIOD_START}, ` +
+    `dateDiff('second', ${PERIOD_START}, ${PERIOD_END})), 1)`;
+  const days = Math.max(0, ...[...sql.matchAll(DAYS_BEFORE_START)].map(([, n]) => Number(n)));
+  if (days <= 1) return ` AND OccurredAt >= ${oneWindowBack}`;
+
+  return ` AND OccurredAt >= least(${oneWindowBack}, subtractDays(${PERIOD_START}, ${days}))`;
 }
 
 const isSpace = (token: string) => /^\s+$/.test(token);
