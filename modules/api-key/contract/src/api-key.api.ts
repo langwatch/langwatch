@@ -266,6 +266,19 @@ export interface ApiKeyApi {
     by: ApiKeyManagementCaller,
   ): Promise<NamedApiKeyBinding[]>;
   /**
+   * What a restricted key bound to every one of these scopes may carry: what the owner (else
+   * the caller) holds at each, by the mint's own resolver, so group grants count. Only an
+   * organization admin may ask about another owner.
+   */
+  listGrantablePermissions(
+    input: {
+      organizationId: string;
+      scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+      ownerUserId?: string;
+    },
+    by: ApiKeyManagementCaller,
+  ): Promise<string[]>;
+  /**
    * One key id resolved to a display name. Answers null identically for an id
    * that does not exist and one in another organization, so it cannot enumerate.
    */
@@ -290,6 +303,14 @@ export interface ApiKeyApi {
     input: { organizationId: string; apiKeyId: string },
     by: ApiKeyManagementCaller,
   ): Promise<void>;
+  /**
+   * Swaps a key's secret for a new one, keeping its id, settings and grants, and answers the new
+   * token once. The old secret is refused at once: there is no grace period.
+   */
+  rotateKey(
+    input: { organizationId: string; apiKeyId: string },
+    by: ApiKeyManagementCaller,
+  ): Promise<{ token: string; apiKey: ApiKey }>;
   listOrganizationProjects(
     input: { organizationId: string },
     by: ApiKeyManagementCaller,

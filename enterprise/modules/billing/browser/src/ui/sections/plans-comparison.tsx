@@ -31,6 +31,7 @@ import {
   getGrowthPlanFeatures,
 } from "../../model/billing-plans.ts";
 import type { BillingPricingService } from "../../model/billing-pricing.service.ts";
+import { checkoutIntentHref } from "../../model/checkout-intent.ts";
 import {
   type ComparisonPlanId,
   resolveCurrentComparisonPlan,
@@ -115,9 +116,13 @@ function getPlanPrice({
 function PlanCardActions({
   plan,
   currentPlan,
+  currency,
+  billingPeriod,
 }: {
   plan: PlanColumn;
   currentPlan: ComparisonPlanId | null;
+  currency: Currency;
+  billingPeriod: BillingInterval;
 }) {
   if (plan.id === "free") {
     return null;
@@ -136,7 +141,7 @@ function PlanCardActions({
 
     return (
       <Button asChild width="full" colorPalette="orange" variant="solid">
-        <Link unstyled href="/settings/subscription">
+        <Link unstyled href={checkoutIntentHref({ interval: billingPeriod, currency })}>
           Upgrade now
         </Link>
       </Button>
@@ -207,7 +212,12 @@ function PlanCard({
         </VStack>
 
         <VStack width="full" marginTop="auto" paddingTop={4}>
-          <PlanCardActions plan={plan} currentPlan={currentPlan} />
+          <PlanCardActions
+            plan={plan}
+            currentPlan={currentPlan}
+            currency={currency}
+            billingPeriod={billingPeriod}
+          />
         </VStack>
       </VStack>
     </Card>
