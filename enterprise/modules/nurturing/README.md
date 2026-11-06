@@ -11,7 +11,7 @@ Product analytics and lifecycle messaging: every owner tells nurturing through a
 | Classification | enterprise (`modules/catalogue.json`)                                                                          |
 | Subjects       | nurturing, product-milestone                                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md)                                                            |
-| Api token      | `NurturingApi` = `moduleApi<NurturingApi>()("nurturing")`, `contract/src/nurturing-types.ts:208` (1 operation) |
+| Api token      | `NurturingApi` = `moduleApi<NurturingApi>()("nurturing")`, `contract/src/nurturing-types.ts:212` (1 operation) |
 | Installed by   | api, worker, tasks (process)                                                                                   |
 
 ## What nurturing owns
@@ -20,7 +20,7 @@ Product analytics and lifecycle messaging: every owner tells nurturing through a
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | Postgres table                 | `NurturingOrganization`                                                                                                                       | `process/src/repositories/prisma/prisma.nurturing-milestones.repository.ts:31`        |
 | Postgres, accessed not claimed | `Organization`, `Project`, `Team`                                                                                                             | `process/src/repositories/prisma/prisma.nurturing-project-directory.repository.ts:12` |
-| Stores required                |                                                                                                                                               | `process/src/channels/http/http.customer-io.channel.ts:19`                            |
+| Stores required                |                                                                                                                                               | `process/src/channels/http/http.customer-io.channel.ts:20`                            |
 | Stores required                |                                                                                                                                               | `process/src/channels/http/http.nurturing.channels.ts:13`                             |
 | Stores required                | prisma, redis                                                                                                                                 | `process/src/repositories/live/live.nurturing.repositories.ts:11`                     |
 | Stores required                | ≈ `ownedRepositories.requires`                                                                                                                | `process/src/repositories/prisma/prisma.nurturing.repositories.ts:16`                 |

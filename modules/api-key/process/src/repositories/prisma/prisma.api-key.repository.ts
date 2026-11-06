@@ -1,4 +1,5 @@
 import {
+  ApiKeyAlreadyRevokedError,
   CLI_LOGIN_KEY_NAME_PREFIX,
   HIDDEN_SYSTEM_KEY_NAMES,
   RESERVED_SYSTEM_KEY_NAMES,
@@ -120,6 +121,25 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
     return this.database.apiKey.findUniqueOrThrow({
       where: { id: input.id },
     });
+  }
+  /** SQL for the same reason as `revoke`: the fence must be re-checked under the row lock. */
+  async rotateSecret(input: {
+    id: string;
+    organizationId: string;
+    lookupId: string;
+    hashedSecret: string;
+  }): Promise<ApiKeyRow> {
+    const rotated = await this.database.$executeRaw`
+      UPDATE "ApiKey"
+         SET "lookupId" = ${input.lookupId},
+             "hashedSecret" = ${input.hashedSecret},
+             "updatedAt" = now()
+       WHERE "id" = ${input.id}
+         AND "organizationId" = ${input.organizationId}
+         AND "revokedAt" IS NULL
+    `;
+    if (rotated === 0) throw new ApiKeyAlreadyRevokedError(input.id);
+    return this.database.apiKey.findUniqueOrThrow({ where: { id: input.id } });
   }
   async updateLastUsedAt(input: { id: string }): Promise<void> {
     await this.update({ id: input.id, lastUsedAt: nowInstant() });

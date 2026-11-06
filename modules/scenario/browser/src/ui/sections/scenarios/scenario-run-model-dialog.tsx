@@ -5,8 +5,8 @@ import { SimulationModelSelect } from "./simulation-model-select.tsx";
 
 /**
  * Shown after the user picks a target in the scenario "Save and run" flow. Lets them
- * choose the user-simulator and judge models for the run; both default to the project's
- * Default model (the scenarios.user_simulator / scenarios.judge resolution).
+ * choose the user-simulator and judge models for the run; they default to the project's
+ * Default and Judge models (the scenarios.user_simulator / scenarios.judge resolution).
  */
 export function ScenarioRunModelDialog({
   open,
@@ -37,8 +37,8 @@ export function ScenarioRunModelDialog({
     >
       <VStack gap={4} align="stretch">
         <Text fontSize="sm" color="fg.muted">
-          Pick the model that role-plays the user and the model that judges the run. Both default to
-          your project&apos;s Default model.
+          Pick the model that role-plays the user and the model that judges the run. They default to
+          your project&apos;s Default and Judge models.
         </Text>
         <SimulationModelSelect
           label="User simulator"

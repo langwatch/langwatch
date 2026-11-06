@@ -240,6 +240,7 @@ describe("given a service key with all permissions", () => {
           "scenarios": "write",
           "secrets": "write",
           "sso": "write",
+          "subscription": "write",
           "team": "write",
           "traces": "write",
           "triggers": "write",
