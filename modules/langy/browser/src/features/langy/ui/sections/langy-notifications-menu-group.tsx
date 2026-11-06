@@ -24,15 +24,13 @@ export const LANGY_NOTIFICATIONS_MENU_RETRY = "Try setting up again";
 
 function menuHint({
   blocked,
-  on,
   failure,
 }: {
   blocked: boolean;
-  on: boolean;
   failure: LangyPushSetupFailure | null;
 }) {
   if (blocked) return LANGY_NOTIFICATIONS_MENU_BLOCKED_HINT;
-  if (on && failure) return langyPushSetupProblem(failure).line;
+  if (failure) return langyPushSetupProblem(failure).line;
   return LANGY_NOTIFICATIONS_MENU_HINT;
 }
 
@@ -74,7 +72,7 @@ export function LangyNotificationsMenuGroup() {
           <Box flex={1}>
             <Text textStyle="sm">{menuLabel({ blocked, unsupported })}</Text>
             <Text textStyle="xs" color="fg.muted" whiteSpace="normal" maxWidth="20rem">
-              {menuHint({ blocked, on, failure })}
+              {menuHint({ blocked, failure })}
             </Text>
           </Box>
           {on ? (
