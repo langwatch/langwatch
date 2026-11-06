@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  * Pins what the create drawer sends: reset on open, key type, permission mode, payload,
- * and that only the name and expiry sit outside Advanced.
+ * and that only description and permissions wait under Advanced.
  */
 
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
@@ -237,25 +237,30 @@ describe("given a new key", () => {
       expect(onCreate.mock.calls[0]?.[0]?.expiresAt).toBeUndefined();
     });
 
-    /** @scenario "The create drawer asks only for a name and an expiry up front" */
-    it("keeps key type, description, scope and permissions under a closed Advanced", async () => {
+    /** @scenario "The create drawer shows the key type, name, scope and expiry up front" */
+    it("orders key type, name, scope and expiry, with the rest under a closed Advanced", async () => {
       state.members = ADMIN_MEMBERS;
       const user = userEvent.setup();
       renderDrawer();
-      expect(nameInput()).toBeVisible();
-      expect(screen.getByTestId("api-key-expiration")).toBeVisible();
+      const upFront = [
+        screen.getByRole("radio", { name: "Service" }),
+        nameInput(),
+        screen.getByRole("button", { name: "Clear scope" }),
+        screen.getByTestId("api-key-expiration"),
+      ];
+      for (const [index, field] of upFront.slice(1).entries()) {
+        expect(upFront[index]?.compareDocumentPosition(field)).toBe(
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+      }
       expect(screen.getByTestId("api-key-advanced-summary")).toHaveTextContent(
         "Personal key with all permissions on Web App.",
       );
-      expect(screen.queryByRole("button", { name: "Clear scope" })).toBeNull();
-      expect(screen.queryByRole("textbox", { name: /Description/ })).toBeNull();
+      expect(screen.getByPlaceholderText("What is this key used for?")).not.toBeVisible();
       expect(screen.queryByRole("radio", { name: "Restricted" })).toBeNull();
-      expect(screen.queryByRole("radio", { name: "Service" })).toBeNull();
       await openAdvanced(user);
-      expect(screen.getByRole("button", { name: "Clear scope" })).toBeVisible();
       expect(screen.getByPlaceholderText("What is this key used for?")).toBeVisible();
       expect(screen.getByRole("radio", { name: "Restricted" })).toBeInTheDocument();
-      expect(screen.getByRole("radio", { name: "Service" })).toBeInTheDocument();
     });
   });
 
@@ -338,8 +343,8 @@ describe("given a creator who submits an incomplete form", () => {
     it("names every missing requirement, opens Advanced, focuses the first and mints nothing", async () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
-      await openAdvanced(user);
       await user.click(screen.getByRole("button", { name: "Clear scope" }));
+      await openAdvanced(user);
       await user.click(screen.getByText("Restricted"));
       await openAdvanced(user);
       const advanced = screen.getByTestId("api-key-advanced-toggle");
@@ -360,7 +365,6 @@ describe("given a creator who submits an incomplete form", () => {
     it("keeps what was entered, drops that error and moves focus to the next gap", async () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
-      await openAdvanced(user);
       await user.click(screen.getByRole("button", { name: "Clear scope" }));
       await user.click(createButton());
       await user.type(nameInput(), "CI");
@@ -383,7 +387,6 @@ describe("given a creator who submits an incomplete form", () => {
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
       await user.type(nameInput(), "CI");
-      await openAdvanced(user);
       await user.click(screen.getByRole("button", { name: "Clear scope" }));
       await user.click(createButton());
       expect(screen.getByText("Choose where this key can be used.")).toBeInTheDocument();
@@ -445,7 +448,6 @@ describe("given an admin", () => {
       state.members = ADMIN_MEMBERS;
       const user = userEvent.setup();
       const { onCreate } = renderDrawer();
-      await openAdvanced(user);
       expect(screen.getByText("Key type")).toBeInTheDocument();
       fireEvent.click(screen.getByText("Service"));
       expect(await screen.findByText(/Not tied to any user/)).toBeInTheDocument();

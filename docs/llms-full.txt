@@ -430,14 +430,14 @@ An [ingestion template](/ai-governance/ingestion-templates) mints an ingestion k
   </Step>
 
   <Step title="Fill in the drawer">
+    - **Key type**: shown to organization admins only. Other members always create a personal key
     - **Name**: for example `Local dev` or `MCP key`
+    - **Scope**: the projects, teams or the organization the key can access. The current project is picked for you
     - **Expiration**: **No expiration** by default, or 7, 30, 60 or 90 days, or **Custom**
 
-    That is all a first key needs: it gets all your permissions on the current project. Open **Advanced** to change the rest:
+    That is all a first key needs: it gets all your permissions on that scope. Open **Advanced** to change the rest:
 
-    - **Key type**: shown to organization admins only. Other members always create a personal key
     - **Description**: optional
-    - **Scope**: the projects, teams or the organization the key can access
     - **Permissions**: **All** gives the key your own permissions on each scope. **Restricted** lets you pick read or write per [permission category](#permission-categories)
   </Step>
 
@@ -476,11 +476,12 @@ Service keys are for automated systems: CI/CD pipelines, production services and
   </Step>
 
   <Step title="Fill in the drawer">
-    - **Name** and **Expiration**
+    - **Key type**: **Service**
+    - **Name**
+    - **Scope**: the projects, teams or the organization the key can access
+    - **Expiration**
     - Under **Advanced**:
-      - **Key type**: **Service**
       - **Description**: optional
-      - **Scope**: the projects, teams or the organization the key can access
       - **Permissions**: **All** gives Admin on every scope you picked. **Restricted** gives only the categories you tick
 
     <Warning>

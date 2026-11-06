@@ -1,5 +1,5 @@
 /**
- * "Create new secret key": asks for a name and an expiry; the rest waits under Advanced.
+ * "Create new secret key": key type, name, scope and expiry up front; the rest under Advanced.
  * Every level offered is bounded by what the caller holds at the selected scope — the
  * mint refuses (`api_key_scope_violation`) rather than dropping one.
  */
@@ -130,7 +130,7 @@ const ACCESS_NOTE_ID = "api-key-access-note";
 type KeyField = "name" | "scope" | "permissions" | "expiration";
 
 /** The fields that sit under Advanced: a gap in one opens it before focus moves there. */
-const ADVANCED_FIELDS: readonly KeyField[] = ["scope", "permissions"];
+const ADVANCED_FIELDS: readonly KeyField[] = ["permissions"];
 
 const ADVANCED_SECTION = "advanced";
 
@@ -143,8 +143,8 @@ function missingFields(input: {
 }): KeyField[] {
   const missing: KeyField[] = [];
   if (!input.name.trim()) missing.push("name");
-  if (!input.expirationChosen) missing.push("expiration");
   if (!input.hasScope) missing.push("scope");
+  if (!input.expirationChosen) missing.push("expiration");
   if (!input.hasAnySelection) missing.push("permissions");
   return missing;
 }
@@ -692,6 +692,17 @@ export function CreateApiKeyDrawer({
       <VStack gap={5} align="start">
         {accessBlocked && <AccessNote myBindings={access} />}
         {notice}
+        {/* Key type — only admins can create service keys */}
+        {isAdmin && (
+          <KeyTypeField
+            keyType={keyType}
+            onKeyTypeChange={setKeyType}
+            selectedUserId={selectedUserId}
+            onUserChange={setSelectedUserId}
+            memberCollection={memberCollection}
+          />
+        )}
+
         <SettingsField label="Name" error={showError("name")}>
           <Input
             ref={gapFocus.refs.name}
@@ -700,6 +711,27 @@ export function CreateApiKeyDrawer({
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+        </SettingsField>
+
+        <SettingsField label="Scope" error={showError("scope")}>
+          <Box ref={gapFocus.refs.scope} width="full">
+            <ScopeChipPicker
+              value={selectedScopes}
+              onChange={(next) => {
+                setSelectedScopes(next);
+                setCategorySelections({});
+              }}
+              organizationId={organizationId}
+              organizationName={organizationName}
+              availableTeams={orgTeams}
+              availableProjects={orgProjects}
+              label=""
+              showQuickPicks
+              currentOrganizationId={organizationId}
+              currentTeamId={currentTeamId}
+              currentProjectId={currentProjectId}
+            />
+          </Box>
         </SettingsField>
 
         <SettingsField label="Expiration">
@@ -748,17 +780,6 @@ export function CreateApiKeyDrawer({
             organizationName,
           })}
         >
-          {/* Key type — only admins can create service keys */}
-          {isAdmin && (
-            <KeyTypeField
-              keyType={keyType}
-              onKeyTypeChange={setKeyType}
-              selectedUserId={selectedUserId}
-              onUserChange={setSelectedUserId}
-              memberCollection={memberCollection}
-            />
-          )}
-
           <SettingsField label="Description (optional)">
             <Textarea
               placeholder="What is this key used for?"
@@ -768,27 +789,6 @@ export function CreateApiKeyDrawer({
               rows={3}
               resize="vertical"
             />
-          </SettingsField>
-
-          <SettingsField label="Scope" error={showError("scope")}>
-            <Box ref={gapFocus.refs.scope} width="full">
-              <ScopeChipPicker
-                value={selectedScopes}
-                onChange={(next) => {
-                  setSelectedScopes(next);
-                  setCategorySelections({});
-                }}
-                organizationId={organizationId}
-                organizationName={organizationName}
-                availableTeams={orgTeams}
-                availableProjects={orgProjects}
-                label=""
-                showQuickPicks
-                currentOrganizationId={organizationId}
-                currentTeamId={currentTeamId}
-                currentProjectId={currentProjectId}
-              />
-            </Box>
           </SettingsField>
 
           <PermissionsField

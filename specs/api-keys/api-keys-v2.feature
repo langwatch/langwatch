@@ -319,13 +319,13 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And naming the key is enough to create it with no expiry
 
     @integration
-    Scenario: The create drawer asks only for a name and an expiry up front
+    Scenario: The create drawer shows the key type, name, scope and expiry up front
       When "ada" opens the create drawer on project "alpha"
-      Then she sees the name and the expiry
-      And key type, description, scope and permissions sit in a closed "Advanced" section
+      Then she sees the key type, the name, the scope and the expiry, in that order
+      And description and permissions sit in a closed "Advanced" section
       And the closed section says the key gets all permissions on project "alpha"
       When she opens "Advanced"
-      Then she can change the key type, description, scope and permissions
+      Then she can change the description and the permissions
 
     @integration
     Scenario: A custom expiry asks for its date before the key is minted

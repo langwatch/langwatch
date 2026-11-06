@@ -925,7 +925,6 @@ describe("given a key is being created", () => {
       ).toBeInTheDocument();
 
       await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "CI");
-      await user.click(screen.getByTestId("api-key-advanced-toggle"));
       await user.click(screen.getByTestId("clear-scopes"));
       await user.click(screen.getByRole("button", { name: "Create secret key" }));
 
