@@ -58,6 +58,24 @@ describe("PlansComparisonPage", () => {
     });
   });
 
+  describe("given an organization on the Free plan", () => {
+    describe("when Annually and USD are picked and Upgrade now is pressed", () => {
+      /** @scenario "Upgrade now on the Growth column starts the Growth checkout" */
+      it("links to the subscription page asking for the annual Growth checkout in USD", () => {
+        renderPlans({ activePlan: { type: "FREE", free: true } });
+
+        fireEvent.click(screen.getByRole("button", { name: "Annually" }));
+        fireEvent.click(screen.getByTestId("currency-toggle"));
+
+        const upgrade = within(column("growth")).getByRole("link", { name: "Upgrade now" });
+        expect(upgrade).toHaveAttribute(
+          "href",
+          "/settings/subscription?checkout=growth&interval=annual&currency=USD",
+        );
+      });
+    });
+  });
+
   describe("given a member without administrative rights", () => {
     describe("when the comparison is opened", () => {
       /** @scenario "Non-admin members can access plans comparison" */

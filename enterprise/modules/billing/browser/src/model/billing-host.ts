@@ -66,6 +66,9 @@ export abstract class BillingHostApi {
   /** Sends the reader somewhere else in the application. */
   abstract navigate(to: string): void;
 
+  /** Swaps the current address for another in the application, adding no history entry. */
+  abstract replace(to: string): void;
+
   /**
    * Leaves the application for a URL it does not serve. A Stripe checkout
    * replaces the current document rather than opening a new tab, so the
