@@ -95,7 +95,7 @@ describe("the Roles & access page", () => {
 
       expect(screen.getByRole("heading", { name: "Roles & access" })).toBeInTheDocument();
       expect(screen.getByRole("tab", { name: "Roles" })).toHaveAttribute("aria-selected", "true");
-      expect(screen.getByText("Predefined roles")).toBeInTheDocument();
+      expect(screen.getByTestId("builtin-roles")).toBeInTheDocument();
       expect(state.bindingReads).toBeGreaterThan(0);
       expect(state.grantReads).toBe(0);
     });

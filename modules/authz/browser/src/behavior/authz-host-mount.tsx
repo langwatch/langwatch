@@ -10,6 +10,8 @@ import {
   type UiFeedback,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -34,6 +36,8 @@ class HostServiceAuthzHost extends AuthzHostApi {
       structure: AuthzOrganizationStructure;
       route: AuthzRouteReading;
       setQuery: AuthzHostApi["setQuery"];
+      openOverlay: <Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>) => void;
+      closeOverlay: () => void;
     },
   ) {
     super();
@@ -66,6 +70,14 @@ class HostServiceAuthzHost extends AuthzHostApi {
     this.deps.setQuery(next, options);
   }
 
+  openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.deps.openOverlay(drawer, props);
+  }
+
+  closeOverlay(): void {
+    this.deps.closeOverlay();
+  }
+
   succeeded(notice: AuthzSuccessNotice): void {
     this.deps.feedback.succeeded(notice);
   }
@@ -82,6 +94,7 @@ class HostServiceAuthzHost extends AuthzHostApi {
  */
 export default function AuthzHostMount({ children }: { children?: ReactNode }) {
   const { session, feedback, route } = useUiHostServices();
+  const { openDrawer, closeDrawer } = useDrawer();
   const { query } = route.reading();
   const { organizationId } = useUiScope().activeScope();
   // The plan tier only: the session-cached read, not the monthly usage count.
@@ -120,8 +133,10 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
         structure,
         route: { query },
         setQuery: (next, options) => route.setQuery(next, options),
+        openOverlay: (drawer, props) => openDrawer(drawer, props),
+        closeOverlay: () => closeDrawer(),
       }),
-    [organizationId, session, feedback, plan, structure, query, route],
+    [organizationId, session, feedback, plan, structure, query, route, openDrawer, closeDrawer],
   );
   return <AuthzHostProvider value={host}>{children}</AuthzHostProvider>;
 }
