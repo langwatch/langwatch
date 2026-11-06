@@ -362,12 +362,12 @@ function legacySsoAccess({
   };
 }
 
-/** Membership is the organization's (ADR-129): a join lands through the arrival's door. */
 /** A refused sign-in at an organization, recorded by the module that owns its seats. */
 function refusedSignInSeats(organizations: OrganizationApi): RefusedSignInSeats {
   return { recordRefusedSignIn: (args) => organizations.recordRefusedSignIn(args) };
 }
 
+/** Membership is the organization's (ADR-129): a join lands through the arrival's door. */
 function joinMemberships(organizations: OrganizationApi): JoinMembership {
   return {
     isMember: (args) => organizations.isMember(args),

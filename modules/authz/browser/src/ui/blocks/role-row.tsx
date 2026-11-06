@@ -6,8 +6,8 @@ import type { ReactNode } from "react";
 
 import type { RoleDotPalette } from "../../model/builtin-roles.ts";
 
-/** The columns every role line shares, so the built-in and custom lists align. */
-export const ROLE_ROW_COLUMNS = "230px minmax(0, 1fr) 80px 110px 150px";
+/** The columns of a role line. */
+const ROLE_ROW_COLUMNS = "230px minmax(0, 1fr) 80px 110px 150px";
 
 const DOT_COLOR: Record<RoleDotPalette, string> = {
   orange: "orange.solid",
