@@ -1,4 +1,7 @@
-import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
+import {
+  detectLicenseInputForm,
+  type LicenseStatus,
+} from "@langwatch/enterprise-licensing-contract";
 import { toEpochMs, readableDate } from "@langwatch/time";
 
 /** License status with metadata fields (excludes corrupted/no-license states) */
@@ -83,4 +86,30 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Whether the license names a hosted service, so a renewal can be collected now. */
+export function isConnectedLicense(status: LicenseStatus | undefined): boolean {
+  if (!status?.hasLicense) return false;
+  return "connected" in status && status.connected === true;
+}
+
+/** Whether the license came from `LANGWATCH_LICENSE_KEY`, which the page cannot remove. */
+export function isEnvironmentLicense(status: LicenseStatus | undefined): boolean {
+  if (!status?.hasLicense) return false;
+  return "source" in status && status.source === "environment";
+}
+
+/** A license file is a few hundred base64 characters; anything this large is another file. */
+const MAX_LICENSE_FILE_BYTES = 64 * 1024;
+
+/** A signed key is a few hundred characters of base64, nothing else. */
+const LICENSE_KEY_TEXT = /^[A-Za-z0-9+/=_-]{64,}$/;
+
+/** The license or activation code a file holds, judged by content whatever its name; else null. */
+export function licenseTextOfFile({ text, size }: { text: string; size: number }): string | null {
+  if (size > MAX_LICENSE_FILE_BYTES) return null;
+  const trimmed = text.trim();
+  if (detectLicenseInputForm(trimmed).form === "activation_code") return trimmed;
+  return LICENSE_KEY_TEXT.test(trimmed.replace(/\s+/g, "")) ? trimmed : null;
 }

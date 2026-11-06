@@ -87,15 +87,16 @@ export class ConnectInstallService {
   private constructor(private readonly deps: ConnectInstallServiceDependencies) {}
 
   /**
-   * The credential this organization calls LangWatch with; empty where it holds
-   * no license, where the license is not a license, or where Connect is off.
+   * The credential this organization calls LangWatch with; empty where Connect is off or
+   * the license is not a signed one naming a hosted service, so an offline license calls
+   * nothing. A lapsed term still yields one: it is how a renewal is collected.
    */
   async findCredential(organizationId: string): Promise<ConnectCredential[]> {
     if (!this.deps.deployment.permitted) return [];
 
     const organization = await this.deps.organizations.findById(organizationId);
     const licenseKey = this.licenseKeyOf(organization);
-    if (!licenseKey) return [];
+    if (!licenseKey || !this.namesHostedService(licenseKey)) return [];
 
     const token = this.tokenOf(licenseKey);
     if (!token) return [];
@@ -409,6 +410,15 @@ export class ConnectInstallService {
     if (!result.valid) return [];
 
     return connectServicesNamedBy(result.licenseData.connectServices);
+  }
+
+  /** Whether a license LangWatch signed names a hosted service, whatever its term. */
+  private namesHostedService(licenseKey: string): boolean {
+    const signed = this.deps.cryptography.parseLicenseKey(licenseKey);
+    if (!signed || !this.deps.cryptography.verifySignature(signed, this.deps.publicKey)) {
+      return false;
+    }
+    return connectServicesNamedBy(signed.data.connectServices).length > 0;
   }
 
   /** A pasted key that is not a license yields no credential, not a crash. */

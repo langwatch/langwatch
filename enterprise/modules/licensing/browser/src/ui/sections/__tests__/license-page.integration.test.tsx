@@ -72,7 +72,7 @@ type InstalledLicense = Extract<LicenseStatus, { hasLicense: true }>;
 const renderCard = (status: InstalledLicense) =>
   renderWithDesignSystem(
     <Wrapper>
-      <LicenseDetailsCard status={status} onRemove={vi.fn()} isRemoving={false} />
+      <LicenseDetailsCard status={status} onRemove={vi.fn()} isRemoving={false} canManage />
     </Wrapper>,
   );
 
@@ -167,6 +167,7 @@ describe("the no-license card", () => {
           onActivationCodeChange={vi.fn()}
           onCodeActivate={overrides?.onCodeActivate ?? vi.fn()}
           isActivating={false}
+          canManage
         />
       </Wrapper>,
     );

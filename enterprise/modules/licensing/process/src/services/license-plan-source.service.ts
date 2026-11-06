@@ -1,5 +1,6 @@
 import type { LicenseCryptography } from "@langwatch/enterprise-license-signing";
 import {
+  type LicenseSource,
   UNLIMITED_PLAN,
   mapToPlanInfo,
   type PlanInfo,
@@ -20,7 +21,14 @@ export type LicensePlanSourceOptions = {
   licenses: OrganizationLicense;
   /** How a key is parsed, verified and dated. */
   cryptography: LicenseCryptography;
+  /** A signed `LANGWATCH_LICENSE_KEY`, which licenses every organization that stored none. */
+  instanceLicenseKey?: string | undefined;
 };
+
+/** The key an organization runs on, and where it was installed. */
+export type ResolvedLicenseKey =
+  | { licenseKey: string; source: LicenseSource }
+  | { licenseKey: null; source: null };
 
 /**
  * What a signed licence entitles one organization to, in each deployment mode.
@@ -28,19 +36,38 @@ export type LicensePlanSourceOptions = {
  */
 export class LicensePlanSourceService {
   static create(options: LicensePlanSourceOptions): LicensePlanSourceService {
-    return new LicensePlanSourceService(options.licenses, options.cryptography);
+    return new LicensePlanSourceService(
+      options.licenses,
+      options.cryptography,
+      options.instanceLicenseKey,
+    );
   }
 
   private constructor(
     private readonly licenses: OrganizationLicense,
     private readonly cryptography: LicenseCryptography,
+    private readonly instanceLicenseKey: string | undefined,
   ) {}
 
-  /** The Cloud reading: signature AND term, so a lapsed contract steps aside. */
-  async getActivePlan(organizationId: string): Promise<PlanInfo> {
+  /**
+   * The stored key, else the environment key unless it is bound to another
+   * organization. A forged environment key still resolves here and is judged by its reader.
+   */
+  async resolveLicenseKey(organizationId: string): Promise<ResolvedLicenseKey> {
     const { licenseKey } = await this.licenses
       .getOrganizationLicense(organizationId)
       .catch(unlicensedWhenMissing);
+    if (licenseKey) return { licenseKey, source: "stored" };
+    const instanceKey = this.instanceLicenseKey;
+    if (!instanceKey) return { licenseKey: null, source: null };
+    const claimed = this.cryptography.parseLicenseKey(instanceKey)?.data.organizationId;
+    if (claimed !== void 0 && claimed !== organizationId) return { licenseKey: null, source: null };
+    return { licenseKey: instanceKey, source: "environment" };
+  }
+
+  /** The Cloud reading: signature AND term, so a lapsed contract steps aside. */
+  async getActivePlan(organizationId: string): Promise<PlanInfo> {
+    const { licenseKey } = await this.resolveLicenseKey(organizationId);
     if (!licenseKey) {
       return UNLIMITED_PLAN;
     }
@@ -52,9 +79,7 @@ export class LicensePlanSourceService {
 
   /** The self-hosted reading: signature only, so a lapsed licence still holds. */
   async getSelfHostedPlan(organizationId: string): Promise<PlanInfo> {
-    const { licenseKey } = await this.licenses
-      .getOrganizationLicense(organizationId)
-      .catch(unlicensedWhenMissing);
+    const { licenseKey } = await this.resolveLicenseKey(organizationId);
     if (!licenseKey) {
       return UNLIMITED_PLAN;
     }

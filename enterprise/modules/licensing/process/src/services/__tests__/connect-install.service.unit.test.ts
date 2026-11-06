@@ -139,7 +139,7 @@ describe("what a self-hosted install may call", () => {
     expect(await service.findEnabledServices(ORGANIZATION)).toEqual([]);
 
     const status = await service.getStatus(ORGANIZATION);
-    expect(status).toMatchObject({ deployment: "on", licensed: true });
+    expect(status).toMatchObject({ deployment: "on", licensed: false });
     expect(gateway.classifications).toEqual([]);
   });
 

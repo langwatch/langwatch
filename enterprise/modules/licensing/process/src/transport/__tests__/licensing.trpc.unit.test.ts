@@ -77,6 +77,27 @@ describe("the license tRPC namespace", () => {
     });
   });
 
+  describe("given a member who may view the organization but not manage it", () => {
+    /** @scenario The server still refuses licence changes from a member */
+    it("refuses upload, activate, remove and refresh before any handler runs", async () => {
+      const { caller } = await mount({
+        permits: (permission) => permission === "organization:view",
+      });
+      const organizationId = "org-456";
+
+      const refusals = await Promise.allSettled([
+        caller.upload({ organizationId, licenseKey: EXPIRED_LICENSE_KEY }),
+        caller.activate({ organizationId, code: "LW-AAAA-BBBB-CCCC-DDDD" }),
+        caller.remove({ organizationId }),
+        caller.refresh({ organizationId }),
+      ]);
+
+      for (const refusal of refusals) {
+        expect(refusal).toMatchObject({ status: "rejected", reason: { code: "FORBIDDEN" } });
+      }
+    });
+  });
+
   describe("given an organization with no license", () => {
     describe("when license.getStatus is called", () => {
       /** @scenario "Gets license status for organization without license" */

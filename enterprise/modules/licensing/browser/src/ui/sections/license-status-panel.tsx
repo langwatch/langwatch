@@ -10,6 +10,7 @@ import { useState } from "react";
 
 import { licensingApi } from "../../behavior/licensing-api.ts";
 import { licenseMetersSeats } from "../../model/license-status.ts";
+import { useLicensingHost } from "../../model/licensing-host.ts";
 import { LicenseDetailsCard } from "../../ui/elements/license-details-card.tsx";
 import { LicenseLoadError } from "../../ui/elements/license-load-error.tsx";
 import { LicenseLoadingSkeleton } from "../../ui/elements/license-loading-skeleton.tsx";
@@ -26,6 +27,9 @@ interface LicenseStatusPanelProps {
 
 export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) {
   const [licenseKey, setLicenseKey] = useState("");
+  const [isReplacing, setIsReplacing] = useState(false);
+  // The server refuses every change without organization:manage; this only hides what would fail.
+  const canManage = useLicensingHost().canManageOrganization();
 
   const {
     data: status,
@@ -48,6 +52,7 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
       onUploadSuccess: () => {
         setLicenseKey("");
         setActivationCode("");
+        setIsReplacing(false);
         void refetch();
       },
       onRemoveSuccess: () => {
@@ -97,6 +102,7 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
           onActivationCodeChange={setActivationCode}
           onCodeActivate={handleCodeActivate}
           isActivating={isUploading}
+          canManage={canManage}
         />
       </VStack>
     );
@@ -113,7 +119,24 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
         isRemoving={isRemoving}
         onRefresh={refresh}
         isRefreshing={isRefreshing}
+        onReplace={() => setIsReplacing(true)}
+        canManage={canManage}
       />
+      {isReplacing && canManage ? (
+        <NoLicenseCard
+          mode="replace"
+          onCancel={() => setIsReplacing(false)}
+          licenseKey={licenseKey}
+          onLicenseKeyChange={setLicenseKey}
+          onActivate={() => submitLicense(licenseKey)}
+          onFileActivate={submitLicense}
+          activationCode={activationCode}
+          onActivationCodeChange={setActivationCode}
+          onCodeActivate={handleCodeActivate}
+          isActivating={isUploading}
+          canManage={canManage}
+        />
+      ) : null}
     </VStack>
   );
 }
