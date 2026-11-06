@@ -7,7 +7,8 @@ import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 export const BILLING_CHECKOUT_TOTAL_METRIC_NAME = "billing_checkout_total";
 
 /** Which door the checkout came through. */
-export type BillingCheckoutFlow = "subscription" | "seat_checkout";
+const BILLING_CHECKOUT_FLOWS = ["subscription", "seat_checkout"] as const;
+export type BillingCheckoutFlow = (typeof BILLING_CHECKOUT_FLOWS)[number];
 
 /**
  * Counts checkouts started, refused and completed. A missing upgrade button
@@ -44,6 +45,11 @@ export class BillingCheckoutMeterService {
       this.checkouts.inc({ stage: "failed", flow, reason: "no_checkout_url" });
     }
     return result;
+  }
+
+  /** Writes zero starts per flow, so a door nobody reaches still exports a series to alert on. */
+  seedStarts(): void {
+    for (const flow of BILLING_CHECKOUT_FLOWS) this.checkouts.inc({ stage: "started", flow }, 0);
   }
 
   completed(): void {

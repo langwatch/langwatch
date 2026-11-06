@@ -32,6 +32,19 @@ Feature: Checkout volume is measured
     Then one completed checkout is counted
 
   @unit
+  Scenario: Both checkout doors export a started series before anyone checks out
+    Given billing runs on LangWatch Cloud
+    When billing starts
+    Then each checkout door reports zero started checkouts
+    And an alert on starts going quiet sees a series even when no one has reached checkout
+
+  @unit
+  Scenario: A self-hosted deployment exports no checkout series
+    Given billing runs on a self-hosted deployment
+    When billing starts
+    Then no checkout series is written
+
+  @unit
   Scenario: Both checkout doors and the completion webhook are counted
     Given billing runs on LangWatch Cloud with a payment provider
     When a Growth seat checkout opens, a checkout for a plan with no price is refused, and a completed checkout is delivered

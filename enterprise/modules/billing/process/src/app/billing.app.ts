@@ -746,6 +746,7 @@ export class BillingModule
     this.#reporting = reporting;
     this.#resourceLimitAlerts = resourceLimitAlerts;
     this.#lifecycle = lifecycle;
+    if (isSaas) BillingModule.#checkouts.seedStarts();
   }
 
   notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void> {

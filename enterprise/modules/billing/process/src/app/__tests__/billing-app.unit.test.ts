@@ -513,9 +513,11 @@ describe("the subscription door BillingModule serves", () => {
 
 describe("the checkouts BillingModule counts", () => {
   let metrics = createRecordingMeterProvider();
+  const writes = () =>
+    metrics.recorded.filter((write) => write.instrument === BILLING_CHECKOUT_TOTAL_METRIC_NAME);
   const counted = () =>
-    metrics.recorded
-      .filter((write) => write.instrument === BILLING_CHECKOUT_TOTAL_METRIC_NAME)
+    writes()
+      .filter(({ value }) => value > 0)
       .map(({ attributes }) => attributes);
 
   beforeEach(() => {
@@ -523,6 +525,27 @@ describe("the checkouts BillingModule counts", () => {
     metrics.install();
   });
   afterEach(() => metrics.uninstall());
+
+  describe("when billing starts on LangWatch Cloud", () => {
+    /** @scenario "Both checkout doors export a started series before anyone checks out" */
+    it("writes zero starts for each door", () => {
+      billingApp({ isSaas: true, withStripe: true, withSubscriptions: true });
+
+      expect(writes().map(({ value, attributes }) => ({ value, attributes }))).toEqual([
+        { value: 0, attributes: { stage: "started", flow: "subscription" } },
+        { value: 0, attributes: { stage: "started", flow: "seat_checkout" } },
+      ]);
+    });
+  });
+
+  describe("when billing starts on a self-hosted deployment", () => {
+    /** @scenario "A self-hosted deployment exports no checkout series" */
+    it("writes nothing", () => {
+      billingApp({ isSaas: false, withStripe: false });
+
+      expect(writes()).toEqual([]);
+    });
+  });
 
   describe("given LangWatch Cloud with a payment provider", () => {
     /** @scenario "Both checkout doors and the completion webhook are counted" */
