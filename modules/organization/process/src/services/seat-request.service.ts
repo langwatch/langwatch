@@ -411,25 +411,39 @@ export class SeatRequestService {
       return "invited";
     }
     const userId = request.userId;
-    if (!isFull) {
-      // The approver's seat decision stands for the organization: the grant is the system's.
-      await memberships.changeMemberRole({
-        organizationId,
-        userId,
-        role: OrganizationUserRole.MEMBER,
-        currentUserId: by.id,
-        caller: { type: "system" },
-      });
-    }
-    if (membership.disabledAt !== null) {
+    const held = membership.disabledAt !== null;
+    // A grant lands only on a live membership, so a held row is enabled before its role moves.
+    if (held) {
       await memberships.setMemberDisabled({
         organizationId,
         userId,
         disabled: false,
         actingUser: by,
       });
-      return "enabled";
     }
+    if (!isFull) {
+      try {
+        // The approver's seat decision stands for the organization: the grant is the system's.
+        await memberships.changeMemberRole({
+          organizationId,
+          userId,
+          role: OrganizationUserRole.MEMBER,
+          currentUserId: by.id,
+          caller: { type: "system" },
+        });
+      } catch (error) {
+        if (held) {
+          await memberships.setMemberDisabled({
+            organizationId,
+            userId,
+            disabled: true,
+            actingUser: null,
+          });
+        }
+        throw error;
+      }
+    }
+    if (held) return "enabled";
     return isFull ? "already_member" : "promoted";
   }
 

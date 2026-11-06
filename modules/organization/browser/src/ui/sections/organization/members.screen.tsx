@@ -141,7 +141,7 @@ function usePeopleListState({
   const { openDrawer } = useDrawer();
   const { cut, selectCut } = useCutFromAddress();
 
-  const invitesFlow = useInviteFlow({ organization, activePlan });
+  const invitesFlow = useInviteFlow({ organization, activePlan, canManage });
   const removal = useMemberRemoval(organization.id);
   const reads = usePeopleListReads({
     organization,
@@ -714,9 +714,12 @@ function PeopleRows({
 function useInviteFlow({
   organization,
   activePlan,
+  canManage,
 }: {
   organization: OrganizationWithMembersAndTheirTeams;
   activePlan: PlanInfo;
+  /** Invitations are a manager's list; a reader is never asked for them. */
+  canManage: boolean;
 }) {
   const {
     open: isInviteLinkOpen,
@@ -726,7 +729,7 @@ function useInviteFlow({
 
   const pendingInvites = api.invite.getOrganizationPendingInvites.useQuery(
     { organizationId: organization.id },
-    { enabled: !!organization.id },
+    { enabled: !!organization.id && canManage },
   );
 
   const [selectedInvites, setSelectedInvites] = useState<{ inviteCode: string; email: string }[]>(
