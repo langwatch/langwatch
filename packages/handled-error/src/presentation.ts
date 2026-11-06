@@ -2128,6 +2128,10 @@ const presentations = {
     describe: () =>
       "Someone may have approved or declined it already. Reload to see the open requests.",
   },
+  seat_change_busy: {
+    title: "Another seat change is in progress",
+    describe: () => "Try again in a moment.",
+  },
   member_seat_limit_reached: {
     title: "All member seats are in use",
     describe: () => "Free a seat by disabling a membership, or upgrade the plan to add more.",

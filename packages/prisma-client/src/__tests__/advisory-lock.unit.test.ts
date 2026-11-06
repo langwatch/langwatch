@@ -68,5 +68,21 @@ describe("withAdvisoryLock", () => {
       ).rejects.toMatchObject({ name: "AdvisoryLockBusyError", key: "seat-org:acme" });
       expect(runs).toBe(0);
     });
+
+    it("throws the error the owner names for a busy lock", async () => {
+      const { prisma } = clientAnswering([]);
+      const busy = Object.assign(new Error("busy"), { code: "seat_change_busy" });
+
+      await expect(
+        withAdvisoryLock({
+          prisma,
+          key: "seat-org:acme",
+          work: async () => 1,
+          waitMs: 500,
+          deps: clock(),
+          onBusy: () => busy,
+        }),
+      ).rejects.toBe(busy);
+    });
   });
 });

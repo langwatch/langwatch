@@ -44,11 +44,14 @@ export async function withAdvisoryLock<T>({
   work,
   waitMs = DEFAULT_WAIT_MS,
   deps = REAL_DEPS,
+  onBusy = () => new AdvisoryLockBusyError(key),
 }: {
   prisma: Pick<PrismaClient, "$transaction">;
   key: string;
   work: () => Promise<T>;
   waitMs?: number;
+  /** The error a caller still waiting at the deadline gets; the owner names it for its users. */
+  onBusy?: () => Error;
   deps?: AdvisoryLockDeps;
 }): Promise<T> {
   const deadline = deps.now() + waitMs;
@@ -66,7 +69,7 @@ SELECT pg_try_advisory_xact_lock(hashtextextended(${key}, 0)) AS locked`;
       { timeout: HOLD_TIMEOUT_MS, maxWait: waitMs },
     );
     if (attempt.held) return attempt.value;
-    if (deps.now() >= deadline) throw new AdvisoryLockBusyError(key);
+    if (deps.now() >= deadline) throw onBusy();
     const { min, max } = RETRY_PAUSE_MS;
     await deps.wait(min + deps.random() * (max - min));
   }

@@ -101,6 +101,13 @@ Feature: Seat requests when an organization is over its seat limit
       Then the approval refuses with member_seat_limit_reached
       And the seat request stays open
 
+    @unit
+    Scenario: A seat change that waits too long for the seat lock asks to try again
+      Given another seat change holds the organization's seat lock for the whole wait
+      When a seat change gives up waiting for it
+      Then it refuses with seat_change_busy, a retryable 409
+      And the message says "Another seat change is in progress. Try again in a moment."
+
     @integration
     Scenario: Two approvals for the last free full seat at once: exactly one wins
       Given "first@acme.example" and "second@acme.example" are each held pending with an open seat request
