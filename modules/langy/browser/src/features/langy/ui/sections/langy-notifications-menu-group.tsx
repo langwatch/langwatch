@@ -7,6 +7,10 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Bell, BellOff, Check } from "lucide-react";
 
+import {
+  langyPushSetupProblem,
+  type LangyPushSetupFailure,
+} from "../../../../model/langy-notifications.ts";
 import { useLangyNotificationPreference } from "../../behavior/use-langy-notifications.ts";
 
 export const LANGY_NOTIFICATIONS_MENU_LABEL = "Notifications";
@@ -16,6 +20,20 @@ export const LANGY_NOTIFICATIONS_MENU_BLOCKED = "Blocked by your browser";
 export const LANGY_NOTIFICATIONS_MENU_BLOCKED_HINT =
   "Click the icon beside the address, allow notifications for this site, then come back to this tab.";
 export const LANGY_NOTIFICATIONS_MENU_UNSUPPORTED = "Not supported in this browser";
+
+function menuHint({
+  blocked,
+  on,
+  failure,
+}: {
+  blocked: boolean;
+  on: boolean;
+  failure: LangyPushSetupFailure | null;
+}) {
+  if (blocked) return LANGY_NOTIFICATIONS_MENU_BLOCKED_HINT;
+  if (on && failure) return langyPushSetupProblem(failure).line;
+  return LANGY_NOTIFICATIONS_MENU_HINT;
+}
 
 function menuLabel({ blocked, unsupported }: { blocked: boolean; unsupported: boolean }) {
   if (blocked) return LANGY_NOTIFICATIONS_MENU_BLOCKED;
@@ -52,8 +70,8 @@ export function LangyNotificationsMenuGroup() {
           </Box>
           <Box flex={1}>
             <Text textStyle="sm">{menuLabel({ blocked, unsupported })}</Text>
-            <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
-              {blocked ? LANGY_NOTIFICATIONS_MENU_BLOCKED_HINT : LANGY_NOTIFICATIONS_MENU_HINT}
+            <Text textStyle="xs" color="fg.muted" whiteSpace="normal" maxWidth="20rem">
+              {menuHint({ blocked, on, failure: notifications.pushSetupFailure })}
             </Text>
           </Box>
           {on ? (

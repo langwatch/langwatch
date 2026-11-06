@@ -1,6 +1,6 @@
 /**
- * Langy's notifications leave from the server through Web Push: a long turn, a waiting card,
- * the `notify` tool; to the owner, when they turned notifications on.
+ * Langy's notifications leave from the server through Web Push: a long turn, a waiting card
+ * (a permission, or the folder share), the `notify` tool; to the owner, when they turned them on.
  * @see specs/langy/langy-notifications.feature
  */
 import {
@@ -80,6 +80,7 @@ function langyWebPushCandidate(event: LangyConversationProcessingEvent): Candida
         ? { kind: "turn_finished", turnId: event.data.turnId }
         : NOT_A_CANDIDATE;
     case LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED:
+    case LANGY_CONVERSATION_EVENT_TYPES.LOCAL_CONTROL_REQUESTED:
       return { kind: "decision_needed" };
     case LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED:
       return notifyToolCandidate(event.data.toolName, event.data.input);
@@ -96,6 +97,7 @@ export function createLangyWebPushSubscriber(
     eventTypes: [
       LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
       LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED,
+      LANGY_CONVERSATION_EVENT_TYPES.LOCAL_CONTROL_REQUESTED,
       LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED,
     ],
     options: {

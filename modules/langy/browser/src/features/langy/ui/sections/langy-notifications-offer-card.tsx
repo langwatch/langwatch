@@ -5,8 +5,9 @@
  */
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Bell, BellOff, Check } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
+import { langyPushSetupProblem } from "../../../../model/langy-notifications.ts";
 import { useLangyNotificationPreference } from "../../behavior/use-langy-notifications.ts";
 
 export const LANGY_NOTIFICATIONS_OFFER_QUESTION =
@@ -21,6 +22,7 @@ export const LANGY_NOTIFICATIONS_BLOCKED_LINE =
   "Your browser blocked notifications for this site. To allow them, click the icon beside the address, turn notifications on, and come back to this tab.";
 export const LANGY_NOTIFICATIONS_UNSUPPORTED_LINE =
   "This browser cannot show notifications, so check back here in about 10 minutes.";
+export const LANGY_NOTIFICATIONS_RETRY_LABEL = "Try again";
 
 export function LangyNotificationsOfferCard() {
   const notifications = useLangyNotificationPreference();
@@ -37,6 +39,16 @@ export function LangyNotificationsOfferCard() {
   }
   if (permission === "denied") {
     return <SettledLine icon={<BellOff size={14} />} line={LANGY_NOTIFICATIONS_BLOCKED_LINE} />;
+  }
+  if (choice === "enabled" && permission === "granted" && notifications.pushSetupFailure) {
+    const problem = langyPushSetupProblem(notifications.pushSetupFailure);
+    return (
+      <SettledLine
+        icon={<BellOff size={14} />}
+        line={problem.line}
+        action={problem.retryable ? <RetryButton retry={notifications.retryPushSetup} /> : null}
+      />
+    );
   }
   if (choice === "enabled" && permission === "granted") {
     return <SettledLine icon={<Check size={14} />} line={LANGY_NOTIFICATIONS_ENABLED_LINE} />;
@@ -77,18 +89,47 @@ export function LangyNotificationsOfferCard() {
   );
 }
 
-function SettledLine({ icon, line }: { icon: ReactNode; line: string }) {
+function SettledLine({
+  icon,
+  line,
+  action,
+}: {
+  icon: ReactNode;
+  line: string;
+  action?: ReactNode;
+}) {
   return (
     <CardShell>
-      <HStack align="start" gap={2}>
-        <Box color="fg.muted" paddingTop="0.5">
-          {icon}
-        </Box>
-        <Text textStyle="sm" color="fg.muted">
-          {line}
-        </Text>
-      </HStack>
+      <VStack align="stretch" gap={3}>
+        <HStack align="start" gap={2}>
+          <Box color="fg.muted" paddingTop="0.5">
+            {icon}
+          </Box>
+          <Text textStyle="sm" color="fg.muted">
+            {line}
+          </Text>
+        </HStack>
+        {action ? <HStack gap={2}>{action}</HStack> : null}
+      </VStack>
     </CardShell>
+  );
+}
+
+function RetryButton({ retry }: { retry: () => Promise<void> }) {
+  const [retrying, setRetrying] = useState(false);
+  const onClick = async () => {
+    setRetrying(true);
+    try {
+      await retry();
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  return (
+    <Button size="xs" variant="outline" loading={retrying} onClick={() => void onClick()}>
+      {LANGY_NOTIFICATIONS_RETRY_LABEL}
+    </Button>
   );
 }
 

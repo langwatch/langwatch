@@ -1,5 +1,5 @@
 import type * as webPushModule from "@langwatch/browser-host/web-push";
-import { renderHook, waitFor } from "@testing-library/react";
+import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -17,6 +17,8 @@ const server = vi.hoisted(() => ({
   invalidated: 0,
   /** What storing a subscription fails with, when it fails. */
   saveError: null as unknown,
+  /** Reading the installation's public key fails, as when the server is unreachable. */
+  keyFails: false,
 }));
 const worker = vi.hoisted(() => ({
   handler: null as null | {
@@ -45,7 +47,14 @@ vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
 vi.mock("../../../../behavior/langy-api.ts", () => ({
   api: {
     useUtils: () => ({
-      notification: { webPushPublicKey: { fetch: async () => ({ publicKey: "dmFwaWQta2V5" }) } },
+      notification: {
+        webPushPublicKey: {
+          fetch: async () => {
+            if (server.keyFails) throw new TypeError("Failed to fetch");
+            return { publicKey: "dmFwaWQta2V5" };
+          },
+        },
+      },
       langy: {
         messages: {
           invalidate: async () => {
@@ -75,8 +84,11 @@ vi.mock("../../../../behavior/langy-api.ts", () => ({
 
 import { readWebPushDeviceState } from "@langwatch/browser-host/web-push";
 
-import { langyTabNotifies } from "../../../../model/langy-notifications.ts";
-import { useLangyWebPush } from "../use-langy-web-push.ts";
+import {
+  langyTabNotifies,
+  type LangyPushSetupFailure,
+} from "../../../../model/langy-notifications.ts";
+import { useLangyPushSetupFailure, useLangyWebPush } from "../use-langy-web-push.ts";
 
 const ENDPOINT = "https://fcm.googleapis.com/fcm/send/laptop";
 
@@ -146,6 +158,7 @@ beforeEach(() => {
   server.subscribed = [];
   server.invalidated = 0;
   server.saveError = null;
+  server.keyFails = false;
   browserPush.supported = true;
   browserPush.subscribeFails = false;
   browserPush.held = null;
@@ -216,6 +229,60 @@ describe("given a browser the server cannot push to", () => {
     await waitFor(() => expect(readWebPushDeviceState()).toBe("unavailable"));
     await waitFor(() => expect(browserPush.held).toBeNull());
     expect(tabNotifies()).toBe(true);
+  });
+});
+
+describe("why setting up this browser failed, for the person to act on", () => {
+  /** Mounts the page's push and reads the failure it recorded once subscribing settled. */
+  async function settledFailure(): Promise<LangyPushSetupFailure | null> {
+    const { result } = renderHook(() => {
+      useLangyWebPush();
+      return useLangyPushSetupFailure();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return result.current;
+  }
+
+  it("says LangWatch could not be reached when the public key does not load", async () => {
+    server.keyFails = true;
+
+    expect(await settledFailure()).toBe("server_unreachable");
+    expect(readWebPushDeviceState()).not.toBe("subscribed");
+  });
+
+  it("says the browser refused when it would not subscribe", async () => {
+    browserPush.subscribeFails = true;
+
+    expect(await settledFailure()).toBe("browser_refused");
+  });
+
+  it("says the browser could not be saved when storing the subscription fails", async () => {
+    server.saveError = new TypeError("Failed to fetch");
+
+    expect(await settledFailure()).toBe("save_failed");
+  });
+
+  it("says the push service is refused when the server will never send to it", async () => {
+    server.saveError = { code: "web_push_endpoint_refused", httpStatus: 422 };
+
+    expect(await settledFailure()).toBe("push_service_refused");
+  });
+
+  it("says the browser cannot hold a subscription when it has no Push API", async () => {
+    browserPush.supported = false;
+    installBrowserPush();
+
+    expect(await settledFailure()).toBe("unsupported");
+  });
+
+  it("clears the failure once a later attempt subscribes", async () => {
+    server.keyFails = true;
+    expect(await settledFailure()).toBe("server_unreachable");
+    cleanup();
+
+    server.keyFails = false;
+    expect(await settledFailure()).toBeNull();
+    expect(server.subscribed).toHaveLength(1);
   });
 });
 
