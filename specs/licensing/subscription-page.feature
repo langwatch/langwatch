@@ -230,6 +230,28 @@ Feature: Subscription Page Plan Management
       Then the price row reads "€29/mo" with no seats breakdown
 
     @integration
+    Scenario: The plan card keeps the approved spacing
+      Given the plan card of a Growth plan with its features
+      When it is drawn in a browser
+      Then the rows box starts 53px below the card's top edge
+      And the plan name sits 10px after the status dot, in weight 600
+      And the features read in 13px text on 28px lines, each after a 12px check 20px to its left
+
+    @integration
+    Scenario: An enterprise subscription's card is named Enterprise and shows no usage row
+      Given my organization has an active enterprise subscription
+      And it sent 812,400 events this month
+      When I view the subscription page
+      Then the card's title reads "Enterprise"
+      And its bordered box holds the seats row but no "Events this month" row
+
+    @integration
+    Scenario: An enterprise subscription's card offers sales contact as an orange outline
+      Given the plan card of an enterprise subscription
+      When it is drawn in a browser
+      Then "Contact us to upgrade" draws an orange outline
+
+    @integration
     Scenario: An enterprise plan's card has no price row
       Given my organization has an active enterprise subscription
       When I view the subscription page

@@ -144,7 +144,11 @@ export function CurrentPlanBlock({
   return (
     <Card
       data-testid="current-plan-block"
-      title={planName}
+      title={
+        <Box as="span" marginLeft="0.5" data-testid="current-plan-name">
+          {planName}
+        </Box>
+      }
       status="ok"
       badgePlacement="title"
       footerDivider={hasActions}
@@ -172,7 +176,7 @@ export function CurrentPlanBlock({
         ) : undefined
       }
     >
-      <VStack align="stretch" gap={4}>
+      <VStack align="stretch" gap={4} paddingTop={2}>
         <SettingList variant="boxed" data-testid="plan-usage-rows">
           {pricing && (
             <SettingRow label="Price" data-testid="plan-price">
@@ -214,14 +218,15 @@ export function CurrentPlanBlock({
           <SimpleGrid
             data-testid="current-plan-features-grid"
             templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }}
-            gap={2}
+            rowGap={2}
+            columnGap={3}
           >
             {features.map((feature) => (
-              <HStack key={feature} gap={2} alignItems="start">
-                <Box color="green.fg" flexShrink={0} paddingTop="0.5">
-                  <Check size={16} />
+              <HStack key={feature} gap={2} alignItems="start" data-testid="current-plan-feature">
+                <Box color="green.solid" flexShrink={0} paddingTop={1}>
+                  <Check size={12} />
                 </Box>
-                <Text fontSize="sm" color="fg.muted">
+                <Text textStyle="bodySm" color="fg.muted">
                   {feature}
                 </Text>
               </HStack>

@@ -357,12 +357,12 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                | Environment variable                           | Declared at                            |
 | ------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
-| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:176`           |
-| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:177`           |
-| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:178`           |
-| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:179`           |
-| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:180`           |
-| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:181`           |
+| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:183`           |
+| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:184`           |
+| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:185`           |
+| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:186`           |
+| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:187`           |
+| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:188`           |
 | config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:13` |
 | config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:15` |
 | config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:23` |
