@@ -20,6 +20,7 @@ import { OAuthProfileEmailChannel } from "../../channels/http/http.oauth-profile
 import {
   SIGN_IN_HINT_COOKIE,
   SIGN_IN_HINT_TTL_MS,
+  roundTripBindingOf,
   signInHintSealer,
 } from "../../rules/sign-in-hint.rules.ts";
 import { AuthDoorService, type AuthDoorDeps } from "../auth-door.service.ts";
@@ -609,31 +610,51 @@ function refusing(overrides: Partial<AuthDoorDeps> = {}) {
   });
 }
 
+/** The `state`/`RelayState` the person's own sign-in start was sent to the provider with. */
+const ROUND_TRIP = "rt-started-here";
+
 function sealedHint({
   email = "new.hire@acme.com",
   providerId = CONNECTION,
   issuedAt = NOW_MS - 60_000,
   secret = HINT_SECRET,
-}: { email?: string; providerId?: string; issuedAt?: number; secret?: string } = {}): string {
-  return signInHintSealer({ secret }).seal({ email, providerId, issuedAt });
+  roundTrip = ROUND_TRIP,
+}: {
+  email?: string;
+  providerId?: string;
+  issuedAt?: number;
+  secret?: string;
+  roundTrip?: string;
+} = {}): string {
+  const binding = roundTripBindingOf({ value: roundTrip });
+  return signInHintSealer({ secret }).seal({ email, providerId, issuedAt, binding });
 }
 
 function refusedCallback({
   path = `/api/auth/sso/callback/${CONNECTION}`,
   hint,
-}: { path?: string; hint?: string } = {}): Request {
-  return new Request(`${BASE_URL}${path}?error=access_denied&state=s`, {
+  state = ROUND_TRIP,
+}: { path?: string; hint?: string; state?: string } = {}): Request {
+  return new Request(`${BASE_URL}${path}?error=access_denied&state=${state}`, {
     headers: hint === undefined ? {} : { cookie: `other=1; ${SIGN_IN_HINT_COOKIE}=${hint}` },
   });
 }
 
 const SAML_NO_ASSERTION_LOCATION = `${BASE_URL}/auth/error?error=saml_no_assertion&error_description=SAML+response+contains+no+assertions`;
 
-function samlPost({ status, hint }: { status: string; hint?: string }): Request {
+function samlPost({
+  status,
+  hint,
+  relayState = ROUND_TRIP,
+}: {
+  status: string;
+  hint?: string;
+  relayState?: string;
+}): Request {
   const xml = `<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"><samlp:Status><samlp:StatusCode Value="${status}"><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:RequestDenied"/></samlp:StatusCode></samlp:Status></samlp:Response>`;
   const body = new URLSearchParams({
     SAMLResponse: Buffer.from(xml).toString("base64"),
-    RelayState: "relay-1",
+    RelayState: relayState,
   });
   return new Request(`${BASE_URL}/api/auth/sso/saml2/sp/acs/${CONNECTION}`, {
     method: "POST",
@@ -745,6 +766,69 @@ describe("given an identity provider that refused a sign-in started on our page"
 
       expect(locationOf(answered).searchParams.get("error")).toBe("sign_in_failed");
       expect(calls).toEqual([]);
+    });
+  });
+
+  describe("when a refusal does not echo the round trip the hint was bound to", () => {
+    /** @scenario "A refusal that does not echo the sign-in's round trip names nobody" */
+    it("asks identity with no address for a forged OIDC refusal", async () => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: "org_1",
+        idp: "okta",
+        outcome: "refused",
+      });
+
+      await refusing({ refusedSignIns }).service.betterAuthHandshake(
+        refusedCallback({ hint: sealedHint(), state: "rt-forged" }),
+      );
+
+      expect(calls[0]?.email).toBeNull();
+    });
+
+    /** @scenario "A refusal that does not echo the sign-in's round trip names nobody" */
+    it("asks identity with no address for a forged SAML refusal", async () => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: "org_1",
+        idp: "saml",
+        outcome: "refused",
+      });
+      const world = door({
+        refusedSignIns,
+        betterAuth: async () => ({
+          handler: async () =>
+            new Response(null, { status: 302, headers: { location: SAML_NO_ASSERTION_LOCATION } }),
+        }),
+      });
+
+      const answered = await world.service.betterAuthHandshake(
+        samlPost({
+          status: "urn:oasis:names:tc:SAML:2.0:status:Responder",
+          hint: sealedHint(),
+          relayState: "rt-forged",
+        }),
+      );
+
+      expect(locationOf(answered).searchParams.get("error")).toBe("access_denied");
+      expect(calls[0]?.email).toBeNull();
+    });
+
+    it("asks identity with no address for a hint sealed without a round trip", async () => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: "org_1",
+        idp: "okta",
+        outcome: "refused",
+      });
+      const unbound = signInHintSealer({ secret: HINT_SECRET }).seal({
+        email: "new.hire@acme.com",
+        providerId: CONNECTION,
+        issuedAt: NOW_MS - 60_000,
+      });
+
+      await refusing({ refusedSignIns }).service.betterAuthHandshake(
+        refusedCallback({ hint: unbound }),
+      );
+
+      expect(calls[0]?.email).toBeNull();
     });
   });
 
@@ -891,6 +975,9 @@ describe("given a provider sign-in started on our page with a typed address", ()
     /** @scenario "The hint is set when a sign-in starts and dropped once the callback answers" */
     it("sets a signed, httpOnly hint for 15 minutes that rides a cross-site SAML post", async () => {
       const world = door();
+      world.handler.mockImplementation(async () =>
+        Response.json({ url: `https://idp.acme.test/sso?SAMLRequest=x&RelayState=${ROUND_TRIP}` }),
+      );
       const body = { providerId: CONNECTION, loginHint: "New.Hire@acme.com", callbackURL: "/" };
 
       const answered = await world.service.betterAuthHandshake(start(body));
@@ -906,7 +993,22 @@ describe("given a provider sign-in started on our page with a typed address", ()
       const value = cookie.split(";")[0]!.split("=")[1]!;
       expect(
         signInHintSealer({ secret: HINT_SECRET }).decode({ value, nowMs: NOW_MS }),
-      ).toMatchObject({ email: "new.hire@acme.com", providerId: CONNECTION });
+      ).toMatchObject({
+        email: "new.hire@acme.com",
+        providerId: CONNECTION,
+        binding: roundTripBindingOf({ value: ROUND_TRIP }),
+      });
+    });
+
+    /** @scenario "A refusal that does not echo the sign-in's round trip names nobody" */
+    it("sets no hint when its answer carries no round-trip value", async () => {
+      const world = door();
+
+      const answered = await world.service.betterAuthHandshake(
+        start({ providerId: CONNECTION, loginHint: "a@acme.com" }),
+      );
+
+      expect(answered.headers.get("set-cookie")).toBeNull();
     });
   });
 

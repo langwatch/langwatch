@@ -4,8 +4,12 @@ import { describe, expect, it } from "vitest";
 import { refusedSignInLocationOf } from "../sign-in-callback-failure.rules.ts";
 import {
   extractCallbackSource,
+  extractEchoedRoundTrip,
+  extractRoundTripValue,
   extractSignInHintCookie,
   extractSignInStartHint,
+  extractHintedAddress,
+  roundTripBindingOf,
   SIGN_IN_HINT_TTL_MS,
   signInHintSealer,
 } from "../sign-in-hint.rules.ts";
@@ -173,5 +177,69 @@ describe("refusedSignInLocationOf", () => {
       expect(target.searchParams.has("idp")).toBe(false);
       expect(target.searchParams.get("trace")).toBe("ref_1");
     });
+  });
+});
+
+describe("extractRoundTripValue", () => {
+  it("reads a SAML start's RelayState", () => {
+    expect(
+      extractRoundTripValue({ url: "https://idp.acme.test/sso?SAMLRequest=x&RelayState=r1" }),
+    ).toBe("r1");
+  });
+
+  it("reads an OIDC start's state", () => {
+    expect(extractRoundTripValue({ url: "https://idp.acme.test/authorize?state=s1" })).toBe("s1");
+  });
+
+  it("reads nothing off a URL without one, or off no URL", () => {
+    expect(extractRoundTripValue({ url: "https://idp.acme.test/authorize" })).toBeUndefined();
+    expect(extractRoundTripValue({ url: "not a url" })).toBeUndefined();
+    expect(extractRoundTripValue({ url: null })).toBeUndefined();
+  });
+});
+
+describe("extractEchoedRoundTrip", () => {
+  it("reads the state on a callback's query", () => {
+    expect(
+      extractEchoedRoundTrip({
+        url: "https://app.test/cb?error=access_denied&state=s1",
+        formBody: undefined,
+      }),
+    ).toBe("s1");
+  });
+
+  it("reads the RelayState a provider posted", () => {
+    expect(
+      extractEchoedRoundTrip({
+        url: "https://app.test/acs/c",
+        formBody: "SAMLResponse=x&RelayState=r1",
+      }),
+    ).toBe("r1");
+  });
+
+  it("reads nothing from an oversized form", () => {
+    const formBody = `RelayState=r1&pad=${"a".repeat(600 * 1024)}`;
+    expect(extractEchoedRoundTrip({ url: "https://app.test/acs/c", formBody })).toBeUndefined();
+  });
+});
+
+describe("extractHintedAddress", () => {
+  const bound = { ...hint, binding: roundTripBindingOf({ value: "rt-1" }) };
+
+  /** @scenario "A refusal that does not echo the sign-in's round trip names nobody" */
+  it("names the address when the callback echoes the bound round trip", () => {
+    expect(
+      extractHintedAddress({ hint: bound, providerId: "ssoc_acme", echoedRoundTrip: "rt-1" }),
+    ).toBe("sam@acme.com");
+  });
+
+  /** @scenario "A refusal that does not echo the sign-in's round trip names nobody" */
+  it.each([
+    ["another round trip", bound, "ssoc_acme", "rt-2"],
+    ["no round trip echoed", bound, "ssoc_acme", undefined],
+    ["a hint with no binding", hint, "ssoc_acme", "rt-1"],
+    ["another provider", bound, "ssoc_other", "rt-1"],
+  ] as const)("names nobody for %s", (_label, given, providerId, echoedRoundTrip) => {
+    expect(extractHintedAddress({ hint: given, providerId, echoedRoundTrip })).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 import type { RefusedSignInSource } from "@langwatch/identity-contract";
 import { z } from "zod";
@@ -22,6 +22,8 @@ const signInHintSchema = z.object({
   email: z.string().min(3).max(MAX_EMAIL_LENGTH),
   providerId: z.string().min(1).max(200),
   issuedAt: z.number().int(),
+  /** The hash of the round-trip value (`state` or `RelayState`) this sign-in's provider echoes. */
+  binding: z.string().min(1).max(100).optional(),
 });
 export type SignInHint = z.infer<typeof signInHintSchema>;
 
@@ -89,6 +91,64 @@ function parseHintPayload(payload: string): SignInHint | undefined {
   } catch {
     return undefined;
   }
+}
+
+/** The hash a hint keeps of a round-trip value, so a callback can show it holds the same one. */
+export function roundTripBindingOf({ value }: { value: string }): string {
+  return createHash("sha256").update(`langwatch:sign-in-round-trip\0${value}`).digest("base64url");
+}
+
+/** The `state` or `RelayState` a sign-in start sends the person to the provider with. */
+export function extractRoundTripValue({
+  url,
+}: {
+  url: string | null | undefined;
+}): string | undefined {
+  if (!url) return undefined;
+  try {
+    const params = new URL(url).searchParams;
+    return params.get("RelayState") ?? params.get("state") ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A posted callback form past this size is not read. */
+const MAX_CALLBACK_FORM_BYTES = 512 * 1024;
+
+/** The round-trip value a callback echoes: `state` on its query, or `RelayState`/`state` posted. */
+export function extractEchoedRoundTrip({
+  url,
+  formBody,
+}: {
+  url: string;
+  formBody: string | undefined;
+}): string | undefined {
+  const fromQuery = new URL(url).searchParams.get("state");
+  if (fromQuery) return fromQuery;
+  if (!formBody || formBody.length > MAX_CALLBACK_FORM_BYTES) return undefined;
+  const form = new URLSearchParams(formBody);
+  return form.get("RelayState") ?? form.get("state") ?? undefined;
+}
+
+/**
+ * The address a hint names, only when it was set for this callback's provider and the callback
+ * echoes the round-trip value the hint was bound to. A page that forges a refusal does not know
+ * that value, so it can never make a refusal speak for somebody's typed address.
+ */
+export function extractHintedAddress({
+  hint,
+  providerId,
+  echoedRoundTrip,
+}: {
+  hint: SignInHint | undefined;
+  providerId: string;
+  echoedRoundTrip: string | undefined;
+}): string | null {
+  if (!hint || hint.providerId !== providerId || !hint.binding || !echoedRoundTrip) return null;
+  const echoed = Buffer.from(roundTripBindingOf({ value: echoedRoundTrip }));
+  const bound = Buffer.from(hint.binding);
+  return echoed.length === bound.length && timingSafeEqual(echoed, bound) ? hint.email : null;
 }
 
 /** The `Set-Cookie` that carries a sealed hint to the callback. */

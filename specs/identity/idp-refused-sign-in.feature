@@ -67,8 +67,16 @@ Feature: A sign-in the company's identity provider refused says who refused it
   Scenario: The hint is set when a sign-in starts and dropped once the callback answers
     Given the person starts a sign-in with a provider from our sign-in page with their address
     Then the answer sets a signed, httpOnly hint cookie scoped to /api/auth that expires in 15 minutes
+    And the hint holds a hash of the state or RelayState the answer sends the person to the provider with
+    And an answer that carries neither sets no hint
     And over https it is SameSite=None and Secure, so a SAML provider's cross-site post carries it
     And when the provider's callback answers, the hint cookie is cleared
+
+  @unit
+  Scenario: A refusal that does not echo the sign-in's round trip names nobody
+    Given the person holds a fresh hint from a sign-in they started
+    When a refusal reaches the callback with a state or RelayState other than the one the hint holds
+    Then the door treats the address as unknown, so a page that forges a refusal mails nobody
 
   @unit
   Scenario: A SAML refusal posted back is classified like an OIDC refusal

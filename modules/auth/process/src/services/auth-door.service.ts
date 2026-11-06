@@ -35,8 +35,12 @@ import {
   buildClearedSignInHintCookie,
   buildSignInHintCookie,
   extractCallbackSource,
+  extractEchoedRoundTrip,
+  extractRoundTripValue,
   extractSignInHintCookie,
   extractSignInStartHint,
+  extractHintedAddress,
+  roundTripBindingOf,
   isSignInStartPath,
   type SignInHintSealer,
 } from "../rules/sign-in-hint.rules.ts";
@@ -221,7 +225,12 @@ export class AuthDoorService {
 
     const pathname = new URL(request.url).pathname;
     const startHint = await this.readSignInStartHint({ request: stated, pathname });
-    const providerRefused = await this.readSamlRefusal({ request: stated, pathname });
+    const callbackForm = await this.readCallbackForm({ request: stated, pathname });
+    const providerRefused =
+      callbackForm !== undefined &&
+      isSamlAssertionConsumerPost({ pathname, method: request.method }) &&
+      samlResponseOutcomeOf({ formBody: callbackForm }) === "refused";
+    const echoedRoundTrip = extractEchoedRoundTrip({ url: request.url, formBody: callbackForm });
 
     const answered = await this.deps.oauthProfileEmails.runWithScope(async () =>
       this.deps.idTokenIssuerRefusals.runWithScope(async () =>
@@ -240,6 +249,7 @@ export class AuthDoorService {
         errorPageUrl,
         traceId,
         providerRefused,
+        echoedRoundTrip,
       }),
       pathname,
       errorPageUrl,
@@ -248,19 +258,19 @@ export class AuthDoorService {
     return this.carrySignInHint({ request, response: landed, pathname, startHint });
   }
 
-  /** Whether a SAML Response posted back says the provider refused, read off a copy. */
-  private async readSamlRefusal({
+  /** The form a provider posted to a sign-in callback, read off a copy so Better Auth reads it. */
+  private async readCallbackForm({
     request,
     pathname,
   }: {
     request: Request;
     pathname: string;
-  }): Promise<boolean> {
-    if (!isSamlAssertionConsumerPost({ pathname, method: request.method })) return false;
+  }): Promise<string | undefined> {
+    if (request.method !== "POST" || !isSignInCallbackPath({ pathname })) return undefined;
     try {
-      return samlResponseOutcomeOf({ formBody: await request.clone().text() }) === "refused";
+      return await request.clone().text();
     } catch {
-      return false;
+      return undefined;
     }
   }
 
@@ -281,8 +291,11 @@ export class AuthDoorService {
     }
   }
 
-  /** Sets the hint on an accepted sign-in start, and drops it once a callback has answered. */
-  private carrySignInHint({
+  /**
+   * Sets the hint on an accepted sign-in start, bound to the round-trip value its answer sends the
+   * person to the provider with, and drops it once a callback has answered.
+   */
+  private async carrySignInHint({
     request,
     response,
     pathname,
@@ -292,15 +305,18 @@ export class AuthDoorService {
     response: Response;
     pathname: string;
     startHint: { providerId: string; email: string } | undefined;
-  }): Response {
+  }): Promise<Response> {
     const secure = this.deps.baseUrl().startsWith("https:");
     const isCallback = isSignInCallbackPath({ pathname });
     const carriesHint = extractSignInHintCookie(request.headers.get("cookie")) !== undefined;
     let cookie: string | undefined;
-    if (startHint && response.status < 400) {
+    const roundTrip =
+      startHint && response.status < 400 ? await extractProviderRoundTrip({ response }) : undefined;
+    if (startHint && roundTrip) {
       const value = this.deps.signInHints().seal({
         ...startHint,
         issuedAt: this.deps.now().epochMilliseconds,
+        binding: roundTripBindingOf({ value: roundTrip }),
       });
       if (value) cookie = buildSignInHintCookie({ value, secure });
     } else if (isCallback && carriesHint) {
@@ -323,12 +339,14 @@ export class AuthDoorService {
     errorPageUrl,
     traceId,
     providerRefused,
+    echoedRoundTrip,
   }: {
     request: Request;
     response: Response;
     errorPageUrl: string;
     traceId: string | undefined;
     providerRefused: boolean;
+    echoedRoundTrip: string | undefined;
   }): Promise<Response> {
     const redirect = signInErrorRedirectOf({
       status: response.status,
@@ -340,7 +358,7 @@ export class AuthDoorService {
     if (redirect.kind === "pass") return response;
     let location = redirect.location;
     if (redirect.kind === "provider_refused") {
-      location = await this.classifyRefusal({ request, location, traceId });
+      location = await this.classifyRefusal({ request, location, traceId, echoedRoundTrip });
     } else {
       logger.error(
         { code: redirect.code, description: redirect.description, traceId: traceId ?? null },
@@ -361,10 +379,12 @@ export class AuthDoorService {
     request,
     location,
     traceId,
+    echoedRoundTrip,
   }: {
     request: Request;
     location: string;
     traceId: string | undefined;
+    echoedRoundTrip: string | undefined;
   }): Promise<string> {
     const reference = traceId ?? this.deps.newReferenceId();
     const source = extractCallbackSource({ pathname: new URL(request.url).pathname });
@@ -377,7 +397,7 @@ export class AuthDoorService {
             .signInHints()
             .decode({ value: sealed, nowMs: this.deps.now().epochMilliseconds })
         : undefined;
-      const email = hint?.providerId === hintProviderId ? hint.email : null;
+      const email = extractHintedAddress({ hint, providerId: hintProviderId, echoedRoundTrip });
       try {
         verdict = await this.deps.refusedSignIns.classifyRefusedSignIn({ refusedBy, email });
       } catch (error) {
@@ -400,6 +420,23 @@ export class AuthDoorService {
       "an identity provider refused a sign-in; the person was told why",
     );
     return refusedSignInLocationOf({ location, verdict, reference });
+  }
+}
+
+/** The round-trip value a sign-in start's answer carries in its provider URL, body or redirect. */
+async function extractProviderRoundTrip({
+  response,
+}: {
+  response: Response;
+}): Promise<string | undefined> {
+  const fromRedirect = extractRoundTripValue({ url: response.headers.get("location") });
+  if (fromRedirect) return fromRedirect;
+  try {
+    const body: unknown = await response.clone().json();
+    const url = typeof body === "object" && body !== null && "url" in body ? body.url : undefined;
+    return typeof url === "string" ? extractRoundTripValue({ url }) : undefined;
+  } catch {
+    return undefined;
   }
 }
 
