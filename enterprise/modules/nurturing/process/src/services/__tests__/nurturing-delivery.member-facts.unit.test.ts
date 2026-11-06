@@ -15,7 +15,7 @@ import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/me
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingMemberFactsService } from "../nurturing-member-facts.service.ts";
-import type { CustomerIoChannel } from "../../channels/customer-io.channel.ts";
+import { CustomerIoChannel } from "../../channels/customer-io.channel.ts";
 import { NurturingService } from "../nurturing.service.ts";
 
 const T0 = Date.UTC(2026, 9, 20, 12);
@@ -26,6 +26,22 @@ type Call = { path: string; userId: string; traits?: unknown;
   properties?: unknown;
   messageId?: string;
 };
+
+/** A Customer.io that rejects the first joined_organization track, and records the events it took. */
+class RejectsFirstJoinedOrganization extends CustomerIoChannel {
+  readonly sent: string[] = [];
+  #rejected = false;
+  async identifyUser(): Promise<void> {}
+  async groupUser(): Promise<void> {}
+  async batch(): Promise<void> {}
+  async trackEvent({ event }: { event: string }): Promise<void> {
+    if (event === "joined_organization" && !this.#rejected) {
+      this.#rejected = true;
+      throw new Error("customer.io is down");
+    }
+    this.sent.push(event);
+  }
+}
 
 /** A claim repository whose clock the test moves, with the real window semantics. */
 class ClockedClaims implements NurturingClaimRepository {
@@ -432,33 +448,20 @@ describe("NurturingDeliveryService organization facts", () => {
 
     /** @scenario "A joined_organization that failed to send is tracked on the person's next join" */
     it("gives the slot back when the track fails, then tracks once and keeps it after success", async () => {
-      const sent: unknown[] = [];
-      let failNext = true;
-      const channel = {
-        identifyUser: async () => {},
-        groupUser: async () => {},
-        batch: async () => {},
-        trackEvent: async ({ event }: { event: unknown }) => {
-          if (event === "joined_organization" && failNext) {
-            failNext = false;
-            throw new Error("customer.io is down");
-          }
-          sent.push(event);
-        },
-      } as unknown as CustomerIoChannel;
+      const channel = new RejectsFirstJoinedOrganization();
       const { deliver } = await organizationWithMembers({
         customerIoService: NurturingService.create({ channel }),
       });
 
       await deliver(inviteAccepted);
       await settle();
-      expect(sent).toEqual(["joined_via_invite"]);
+      expect(channel.sent).toEqual(["joined_via_invite"]);
 
       await deliver(ssoAutoAdded);
       await deliver({ ...ssoAutoAdded, sourceEventId: "sso-2" });
       await settle();
 
-      expect(sent.filter((event) => event === "joined_organization")).toHaveLength(1);
+      expect(channel.sent.filter((event) => event === "joined_organization")).toHaveLength(1);
     });
 
     /** @scenario "A join from before joined_organization existed is not tracked as it" */

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import type { OrganizationUserRole } from "@langwatch/organization-contract";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 
 import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
 import { type KnownTraces, knownTraceTraits } from "./nurturing-member-facts.rules.ts";
@@ -15,7 +15,7 @@ type Joined = Pick<
  * Joins before this went out under joined_via_invite / joined_via_sso, so a replayed old join
  * must not start the campaign now. 2026-11-06T00:00Z, the day the shared event was introduced.
  */
-const JOINED_ORGANIZATION_SINCE_MS = Date.UTC(2026, 10, 6);
+const JOINED_ORGANIZATION_SINCE = Temporal.Instant.from("2026-11-06T00:00:00Z");
 
 /** Keyed by every role, so a new OrganizationUserRole fails the compile until it is named here. */
 const SEAT_BY_ROLE: Readonly<Record<OrganizationUserRole, string>> = {
@@ -66,7 +66,7 @@ function joinedCalls({
     group,
     { type: "track", userId, event: JOINED_VIA[joinMethod], properties },
   ];
-  if (firstJoin && occurredAt >= JOINED_ORGANIZATION_SINCE_MS) {
+  if (firstJoin && occurredAt >= JOINED_ORGANIZATION_SINCE.epochMilliseconds) {
     calls.push({
       type: "track",
       userId,
