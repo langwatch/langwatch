@@ -40,7 +40,11 @@ import type { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
-import { findRegisteredRefusals } from "../../rules/better-auth-error-code.rules.ts";
+import {
+  findRegisteredRefusals,
+  refusedWith,
+  SSO_DISCOVERY_REFUSAL_CODES,
+} from "../../rules/better-auth-error-code.rules.ts";
 import { getAccountIssuer } from "../../rules/provider-account-issuer.rules.ts";
 import {
   ID_TOKEN_MAX_AGE_SECONDS,
@@ -302,6 +306,20 @@ async function countSignInAttempt({
       "could not record how a sign-in attempt went; the attempt itself already answered",
     );
   }
+}
+
+/**
+ * The SSO engine's refusal of a provider's discovery document reaches only the browser. The
+ * person signing in cannot fix an unreadable or untrusted provider; an administrator can.
+ */
+export function logSsoDiscoveryRefusal(ctx: { context?: { returned?: unknown } }): void {
+  const returned = ctx.context?.returned;
+  if (!(returned instanceof APIError) || !refusedWith(returned, SSO_DISCOVERY_REFUSAL_CODES))
+    return;
+  logger.warn(
+    { code: returned.body?.code, reason: returned.message },
+    "an sso sign-in was refused",
+  );
 }
 
 /**
@@ -894,6 +912,7 @@ export const createAuthOptions = ({
     after: createAuthMiddleware(async (ctx) => {
       await passwordResetSession?.signInAfterPasswordReset(ctx);
       await countSignInAttempt({ ctx, signInLockout });
+      logSsoDiscoveryRefusal(ctx);
       answerAuthRefusalByRegisteredCode(ctx);
     }),
   },
