@@ -65,16 +65,45 @@ Feature: Langy's cards read at the right attention weight
     And the trouble is carried by a calm rust tone, not a loud alert box
     And the retry is offered as a clear action
 
+  # A failed tool call is part of how an agent works, not an alarm: it folds into
+  # the record of the work with the calls that worked, like a terminal agent's log.
+  # Red stays in the conversation only where the person has to act on it.
   @integration
-  Scenario: A step the turn recovered from folds to one line
+  Scenario: A failed step folds into the record of the work
     Given a step that failed and a reply Langy wrote after it
     When I read the finished turn
-    Then that failure is one quiet line, not a card
-    And the line says Langy answered below, never that it carried on, since the reply may be the turn stopping there
-    And opening the line shows the card it always showed
+    Then that failure is no card of its own in the conversation
+    And it is a row in the folded record of the work, with the steps that worked
+    And the row says the step failed, never that Langy carried on
+    And opening the row shows the card it always showed, with its details and copy
+
+  @integration
+  Scenario: A step that fails while the turn is running folds into the record too
+    Given a step that failed while Langy is still working
+    When I watch the turn
+    Then that failure is a row in the folded record of the work, not a card
+
+  @integration
+  Scenario: The record of the work counts its failures quietly
+    Given three steps that failed while Langy was working
+    When I read the record of the work
+    Then its header says "3 failed" in the same quiet grey as the call count
+    And nothing in the header is red
 
   @integration
   Scenario: A step the turn never recovered from keeps its card
     Given a step that failed and no reply after it
-    When I read the turn
+    When I read the finished turn
     Then that failure keeps its card
+
+  @integration
+  Scenario: A step the person denied keeps its card
+    Given a step the person was asked to allow and denied
+    When I read the turn, while it runs or after it answered
+    Then that step keeps its card in the conversation
+
+  @integration
+  Scenario: A failure the person can act on keeps its card
+    Given a step refused because the plan is out of room
+    When I watch the turn
+    Then the card that offers the upgrade stays in the conversation

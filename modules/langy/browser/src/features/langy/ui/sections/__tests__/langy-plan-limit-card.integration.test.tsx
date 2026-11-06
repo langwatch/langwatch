@@ -2,6 +2,7 @@
 /**
  * @see specs/langy/langy-cli-tool-envelope.feature
  *      "A plan limit is a decision, not a broken step"
+ * @see specs/langy/langy-card-taxonomy.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, screen } from "@testing-library/react";
@@ -97,6 +98,13 @@ describe("a tool call refused on a plan limit", () => {
     expect(card.textContent).not.toContain(
       "Your access in this project doesn't cover this action.",
     );
+  });
+
+  /** @scenario "A failure the person can act on keeps its card" */
+  it("keeps its card in the conversation while the turn is still running", () => {
+    renderTurn();
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /tool call/ })).toBeNull();
   });
 
   it("never shows the platform's internal vocabulary", () => {

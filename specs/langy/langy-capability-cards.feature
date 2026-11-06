@@ -392,6 +392,7 @@ Feature: Langy renders domain-capability cards for tool calls
     Scenario: A turn that failed immediately still leads with the failure
       Given the first thing Langy did in a turn failed
       Then the failure is the first thing in the transcript
+      And once the turn answered, it is the first row of the folded record of the work
 
     # Ordering held inside the activity block and nowhere else. The block itself
     # sat above the reply and the whole reply below it, so a turn that wrote a

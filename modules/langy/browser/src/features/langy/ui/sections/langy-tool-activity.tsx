@@ -437,8 +437,8 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
 
     // A tool call whose output is a staged proposal renders as a ProposalCard.
     if (isProposalOutput(part.output)) return;
-    // A failed call has its own red error card, including structured trace/log
-    // actions. It must never get the green checkmark of a completed activity.
+    // A failed call is drawn from toFailedToolCalls, as a failed row of the receipt
+    // or its own card. It must never get the green checkmark of a completed activity.
     if (renderedToolFailure(part)) return;
     // A call whose name maps to a capability is a CARD for its whole life —
     // the pending shell while it runs, the bespoke card once it settles. Only a
@@ -534,7 +534,7 @@ export function LangyActivityParts({
   /**
    * The turn wrote its reply in a LATER run than this one. A run holds only
    * its own parts, so it cannot see the answer that followed it; the caller
-   * can. See the recovered-failure fold below.
+   * can. See {@link keepsItsCard}.
    */
   answeredAfter?: boolean;
 }) {
@@ -581,22 +581,22 @@ export function LangyActivityParts({
     : allCompletedGroups;
 
   // One ordered transcript, a stable sort on the part each block came from (see {@link Sequenced}).
-  // A step that failed and was followed by the turn's own reply is folded to one line that opens
-  // into the same card, since nothing is hidden. A turn still running, or one that never replied,
-  // keeps its failures where they are.
+  // A failed step folds into the receipt with the steps that worked; only one the
+  // reader has to act on keeps its card (see {@link keepsItsCard}).
   const answerIndex = lastAnswerTextIndex(view);
+  const failureCards = failures.filter((failure) =>
+    keepsItsCard({ failure, live, answered: answeredAfter || answerIndex > failure.order }),
+  );
+  const foldedFailures = failures.filter((failure) => !failureCards.includes(failure));
+  const receiptOrders = [
+    ...completedGroups.map((group) => group.order),
+    ...foldedFailures.map((failure) => failure.order),
+  ];
   const rows: { key: string; order: number; node: ReactNode }[] = [
-    ...failures.map(({ id, call, presentation, order }) => ({
+    ...failureCards.map(({ id, call, presentation, order }) => ({
       key: `failure:${id}`,
       order,
-      node: (
-        <FailedToolCallRow
-          call={call}
-          presentation={presentation}
-          devMode={devMode}
-          recovered={!live && (answeredAfter || answerIndex > order)}
-        />
-      ),
+      node: <FailedToolCallRow call={call} presentation={presentation} devMode={devMode} />,
     })),
     ...runningGroups.map((group) => ({
       key: `running:${group.key}`,
@@ -608,15 +608,16 @@ export function LangyActivityParts({
       ),
     })),
     // Finished work has ONE shape, whatever the count.
-    ...(completedGroups.length > 0
+    ...(receiptOrders.length > 0
       ? [
           {
             key: "completed-batch",
             // The receipt stands where the first step it summarises ran.
-            order: Math.min(...completedGroups.map((group) => group.order)),
+            order: Math.min(...receiptOrders),
             node: (
               <CompletedActivityBatch
                 groups={completedGroups}
+                failures={foldedFailures}
                 reasoningTitles={reasoningTitles}
                 devMode={devMode}
               />
@@ -671,15 +672,37 @@ export function LangyActivityParts({
 }
 
 /**
+ * Whether a failed step stays a card in the conversation rather than a row of the
+ * receipt: only when the reader has to act. A denied permission, a decision the
+ * card offers (LangyFailedStepCard), or a settled turn that never answered after it.
+ */
+function keepsItsCard({
+  failure,
+  live,
+  answered,
+}: {
+  failure: FailedToolCall;
+  live: boolean;
+  answered: boolean;
+}): boolean {
+  if (failure.call.state === "output-denied") return true;
+  if (isReaderDecision({ call: failure.call, presentation: failure.presentation })) return true;
+  return !live && !answered;
+}
+
+/**
  * The implementation trail is one receipt, not one card per mechanism. Hover
  * previews it; click pins it open for touch/keyboard users.
  */
 function CompletedActivityBatch({
   groups,
+  failures,
   reasoningTitles = [],
   devMode,
 }: {
   groups: ActivityGroup[];
+  /** Failed steps the turn worked past, listed among the steps that worked. */
+  failures: FailedToolCall[];
   /** The turn's folded thinking steps — rows of the receipt, expanded only. */
   reasoningTitles?: string[];
   devMode: boolean;
@@ -695,7 +718,18 @@ function CompletedActivityBatch({
     }, 2200);
     return () => window.clearTimeout(timer);
   }, []);
-  const callCount = groups.reduce((count, group) => count + group.calls.length, 0);
+  const failedCount = failures.length;
+  const callCount = groups.reduce((count, group) => count + group.calls.length, failedCount);
+  const steps = [
+    ...groups.map((group) => ({
+      order: group.order,
+      node: <CompletedActivityRow key={group.key} group={group} devMode={devMode} />,
+    })),
+    ...failures.map((failure) => ({
+      order: failure.order,
+      node: <FailedActivityRow key={failure.id} failure={failure} devMode={devMode} />,
+    })),
+  ].toSorted((left, right) => left.order - right.order);
 
   return (
     // The summary is the CARD; the steps it summarises hang beneath it. A
@@ -722,14 +756,23 @@ function CompletedActivityBatch({
         _hover={{ borderColor: "border.emphasized" }}
       >
         <HStack gap={2}>
-          <Box color="green.fg" display="flex" flexShrink={0}>
-            <Check size={11} />
-          </Box>
+          {groups.length > 0 ? (
+            <Box color="green.fg" display="flex" flexShrink={0}>
+              <Check size={11} />
+            </Box>
+          ) : (
+            <Box color="fg.subtle" display="flex" flexShrink={0}>
+              <AlertCircle size={11} aria-hidden="true" />
+            </Box>
+          )}
           <Text textStyle="xs" fontWeight="560" color="fg" flex={1} truncate>
-            {groups.length} {groups.length === 1 ? "action" : "actions"} completed
+            {groups.length > 0
+              ? `${groups.length} ${groups.length === 1 ? "action" : "actions"} completed`
+              : `${failedCount} ${failedCount === 1 ? "step" : "steps"} tried`}
           </Text>
           <Text textStyle="2xs" color="fg.subtle">
             {callCount} {callCount === 1 ? "tool call" : "tool calls"}
+            {failedCount > 0 ? ` · ${failedCount} failed` : null}
           </Text>
           <Box
             color="fg.subtle"
@@ -753,9 +796,7 @@ function CompletedActivityBatch({
           borderColor="border.muted"
           as="ul"
         >
-          {groups.map((group) => (
-            <CompletedActivityRow key={group.key} group={group} devMode={devMode} />
-          ))}
+          {steps.map((step) => step.node)}
           {/* The thinking steps the model narrated between calls — part of the
               turn's process record, so they live in the same receipt as the
               actions they punctuated, quieter (they claim thought, not work). */}
@@ -1142,24 +1183,12 @@ function FailedToolCallRow({
   call,
   presentation,
   devMode,
-  recovered = false,
 }: {
   call: ToolCall;
   presentation: LangyToolErrorPresentation;
   devMode: boolean;
-  /**
-   * The turn went on to answer after this step failed. The card folds to one
-   * line, which opens into the same card — a recovered step is process record,
-   * and the turn's own reply is the account of what happened.
-   */
-  recovered?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  // A decision the reader can make is never folded: its card is the way to
-  // make it (LangyFailedStepCard).
-  if (recovered && !isReaderDecision({ call, presentation })) {
-    return <RecoveredToolFailureRow presentation={presentation} />;
-  }
   return (
     <VStack align="stretch" gap={1}>
       <Box position="relative">
@@ -1176,39 +1205,58 @@ function FailedToolCallRow({
 }
 
 /**
- * A step that failed and that the turn recovered from, folded to one line — quiet, not gone,
- * one click from the same card, no longer competing with the answer.
+ * A failed step inside the receipt: one quiet line marked failed, opening into the
+ * error card it would have been, so nothing is hidden.
  */
-function RecoveredToolFailureRow({ presentation }: { presentation: LangyToolErrorPresentation }) {
+function FailedActivityRow({ failure, devMode }: { failure: FailedToolCall; devMode: boolean }) {
   const [open, setOpen] = useState(false);
+  const [jsonOpen, setJsonOpen] = useState(false);
+  const { call, presentation } = failure;
+  const detail = describeToolCall({ name: call.name, input: call.input }).detail;
+
   return (
-    <VStack align="stretch" gap={2}>
-      <chakra.button
-        type="button"
-        width="full"
-        textAlign="left"
-        cursor="pointer"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <HStack gap={2}>
-          <Box color="fg.subtle" display="flex" flexShrink={0}>
+    <VStack align="stretch" gap={1} as="li">
+      <HStack gap={2} paddingY={1.5}>
+        <ResultDisclosureButton isExpanded={open} onToggle={() => setOpen((value) => !value)}>
+          <Box as="span" color="fg.subtle" display="flex" flexShrink={0}>
             <AlertCircle size={11} aria-hidden="true" />
           </Box>
-          <Text textStyle="xs" color="fg.subtle" flex={1} truncate>
-            {presentation.title}, and Langy carried on
-          </Text>
-          <Box
-            color="fg.subtle"
-            display="flex"
-            transform={open ? "rotate(90deg)" : undefined}
-            transition="transform 150ms ease"
+          <Text
+            as="span"
+            display="block"
+            textStyle="xs"
+            color="fg.muted"
+            fontWeight="520"
+            flex={1}
+            minWidth={0}
+            truncate
           >
-            <ChevronRight size={12} />
-          </Box>
-        </HStack>
-      </chakra.button>
-      {open ? <LangyToolErrorCard presentation={presentation} /> : null}
+            {presentation.title}
+          </Text>
+          {detail && !open ? (
+            <Text
+              as="span"
+              display="block"
+              textStyle="2xs"
+              color="fg.subtle"
+              fontFamily="mono"
+              maxWidth="52%"
+              truncate
+            >
+              {detail}
+            </Text>
+          ) : null}
+        </ResultDisclosureButton>
+        {devMode ? (
+          <RawDataToggle isOpen={jsonOpen} onToggle={() => setJsonOpen((value) => !value)} />
+        ) : null}
+      </HStack>
+      {open ? (
+        <Box paddingBottom={1.5}>
+          <LangyToolErrorCard presentation={presentation} />
+        </Box>
+      ) : null}
+      {devMode && jsonOpen ? <RawCallJson call={call} /> : null}
     </VStack>
   );
 }

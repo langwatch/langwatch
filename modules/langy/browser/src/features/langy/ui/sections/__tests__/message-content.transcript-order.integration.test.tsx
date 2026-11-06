@@ -252,10 +252,10 @@ describe("given a turn whose first step failed", () => {
       ] as UIMessage["parts"]),
     );
 
-    const failure = blockHolding("and Langy carried on");
-    expect(screen.getByLabelText("Langy activity").firstElementChild?.textContent).toContain(
-      "and Langy carried on",
-    );
+    // The turn answered, so the failure is the receipt's first row, not a card.
+    const failure = screen.getByRole("button", { name: /failed/, expanded: false });
+    expect(screen.getByLabelText("Langy activity").firstElementChild?.contains(failure)).toBe(true);
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(inOrder(failure, blockHolding("ls modules"), screen.getByText(CLOSING))).toBe(true);
   });
 });
