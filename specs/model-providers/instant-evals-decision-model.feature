@@ -5,10 +5,17 @@ Feature: Instant Evals decision model column in Default models
 
   # ADR-182. LangWatch Instant Preview is the hosted, metered default. An own decision model
   # runs on the organization's key, unmetered and uncapped, behind the
-  # release_instant_evals_own_decision_model flag. A broken own key never falls back.
+  # release_instant_evals_own_decision_model flag, on by default. A broken own key never falls back.
 
   Background:
     Given an organization with a project
+
+  # --- The flag ---
+
+  @unit
+  Scenario: Own decision models are on by default
+    When the flag registry is read
+    Then the own decision model flag is a product flag, on unless switched off
 
   # --- Resolving the column ---
 
@@ -347,7 +354,13 @@ Feature: Instant Evals decision model column in Default models
   Scenario: The Default models table shows an Instant Evals column defaulting to LangWatch Instant Preview
     When I open Settings > Model Providers > Default models
     Then I see an "Instant Evals" column
-    And it reads "LangWatch Instant Preview" where nothing is set
+    And it reads "Instant Preview" with the LangWatch mark where nothing is set
+
+  @unit
+  Scenario: A decision model reads as its model name, as a chat model does
+    When a decision model is listed in a picker
+    Then its label is the model name only, such as "gpt-6-luna" or "Microsoft Decision 1"
+    And its provider is shown by the provider heading and icon, never written in the label
 
   @integration
   Scenario: The drawer offers only decision models for the Instant Evals column
@@ -362,6 +375,13 @@ Feature: Instant Evals decision model column in Default models
     When I edit the Instant Evals column
     Then I can pick "LangWatch Instant Preview" and "OpenAI Decisions API"
     And "Inception Mercury Decide" is not offered, so every pick I can make runs
+
+  @unit
+  Scenario: With the router flag on LangWatch Instant Preview says it routes
+    Given the judge router flag is on for my organization
+    When the Instant Evals choices are built
+    Then "LangWatch Instant Preview" says a decision model answers what it is sure of and an LLM the rest
+    And with the router flag off it reads "Hosted by LangWatch and billed with your plan."
 
   @integration
   Scenario: The drawer asks about the picked scopes, not the page's project

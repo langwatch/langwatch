@@ -573,6 +573,7 @@ function TokenCreatedBody({
 
 export function TokenCreatedDialog({
   newToken,
+  title = "Token created",
   keyName,
   projectId,
   endpoint,
@@ -580,6 +581,8 @@ export function TokenCreatedDialog({
   onClose,
 }: {
   newToken: string | null;
+  /** A rotation reuses the dialog under its own title. */
+  title?: string;
   keyName?: string;
   projectId?: string;
   endpoint: string;
@@ -591,7 +594,7 @@ export function TokenCreatedDialog({
     <Dialog
       open={!!newToken}
       onClose={onClose}
-      title="Token created"
+      title={title}
       size="xl"
       cancelLabel={null}
       closeOnInteractOutside={false}
