@@ -229,8 +229,14 @@ Feature: Credential Validation
 
   @unit
   Scenario: Azure reports a missing deployment by its name
-    Given Azure answers the check with 404
+    Given Azure answers the check with 404 and the DeploymentNotFound code
     Then the refusal names the deployment that was not found
+
+  # A wrong endpoint path answers 404 too, before the key is looked at.
+  @unit
+  Scenario: A bare Azure 404 does not claim the key works
+    Given Azure answers the check with 404 and no DeploymentNotFound code
+    Then the check is reported as refused, not as a missing deployment
 
   @unit
   Scenario: Azure answering past authentication proves the credential
@@ -241,6 +247,12 @@ Feature: Credential Validation
   Scenario: An Azure endpoint that does not answer is reported as unreachable
     Given the Azure endpoint does not resolve or never answers
     Then the provider is reported unreachable, with advice to check the endpoint
+
+  @unit
+  Scenario: An Azure credential routed through an API gateway is not checked
+    Given an Azure credential with an API gateway base URL
+    When I call validateProviderApiKey for it
+    Then validation is skipped as not probeable, since the gateway speaks its own auth
 
   @unit
   Scenario: An Azure credential with no deployment to ask is not checked

@@ -11,6 +11,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   MAX_UPSTREAM_DETAIL_LENGTH,
   type UpstreamRefusal,
+  extractUpstreamCode,
   extractUpstreamMessage,
   extractUpstreamReason,
   geminiRefusalKind,
@@ -25,6 +26,8 @@ import type { ModelProviderEgressResponse } from "./ssrf-model-provider-egress.s
 export type ProbeResponse = ModelProviderEgressResponse;
 
 const logger = createLogger("langwatch:api:providerValidation");
+
+const AZURE_DEPLOYMENT_NOT_FOUND = "DeploymentNotFound";
 
 /**
  * Reads the provider's own explanation for a refusal. Never throws: an
@@ -57,6 +60,7 @@ async function readUpstreamRefusal(
       ? redactApiKey(message, apiKey).slice(0, MAX_UPSTREAM_DETAIL_LENGTH)
       : undefined,
     reason: extractUpstreamReason(parsed),
+    code: extractUpstreamCode(parsed),
   };
 }
 
@@ -114,7 +118,7 @@ export async function handleHttpError({
   response: ProbeResponse;
   context: ProbeContext;
 }): Promise<RankedFailure> {
-  const { message, reason } = await readUpstreamRefusal(response, context.apiKey);
+  const { message, reason, code } = await readUpstreamRefusal(response, context.apiKey);
 
   // The one place the provider's own words are kept. Redacted at the point of
   // reading, because this is a log and the key is what it would otherwise
@@ -153,8 +157,13 @@ export async function handleHttpError({
     );
   }
 
-  // Azure answers 404 once the key and endpoint are past: the deployment named is not there.
-  if (context.provider === "azure" && response.status === 404 && context.model) {
+  // A wrong endpoint path also answers 404, so only Azure's own code names the deployment.
+  if (
+    context.provider === "azure" &&
+    response.status === 404 &&
+    code === AZURE_DEPLOYMENT_NOT_FOUND &&
+    context.model
+  ) {
     return refusal(
       new ProviderDeploymentNotFoundError({
         provider: context.provider,

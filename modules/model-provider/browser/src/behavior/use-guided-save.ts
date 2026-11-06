@@ -1,5 +1,5 @@
 import { findRecommendedChatModels } from "@langwatch/model-provider-contract";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { guidedModelCatalogFor } from "../model/guided-credential-fields.ts";
 import type {
@@ -82,22 +82,33 @@ export function useApplyGuidedModel({
   state: Pick<UseModelProviderFormState, "customModels">;
   actions: Pick<
     UseModelProviderFormActions,
-    "setUseAsDefaultProvider" | "setProjectDefaultModel" | "setCustomModels"
+    "setUseAsDefaultProvider" | "setProjectDefaultModel" | "addCustomModel" | "removeCustomModel"
   >;
   storedRow: unknown;
 }): void {
   const model = chatModel ?? state.customModels[0]?.modelId;
-  const { setUseAsDefaultProvider, setProjectDefaultModel, setCustomModels } = actions;
+  const { setUseAsDefaultProvider, setProjectDefaultModel, addCustomModel, removeCustomModel } =
+    actions;
   useEffect(() => {
     if (!guided || !model) return;
     setUseAsDefaultProvider(true);
     setProjectDefaultModel(`${providerKey}/${model}`);
   }, [guided, model, providerKey, storedRow, setUseAsDefaultProvider, setProjectDefaultModel]);
 
-  const registered =
-    state.customModels.length === 1 && state.customModels[0]?.modelId === chatModel;
+  // The stored row's own models stay; only the one this panel added is swapped out.
+  const added = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!guided || !registersModel || !chatModel || registered) return;
-    setCustomModels([{ modelId: chatModel, displayName: chatModel, mode: "chat" }]);
-  }, [guided, registersModel, chatModel, registered, storedRow, setCustomModels]);
+    added.current = undefined;
+  }, [storedRow]);
+  const registered = state.customModels.some((entry) => entry.modelId === chatModel);
+  useEffect(() => {
+    if (!guided || !registersModel || !chatModel) return;
+    if (added.current && added.current !== chatModel) {
+      removeCustomModel(added.current);
+      added.current = undefined;
+    }
+    if (registered) return;
+    addCustomModel({ modelId: chatModel, displayName: chatModel, mode: "chat" });
+    added.current = chatModel;
+  }, [guided, registersModel, chatModel, registered, storedRow, addCustomModel, removeCustomModel]);
 }
