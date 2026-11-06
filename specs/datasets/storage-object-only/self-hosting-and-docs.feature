@@ -12,7 +12,6 @@
 #     enabled (charts/langwatch/templates/_helpers.tpl:210-218);
 #   - the chart still names a dataset migration Job that no template creates
 #     (_helpers.tpl:1177, :1543, :1550, :1742; templates/NOTES.txt:173-187, :241-244);
-#   - .env.example:102-104 offers SKIP_DATASET_S3_MIGRATE, which nothing reads;
 #   - docs/self-hosting/upgrade-dataset-storage.mdx:6-9, :116-152 promise rows kept in PostgreSQL as
 #     a fallback; docs/platform/data-retention.mdx:26 places datasets in Postgres;
 #     docs/self-hosting/infrastructure/architecture.mdx:57 calls dataset storage optional;
@@ -62,8 +61,7 @@ Feature: Self-hosted installs keep dataset files safe once Postgres holds no cop
       And it describes the remaining-content move, the records-table cleanup an operator confirms and the dataset storage audit
       And it no longer promises that rows are kept in PostgreSQL as a fallback
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: The environment example no longer offers the dead dataset migration opt-out
       When the environment example is read
       Then it does not mention SKIP_DATASET_S3_MIGRATE
