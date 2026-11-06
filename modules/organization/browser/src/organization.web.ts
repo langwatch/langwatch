@@ -46,7 +46,7 @@ export const organizationWeb = defineBrowserModule("organization")
     "pages/settings/directory": {
       path: "/settings/directory",
       within: "settings",
-      label: "Directory",
+      label: "Users",
       load: () => import("./ui/sections/organization/directory.screen.tsx"),
     },
     "pages/settings/authentication": {

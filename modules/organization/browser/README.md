@@ -13,7 +13,7 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 | Page key                        | URL                        | Within   | Label          | Permission      | Flags |
 | ------------------------------- | -------------------------- | -------- | -------------- | --------------- | ----- |
 | `pages/settings/audit-log`      | `/settings/audit-log`      | settings | Audit Log      | `auditLog:view` | –     |
-| `pages/settings/directory`      | `/settings/directory`      | settings | Directory      | –               | –     |
+| `pages/settings/directory`      | `/settings/directory`      | settings | Users          | –               | –     |
 | `pages/settings/authentication` | `/settings/authentication` | settings | Authentication | `sso:view`      | –     |
 | `pages/settings/teams/[team]`   | `/settings/teams/:team`    | settings | –              | `team:view`     | –     |
 

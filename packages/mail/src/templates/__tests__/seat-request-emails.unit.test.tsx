@@ -2,11 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { TestMailer } from "../../__tests__/mailer.test-double.ts";
 import type { EmailContent } from "../../email-sender.ts";
-import {
-  sendAccessNoticeDigestEmail,
-  sendIdpRefusedSignInEmail,
-  sendSeatRequestEmail,
-} from "../seat-request-emails.tsx";
+import { sendIdpRefusedSignInEmail, sendSeatRequestEmail } from "../seat-request-emails.tsx";
 
 class RecordingMailer extends TestMailer {
   readonly sent: EmailContent[] = [];
@@ -85,25 +81,5 @@ describe("sendIdpRefusedSignInEmail", () => {
     expect(mailer.sent[0]?.html).toContain(
       "Foo Bar (foo@acme.com) tried to sign in, but your identity provider (Okta) refused it. If they should have access, assign them to the LangWatch app in Okta.",
     );
-  });
-});
-
-describe("sendAccessNoticeDigestEmail", () => {
-  it("names the people and counts the rest", async () => {
-    const mailer = new RecordingMailer();
-
-    await sendAccessNoticeDigestEmail({
-      mailer,
-      recipientEmail: "priya@acme.example",
-      organizationName: "Acme Corp",
-      people: [{ name: "Foo Bar", email: "foo@acme.example", kind: "seat_request", idpName: null }],
-      moreCount: 5,
-      requestsUrl,
-    });
-
-    const [content] = mailer.sent;
-    expect(content?.subject).toBe("6 people need access to Acme Corp");
-    expect(content?.html).toContain("Foo Bar (foo@acme.example)");
-    expect(content?.html).toContain("and 5 more");
   });
 });

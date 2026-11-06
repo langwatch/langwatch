@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
 import type { MailSender } from "../email-sender.ts";
-import { DataTable, EmailLayout, Muted, Paragraph, PrimaryButton } from "./email-layout.tsx";
+import { EmailLayout, Muted, Paragraph, PrimaryButton } from "./email-layout.tsx";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 /**
@@ -221,104 +221,5 @@ export const sendIdpRefusedSignInEmail = async ({
   ...props
 }: IdpRefusedSignInProps & { mailer: MailSender; idempotencyKey?: string }) => {
   const { subject, html } = await renderMailTemplate(idpRefusedSignInTemplate, props);
-  await sendEmail({ mailer, content: { to: props.recipientEmail, subject, html, idempotencyKey } });
-};
-
-/* ── Everyone held back over the last day, in one mail. ──────────────────── */
-
-/** The most people a digest names; the rest are counted. */
-export const ACCESS_DIGEST_MAX_NAMES = 20;
-
-export const accessNoticeDigestProps = z.object({
-  recipientEmail: z.email(),
-  organizationName: z.string().min(1),
-  people: z
-    .array(
-      z.object({
-        name: z.string().nullable(),
-        email: z.string(),
-        kind: z.enum(["seat_request", "idp_refused"]),
-        idpName: z.string().nullable(),
-      }),
-    )
-    .max(ACCESS_DIGEST_MAX_NAMES),
-  /** How many more people the digest does not name. */
-  moreCount: z.number().int().nonnegative(),
-  requestsUrl: z.url(),
-});
-
-export type AccessNoticeDigestProps = z.infer<typeof accessNoticeDigestProps>;
-
-export const accessNoticeDigestSubject = ({
-  people,
-  moreCount,
-  organizationName,
-}: AccessNoticeDigestProps) => {
-  const total = people.length + moreCount;
-  return `${total} ${total === 1 ? "person needs" : "people need"} access to ${organizationName}`;
-};
-
-export const AccessNoticeDigestEmail = (props: AccessNoticeDigestProps) => (
-  <EmailLayout
-    preview={accessNoticeDigestSubject(props)}
-    heading="People are waiting for access"
-    footNote={recipientNotice}
-  >
-    <Paragraph>
-      {`Over the last day these people tried to get into ${props.organizationName} and could not.`}
-    </Paragraph>
-    <DataTable
-      columns={[
-        { key: "person", label: "Person" },
-        { key: "what", label: "What happened" },
-      ]}
-      rows={props.people.map((person) => ({
-        key: `${person.kind}:${person.email}`,
-        cells: {
-          person: personLabel(person),
-          what:
-            person.kind === "seat_request"
-              ? "Waiting for a seat"
-              : `Sign-in refused by ${idpPhrase(person.idpName).assignIn}`,
-        },
-      }))}
-    />
-    {props.moreCount > 0 && <Paragraph>{`and ${props.moreCount} more`}</Paragraph>}
-    <Paragraph>
-      Seat requests are approved from the requests list. A refused sign-in is fixed by assigning the
-      person to the LangWatch app in your identity provider.
-    </Paragraph>
-    <PrimaryButton href={props.requestsUrl}>Review the requests</PrimaryButton>
-  </EmailLayout>
-);
-
-export const accessNoticeDigestTemplate = defineTemplate({
-  id: "access-notice-digest",
-  title: "People are waiting for access",
-  sentWhen:
-    "The seat requests and refused sign-ins held back over a day, in one mail. Sent to administrators and Billing members.",
-  schema: accessNoticeDigestProps,
-  subject: accessNoticeDigestSubject,
-  Component: AccessNoticeDigestEmail,
-  fixtures: {
-    "a busy day": {
-      recipientEmail: "priya@acme.example",
-      organizationName: "Acme Corp",
-      people: [
-        { name: "Foo Bar", email: "foo@acme.example", kind: "seat_request", idpName: null },
-        { name: null, email: "baz@acme.example", kind: "idp_refused", idpName: "Okta" },
-      ],
-      moreCount: 5,
-      requestsUrl: "https://app.langwatch.ai/settings/members?tab=requests",
-    },
-  },
-});
-
-export const sendAccessNoticeDigestEmail = async ({
-  mailer,
-  idempotencyKey,
-  ...props
-}: AccessNoticeDigestProps & { mailer: MailSender; idempotencyKey?: string }) => {
-  const { subject, html } = await renderMailTemplate(accessNoticeDigestTemplate, props);
   await sendEmail({ mailer, content: { to: props.recipientEmail, subject, html, idempotencyKey } });
 };

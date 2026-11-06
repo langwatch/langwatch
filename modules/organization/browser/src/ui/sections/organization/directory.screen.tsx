@@ -66,7 +66,7 @@ function Directory({
   return (
     <>
       <PageLayout.Header description="Who is in this organization, how they got here, and which system says so.">
-        <PageLayout.Heading>Directory</PageLayout.Heading>
+        <PageLayout.Heading>Users</PageLayout.Heading>
       </PageLayout.Header>
       <VStack gap={3} width="full" align="stretch">
         {/* The status band reads what the directory has been doing: sso:view. */}
@@ -118,7 +118,7 @@ function DirectoryTabs({
   if (!canManage) {
     return (
       <ContentTabs
-        label="Directory"
+        label="Users"
         value="people"
         onValueChange={({ value }) => onSelectTab(value)}
         mount="active"
@@ -130,7 +130,7 @@ function DirectoryTabs({
 
   return (
     <ContentTabs
-      label="Directory"
+      label="Users"
       value={tab}
       onValueChange={({ value }) => onSelectTab(value)}
       mount="active"

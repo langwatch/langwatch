@@ -4,7 +4,7 @@ import { AccessState } from "@langwatch/design-system/access-state";
  * or turned off by an administrator) reads who to contact instead of creating an organization.
  * Spec: modules/organization/specs/seat-requests.feature
  */
-import { Box, Button, Spinner } from "@langwatch/design-system/primitives";
+import { Box, Button, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import type { HeldMembership } from "@langwatch/organization-contract";
 import type { ReactNode } from "react";
 
@@ -34,9 +34,10 @@ export function HeldMembershipScreen({
   onCheckAgain: () => void;
 }) {
   const host = useOrganizationHost();
-  const contacts = membership.contacts.map((contact) => contact.name).join(", ");
-  const contactLine = contacts ? ` Contact one of them: ${contacts}.` : "";
   const overLimit = membership.reason === "seat_limit";
+  const lead = overLimit
+    ? "Your organization is over its seat limits. Please contact an administrator to approve your access:"
+    : `An administrator turned off your access to ${membership.organizationName}. Contact one of them:`;
 
   return (
     <Box maxWidth="640px" marginX="auto" paddingY={12} paddingX={4}>
@@ -49,9 +50,16 @@ export function HeldMembershipScreen({
             : `Your access to ${membership.organizationName} is turned off`
         }
         description={
-          overLimit
-            ? `We've asked your administrators to approve a seat.${contactLine}`
-            : `An administrator turned off your access to ${membership.organizationName}.${contactLine}`
+          <VStack align="start" gap={2}>
+            <Text>{lead}</Text>
+            <VStack as="ul" align="start" gap={1} listStyleType="none" data-testid="held-contacts">
+              {membership.contacts.map((contact) => (
+                <Text as="li" key={`${contact.name}-${contact.email ?? ""}`}>
+                  {contact.email ? `${contact.name} (${contact.email})` : contact.name}
+                </Text>
+              ))}
+            </VStack>
+          </VStack>
         }
         actions={
           <>

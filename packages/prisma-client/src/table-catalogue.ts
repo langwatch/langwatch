@@ -602,8 +602,7 @@ export const prismaModelFieldCatalogue = {
     "dayKey",
     "idpRefused",
     "createdAt",
-    "mailedAt",
-    "delivery"
+    "mailedAt"
   ],
   "Team": [
     "id",

@@ -221,7 +221,7 @@ function accessGroup({ enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
       {
         // On every plan: members, teams and groups are tabs of this one page,
         // and each old address forwards onto its tab, as on main.
-        label: "Directory",
+        label: "Users",
         href: "/settings/directory",
         includePath: "/settings/directory",
         icon: BookUser,

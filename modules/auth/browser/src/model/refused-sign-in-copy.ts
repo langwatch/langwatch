@@ -40,5 +40,5 @@ export function describeProviderRefusal(idp: string | null | undefined): SignInR
 
 export const SEAT_LIMIT_REFUSAL: SignInRefusalCopy = {
   title: "Waiting for a seat",
-  body: "Your organization is over its seat limit. We've asked your administrators to approve a seat. Once they do, sign in again.",
+  body: "Your organization is over its seat limits. Please contact an administrator to approve your access.",
 };

@@ -249,11 +249,6 @@ export class SeatRequestService {
     return { outcome: "declined" };
   }
 
-  /** The worker's digest sweep over the notices this service records. */
-  sendDueDigests(): Promise<{ digests: number }> {
-    return this.dependencies.notices.sendDueDigests();
-  }
-
   /** The caller's memberships they cannot use, each with whom to contact (ruling R2). */
   async heldMemberships({ userId }: { userId: string }): Promise<HeldMemberships> {
     const [states, requests] = await Promise.all([
@@ -270,7 +265,7 @@ export class SeatRequestService {
         reason: heldReason({ role: state.role, request }),
         contacts: contacts.flatMap((contact) => {
           const name = contact.name ?? contact.email;
-          return name ? [{ name }] : [];
+          return name ? [{ name, email: contact.email }] : [];
         }),
       });
     }

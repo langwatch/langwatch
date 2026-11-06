@@ -101,7 +101,7 @@ const heldMembershipSchemaDefinition = z.object({
   organizationId: z.string(),
   organizationName: z.string(),
   reason: z.enum(["seat_limit", "access_turned_off"]),
-  contacts: z.array(z.object({ name: z.string() })),
+  contacts: z.array(z.object({ name: z.string(), email: z.string().nullable() })),
 });
 export interface HeldMembershipSchema extends Named<typeof heldMembershipSchemaDefinition> {}
 export const heldMembershipSchema: HeldMembershipSchema = heldMembershipSchemaDefinition;

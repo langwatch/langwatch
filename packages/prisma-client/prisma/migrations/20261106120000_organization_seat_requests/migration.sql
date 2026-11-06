@@ -30,7 +30,6 @@ CREATE TABLE IF NOT EXISTS "OrganizationAccessNotice" (
     "idpRefused" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "mailedAt" TIMESTAMP(3),
-    "delivery" TEXT,
     CONSTRAINT "OrganizationAccessNotice_pkey" PRIMARY KEY ("id")
 );
 
@@ -38,5 +37,3 @@ CREATE UNIQUE INDEX IF NOT EXISTS "SeatRequest_organizationId_email_key" ON "Sea
 CREATE INDEX IF NOT EXISTS "SeatRequest_organizationId_status_idx" ON "SeatRequest"("organizationId", "status");
 CREATE INDEX IF NOT EXISTS "SeatRequest_userId_idx" ON "SeatRequest"("userId");
 CREATE UNIQUE INDEX IF NOT EXISTS "OrganizationAccessNotice_organizationId_kind_email_dayKey_key" ON "OrganizationAccessNotice"("organizationId", "kind", "email", "dayKey");
-CREATE INDEX IF NOT EXISTS "OrganizationAccessNotice_organizationId_mailedAt_idx" ON "OrganizationAccessNotice"("organizationId", "mailedAt");
-CREATE INDEX IF NOT EXISTS "OrganizationAccessNotice_mailedAt_idx" ON "OrganizationAccessNotice"("mailedAt");

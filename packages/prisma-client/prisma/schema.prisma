@@ -1134,8 +1134,8 @@ model SeatRequest {
   @@index([userId])
 }
 
-/// The mail outbox for seat requests and refused sign-ins: at most one row per organization,
-/// kind, address and UTC day; held rows go out together as one digest per 24 hours.
+/// The mail log for seat requests and refused sign-ins: at most one row per organization,
+/// kind, address and UTC day, each mailed at once.
 model OrganizationAccessNotice {
   id             String    @id
   organizationId String
@@ -1149,14 +1149,10 @@ model OrganizationAccessNotice {
   /// Whether the seat request it announces was also refused by the identity provider.
   idpRefused     Boolean   @default(false)
   createdAt      DateTime  @default(now())
-  /// Null while held for the next digest.
+  /// Set once the notice was handed to the mailer; null if a send never started.
   mailedAt       DateTime?
-  /// immediate | digest, once mailed.
-  delivery       String?
 
   @@unique([organizationId, kind, email, dayKey])
-  @@index([organizationId, mailedAt])
-  @@index([mailedAt])
 }
 
 model Team {

@@ -10,9 +10,9 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
 ## Screens
 
-| Page key               | URL               | Within   | Label          | Permission            | Flags |
-| ---------------------- | ----------------- | -------- | -------------- | --------------------- | ----- |
-| `pages/settings/roles` | `/settings/roles` | settings | Roles & access | `organization:manage` | –     |
+| Page key               | URL               | Within   | Label          | Permission     | Flags |
+| ---------------------- | ----------------- | -------- | -------------- | -------------- | ----- |
+| `pages/settings/roles` | `/settings/roles` | settings | Roles & access | `members:view` | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 

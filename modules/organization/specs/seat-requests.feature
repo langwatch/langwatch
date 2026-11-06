@@ -160,7 +160,9 @@ Feature: Seat requests when an organization is over its seat limit
       When "late@acme.example" opens a seat request twice
       Then the sales channel is told about the seat request once
 
-  Rule: administrators and Billing members are told, and the mail is bounded
+  Rule: administrators and Billing members are mailed about each person at once
+    Organizations see few of these a day, and each one says an employee wants LangWatch, so there
+    is no digest; the only limit is one notice per person, kind and day.
 
     @unit
     Scenario: The first notice of the day is mailed at once to administrators and Billing members
@@ -168,29 +170,16 @@ Feature: Seat requests when an organization is over its seat limit
       Then "Ada Admin" and "Bill Payer" are mailed about "late@acme.example" at once
 
     @unit
-    Scenario: Later notices in the same window are held for one digest
-      Given a seat request mail went out an hour ago
-      When "second@acme.example" and "third@acme.example" open seat requests
-      Then nobody is mailed at once
-      And when the window closes one digest names both people
-
-    @unit
-    Scenario: A notice after the window closed carries the ones still held
-      Given "second@acme.example" waits for the digest of a window that has closed
-      When "fourth@acme.example" opens a seat request before the digest sweep runs
-      Then one digest names both people at once
-      And nothing is left waiting for another day
+    Scenario: Each person's notice is mailed at once
+      Given a seat request mail about "first@acme.example" went out an hour ago
+      When "second@acme.example" opens a seat request
+      Then "Ada Admin" and "Bill Payer" are each mailed about "second@acme.example" at once
+      And no mail groups the two people together
 
     @unit
     Scenario: The same person is noticed at most once a day per kind
       When "late@acme.example" is refused by the identity provider three times in a day
       Then one identity provider refusal notice names "late@acme.example"
-
-    @unit
-    Scenario: A digest names at most twenty people
-      Given twenty-five notices are held for the digest
-      When the window closes
-      Then the digest names twenty people and says "and 5 more"
 
     @unit
     Scenario: The seat request mail says when the identity provider also refused the person
@@ -216,10 +205,11 @@ Feature: Seat requests when an organization is over its seat limit
     Scenario: The waiting screen names who to contact instead of onboarding
       Given "late@acme.example" is held pending with an open seat request
       When "late@acme.example" lands with no active organization
-      Then they see that the organization is over its seat limit and who to contact
+      Then they read "Your organization is over its seat limits. Please contact an administrator to approve your access:"
+      And they see each contact's name and email address
 
     @integration
     Scenario: Administrators see seat requests beside join requests
       Given "late@acme.example" has an open seat request
-      When an administrator opens the Directory requests
+      When an administrator opens the requests on the Users page
       Then the seat request is listed with Approve and Decline

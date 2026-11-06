@@ -331,7 +331,7 @@ describe("given an organization that is out of seats for the refused person", ()
     expect(screen.getByText("Waiting for a seat")).toBeTruthy();
     expect(
       screen.getByText(
-        "Your organization is over its seat limit. We've asked your administrators to approve a seat. Once they do, sign in again.",
+        "Your organization is over its seat limits. Please contact an administrator to approve your access.",
       ),
     ).toBeTruthy();
     expect(screen.getByTestId("sign-in-error-trace").textContent).toBe("Reference: ref_2");

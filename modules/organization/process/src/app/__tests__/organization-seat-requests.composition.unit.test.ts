@@ -424,7 +424,10 @@ describe("given a person whose membership gives no access", () => {
             organizationId: ORGANIZATION_ID,
             organizationName: "ACME",
             reason: "seat_limit",
-            contacts: [{ name: "Ada Admin" }, { name: "Bill Payer" }],
+            contacts: [
+              { name: "Ada Admin", email: "ada@acme.example" },
+              { name: "Bill Payer", email: "bill@acme.example" },
+            ],
           },
         ],
       });

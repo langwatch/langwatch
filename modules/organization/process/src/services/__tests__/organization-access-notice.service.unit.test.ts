@@ -1,5 +1,5 @@
 /**
- * The bounded mail behind seat requests and refused sign-ins (ruling R5).
+ * The mail behind seat requests and refused sign-ins (ruling R5).
  * @see modules/organization/specs/seat-requests.feature
  */
 import { createTestLogger } from "@langwatch/test-harness";
@@ -7,10 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryAccessNoticeMailChannel } from "../../channels/memory/memory.access-notice-mail.channel.ts";
 import { MemoryOrganizationAccessNoticeRepository } from "../../repositories/memory/memory.organization-access-notice.repository.ts";
-import {
-  ACCESS_NOTICE_WINDOW_MS,
-  OrganizationAccessNoticeService,
-} from "../organization-access-notice.service.ts";
+import { OrganizationAccessNoticeService } from "../organization-access-notice.service.ts";
 
 const ORGANIZATION_ID = "org-acme";
 const HOUR_MS = 60 * 60 * 1000;
@@ -50,65 +47,25 @@ function notices() {
 }
 
 describe("OrganizationAccessNoticeService", () => {
-  describe("when the first notice of the window is recorded", () => {
-    it("mails every recipient at once", async () => {
-      const { mail, seatRequest } = notices();
+  describe("when two different people ask for a seat an hour apart", () => {
+    /** @scenario "Each person's notice is mailed at once" */
+    it("mails every recipient about each person, one mail per person", async () => {
+      const { clock, mail, seatRequest } = notices();
 
-      const result = await seatRequest("late@acme.example");
-
-      expect(result).toEqual({ recorded: true, mailed: true });
-      expect(mail.seatRequests.map((sent) => sent.recipientEmail)).toEqual([
-        "ada@acme.example",
-        "bill@acme.example",
-      ]);
-    });
-  });
-
-  describe("when more notices arrive within the window", () => {
-    /** @scenario "Later notices in the same window are held for one digest" */
-    it("mails none at once and sends one digest naming both when the window closes", async () => {
-      const { clock, mail, service, seatRequest } = notices();
-      await seatRequest("first@acme.example");
+      const first = await seatRequest("first@acme.example");
       clock.now += HOUR_MS;
+      const second = await seatRequest("second@acme.example");
 
-      await seatRequest("second@acme.example");
-      await seatRequest("third@acme.example");
-
-      expect(mail.seatRequests).toHaveLength(2);
-      expect(await service.sendDueDigests()).toEqual({ digests: 0 });
-
-      clock.now = START + ACCESS_NOTICE_WINDOW_MS;
-      expect(await service.sendDueDigests()).toEqual({ digests: 1 });
-      expect(mail.digests.map((digest) => digest.recipientEmail)).toEqual([
-        "ada@acme.example",
-        "bill@acme.example",
+      expect([first, second]).toEqual([
+        { recorded: true, mailed: true },
+        { recorded: true, mailed: true },
       ]);
-      expect(mail.digests[0]?.people.map((person) => person.email)).toEqual([
-        "second@acme.example",
-        "third@acme.example",
+      expect(mail.seatRequests.map((sent) => [sent.recipientEmail, sent.personEmail])).toEqual([
+        ["ada@acme.example", "first@acme.example"],
+        ["bill@acme.example", "first@acme.example"],
+        ["ada@acme.example", "second@acme.example"],
+        ["bill@acme.example", "second@acme.example"],
       ]);
-      expect(await service.sendDueDigests()).toEqual({ digests: 0 });
-    });
-  });
-
-  describe("when a notice arrives after the window closed but before the sweep", () => {
-    /** @scenario "A notice after the window closed carries the ones still held" */
-    it("mails one digest naming the held person and the new one", async () => {
-      const { clock, mail, service, seatRequest } = notices();
-      await seatRequest("first@acme.example");
-      clock.now += HOUR_MS;
-      await seatRequest("second@acme.example");
-      clock.now = START + ACCESS_NOTICE_WINDOW_MS + HOUR_MS;
-
-      const result = await seatRequest("fourth@acme.example");
-
-      expect(result).toEqual({ recorded: true, mailed: true });
-      expect(mail.seatRequests).toHaveLength(2);
-      expect(mail.digests[0]?.people.map((person) => person.email)).toEqual([
-        "second@acme.example",
-        "fourth@acme.example",
-      ]);
-      expect(await service.sendDueDigests()).toEqual({ digests: 0 });
     });
   });
 
@@ -133,25 +90,6 @@ describe("OrganizationAccessNoticeService", () => {
         "ada@acme.example",
         "bill@acme.example",
       ]);
-    });
-  });
-
-  describe("when twenty-five notices are held for the digest", () => {
-    /** @scenario "A digest names at most twenty people" */
-    it("names twenty people and counts five more", async () => {
-      const { clock, mail, service, seatRequest } = notices();
-      await seatRequest("first@acme.example");
-      for (let index = 0; index < 25; index++) {
-        clock.now += 1_000;
-        await seatRequest(`person-${index}@acme.example`);
-      }
-
-      clock.now = START + ACCESS_NOTICE_WINDOW_MS;
-      await service.sendDueDigests();
-
-      const [digest] = mail.digests;
-      expect(digest?.people).toHaveLength(20);
-      expect(digest?.moreCount).toBe(5);
     });
   });
 

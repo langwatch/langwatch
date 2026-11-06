@@ -52,7 +52,7 @@ export function SeatRequestsCard({ showAllLink = false }: { showAllLink?: boolea
             {showAllLink && (
               <Link href="/settings/directory">
                 <Button size="xs" variant="ghost" color="fg.muted">
-                  Directory
+                  Users
                   <ArrowRight size={14} aria-hidden />
                 </Button>
               </Link>

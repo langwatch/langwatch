@@ -102,7 +102,7 @@ SCIM `DELETE` or `PATCH active: false`. Those operations revoke the person's
 browser sessions and CLI tokens, remove organization membership and role
 bindings, and keep their LangWatch data.
 
-In **Directory**, **Disable** is reversible: it refuses the person's requests,
+In **Users**, **Disable** is reversible: it refuses the person's requests,
 preserves their role and bindings, and frees their seat. **Remove from
 organization** ends membership and access.
 
@@ -130,9 +130,9 @@ people that connection provisioned, and can take on a member that no connector
 has claimed yet. It cannot manage people owned by another connection. Revoke a
 token from the **Provisioning tokens** table when that integration should stop.
 
-SCIM creates an organization Member. Use **Settings > Directory > People** to
+SCIM creates an organization Member. Use **Settings > Users > People** to
 give the person a different organization role or direct access. Use
-**Settings > Directory > Groups** to assign access through a group. A SCIM
+**Settings > Users > Groups** to assign access through a group. A SCIM
 `PATCH` with `active: false` deactivates the account, removes its organization
 membership and role bindings, and revokes browser sessions and CLI tokens. A
 SCIM `DELETE` has the same access and session effects while keeping the
@@ -189,5 +189,5 @@ that are already past it.
 | Set up or replace the identity provider | **Settings > Authentication > Identity provider** |
 | Check directory sync or issue a provisioning token | **Settings > Authentication > Connectors** |
 | Change who can join, account lockout or session limits | **Settings > Authentication > Overview > Organization policies** |
-| Edit a person, team or project assignment | **Settings > Directory > People** or **Settings > Directory > Teams & projects** |
+| Edit a person, team or project assignment | **Settings > Users > People** or **Settings > Users > Teams & projects** |
 | Define roles or review assignments | **Settings > Roles > Roles** or **Settings > Roles > Role assignments** |

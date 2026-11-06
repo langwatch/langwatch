@@ -137,7 +137,7 @@ describe("given an enterprise plan", () => {
       expect(hrefs).not.toContain("/settings/role-bindings");
     });
 
-    it("offers Directory on every plan, in place of Members, Teams, Groups and SCIM", () => {
+    it("offers Users on every plan, in place of Members, Teams, Groups and SCIM", () => {
       for (const enterprisePlan of ["pending", "locked", "included"] as const) {
         const hrefs = hrefsIn({ enterprisePlan });
         expect(hrefs).toContain("/settings/directory");

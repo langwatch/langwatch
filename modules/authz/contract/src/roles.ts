@@ -163,6 +163,8 @@ const LITE_MEMBER: readonly AuthzPermission[] = [
   "scenarios:view",
   "secrets:view",
   "team:view",
+  // Reads who is in the organization, as every organization role does; changes nothing.
+  "members:view",
 ];
 
 /** Demo-project visitor: read-only product tour. Mirrors DEMO_VIEW_PERMISSIONS. */

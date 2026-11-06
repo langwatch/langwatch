@@ -50,11 +50,8 @@ export {
   type ConnectedStatementEmailProps,
 } from "./templates/connected-statement-email.tsx";
 export {
-  ACCESS_DIGEST_MAX_NAMES,
-  sendAccessNoticeDigestEmail,
   sendIdpRefusedSignInEmail,
   sendSeatRequestEmail,
-  type AccessNoticeDigestProps,
   type SeatRequestProps,
 } from "./templates/seat-request-emails.tsx";
 export { sendLicenseEmail } from "./templates/license-email.tsx";

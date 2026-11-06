@@ -20,7 +20,7 @@ Feature: A sign-in the company's identity provider refused says who refused it
     When Okta refuses the sign-in with "access_denied"
     Then the person is sent to the sign-in error screen with the code "seat_limit_reached"
     And the organization is told about the refused sign-in for that address with the provider kind
-    And the screen says the organization is over its seat limit and the administrators were asked
+    And the screen says the organization is over its seat limits and to contact an administrator to approve the access
 
   @unit
   Scenario: A refused person at an organization with seats free is told the provider refused

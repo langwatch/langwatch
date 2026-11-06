@@ -103,16 +103,9 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
 
       const [stored] = await record(`${namespace}-n1`);
       expect(await record(`${namespace}-n2`)).toEqual([]);
-      expect(await notices.findOrganizationsWithHeld()).toContain(organizationId);
 
-      expect(
-        await notices.markMailed({ ids: [stored!.id], delivery: "digest", at: 20_000 }),
-      ).toEqual([stored!.id]);
-      expect(
-        await notices.markMailed({ ids: [stored!.id], delivery: "digest", at: 20_001 }),
-      ).toEqual([]);
-      expect(await notices.getMailWindow({ organizationId })).toEqual({ lastMailedAt: 20_000 });
-      expect(await notices.findHeld({ organizationId })).toEqual([]);
+      expect(await notices.markMailed({ ids: [stored!.id], at: 20_000 })).toEqual([stored!.id]);
+      expect(await notices.markMailed({ ids: [stored!.id], at: 20_001 })).toEqual([]);
     });
   });
 });

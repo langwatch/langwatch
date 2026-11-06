@@ -219,7 +219,7 @@ describe("the directory page", () => {
     it("opens the people tab, listing members and invitations together", () => {
       renderDirectory();
 
-      expect(screen.getByRole("heading", { name: "Directory" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Users" })).toBeInTheDocument();
       expect(screen.getByRole("tab", { name: /People/ })).toHaveAttribute("aria-selected", "true");
       expect(screen.getByText("Sam")).toBeInTheDocument();
       expect(screen.getByTestId("people-cuts")).toHaveTextContent("Everybody");

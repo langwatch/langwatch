@@ -5,7 +5,6 @@ import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { OrganizationModule } from "./app/organization.app.ts";
 import { organizationChannels } from "./channels/organization-channels.registry.ts";
-import { accessDigestEventing } from "./eventing/organization-access-digest.pipeline.ts";
 import { organizationAuditEventing } from "./eventing/organization-audit.pipeline.ts";
 import { organizationLifecycleEventing } from "./eventing/organization-lifecycle.pipeline.ts";
 import { privateDataplaneRecorderEventing } from "./eventing/organization-private-dataplane.pipeline.ts";
@@ -55,7 +54,6 @@ export const organizationProcessModule: PublishedProcessModule<
   .withEventing(organizationLifecycleEventing)
   .withEventing(organizationAuditEventing)
   .withEventing(privateDataplaneRecorderEventing)
-  .withEventing(accessDigestEventing)
   // Old images record no presence fact: run once none serves (ADR-173 §3).
   .withMigrations(({ app }) => [
     defineMigrationStep({

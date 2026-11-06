@@ -6,7 +6,7 @@ The server half of [organization](../README.md). Organisations and who is in the
 
 ## Installation
 
-`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, seatRequestTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withEventing(accessDigestEventing).withMigrations(…)`, `src/organization.module.ts:31`.
+`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, seatRequestTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withMigrations(…)`, `src/organization.module.ts:30`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -2207,6 +2207,7 @@ interface Output {
     reason: "seat_limit" | "access_turned_off";
     contacts: {
       name: string;
+      email: string | null;
     }[];
   }[];
 }
@@ -2317,14 +2318,6 @@ interface Output {
 None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
-
-### Pipeline `organization_access_notice_digest` (aggregate `global`)
-
-Declared at `src/eventing/organization-access-digest.pipeline.ts:33`.
-
-| Kind            | Name                 | Handles                                                                              | Declared at                                              |
-| --------------- | -------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------- |
-| process manager | `accessNoticeDigest` | every 15 min (`ACCESS_DIGEST_INTERVAL_MS = 15 * 60 * 1000`); intents `send` (outbox) | `src/eventing/organization-access-digest.pipeline.ts:38` |
 
 ### Pipeline `organization_audit` (aggregate `organization_audit`)
 

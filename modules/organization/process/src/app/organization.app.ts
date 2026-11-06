@@ -963,11 +963,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#seatRequests.heldMemberships({ userId: by.id });
   }
 
-  /** The worker's digest sweep: one mail per organization whose notice window closed. */
-  sendAccessNoticeDigests(): Promise<{ digests: number }> {
-    return this.#seatRequests.sendDueDigests();
-  }
-
   /**
    * Whether a user is a member of an organization — a door the feature-flag resolver asks on every
    * organization-targeted read, to gate whether the caller may see a flag's answer.

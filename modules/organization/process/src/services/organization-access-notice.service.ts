@@ -10,12 +10,6 @@ import type {
 } from "../repositories/organization-access-notice.repository.ts";
 import { IDENTITY_PROVIDER_NAMES } from "../rules/identity-provider-name.rules.ts";
 
-/** The most people one digest names; the mail counts the rest. */
-export const ACCESS_DIGEST_MAX_NAMES = 20;
-
-/** One window per organization: the first notice in it is mailed, the rest wait for the digest. */
-export const ACCESS_NOTICE_WINDOW_MS = 24 * 60 * 60 * 1000;
-
 /** Someone told about seat requests: an active administrator or a Billing member. */
 export type AccessNoticeRecipient = Readonly<{ userId: string; email: string }>;
 
@@ -47,9 +41,8 @@ type Dependencies = Readonly<{
 }>;
 
 /**
- * The bounded mail behind seat requests and refused sign-ins (ruling R5): at most one notice per
- * person, kind and day; the first in an organization's 24-hour window is mailed at once and the
- * rest go out together when the window closes.
+ * The mail behind seat requests and refused sign-ins (ruling R5): each person's notice is mailed at
+ * once, and the same person is noticed at most once a day per kind.
  */
 export class OrganizationAccessNoticeService {
   static create(dependencies: Dependencies): OrganizationAccessNoticeService {
@@ -58,7 +51,7 @@ export class OrganizationAccessNoticeService {
 
   private constructor(private readonly dependencies: Dependencies) {}
 
-  /** Records one notice and mails it when the window is open; answers whether it was new. */
+  /** Records one notice and mails it at once; a repeat the same day records and mails nothing. */
   async record(input: {
     organizationId: string;
     kind: AccessNoticeKind;
@@ -84,57 +77,10 @@ export class OrganizationAccessNoticeService {
     });
     if (!notice) return { recorded: false, mailed: false };
 
-    const { lastMailedAt } = await notices.getMailWindow({ organizationId: input.organizationId });
-    if (lastMailedAt !== null && at - lastMailedAt < ACCESS_NOTICE_WINDOW_MS) {
-      return { recorded: true, mailed: false };
-    }
-    const held = await notices.findHeld({ organizationId: input.organizationId });
-    if (held.some((row) => row.id !== notice.id)) {
-      // A window closed before the sweep ran: what it held goes out now, with this notice.
-      const mailed = await this.mailHeld({ organizationId: input.organizationId, held, at });
-      return { recorded: true, mailed: mailed.has(notice.id) };
-    }
-    const [claimed] = await notices.markMailed({ ids: [notice.id], delivery: "immediate", at });
+    const [claimed] = await notices.markMailed({ ids: [notice.id], at });
     if (!claimed) return { recorded: true, mailed: false };
     await this.mailOne({ notice, heldWithoutAccess: input.heldWithoutAccess ?? true });
     return { recorded: true, mailed: true };
-  }
-
-  /** Mails one digest to every organization whose window closed with notices held. */
-  async sendDueDigests(): Promise<{ digests: number }> {
-    const { notices, now } = this.dependencies;
-    let digests = 0;
-    for (const organizationId of await notices.findOrganizationsWithHeld()) {
-      const at = now();
-      const { lastMailedAt } = await notices.getMailWindow({ organizationId });
-      if (lastMailedAt !== null && at - lastMailedAt < ACCESS_NOTICE_WINDOW_MS) continue;
-      const held = await notices.findHeld({ organizationId });
-      const mailed = await this.mailHeld({ organizationId, held, at });
-      if (mailed.size > 0) digests += 1;
-    }
-    return { digests };
-  }
-
-  /** Claims the held notices and mails the ones this process won as one digest. */
-  private async mailHeld({
-    organizationId,
-    held,
-    at,
-  }: {
-    organizationId: string;
-    held: readonly AccessNoticeRow[];
-    at: number;
-  }): Promise<ReadonlySet<string>> {
-    const claimedIds = new Set(
-      await this.dependencies.notices.markMailed({
-        ids: held.map((row) => row.id),
-        delivery: "digest",
-        at,
-      }),
-    );
-    const claimed = held.filter((row) => claimedIds.has(row.id));
-    if (claimed.length > 0) await this.mailDigest({ organizationId, notices: claimed });
-    return claimedIds;
   }
 
   private async mailOne({
@@ -174,41 +120,6 @@ export class OrganizationAccessNoticeService {
             })
           : mail.sendIdpRefused({ ...envelope, idpName });
       }),
-    });
-  }
-
-  private async mailDigest({
-    organizationId,
-    notices,
-  }: {
-    organizationId: string;
-    notices: readonly AccessNoticeRow[];
-  }): Promise<void> {
-    const { context, mail, requestsUrl } = this.dependencies;
-    const [recipients, organizationName] = await Promise.all([
-      context.recipients({ organizationId }),
-      context.organizationName({ organizationId }),
-    ]);
-    const people = notices.slice(0, ACCESS_DIGEST_MAX_NAMES).map((notice) => ({
-      name: notice.name,
-      email: notice.email,
-      kind: notice.kind,
-      idpName: (notice.idp && IDENTITY_PROVIDER_NAMES[notice.idp]) || null,
-    }));
-    const digestKey = notices[0]?.id ?? "";
-    await this.fanOut({
-      organizationId,
-      what: "digest",
-      sends: recipients.map((recipient) =>
-        mail.sendDigest({
-          recipientEmail: recipient.email,
-          organizationName,
-          people,
-          moreCount: notices.length - people.length,
-          requestsUrl,
-          idempotencyKey: `access-digest:${digestKey}:${recipient.userId}`,
-        }),
-      ),
     });
   }
 

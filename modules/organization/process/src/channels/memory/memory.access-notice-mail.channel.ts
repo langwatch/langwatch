@@ -1,4 +1,4 @@
-import type { AccessNoticeDigestProps, SeatRequestProps } from "@langwatch/mail";
+import type { SeatRequestProps } from "@langwatch/mail";
 
 import { AccessNoticeMailChannel, type IdpRefusedMail } from "../access-notice-mail.channel.ts";
 
@@ -12,7 +12,6 @@ export class MemoryAccessNoticeMailChannel extends AccessNoticeMailChannel {
 
   readonly seatRequests: (SeatRequestProps & Envelope)[] = [];
   readonly idpRefusals: (IdpRefusedMail & Envelope)[] = [];
-  readonly digests: (AccessNoticeDigestProps & Envelope)[] = [];
 
   private constructor() {
     super();
@@ -24,9 +23,5 @@ export class MemoryAccessNoticeMailChannel extends AccessNoticeMailChannel {
 
   async sendIdpRefused(input: IdpRefusedMail & Envelope): Promise<void> {
     this.idpRefusals.push(input);
-  }
-
-  async sendDigest(input: AccessNoticeDigestProps & Envelope): Promise<void> {
-    this.digests.push(input);
   }
 }

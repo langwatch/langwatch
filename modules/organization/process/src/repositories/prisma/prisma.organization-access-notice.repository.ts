@@ -49,19 +49,6 @@ export class PrismaOrganizationAccessNoticeRepository
     }
   }
 
-  async getMailWindow({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<{ lastMailedAt: number | null }> {
-    const latest = await this.prisma.organizationAccessNotice.findFirst({
-      where: { organizationId, mailedAt: { not: null } },
-      orderBy: { mailedAt: "desc" },
-      select: { mailedAt: true },
-    });
-    return { lastMailedAt: latest?.mailedAt?.getTime() ?? null };
-  }
-
   async markMailed(
     input: Parameters<OrganizationAccessNoticeRepository["markMailed"]>[0],
   ): Promise<string[]> {
@@ -69,28 +56,11 @@ export class PrismaOrganizationAccessNoticeRepository
     for (const id of input.ids) {
       const result = await this.prisma.organizationAccessNotice.updateMany({
         where: { id, mailedAt: null },
-        data: { mailedAt: new Date(input.at), delivery: input.delivery },
+        data: { mailedAt: new Date(input.at) },
       });
       if (result.count > 0) marked.push(id);
     }
     return marked;
-  }
-
-  async findHeld({ organizationId }: { organizationId: string }): Promise<AccessNoticeRow[]> {
-    const rows = await this.prisma.organizationAccessNotice.findMany({
-      where: { organizationId, mailedAt: null },
-      orderBy: { createdAt: "asc" },
-    });
-    return rows.map(rowOf);
-  }
-
-  async findOrganizationsWithHeld(): Promise<string[]> {
-    const rows = await this.prisma.organizationAccessNotice.findMany({
-      where: { mailedAt: null },
-      distinct: ["organizationId"],
-      select: { organizationId: true },
-    });
-    return rows.map((row) => row.organizationId);
   }
 }
 
