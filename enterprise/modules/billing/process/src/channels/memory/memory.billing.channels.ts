@@ -11,6 +11,7 @@ import { HubspotFormChannel, type HubspotFormReceipt } from "../hubspot-form.cha
 import { LicenseEmailChannel } from "../license-email.channel.ts";
 import { UsageLimitEmailChannel } from "../usage-limit-email.channel.ts";
 import { MemoryConnectedInvoicingChannel } from "./memory.connected-invoicing.channel.ts";
+import { MemoryStripeCouponsChannel } from "./memory.stripe-coupons.channel.ts";
 import { MemoryStripeCustomersChannel } from "./memory.stripe-customers.channel.ts";
 import { MemoryStripeInvoicesChannel } from "./memory.stripe-invoices.channel.ts";
 import { MemoryStripeMetersChannel } from "./memory.stripe-meters.channel.ts";
@@ -34,6 +35,7 @@ export class MemoryBillingChannels {
             subscriptions: MemoryStripeSubscriptionsChannel.create(),
             invoices: MemoryStripeInvoicesChannel.create(),
             prices: MemoryStripePricesChannel.create(),
+            coupons: MemoryStripeCouponsChannel.create(),
             meters: MemoryStripeMetersChannel.create(),
             connectedInvoicing: MemoryConnectedInvoicingChannel.create(),
           }

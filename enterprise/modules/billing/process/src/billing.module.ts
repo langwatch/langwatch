@@ -29,12 +29,13 @@ import {
 import { detectEnvironment, StripePricesSyncTask } from "./tasks/stripe-prices-sync.task.ts";
 import { TieredFreeToSeatEventMigrateTask } from "./tasks/tiered-free-to-seat-event.task.ts";
 import { billingStripeWebhookRest } from "./transport/billing-stripe-webhook.rest.ts";
+import { billingCouponsTrpcTransport } from "./transport/billing-coupons.trpc.ts";
 import { connectedBillingTrpcTransport } from "./transport/connected-billing.trpc.ts";
 import { currencyTrpcTransport } from "./transport/currency.trpc.ts";
 import { subscriptionTrpcTransport } from "./transport/subscription.trpc.ts";
 
 /**
- * Billing as an installed module: the connected-billing, currency and subscription
+ * Billing as an installed module: the connected-billing, coupons, currency and subscription
  * doors and the Stripe callback; the factories below serve today's callers.
  */
 export const billingProcessModule: PublishedProcessModule<
@@ -47,6 +48,7 @@ export const billingProcessModule: PublishedProcessModule<
   .withApi(BillingModule)
   .withTransports(
     connectedBillingTrpcTransport,
+    billingCouponsTrpcTransport,
     billingStripeWebhookRest,
     currencyTrpcTransport,
     subscriptionTrpcTransport,

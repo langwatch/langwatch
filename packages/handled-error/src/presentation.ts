@@ -3123,6 +3123,23 @@ const presentations = {
     title: "This plan isn't ready to buy yet",
     describe: () => "We've been notified. Contact support if you need it sooner.",
   },
+  billing_coupon_invalid: {
+    // fault: customer. An operator typed a coupon the checkout could not use;
+    // the drawer shows each field's own line, this is the summary above them.
+    title: "Check the coupon details",
+    describe: () => "Nothing was created in Stripe. Correct the highlighted fields and try again.",
+  },
+  billing_coupon_code_taken: {
+    // fault: customer. Stripe allows one active promotion code per name.
+    title: "That code is already in use",
+    describe: () =>
+      "An active promotion code already has this name. Deactivate it first or choose another code.",
+  },
+  billing_coupons_unavailable: {
+    // fault: platform. Off LangWatch Cloud, or the payment provider is not configured.
+    title: "Coupons are not available here",
+    describe: () => "Coupons are managed from the LangWatch Cloud admin console only.",
+  },
   billing_currency_unsupported: {
     // Account state, not an outage, and not fixable from the UI: the account is
     // locked to a currency we don't price plans in, so retrying never helps.

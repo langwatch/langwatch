@@ -3,7 +3,9 @@
  * Cloud admin is LangWatch's own tooling: off SaaS it answers as an unknown page.
  */
 
+import { Lent } from "@langwatch/browser-host/lent";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { CouponsSectionToken } from "@langwatch/enterprise-billing-client";
 import { SearchX } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -84,6 +86,15 @@ export function CloudSeatUseScreen() {
   return (
     <CloudOnly>
       <SeatUseView />
+    </CloudOnly>
+  );
+}
+
+/** Stripe coupons and promotion codes, which billing owns and lends. */
+export function CloudCouponsScreen() {
+  return (
+    <CloudOnly>
+      <Lent of={CouponsSectionToken} props={{}} />
     </CloudOnly>
   );
 }

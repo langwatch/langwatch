@@ -284,6 +284,7 @@ describe("given an operator", () => {
         "admin-cloud",
       );
       expect(adminHrefsIn({ ...admin, hasCloudOps: true })).toContain("/ops/cloud/licenses");
+      expect(adminHrefsIn({ ...admin, hasCloudOps: true })).toContain("/ops/cloud/coupons");
     });
 
     it("gives every entry an icon no other entry wears", () => {
