@@ -17,6 +17,9 @@ export type SeatCommit = {
   successTitle: string;
 };
 
+/** How a commit ended: all done, refused before anything changed, or changed but not invited. */
+export type SeatCommitOutcome = "committed" | "refused" | "notInvited";
+
 type CreateInvites = (input: {
   organizationId: string;
   invites: {
@@ -97,6 +100,47 @@ async function changeDeveloperSeats({
   }
 }
 
+/** The full seats first, then Developer seats, then the invites; stops at the first refusal. */
+async function commitChange({
+  host,
+  change,
+  commitSeats,
+  setDeveloperSeats,
+  send,
+  organizationId,
+  onChanged,
+}: {
+  host: BillingHostApi;
+  change: SeatCommit;
+  commitSeats: (input: { newSeats: number; quotedAt: number | undefined }) => Promise<boolean>;
+  setDeveloperSeats: SetDeveloperSeats;
+  send: (emails: string[]) => Promise<boolean>;
+  organizationId: string;
+  onChanged: () => void;
+}): Promise<SeatCommitOutcome> {
+  const seatsChanged =
+    change.seats === undefined ||
+    (await commitSeats({ newSeats: change.seats, quotedAt: change.quotedAt }));
+  if (!seatsChanged) return "refused";
+  const developerChanged =
+    change.developer === undefined ||
+    (await changeDeveloperSeats({
+      host,
+      setDeveloperSeats,
+      organizationId,
+      developer: change.developer,
+    }));
+  if (!developerChanged) {
+    onChanged();
+    return "refused";
+  }
+  const invited = await send(change.emails);
+  onChanged();
+  if (!invited) return "notInvited";
+  host.succeeded({ title: change.successTitle });
+  return "committed";
+}
+
 export function useSeatPurchase({
   organizationId,
   activeTeamId,
@@ -132,30 +176,18 @@ export function useSeatPurchase({
     return true;
   };
 
-  /** The full seats first, then Developer seats, then the invites; stops at the first refusal. */
-  const commit = async (change: SeatCommit): Promise<boolean> => {
-    if (!organizationId) return false;
-    const seatsChanged =
-      change.seats === undefined ||
-      (await commitSeats({ newSeats: change.seats, quotedAt: change.quotedAt }));
-    if (!seatsChanged) return false;
-    const developerChanged =
-      change.developer === undefined ||
-      (await changeDeveloperSeats({
-        host,
-        setDeveloperSeats: setDeveloperSeats.mutateAsync,
-        organizationId,
-        developer: change.developer,
-      }));
-    if (!developerChanged) {
-      onChanged();
-      return false;
-    }
-    await send(organizationId, change.emails);
-    host.succeeded({ title: change.successTitle });
-    onChanged();
-    return true;
-  };
+  const commit = (change: SeatCommit): Promise<SeatCommitOutcome> =>
+    organizationId
+      ? commitChange({
+          host,
+          change,
+          commitSeats,
+          setDeveloperSeats: setDeveloperSeats.mutateAsync,
+          send: (emails) => send(organizationId, emails),
+          organizationId,
+          onChanged,
+        })
+      : Promise.resolve("refused");
 
   return {
     invite,

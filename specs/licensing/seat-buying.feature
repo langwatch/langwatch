@@ -212,6 +212,24 @@ Feature: Buying seats
       And "qux@acme.example" is not invited
       And the confirm is still open
 
+    @integration
+    Scenario: An invite refused after the seats changed keeps Manage seats open
+      Given the confirm to add 1 seat for "qux@acme.example" is open
+      And the invitation for "qux@acme.example" is refused
+      When I choose "Pay €24.17 and add"
+      Then the subscription is changed to 4 seats
+      And I am told the invites could not be sent
+      And I am not told the seat was added with an invite sent
+      And the confirm closes and Manage seats stays open
+
+    @unit
+    Scenario: Lowering full seats while adding Developer seats names what is due today
+      Given a Developer seat price of €5 a month is configured
+      And Manage seats on Growth lowers the full seats from 5 to 3 and raises the Developer seats from 0 to 2
+      When the confirm is shown
+      Then its first line reads "Today" with the prorated Developer seat amount charged today
+      And it still reads the seats kept until 1 Dec and the price from 1 Dec
+
   Rule: Lite and Developer seats fold under Other seat types in Manage seats
 
     @integration

@@ -134,6 +134,35 @@ describe("seatConfirm()", () => {
     expect(confirm.lines[0]?.detail).toBe("Nothing to pay today.");
     expect(confirm.actionLabel).toBe("Confirm");
   });
+
+  /** @scenario "Lowering full seats while adding Developer seats names what is due today" */
+  it("names the Developer seat charge due today when the full seats go down", () => {
+    const confirm = seatConfirm({
+      plan: growth({
+        paid: 5,
+        seats: 3,
+        developer: { current: 0, target: 2, unitCents: 500 },
+        developerDueCents: 833,
+      }),
+      emails: [],
+      todayMs: NOV_6,
+    });
+    expect(confirm.lines[0]).toEqual({
+      label: "Today",
+      detail: "Charged today to the card on file, for 6 Nov to 1 Dec.",
+      value: "€8.33",
+    });
+    expect(confirm.lines.map((line) => line.label)).toEqual(["Today", "Until 1 Dec", "From 1 Dec"]);
+  });
+
+  it("adds no Today line when only the full seats go down", () => {
+    const confirm = seatConfirm({
+      plan: growth({ paid: 5, seats: 3 }),
+      emails: [],
+      todayMs: NOV_6,
+    });
+    expect(confirm.lines.map((line) => line.label)).toEqual(["Until 1 Dec", "From 1 Dec"]);
+  });
 });
 
 describe("seatChangeToast()", () => {

@@ -368,15 +368,30 @@ function confirmPricing(plan: GrowthSeatPlan): ConfirmPricing {
   };
 }
 
-function loweringConfirm(plan: GrowthSeatPlan, pricing: ConfirmPricing): SeatConfirm {
+function loweringConfirm({
+  plan,
+  pricing,
+  devDelta,
+  todayMs,
+}: {
+  plan: GrowthSeatPlan;
+  pricing: ConfirmPricing;
+  devDelta: number;
+  todayMs: number;
+}): SeatConfirm {
   const { paid, seats, price, quote } = plan;
   const { day, fromDay, perPeriod, seatsDetail, monthly } = pricing;
+  const due =
+    devDelta > 0
+      ? dueTodayCents({ delta: 0, quote, devDelta, developerDueCents: plan.developerDueCents })
+      : undefined;
   const kept = quote?.keptSeats ?? paid;
   const rest = quote?.billingInterval === "year" ? "year" : "month";
   const until = day ? `until ${day}` : "until the period ends";
   return {
     title: `Lower to ${plural(seats, "seat")}${day ? ` from ${day}` : ""}?`,
     lines: [
+      ...todayLine({ due, price, todayMs, day }),
       {
         label: day ? `Until ${day}` : "Until the period ends",
         detail: `${plural(kept, "seat")} × ${money(price, price.seatCents)}`,
@@ -435,7 +450,7 @@ export function seatConfirm({
   const delta = seats - paid;
   const devDelta = developer ? developer.target - developer.current : 0;
   const pricing = confirmPricing(plan);
-  if (delta < 0) return loweringConfirm(plan, pricing);
+  if (delta < 0) return loweringConfirm({ plan, pricing, devDelta, todayMs });
 
   const due = dueTodayCents({ delta, quote, devDelta, developerDueCents: plan.developerDueCents });
   const added = delta > 0 ? plural(delta, "seat") : plural(Math.max(devDelta, 0), "developer seat");

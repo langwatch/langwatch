@@ -832,6 +832,30 @@ describe("<SubscriptionPage/> buying seats", () => {
       expect(mockCreateInvitesMutateAsync).not.toHaveBeenCalled();
       expect(screen.getByRole("button", { name: "Pay €24.17 and add" })).toBeEnabled();
     });
+
+    /** @scenario "An invite refused after the seats changed keeps Manage seats open" */
+    it("keeps Manage seats open without the success message when the invite is refused", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      mockCreateInvitesMutateAsync.mockRejectedValueOnce(new Error("invite refused"));
+      const host = renderPage();
+      await openManageSeats();
+
+      addPerson("qux@acme.example");
+      fireEvent.click(lastButton("Add 1 seat · €29/mo"));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay €24.17 and add" }));
+
+      await waitFor(() =>
+        expect(seatChange).toHaveBeenCalledWith(expect.objectContaining({ totalMembers: 4 })),
+      );
+      await waitFor(() =>
+        expect(host.failures).toContainEqual(
+          expect.objectContaining({ fallbackTitle: "Couldn't send invites" }),
+        ),
+      );
+      expect(host.successes).toEqual([]);
+      await waitFor(() => expect(screen.queryByTestId("seat-confirm-dialog")).toBeNull());
+      expect(screen.getByTestId("add-invite-row")).toBeInTheDocument();
+    });
   });
 
   describe("given Other seat types on Growth", () => {

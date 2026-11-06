@@ -46,7 +46,7 @@ import {
 import { SeatConfirmDialog } from "../blocks/seat-confirm-dialog.tsx";
 import { SeatSummaryLines } from "../blocks/seat-summary-lines.tsx";
 import { SeatStepper } from "../elements/seat-stepper.tsx";
-import type { SeatCommit } from "./use-seat-purchase.ts";
+import type { SeatCommit, SeatCommitOutcome } from "./use-seat-purchase.ts";
 
 let inviteRowSequence = 0;
 
@@ -100,6 +100,21 @@ function disabledReasonOf({
   return undefined;
 }
 
+/** A refusal keeps the confirm open; a refused invite keeps the drawer open for another try. */
+function settleCommit({
+  outcome,
+  growth,
+  onClose,
+}: {
+  outcome: SeatCommitOutcome;
+  growth: { closeConfirm: () => void };
+  onClose: () => void;
+}) {
+  if (outcome === "refused") return;
+  growth.closeConfirm();
+  if (outcome === "committed") onClose();
+}
+
 export function UserManagementDrawer({
   open,
   onClose,
@@ -125,7 +140,7 @@ export function UserManagementDrawer({
   price: SeatPrice;
   onInvite: (emails: string[]) => Promise<boolean>;
   onUpgrade: (input: { seats: number; emails: string[] }) => Promise<void>;
-  onCommit: (change: SeatCommit) => Promise<boolean>;
+  onCommit: (change: SeatCommit) => Promise<SeatCommitOutcome>;
   isUpgradeLoading: boolean;
 }) {
   const [rows, setRows] = useState<InviteRow[]>([]);
@@ -185,9 +200,7 @@ export function UserManagementDrawer({
     if (!growth) return;
     setIsCommitting(true);
     try {
-      if (!(await onCommit(growth.commitFor(emails)))) return;
-      growth.closeConfirm();
-      onClose();
+      settleCommit({ outcome: await onCommit(growth.commitFor(emails)), growth, onClose });
     } finally {
       setIsCommitting(false);
     }
@@ -444,7 +457,6 @@ function OtherSeatTypes({ growth, price }: { growth: GrowthSeats; price: SeatPri
 
 type GrowthSeats = NonNullable<ReturnType<typeof useGrowthSeats>>;
 
-/** The Growth seat count, its Developer seats, their quotes, and the confirm that commits them. */
 /** Why the confirm waits on a quote, if it does. */
 function quoteReason({ needed, failed }: { needed: boolean; failed: boolean }) {
   if (!needed) return undefined;
@@ -467,6 +479,7 @@ function developerPlanOf({
   };
 }
 
+/** The Growth seat count, its Developer seats, their quotes, and the confirm that commits them. */
 function useGrowthSeats({
   open,
   mode,

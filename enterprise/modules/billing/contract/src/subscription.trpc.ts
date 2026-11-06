@@ -9,9 +9,10 @@ import {
   billingDisplayInvoiceSchema,
   billingPortalSessionSchema,
   billingRedirectSchema,
+  developerSeatQuoteSchema,
+  developerSeatsSchema,
   subscriptionItemsUpdatedSchema,
 } from "./billing-types.ts";
-import { developerSeatQuoteSchema, developerSeatsSchema } from "./developer-seats.ts";
 import { SUBSCRIBABLE_PLANS } from "./plan-types.ts";
 import { currencySchema } from "./pricing.ts";
 
