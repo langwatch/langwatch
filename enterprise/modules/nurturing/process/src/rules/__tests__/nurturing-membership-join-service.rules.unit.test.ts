@@ -111,7 +111,7 @@ describe("joined_via_sso", () => {
 describe("joined_organization", () => {
   const CUT_OFF = Temporal.Instant.from("2026-11-06T00:00:00Z").epochMilliseconds;
   const invite = (overrides: { role?: string; occurredAt?: number } = {}) =>
-    fireJoinedOrganization({ kind: "invite_accepted", ...joinSource, ...overrides });
+    fireJoinedOrganization({ kind: "invite_accepted", ...joinSource, ...overrides })[0];
 
   /** @scenario "A join is tracked as joined_organization beside its own event" */
   it("is decided with the invite method, the seat and a stable message id", () => {
@@ -131,7 +131,7 @@ describe("joined_organization", () => {
 
   /** @scenario "A join is tracked as joined_organization beside its own event" */
   it("carries the sso method for an SSO add", () => {
-    expect(fireJoinedOrganization({ kind: "sso_auto_added", ...joinSource })).toMatchObject({
+    expect(fireJoinedOrganization({ kind: "sso_auto_added", ...joinSource })[0]).toMatchObject({
       properties: { join_method: "sso" },
     });
   });
@@ -148,6 +148,6 @@ describe("joined_organization", () => {
 
   /** @scenario "A join at the cut-off is tracked as joined_organization, one a millisecond earlier is not" */
   it("is not decided for a join one millisecond before the cut-off", () => {
-    expect(invite({ occurredAt: CUT_OFF - 1 })).toBeNull();
+    expect(invite({ occurredAt: CUT_OFF - 1 })).toBeUndefined();
   });
 });

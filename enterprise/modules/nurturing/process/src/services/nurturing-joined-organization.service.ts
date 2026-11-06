@@ -37,7 +37,7 @@ export class NurturingJoinedOrganizationService {
    */
   async deliver(signal: NurturingSignal): Promise<void> {
     if (signal.kind !== "invite_accepted" && signal.kind !== "sso_auto_added") return;
-    const call = fireJoinedOrganization(signal);
+    const [call] = fireJoinedOrganization(signal);
     if (!call) return;
     const { claims, customerIo } = this.dependencies;
     const claimKey = `nurturing:joined_organization:${signal.userId}:${signal.organizationId}`;

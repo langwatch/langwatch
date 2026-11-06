@@ -69,22 +69,24 @@ function joinedCalls({
 const JOIN_METHOD = { invite_accepted: "invite", sso_auto_added: "sso" } as const;
 
 /**
- * Decides the one joined_organization track of a join, by invite or by SSO; null for a join from
+ * Decides the one joined_organization track of a join, by invite or by SSO; none for a join from
  * before the event existed. Sent once per person and organization by its delivery, not here.
  */
 export function fireJoinedOrganization(
   signal: NurturingSignalOf<"invite_accepted"> | NurturingSignalOf<"sso_auto_added">,
-): TrackCall | null {
-  if (signal.occurredAt < JOINED_ORGANIZATION_SINCE.epochMilliseconds) return null;
+): TrackCall[] {
+  if (signal.occurredAt < JOINED_ORGANIZATION_SINCE.epochMilliseconds) return [];
   const { userId, organizationId } = signal;
-  return {
-    type: "track",
-    userId,
-    event: "joined_organization",
-    // Stable per person and organization, so Customer.io can drop a repeat of this join.
-    messageId: `joined_organization:${userId}:${organizationId}`,
-    properties: { ...joinProperties(signal), join_method: JOIN_METHOD[signal.kind] },
-  };
+  return [
+    {
+      type: "track",
+      userId,
+      event: "joined_organization",
+      // Stable per person and organization, so Customer.io can drop a repeat of this join.
+      messageId: `joined_organization:${userId}:${organizationId}`,
+      properties: { ...joinProperties(signal), join_method: JOIN_METHOD[signal.kind] },
+    },
+  ];
 }
 
 /**
