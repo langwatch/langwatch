@@ -1,7 +1,7 @@
 /**
  * Answers one LLM judge whose model is Instant Evals through the judge leaf, before any provider
- * lookup (ADR-174 decisions 1, 7, 9, 16). A stream chunk is skipped before the judge is called,
- * and a refusal comes back as an error result, never thrown, so no caller reads it as a skip.
+ * lookup (ADR-174 d1, 7, 9, 16). A stream chunk is skipped before the call, a refusal is an error
+ * result, never thrown. LangWatch's model is routed under the judge router flag (ADR-190).
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import type { GuardrailCheckDirection } from "@langwatch/evaluation-contract";
@@ -10,6 +10,7 @@ import {
   instantEvalOwnDecisionModelOf,
   instantEvalUnavailableDecisionModelSkipOf,
   type InstantEvalJudgeApi,
+  type InstantEvalJudgeRouteRequest,
 } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
@@ -31,7 +32,16 @@ type EvaluationJudgingDeps = Readonly<{
   decisionModels: Pick<ModelProviderApi, "resolveDecisionModel">;
   /** The shared augmenter every judge's result runs through, so a leak is never hidden. */
   evaluators: Pick<EvaluatorApi, "augmentResult">;
+  /** Whether the project's organization has the judge router flag (ADR-190 decision 8). */
+  judgeRouting: EvaluationJudgeRouting;
 }>;
+
+export type EvaluationJudgeRouting = Readonly<{
+  isRouted: (input: { projectId: string }) => Promise<boolean>;
+}>;
+
+/** What an LLM-as-judge evaluator asks the router for; the table picks its slot and mode. */
+const LLM_JUDGE_ROUTE: InstantEvalJudgeRouteRequest = { job: "llm_judge" };
 
 export class EvaluationJudgingService {
   private constructor(private readonly deps: EvaluationJudgingDeps) {}
@@ -101,6 +111,9 @@ export class EvaluationJudgingService {
     if (resolved.kind === "own_unavailable") {
       return instantEvalSkipResultOf(instantEvalUnavailableDecisionModelSkipOf(resolved));
     }
+    // An own decision model is never routed, so the flag is read on LangWatch's model only.
+    const isRouted =
+      resolved.kind === "langwatch" && (await this.deps.judgeRouting.isRouted({ projectId }));
     const answer = await this.deps.judges.judge({
       projectId,
       text: request.text,
@@ -110,6 +123,7 @@ export class EvaluationJudgingService {
       ...(resolved.kind === "own"
         ? { decisionModel: instantEvalOwnDecisionModelOf(resolved) }
         : {}),
+      ...(isRouted ? { route: LLM_JUDGE_ROUTE } : {}),
     });
     if (answer.outcome === "refused") {
       return instantEvalRefusalResultOf({ code: answer.code, message: answer.message });

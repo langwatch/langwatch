@@ -9,8 +9,9 @@ import { AnalyticsBoundary } from "react-contextual-analytics";
 
 import { onboardingApi } from "../../../../behavior/onboarding-api.ts";
 import { useOnboardingHost } from "../../../../model/onboarding-host.ts";
-import { greetingName, setupTarget } from "../../model/copy.ts";
+import { setupTarget } from "../../model/copy.ts";
 import type { TakeoverPhase } from "../../model/resume.ts";
+import { firstNameOf } from "../../model/tour-landing.ts";
 import { HelloScreen } from "./hello-screen.tsx";
 import { ProviderScreen } from "./provider-screen.tsx";
 import { TAKEOVER_FADE_MS, TakeoverStage } from "./takeover-stage.tsx";
@@ -64,7 +65,7 @@ export function GuidedTakeover({
     host.hardRedirect(returnTo ?? guidedPathLanding({ path: first, projectSlug }));
   };
 
-  const firstName = greetingName(userName);
+  const firstName = firstNameOf(userName);
   const target = setupTarget({ organizationName, usageStyle });
 
   return (

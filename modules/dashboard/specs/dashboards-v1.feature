@@ -51,18 +51,11 @@ Feature: Dashboards v1
     And it carries no Legacy pill
 
   @integration
-  Scenario: AC3i The Dashboards pages point back to the old Analytics
+  Scenario: AC3i The Dashboards pages do not point back to the old Analytics
     Given the release_dashboards flag is on for the project
     And the member holds analytics:view
     When the member opens a Dashboards page
-    Then an info banner asks "Looking for the old Analytics? It is still here."
-    And the banner links to /[project]/analytics
-
-  @integration
-  Scenario: AC3j The Dashboards pages show no old-Analytics banner when they do not open
-    Given the release_dashboards flag is off for the project
-    When the member opens a Dashboards page
-    Then no old-Analytics banner shows
+    Then no banner asks "Looking for the old Analytics? It is still here."
 
   @integration
   Scenario: AC3c The legacy Analytics page offers Dashboards when the flag is on
@@ -148,13 +141,6 @@ Feature: Dashboards v1
   Scenario: AC3r Quick Search opens the same Analytics destination as the sidebar
     Given the member searches for "analytics" in Quick Search
     Then the Analytics page opens where the sidebar Analytics entry would
-
-  @integration
-  Scenario: AC3s The Dashboards pages show no old-Analytics banner to a member without analytics:view
-    Given the release_dashboards flag is on for the project
-    And the member lacks analytics:view
-    When the member opens a Dashboards page
-    Then no old-Analytics banner shows
 
   # ---------------------------------------------------------------------------
   # Agent Flight Deck

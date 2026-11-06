@@ -1,4 +1,7 @@
-import { ApiKeyAlreadyRevokedError } from "@langwatch/api-key-contract";
+import {
+  ApiKeyAlreadyRevokedError,
+  CliKeySelectionInvalidError,
+} from "@langwatch/api-key-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 /**
@@ -50,6 +53,7 @@ function serviceWith(options: {
   createdKey?: { id: string; createdAt: Date };
   revoke?: ApiKeyLifecycleService["revoke"];
   extendLoginKeyExpiry?: (input: unknown) => Promise<void>;
+  policy?: Partial<ApiKeyGrantPolicyService>;
 }) {
   const revoke = vi.fn(options.revoke ?? ((input) => Promise.resolve(revokedKey(input.id))));
   const create = vi.fn();
@@ -70,7 +74,7 @@ function serviceWith(options: {
 
   const lifecycle = createApiFixture<ApiKeyLifecycleService>({ create, revoke });
 
-  const policy = createApiFixture<ApiKeyGrantPolicyService>();
+  const policy = createApiFixture<ApiKeyGrantPolicyService>(options.policy);
 
   const service = ApiKeyCliService.create(
     {
@@ -84,6 +88,66 @@ function serviceWith(options: {
 
   return { service, revoke, create, created, extendLoginKeyExpiry };
 }
+
+describe("given an approval that asks for organization:delete", () => {
+  const ORG_SCOPE = [{ scopeType: "ORGANIZATION" as const, scopeId: "org-1" }];
+
+  describe("when the approval is validated on an organization scope", () => {
+    /** @scenario "a CLI login key never carries organization:delete" */
+    it("drops organization:delete and keeps the rest", async () => {
+      const assertSelectionWithinCeiling = vi.fn(() => Promise.resolve());
+      const { service } = serviceWith({ policy: { assertSelectionWithinCeiling } });
+
+      const selection = await service.validateCliSelection({
+        userId: "user-1",
+        organizationId: "org-1",
+        selection: {
+          bindings: ORG_SCOPE,
+          permissions: ["organization:view", "organization:manage", "organization:delete"],
+        },
+      });
+
+      expect(selection.permissions).toEqual(["organization:manage", "organization:view"]);
+      expect(assertSelectionWithinCeiling).toHaveBeenCalledWith(
+        expect.objectContaining({ permissions: ["organization:view", "organization:manage"] }),
+      );
+    });
+
+    /** @scenario "a CLI login key never carries organization:delete" */
+    it("refuses an approval that asks for nothing else", async () => {
+      const { service } = serviceWith({
+        policy: { assertSelectionWithinCeiling: () => Promise.resolve() },
+      });
+
+      await expect(
+        service.validateCliSelection({
+          userId: "user-1",
+          organizationId: "org-1",
+          selection: { bindings: ORG_SCOPE, permissions: ["organization:delete"] },
+        }),
+      ).rejects.toThrow(CliKeySelectionInvalidError);
+    });
+  });
+
+  describe("when an approval stamped before this fix reaches the exchange", () => {
+    /** @scenario "a CLI login key never carries organization:delete" */
+    it("mints the key without organization:delete", async () => {
+      const { service, create } = serviceWith({});
+
+      const minted = await service.mintCliLoginKey({
+        userId: "user-1",
+        organizationId: "org-1",
+        deviceLabel: "laptop",
+        selection: { bindings: ORG_SCOPE, permissions: ["organization:delete", "traces:view"] },
+      });
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ permissions: ["traces:view"] }),
+      );
+      expect(minted.scope.permissions).toEqual(["traces:view"]);
+    });
+  });
+});
 
 describe("given a CLI login key mint", () => {
   describe("when the exchange reports what it minted", () => {
