@@ -4,10 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { StripeCoupon, StripePromotionCode } from "../../channels/stripe-coupons.channel.ts";
-import {
-  judgePromotionCode,
-  nameCouponProducts,
-} from "../coupon-checkout-compatibility.rules.ts";
+import { judgePromotionCode, nameCouponProducts } from "../coupon-checkout-compatibility.rules.ts";
 
 const PRODUCTS = { seats: "prod_seats", events: "prod_events" };
 const NOW = 1_900_000_000;
@@ -152,7 +149,7 @@ describe("nameCouponProducts", () => {
   it("names the Growth products and leaves any other as its id", () => {
     expect(
       nameCouponProducts({
-        coupon: coupon({ products: [PRODUCTS.seats, PRODUCTS.events, "prod_other"] }),
+        productIds: [PRODUCTS.seats, PRODUCTS.events, "prod_other"],
         products: PRODUCTS,
       }),
     ).toEqual([
@@ -160,11 +157,5 @@ describe("nameCouponProducts", () => {
       { id: PRODUCTS.events, role: "growth_events" },
       { id: "prod_other", role: null },
     ]);
-  });
-
-  it("answers null for a coupon that limits no product", () => {
-    expect(nameCouponProducts({ coupon: coupon({ products: null }), products: PRODUCTS })).toBe(
-      null,
-    );
   });
 });

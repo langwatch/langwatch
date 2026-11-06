@@ -80,7 +80,8 @@ export function CreateCouponDrawer({ open, onClose }: { open: boolean; onClose: 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (commands.create.isPending) return;
-    if (Object.keys(couponProblemsOf({ draft, now: nowInstant() })).length > 0) {
+    const problems = couponProblemsOf({ draft, now: nowInstant() });
+    if (Object.keys(problems).length > 0) {
       setAttempts((count) => count + 1);
       return;
     }
@@ -125,8 +126,8 @@ export function CreateCouponDrawer({ open, onClose }: { open: boolean; onClose: 
       <form id={formId} ref={formRef} noValidate onSubmit={submit}>
         <VStack align="start" gap={4} width="full">
           <Text fontSize="sm" color="fg.muted">
-            A percentage off Growth Seats. The Growth checkout refuses fixed-amount coupons, so
-            this page only makes percentage ones.
+            A percentage off Growth Seats. The Growth checkout refuses fixed-amount coupons, so this
+            page only makes percentage ones.
           </Text>
           <DiscountFields draft={draft} set={set} problems={problems} />
           <CodeFields draft={draft} set={set} problems={problems} />

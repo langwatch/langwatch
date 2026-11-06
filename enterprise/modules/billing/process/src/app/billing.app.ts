@@ -78,9 +78,9 @@ import {
   planLimitInFlight,
   resourceLimitCooldown,
 } from "../services/billing-alert-cooldown.service.ts";
+import { BillingCouponService } from "../services/billing-coupon.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
 import { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
-import { BillingCouponService } from "../services/billing-coupon.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
 import {
   EEWebhookService,

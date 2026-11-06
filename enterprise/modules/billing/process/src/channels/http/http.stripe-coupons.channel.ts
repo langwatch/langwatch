@@ -73,19 +73,23 @@ export class HttpStripeCouponsChannel extends StripeCouponsChannel {
   }
 }
 
+/** At 100 items a page, 100 pages is 10,000 coupons or codes: far past any real account. */
+const MAX_PAGES = 100;
+
 /** Every item of a listing, following Stripe's cursor to the end. */
 async function everyPage<T extends { id: string }>(
   page: (startingAfter: string | undefined) => Promise<Stripe.ApiList<T>>,
 ): Promise<T[]> {
   const all: T[] = [];
   let startingAfter: string | undefined;
-  for (;;) {
+  for (let pageNumber = 0; pageNumber < MAX_PAGES; pageNumber++) {
     const { data, has_more: hasMore } = await page(startingAfter);
     all.push(...data);
     const last = data.at(-1);
     if (!hasMore || !last) return all;
     startingAfter = last.id;
   }
+  throw new Error(`Stripe listing ran past ${MAX_PAGES} pages`);
 }
 
 function toCoupon(coupon: Stripe.Coupon): StripeCoupon {

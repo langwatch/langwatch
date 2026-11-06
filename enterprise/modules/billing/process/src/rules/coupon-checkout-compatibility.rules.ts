@@ -86,17 +86,17 @@ function isExhausted(held: { timesRedeemed: number; maxRedemptions: number | nul
   return held.maxRedemptions !== null && held.timesRedeemed >= held.maxRedemptions;
 }
 
-/** The coupon's product limit, each Growth product named; null when it limits none. */
+/** The products a coupon is limited to, each Growth product named. */
 export function nameCouponProducts({
-  coupon,
+  productIds,
   products,
 }: {
-  coupon: StripeCoupon;
+  productIds: readonly string[];
   products: GrowthCheckoutProducts;
-}): CouponProduct[] | null {
-  if (!coupon.products) return null;
-  return coupon.products.map((id) => ({
-    id,
-    role: id === products.seats ? "growth_seats" : id === products.events ? "growth_events" : null,
-  }));
+}): CouponProduct[] {
+  const roles = new Map<string, CouponProduct["role"]>([
+    [products.seats, "growth_seats"],
+    [products.events, "growth_events"],
+  ]);
+  return productIds.map((id) => ({ id, role: roles.get(id) ?? null }));
 }

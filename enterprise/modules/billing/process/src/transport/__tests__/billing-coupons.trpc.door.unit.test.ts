@@ -69,7 +69,11 @@ function couponsDoor(reached: string[]) {
       throw new Error("the door admitted the caller");
     },
   });
-  const runtime = createTrpcRuntime<Context>({ root, procedure: root.procedure, members: members() });
+  const runtime = createTrpcRuntime<Context>({
+    root,
+    procedure: root.procedure,
+    members: members(),
+  });
   const mountOptions = {
     middlewareContext: [bindTrpcMiddlewareContext(operatorContext, (ctx: Context) => ctx.operator)],
   };

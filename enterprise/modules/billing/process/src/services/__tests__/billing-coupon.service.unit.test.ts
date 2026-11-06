@@ -128,12 +128,24 @@ describe("BillingCouponService", () => {
       ]);
     });
 
+    it("answers no product limit for a coupon that applies to every product", async () => {
+      const { channel, service } = compose();
+      channel.seed({ coupon: heldCoupon({ products: null }), codes: [heldCode()] });
+
+      const { coupons } = await service.list();
+
+      expect(coupons[0]?.products).toBeNull();
+    });
+
     /** @scenario "The list fails clearly when Stripe is unreachable" */
     it("passes Stripe's refusal through for the page to show", async () => {
       const { channel, service } = compose();
       channel.refuse({
         operation: "listCoupons",
-        error: new Stripe.errors.StripeConnectionError({ type: "api_error", message: "unreachable" }),
+        error: new Stripe.errors.StripeConnectionError({
+          type: "api_error",
+          message: "unreachable",
+        }),
       });
 
       await expect(service.list()).rejects.toMatchObject({ type: "StripeConnectionError" });
@@ -224,7 +236,10 @@ describe("BillingCouponService", () => {
 
       const refusal = await refusalOf(service.create({ ...REQUEST, code: "welcome50" }));
 
-      expect(refusal).toMatchObject({ code: "billing_coupon_code_taken", meta: { code: "welcome50" } });
+      expect(refusal).toMatchObject({
+        code: "billing_coupon_code_taken",
+        meta: { code: "welcome50" },
+      });
       expect(channel.coupons.map((coupon) => coupon.id)).toEqual(["coupon_half"]);
     });
 
@@ -232,7 +247,10 @@ describe("BillingCouponService", () => {
       const { channel, service } = compose();
       channel.refuse({
         operation: "createPromotionCode",
-        error: new Stripe.errors.StripeInvalidRequestError({ type: "invalid_request_error", message: "taken" }),
+        error: new Stripe.errors.StripeInvalidRequestError({
+          type: "invalid_request_error",
+          message: "taken",
+        }),
       });
 
       await expect(service.create(REQUEST)).rejects.toMatchObject({

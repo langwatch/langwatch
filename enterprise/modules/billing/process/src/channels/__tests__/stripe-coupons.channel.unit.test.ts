@@ -56,7 +56,7 @@ const atProviderCoupon = (id: string): Stripe.Coupon =>
     max_redemptions: null,
     redeem_by: null,
     created: COUPON.created,
-  }) as unknown as Stripe.Coupon;
+  }) as Stripe.Coupon;
 
 const atProviderCode = {
   id: "promo_a",
@@ -74,7 +74,7 @@ const atProviderCode = {
     minimum_amount: null,
     minimum_amount_currency: null,
   },
-} as unknown as Stripe.PromotionCode;
+} as Stripe.PromotionCode;
 
 const list = <T>(data: T[], hasMore = false) => ({
   object: "list" as const,
@@ -113,7 +113,9 @@ describe("Stripe coupons over the provider", () => {
         promotionCodes: { list: async () => list([atProviderCode]) },
       });
 
-      expect(await HttpStripeCouponsChannel.create({ stripe }).listPromotionCodes()).toEqual([CODE]);
+      expect(await HttpStripeCouponsChannel.create({ stripe }).listPromotionCodes()).toEqual([
+        CODE,
+      ]);
     });
   });
 
@@ -143,7 +145,11 @@ describe("Stripe coupons over the provider", () => {
         durationInMonths: 2,
         products: ["prod_seats"],
       });
-      await channel.createPromotionCode({ couponId: "coupon_a", code: "HALF50", maxRedemptions: 5 });
+      await channel.createPromotionCode({
+        couponId: "coupon_a",
+        code: "HALF50",
+        maxRedemptions: 5,
+      });
 
       expect(coupons[0]).toMatchObject({
         percent_off: 50,
