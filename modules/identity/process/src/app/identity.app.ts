@@ -627,11 +627,12 @@ export class IdentityModule
     const dialableIdpOrigins = () => setup.channels.authReads.findDialableIdentityProviderOrigins();
     // The same fence the published-proof reads go through: an issuer is a
     // string an administrator typed.
-    const issuerDiscovery = setup.channels.ssoIssuerDiscovery;
+    const issuerDiscovery = setup.channels.ssoRegistrationIssuerDiscovery;
     const ssoIssuers = SsoIssuerDirectoryService.create({
       connections: setup.repositories.ssoConnections,
       endpointOrigins: SsoIssuerEndpointOriginsService.create({
-        discovery: issuerDiscovery,
+        // Read at every sign-in, so on the route the engine's own sign-in fetches take.
+        discovery: setup.channels.ssoSignInIssuerDiscovery,
         resolveHost: systemHostAddresses,
         dialableInternalOrigins: dialableIdpOrigins,
       }),
