@@ -90,7 +90,10 @@ import { SeatEventSubscriptionService } from "../services/seat-event-subscriptio
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
-import { BillingSubscriptionService } from "../services/subscription.service.ts";
+import {
+  BillingSubscriptionService,
+  type SeatsInUseCounter,
+} from "../services/subscription.service.ts";
 import { UsageLimitOrganizationService } from "../services/usage-limit-organization.service.ts";
 import {
   StripeUsageReportingBuilder,
@@ -114,7 +117,11 @@ type BillingSetup = FeatureSetup<
 /** The license registry's view of a customer's terms and seats. */
 type ConnectedLicensing = Pick<
   LicensingApi,
-  "getContractTerms" | "raiseContractCommit" | "getConnectedSeats" | "findSeatChanges"
+  | "getContractTerms"
+  | "raiseContractCommit"
+  | "getConnectedSeats"
+  | "findSeatChanges"
+  | "countFullSeatsInUse"
 >;
 
 /** The peers connected billing reads and gates through, each only as wide as it is used. */
@@ -450,6 +457,7 @@ export class BillingModule
               stripe,
               nodeEnvironment,
               repositories,
+              seatsInUse: licensing,
             })
           : void 0,
       connected: {
@@ -490,10 +498,12 @@ export class BillingModule
     stripe,
     nodeEnvironment,
     repositories,
+    seatsInUse,
   }: {
     subscription: SubscriptionComposition;
     stripe: Pick<BillingStripe, "channels">;
     nodeEnvironment: string | undefined;
+    seatsInUse: SeatsInUseCounter;
     repositories: Pick<
       BillingRepositories,
       "subscriptions" | "organizations" | "seatEventSubscriptions"
@@ -521,6 +531,7 @@ export class BillingModule
         }),
         notifier: subscription.notifier,
         stripeErrors,
+        seatsInUse,
       }),
     };
   }

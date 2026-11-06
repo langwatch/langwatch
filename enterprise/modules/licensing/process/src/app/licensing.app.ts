@@ -743,6 +743,10 @@ export class LicensingModule implements LicensingApiContract {
     return this.#contractBudgets.termsOf(input.organizationId);
   }
 
+  countFullSeatsInUse(input: { organizationId: string }): Promise<number> {
+    return this.#service.countFullSeatsInUse(input.organizationId);
+  }
+
   getConnectedSeats(input: { organizationId: string }): Promise<ConnectedSeats> {
     return this.#registry.getConnectedSeats(input.organizationId);
   }

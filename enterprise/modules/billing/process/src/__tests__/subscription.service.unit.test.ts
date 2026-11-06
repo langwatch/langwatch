@@ -3,6 +3,7 @@ import {
   PlanTypes,
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import Stripe from "stripe";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
@@ -24,7 +25,10 @@ import { SeatEventSubscriptionService } from "../services/seat-event-subscriptio
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
-import { BillingSubscriptionService } from "../services/subscription.service.ts";
+import {
+  BillingSubscriptionService,
+  type SeatsInUseCounter,
+} from "../services/subscription.service.ts";
 
 const subscriptionRecord = (
   overrides: Partial<BillingSubscriptionRecord>,
@@ -45,6 +49,12 @@ const subscriptionRecord = (
 });
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
+
+/** Full seats in use, as licensing counts them; each test sets its own. */
+let fullSeatsInUse = 1;
+const seatsInUse = createApiFixture<SeatsInUseCounter>({
+  countFullSeatsInUse: () => Promise.resolve(fullSeatsInUse),
+});
 
 /** A subscription as the provider holds it, with only the fields these paths read. */
 const providerSubscription = ({
@@ -152,6 +162,7 @@ const createServiceWithSeatEventFns = ({
     seatEventService,
     notifier: createMockNotifier(),
     stripeErrors: StripeErrorTranslatorService.create(),
+    seatsInUse,
   });
 
 describe("BillingSubscriptionService", () => {
@@ -173,6 +184,7 @@ describe("BillingSubscriptionService", () => {
         itemCalculator: createMockItemCalculator(),
         notifier: createMockNotifier(),
         stripeErrors: StripeErrorTranslatorService.create(),
+        seatsInUse,
       });
 
       expect(typeof localService.updateSubscriptionItems).toBe("function");
@@ -185,6 +197,7 @@ describe("BillingSubscriptionService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    fullSeatsInUse = 1;
     stripeInvoices = MemoryStripeInvoicesChannel.create();
     stripeSubscriptions = MemoryStripeSubscriptionsChannel.create();
     repository = createMockRepository();
@@ -198,6 +211,7 @@ describe("BillingSubscriptionService", () => {
       itemCalculator: itemCalculator,
       notifier: createMockNotifier(),
       stripeErrors: StripeErrorTranslatorService.create(),
+      seatsInUse,
     });
   });
 
@@ -271,8 +285,9 @@ describe("BillingSubscriptionService", () => {
       });
     });
 
-    describe("when upgradeMembers is false", () => {
-      it("passes zero members to the item calculator", async () => {
+    describe("when the seat count is below the full seats in use", () => {
+      beforeEach(() => {
+        fullSeatsInUse = 5;
         repository.findLastNonCancelled.mockResolvedValue(
           subscriptionRecord({
             id: "sub_db_1",
@@ -286,23 +301,92 @@ describe("BillingSubscriptionService", () => {
             items: [{ id: "si_1", priceId: "price_launch" }],
           }),
         });
-        itemCalculator.getItemsToUpdate.mockReturnValue([]);
+      });
 
-        await service.updateSubscriptionItems({
+      /** @scenario "A seat change at or above the seats in use goes through" */
+      it("sends a seat count equal to the seats in use", async () => {
+        itemCalculator.getItemsToUpdate.mockReturnValue([{ id: "si_1", quantity: 1 }]);
+
+        const result = await service.updateSubscriptionItems({
           organizationId: "org_123",
           plan: PlanTypes.LAUNCH,
-          upgradeMembers: false,
-          upgradeTraces: true,
+          upgradeMembers: true,
+          upgradeTraces: false,
           totalMembers: 5,
-          totalTraces: 30_000,
+          totalTraces: 0,
         });
 
-        expect(itemCalculator.getItemsToUpdate).toHaveBeenCalledWith(
-          expect.objectContaining({
-            tracesToAdd: 30_000,
-            membersToAdd: 0,
+        expect(result).toEqual({ success: true });
+        expect(stripeSubscriptions.updates).toHaveLength(1);
+      });
+
+      /** @scenario "A seat change below the seats in use is refused" */
+      it("refuses before calling the payment provider", async () => {
+        await expect(
+          service.updateSubscriptionItems({
+            organizationId: "org_123",
+            plan: PlanTypes.LAUNCH,
+            upgradeMembers: true,
+            upgradeTraces: false,
+            totalMembers: 3,
+            totalTraces: 0,
           }),
-        );
+        ).rejects.toMatchObject({
+          code: "seat_quantity_below_in_use",
+          meta: { requested: 3, minimum: 5 },
+        });
+        expect(stripeSubscriptions.updates).toEqual([]);
+        expect(itemCalculator.getItemsToUpdate).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A seat change that leaves members out is refused, not sent as zero seats" */
+      it("refuses upgradeMembers false instead of sending zero seats", async () => {
+        await expect(
+          service.updateSubscriptionItems({
+            organizationId: "org_123",
+            plan: PlanTypes.LAUNCH,
+            upgradeMembers: false,
+            upgradeTraces: true,
+            totalMembers: 5,
+            totalTraces: 30_000,
+          }),
+        ).rejects.toMatchObject({ code: "seat_quantity_below_in_use" });
+        expect(stripeSubscriptions.updates).toEqual([]);
+      });
+
+      /** @scenario "A fractional seat count is refused" */
+      it("refuses a fractional seat count", async () => {
+        await expect(
+          service.updateSubscriptionItems({
+            organizationId: "org_123",
+            plan: PlanTypes.LAUNCH,
+            upgradeMembers: true,
+            upgradeTraces: false,
+            totalMembers: 5.5,
+            totalTraces: 0,
+          }),
+        ).rejects.toMatchObject({ code: "seat_quantity_below_in_use" });
+      });
+    });
+
+    describe("when no full seats are in use", () => {
+      /** @scenario "An organization with no seats in use still keeps one seat" */
+      it("refuses zero seats with a minimum of one", async () => {
+        fullSeatsInUse = 0;
+
+        await expect(
+          service.updateSubscriptionItems({
+            organizationId: "org_123",
+            plan: PlanTypes.LAUNCH,
+            upgradeMembers: true,
+            upgradeTraces: false,
+            totalMembers: 0,
+            totalTraces: 0,
+          }),
+        ).rejects.toMatchObject({
+          code: "seat_quantity_below_in_use",
+          meta: { requested: 0, minimum: 1 },
+        });
       });
     });
 

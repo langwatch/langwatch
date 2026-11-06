@@ -3124,6 +3124,17 @@ const presentations = {
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
+  seat_quantity_below_in_use: {
+    // fault: customer. The seat count asked for is lower than the full seats
+    // in use, so nothing changed and nothing was charged.
+    title: "That's fewer seats than you use",
+    describe: (error) => {
+      const minimum = error.meta.minimum;
+      return typeof minimum === "number"
+        ? `Nothing changed. Choose at least ${minimum} seats.`
+        : "Nothing changed. Choose at least as many seats as are in use.";
+    },
+  },
   subscription_already_active: {
     // fault: customer. A checkout was asked for while a plan is live, so we
     // started nothing. Plan changes and cancelling go through the billing
