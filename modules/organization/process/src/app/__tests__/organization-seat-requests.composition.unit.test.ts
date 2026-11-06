@@ -96,6 +96,38 @@ describe("given an organization over its seat limit", () => {
     });
   });
 
+  describe("when the identity provider refuses a full-seat joiner while only Lite seats are free", () => {
+    /** @scenario "A refused sign-in that would be held pending opens a seat request flagged as refused" */
+    it("answers seat_limit, as the joiner would be left Lite for want of a full seat", async () => {
+      const { app, openRequests } = await application({ freeLite: 3 });
+
+      const answer = await app.recordRefusedSignIn({
+        organizationId: ORGANIZATION_ID,
+        email: "late@acme.example",
+        idp: "saml",
+      });
+
+      expect(answer).toEqual({ outcome: "seat_limit" });
+      expect(await openRequests()).toHaveLength(1);
+    });
+  });
+
+  describe("when the identity provider refuses a Developer-seat joiner at the full seat limit", () => {
+    /** @scenario "A refused sign-in with a seat free records an identity provider notice" */
+    it("answers refused, since a Developer is its own seat", async () => {
+      const { app, openRequests } = await application({ joinerRole: "DEVELOPER" });
+
+      const answer = await app.recordRefusedSignIn({
+        organizationId: ORGANIZATION_ID,
+        email: "dev@acme.example",
+        idp: "okta",
+      });
+
+      expect(answer).toEqual({ outcome: "refused" });
+      expect(await openRequests()).toEqual([]);
+    });
+  });
+
   describe("when the identity provider refuses an address while a seat is free", () => {
     /** @scenario "A refused sign-in with a seat free records an identity provider notice" */
     it("answers refused, opens no request and mails a refusal notice", async () => {

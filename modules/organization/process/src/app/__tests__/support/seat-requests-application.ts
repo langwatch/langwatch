@@ -58,6 +58,8 @@ export async function application(
     isSaas?: boolean;
     /** The notice log is down, so no access notice can be recorded. */
     noticesDown?: boolean;
+    /** The seat an arrival joins on; a full Member seat unless named. */
+    joinerRole?: "MEMBER" | "DEVELOPER";
   } = {},
 ) {
   const memory = MemoryOrganizationDatabase.create();
@@ -112,6 +114,10 @@ export async function application(
     createdAt: nowInstant(),
     updatedAt: nowInstant(),
   });
+  if (options.joinerRole) {
+    const organization = memory.organizations.get(ORGANIZATION_ID);
+    if (organization) organization.joinerRole = options.joinerRole;
+  }
   if (options.noticesDown) {
     setup.repositories.accessNotices.record = async () => {
       throw new Error("notice log unavailable");

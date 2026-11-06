@@ -146,12 +146,13 @@ export class SeatRequestService {
     idp: SignInIdpKind | null;
   }): Promise<RefusedSignInOutcome> {
     const address = email.trim().toLowerCase();
-    const [full, lite, refusedToday] = await Promise.all([
+    const [joinerSeat, full, refusedToday] = await Promise.all([
+      this.dependencies.members.readJoinerSeat({ organizationId }),
       this.dependencies.seats.checkLimit({ organizationId, resource: "members" }),
-      this.dependencies.seats.checkLimit({ organizationId, resource: "membersLite" }),
       this.dependencies.notices.refusedSignInsToday({ organizationId }),
     ]);
-    const outcome = !full.allowed && !lite.allowed ? "seat_limit" : "refused";
+    // As at admission: a joiner whose role takes a full seat with none free is left Lite or held.
+    const outcome = joinerSeat === "MEMBER" && !full.allowed ? "seat_limit" : "refused";
     // The address is only what was typed at sign-in start, so a burst of refusals answers the
     // screen but stops opening requests and mailing administrators for the rest of the day.
     if (refusedToday >= REFUSED_SIGN_IN_DAILY_CAP) {

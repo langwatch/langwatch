@@ -47,14 +47,15 @@ Feature: Seat requests when an organization is over its seat limit
 
     @unit
     Scenario: A refused sign-in that would be held pending opens a seat request flagged as refused
-      Given every full member seat and every Lite Member seat is in use
+      Given arrivals join on a full Member seat and every full member seat is in use
+      And whether or not a Lite Member seat is free, since the arrival would be held or left Lite
       When the identity provider "okta" refuses "late@acme.example"
       Then the refusal is answered "seat_limit"
       And an open seat request names "late@acme.example" as refused by "okta"
 
     @unit
     Scenario: A refused sign-in with a seat free records an identity provider notice
-      Given a full member seat is free
+      Given a full member seat is free, or arrivals join on a Developer seat, which is its own
       When the identity provider "okta" refuses "nobody@acme.example"
       Then the refusal is answered "refused"
       And no seat request names "nobody@acme.example"
