@@ -85,6 +85,11 @@ describe("given the hosted product", () => {
       expect(hrefsIn({ isSaaS: true })).toContain("/settings/subscription");
       expect(hrefsIn({ isSaaS: true })).not.toContain("/settings/license");
     });
+
+    /** @scenario "A Lite Member finds the subscription page in the settings menu on the cloud" */
+    it("offers the subscription page to a lite member too", () => {
+      expect(hrefsIn({ isSaaS: true, isLiteMember: true })).toContain("/settings/subscription");
+    });
   });
 });
 

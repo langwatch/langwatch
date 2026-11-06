@@ -742,6 +742,32 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
     });
   }
 
+  /**
+   * A new secret for one key, answered once; the old one is refused at once. The same caller rule
+   * as revoke, and like a mint an operator acting as a member may not do it.
+   */
+  async rotateKey(
+    input: Readonly<{ organizationId: string; apiKeyId: string }>,
+    by: ApiKeyCaller,
+  ): Promise<{ token: string; apiKey: ApiKey }> {
+    if (by.impersonatorId) {
+      throw new PermissionDeniedError({
+        permission: "organization:view",
+        scope: { type: "organization", id: input.organizationId },
+        denialReason: "no-grant",
+      });
+    }
+    await this.#ensureMember(input.organizationId, by);
+    const callerIsAdmin = await this.#isOrganizationAdmin(input.organizationId, by);
+
+    return this.#service.rotate({
+      id: input.apiKeyId,
+      callerUserId: by.id,
+      callerIsAdmin,
+      organizationId: input.organizationId,
+    });
+  }
+
   /** The organization's projects, for the restricted-permission picker. */
   async listOrganizationProjects(
     input: Readonly<{ organizationId: string }>,

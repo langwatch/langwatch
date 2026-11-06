@@ -353,9 +353,9 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then the key expires 30 days from now
 
     @integration
-    Scenario: A key row offers Edit and Revoke
+    Scenario: A key row offers Edit, Rotate and Revoke
       When "ada" opens the row menu of a key she may change
-      Then its actions are "Edit" and "Revoke", and nothing else
+      Then its actions are "Edit", "Rotate" and "Revoke", and nothing else
 
     @integration
     Scenario: A member mints a personal key within their own grants
