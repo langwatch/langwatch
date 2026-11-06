@@ -20,7 +20,11 @@ import { NurturingService } from "../nurturing.service.ts";
 const T0 = Date.UTC(2026, 9, 20, 12);
 const seconds = (ms: number) => Math.floor(ms / 1000);
 
-type Call = { path: string; userId: string; traits?: unknown; event?: unknown };
+type Call = { path: string; userId: string; traits?: unknown;
+  event?: unknown;
+  properties?: unknown;
+  messageId?: string;
+};
 
 /** A claim repository whose clock the test moves, with the real window semantics. */
 class ClockedClaims implements NurturingClaimRepository {
@@ -168,7 +172,8 @@ const firstSession: NurturingSignal = {
   agentTypes: ["claude_code"],
   memberUserIds: ["admin-1", "member-2"],
 };
-const joined = { tenantId: "org-1", occurredAt: T0, userId: "joiner-1" };
+const JOINED_AT = Date.UTC(2026, 10, 7);
+const joined = { tenantId: "org-1", occurredAt: JOINED_AT, userId: "joiner-1" };
 const inviteAccepted: NurturingSignal = {
   kind: "invite_accepted",
   sourceEventId: "invite-1",
@@ -375,6 +380,63 @@ describe("NurturingDeliveryService organization facts", () => {
     });
   });
 
+  describe("when a person joins an organization", () => {
+    const joinedOrganizations = (cio: Organization["cio"]) =>
+      cio.tracks().filter(({ event }) => event === "joined_organization");
+
+    /** @scenario "A join is tracked as joined_organization beside its own event" */
+    it("tracks joined_organization with the join method and a stable message id", async () => {
+      const { cio, deliver } = await organizationWithMembers();
+
+      await deliver(ssoAutoAdded);
+      await settle();
+
+      expect(joinedOrganizations(cio)).toEqual([
+        expect.objectContaining({
+          messageId: "joined_organization:joiner-1:org-1",
+          properties: expect.objectContaining({ join_method: "sso", organization_id: "org-1" }),
+        }),
+      ]);
+    });
+
+    /** @scenario "A redelivered or replayed join is tracked once" */
+    it("tracks joined_organization once when the same invite is replayed after the delivery window", async () => {
+      const { cio, claims, deliver } = await organizationWithMembers();
+
+      await deliver(inviteAccepted);
+      claims.now += 8 * 24 * 60 * 60 * 1000;
+      await deliver(inviteAccepted);
+      await settle();
+
+      expect(joinedOrganizations(cio)).toHaveLength(1);
+    });
+
+    /** @scenario "An invite and an SSO add of the same person and organization are tracked once" */
+    it("tracks joined_organization once for an invite and an SSO add of the same organization", async () => {
+      const { cio, deliver } = await organizationWithMembers();
+
+      await deliver(inviteAccepted);
+      await deliver(ssoAutoAdded);
+      await settle();
+
+      expect(cio.tracks().map(({ event }) => event)).toEqual([
+        "joined_via_invite",
+        "joined_organization",
+        "joined_via_sso",
+      ]);
+    });
+
+    /** @scenario "A join from before joined_organization existed is not tracked as it" */
+    it("does not track joined_organization for a join that predates it", async () => {
+      const { cio, deliver } = await organizationWithMembers();
+
+      await deliver({ ...inviteAccepted, occurredAt: T0 });
+      await settle();
+
+      expect(cio.tracks().map(({ event }) => event)).toEqual(["joined_via_invite"]);
+    });
+  });
+
   describe("when a person joins an organization with no traces", () => {
     /** @scenario "An invite into an organization with no traces says nothing about traces" */
     it("sends no has_traces for an invite", async () => {
@@ -384,7 +446,10 @@ describe("NurturingDeliveryService organization facts", () => {
       await settle();
 
       expect(cio.identifies()).toEqual([]);
-      expect(cio.tracks().map(({ event }) => event)).toEqual(["joined_via_invite"]);
+      expect(cio.tracks().map(({ event }) => event)).toEqual([
+        "joined_via_invite",
+        "joined_organization",
+      ]);
     });
 
     /** @scenario "A person with no traces anywhere still starts at has_traces false" */
@@ -589,7 +654,10 @@ describe("NurturingDeliveryService organization facts", () => {
       await settle();
 
       expect(cio.identifies()).toEqual([]);
-      expect(cio.tracks().map(({ event }) => event)).toEqual(["joined_via_invite"]);
+      expect(cio.tracks().map(({ event }) => event)).toEqual([
+        "joined_via_invite",
+        "joined_organization",
+      ]);
     });
 
     /** @scenario "An SSO person whose trace lookup fails still starts their milestones" */
@@ -603,7 +671,7 @@ describe("NurturingDeliveryService organization facts", () => {
       const [traits] = traitsOf(cio.identifies(), "joiner-1");
       expect(traits).toMatchObject({ has_evaluations: false });
       expectNoTraceTraits(traits);
-      expect(cio.tracks().map(({ event }) => event)).toEqual(["joined_via_sso"]);
+      expect(cio.tracks().map(({ event }) => event)).toEqual(["joined_via_sso", "joined_organization"]);
     });
   });
 

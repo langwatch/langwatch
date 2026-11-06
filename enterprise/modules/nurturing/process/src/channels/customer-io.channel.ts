@@ -21,6 +21,7 @@ export abstract class CustomerIoChannel {
     userId: string;
     event: CioEventName;
     properties?: Record<string, unknown>;
+    messageId?: string;
   }): Promise<void>;
   abstract groupUser(input: {
     userId: string;

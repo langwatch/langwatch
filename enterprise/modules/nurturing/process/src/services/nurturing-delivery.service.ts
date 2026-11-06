@@ -72,6 +72,9 @@ type MemberBatch = Readonly<{ userIds: readonly string[]; traits: Partial<CioPer
 /** How long a delivered signal is remembered against a redelivered source event. */
 const DELIVERED_WINDOW_SECONDS = 7 * 24 * 60 * 60;
 
+/** A person joins an organization once, so this outlives any realistic replay of the join. */
+const JOINED_WINDOW_SECONDS = 365 * 24 * 60 * 60;
+
 /**
  * Sends each recorded signal once, as main sent it: Customer.io through the
  * moved billing rules, PostHog as main's trackServerEvent. A sink that fails
@@ -112,8 +115,9 @@ export class NurturingDeliveryService {
     const deliveredClaim = `nurturing:${key}`;
     if (!(await this.deps.claims.claim(deliveredClaim, DELIVERED_WINDOW_SECONDS))) return;
     if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
+    const firstJoin = await this.firstJoinOf({ signal, deliveredClaim });
     const memberBatch = await this.memberBatchOf({ signal, deliveredClaim });
-    this.toCustomerIo(signal);
+    this.toCustomerIo({ signal, firstJoin });
     this.toPostHogSafely(signal);
     await this.identifyCodingAgentMembers(signal);
     await this.ownCodingDelivery?.deliver(signal);
@@ -227,6 +231,32 @@ export class NurturingDeliveryService {
     }
   }
 
+  /**
+   * True when this is the person's first join of this organization, by invite or by SSO: both
+   * feed the one joined_organization event, which starts a campaign and must reach a person once.
+   * Keyed on person and organization, not on the source event, so a replay or the other route
+   * is not first. Always true for a signal that is no join.
+   */
+  private async firstJoinOf({
+    signal,
+    deliveredClaim,
+  }: {
+    signal: NurturingSignal;
+    deliveredClaim: string;
+  }): Promise<boolean> {
+    if (signal.kind !== "invite_accepted" && signal.kind !== "sso_auto_added") return true;
+    const key = `nurturing:joined_organization:${signal.userId}:${signal.organizationId}`;
+    try {
+      return await this.deps.claims.claim(key, JOINED_WINDOW_SECONDS);
+    } catch (error) {
+      reportFailure(error);
+      return NurturingClaimReleaseService.create(this.deps.claims).rethrowAfterReleasing({
+        error,
+        keys: [deliveredClaim],
+      });
+    }
+  }
+
   /** True when this signal's debounce window already sent for its tenant or person. */
   private async withinCustomerIoDebounce(signal: NurturingSignal): Promise<boolean> {
     const debounce = pickCustomerIoDebounce(signal);
@@ -247,7 +277,12 @@ export class NurturingDeliveryService {
           break;
         case "track":
           void nurturing
-            .trackEvent({ userId: call.userId, event: call.event, properties: call.properties })
+            .trackEvent({
+              userId: call.userId,
+              event: call.event,
+              properties: call.properties,
+              messageId: call.messageId,
+            })
             .catch(reportFailure);
           break;
         case "group":
@@ -259,7 +294,13 @@ export class NurturingDeliveryService {
     }
   }
 
-  private toCustomerIo(signal: NurturingSignal): void {
+  private toCustomerIo({
+    signal,
+    firstJoin,
+  }: {
+    signal: NurturingSignal;
+    firstJoin: boolean;
+  }): void {
     if (!this.deps.customerIo) return;
     if (isCodingOrAppSignal(signal)) return this.sendCustomerIoCalls(fireCodingOrApp(signal));
     switch (signal.kind) {
@@ -286,12 +327,12 @@ export class NurturingDeliveryService {
       case "invite_accepted":
         return this.sendWithTraces({
           ...signal,
-          callsFor: (traces) => fireInviteAccepted({ signal, traces }),
+          callsFor: (traces) => fireInviteAccepted({ signal, traces, firstJoin }),
         });
       case "sso_auto_added":
         return this.sendWithTraces({
           ...signal,
-          callsFor: (traces) => fireSsoAutoAdded({ signal, traces }),
+          callsFor: (traces) => fireSsoAutoAdded({ signal, traces, firstJoin }),
         });
       case "session_started":
         return this.sendCustomerIoCalls(fireActivity(signal));

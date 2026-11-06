@@ -29,12 +29,14 @@ export class NurturingService {
     userId,
     event,
     properties,
+    messageId,
   }: {
     userId: string;
     event: CioEventName;
     properties?: Record<string, unknown>;
+    messageId?: string;
   }): Promise<void> {
-    await this.channel.trackEvent({ userId, event, properties });
+    await this.channel.trackEvent({ userId, event, properties, messageId });
   }
 
   async groupUser({

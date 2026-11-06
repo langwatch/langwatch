@@ -45,6 +45,7 @@ export class HttpCustomerIoChannel extends CustomerIoChannel {
     userId: string;
     event: CioEventName;
     properties?: Record<string, unknown>;
+    messageId?: string;
   }): Promise<void> {
     return this.post("/track", input);
   }
@@ -68,6 +69,7 @@ export class HttpCustomerIoChannel extends CustomerIoChannel {
             userId: call.userId,
             event: call.event,
             properties: call.properties,
+            ...(call.messageId ? { messageId: call.messageId } : {}),
           };
         case "group":
           return {
