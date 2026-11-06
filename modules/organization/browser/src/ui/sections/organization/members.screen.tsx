@@ -864,8 +864,6 @@ function useMemberRemoval(organizationId: string) {
                   title: "Member removed",
                   description:
                     "Their seat did not go to the person waiting: enable them in Users to give it.",
-                  type: "warning",
-                  duration: 8000,
                 }
               : {
                   title: "Member removed successfully",

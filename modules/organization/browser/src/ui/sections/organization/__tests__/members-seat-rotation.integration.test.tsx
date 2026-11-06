@@ -242,6 +242,7 @@ describe("given Qux is waiting for a full member seat", () => {
     ];
   });
 
+  /** @scenario "A person waiting for a seat is listed as waiting, not disabled" */
   it("lists Qux as waiting for a seat, not disabled, and counts them as waiting", () => {
     renderUsers();
 
@@ -255,6 +256,7 @@ describe("given Qux is waiting for a full member seat", () => {
     expect(screen.getByRole("button", { name: /^Members, 3 people/ })).toBeInTheDocument();
   });
 
+  /** @scenario "The Waiting to join cut lists people waiting for a seat" */
   it("shows Qux under the Waiting to join cut and not under Members", () => {
     renderUsers({ people: "waiting" });
     expect(screen.getByText("Qux")).toBeInTheDocument();
@@ -266,6 +268,7 @@ describe("given Qux is waiting for a full member seat", () => {
     expect(screen.getByText("Baz")).toBeInTheDocument();
   });
 
+  /** @scenario "A person waiting for a seat can be given one from their row" */
   it("offers to give Qux a seat from their row", async () => {
     renderUsers();
 

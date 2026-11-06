@@ -175,6 +175,25 @@ Feature: Seat rotation
       And 4 of 5 full member seats are in use
 
     @integration
+    Scenario: A person waiting for a seat is listed as waiting, not disabled
+      Given "Qux" is waiting for a full member seat
+      When an administrator opens Users
+      Then "Qux" carries the chip "Waiting for a seat"
+      And the Waiting to join cut counts "Qux" beside the join requests
+
+    @integration
+    Scenario: The Waiting to join cut lists people waiting for a seat
+      Given "Qux" is waiting for a full member seat
+      When an administrator selects the Waiting to join cut
+      Then "Qux" is listed there and not under Members
+
+    @integration
+    Scenario: A person waiting for a seat can be given one from their row
+      Given "Qux" is waiting for a full member seat
+      When an administrator chooses "Give them a seat" on the row of "Qux"
+      Then "Qux" is enabled
+
+    @integration
     Scenario: Enabling a person waiting for a seat admits them
       Given "Bar" took their seat 45 days ago
       And "Qux" is waiting for a full member seat
