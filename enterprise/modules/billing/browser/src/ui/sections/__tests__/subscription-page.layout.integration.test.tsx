@@ -50,6 +50,10 @@ class TestBillingHost extends BillingHostApi {
     return "test-team-id";
   }
 
+  canInviteMembers(): boolean {
+    return true;
+  }
+
   routeQuery(): Readonly<Record<string, string | undefined>> {
     return {};
   }
@@ -194,9 +198,11 @@ const eventLimit = (overrides: Partial<MockMessageLimitInfo>): MockMessageLimitI
 const givenUsage = ({
   membersCount,
   messageLimitInfo,
+  usageUnit = "events",
 }: {
   membersCount: number;
   messageLimitInfo?: MockMessageLimitInfo;
+  usageUnit?: "events" | "traces";
 }) => {
   mockGetUsage.mockReturnValue({
     data: {
@@ -204,7 +210,7 @@ const givenUsage = ({
       membersCount,
       currentMonthMessagesCount: messageLimitInfo?.current,
       messageLimitInfo,
-      usageUnit: "events",
+      usageUnit,
     },
     isLoading: false,
     refetch: vi.fn(),
@@ -441,6 +447,53 @@ describe("<SubscriptionPage/> layout", () => {
           name: "Upgrade to Growth",
         }),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("when a Free organization is close to its event limit", () => {
+    beforeEach(() => {
+      givenUsage({
+        membersCount: 2,
+        messageLimitInfo: eventLimit({
+          status: "warning",
+          current: 45000,
+          currentFormatted: "45,000",
+        }),
+      });
+    });
+
+    /** @scenario "A Free plan close to its event limit is warned before it is reached" */
+    it("warns that the limit is close without saying it is reached", async () => {
+      renderSubscriptionPage();
+
+      const row = await screen.findByTestId("plan-event-usage");
+      expect(row).toHaveTextContent("45,000 / 50,000");
+      expect(row).toHaveTextContent("Close to the limit");
+      expect(row).not.toHaveTextContent("Limit reached");
+    });
+  });
+
+  describe("when a Free organization billed per trace used all of its traces", () => {
+    beforeEach(() => {
+      givenUsage({
+        membersCount: 2,
+        usageUnit: "traces",
+        messageLimitInfo: eventLimit({
+          status: "exceeded",
+          current: 50000,
+          currentFormatted: "50,000",
+        }),
+      });
+    });
+
+    /** @scenario "A plan billed per trace names traces in its usage row" */
+    it("names traces in the row and in the limit hint", async () => {
+      renderSubscriptionPage();
+
+      const row = await screen.findByTestId("plan-event-usage");
+      expect(row).toHaveTextContent("Traces this month");
+      expect(row).toHaveTextContent("New traces are not processed");
+      expect(row).not.toHaveTextContent("events");
     });
   });
 

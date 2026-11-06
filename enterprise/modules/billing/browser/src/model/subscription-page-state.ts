@@ -127,6 +127,8 @@ export function subscriptionChangesRequired({
 /** This month's events on the plan card: the count, and the cap with a meter where one applies. */
 export type PlanEventUsage = {
   label: string;
+  /** What the plan counts, in the plural: "events" or "traces". */
+  noun: "events" | "traces";
   value: string;
   /** Share of the cap used, or null when the plan has no cap to measure against. */
   fillRatio: number | null;
@@ -155,14 +157,16 @@ export function planEventUsage({
   showLimit: boolean;
 }): PlanEventUsage | undefined {
   if (!messageLimitInfo || currentMonthCount == null) return undefined;
-  const label = usageUnit === "traces" ? "Traces this month" : "Events this month";
+  const noun = usageUnit === "traces" ? "traces" : "events";
+  const label = noun === "traces" ? "Traces this month" : "Events this month";
   const capped =
     showLimit && messageLimitInfo.max > 0 && messageLimitInfo.maxFormatted !== "Unlimited";
   if (!capped) {
-    return { label, value: messageLimitInfo.currentFormatted, fillRatio: null, status: "ok" };
+    return { label, noun, value: messageLimitInfo.currentFormatted, fillRatio: null, status: "ok" };
   }
   return {
     label,
+    noun,
     value: `${messageLimitInfo.currentFormatted} / ${messageLimitInfo.maxFormatted}`,
     fillRatio: messageLimitInfo.current / messageLimitInfo.max,
     status: messageLimitInfo.status,

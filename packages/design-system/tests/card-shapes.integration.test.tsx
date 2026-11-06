@@ -13,13 +13,17 @@ import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(cleanup);
 
-/** jsdom resolves no cascade layers, so read the rules a node's classes were given. */
-function rulesOf(element: Element): string {
+/**
+ * jsdom resolves no cascade layers, so read the rules a node's classes were given.
+ * `nested` reads the rules for a descendant selector part instead.
+ */
+function rulesOf(element: Element, nested?: string): string {
   const css = Array.from(document.querySelectorAll("style"))
     .map((style) => style.textContent ?? "")
     .join("\n");
+  const selector = nested ? `[^{]*${nested}[^{]*` : "";
   return Array.from(element.classList)
-    .flatMap((name) => css.match(new RegExp(`\\.${name}\\{[^}]*\\}`, "g")) ?? [])
+    .flatMap((name) => css.match(new RegExp(`\\.${name}${selector}\\{[^}]*\\}`, "g")) ?? [])
     .join("");
 }
 
@@ -90,15 +94,7 @@ describe("Card", () => {
       const list = screen.getByTestId("rows");
       expect(list.dataset.settingList).toBe("boxed");
       expect(rulesOf(list)).toContain("border-width:1px");
-      const css = Array.from(document.querySelectorAll("style"))
-        .map((style) => style.textContent ?? "")
-        .join("\n");
-      const valueRule = Array.from(list.classList)
-        .flatMap(
-          (name) =>
-            css.match(new RegExp(`\\.${name}[^{]*data-setting-value[^{]*\\{[^}]*\\}`, "g")) ?? [],
-        )
-        .join("");
+      const valueRule = rulesOf(list, "data-setting-value");
       expect(valueRule).toContain("justify-content:flex-end");
     });
   });

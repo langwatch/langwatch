@@ -247,6 +247,22 @@ Feature: Subscription Page Plan Management
       And I am offered the Growth upgrade
 
     @integration
+    Scenario: A Free plan close to its event limit is warned before it is reached
+      Given my organization is on the Free plan
+      And my organization sent 45,000 of its 50,000 events this month
+      When I view the subscription page
+      Then the current plan card says the event limit is close
+      And it does not say the limit is reached
+
+    @integration
+    Scenario: A plan billed per trace names traces in its usage row
+      Given my organization is on the Free plan billed per trace
+      And my organization used all of its traces this month
+      When I view the subscription page
+      Then the usage row reads "Traces this month"
+      And the limit hint says new traces are not processed
+
+    @integration
     Scenario: A plan billed per event shows the month's events without a limit
       Given my organization has an active Growth subscription billed per seat and event
       When I view the subscription page
@@ -351,6 +367,13 @@ Feature: Subscription Page Plan Management
       And I am told an upgrade is required, in the danger tone
       And I see a note that my organization uses more seats than the plan includes
       And I am offered the upgrade
+
+    @integration
+    Scenario: A legacy plan within its seats is asked to upgrade without the danger tone
+      Given my organization is on a legacy tiered paid plan
+      And my organization uses no more seats than the plan includes
+      When I view the subscription page
+      Then I am told an upgrade is required, in the warning tone
 
     @integration
     Scenario: The billing page counts Lite Members above the plan as over the limit

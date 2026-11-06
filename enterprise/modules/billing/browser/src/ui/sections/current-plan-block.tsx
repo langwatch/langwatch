@@ -26,7 +26,7 @@ function EventUsageRow({ usage }: { usage: PlanEventUsage }) {
       label={usage.label}
       hint={
         usage.status === "exceeded"
-          ? "New events are not processed until the month resets or you upgrade."
+          ? `New ${usage.noun} are not processed until the month resets or you upgrade.`
           : undefined
       }
       data-testid="plan-event-usage"
@@ -114,6 +114,7 @@ export function CurrentPlanBlock({
   userCount,
   maxSeats,
   upgradeRequired,
+  isOverPlanSeats,
   onUserCountClick,
   onUpgrade,
   isUpgradeLoading,
@@ -133,6 +134,8 @@ export function CurrentPlanBlock({
   userCount: number;
   maxSeats?: number;
   upgradeRequired?: boolean;
+  /** Above the plan's seats: the upgrade-required chip turns to the danger tone. */
+  isOverPlanSeats?: boolean;
   onUserCountClick?: () => void;
   onUpgrade?: () => void;
   isUpgradeLoading?: boolean;
@@ -163,7 +166,11 @@ export function CurrentPlanBlock({
         <HStack gap={2}>
           <StatusChip label="Current" tone="good" />
           {upgradeRequired && (
-            <StatusChip label="Upgrade required" tone="bad" data-testid="upgrade-required-chip" />
+            <StatusChip
+              label="Upgrade required"
+              tone={isOverPlanSeats || isOverSeats ? "bad" : "warning"}
+              data-testid="upgrade-required-chip"
+            />
           )}
         </HStack>
       }

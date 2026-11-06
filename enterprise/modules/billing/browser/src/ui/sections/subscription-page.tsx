@@ -385,6 +385,7 @@ export function SubscriptionPage() {
           userCount={seatUsageN}
           maxSeats={isTieredPricingModel ? undefined : seatUsageM}
           upgradeRequired={updateRequired}
+          isOverPlanSeats={isOverPlanSeats}
           onUserCountClick={() => setIsDrawerOpen(true)}
           onUpgrade={cardCarriesUpgrade ? handleUpgrade : undefined}
           isUpgradeLoading={isUpgradeLoading}
