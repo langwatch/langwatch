@@ -20,9 +20,25 @@ const { state } = vi.hoisted(() => ({
     bindings: [] as { scopeType: string; scopeId: string; role: string }[],
     bindingsLoading: false,
     bindingsFailed: false,
+    ceilingLoading: false,
     firstMessage: void 0 as boolean | undefined,
   },
 }));
+
+// The ceiling is the server's answer; faked here over the seeded bindings.
+vi.mock("../../../behavior/use-grantable-permissions.ts", async () => {
+  const { fakeGrantableHook } = await import("./support/fake-grantable.ts");
+  const answer = fakeGrantableHook({
+    bindings: () => state.bindings,
+    projectTeams: { "proj-1": "team-1", "proj-2": "team-2", "proj-personal": "team-personal" },
+  });
+  return {
+    useGrantablePermissions: (input: Parameters<typeof answer>[0]) =>
+      state.ceilingLoading
+        ? { permissions: [], isLoading: true, isError: false, refetch: () => undefined }
+        : answer(input),
+  };
+});
 
 vi.mock("../../../behavior/api-key-api.ts", () => ({
   apiKeyApi: {
@@ -129,6 +145,7 @@ beforeEach(() => {
   state.bindings = [];
   state.bindingsLoading = false;
   state.bindingsFailed = false;
+  state.ceilingLoading = false;
   state.firstMessage = void 0;
 });
 
@@ -295,6 +312,21 @@ describe("given the CLI asked for management access", () => {
       );
       expect(host.approvals[0]!.keySelection?.permissions).not.toContain("organization:delete");
       expect(request).not.toHaveTextContent("Delete the organization");
+    });
+  });
+
+  describe("when an organization admin opens it before their access has loaded", () => {
+    it("does not claim they hold no management access, and keeps approve unavailable", async () => {
+      const user = userEvent.setup();
+      state.bindings = [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" }];
+      state.ceilingLoading = true;
+      const host = hostFor({ lookup: managementLookup });
+      renderWithApiKeyHost(<CliAuthScreen />, host);
+      await confirmCode(user);
+
+      expect(await screen.findByRole("button", { name: "Approve" })).toBeDisabled();
+      expect(screen.queryByText("You have no management access here")).toBeNull();
+      expect(host.approvals).toEqual([]);
     });
   });
 

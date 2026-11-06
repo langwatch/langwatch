@@ -322,6 +322,10 @@ const registry = {
     tips: ["Revoked keys cannot be reactivated — create a new API key if you need one"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  api_key_expired: {
+    tips: ["An expired key cannot be rotated. Create a new API key instead"],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
   api_key_permission_denied: {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
     docsPath: "/api-reference/api-keys/create-api-key",
