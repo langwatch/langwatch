@@ -821,6 +821,11 @@ const NO_GATEWAY_REASONS: Partial<Record<AssistantKind, string>> = {
   grok: "Grok routes no model traffic through its environment, so the gateway never applies.",
 };
 
+/** Why a kind that locks direct OTLP off never uses it, shown under the disabled switch. */
+const NO_OTEL_DIRECT_REASONS: Partial<Record<AssistantKind, string>> = {
+  cursor: "Cursor is GUI-only, so direct OTLP never applies.",
+};
+
 /**
  * CLI path policy for the `langwatch <tool>` wrapper, folded into the tile and cached at
  * login (cliBootstrap's `toolPolicies`). A path the kind locks (`lockedToggles`) shows off.
@@ -862,7 +867,8 @@ function CliPathsSection({
             <Text fontSize="sm">Allow direct OTLP ingestion</Text>
             <Text fontSize="xs" color="fg.muted">
               {noOtelDirect
-                ? "Cursor is GUI-only, so direct OTLP never applies."
+                ? (NO_OTEL_DIRECT_REASONS[form.assistantKind] ??
+                  "This tool never exports straight to the OTLP endpoint.")
                 : "Export telemetry straight to the personal OTLP endpoint."}
             </Text>
           </VStack>

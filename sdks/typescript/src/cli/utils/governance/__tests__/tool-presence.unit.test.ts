@@ -102,6 +102,44 @@ describe("isExecutableOnPath", () => {
   it("does not ask a shell it does not resolve aliases through", () => {
     expect(isToolResolvable({ tool: "pi", env: { PATH: binDir, SHELL: "/bin/sh" } })).toBe(false);
   });
+
+  describe("when the alias shell is asked", () => {
+    const isWindows = process.platform === "win32";
+    const hasBash = !isWindows && fs.existsSync("/bin/bash");
+    const bashEnv = () => ({ HOME: binDir, SHELL: "/bin/bash", PATH: "/bin:/usr/bin" });
+
+    it.skipIf(!hasBash)("counts a tool only the rc's alias reaches", () => {
+      const hidden = path.join(binDir, "hidden-pi");
+      fs.writeFileSync(hidden, "#!/bin/sh\n");
+      fs.chmodSync(hidden, 0o755);
+      fs.writeFileSync(path.join(binDir, ".bashrc"), `alias pi='${hidden}'\n`);
+
+      expect(isToolResolvable({ tool: "pi", env: bashEnv() })).toBe(true);
+    });
+
+    it.skipIf(!hasBash)("refuses a tool the shell does not know", () => {
+      fs.writeFileSync(path.join(binDir, ".bashrc"), "\n");
+
+      expect(isToolResolvable({ tool: "pi", env: bashEnv() })).toBe(false);
+    });
+
+    it.skipIf(!hasBash)("does not count our own scoped function as the tool", () => {
+      fs.writeFileSync(path.join(binDir, ".bashrc"), "pi() { :; }\n");
+
+      expect(isToolResolvable({ tool: "pi", env: bashEnv() })).toBe(false);
+    });
+
+    it.skipIf(isWindows)("counts the tool as found when the shell gives no answer", () => {
+      const killedShell = path.join(binDir, "bash");
+      fs.writeFileSync(killedShell, "#!/bin/sh\nkill -KILL $$\n");
+      fs.chmodSync(killedShell, 0o755);
+      const missingShell = path.join(binDir, "missing", "bash");
+
+      for (const shell of [killedShell, missingShell]) {
+        expect(isToolResolvable({ tool: "pi", env: { PATH: "/bin", SHELL: shell } })).toBe(true);
+      }
+    });
+  });
 });
 
 describe("shellLookupStdin", () => {
