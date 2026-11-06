@@ -88,6 +88,7 @@ import {
 import {
   useLangyHistoryError,
   useLangyListError,
+  useReleaseTurnOfLostConversation,
 } from "../../behavior/panel/use-langy-panel-errors.ts";
 import {
   useLangyDevInspector,
@@ -397,6 +398,9 @@ function LangyPanel({
     messages: engine.messages,
     retryEngineTurn: engine.retryTurn,
     restoreDraftOnFailure,
+  });
+  useReleaseTurnOfLostConversation({
+    errorKinds: [failure.turnError?.kind, historyError.presentation?.kind],
   });
   useLangyOutlivedTurnError({
     error: engine.error,

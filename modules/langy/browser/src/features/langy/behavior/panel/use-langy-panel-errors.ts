@@ -4,6 +4,7 @@ import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import {
   explainLangyError,
   isLangyConversationPending,
+  isLostLangyConversation,
   LANGY_CONVERSATION_PENDING_GRACE_MS,
   readLangyTrpcError,
 } from "../logic/langy-error-explainer.ts";
@@ -93,6 +94,23 @@ export function useLangyHistoryError({
   }, [isUnconfirmed, refetchHistory]);
 
   return { presentation, isUnconfirmed };
+}
+
+/**
+ * A conversation the reader can no longer see runs nothing they could stop, and no fold of it
+ * will ever arrive to settle the turn: the composer goes back to Send.
+ */
+export function useReleaseTurnOfLostConversation({
+  errorKinds,
+}: {
+  errorKinds: readonly (string | null | undefined)[];
+}) {
+  const lost = errorKinds.some(isLostLangyConversation);
+  useEffect(() => {
+    if (!lost) return;
+    const store = useLangyStore.getState();
+    if (store.turnPhase !== "idle") store.settleTurn(store.activeTurnId);
+  }, [lost]);
 }
 
 const CONVERSATIONS_UNAVAILABLE = {

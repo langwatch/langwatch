@@ -89,6 +89,7 @@ describe("createLangyChatTransport", () => {
       expect(onIds).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",
+        projectId: "p1",
       });
     });
 
@@ -271,9 +272,24 @@ describe("createLangyChatTransport", () => {
       expect(onIds).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",
+        projectId: "p1",
       });
       // And it got far enough to open the live stream.
       expect(subscription).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the panel no longer belongs to the project the send started in", () => {
+    it("streams nothing and never attaches to the turn", async () => {
+      const onIds = vi.fn(() => false);
+      const onTurnSettled = vi.fn();
+      const { transport } = makeTransport({ conversationId: null }, { onIds, onTurnSettled });
+
+      const stream = await transport.sendMessages(options());
+
+      expect((await stream.getReader().read()).done).toBe(true);
+      expect(subscription).not.toHaveBeenCalled();
+      expect(onTurnSettled).not.toHaveBeenCalled();
     });
   });
 

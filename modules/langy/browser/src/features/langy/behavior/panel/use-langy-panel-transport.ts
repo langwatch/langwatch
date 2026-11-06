@@ -12,7 +12,11 @@ import {
   type LangyTrpcClient,
 } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
-import { type LangyContextChip, useLangyStore } from "../../../../behavior/langy.store.ts";
+import {
+  isTurnInPanelScope,
+  type LangyContextChip,
+  useLangyStore,
+} from "../../../../behavior/langy.store.ts";
 import { navigateDedupKey, reserveNavigate } from "../../../../model/langy-navigate-dedup.ts";
 import { executeUiAction } from "../../../../model/ui-actions/execute-ui-action.ts";
 import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
@@ -292,8 +296,15 @@ export function useLangyPanelTransport({
           if (!ctx) throw new Error("Langy turn context not ready");
           return ctx;
         },
-        onIds: ({ conversationId, turnId }) => {
-          useLangyStore.getState().beginTurn({ conversationId, turnId });
+        onIds: ({ conversationId, turnId, projectId: sentFrom }) => {
+          const store = useLangyStore.getState();
+          // Adopted here, the other project's conversation reads as not found and its turn
+          // pins the composer on "working" (the scope change already settled this one).
+          if (!isTurnInPanelScope({ scope: store.activeConversationScope, projectId: sentFrom })) {
+            kickoffNamedRef.current = null;
+            return false;
+          }
+          store.beginTurn({ conversationId, turnId });
           dispatchedTurnIdRef.current = turnId;
           // The words are a bubble on screen now, so they are no longer a
           // draft to hand back.
@@ -303,6 +314,7 @@ export function useLangyPanelTransport({
           const named = kickoffNamedRef.current;
           kickoffNamedRef.current = null;
           named?.(conversationId);
+          return true;
         },
         getResumeTarget: () => currentResumeTarget(turnContextRef.current?.projectId),
         onNavigate: (entry) =>

@@ -491,6 +491,11 @@ function isTransientLangyHistoryReadFailure(kind: string): boolean {
   return !TERMINAL_LANGY_HISTORY_READ_KINDS.has(kind);
 }
 
+/** Is this failure the reader losing the conversation itself (gone, or not theirs)? */
+export function isLostLangyConversation(kind: string | null | undefined): boolean {
+  return !!kind && TERMINAL_LANGY_HISTORY_READ_KINDS.has(kind);
+}
+
 /**
  * May this failed history read be demoted to the panel's quiet "showing the messages we
  * last loaded" line, rather than owning the message column?

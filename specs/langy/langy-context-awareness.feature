@@ -241,6 +241,27 @@ Feature: Langy lights up what it can use as context ("glow and go")
       | switch to a different organization              |
       | sign in as somebody else on that same project   |
 
+  Scenario Outline: A message still on its way stays where I sent it
+    # A cold start can take seconds to name the conversation. The guided
+    # onboarding sends its kickoff the moment the panel opens, so the page
+    # settling on another project in that window is the ordinary case.
+    Given I sent Langy a message on <from>
+    And Langy has not named the conversation yet
+    When I move to <to> before it does
+    Then the panel does not open that conversation there
+    And it never says the conversation was not found
+    And the composer lets me send again
+    Examples:
+      | from                  | to                    |
+      | a project             | my personal workspace |
+      | my personal workspace | a project             |
+
+  Scenario: A conversation I can no longer see does not leave Langy working
+    Given Langy is working on a reply
+    When the conversation turns out to be gone, or not mine
+    Then the panel says the conversation is no longer available
+    And the composer offers Send again, not Stop
+
   Scenario: A project I come back to is where I left it
     Given I was in the middle of a conversation on a project
     When I reload the page on that same project, as that same person

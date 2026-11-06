@@ -58,8 +58,11 @@ export interface LangyChatTransportDeps {
   client: LangyTurnClient;
   /** Read the current turn inputs at send time (owns projectId → fixes regenerate). */
   getContext: () => LangyTurnRequestContext;
-  /** Adopt the conversation + turn the server started (replaces the header scrape). */
-  onIds: (ids: { conversationId: string; turnId: string }) => void;
+  /**
+   * Adopt the conversation + turn the server started in `projectId`. Answering `false` means the
+   * panel moved somewhere else while the send was in flight: the turn is not streamed here.
+   */
+  onIds: (ids: { conversationId: string; turnId: string; projectId: string }) => boolean | void;
   /** Push a status/progress/milestone signal (drives StreamingStatusLine via the store). */
   onSignal: (signal: LangyTurnSignalEntry) => void;
   /**
@@ -119,7 +122,8 @@ export function createLangyChatTransport(deps: LangyChatTransportDeps): ChatTran
         options,
         idempotencyKey,
       });
-      deps.onIds({ conversationId, turnId });
+      const adopted = deps.onIds({ conversationId, turnId, projectId: ctx.projectId });
+      if (adopted === false) return emptyTurnStream();
 
       return subscribeTurnStream({
         client: deps.client,
@@ -214,6 +218,15 @@ function streamCallbacks(deps: LangyChatTransportDeps) {
     onSettled: deps.onTurnSettled,
     ...(deps.onWireEntry ? { onWireEntry: deps.onWireEntry } : {}),
   };
+}
+
+/** A turn the panel no longer belongs to: nothing to draw, no subscription, no settle. */
+function emptyTurnStream(): ReadableStream<UIMessageChunk> {
+  return new ReadableStream<UIMessageChunk>({
+    start(controller) {
+      controller.close();
+    },
+  });
 }
 
 type Controller = ReadableStreamDefaultController<UIMessageChunk>;
