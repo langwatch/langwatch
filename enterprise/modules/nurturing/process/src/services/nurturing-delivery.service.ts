@@ -102,7 +102,8 @@ export class NurturingDeliveryService {
     const { claims, customerIo, posthog } = deps;
     return new NurturingDeliveryService(deps, {
       postHogDelivery: posthog && NurturingPostHogDeliveryService.create(posthog),
-      ownCodingDelivery: customerIo && NurturingOwnCodingDeliveryService.create({ claims, customerIo }),
+      ownCodingDelivery:
+        customerIo && NurturingOwnCodingDeliveryService.create({ claims, customerIo }),
       joinedOrganization: NurturingJoinedOrganizationService.create({ claims }),
     });
   }
@@ -261,7 +262,13 @@ export class NurturingDeliveryService {
     }
   }
 
-  private toCustomerIo({ signal, firstJoin }: { signal: NurturingSignal; firstJoin: boolean }): void {
+  private toCustomerIo({
+    signal,
+    firstJoin,
+  }: {
+    signal: NurturingSignal;
+    firstJoin: boolean;
+  }): void {
     if (!this.deps.customerIo) return;
     if (isCodingOrAppSignal(signal)) return this.sendCustomerIoCalls(fireCodingOrApp(signal));
     switch (signal.kind) {

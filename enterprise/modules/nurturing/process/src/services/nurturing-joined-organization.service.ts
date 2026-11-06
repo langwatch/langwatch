@@ -27,7 +27,11 @@ type TrackCall = Extract<CioBatchCall, { type: "track" }>;
  * organization however they joined and however often the join is replayed.
  */
 export class NurturingJoinedOrganizationService {
-  static create({ claims }: { claims: NurturingClaimRepository }): NurturingJoinedOrganizationService {
+  static create({
+    claims,
+  }: {
+    claims: NurturingClaimRepository;
+  }): NurturingJoinedOrganizationService {
     return new NurturingJoinedOrganizationService(claims);
   }
 

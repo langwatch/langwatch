@@ -9,19 +9,22 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { CustomerIoChannel } from "../../channels/customer-io.channel.ts";
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingMemberFactsService } from "../nurturing-member-facts.service.ts";
-import { CustomerIoChannel } from "../../channels/customer-io.channel.ts";
 import { NurturingService } from "../nurturing.service.ts";
 
 const T0 = Date.UTC(2026, 9, 20, 12);
 const seconds = (ms: number) => Math.floor(ms / 1000);
 
-type Call = { path: string; userId: string; traits?: unknown;
+type Call = {
+  path: string;
+  userId: string;
+  traits?: unknown;
   event?: unknown;
   properties?: unknown;
   messageId?: string;
@@ -709,7 +712,10 @@ describe("NurturingDeliveryService organization facts", () => {
       const [traits] = traitsOf(cio.identifies(), "joiner-1");
       expect(traits).toMatchObject({ has_evaluations: false });
       expectNoTraceTraits(traits);
-      expect(cio.tracks().map(({ event }) => event)).toEqual(["joined_via_sso", "joined_organization"]);
+      expect(cio.tracks().map(({ event }) => event)).toEqual([
+        "joined_via_sso",
+        "joined_organization",
+      ]);
     });
   });
 
