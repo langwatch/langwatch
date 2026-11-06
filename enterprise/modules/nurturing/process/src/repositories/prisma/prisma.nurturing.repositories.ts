@@ -18,7 +18,10 @@ export class PostgresNurturingRepositories {
 
   static create({
     prisma,
-  }: Readonly<{ prisma: PrismaClient }>): Omit<NurturingRepositories, "claims"> {
+  }: Readonly<{ prisma: PrismaClient }>): Omit<
+    NurturingRepositories,
+    "claims" | "usageOrganizations"
+  > {
     return {
       ...ownedRepositories.create({ prisma }),
       projects: PrismaNurturingProjectDirectoryRepository.create({ prisma }),
