@@ -223,12 +223,13 @@ describe("given a board where one widget's LWQL query fails", () => {
   });
 
   const failingFace = () =>
-    screen.getByText("Couldn't load Cost").closest("[data-testid='widget-state-face']");
+    screen.getByText("Couldn't load").closest("[data-testid='widget-state-face']");
 
   describe("when the member views the board", () => {
     /** @scenario "AC23 A failing query does not take the board down" */
-    it("shows that widget's error state by name", () => {
-      expect(screen.getByText("Couldn't load Cost")).toBeInTheDocument();
+    it("shows that widget's error state, and its card title names it", () => {
+      expect(screen.getByText("Couldn't load")).toBeInTheDocument();
+      expect(screen.getByTitle("Cost")).toBeInTheDocument();
     });
 
     /** @scenario "AC23 A failing query does not take the board down" */
