@@ -2,6 +2,7 @@
 export * from "./actor.ts";
 export * from "./aggregate-admin-gate.ts";
 export * from "./authorization.ts";
+export * from "./braid-condition.ts";
 export * from "./decision.ts";
 export * from "./errors.ts";
 export { Actions, Resources, type Action, type Resource } from "./permission-vocabulary.ts";

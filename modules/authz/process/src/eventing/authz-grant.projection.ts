@@ -3,6 +3,7 @@ import {
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
+  GRANT_SOURCE_BRAID,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -70,6 +71,9 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
     const { data } = event;
     // One column, two tiers: a resource grant states its end inside its terms, a binding on itself.
     const expiresAtMs = data.resource?.expiresAtMs ?? data.expiresAtMs;
+    // A braid's row names the person who made it, as both projects' lists show (ADR-185 §2).
+    const braidCreator =
+      data.source === GRANT_SOURCE_BRAID && data.actor.type === "user" ? data.actor.id : null;
     return {
       kind: "grant.upsert",
       ...(data.membershipStamp ? { membershipStamp: data.membershipStamp } : {}),
@@ -89,10 +93,11 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
         permission: data.resource?.permission ?? null,
         resourceKind: data.resource ? RESOURCE_KIND_TO_DB[data.resource.kind] : null,
         projectId: data.resource?.projectId ?? null,
-        createdByUserId: data.resource?.createdByUserId ?? null,
+        createdByUserId: data.resource?.createdByUserId ?? braidCreator,
         expiresAt: expiresAtMs ? Temporal.Instant.fromEpochMilliseconds(expiresAtMs) : null,
         maxViews: data.resource?.maxViews ?? null,
         ...(data.condition !== undefined ? { condition: data.condition } : {}),
+        ...(data.replacesGrantId === undefined ? {} : { replacesGrantId: data.replacesGrantId }),
         occurredAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
       },
     };

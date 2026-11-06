@@ -2266,6 +2266,7 @@ export const prismaModelFieldCatalogue = {
     "expiresAt",
     "maxViews",
     "condition",
+    "replacesGrantId",
     "occurredAt",
     "createdAt",
     "updatedAt",

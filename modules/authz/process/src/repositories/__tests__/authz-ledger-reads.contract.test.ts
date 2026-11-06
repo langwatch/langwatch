@@ -370,6 +370,36 @@ describe.each(backends)("given the ledger reads on the $name backend", (backend)
       ]);
     });
 
+    /** @scenario "The aggregate reconciler never revokes or reattaches a braid" */
+    it("leaves a braid out of a reader's shared reads, so the aggregate reconciler never touches one", async () => {
+      const fixture = await open();
+      const { organizationId, repositories } = fixture;
+      const readerProjectId = id("project");
+      const sharedRead = (input: { scopeId: string; source: string }) =>
+        grantRow({
+          organizationId,
+          principalType: STORED_PRINCIPAL_KIND.project,
+          principalId: readerProjectId,
+          roleKey: PROJECT_READER_ROLE_KEY,
+          scopeType: "PROJECT",
+          condition: { type: "trace" },
+          ...input,
+        });
+      const aggregate = sharedRead({ scopeId: "member_a", source: "aggregate-reconciler" });
+      const braid = sharedRead({ scopeId: "member_b", source: "braid" });
+      await attach(fixture, aggregate);
+      await attach(fixture, braid);
+
+      expect(
+        await repositories.ledgerReads.findLiveSharedProjectGrants({
+          organizationId,
+          readerProjectId,
+        }),
+      ).toEqual([
+        { grantId: aggregate.id, memberProjectId: "member_a", condition: { type: "trace" } },
+      ]);
+    });
+
     it("confirms a resource grant only in its own project", async () => {
       const fixture = await open();
       const { organizationId, repositories } = fixture;

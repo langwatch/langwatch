@@ -3,6 +3,7 @@ import {
   type BindingRoleKey,
   type CollectedBinding,
   type GrantScopeTier,
+  GRANT_SOURCE_BRAID,
   PROJECT_READER_ROLE_KEY,
   STORED_PRINCIPAL_KIND,
   type StoredPrincipalKind,
@@ -138,6 +139,9 @@ export function shareLinkRowFrom({
     },
   ];
 }
+
+/** A braid is a shared read its own writer owns; the aggregate list, attach and revoke skip it. */
+export const NOT_A_BRAID = { source: { not: GRANT_SOURCE_BRAID } } as const;
 
 /** The rows that are one reader project's shared reads (ADR-177): the minter's read, and
  *  the ledger's list, revoke and attach. */
