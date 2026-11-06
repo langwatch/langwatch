@@ -1,8 +1,7 @@
 /**
  * What the guided connect panel asks per provider: its short name, a one-line hint, and only
  * the credentials needed to get started (the settings drawer keeps the full list).
- * Providers with no readable model list carry the typed model's placeholder; Azure borrows
- * OpenAI's chips and takes a typed deployment name only when it differs from the model.
+ * A provider with no model list types its model; Azure borrows OpenAI's chips instead.
  */
 
 export type GuidedCredentialField = {
