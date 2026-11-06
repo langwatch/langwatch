@@ -7,8 +7,8 @@ import { Button } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, Clipboard } from "lucide-react";
 import type React from "react";
+import { useState } from "react";
 
-import { useCopiedFlash } from "../../behavior/use-copied-flash.ts";
 import { useApiKeyHost } from "../../model/api-key-host.ts";
 
 export function InlineCopyButton({
@@ -22,7 +22,7 @@ export function InlineCopyButton({
   onCopied?: () => void;
 }): React.ReactElement {
   const host = useApiKeyHost();
-  const { copied, flash } = useCopiedFlash();
+  const [copied, setCopied] = useState(false);
 
   async function handleCopy(): Promise<void> {
     const ok = await host.copyToClipboard({
@@ -30,7 +30,8 @@ export function InlineCopyButton({
       succeeded: { title: "Copied", description: `${label} copied to clipboard` },
     });
     if (ok) {
-      flash();
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
       onCopied?.();
     }
   }
