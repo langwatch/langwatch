@@ -15,9 +15,11 @@ let starsRead: Promise<StarsRead> | undefined;
 
 /** The public star count, read once per process; the last known count if GitHub is down. */
 export function readStars() {
-  /* CI passes the workflow's token; a local build asks unsigned. */
-  const { GITHUB_TOKEN: token } = loadEnv("production", appRoot, "GITHUB_TOKEN");
-  starsRead ??= fetchStars({ cacheFile: defaultCacheFile, token });
+  /* CI passes the workflow's token; a local build asks unsigned. Read once, with the count. */
+  starsRead ??= fetchStars({
+    cacheFile: defaultCacheFile,
+    token: loadEnv("production", appRoot, "GITHUB_TOKEN").GITHUB_TOKEN,
+  });
   return starsRead;
 }
 
