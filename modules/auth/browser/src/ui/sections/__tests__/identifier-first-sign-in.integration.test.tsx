@@ -94,7 +94,7 @@ import {
 } from "../../../model/last-used-method.ts";
 import { PASSKEY_ON_THIS_DEVICE_STORAGE_KEY } from "../../../model/passkey-on-this-device.ts";
 import { _resetTwoStepChallengeForTests } from "../../../model/two-step-challenge.ts";
-import { IdentifierFirstSignIn } from "../identifier-first-sign-in.tsx";
+import { COMPANY_HANDOFF_LINE, IdentifierFirstSignIn } from "../identifier-first-sign-in.tsx";
 
 const passwordMethod: SignInMethod = {
   id: "password",
@@ -312,6 +312,7 @@ describe("given the identifier-first sign-in screen", () => {
   describe("when an address routes to an identity provider", () => {
     /** @scenario The email step renders the routed outcome */
     /** @scenario "The address typed on our screen rides along to the identity provider" */
+    /** @scenario "Leaving for the company sign-in says what to do if it refuses" */
     it("sends the person to the provider the decision named, address in hand", async () => {
       routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
         outcome: "redirect_to_connection",
@@ -331,7 +332,9 @@ describe("given the identifier-first sign-in screen", () => {
           loginHint: "sam@acme.com",
         });
       });
-      expect(await screen.findByTestId("routed-to-connection")).toHaveTextContent(/okta/i);
+      expect(await screen.findByTestId("routed-to-connection")).toHaveTextContent(
+        COMPANY_HANDOFF_LINE,
+      );
     });
 
     /** @scenario "An address routed to an identity provider is dialled on the router's first answer" */
@@ -347,7 +350,7 @@ describe("given the identifier-first sign-in screen", () => {
       await enterEmail("sam@acme.com");
 
       await waitFor(() => expect(signInMock).toHaveBeenCalledTimes(1));
-      // The card that follows the dial outlasts the quiet window; nothing re-asks or re-dials.
+      // The card that follows the dial re-asks and re-dials nothing.
       expect(await screen.findByTestId("routed-to-connection")).toBeInTheDocument();
       // One ask on arrival with no address, one for the address typed.
       expect(routeMock).toHaveBeenCalledTimes(2);
@@ -423,7 +426,7 @@ describe("given the identifier-first sign-in screen", () => {
         expect(screen.queryByTestId("routed-to-connection-refused")).not.toBeInTheDocument(),
       );
       expect(signInMock).toHaveBeenCalledTimes(2);
-      expect(screen.getByTestId("routed-to-connection")).toHaveTextContent(/^Taking you to/);
+      expect(screen.getByTestId("routed-to-connection")).toHaveTextContent(COMPANY_HANDOFF_LINE);
     });
 
     /** @scenario "A provider my address was routed to is badged once it lets me in" */

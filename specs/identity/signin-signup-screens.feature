@@ -50,6 +50,13 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     And the router is not asked again on the way
 
   @integration
+  Scenario: Leaving for the company sign-in says what to do if it refuses
+    When I enter an address the router sends to my organization's identity provider
+    Then the screen says at once that it is continuing to my company's sign-in
+    And it says to ask my IT team to assign me the LangWatch app if that sign-in says I have no access
+    And it names no organization and no administrator
+
+  @integration
   Scenario: A refused hand-off to the identity provider says so instead of waiting
     When I enter an address the router sends to my organization's identity provider
     And starting the provider sign-in is refused or fails on the network

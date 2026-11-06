@@ -474,24 +474,19 @@ function NoAccountYet({
 }
 
 /**
- * Watches a hand-off's answer. Each start clears the last refusal; a refusal keeps the card up
- * from then on. A network failure throws rather than answering, and is a refusal all the same.
+ * Watches a hand-off's answer. Each start clears the last refusal. A network failure throws
+ * rather than answering, and is a refusal all the same.
  */
 function watchHandOff({
   handOff,
   setRefusal,
-  setWaitIsVisible,
 }: {
   handOff: ReturnType<typeof signIn> | void;
   setRefusal: (refusal: string | null) => void;
-  setWaitIsVisible: (visible: boolean) => void;
 }): void {
   setRefusal(null);
   if (!handOff) return;
-  const refuse = (message: string) => {
-    setWaitIsVisible(true);
-    setRefusal(message);
-  };
+  const refuse = (message: string) => setRefusal(message);
   void handOff.then(
     (result) => {
       if (result && result.ok !== true) refuse(ssoHandOffFailureMessage(result));
@@ -501,10 +496,11 @@ function watchHandOff({
 }
 
 /**
- * How long a hand-off is allowed to take before the screen admits to it. A
- * redirect inside this window paints nothing — an 80ms flash isn't information.
+ * Said while leaving for the company sign-in, painted at once: this page stays up while the
+ * provider loads, and the provider's own refusal page names neither LangWatch nor the fix.
  */
-const HANDOFF_QUIET_MS = 400;
+export const COMPANY_HANDOFF_LINE =
+  "Continuing to your company's sign-in. If it says you don't have access to LangWatch, ask your IT team to assign you the LangWatch app.";
 
 /**
  * Whether a routed hand-off starts on its own. A typed address always dials; with no address
@@ -527,9 +523,8 @@ function routedHandOff({
 }
 
 /**
- * The decision routed this address to an identity provider; nothing is drawn
- * while the browser is on its way there. A slow or refused hand-off shows a
- * card saying where it's going, with a button for the refused case.
+ * The decision routed this address to an identity provider. The card says where it's going
+ * while the browser leaves, with a button for the refused case.
  */
 export function RoutedToConnection({
   decision,
@@ -558,7 +553,6 @@ export function RoutedToConnection({
 }) {
   const method: SignInMethod | undefined = decision.methodSet[0];
   const dialed = useRef(false);
-  const [waitIsVisible, setWaitIsVisible] = useState(false);
   // A refused start never leaves this page, so it stops the spinner and says so.
   const [refusal, setRefusal] = useState<string | null>(null);
 
@@ -571,17 +565,10 @@ export function RoutedToConnection({
     watchHandOff({
       handOff: signIn(method.id, { callbackUrl, loginHint }),
       setRefusal,
-      setWaitIsVisible,
     });
   }, [autoStart, method, callbackUrl, loginHint, onAutoStart]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setWaitIsVisible(true), HANDOFF_QUIET_MS);
-    return () => clearTimeout(timer);
-  }, []);
-
   if (!method) return null;
-  if (autoStart && !waitIsVisible) return null;
 
   const waiting = autoStart && refusal === null;
   return (
@@ -594,13 +581,11 @@ export function RoutedToConnection({
       <HStack gap={3}>
         {waiting && <Spinner size="sm" color="orange.fg" />}
         <Text data-testid="routed-to-connection">
-          {waiting
-            ? `Taking you to your organization's sign-in with ${signInMethodLabel(method)}.`
-            : `Log in with ${signInMethodLabel(method)} to continue.`}
+          {waiting ? COMPANY_HANDOFF_LINE : `Log in with ${signInMethodLabel(method)} to continue.`}
         </Text>
       </HStack>
       <FrontDoorPrimaryButton
-        onClick={() => watchHandOff({ handOff: onContinue(method), setRefusal, setWaitIsVisible })}
+        onClick={() => watchHandOff({ handOff: onContinue(method), setRefusal })}
       >
         {signInMethodActionLabel(method)}
       </FrontDoorPrimaryButton>
