@@ -43,6 +43,20 @@ Feature: Seat requests when an organization is over its seat limit
       When "late@acme.example" signs in again
       Then exactly one seat request names "late@acme.example"
 
+    @unit
+    Scenario: A held person whose seat request failed to open gets one when they arrive again
+      Given every full member seat and every Lite Member seat is in use
+      And "late@acme.example" was held pending but their seat request could not be opened
+      When "late@acme.example" signs in again
+      Then an open seat request names "late@acme.example"
+
+    @unit
+    Scenario: Arriving again never reopens a seat request that was answered
+      Given every full member seat and every Lite Member seat is in use
+      And "late@acme.example" is held pending and their seat request was declined
+      When "late@acme.example" signs in again
+      Then no open seat request names "late@acme.example"
+
   Rule: a sign-in the identity provider refused is answered without naming anyone
 
     @unit
@@ -136,6 +150,15 @@ Feature: Seat requests when an organization is over its seat limit
       When "first@acme.example" and "second@acme.example" arrive by single sign-on at the same moment asking for a full seat
       Then exactly one of them is a full member
       And the other is a Lite Member
+
+    @unit
+    Scenario: An approval that cannot hand its claim back retries, then fails as an infrastructure error
+      Given "late@acme.example" is held pending with an open seat request
+      And every full member seat is in use
+      When an administrator approves the seat request and reopening the request fails once
+      Then the approval refuses with member_seat_limit_reached
+      And the seat request stays open
+      But when reopening keeps failing, the approval fails with an infrastructure error naming both failures
 
     @unit
     Scenario: Approving a seat request that is not open is refused

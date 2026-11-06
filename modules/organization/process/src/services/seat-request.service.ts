@@ -114,7 +114,8 @@ export class SeatRequestService {
 
   /**
    * Opens a request when an admission asked for a full seat and was left Lite or held (ruling
-   * R1). A Developer seat, a retried admission and a seat that fitted open nothing.
+   * R1). A repeated admission of a Lite or held member only fills a missing request, so one
+   * whose first opening failed is still seen, and an answered one is never reopened.
    */
   async openForAdmission(input: {
     organizationId: string;
@@ -123,7 +124,7 @@ export class SeatRequestService {
     admission: OrganizationAdmission;
   }): Promise<void> {
     const { organizationId, userId, admission } = input;
-    if (admission.outcome !== "created" || admission.seat !== "EXTERNAL") return;
+    if (admission.seat !== "EXTERNAL") return;
     const requested =
       input.requestedSeat ?? (await this.dependencies.members.readJoinerSeat({ organizationId }));
     if (requested !== "MEMBER") return;
@@ -137,6 +138,7 @@ export class SeatRequestService {
       source: admission.pending ? "pending" : "lite",
       idpRefused: false,
       idpKind: null,
+      onlyIfAbsent: admission.outcome === "already-present",
     });
   }
 
@@ -308,10 +310,11 @@ export class SeatRequestService {
     source: SeatRequestSource;
     idpRefused: boolean;
     idpKind: SignInIdpKind | null;
+    onlyIfAbsent?: boolean;
   }): Promise<void> {
     const { requests, notices, now, newId } = this.dependencies;
     const opened = await requests.open({ ...input, id: newId(), at: now() });
-    if (opened.outcome === "already_open" || opened.outcome === "resolved_meanwhile") return;
+    if (opened.outcome !== "opened" && opened.outcome !== "reopened") return;
     // The request is open either way, and a later arrival answers already_open, so sales are
     // told even when the notice could not be recorded.
     await notices

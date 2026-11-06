@@ -21,6 +21,7 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
       (row) => row.organizationId === input.organizationId && row.email === input.email,
     );
     const existing = this.rows[index];
+    if (existing && input.onlyIfAbsent) return { request: existing, outcome: "already_recorded" };
     if (!existing) {
       const request: SeatRequestRow = {
         id: input.id,

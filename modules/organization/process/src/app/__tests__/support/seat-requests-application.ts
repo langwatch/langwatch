@@ -155,5 +155,18 @@ export async function application(
   const openRequests = async () =>
     (await app.listOpenSeatRequests({ organizationId: ORGANIZATION_ID })).requests;
 
-  return { app, memory, state, mail, salesNotices, arrive, membershipOf, openRequests };
+  /** The seat request rows, whose writes a test may make fail. */
+  const seatRequests = setup.repositories.seatRequests;
+
+  return {
+    app,
+    memory,
+    state,
+    mail,
+    salesNotices,
+    seatRequests,
+    arrive,
+    membershipOf,
+    openRequests,
+  };
 }

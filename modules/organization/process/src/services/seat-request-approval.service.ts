@@ -18,6 +18,10 @@ import type {
 } from "./organization-seat-license.service.ts";
 import type { SeatRequestMemberships, SeatRequestPeers } from "./seat-request.service.ts";
 
+/** How often a claim whose seat could not be given is handed back before giving up. */
+const RELEASE_ATTEMPTS = 3;
+const RELEASE_PAUSE_MS = 100;
+
 type Dependencies = Readonly<{
   requests: SeatRequestRepository;
   members: OrganizationMembershipRepository;
@@ -25,7 +29,36 @@ type Dependencies = Readonly<{
   seats: Pick<OrganizationSeatLicense, "checkLimit">;
   peers: Pick<SeatRequestPeers, "inviteMember">;
   now: () => number;
+  wait?: (ms: number) => Promise<void>;
 }>;
+
+/** The claim an approval holds on its request while it gives the seat. */
+type Claim = Readonly<{ organizationId: string; id: string; resolvedByUserId: string; at: number }>;
+
+/** A claim that could not be handed back: the request reads APPROVED with no seat given. */
+export class SeatRequestReleaseError extends Error {
+  readonly claim: Claim;
+  readonly refusal: unknown;
+  readonly releaseFailure: unknown;
+
+  constructor({
+    claim,
+    refusal,
+    releaseFailure,
+  }: {
+    claim: Claim;
+    refusal: unknown;
+    releaseFailure: unknown;
+  }) {
+    super(`seat request ${claim.id} could not be reopened after its seat was refused`, {
+      cause: releaseFailure,
+    });
+    this.name = "SeatRequestReleaseError";
+    this.claim = claim;
+    this.refusal = refusal;
+    this.releaseFailure = releaseFailure;
+  }
+}
 
 /**
  * Approving a seat request (modules/organization/specs/seat-requests.feature): claim the request,
@@ -70,7 +103,7 @@ export class SeatRequestApprovalService {
         outcome: await this.giveFullSeat({ organizationId, request, membership, isFull, by }),
       };
     } catch (error) {
-      await this.dependencies.requests.release(claim);
+      await this.release({ claim, refusal: error });
       const refusal = readSeatRefusal(error);
       if (refusal.kind === "seat-limit")
         throw new MemberSeatLimitReachedError({ meta: refusal.limit });
@@ -96,6 +129,27 @@ export class SeatRequestApprovalService {
         if (HandledError.isHandled(error) && error.code === "member_not_found") return null;
         throw error;
       });
+  }
+
+  /**
+   * Hands the claim back so the request is open again, retried: a request left APPROVED with
+   * no seat drops off every list. A release that still fails is an infrastructure error naming
+   * both failures, never the handled refusal that would tell the approver to just retry.
+   */
+  private async release({ claim, refusal }: { claim: Claim; refusal: unknown }): Promise<void> {
+    const wait =
+      this.dependencies.wait ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    let failure: unknown;
+    for (let attempt = 0; attempt < RELEASE_ATTEMPTS; attempt++) {
+      try {
+        await this.dependencies.requests.release(claim);
+        return;
+      } catch (error) {
+        failure = error;
+        if (attempt + 1 < RELEASE_ATTEMPTS) await wait(RELEASE_PAUSE_MS * 2 ** attempt);
+      }
+    }
+    throw new SeatRequestReleaseError({ claim, refusal, releaseFailure: failure });
   }
 
   private async assertFullSeatFree({

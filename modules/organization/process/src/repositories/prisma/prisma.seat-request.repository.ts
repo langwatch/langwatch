@@ -35,6 +35,9 @@ export class PrismaSeatRequestRepository
       organizationId_email: { organizationId: input.organizationId, email: input.email },
     };
     const existing = await this.prisma.seatRequest.findUnique({ where });
+    if (existing && input.onlyIfAbsent) {
+      return { request: rowOf(existing), outcome: "already_recorded" };
+    }
     if (!existing) {
       try {
         const created = await this.prisma.seatRequest.create({

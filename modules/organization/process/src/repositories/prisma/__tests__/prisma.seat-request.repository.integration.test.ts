@@ -86,6 +86,41 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
     });
   });
 
+  describe("when an open that only fills a gap meets a missing row and then an answered one", () => {
+    /** @scenario "Arriving again never reopens a seat request that was answered" */
+    it("opens the missing row, then leaves the declined row as it is", async () => {
+      const gapOnly = (id: string, at: number) =>
+        requests.open({
+          id,
+          organizationId,
+          email: "again@acme.example",
+          userId: null,
+          name: null,
+          source: "pending",
+          idpRefused: false,
+          idpKind: null,
+          at,
+          onlyIfAbsent: true,
+        });
+      const first = await gapOnly(`${namespace}-gap-a`, 1_000);
+      await requests.resolve({
+        organizationId,
+        id: first.request.id,
+        status: "DECLINED",
+        resolvedByUserId: "user-ada",
+        at: 2_000,
+      });
+
+      const again = await gapOnly(`${namespace}-gap-b`, 3_000);
+
+      expect(first.outcome).toBe("opened");
+      expect(again).toMatchObject({
+        outcome: "already_recorded",
+        request: { id: first.request.id, status: "DECLINED" },
+      });
+    });
+  });
+
   describe("when a request is reopened, claimed and declined while another arrival is in flight", () => {
     /** @scenario "Sales hear about a seat request from an account-managed organization once" */
     it("leaves the newer decline and its sales claim in place", async () => {

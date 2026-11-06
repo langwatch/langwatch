@@ -18,10 +18,13 @@ export type SeatRequestRow = Readonly<{
   resolvedByUserId: string | null;
 }>;
 
-/** What opening found: a new row, a reopened one, one already open, or one answered since. */
+/**
+ * What opening found: a new row, a reopened one, one already open, one answered since, or (for
+ * an open that only fills a gap) a row already on record, left as it is.
+ */
 export type SeatRequestOpened = Readonly<{
   request: SeatRequestRow;
-  outcome: "opened" | "reopened" | "already_open" | "resolved_meanwhile";
+  outcome: "opened" | "reopened" | "already_open" | "resolved_meanwhile" | "already_recorded";
 }>;
 
 /** The seat requests organization keeps, one row per organization and address. */
@@ -37,6 +40,8 @@ export abstract class SeatRequestRepository {
     idpRefused: boolean;
     idpKind: SignInIdpKind | null;
     at: number;
+    /** Only when the address has no row yet: an open or answered request is left untouched. */
+    onlyIfAbsent?: boolean;
   }): Promise<SeatRequestOpened>;
   /** Every open request in the organization, oldest first. */
   abstract findOpen(input: { organizationId: string }): Promise<SeatRequestRow[]>;

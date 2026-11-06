@@ -3,7 +3,7 @@
  * @see modules/organization/specs/seat-requests.feature
  */
 import { OrganizationUserRole } from "@langwatch/organization-contract";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   ADA,
@@ -71,6 +71,41 @@ describe("given an organization over its seat limit", () => {
       await arrive({ email: "late@acme.example" });
 
       expect((await openRequests()).filter((r) => r.email === "late@acme.example")).toHaveLength(1);
+    });
+  });
+
+  describe("when a held person's seat request failed to open and they arrive again", () => {
+    /** @scenario "A held person whose seat request failed to open gets one when they arrive again" */
+    it("opens the missing request", async () => {
+      const { arrive, openRequests, seatRequests } = await application();
+      const open = seatRequests.open.bind(seatRequests);
+      seatRequests.open = async () => {
+        throw new Error("seat request store unavailable");
+      };
+      await arrive({ email: "late@acme.example" });
+      expect(await openRequests()).toEqual([]);
+      seatRequests.open = open;
+
+      await arrive({ email: "late@acme.example" });
+
+      expect((await openRequests()).map((request) => request.email)).toEqual(["late@acme.example"]);
+    });
+  });
+
+  describe("when a held person whose seat request was declined arrives again", () => {
+    /** @scenario "Arriving again never reopens a seat request that was answered" */
+    it("leaves the declined request closed", async () => {
+      const { app, arrive, openRequests } = await application();
+      await arrive({ email: "late@acme.example" });
+      const [request] = await openRequests();
+      await app.declineSeatRequest(
+        { organizationId: ORGANIZATION_ID, seatRequestId: request!.id },
+        ADA,
+      );
+
+      await arrive({ email: "late@acme.example" });
+
+      expect(await openRequests()).toEqual([]);
     });
   });
 
@@ -229,6 +264,55 @@ describe("given an open seat request", () => {
         ),
       ).rejects.toMatchObject({ code: "member_seat_limit_reached" });
       expect((await openRequests()).map((open) => open.id)).toEqual([request!.id]);
+    });
+  });
+
+  describe("when an approval refused for want of a seat cannot hand its claim back at once", () => {
+    let given: Awaited<ReturnType<typeof application>>;
+    let requestId: string;
+
+    beforeEach(async () => {
+      given = await application();
+      await given.arrive({ email: "late@acme.example" });
+      const [request] = await given.openRequests();
+      requestId = request!.id;
+    });
+
+    /** @scenario "An approval that cannot hand its claim back retries, then fails as an infrastructure error" */
+    it("retries the hand-back and refuses with member_seat_limit_reached", async () => {
+      const { app, openRequests, seatRequests } = given;
+      const release = seatRequests.release.bind(seatRequests);
+      let failures = 1;
+      seatRequests.release = async (claim) => {
+        if (failures-- > 0) throw new Error("seat request store unavailable");
+        return release(claim);
+      };
+
+      await expect(
+        app.approveSeatRequest({ organizationId: ORGANIZATION_ID, seatRequestId: requestId }, ADA),
+      ).rejects.toMatchObject({ code: "member_seat_limit_reached" });
+      expect((await openRequests()).map((open) => open.id)).toEqual([requestId]);
+    });
+
+    /** @scenario "An approval that cannot hand its claim back retries, then fails as an infrastructure error" */
+    it("fails with an unhandled error naming both failures when the hand-back keeps failing", async () => {
+      const { app, seatRequests } = given;
+      const releaseFailure = new Error("seat request store unavailable");
+      seatRequests.release = async () => {
+        throw releaseFailure;
+      };
+
+      const failure = await app
+        .approveSeatRequest({ organizationId: ORGANIZATION_ID, seatRequestId: requestId }, ADA)
+        .catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({
+        name: "SeatRequestReleaseError",
+        cause: releaseFailure,
+        releaseFailure,
+        refusal: expect.objectContaining({ code: "member_seat_limit_reached" }),
+      });
+      expect(failure).not.toHaveProperty("code");
     });
   });
 
