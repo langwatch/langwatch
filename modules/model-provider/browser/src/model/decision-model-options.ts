@@ -6,6 +6,7 @@
 
 import {
   DECISION_MODELS,
+  decisionModelPickerTitle,
   findDecisionModel,
   findModelProviderDefinition,
   isOwnDecisionModelId,
@@ -20,9 +21,9 @@ import {
 
 import { MODEL_ROLE_LABEL } from "./default-model-cascade.ts";
 
-/** Every decision model's label keyed by its id, so a chip or picker shows the label. */
+/** Every decision model's picker title keyed by its id, for a chip or row beside its icon. */
 export const DECISION_MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = Object.fromEntries(
-  DECISION_MODELS.map((entry) => [entry.id, entry.label]),
+  DECISION_MODELS.map((entry) => [entry.id, decisionModelPickerTitle(entry)]),
 );
 
 /** Evals Preview's line when the judge router answers for it (ADR-190). */
@@ -47,11 +48,10 @@ function ownModelOption({
   entry: DecisionModelEntry;
   offered: ReadonlySet<string>;
 }): ModelPickerOption {
-  if (offered.has(entry.id)) {
-    return { label: entry.label, value: entry.id, subtitle: entry.description };
-  }
+  const label = decisionModelPickerTitle(entry);
+  if (offered.has(entry.id)) return { label, value: entry.id, subtitle: entry.description };
   return {
-    label: entry.label,
+    label,
     value: entry.id,
     subtitle: addKeyHint(entry.provider),
     disabled: true,

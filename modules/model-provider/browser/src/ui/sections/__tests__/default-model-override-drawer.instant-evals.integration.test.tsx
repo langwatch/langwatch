@@ -183,7 +183,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       const titles = pickable(instantEvalsOptions()).map((option) => option.textContent ?? "");
       expect(titles).toHaveLength(2);
       expect(titles[0]).toContain("Evals Preview");
-      expect(titles[1]).toContain("OpenAI Decisions (gpt-6-luna)");
+      expect(titles[1]).toContain("Decisions API");
       expect(optionTitled("Inception Mercury Decide")).toHaveAttribute("aria-disabled", "true");
     });
 
@@ -234,7 +234,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       const inception = optionTitled("Inception Mercury Decide");
       expect(inception).toHaveTextContent("Add an Inception key in Model Providers to use it.");
       expect(inception).toHaveAttribute("aria-disabled", "true");
-      expect(optionTitled("OpenAI Decisions (gpt-6-luna)")).toHaveTextContent(
+      expect(optionTitled("Decisions API")).toHaveTextContent(
         "OpenAI's Decisions API, on your OpenAI key.",
       );
     });
@@ -292,13 +292,19 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
     });
 
     /** @scenario "A model two providers offer is told apart by its provider" */
-    it("lists the two as rows titled by their provider", () => {
+    it("lists the two as Decisions API rows, told apart by their provider icon", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
-      const titles = pickable(instantEvalsOptions()).map((option) => option.textContent ?? "");
-      expect(titles.some((title) => title.includes("OpenAI Decisions (gpt-6-luna)"))).toBe(true);
-      expect(titles.some((title) => title.includes("Azure OpenAI Decisions (gpt-6-luna)"))).toBe(
-        true,
+      const rows = pickable(instantEvalsOptions()).filter((option) =>
+        [OPENAI_DECISIONS.value, AZURE_DECISIONS.value].includes(option.dataset.value ?? ""),
+      );
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        expect(row).toHaveTextContent("Decisions API");
+        expect(row.querySelector("svg, img")).not.toBeNull();
+      }
+      expect(rows[0]?.querySelector("svg, img")?.outerHTML).not.toBe(
+        rows[1]?.querySelector("svg, img")?.outerHTML,
       );
     });
   });

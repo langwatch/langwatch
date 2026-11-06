@@ -115,7 +115,7 @@ describe("<ModelSelector/>", () => {
 
   describe("given decision models the server titles from the catalogue", () => {
     /** @scenario "The picker names a decision model by its catalogue title, an LLM by its id" */
-    it("titles each decision row by its catalogue name and line, and leaves the LLM as its id", () => {
+    it("titles each Decisions row Decisions API with its catalogue line, and leaves the LLM as its id", () => {
       storedProviders.current = [STORED_OPENAI];
       const decisionModels = ["openai/decisions:gpt-6-luna", "azure/decisions:gpt-6-luna"].map(
         (id) => ({ value: id, label: findDecisionModel(id)?.label ?? id }),
@@ -133,15 +133,14 @@ describe("<ModelSelector/>", () => {
       const listbox = screen.getByRole("listbox", { hidden: true });
       const rows = within(listbox).getAllByRole("option", { hidden: true });
       const rowFor = (value: string) => rows.find((row) => row.dataset.value === value);
-      expect(rowFor("openai/decisions:gpt-6-luna")).toHaveTextContent(
-        "OpenAI Decisions (gpt-6-luna)",
-      );
-      expect(rowFor("openai/decisions:gpt-6-luna")).toHaveTextContent(
-        "OpenAI's Decisions API, on your OpenAI key.",
-      );
-      expect(rowFor("azure/decisions:gpt-6-luna")).toHaveTextContent(
-        "Azure OpenAI Decisions (gpt-6-luna)",
-      );
+      const openai = rowFor("openai/decisions:gpt-6-luna");
+      const azure = rowFor("azure/decisions:gpt-6-luna");
+      for (const row of [openai, azure]) {
+        expect(row).toHaveTextContent("Decisions API");
+        expect(row).not.toHaveTextContent("(gpt-6-luna)");
+        expect(row?.querySelector("svg, img")).not.toBeNull();
+      }
+      expect(openai).toHaveTextContent("OpenAI's Decisions API, on your OpenAI key.");
       const llm = rowFor("openai/gpt-6-luna");
       expect(llm?.textContent).toBe("gpt-6-luna");
       expect(within(llm!).queryByTestId("model-option-subtitle")).not.toBeInTheDocument();

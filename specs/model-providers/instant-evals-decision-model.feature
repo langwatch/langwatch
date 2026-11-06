@@ -359,7 +359,9 @@ Feature: Instant Evals decision model column in Default models
   @unit
   Scenario: A decision model's title names its provider and its model
     When a decision model is listed in a picker
-    Then its title names the provider and the model, such as "OpenAI Decisions (gpt-6-luna)" or "Inception Mercury Decide"
+    Then its title names the provider and the model, such as "Inception Mercury Decide"
+    And OpenAI's and Azure OpenAI's Decisions models read "Decisions API" beside their provider icon
+    And their full names stay "OpenAI Decisions (gpt-6-luna)" and "Azure OpenAI Decisions (gpt-6-luna)"
     And LangWatch's hosted model reads "Evals Preview", described as "Optimized for evals"
 
   @integration
@@ -374,7 +376,7 @@ Feature: Instant Evals decision model column in Default models
     Given the flag is on for my organization
     And my project has an OpenAI key and no Inception key
     When I edit the Instant Evals column
-    Then I can pick "Evals Preview" and "OpenAI Decisions (gpt-6-luna)"
+    Then I can pick "Evals Preview" and OpenAI's "Decisions API"
     And "Inception Mercury Decide" is listed but cannot be picked, so every pick I can make runs
 
   @integration
@@ -399,7 +401,7 @@ Feature: Instant Evals decision model column in Default models
     Given the flag is on for my organization
     And my project has an OpenAI key and an Azure OpenAI key
     When I edit the Instant Evals column
-    Then "OpenAI Decisions (gpt-6-luna)" and "Azure OpenAI Decisions (gpt-6-luna)" are two rows
+    Then two rows read "Decisions API", one with the OpenAI icon and one with the Azure icon
 
   @integration
   Scenario: A decision model whose provider has no key says how to enable it

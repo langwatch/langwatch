@@ -66,8 +66,10 @@ export type DecisionModelEntry = Readonly<{
   id: string;
   /** The registry provider whose row holds the key; `langwatch` is the hosted classifier. */
   provider: string;
-  /** The picker title: provider and model, so one model on two providers reads apart. */
+  /** The full name: provider and model, so one model on two providers reads apart in text. */
   label: string;
+  /** A picker row's title when it differs from `label`; the row's provider icon names the provider. */
+  pickerLabel?: string;
   description: string;
   /** Absent for the hosted classifier, which the judge reaches through its own client. */
   wire?: DecisionModelWire;
@@ -101,6 +103,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
     id: "openai/decisions:gpt-6-luna",
     provider: "openai",
     label: "OpenAI Decisions (gpt-6-luna)",
+    pickerLabel: "Decisions API",
     description: "OpenAI's Decisions API, on your OpenAI key.",
     wire: "openai_decisions",
     providerModel: "gpt-6-luna",
@@ -168,6 +171,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
     id: "azure/decisions:gpt-6-luna",
     provider: "azure",
     label: "Azure OpenAI Decisions (gpt-6-luna)",
+    pickerLabel: "Decisions API",
     description: "Azure OpenAI Decisions API, on your own Azure OpenAI resource.",
     wire: "openai_decisions",
     providerModel: "gpt-6-luna",
@@ -245,6 +249,11 @@ export function azureResourceOf(endpoint: string): AzureEndpointRead {
 
 export function findDecisionModel(id: string): DecisionModelEntry | undefined {
   return DECISION_MODELS.find((entry) => entry.id === id);
+}
+
+/** A decision model's title in a picker row or chip, beside its provider icon. */
+export function decisionModelPickerTitle(entry: DecisionModelEntry): string {
+  return entry.pickerLabel ?? entry.label;
 }
 
 export function isDecisionModelId(id: string): boolean {

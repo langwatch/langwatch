@@ -600,7 +600,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Given the server answers with OpenAI Decisions and Azure OpenAI Decisions on gpt-6-luna
       And the project's OpenAI provider offers the LLM gpt-6-luna
       When a member opens the model picker on an LLM judge
-      Then the decision rows read "OpenAI Decisions (gpt-6-luna)" and "Azure OpenAI Decisions (gpt-6-luna)"
+      Then both decision rows read "Decisions API", told apart by their provider icon
       And the OpenAI row says "OpenAI's Decisions API, on your OpenAI key."
       And the OpenAI group still lists the LLM as "gpt-6-luna"
 

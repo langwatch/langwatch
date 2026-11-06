@@ -263,11 +263,12 @@ export function modelSelectionFrom({
     mode,
     isCustom: customModelIdSet.has(modelValue),
   }));
-  // A decision model's line comes from the catalogue, as its title does on the server.
+  // A decision model's line, and a shorter row title where it has one, come from the catalogue.
   const builtInOptions: ModelOption[] = builtInModels.map(({ value, label }) => {
-    const subtitle = findDecisionModel(value)?.description;
+    const entry = findDecisionModel(value);
+    const subtitle = entry?.description;
     return {
-      label,
+      label: entry?.pickerLabel ?? label,
       value,
       isDisabled: false,
       mode,

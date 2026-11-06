@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   azureResourceOf,
   DECISION_MODELS,
+  decisionModelPickerTitle,
   isOwnDecisionModelId,
   LANGWATCH_DECISION_MODEL_ID,
 } from "../catalog/decision-models.ts";
@@ -64,6 +65,17 @@ describe("DECISION_MODELS", () => {
         "Azure OpenAI Decisions (gpt-6-luna)",
       ]),
     );
+  });
+
+  /** @scenario "A decision model's title names its provider and its model" */
+  it("titles OpenAI's and Azure OpenAI's Decisions models Decisions API in a picker", () => {
+    const titles = ["openai/decisions:gpt-6-luna", "azure/decisions:gpt-6-luna"].map((id) => {
+      const entry = DECISION_MODELS.find((candidate) => candidate.id === id);
+      return entry ? decisionModelPickerTitle(entry) : id;
+    });
+    expect(titles).toEqual(["Decisions API", "Decisions API"]);
+    const inception = DECISION_MODELS.find((entry) => entry.provider === "inception");
+    expect(inception && decisionModelPickerTitle(inception)).toBe("Inception Mercury Decide");
   });
 
   it("never repeats an id", () => {

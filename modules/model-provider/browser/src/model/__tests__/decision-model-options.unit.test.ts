@@ -36,7 +36,7 @@ describe("decisionModelPickerOptions", () => {
     it("lists LangWatch's model first, then every catalogue model", () => {
       expect(options[0]?.value).toBe(LANGWATCH_DECISION_MODEL_ID);
       expect(options.map((option) => option.label)).toEqual(
-        expect.arrayContaining(["Inception Mercury Decide", "Azure OpenAI Decisions (gpt-6-luna)"]),
+        expect.arrayContaining(["Inception Mercury Decide", "Decisions API"]),
       );
     });
 
