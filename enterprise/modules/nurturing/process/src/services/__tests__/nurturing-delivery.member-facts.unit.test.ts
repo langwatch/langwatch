@@ -6,6 +6,7 @@
 import type { NurturingSignal, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -20,7 +21,14 @@ import { NurturingService } from "../nurturing.service.ts";
 const T0 = Date.UTC(2026, 9, 20, 12);
 const seconds = (ms: number) => Math.floor(ms / 1000);
 
-type Call = { path: string; userId: string; traits?: unknown; event?: unknown };
+type Call = {
+  path: string;
+  userId: string;
+  traits?: unknown;
+  event?: unknown;
+  properties?: unknown;
+  messageId?: string;
+};
 
 /** A claim repository whose clock the test moves, with the real window semantics. */
 class ClockedClaims implements NurturingClaimRepository {
@@ -37,16 +45,31 @@ class ClockedClaims implements NurturingClaimRepository {
   }
 }
 
-/** Customer.io over a recording fetch: a batch's items are unpacked into one call each. */
-function customerIo() {
+/** How the first joined_organization request fails: a 500 reply, or a fetch that throws. */
+type JoinedOrganizationFailure = "an HTTP 500" | "a network error";
+
+/**
+ * Customer.io over a recording fetch: a batch's items are unpacked into one call each. A failed
+ * joined_organization request is not recorded, as Customer.io never took it.
+ */
+function customerIo({
+  failFirstJoinedOrganization,
+}: { failFirstJoinedOrganization?: JoinedOrganizationFailure } = {}) {
   const calls: Call[] = [];
   let batchRequests = 0;
+  let failure = failFirstJoinedOrganization;
   const service = NurturingService.create({
     channel: HttpCustomerIoChannel.create({
       config: { customerIoApiKey: "key", customerIoRegion: "us" },
       fetchFn: async (url: string | URL | Request, init?: RequestInit) => {
         const path = new URL(url instanceof Request ? url.url : url).pathname;
         const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
+        if (failure && path === "/v1/track" && body.event === "joined_organization") {
+          const failed = failure;
+          failure = undefined;
+          if (failed === "a network error") throw new TypeError("fetch failed");
+          return new Response("customer.io is down", { status: 500 });
+        }
         if (path === "/v1/batch") {
           batchRequests += 1;
           for (const item of body.batch) calls.push({ path: `/v1/${item.type}`, ...item });
@@ -79,14 +102,16 @@ async function organizationWithMembers({
   ]),
   traced = new Set<string>(),
   organizationsOfPerson = [],
+  failFirstJoinedOrganization,
 }: {
   members?: readonly string[];
   placed?: ReadonlyMap<string, string>;
   traced?: ReadonlySet<string>;
   organizationsOfPerson?: readonly string[];
+  failFirstJoinedOrganization?: JoinedOrganizationFailure;
 } = {}) {
   const claims = new ClockedClaims();
-  const cio = customerIo();
+  const cio = customerIo({ failFirstJoinedOrganization });
   const milestones = MemoryNurturingMilestonesRepository.create();
   const projects = MemoryNurturingProjectDirectoryRepository.create({ placed, traced });
   const getAllMembers = vi.fn(async () => members.map((id) => ({ id })) as never);
@@ -168,7 +193,8 @@ const firstSession: NurturingSignal = {
   agentTypes: ["claude_code"],
   memberUserIds: ["admin-1", "member-2"],
 };
-const joined = { tenantId: "org-1", occurredAt: T0, userId: "joiner-1" };
+const JOINED_AT = Temporal.Instant.from("2026-11-07T00:00:00Z").epochMilliseconds;
+const joined = { tenantId: "org-1", occurredAt: JOINED_AT, userId: "joiner-1" };
 const inviteAccepted: NurturingSignal = {
   kind: "invite_accepted",
   sourceEventId: "invite-1",
@@ -270,6 +296,50 @@ describe("NurturingDeliveryService organization facts", () => {
     });
   });
 
+  describe("when another coding fact of the organization is delivered", () => {
+    const source = {
+      sourceEventId: "org-1:1",
+      tenantId: "project-1",
+      occurredAt: T0,
+      userId: "admin-1",
+      projectId: "project-1",
+    };
+
+    /** @scenario "The terminal types, repo count and first-three-days count tell every active member" */
+    it.each([
+      [
+        { ...source, kind: "coding_terminal_types", terminalTypes: ["vscode"] },
+        { coding_terminal_types: ["vscode"] },
+      ],
+      [{ ...source, kind: "coding_repo_count", codingRepoCount: 2 }, { coding_repo_count: 2 }],
+      [
+        { ...source, kind: "coding_session_days_first_3", codingSessionDaysFirst3: 2 },
+        { coding_session_days_first_3: 2 },
+      ],
+    ] satisfies [NurturingSignal, object][])(
+      "identifies every active member with %j",
+      async (signal, traits) => {
+        const { cio, deliver } = await organizationWithMembers();
+
+        await deliver(signal);
+        await settle();
+
+        expect(traitsOf(cio.identifies(), "admin-1")).toEqual([traits]);
+        expect(traitsOf(cio.identifies(), "member-2")).toEqual([traits]);
+      },
+    );
+
+    /** @scenario "The active days stay the admin's" */
+    it("tells only the admin the active days", async () => {
+      const { cio, deliver } = await organizationWithMembers();
+
+      await deliver({ ...source, kind: "coding_active_days", codingActiveDays: 3 });
+      await settle();
+
+      expect(cio.identifies().map(({ userId }) => userId)).toEqual(["admin-1"]);
+    });
+  });
+
   describe("when the first coding session is delivered twice", () => {
     /** @scenario "The first coding session tells every member coding_first_session_at once" */
     it("tells member-2 the first session once and tracks only the admin", async () => {
@@ -331,6 +401,103 @@ describe("NurturingDeliveryService organization facts", () => {
     });
   });
 
+  describe("when a person joins an organization", () => {
+    const joinedOrganizations = (cio: Organization["cio"]) =>
+      cio.tracks().filter(({ event }) => event === "joined_organization");
+
+    /** @scenario "A join is tracked as joined_organization beside its own event" */
+    it("tracks joined_organization with the join method and a stable message id", async () => {
+      const { cio, deliver } = await organizationWithMembers();
+
+      await deliver(ssoAutoAdded);
+      await settle();
+
+      expect(joinedOrganizations(cio)).toEqual([
+        expect.objectContaining({
+          messageId: "joined_organization:joiner-1:org-1",
+          properties: expect.objectContaining({ join_method: "sso", organization_id: "org-1" }),
+        }),
+      ]);
+    });
+
+    /** @scenario "A redelivered or replayed join is tracked once" */
+    it("tracks joined_organization once when the same invite is replayed after the delivery window", async () => {
+      const { cio, claims, deliver } = await organizationWithMembers();
+
+      await deliver(inviteAccepted);
+      claims.now += 8 * 24 * 60 * 60 * 1000;
+      await deliver(inviteAccepted);
+      await settle();
+
+      expect(joinedOrganizations(cio)).toHaveLength(1);
+    });
+
+    /** @scenario "An invite and an SSO add of the same person and organization are tracked once" */
+    it("tracks joined_organization once for an invite and an SSO add of the same organization", async () => {
+      const { cio, deliver } = await organizationWithMembers();
+
+      await deliver(inviteAccepted);
+      await deliver(ssoAutoAdded);
+      await settle();
+
+      expect(cio.tracks().map(({ event }) => event)).toEqual([
+        "joined_organization",
+        "joined_via_invite",
+        "joined_via_sso",
+      ]);
+    });
+
+    /** @scenario "A person joining a second organization is tracked joined_organization again" */
+    it("tracks joined_organization again when the same person joins another organization", async () => {
+      const { cio, deliver } = await organizationWithMembers();
+
+      await deliver(inviteAccepted);
+      await deliver({
+        ...inviteAccepted,
+        sourceEventId: "invite-2",
+        tenantId: "org-2",
+        organizationId: "org-2",
+      });
+      await settle();
+
+      expect(joinedOrganizations(cio).map(({ messageId }) => messageId)).toEqual([
+        "joined_organization:joiner-1:org-1",
+        "joined_organization:joiner-1:org-2",
+      ]);
+    });
+
+    /** @scenario "A joined_organization that failed to send is tracked when the same join is replayed" */
+    it.each(["an HTTP 500", "a network error"] as const)(
+      "gives the slot back when Customer.io answers the track with %s, so a replay of the same invite sends it once",
+      async (failure) => {
+        const { cio, deliver } = await organizationWithMembers({
+          failFirstJoinedOrganization: failure,
+        });
+        const events = () => cio.tracks().map(({ event }) => event);
+
+        await deliver(inviteAccepted);
+        await settle();
+        expect(events()).toEqual(["joined_via_invite"]);
+
+        await deliver(inviteAccepted);
+        await deliver(inviteAccepted);
+        await settle();
+
+        expect(events()).toEqual(["joined_via_invite", "joined_organization"]);
+      },
+    );
+
+    /** @scenario "A join from before joined_organization existed is not tracked as it" */
+    it("does not track joined_organization for a join that predates it", async () => {
+      const { cio, deliver } = await organizationWithMembers();
+
+      await deliver({ ...inviteAccepted, occurredAt: T0 });
+      await settle();
+
+      expect(cio.tracks().map(({ event }) => event)).toEqual(["joined_via_invite"]);
+    });
+  });
+
   describe("when a person joins an organization with no traces", () => {
     /** @scenario "An invite into an organization with no traces says nothing about traces" */
     it("sends no has_traces for an invite", async () => {
@@ -340,7 +507,10 @@ describe("NurturingDeliveryService organization facts", () => {
       await settle();
 
       expect(cio.identifies()).toEqual([]);
-      expect(cio.tracks().map(({ event }) => event)).toEqual(["joined_via_invite"]);
+      expect(cio.tracks().map(({ event }) => event)).toEqual([
+        "joined_organization",
+        "joined_via_invite",
+      ]);
     });
 
     /** @scenario "A person with no traces anywhere still starts at has_traces false" */
@@ -545,7 +715,10 @@ describe("NurturingDeliveryService organization facts", () => {
       await settle();
 
       expect(cio.identifies()).toEqual([]);
-      expect(cio.tracks().map(({ event }) => event)).toEqual(["joined_via_invite"]);
+      expect(cio.tracks().map(({ event }) => event)).toEqual([
+        "joined_organization",
+        "joined_via_invite",
+      ]);
     });
 
     /** @scenario "An SSO person whose trace lookup fails still starts their milestones" */
@@ -559,7 +732,10 @@ describe("NurturingDeliveryService organization facts", () => {
       const [traits] = traitsOf(cio.identifies(), "joiner-1");
       expect(traits).toMatchObject({ has_evaluations: false });
       expectNoTraceTraits(traits);
-      expect(cio.tracks().map(({ event }) => event)).toEqual(["joined_via_sso"]);
+      expect(cio.tracks().map(({ event }) => event)).toEqual([
+        "joined_organization",
+        "joined_via_sso",
+      ]);
     });
   });
 

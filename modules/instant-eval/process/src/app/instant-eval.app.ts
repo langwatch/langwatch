@@ -229,6 +229,12 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       hostedPlans: setup.config.isSaas
         ? { isEnterprisePlan: InstantEvalModule.isEnterprisePlanOf(setup) }
         : null,
+      // Own models answer to their own flag, never to `release_instant_evals` (ADR-182).
+      ownModels: {
+        runsOnOwnModel: async ({ projectId }) =>
+          (await setup.dependencies.modelProviders.resolveDecisionModel({ projectId })).kind ===
+          "own",
+      },
     });
     const optIns = InstantEvalModule.optInsOf({ setup, access });
     const reads = InstantEvalReadsService.create({
@@ -434,6 +440,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
             scope: { type: "organization", id: organizationId },
           }),
         isReleased: (input) => access.isReleased(input),
+        isHostedReleased: (input) => access.isHostedReleased(input),
         recordOptIn: (input) => organizations.recordInstantEvalsOptIn(input),
       },
     });
