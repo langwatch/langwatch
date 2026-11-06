@@ -2,7 +2,11 @@
  * Whoever started a checkout keeps paying: completion hands them the Billing role.
  * Spec: specs/licensing/billing-role.feature
  */
-import type { AuthzApi, AuthzSetBillingRoleInput } from "@langwatch/authz-contract";
+import {
+  BindingMissingError,
+  type AuthzApi,
+  type AuthzSetBillingRoleInput,
+} from "@langwatch/authz-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -12,11 +16,12 @@ const ORG = "org-1";
 const ADMIN = "user-admin";
 const STARTER = "user-starter";
 
-function starterRole() {
+function starterRole({ failure }: { failure?: Error } = {}) {
   const writes: AuthzSetBillingRoleInput[] = [];
   const billingRoles = createApiFixture<AuthzApi>({
     findActiveOrganizationAdministrators: async () => [ADMIN],
     setBillingRole: async (input) => {
+      if (failure) throw failure;
       writes.push(input);
     },
   });
@@ -60,5 +65,36 @@ describe("BillingStarterRoleService", () => {
     await service.grantToStarter({ organizationId: ORG, startedByUserId: null, eventId: "evt_3" });
 
     expect(writes).toEqual([]);
+  });
+
+  /** @scenario "A checkout starter who left the organization is not given Billing" */
+  it("completes without the role when the starter no longer has a membership", async () => {
+    const { service } = starterRole({ failure: new BindingMissingError() });
+
+    await expect(
+      service.grantToStarter({ organizationId: ORG, startedByUserId: STARTER, eventId: "evt_4" }),
+    ).resolves.toBeUndefined();
+  });
+
+  /** @scenario "A checkout starter who left the organization is not given Billing" */
+  it("still fails on any other error, so the webhook retries", async () => {
+    const { service } = starterRole({ failure: new Error("ledger unavailable") });
+
+    await expect(
+      service.grantToStarter({ organizationId: ORG, startedByUserId: STARTER, eventId: "evt_5" }),
+    ).rejects.toThrow("ledger unavailable");
+  });
+
+  /** @scenario "Checkout completer becomes Billing" */
+  it("writes as the system, a consequence of the checkout already paid for", async () => {
+    const { service, writes } = starterRole();
+
+    await service.grantToStarter({
+      organizationId: ORG,
+      startedByUserId: STARTER,
+      eventId: "evt_6",
+    });
+
+    expect(writes[0]?.caller).toEqual({ type: "system" });
   });
 });

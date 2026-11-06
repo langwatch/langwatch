@@ -35,6 +35,12 @@ Feature: Billing role
     When the checkout completes
     Then they hold the Billing role
 
+  Scenario: A checkout starter who left the organization is not given Billing
+    Given a member started a checkout and was then removed from the organization
+    When the checkout completes
+    Then no Billing grant is written and the checkout still completes
+    And any other failure to grant Billing fails the webhook so Stripe retries it
+
   Scenario: An administrator who completes checkout is not given Billing
     Given an administrator started a checkout
     When the checkout completes

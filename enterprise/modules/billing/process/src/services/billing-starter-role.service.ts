@@ -10,6 +10,14 @@ export type CheckoutBillingRoles = Pick<
   "setBillingRole" | "findActiveOrganizationAdministrators"
 >;
 
+function isMembershipGone(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "role_binding_not_found"
+  );
+}
+
 export class BillingStarterRoleService {
   static create({
     billingRoles,
@@ -36,14 +44,21 @@ export class BillingStarterRoleService {
       organizationId,
     });
     if (administrators.includes(startedByUserId)) return;
-    await this.billingRoles.setBillingRole({
-      organizationId,
-      userId: startedByUserId,
-      holds: true,
-      caller: { type: "system" },
-      actor: BILLING_CHECKOUT_ACTOR,
-      commandId: `billing-checkout:${eventId}`,
-      source: "checkout",
-    });
+    await this.billingRoles
+      .setBillingRole({
+        organizationId,
+        userId: startedByUserId,
+        holds: true,
+        caller: { type: "system" },
+        actor: BILLING_CHECKOUT_ACTOR,
+        commandId: `billing-checkout:${eventId}`,
+        source: "checkout",
+      })
+      .catch((error: unknown) => {
+        // A starter who left the organization has no membership to hold the role; a retry
+        // would fail the same way, so the checkout completes without it.
+        if (isMembershipGone(error)) return;
+        throw error;
+      });
   }
 }
