@@ -227,15 +227,15 @@ interface Output {
 
 Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscription.trpc.ts:88`.
 
-| Procedure                            | Kind     | Gate                             | Input                     | Output                           |
-| ------------------------------------ | -------- | -------------------------------- | ------------------------- | -------------------------------- |
-| `subscription.addTeamMemberOrEvents` | mutation | Permission `organization:manage` | inline                    | `subscriptionItemsUpdatedSchema` |
-| `subscription.create`                | mutation | Permission `organization:manage` | inline                    | `billingRedirectSchema`          |
-| `subscription.manage`                | mutation | Permission `organization:manage` | inline                    | `billingPortalSessionSchema`     |
-| `subscription.previewProration`      | query    | Permission `organization:manage` | inline                    | `providerOwnedSchema`            |
-| `subscription.getLastSubscription`   | query    | Permission `organization:view`   | `organizationScopeSchema` | `providerOwnedSchema`            |
-| `subscription.prospective`           | mutation | Permission `organization:manage` | inline                    | `providerOwnedSchema`            |
-| `subscription.listInvoices`          | query    | Permission `organization:view`   | `organizationScopeSchema` | inline                           |
+| Procedure                            | Kind     | Gate                              | Input                     | Output                           |
+| ------------------------------------ | -------- | --------------------------------- | ------------------------- | -------------------------------- |
+| `subscription.addTeamMemberOrEvents` | mutation | Permission `organization:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
+| `subscription.create`                | mutation | Permission `subscription:upgrade` | inline                    | `billingRedirectSchema`          |
+| `subscription.manage`                | mutation | Permission `organization:manage`  | inline                    | `billingPortalSessionSchema`     |
+| `subscription.previewProration`      | query    | Permission `organization:manage`  | inline                    | `providerOwnedSchema`            |
+| `subscription.getLastSubscription`   | query    | Permission `organization:view`    | `organizationScopeSchema` | `providerOwnedSchema`            |
+| `subscription.prospective`           | mutation | Permission `organization:manage`  | inline                    | `providerOwnedSchema`            |
+| `subscription.listInvoices`          | query    | Permission `organization:view`    | `organizationScopeSchema` | inline                           |
 
 ```typescript
 // subscription.addTeamMemberOrEvents
