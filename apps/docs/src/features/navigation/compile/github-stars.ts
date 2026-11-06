@@ -8,7 +8,7 @@ import { GITHUB_ACCEPT, REPOSITORY_API_URL, starCount } from "../../../lib/githu
 import { appRoot, cacheRoot } from "../../../paths.ts";
 
 const defaultCacheFile = path.join(cacheRoot, "docs-site/stars.json");
-/** A star count and when GitHub reported it, in epoch milliseconds; both null when unknown. */
+/** A star count and the start of the UTC day GitHub reported it, in epoch ms; null when unknown. */
 export type StarsRead = { count: number | null; at: number | null };
 
 const DAY_MS = 24 * 60 * 60 * 1000;

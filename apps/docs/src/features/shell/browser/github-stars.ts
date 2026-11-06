@@ -5,8 +5,9 @@ const STORAGE_KEY = "lw-docs:github-stars";
 /* A star count an hour old still reads right. GitHub's anonymous limit is per address, so
    readers behind one shared address can still spend it; the build's count then stays. */
 export const STARS_FRESH_MS = 60 * 60 * 1000;
-/* Docs deploy several times a day, so a build's count under a day old needs no live read. */
-const BUILT_FRESH_MS = 24 * STARS_FRESH_MS;
+/* The build stamps the start of the UTC day it read the count, and docs deploy several times a
+   day, so a count from that day or the next needs no live read. */
+const BUILT_FRESH_MS = 2 * 24 * STARS_FRESH_MS;
 
 type StarsWindow = Pick<Window, "document" | "localStorage" | "fetch">;
 /* `count` is null when GitHub was asked at `at` but gave no count: the next ask waits the hour. */
@@ -41,7 +42,7 @@ function paintStars({ win, stars }: { win: Pick<Window, "document">; stars: numb
   });
 }
 
-/** When GitHub reported the build's count, or null for a page built without one. */
+/** The start of the UTC day GitHub reported the build's count, or null for a page without one. */
 function builtAt({ win }: { win: Pick<Window, "document"> }) {
   const [link] = win.document.querySelectorAll<HTMLElement>("[data-docs-github]");
   const at = Number(link?.dataset.docsStarsAt);
@@ -70,9 +71,9 @@ async function fetchStars({ win }: { win: StarsWindow }) {
 let inFlight: Promise<void> | undefined;
 
 /**
- * Replaces the build's star count with a live one once it is a day old. A count read within the
- * hour is used as it is; an older one stands in only on a page built without a count. If GitHub
- * does not answer, the page keeps its count and asks again after the hour, one ask at a time.
+ * Replaces the build's star count with a live one once the day after its read has passed. A count
+ * read within the hour is used as it is; an older one stands in only on a page built without one.
+ * If GitHub does not answer, the page keeps its count and asks again after the hour.
  */
 export function refreshStars(options: { win?: StarsWindow; now?: number } = {}) {
   inFlight ??= askAndPaint(options).finally(() => (inFlight = undefined));

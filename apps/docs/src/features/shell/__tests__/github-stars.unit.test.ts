@@ -12,7 +12,7 @@ function fakeWindow({
   builtAt = NOW - 2 * DAY_MS,
 }: {
   cached?: { count: number; at: number } | null;
-  /** When GitHub reported the build's count; null for a page built without one. */
+  /** The start of the day GitHub reported the build's count; null for a page built without one. */
   builtAt?: number | null;
   github?: { ok: boolean; stars?: unknown } | "offline";
 } = {}) {
@@ -90,20 +90,20 @@ describe("the live GitHub star count", () => {
     });
   });
 
-  describe("when the build's count is under a day old", () => {
+  describe("when the build read its count the day before", () => {
     /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
     it("shows it without asking GitHub", async () => {
-      const { win, count, requests } = fakeWindow({ builtAt: NOW - DAY_MS + 1 });
+      const { win, count, requests } = fakeWindow({ builtAt: NOW - 2 * DAY_MS + 1 });
       await refreshStars({ win: win as never, now: NOW });
       expect(requests).toEqual([]);
       expect(count.textContent).toBe("5,000");
     });
   });
 
-  describe("when the build's count is a day old", () => {
+  describe("when the build read its count two days back", () => {
     /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
     it("asks GitHub for the live count", async () => {
-      const { win, count, requests } = fakeWindow({ builtAt: NOW - DAY_MS });
+      const { win, count, requests } = fakeWindow({ builtAt: NOW - 2 * DAY_MS });
       await refreshStars({ win: win as never, now: NOW });
       expect(requests).toHaveLength(1);
       expect(count.textContent).toBe("7,000");
