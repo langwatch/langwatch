@@ -12,6 +12,7 @@ import type {
   BillingPurchasedLineItem,
   BillingSubscription,
   BillingSubscriptionChange,
+  BillingSubscriptionCheckout,
   BillingSubscriptionPreviewChange,
 } from "../rules/billing-stripe-shapes.rules.ts";
 
@@ -36,6 +37,11 @@ export abstract class StripeSubscriptionsChannel {
   abstract listCheckoutLineItems(input: {
     checkoutSessionId: string;
   }): Promise<BillingPurchasedLineItem[]>;
+
+  /** The checkout session that created the subscription; empty when none did. */
+  abstract findSubscriptionCheckouts(input: {
+    subscriptionId: string;
+  }): Promise<BillingSubscriptionCheckout[]>;
 
   abstract createBillingPortalSession(input: {
     customerId: string;

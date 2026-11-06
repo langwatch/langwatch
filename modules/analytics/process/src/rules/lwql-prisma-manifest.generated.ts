@@ -2518,6 +2518,13 @@ export interface LwqlPrismaRows {
     readonly month: "DateTime";
     readonly sentAt: "DateTime";
   };
+  readonly LicenseRenewalClaim: {
+    readonly stripeInvoiceId: "String";
+    readonly stripeSubscriptionId: "String";
+    readonly claimedAt: "DateTime";
+    readonly deliveredAt: "DateTime?";
+    readonly licenseId: "String?";
+  };
   readonly InstanceIdentity: {
     readonly id: "String";
     readonly instanceId: "String";

@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { Instant } from "@langwatch/time";
 import type Stripe from "stripe";
 
 import type { StripeSubscriptionsChannel } from "../../../channels/stripe-subscriptions.channel.ts";
@@ -25,6 +26,8 @@ export abstract class LicenseGenerator {
     organizationName: string;
     email: string;
     maxMembers: number;
+    /** Absent signs the licensing default term from now. */
+    expiresAt?: Instant;
   }): Promise<GeneratedLicense>;
 }
 
@@ -79,6 +82,16 @@ export type PurchasedCheckout = Pick<
   Stripe.Checkout.Session,
   "id" | "amount_total" | "currency"
 > & { customer_details: { email: string | null; name: string | null } | null };
+
+/** A paid renewal of a licence subscription: the next term, for the seats invoiced. */
+export type LicenseRenewal = {
+  email: string;
+  organizationName: string;
+  seats: number;
+  expiresAt: Instant;
+  amountPaid: number;
+  currency: string;
+};
 
 /** The one Stripe read the purchase makes: the seats bought. */
 type CheckoutLineItems = Pick<StripeSubscriptionsChannel, "listCheckoutLineItems">;
@@ -138,11 +151,40 @@ export class LicensePurchaseService {
     const lineItems = await stripeSubscriptions.listCheckoutLineItems({
       checkoutSessionId: checkoutSession.id,
     });
-    const quantity = lineItems[0]?.quantity ?? 1;
-    const { licenseKey, licenseData } = await this.generateLicense.generate({
+    await this.issue({
+      email,
       organizationName: businessName,
+      seats: lineItems[0]?.quantity ?? 1,
+      amountPaid: checkoutSession.amount_total ?? 0,
+      currency: checkoutSession.currency ?? "usd",
+    });
+  }
+
+  /** Signs and delivers the next term's licence of a renewed licence subscription. */
+  async deliverRenewal(renewal: LicenseRenewal): Promise<{ licenseId: string }> {
+    return this.issue(renewal);
+  }
+
+  private async issue({
+    email,
+    organizationName,
+    seats: quantity,
+    expiresAt,
+    amountPaid,
+    currency,
+  }: {
+    email: string;
+    organizationName: string;
+    seats: number;
+    expiresAt?: Instant;
+    amountPaid: number;
+    currency: string;
+  }): Promise<{ licenseId: string }> {
+    const { licenseKey, licenseData } = await this.generateLicense.generate({
+      organizationName,
       email,
       maxMembers: quantity,
+      ...(expiresAt ? { expiresAt } : {}),
     });
 
     logger.info(
@@ -183,9 +225,10 @@ export class LicensePurchaseService {
       buyerEmail: email,
       planType: licenseData.plan.type,
       seats: quantity,
-      amountPaid: checkoutSession.amount_total ?? 0,
-      currency: checkoutSession.currency ?? "usd",
+      amountPaid,
+      currency,
     });
+    return { licenseId: licenseData.licenseId };
   }
 
   /**
