@@ -28,6 +28,7 @@ import {
   judgePromotionCode,
   nameCouponProducts,
 } from "../rules/coupon-checkout-compatibility.rules.ts";
+import { BestEffortService } from "./best-effort.service.ts";
 import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
 
 export class BillingCouponService {
@@ -35,6 +36,7 @@ export class BillingCouponService {
   readonly #products: GrowthCheckoutProducts;
   readonly #stripeErrors: StripeErrorTranslator;
   readonly #now: () => Instant;
+  readonly #bestEffort = BestEffortService.create();
 
   private constructor({
     coupons,
@@ -126,8 +128,12 @@ export class BillingCouponService {
           : undefined,
       });
     } catch (failure) {
-      // Best-effort cleanup: the operator needs why the code failed, not why the delete did.
-      await this.#coupons.deleteCoupon({ couponId: coupon.id }).catch(() => undefined);
+      // The operator needs why the code failed; a failed delete is logged, not thrown.
+      await this.#bestEffort.run({
+        label: "delete the coupon whose promotion code failed",
+        context: { couponId: coupon.id },
+        effect: () => this.#coupons.deleteCoupon({ couponId: coupon.id }),
+      });
       if (isCodeTaken(failure)) throw new BillingCouponCodeTakenError(request.code);
       throw this.#stripeErrors.translate(failure);
     }
