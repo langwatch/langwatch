@@ -382,11 +382,11 @@ jobs:
       PAYMENTSIM_ADDR: "127.0.0.1:5599"
       PAYMENTSIM_PUBLIC_URL: "http://localhost:5599"
       PAYMENTSIM_WEBHOOK_URL: "http://localhost:5570/api/webhooks/stripe"
-      PAYMENTSIM_WEBHOOK_SECRET: "whsec_paymentsim"
+      PAYMENTSIM_WEBHOOK_SECRET: "whsec_paymentsim" # gitleaks:allow (paymentsim stand-in)
       PAYMENTSIM_CATALOG: "enterprise/modules/billing/contract/src/stripe-catalog.json"
       STRIPE_API_BASE: "http://localhost:5599"
-      STRIPE_SECRET_KEY: "sk_test_paymentsim"
-      STRIPE_WEBHOOK_SECRET: "whsec_paymentsim"
+      STRIPE_SECRET_KEY: "sk_test_paymentsim" # gitleaks:allow (paymentsim stand-in)
+      STRIPE_WEBHOOK_SECRET: "whsec_paymentsim" # gitleaks:allow (paymentsim stand-in)
       BASE_URL: "http://localhost:5570"
       CI: "true"
 
