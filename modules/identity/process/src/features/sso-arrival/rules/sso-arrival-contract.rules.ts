@@ -38,7 +38,10 @@ export interface SsoArrivalMemberships {
     userId: string;
     organizationId: string;
     email: string;
-  }): Promise<Readonly<{ applied: true; inviteId: string }> | Readonly<{ applied: false }>>;
+  }): Promise<
+    | Readonly<{ applied: true; inviteId: string; role: OrganizationUserRole }>
+    | Readonly<{ applied: false }>
+  >;
   /** The organization a membership lands in, as the announcement names it. */
   findOrganization(args: { organizationId: string }): Promise<JoinedOrganization | null>;
 }
