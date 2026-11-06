@@ -12,7 +12,7 @@ export interface NurturingUsageOrganizationsRepository {
    * Rows with an admin that saw a trace since `since`, or, with no trace yet, were written since
    * then; by organization id, after `afterId` when one is given.
    */
-  listRecentlyActive(
+  findRecentlyActive(
     input: Readonly<{ since: number; afterId?: string; limit: number }>,
   ): Promise<NurturingUsageOrganization[]>;
 }

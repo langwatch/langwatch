@@ -91,7 +91,7 @@ export class PrismaNurturingProjectDirectoryRepository implements NurturingProje
     return traced !== null;
   }
 
-  async listProjectIds({ organizationId }: Readonly<{ organizationId: string }>): Promise<string[]> {
+  async findProjectIds({ organizationId }: Readonly<{ organizationId: string }>): Promise<string[]> {
     const teams = await this.prisma.team.findMany({
       where: { organizationId },
       select: { id: true },

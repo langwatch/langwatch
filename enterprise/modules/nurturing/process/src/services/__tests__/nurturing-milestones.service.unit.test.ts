@@ -317,7 +317,7 @@ describe("NurturingMilestonesService", () => {
         },
         getOrganizationCreatedAt: (input) => directory.getOrganizationCreatedAt(input),
         hasTracedProject: (input) => directory.hasTracedProject(input),
-        listProjectIds: (input) => directory.listProjectIds(input),
+        findProjectIds: (input) => directory.findProjectIds(input),
       };
       const service = serviceOver({ milestones, projects });
       await service.projectCreated(projectCreatedFact());

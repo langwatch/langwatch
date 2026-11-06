@@ -82,7 +82,7 @@ export class MemoryNurturingProjectDirectoryRepository implements NurturingProje
     return { organizationCreatedAt: this.state.organizationsCreated.get(organizationId) ?? null };
   }
 
-  async listProjectIds({ organizationId }: Readonly<{ organizationId: string }>): Promise<string[]> {
+  async findProjectIds({ organizationId }: Readonly<{ organizationId: string }>): Promise<string[]> {
     return [...this.state.placed]
       .filter(([, placedIn]) => placedIn === organizationId)
       .map(([projectId]) => projectId);

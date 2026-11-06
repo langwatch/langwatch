@@ -43,12 +43,12 @@ export class MemoryNurturingMilestonesRepository
     return new MemoryNurturingMilestonesRepository(clock);
   }
 
-  async listRecentlyActive({
+  async findRecentlyActive({
     since,
     afterId,
     limit,
   }: Parameters<
-    NurturingUsageOrganizationsRepository["listRecentlyActive"]
+    NurturingUsageOrganizationsRepository["findRecentlyActive"]
   >[0]): Promise<NurturingUsageOrganization[]> {
     const isActive = (organizationId: string) => {
       const lastTraceAt = this.#lastTraceAt.get(organizationId);

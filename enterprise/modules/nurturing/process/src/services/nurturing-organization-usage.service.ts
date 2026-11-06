@@ -59,7 +59,7 @@ export class NurturingOrganizationUsageService {
     let unsynced = 0;
     let afterId: string | undefined;
     for (;;) {
-      const page = await this.dependencies.organizations.listRecentlyActive({
+      const page = await this.dependencies.organizations.findRecentlyActive({
         since,
         limit: PAGE_SIZE,
         ...(afterId === undefined ? {} : { afterId }),
@@ -126,7 +126,7 @@ export class NurturingOrganizationUsageService {
     since,
   }: Readonly<{ organizationId: string; since: number }>): Promise<OrganizationUsage> {
     const { projects, prompts, evaluators, scenarios, traces } = this.dependencies;
-    const projectIds = await projects.listProjectIds({ organizationId });
+    const projectIds = await projects.findProjectIds({ organizationId });
     const [promptCount, evaluatorCount, scenarioCount, traceUsage] = await Promise.all([
       prompts.countOrganizationVersionedPrompts({ organizationId }),
       evaluators.countActiveForProjects({ projectIds }),

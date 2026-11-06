@@ -30,12 +30,12 @@ export class PrismaNurturingUsageOrganizationsRepository implements NurturingUsa
     );
   }
 
-  async listRecentlyActive({
+  async findRecentlyActive({
     since,
     afterId,
     limit,
   }: Parameters<
-    NurturingUsageOrganizationsRepository["listRecentlyActive"]
+    NurturingUsageOrganizationsRepository["findRecentlyActive"]
   >[0]): Promise<NurturingUsageOrganization[]> {
     const at = new Date(since);
     const rows = await this.prisma.nurturingOrganization.findMany({
