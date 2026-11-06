@@ -837,7 +837,7 @@ function CompletedActivityBatch({
   // it silently skipped three calls on touchscreens or keyboard navigation.
   const [open, setOpen] = useState(true);
   const userToggled = useRef(false);
-  const closeTimer = useRef<number>();
+  const closeTimer = useRef<number | undefined>(undefined);
   const pauseClose = () => window.clearTimeout(closeTimer.current);
   const scheduleClose = () => {
     pauseClose();

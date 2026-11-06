@@ -503,7 +503,11 @@ describe("a failed step", () => {
 
 describe("the receipt of the work", () => {
   const opened = () => receiptHeader().getAttribute("aria-expanded");
-  const pass = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+  const pass = (ms: number) => {
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  };
   let wrapper: HTMLElement;
 
   beforeEach(() => {
