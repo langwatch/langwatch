@@ -48,13 +48,7 @@ export class UsageMonthBreakdownService {
       this.projects({ organizationId }),
     ]);
 
-    return {
-      month: month.toString(),
-      resetsOn: nextMonth.toPlainDate({ day: 1 }).toString(),
-      usageUnit,
-      days,
-      projects,
-    };
+    return { resetsOn: nextMonth.toPlainDate({ day: 1 }).toString(), days, projects };
   }
 
   /** Every day of the month, zero where nothing was metered; null when the meter fails. */
@@ -65,12 +59,12 @@ export class UsageMonthBreakdownService {
     organizationId: string;
     month: YearMonth;
   }): Promise<UsageDay[] | null> {
-    const projectIds = await this.sources.tenancy.findProjectIds({ organizationId });
     const window = {
       startDate: `${month.toString()}-01 00:00:00.000`,
       endDate: `${month.add({ months: 1 }).toString()}-01 00:00:00.000`,
     };
     try {
+      const projectIds = await this.sources.tenancy.findProjectIds({ organizationId });
       const counts = await this.sources.meter.countByDay({ organizationId, projectIds, window });
       const byDay = new Map(counts.map(({ day, count }) => [day, count]));
       return Array.from({ length: month.daysInMonth }, (_, index) => {
@@ -83,18 +77,15 @@ export class UsageMonthBreakdownService {
     }
   }
 
-  /** Projects that used the month, the busiest first; null when the count is unknown. */
+  /** Projects that used the month, the busiest first; null when a store could not answer. */
   private async projects({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<ProjectUsageShare[] | null> {
-    const projects = await this.sources.tenancy.findProjectNames({ organizationId });
-    const counts = await this.sources.counter.getCountByProjects({
-      organizationId,
-      projectIds: projects.map((project) => project.id),
-    });
-    if (counts === USAGE_UNKNOWN) return null;
+    const read = await this.projectCounts({ organizationId });
+    if (read === null) return null;
+    const { projects, counts } = read;
     const countById = new Map(counts.map(({ projectId, count }) => [projectId, count]));
 
     return projects
@@ -105,5 +96,19 @@ export class UsageMonthBreakdownService {
       }))
       .filter((project) => project.count > 0)
       .toSorted((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }
+
+  private async projectCounts({ organizationId }: { organizationId: string }) {
+    try {
+      const projects = await this.sources.tenancy.findProjectNames({ organizationId });
+      const counts = await this.sources.counter.getCountByProjects({
+        organizationId,
+        projectIds: projects.map((project) => project.id),
+      });
+      return counts === USAGE_UNKNOWN ? null : { projects, counts };
+    } catch (error) {
+      logger.warn({ organizationId, error }, "The per-project usage could not be read");
+      return null;
+    }
   }
 }

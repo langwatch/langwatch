@@ -6,6 +6,7 @@ import {
   fullSeats,
   liteRow,
   monthEvents,
+  projectShares,
   shortDate,
   type UsagePagePlan,
 } from "../usage-page-state.ts";
@@ -57,7 +58,11 @@ describe("monthEvents", () => {
     it("warns", () => {
       expect(
         monthEvents({ count: 40_000, plan: FREE, pricingModel: "SEAT_EVENT", currency: "EUR" }),
-      ).toMatchObject({ included: "of 50,000 included", fillRatio: 0.8, status: "warning" });
+      ).toMatchObject({
+        allowance: { kind: "cap", max: "50,000" },
+        fillRatio: 0.8,
+        status: "warning",
+      });
     });
   });
 
@@ -79,19 +84,57 @@ describe("monthEvents", () => {
       };
       expect(
         monthEvents({ count: 10, plan: growth, pricingModel: "SEAT_EVENT", currency: "USD" })
-          .included,
-      ).toBe("200,000 included, then $6 per 100,000");
+          .allowance,
+      ).toEqual({ kind: "overage", text: "200,000 included, then $6 per 100,000" });
+    });
+  });
+
+  describe("given an Enterprise plan", () => {
+    it("states no allowance and draws no meter, on either pricing model", () => {
+      const enterprise = {
+        ...FREE,
+        free: false,
+        type: "ENTERPRISE",
+        maxMessagesPerMonth: 1_000_000,
+        planSource: "subscription" as const,
+      };
+      for (const pricingModel of ["SEAT_EVENT", "TIERED"] as const) {
+        expect(
+          monthEvents({ count: 10, plan: enterprise, pricingModel, currency: "EUR" }),
+        ).toMatchObject({ allowance: null, fillRatio: null });
+      }
+    });
+  });
+
+  describe("given a paid seat plan that is not Growth", () => {
+    it("quotes no Growth overage", () => {
+      const custom = {
+        ...FREE,
+        free: false,
+        type: "CUSTOM_PLAN",
+        maxMessagesPerMonth: 999_999_999,
+        planSource: "subscription" as const,
+      };
+      expect(
+        monthEvents({ count: 10, plan: custom, pricingModel: "SEAT_EVENT", currency: "EUR" })
+          .allowance,
+      ).toBeNull();
     });
   });
 });
 
+describe("projectShares", () => {
+  it("gives each project its share of the month's total", () => {
+    expect(projectShares([{ count: 3 }, { count: 1 }])).toEqual([0.75, 0.25]);
+  });
+});
+
 describe("liteRow", () => {
-  it("counts Lite members against a licence's cap on a self-hosted install", () => {
+  it("counts Lite members against a capped seat plan", () => {
     expect(
       liteRow({
-        plan: { ...FREE, free: false, maxMembersLite: 10, planSource: "license" },
-        pricingModel: null,
-        isSaaS: false,
+        plan: { ...FREE, free: false, maxMembersLite: 10, planSource: "subscription" },
+        pricingModel: "SEAT_EVENT",
         liteCount: 3,
       }),
     ).toEqual({ kind: "count", value: "3 / 10", note: null });

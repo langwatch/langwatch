@@ -101,9 +101,7 @@ describe("UsageMonthBreakdownService", () => {
 
       const breakdown = await service.getMonthBreakdown({ organizationId: ORGANIZATION_ID });
 
-      expect(breakdown.month).toBe("2026-11");
       expect(breakdown.resetsOn).toBe("2026-12-01");
-      expect(breakdown.usageUnit).toBe("events");
       expect(breakdown.days).toHaveLength(30);
       expect(breakdown.days?.filter((day) => day.count > 0)).toEqual([
         { date: "2026-11-01", count: 2 },
@@ -173,6 +171,43 @@ describe("UsageMonthBreakdownService", () => {
 
       expect(breakdown.days).toBeNull();
       expect(breakdown.projects).toHaveLength(2);
+    });
+
+    it("answers null projects when the per-project count rejects, and keeps the days", async () => {
+      const meter = await meterWith(EVENTS);
+      const service = UsageMonthBreakdownService.create({
+        counter: {
+          getResolvedUsageUnit: async () => "events",
+          getCountByProjects: async () => {
+            throw new Error("ClickHouse is unreachable");
+          },
+        },
+        meter,
+        tenancy: tenancyWith(),
+        now: () => NOW,
+      });
+
+      const breakdown = await service.getMonthBreakdown({ organizationId: ORGANIZATION_ID });
+
+      expect(breakdown.projects).toBeNull();
+      expect(breakdown.days).toHaveLength(30);
+    });
+
+    it("answers null for both halves when the project list cannot be read", async () => {
+      const meter = await meterWith(EVENTS);
+      const unreachable = async (): Promise<never> => {
+        throw new Error("Postgres is unreachable");
+      };
+      const service = UsageMonthBreakdownService.create({
+        counter: counterOver({ meter, usageUnit: "events" }),
+        meter,
+        tenancy: { findProjectIds: unreachable, findProjectNames: unreachable },
+        now: () => NOW,
+      });
+
+      const breakdown = await service.getMonthBreakdown({ organizationId: ORGANIZATION_ID });
+
+      expect(breakdown).toEqual({ resetsOn: "2026-12-01", days: null, projects: null });
     });
   });
 });

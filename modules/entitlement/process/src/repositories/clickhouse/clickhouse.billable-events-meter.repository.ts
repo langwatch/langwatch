@@ -107,32 +107,21 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
     return result.rows.map((row) => ({ projectId: row.projectId, count: numberOf(row.total) }));
   }
 
-  countByDay(input: {
+  /** Counted `uniq` per day, as `countByProjects` counts per project, so the two agree. */
+  async countByDay({
+    organizationId,
+    projectIds,
+    window,
+  }: {
     organizationId: string;
     projectIds: readonly string[];
     window: MeterWindow;
   }): Promise<DayMeterCount[]> {
-    return countByDayIn({ clickhouse: this.#clickhouse, ...input });
-  }
-}
-
-/** Counted `uniq` per day, as `countByProjects` counts per project, so the two agree. */
-async function countByDayIn({
-  clickhouse,
-  organizationId,
-  projectIds,
-  window,
-}: {
-  clickhouse: ClickHouseQueryClient;
-  organizationId: string;
-  projectIds: readonly string[];
-  window: MeterWindow;
-}): Promise<DayMeterCount[]> {
-  if (projectIds.length === 0) return [];
-  const result = await clickhouse.query<DayRow>({
-    tenantId: "",
-    organizationId,
-    sql: `
+    if (projectIds.length === 0) return [];
+    const result = await this.#clickhouse.query<DayRow>({
+      tenantId: "",
+      organizationId,
+      sql: `
       SELECT toString(toDate(EventTimestamp, 'UTC')) as day, uniq(DeduplicationKeyHash) as total
       FROM ${TABLE_NAME}
       WHERE OrganizationId = {organizationId:String}
@@ -142,16 +131,17 @@ async function countByDayIn({
       GROUP BY day
       ORDER BY day
     `,
-    params: {
-      organizationId,
-      projectIds: [...projectIds],
-      startDate: window.startDate,
-      endDate: window.endDate,
-    },
-    // The organization's meter counts every project the organization owns.
-    SKIP_TENANT_CHECK: true,
-  });
-  return result.rows.map((row) => ({ day: row.day, count: numberOf(row.total) }));
+      params: {
+        organizationId,
+        projectIds: [...projectIds],
+        startDate: window.startDate,
+        endDate: window.endDate,
+      },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
+    });
+    return result.rows.map((row) => ({ day: row.day, count: numberOf(row.total) }));
+  }
 }
 
 function numberOf(value: string | number | undefined): number {

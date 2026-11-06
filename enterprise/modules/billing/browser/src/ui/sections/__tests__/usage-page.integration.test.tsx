@@ -53,9 +53,7 @@ const TIERED_PLAN: MockPlan = {
 
 function month(days: Record<string, number>): UsageMonthBreakdown {
   return {
-    month: "2026-11",
     resetsOn: "2026-12-01",
-    usageUnit: "events",
     days: Array.from({ length: 30 }, (_, index) => {
       const date = `2026-11-${String(index + 1).padStart(2, "0")}`;
       return { date, count: days[date] ?? 0 };
@@ -74,6 +72,8 @@ const state = vi.hoisted(() => ({
   usage: undefined as unknown,
   usageError: false,
   breakdown: undefined as unknown,
+  isAdmin: true,
+  breakdownError: false,
 }));
 
 vi.mock("@langwatch/auth-client", () => ({ useRecordPageOpened: () => undefined }));
@@ -91,7 +91,13 @@ vi.mock("../../../behavior/billing-api.ts", () => {
               ? { data: undefined, isLoading: false, isError: true }
               : { data: state.usage, isLoading: false, isError: false },
         },
-        getMonthBreakdown: answer(() => state.breakdown),
+        getMonthBreakdown: {
+          useQuery: (_input: unknown, options: { enabled?: boolean }) => ({
+            data: options.enabled && !state.breakdownError ? state.breakdown : undefined,
+            isLoading: false,
+            isError: !!options.enabled && state.breakdownError,
+          }),
+        },
       },
       license: { getStatus: answer(() => undefined) },
       currency: { detectCurrency: answer(() => ({ currency: "EUR" })) },
@@ -111,6 +117,7 @@ vi.mock("../../../model/billing-host.ts", () => ({
     organization: () => ({ id: "org-1", name: "QA Org", pricingModel: state.pricingModel }),
     isDeploymentSettled: () => true,
     isSaaS: () => true,
+    canReadMonthBreakdown: () => state.isAdmin,
   }),
 }));
 
@@ -119,15 +126,17 @@ function usageOf({
   count,
   members = 1,
   lite = 0,
+  usageUnit = "events",
 }: {
   plan: MockPlan;
   count: number | null;
   members?: number;
   lite?: number;
+  usageUnit?: "events" | "traces";
 }) {
   return {
     activePlan: plan,
-    usageUnit: "events",
+    usageUnit,
     membersCount: members,
     membersLiteCount: lite,
     currentMonthMessagesCount: count,
@@ -140,6 +149,7 @@ function given({
   members,
   lite,
   pricingModel = "SEAT_EVENT",
+  usageUnit,
   breakdown = month({ "2026-11-01": 3_100, "2026-11-02": 4_800, "2026-11-03": 6_200 }),
 }: {
   plan: MockPlan;
@@ -147,10 +157,11 @@ function given({
   members?: number;
   lite?: number;
   pricingModel?: string | null;
+  usageUnit?: "events" | "traces";
   breakdown?: UsageMonthBreakdown;
 }) {
   state.plan = plan;
-  state.usage = usageOf({ plan, count, members, lite });
+  state.usage = usageOf({ plan, count, members, lite, usageUnit });
   state.pricingModel = pricingModel;
   state.breakdown = breakdown;
 }
@@ -164,6 +175,8 @@ const renderPage = () =>
 
 beforeEach(() => {
   state.usageError = false;
+  state.isAdmin = true;
+  state.breakdownError = false;
 });
 afterEach(() => cleanup());
 
@@ -233,6 +246,24 @@ describe("the usage page", () => {
     });
   });
 
+  describe("given a member who does not administer the organization", () => {
+    beforeEach(() => {
+      given({ plan: FREE_PLAN, count: 31_800 });
+      state.isAdmin = false;
+    });
+
+    /** @scenario "A member who does not administer the organization sees the month without the breakdown" */
+    it("shows the month's count and meter, with no daily bars and no project list", () => {
+      renderPage();
+
+      expect(screen.getByTestId("usage-events-count")).toHaveTextContent("31,800");
+      expect(screen.getByTestId("usage-events-meter")).toBeInTheDocument();
+      expect(screen.queryAllByTestId("usage-daily-bar")).toHaveLength(0);
+      expect(screen.queryByTestId("usage-projects-card")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("usage-events-unavailable")).not.toBeInTheDocument();
+    });
+  });
+
   describe("given a Free organization with no events this month", () => {
     beforeEach(() =>
       given({ plan: FREE_PLAN, count: 0, breakdown: { ...month({}), projects: [] } }),
@@ -260,6 +291,15 @@ describe("the usage page", () => {
 
       expect(screen.getByTestId("usage-events-unavailable")).toBeInTheDocument();
       expect(screen.queryByTestId("usage-events-empty")).not.toBeInTheDocument();
+    });
+
+    it("says the month by day and by project could not be loaded when that read fails", () => {
+      given({ plan: FREE_PLAN, count: 31_800 });
+      state.breakdownError = true;
+      renderPage();
+
+      expect(screen.getByTestId("usage-breakdown-unavailable")).toBeInTheDocument();
+      expect(screen.getByTestId("usage-events-count")).toHaveTextContent("31,800");
     });
 
     it("says the same when the usage read fails outright", () => {
@@ -302,7 +342,24 @@ describe("the usage page", () => {
   });
 
   describe("given a legacy tiered paid plan", () => {
-    beforeEach(() => given({ plan: TIERED_PLAN, count: 1_000, pricingModel: "TIERED" }));
+    beforeEach(() =>
+      given({
+        plan: TIERED_PLAN,
+        count: 1_000,
+        pricingModel: "TIERED",
+        usageUnit: "traces",
+        breakdown: { ...month({}), days: null },
+      }),
+    );
+
+    it("counts traces, the unit the plan is metered in", () => {
+      renderPage();
+
+      expect(
+        within(screen.getByTestId("usage-events-card")).getByText("Traces this month"),
+      ).toBeInTheDocument();
+      expect(screen.queryAllByTestId("usage-daily-bar")).toHaveLength(0);
+    });
 
     /** @scenario "A plan without Lite seats shows no Lite row" */
     it("shows no Lite members row", () => {

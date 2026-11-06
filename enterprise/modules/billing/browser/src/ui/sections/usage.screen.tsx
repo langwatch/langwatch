@@ -24,6 +24,7 @@ import { PricingModel } from "../../model/prisma-types.ts";
 import {
   barHeights,
   chartAxis,
+  dayLabels,
   fullSeats,
   liteRow,
   monthEvents,
@@ -60,21 +61,18 @@ function ResourceLimitsTiles({
   planLabel,
   chipLabel,
   limits,
-  showLimits,
   showLiteMembers,
   messagesLabel,
 }: {
   planLabel: string;
   chipLabel: string;
   limits: React.ComponentProps<typeof ResourceLimitsDisplay>["limits"];
-  showLimits?: boolean;
   showLiteMembers?: boolean;
   messagesLabel?: string;
 }) {
   return (
     <ResourceLimitsDisplay
       limits={limits}
-      showLimits={showLimits}
       showLiteMembers={showLiteMembers}
       messagesLabel={messagesLabel}
       leading={<PlanTile planLabel={planLabel} chipLabel={chipLabel} />}
@@ -138,12 +136,13 @@ function eventsCardState({
   if (count === null) return { kind: "unavailable" };
   const events = monthEvents({ count, plan, pricingModel, currency });
   if (count === 0) {
-    return { kind: "empty", included: events.included?.startsWith("of ") ? events.included : null };
+    return { kind: "empty", cap: events.allowance?.kind === "cap" ? events.allowance.max : null };
   }
   const days = breakdown?.days;
   const chart = days
     ? {
         heights: barHeights(days),
+        labels: dayLabels({ days, unit: "events" }),
         axis: chartAxis(days),
         summary: `Events per day this month, from ${chartAxis(days)[0] ?? ""}.`,
       }
@@ -163,16 +162,22 @@ function HostedUsage({
   plan: UsagePagePlan | undefined;
   usage: { data?: UsageRead; isLoading: boolean; isError: boolean };
 }) {
+  const host = useBillingHost();
   const { currency: detectedCurrency } = useSubscriptionCurrency(organizationId);
   const seatPrices = useBillingPricingService().getGrowthSeatPriceCents();
   const breakdown = billingApi.limits.getMonthBreakdown.useQuery(
     { organizationId },
-    { enabled: !!organizationId, refetchOnWindowFocus: false },
+    { enabled: !!organizationId && host.canReadMonthBreakdown(), refetchOnWindowFocus: false },
   );
   const growth = plan ? parseGrowthSeatPlanType(plan.type) : null;
   const currency = growth?.currency ?? detectedCurrency;
   const seatPriceCents = growth ? seatPrices[growth.currency][growth.billingInterval] : 0;
   const projects = breakdown.data?.projects ?? [];
+  // When the count itself is unknown the events card already says so.
+  const isCountKnown = usage.data !== undefined && usage.data.currentMonthMessagesCount !== null;
+  const isBreakdownMissing =
+    isCountKnown && (breakdown.isError || breakdown.data?.projects === null);
+  const unitTitle = usage.data?.usageUnit === "traces" ? "Traces this month" : "Events this month";
 
   return (
     <>
@@ -183,9 +188,15 @@ function HostedUsage({
         />
       )}
       <UsageEventsCard
+        title={unitTitle}
         state={eventsCardState({ usage, breakdown: breakdown.data, plan, pricingModel, currency })}
         resetsOn={breakdown.data ? `Resets on ${shortDate(breakdown.data.resetsOn)}` : undefined}
       />
+      {isBreakdownMissing && (
+        <Banner status="warning" data-testid="usage-breakdown-unavailable">
+          The month by day and by project could not be loaded. Refresh the page to try again.
+        </Banner>
+      )}
       {projects.length > 0 && usage.data?.currentMonthMessagesCount !== 0 && (
         <UsageProjectsCard projects={projects} />
       )}
@@ -195,7 +206,6 @@ function HostedUsage({
           lite={liteRow({
             plan,
             pricingModel,
-            isSaaS: true,
             liteCount: usage.data.membersLiteCount,
           })}
         />

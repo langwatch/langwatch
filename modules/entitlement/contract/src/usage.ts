@@ -110,11 +110,8 @@ export type ProjectUsageShare = z.infer<typeof projectUsageShareSchema>;
  */
 const usageMonthBreakdownSchemaDefinition = z
   .object({
-    /** `YYYY-MM`, UTC. */
-    month: z.string(),
     /** `YYYY-MM-DD`: the first day of next month, when the count starts again. */
     resetsOn: z.string(),
-    usageUnit: usageUnitSchema,
     days: usageDaySchema.array().nullable(),
     projects: projectUsageShareSchema.array().nullable(),
   })

@@ -121,7 +121,7 @@ Contract `../contract/src/entitlement.trpc.ts:23`, router `src/transport/usage-l
 | Procedure                                   | Kind     | Gate                             | Input                                | Output                      |
 | ------------------------------------------- | -------- | -------------------------------- | ------------------------------------ | --------------------------- |
 | `limits.getUsage`                           | query    | Permission `organization:view`   | `entitlementOrganizationScopeSchema` | `usageStatsSchema`          |
-| `limits.getMonthBreakdown`                  | query    | Permission `cost:view`           | `entitlementOrganizationScopeSchema` | `usageMonthBreakdownSchema` |
+| `limits.getMonthBreakdown`                  | query    | Permission `organization:manage` | `entitlementOrganizationScopeSchema` | `usageMonthBreakdownSchema` |
 | `limits.checkAndSendUsageLimitNotification` | mutation | Permission `organization:manage` | `sendUsageLimitWarningInputSchema`   | `usageLimitWarningSchema`   |
 
 ```typescript
@@ -131,7 +131,7 @@ type Output = z.infer<typeof usageStatsSchema>; // ../contract/src/usage.ts:89
 
 // limits.getMonthBreakdown
 type Input = z.infer<typeof entitlementOrganizationScopeSchema>; // ../contract/src/entitlement.schemas.ts:17
-type Output = z.infer<typeof usageMonthBreakdownSchema>; // ../contract/src/usage.ts:126
+type Output = z.infer<typeof usageMonthBreakdownSchema>; // ../contract/src/usage.ts:123
 
 // limits.checkAndSendUsageLimitNotification
 // Input: sendUsageLimitWarningInputSchema, ../contract/src/entitlement.schemas.ts:43

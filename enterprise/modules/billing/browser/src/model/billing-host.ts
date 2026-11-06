@@ -48,6 +48,11 @@ export abstract class BillingHostApi {
    */
   abstract canInviteMembers(): boolean;
 
+  /** Whether the reader may see the month per project: `organization:manage`, as inviting. */
+  canReadMonthBreakdown(): boolean {
+    return this.canInviteMembers();
+  }
+
   /**
    * The query string the page was opened with. Two keys matter: `success`
    * (Stripe appends it after checkout) and `upgraded_from` (a credit was

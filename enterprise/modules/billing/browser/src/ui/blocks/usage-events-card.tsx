@@ -9,7 +9,7 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Activity } from "lucide-react";
 
-import type { MonthEvents } from "../../model/usage-page-state.ts";
+import { allowanceText, type MonthEvents } from "../../model/usage-page-state.ts";
 import { DailyUsageBars } from "../elements/daily-usage-bars.tsx";
 
 const METER_FILL: Record<MonthEvents["status"], string> = {
@@ -23,11 +23,11 @@ export const SET_UP_TRACING_HREF = "https://langwatch.ai/docs/integration/quick-
 export type UsageEventsCardState =
   | { kind: "loading" }
   | { kind: "unavailable" }
-  | { kind: "empty"; included: string | null }
+  | { kind: "empty"; cap: string | null }
   | {
       kind: "month";
       events: MonthEvents;
-      chart: { heights: number[]; axis: string[]; summary: string } | null;
+      chart: { heights: number[]; labels: string[]; axis: string[]; summary: string } | null;
     };
 
 function Muted({ children }: { children: string }) {
@@ -66,7 +66,7 @@ function EventsBody({ state }: { state: UsageEventsCardState }) {
         <Text textStyle="metric" fontVariantNumeric="tabular-nums" data-testid="usage-events-count">
           {events.count}
         </Text>
-        {events.included && <Muted>{events.included}</Muted>}
+        {events.allowance && <Muted>{allowanceText(events.allowance)}</Muted>}
         <Spacer />
         {events.fillRatio !== null && (
           <MeterBar
@@ -79,7 +79,12 @@ function EventsBody({ state }: { state: UsageEventsCardState }) {
         )}
       </HStack>
       {chart && (
-        <DailyUsageBars heights={chart.heights} axis={chart.axis} summary={chart.summary} />
+        <DailyUsageBars
+          heights={chart.heights}
+          labels={chart.labels}
+          axis={chart.axis}
+          summary={chart.summary}
+        />
       )}
     </VStack>
   );
@@ -87,17 +92,20 @@ function EventsBody({ state }: { state: UsageEventsCardState }) {
 
 export function UsageEventsCard({
   state,
+  title,
   resetsOn,
 }: {
   state: UsageEventsCardState;
+  /** "Events this month", or "Traces this month" where the plan counts traces. */
+  title: string;
   /** "Resets on 1 Dec"; absent until the month is read. */
   resetsOn?: string;
 }) {
-  const aside = state.kind === "empty" && state.included ? `0 ${state.included}` : resetsOn;
+  const aside = state.kind === "empty" && state.cap ? `0 of ${state.cap} included` : resetsOn;
   return (
     <Card
       data-testid="usage-events-card"
-      title="Events this month"
+      title={title}
       actions={aside ? <Muted>{aside}</Muted> : undefined}
     >
       <EventsBody state={state} />

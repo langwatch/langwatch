@@ -73,6 +73,14 @@ Feature: Usage page
     Then "By project" lists support-agent, triage and content in that order with their counts
     And "archive" is not listed
 
+  @integration
+  Scenario: A member who does not administer the organization sees the month without the breakdown
+    Given I am a member without organization:manage
+    When I open the Usage page
+    Then "Events this month" shows the count and the meter
+    And no daily bars and no "By project" section are shown
+    And nothing says the count could not be loaded
+
   # Seats
 
   @integration
@@ -113,6 +121,6 @@ Feature: Usage page
     And it still answers each project's count
 
   @unit
-  Scenario: The month breakdown takes the cost view permission
+  Scenario: Only organization administrators read the month breakdown
     When the month breakdown route is declared
-    Then it asks "cost:view" of the organization
+    Then it asks "organization:manage" of the organization, the audience of the limit email

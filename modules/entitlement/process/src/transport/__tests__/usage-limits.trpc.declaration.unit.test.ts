@@ -27,8 +27,8 @@ function accessDeclared(): unknown[] {
   return declared;
 }
 
-/** @scenario "The month breakdown takes the cost view permission" */
-it("asks cost:view for the month breakdown and keeps the other two as they were", () => {
+/** @scenario "Only organization administrators read the month breakdown" */
+it("asks organization:manage for the month breakdown and keeps the other two as they were", () => {
   const declared = accessDeclared();
 
   expect(
@@ -39,7 +39,7 @@ it("asks cost:view for the month breakdown and keeps the other two as they were"
     ]),
   ).toEqual([
     ["getUsage", "query", "organization:view"],
-    ["getMonthBreakdown", "query", "cost:view"],
+    ["getMonthBreakdown", "query", "organization:manage"],
     ["checkAndSendUsageLimitNotification", "mutation", "organization:manage"],
   ]);
 });

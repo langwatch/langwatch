@@ -1,7 +1,7 @@
 /**
  * The server half of `limits.*`. Every member reads their own allowance (`organization:view`); the
- * month breakdown names every project, so it takes `cost:view` as the usage page does; the
- * notification mails administrators with caller-supplied counts (`organization:manage`).
+ * month breakdown names every project and the notification mails administrators, so both take
+ * `organization:manage`, the audience of the limit email.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { EntitlementApi, usageLimitsTrpc } from "@langwatch/entitlement-contract";
@@ -25,7 +25,7 @@ export const usageLimitsTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("getMonthBreakdown")
-  .withPermission("cost:view")
+  .withPermission("organization:manage")
   .handle(async ({ app, input }) =>
     app.getUsageMonthBreakdown({ organizationId: input.organizationId }),
   )

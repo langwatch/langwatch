@@ -3,12 +3,14 @@
  * Pure: the screen renders these and decides nothing itself.
  * @see specs/licensing/usage-page.feature
  */
-import { Currency } from "@langwatch/enterprise-billing-contract";
+import { UNLIMITED_MESSAGES } from "@langwatch/enterprise-billing-contract";
 import type { UsageDay } from "@langwatch/entitlement-contract";
 import numeral from "numeral";
 
 import {
   formatPrice,
+  GROWTH_INCLUDED_EVENTS,
+  growthOverageCentsPer100k,
   parseGrowthSeatPlanType,
   type Currency as CurrencyType,
 } from "./billing-plans.ts";
@@ -76,15 +78,23 @@ export function planStrip({
   return { title: planTitle(plan), summary: seats, action: "manage" };
 }
 
+/** What the plan includes: a cap the month fills, or an allowance with a price past it. */
+export type MonthAllowance = { kind: "cap"; max: string } | { kind: "overage"; text: string };
+
 /** The events card's headline: the count, what the plan includes, and a meter where it caps. */
 export type MonthEvents = {
   count: string;
-  included: string | null;
+  allowance: MonthAllowance | null;
   fillRatio: number | null;
   status: "ok" | "warning" | "exceeded";
 };
 
 const WARNING_AT = 0.8;
+
+/** The line beside the count: "of 50,000 included", or the overage price. */
+export function allowanceText(allowance: MonthAllowance): string {
+  return allowance.kind === "cap" ? `of ${allowance.max} included` : allowance.text;
+}
 
 export function monthEvents({
   count,
@@ -98,28 +108,26 @@ export function monthEvents({
   currency: CurrencyType;
 }): MonthEvents {
   const formatted = formatCount(count);
+  const uncapped = { count: formatted, allowance: null, fillRatio: null, status: "ok" } as const;
+  // An account-managed plan's terms live in its contract, not the catalogue.
+  if (plan.type === "ENTERPRISE") return uncapped;
   const isSeatEventPaid =
     !plan.free && plan.planSource !== "license" && pricingModel === PricingModel.SEAT_EVENT;
   if (isSeatEventPaid) {
-    const overage = formatPrice({ cents: currency === Currency.EUR ? 500 : 600, currency });
-    return {
-      count: formatted,
-      included: `200,000 included, then ${overage} per 100,000`,
-      fillRatio: null,
-      status: "ok",
-    };
+    if (!parseGrowthSeatPlanType(plan.type)) return uncapped;
+    const overage = formatPrice({ cents: growthOverageCentsPer100k(currency), currency });
+    const text = `${formatCount(GROWTH_INCLUDED_EVENTS)} included, then ${overage} per 100,000`;
+    return { ...uncapped, allowance: { kind: "overage", text } };
   }
   const max = plan.maxMessagesPerMonth;
-  if (max <= 0 || max >= 999_999_999) {
-    return { count: formatted, included: null, fillRatio: null, status: "ok" };
-  }
+  if (max <= 0 || max >= UNLIMITED_MESSAGES) return uncapped;
   const ratio = count / max;
   let status: MonthEvents["status"] = "ok";
   if (ratio >= 1) status = "exceeded";
   else if (ratio >= WARNING_AT) status = "warning";
   return {
     count: formatted,
-    included: `of ${formatCount(max)} included`,
+    allowance: { kind: "cap", max: formatCount(max) },
     fillRatio: Math.min(1, ratio),
     status,
   };
@@ -141,6 +149,11 @@ export function chartAxis(days: readonly UsageDay[]): string[] {
   return [shortDate(first.date), shortDate(days[14]?.date ?? first.date), shortDate(last.date)];
 }
 
+/** Each day's count as a hover label: "3 Nov: 4,800 events". */
+export function dayLabels({ days, unit }: { days: readonly UsageDay[]; unit: string }): string[] {
+  return days.map((day) => `${shortDate(day.date)}: ${formatCount(day.count)} ${unit}`);
+}
+
 /** Each day's bar height as a share of the busiest day, 0 for a day with none. */
 export function barHeights(days: readonly UsageDay[]): number[] {
   const max = Math.max(0, ...days.map((day) => day.count));
@@ -156,18 +169,14 @@ export type LiteRow =
 export function liteRow({
   plan,
   pricingModel,
-  isSaaS,
   liteCount,
 }: {
   plan: UsagePagePlan;
   pricingModel: PricingModel | null | undefined;
-  isSaaS: boolean;
   liteCount: number;
 }): LiteRow {
-  if (isSaaS && plan.free) return { kind: "on-growth" };
-  const hasLiteSeats =
-    plan.maxMembersLite > 0 &&
-    (!isSaaS || plan.planSource === "license" || pricingModel === PricingModel.SEAT_EVENT);
+  if (plan.free) return { kind: "on-growth" };
+  const hasLiteSeats = plan.maxMembersLite > 0 && pricingModel === PricingModel.SEAT_EVENT;
   if (!hasLiteSeats) return { kind: "none" };
   if (plan.maxMembersLite >= UNLIMITED_SEATS_FROM) {
     return { kind: "count", value: formatCount(liteCount), note: "unlimited" };
@@ -185,7 +194,7 @@ export function fullSeats({ used, plan }: { used: number; plan: UsagePagePlan })
   return `${formatCount(used)} / ${formatCount(plan.maxMembers)}`;
 }
 
-/** Each project's share of the busiest one, for the bar beside its count. */
+/** Each project's share of the month's total, for the bar beside its count. */
 export function projectShares(projects: readonly { count: number }[]): number[] {
   const total = projects.reduce((sum, project) => sum + project.count, 0);
   return projects.map((project) => (total > 0 ? project.count / total : 0));

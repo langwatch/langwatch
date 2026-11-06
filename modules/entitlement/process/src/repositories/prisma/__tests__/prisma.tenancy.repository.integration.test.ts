@@ -59,10 +59,13 @@ describe.skipIf(!DB_URL)("PrismaTenancyRepository.findProjectNames", () => {
 
   afterAll(async () => {
     if (!connection) return;
-    await prisma.project.deleteMany({ where: { id: { in: projectIds } } });
-    await prisma.team.deleteMany({ where: { id: teamId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
-    await prisma.$disconnect();
+    try {
+      await prisma.project.deleteMany({ where: { id: { in: projectIds } } });
+      await prisma.team.deleteMany({ where: { id: teamId } });
+      await prisma.organization.deleteMany({ where: { id: organizationId } });
+    } finally {
+      await prisma.$disconnect();
+    }
   });
 
   /** @scenario "Each project's share of the month is listed, the busiest first" */

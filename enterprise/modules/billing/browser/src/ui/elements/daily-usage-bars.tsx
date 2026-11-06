@@ -1,16 +1,19 @@
 /**
  * One bar per day of the month, each as tall as its share of the busiest day, with the first,
- * middle and last day under the axis. Days with nothing draw no bar.
+ * middle and last day under the axis. Days with nothing draw no bar; a hover names the count.
  */
 import { Box, HStack, Text, VStack, VisuallyHidden } from "@langwatch/design-system/primitives";
 
 export function DailyUsageBars({
   heights,
+  labels,
   axis,
   summary,
 }: {
   /** Each day's height as a share of the busiest, 0 to 1. */
   heights: readonly number[];
+  /** Each day's count, shown on hover: "3 Nov: 4,800 events". */
+  labels: readonly string[];
   axis: readonly string[];
   /** What a screen reader hears in place of the bars. */
   summary: string;
@@ -35,6 +38,7 @@ export function DailyUsageBars({
             height={`${height * 100}%`}
             background={height > 0 ? "orange.solid" : "transparent"}
             borderTopRadius="2px"
+            title={labels[index]}
             data-testid="usage-daily-bar"
             data-empty={height === 0 || undefined}
           />
