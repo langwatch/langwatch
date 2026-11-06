@@ -118,6 +118,13 @@ Feature: Seat requests when an organization is over its seat limit
       And that other seat request stays open
 
     @integration
+    Scenario: Seat changes on many organizations at once never starve the connection pool
+      Given eight organizations each start a seat change at the same moment
+      And the server has only two database connections
+      When each seat change counts its seats and writes in its own transaction
+      Then every seat change completes
+
+    @integration
     Scenario: Two single sign-on arrivals for the last free full seat at once: exactly one gets it
       Given exactly one full member seat is free
       When "first@acme.example" and "second@acme.example" arrive by single sign-on at the same moment asking for a full seat

@@ -155,6 +155,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && hasUserBound(clause),
   },
   OrganizationAccessNotice: {},
+  OrganizationSeatLease: {},
   Team: {},
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it

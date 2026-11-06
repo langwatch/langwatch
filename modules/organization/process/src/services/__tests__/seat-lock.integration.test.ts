@@ -34,17 +34,15 @@ import { SeatRequestService, type SeatRequestPeers } from "../seat-request.servi
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
-/** How long a count waits for a second one to arrive before it answers anyway. */
-const RENDEZVOUS_MS = 300;
+/** How long every seat count holds its answer before handing it back. */
+const COUNT_DELAY_MS = 300;
 
 /**
- * The Postgres seat repository, with every seat count held until a second count arrives or
- * RENDEZVOUS_MS passes, so two racing writes both count before either writes unless the lock
- * keeps the second out.
+ * The Postgres seat repository, with every seat count answered COUNT_DELAY_MS after it was
+ * read, so two racing writes both count before either writes unless the lease keeps the
+ * second out until the first has written.
  */
-class RendezvousSeatRepository extends OrganizationSeatRepository {
-  #waiting: (() => void)[] = [];
-
+class DelayedCountSeatRepository extends OrganizationSeatRepository {
   constructor(private readonly inner: OrganizationSeatRepository) {
     super();
   }
@@ -63,12 +61,7 @@ class RendezvousSeatRepository extends OrganizationSeatRepository {
 
   async countMemberSeats(organizationId: string): Promise<OrganizationMemberSeats> {
     const seats = await this.inner.countMemberSeats(organizationId);
-    await new Promise<void>((resolve) => {
-      this.#waiting.push(resolve);
-      if (this.#waiting.length >= 2) this.#waiting.splice(0).forEach((release) => release());
-      setTimeout(resolve, RENDEZVOUS_MS);
-    });
-    this.#waiting = [];
+    await new Promise((resolve) => setTimeout(resolve, COUNT_DELAY_MS));
     return seats;
   }
 
@@ -100,7 +93,7 @@ describe.skipIf(!DB_URL)("two seat-taking writes for the last free full seat", (
   seatLimits.connect({ send: async () => {} });
   const seats = OrganizationSeatLicenseService.create({
     plans: plan,
-    memberships: new RendezvousSeatRepository(PrismaOrganizationSeatRepository.create(prisma)),
+    memberships: new DelayedCountSeatRepository(PrismaOrganizationSeatRepository.create(prisma)),
     notices: seatLimits,
   });
   const members = PrismaOrganizationMembershipRepository.create({
@@ -253,6 +246,47 @@ describe.skipIf(!DB_URL)("two seat-taking writes for the last free full seat", (
         "EXTERNAL",
         "MEMBER",
       ]);
+    });
+  });
+
+  describe("when many organizations change seats at once on a pool of two connections", () => {
+    /** @scenario "Seat changes on many organizations at once never starve the connection pool" */
+    it("completes every one, since a held lease pins no connection", async () => {
+      const url = new URL(DB_URL ?? "");
+      url.searchParams.set("connection_limit", "2");
+      url.searchParams.set("pool_timeout", "3");
+      const small = PrismaConnectionService.create({
+        guard: PrismaTenancyGuardService.create(),
+        logger: createLogger("langwatch:organization:test:seat-lock-pool"),
+      }).connect(
+        PrismaConfigService.create().resolve({ databaseUrl: url.toString(), log: ["error"] }),
+      );
+      const smallClient = small.client as PrismaClient;
+      const seatRepository = PrismaOrganizationSeatRepository.create(smallClient);
+      const organizations = Array.from({ length: 8 }, (_, index) => `${namespace}-pool-${index}`);
+
+      try {
+        const counted = await Promise.all(
+          organizations.map((organizationId) =>
+            seatRepository.withSeatLock({
+              organizationId,
+              // A count, then a write in its own transaction, as an invitation batch does.
+              work: async () => {
+                const seats = await seatRepository.countMemberSeats(organizationId);
+                await smallClient.$transaction(async (transaction) => {
+                  await transaction.organizationUser.findMany({ where: { organizationId } });
+                  await new Promise((resolve) => setTimeout(resolve, 50));
+                });
+                return seats.fullMembers;
+              },
+            }),
+          ),
+        );
+
+        expect(counted).toEqual(organizations.map(() => 0));
+      } finally {
+        await small.closeOnce();
+      }
     });
   });
 });

@@ -27,6 +27,7 @@ export const prismaTableCatalogue = {
   "TeamUser": "TeamUser",
   "OrganizationUser": "OrganizationUser",
   "SeatRequest": "SeatRequest",
+  "OrganizationSeatLease": "OrganizationSeatLease",
   "OrganizationAccessNotice": "OrganizationAccessNotice",
   "Team": "Team",
   "Organization": "Organization",
@@ -592,6 +593,12 @@ export const prismaModelFieldCatalogue = {
     "resolvedByUserId",
     "createdAt",
     "updatedAt"
+  ],
+  "OrganizationSeatLease": [
+    "organizationId",
+    "holder",
+    "expiresAt",
+    "createdAt"
   ],
   "OrganizationAccessNotice": [
     "id",
@@ -3263,6 +3270,7 @@ export const prismaRelationCatalogue = {
     "organization": "Organization"
   },
   "SeatRequest": {},
+  "OrganizationSeatLease": {},
   "OrganizationAccessNotice": {},
   "Team": {
     "members": "TeamUser",

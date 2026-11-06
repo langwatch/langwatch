@@ -1,4 +1,10 @@
-export { AdvisoryLockBusyError, type AdvisoryLockDeps, withAdvisoryLock } from "./advisory-lock.ts";
+export {
+  LEASE_TTL_MS,
+  LeaseBusyError,
+  type LeaseDeps,
+  type LeaseStore,
+  withLease,
+} from "./lease-lock.ts";
 export {
   PrismaConfigService,
   type PrismaConfiguration,

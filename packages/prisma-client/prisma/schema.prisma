@@ -1134,6 +1134,16 @@ model SeatRequest {
   @@index([userId])
 }
 
+/// Held by the one seat-taking write running on an organization (seat-requests.feature). A
+/// row past expiresAt is free to take; a holder deletes its own row when its write is done.
+model OrganizationSeatLease {
+  organizationId String   @id
+  /// Random per hold, so a release deletes only its own lease.
+  holder         String
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+}
+
 /// The mail log for seat requests and refused sign-ins: at most one row per organization,
 /// kind, address and UTC day, each mailed at once.
 model OrganizationAccessNotice {

@@ -111,6 +111,13 @@ Feature: Private Prisma table ownership
     And a write by entitlement in any other file is still reported
 
   @unit @architecture
+  Scenario: A reader whose only access is an admitted write still uses the share
+    Given the Project share admits entitlement's writes in one named file
+    And entitlement only writes Project in that file and never reads it
+    When the policy runs
+    Then no finding calls entitlement a reader that no longer reads Project
+
+  @unit @architecture
   Scenario: A share's write exception that matches no write is reported
     Given the Project share admits a write in a named file
     And that file no longer writes Project, or the exception names a module that is not a reader

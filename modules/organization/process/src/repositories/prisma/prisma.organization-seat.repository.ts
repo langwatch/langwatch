@@ -2,9 +2,8 @@ import { countMemberSeats } from "@langwatch/entitlement-contract";
 import {
   type OrganizationMemberSeats,
   SeatChangeBusyError,
-  seatLockKey,
 } from "@langwatch/organization-contract";
-import { withAdvisoryLock } from "@langwatch/prisma-client";
+import { type LeaseStore, withLease } from "@langwatch/prisma-client";
 import {
   INVITE_STATUS,
   OrganizationUserRole,
@@ -12,6 +11,7 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
 } from "@langwatch/prisma-client/generated";
+import { prismaTables } from "@langwatch/prisma-client/ownership";
 import { z } from "zod";
 
 import { OrganizationSeatRepository } from "../organization-seat.repository.ts";
@@ -19,10 +19,39 @@ import { OrganizationSeatRepository } from "../organization-seat.repository.ts";
 /** Only what this repository needs, named so a caller never names Prisma's own types. */
 type PrismaOrganizationSeatDatabase = PrismaClient | Prisma.TransactionClient;
 
-function canHoldLocks(
-  database: PrismaOrganizationSeatDatabase,
-): database is PrismaOrganizationSeatDatabase & Pick<PrismaClient, "$transaction"> {
+/** A lease written inside a caller's transaction would stay invisible until it commits. */
+function isRootClient(database: PrismaOrganizationSeatDatabase): database is PrismaClient {
   return "$transaction" in database;
+}
+
+/** The organization's seat lease row: taken when free or expired, renewed, then dropped. */
+function seatLeaseStore({
+  prisma,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+}): LeaseStore {
+  return {
+    acquire: async ({ holder, ttlMs }) => {
+      const taken = await prisma.$queryRaw<{ holder: string }[]>`
+INSERT INTO "OrganizationSeatLease" ("organizationId", "holder", "expiresAt")
+VALUES (${organizationId}, ${holder}, now() + make_interval(secs => ${ttlMs / 1000}))
+ON CONFLICT ("organizationId") DO UPDATE
+  SET "holder" = EXCLUDED."holder", "expiresAt" = EXCLUDED."expiresAt"
+  WHERE "OrganizationSeatLease"."expiresAt" < now()
+RETURNING "holder"`;
+      return taken.length > 0;
+    },
+    renew: async ({ holder, ttlMs }) => {
+      await prisma.$executeRaw`
+UPDATE "OrganizationSeatLease" SET "expiresAt" = now() + make_interval(secs => ${ttlMs / 1000})
+WHERE "organizationId" = ${organizationId} AND "holder" = ${holder}`;
+    },
+    release: async ({ holder }) => {
+      await prisma.organizationSeatLease.deleteMany({ where: { organizationId, holder } });
+    },
+  };
 }
 
 /** An invitation's team assignments as stored; anything else reads as none. */
@@ -53,6 +82,9 @@ interface MemberClassificationContext {
 
 /** Seat counts over organization's own membership and invitation rows. */
 export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository {
+  /** The seat lease is this repository's own row; the counts read membership's. */
+  static readonly tables = prismaTables("OrganizationSeatLease");
+
   static create(prisma: PrismaOrganizationSeatDatabase): PrismaOrganizationSeatRepository {
     return new PrismaOrganizationSeatRepository(prisma);
   }
@@ -86,7 +118,7 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
     return (await this.countMemberSeats(organizationId)).developers;
   }
 
-  /** A transaction-scoped advisory lock on the organization, tried and retried (prisma-client). */
+  /** The organization's lease row, holding no connection while `work` runs (withLease). */
   async withSeatLock<T>({
     organizationId,
     work,
@@ -94,12 +126,11 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
     organizationId: string;
     work: () => Promise<T>;
   }): Promise<T> {
-    if (!canHoldLocks(this.prisma)) {
-      throw new Error("The seat lock needs the root client, not a transaction");
+    if (!isRootClient(this.prisma)) {
+      throw new Error("The seat lease needs the root client, not a transaction");
     }
-    return withAdvisoryLock({
-      prisma: this.prisma,
-      key: seatLockKey({ organizationId }),
+    return withLease({
+      store: seatLeaseStore({ prisma: this.prisma, organizationId }),
       work,
       onBusy: () => new SeatChangeBusyError(),
     });

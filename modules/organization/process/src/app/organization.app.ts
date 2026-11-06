@@ -1801,15 +1801,13 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       teamId: input.teamId,
     });
 
-    if (isOrganizationApiCustomRole(input.role)) {
-      await this.updateTeamMemberRole(input, by);
-      return;
-    }
-
+    // Custom roles too: the member's seat, read by the write, must not move under it.
     await this.#infrastructure.seats.withSeat({
       organizationId,
       work: async () => {
-        await this.#assertBuiltInTeamRoleAllowed({ organizationId, input });
+        if (!isOrganizationApiCustomRole(input.role)) {
+          await this.#assertBuiltInTeamRoleAllowed({ organizationId, input });
+        }
         await this.updateTeamMemberRole(input, by);
       },
     });
