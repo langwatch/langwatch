@@ -66,6 +66,7 @@ class MemberHost extends BillingHostApi {
     return true;
   }
   navigate(): void {}
+  replace(): void {}
   leaveTo(url: string): void {
     this.departures.push(url);
   }
