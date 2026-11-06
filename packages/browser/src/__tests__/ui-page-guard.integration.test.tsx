@@ -381,3 +381,54 @@ describe("given a module declaring a screen that requires a grant", () => {
     await expect(load?.()).resolves.toEqual({ default: Page });
   });
 });
+
+class OrganizationOnlySession extends AnsweringSession {
+  hasPermission(): boolean {
+    return false;
+  }
+
+  hasOrganizationPermission(permission: string): boolean {
+    return this.answers.permissions.includes(permission);
+  }
+}
+
+describe("given a page whose grant is asked at the organization", () => {
+  function renderAtOrganization(session: AnsweringSession) {
+    const Guarded = withUiPageGuard({
+      permission: "members:view",
+      permissionAt: "organization",
+      fallbacks: {
+        loading: () => <div>still asking</div>,
+        notFound: () => <div>not here</div>,
+        forbidden: ({ permission }) => <div>missing {permission}</div>,
+      },
+    })(Page);
+    render(
+      <UiHostServicesContextProvider value={hostServices(session)}>
+        <UiHostServiceProvider value={new Map()}>
+          <Guarded />
+        </UiHostServiceProvider>
+      </UiHostServicesContextProvider>,
+    );
+  }
+
+  describe("when the reader holds it at the organization but not on the active project", () => {
+    it("opens the page", () => {
+      renderAtOrganization(
+        new OrganizationOnlySession({ flags: {}, permissions: ["members:view"], settled: true }),
+      );
+
+      expect(screen.queryByText("the page")).not.toBeNull();
+    });
+  });
+
+  describe("when the organization does not grant it", () => {
+    it("names the missing permission", () => {
+      renderAtOrganization(
+        new OrganizationOnlySession({ flags: {}, permissions: [], settled: true }),
+      );
+
+      expect(screen.queryByText("missing members:view")).not.toBeNull();
+    });
+  });
+});

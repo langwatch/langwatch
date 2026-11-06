@@ -11,7 +11,10 @@ Feature: Permission reads come from the session, and a public page holds none
   The session capability (auth) answers hasPermission and hasOrganizationPermission.
   An organization permission follows the grant the active scope holds, as on main
   (Alex, 2026-10-06, scope knot Q2): the project's grant on a project page, the
-  organization's where no project is chosen, from one grant read.
+  organization's where no project is chosen. On a project page the organization's own
+  grant read is added to it for organization permissions only, so a member with no grant
+  on the active project (a Lite Member admitted by domain) still holds the organization
+  floor, such as members:view for the Users page. Project permissions never read it.
   The scope capability (organization) answers which organization, team and project
   this page is about, and answers no permission. A public page (the shared trace)
   mounts an explicit no-session answer: every permission reads as not held there,
@@ -29,7 +32,7 @@ Feature: Permission reads come from the session, and a public page holds none
     Given the reader's grant in the active project lets them manage its organization
     When a screen asks the session whether the reader may manage the organization
     Then the answer is yes
-    And the only grant read sent names the active project
+    And the project permission read names the active project
 
   @integration
   Scenario: A project grant without the organization permission answers no for the organization
@@ -37,6 +40,14 @@ Feature: Permission reads come from the session, and a public page holds none
     When a screen asks the session whether the reader may manage the organization
     Then the answer is no
     And asking the session whether the reader may manage the project answers yes
+
+  @integration
+  Scenario: An organization permission held only at the organization answers yes on a project page
+    Given the reader holds no grant on the active project
+    And the organization grants them members:view
+    When a screen asks the session whether the reader may read the organization's members
+    Then the answer is yes
+    And asking the session for the same permission on the project answers no
 
   @integration
   Scenario: An organization permission is still unanswered while the active project's grants load

@@ -55,7 +55,11 @@ class Reader extends UiSession {
     return null;
   }
 
-  hasPermission(permission: string): boolean {
+  hasPermission(_permission: string): boolean {
+    return false;
+  }
+
+  hasOrganizationPermission(permission: string): boolean {
     return this.grants.includes(permission);
   }
 
