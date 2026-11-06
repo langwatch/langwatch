@@ -68,6 +68,7 @@ function PlanActions({
       {onUpgrade && (
         <Button
           data-testid="current-plan-upgrade-button"
+          data-emphasis="primary"
           colorPalette="orange"
           size="sm"
           onClick={onUpgrade}

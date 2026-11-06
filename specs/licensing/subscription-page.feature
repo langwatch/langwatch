@@ -207,6 +207,14 @@ Feature: Subscription Page Plan Management
       And choosing it starts the Growth checkout for 1 seat
 
     @integration
+    Scenario: The plan card holds the page's one primary upgrade button
+      Given my organization is on the Free plan with 1 member
+      When I view the subscription page
+      Then the current plan card's "Upgrade to Growth" is the primary button
+      And the Growth offer's "Upgrade now" is a secondary button
+      And both start the same Growth checkout
+
+    @integration
     Scenario: A paid plan's card carries subscription management as its action
       Given my organization has an active Growth subscription
       When I view the subscription page

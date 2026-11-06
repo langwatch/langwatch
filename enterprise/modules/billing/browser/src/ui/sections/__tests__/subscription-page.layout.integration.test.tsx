@@ -293,6 +293,31 @@ describe("<SubscriptionPage/> layout", () => {
       });
     });
 
+    /** @scenario "The plan card holds the page's one primary upgrade button" */
+    it("keeps the Growth offer's button secondary and starting the same checkout", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({ url: null });
+      mockCreateSubscription.mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync,
+        isLoading: false,
+        isPending: false,
+      });
+      renderSubscriptionPage();
+
+      const card = await screen.findByTestId("current-plan-block");
+      const cardButton = within(card).getByRole("button", { name: "Upgrade to Growth" });
+      const offerButton = within(screen.getByTestId("upgrade-plan-block")).getByRole("button", {
+        name: /Upgrade now/i,
+      });
+      expect(cardButton).toHaveAttribute("data-emphasis", "primary");
+      expect(offerButton).toHaveAttribute("data-emphasis", "secondary");
+
+      fireEvent.click(offerButton);
+      await waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 1 }));
+      });
+    });
+
     /** @scenario "A Free organization with no invoices sees no invoices block" */
     it("shows no invoices block", async () => {
       renderSubscriptionPage();

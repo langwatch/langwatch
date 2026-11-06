@@ -17,6 +17,7 @@ export function UpgradePlanBlock({
   onUpgrade,
   isLoading,
   isRequired = false,
+  isSecondaryAction = false,
 }: {
   planName: React.ReactNode;
   totalPrice: string;
@@ -27,6 +28,8 @@ export function UpgradePlanBlock({
   isLoading?: boolean;
   /** The organization uses more seats than its plan covers. */
   isRequired?: boolean;
+  /** Another block on the page already carries the primary upgrade button. */
+  isSecondaryAction?: boolean;
 }) {
   return (
     <AccessState
@@ -41,6 +44,8 @@ export function UpgradePlanBlock({
       actions={
         <Button
           colorPalette="orange"
+          variant={isSecondaryAction ? "outline" : "solid"}
+          data-emphasis={isSecondaryAction ? "secondary" : "primary"}
           size="sm"
           onClick={onUpgrade}
           loading={isLoading}

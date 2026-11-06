@@ -341,6 +341,7 @@ export function SubscriptionPage() {
   });
 
   const isSelfManagedPaidPlan = !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride;
+  const cardCarriesUpgrade = isDeveloperPlan && !isEnterprisePlan;
   const eventUsage = currentPlanEventUsage({
     usage: usage.data,
     flags,
@@ -385,7 +386,7 @@ export function SubscriptionPage() {
           maxSeats={isTieredPricingModel ? undefined : seatUsageM}
           upgradeRequired={updateRequired}
           onUserCountClick={() => setIsDrawerOpen(true)}
-          onUpgrade={isDeveloperPlan && !isEnterprisePlan ? handleUpgrade : undefined}
+          onUpgrade={cardCarriesUpgrade ? handleUpgrade : undefined}
           isUpgradeLoading={isUpgradeLoading}
           onManageSubscription={isSelfManagedPaidPlan ? handleManageSubscription : undefined}
           isManageLoading={isManageLoading}
@@ -415,6 +416,7 @@ export function SubscriptionPage() {
             onUpgrade={handleUpgrade}
             isLoading={isUpgradeLoading}
             isRequired={updateRequired}
+            isSecondaryAction={cardCarriesUpgrade}
           />
         )}
 
