@@ -241,6 +241,23 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
     return count === 1 ? { claimed: true, token } : { claimed: false };
   }
 
+  async renewSeatLine({
+    id,
+    token,
+    leaseMs,
+  }: {
+    id: string;
+    token: string;
+    leaseMs: number;
+  }): Promise<boolean> {
+    const now = nowInstant();
+    const { count } = await this.prisma.subscription.updateMany({
+      where: { id, seatLineLeaseToken: token, seatLineLeaseUntil: { gt: toDate(now) } },
+      data: { seatLineLeaseUntil: toDate(now.add({ milliseconds: leaseMs })) },
+    });
+    return count === 1;
+  }
+
   async releaseSeatLine({ id, token }: { id: string; token: string }): Promise<void> {
     await this.prisma.subscription.updateMany({
       where: { id, seatLineLeaseToken: token },

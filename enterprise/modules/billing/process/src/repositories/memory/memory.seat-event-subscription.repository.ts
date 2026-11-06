@@ -213,6 +213,22 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
     return { claimed: true, token };
   }
 
+  async renewSeatLine({
+    id,
+    token,
+    leaseMs,
+  }: {
+    id: string;
+    token: string;
+    leaseMs: number;
+  }): Promise<boolean> {
+    const now = nowInstant();
+    const held = this.store.seatLineLeases.get(id);
+    if (held?.token !== token || Temporal.Instant.compare(held.until, now) <= 0) return false;
+    this.store.seatLineLeases.set(id, { token, until: now.add({ milliseconds: leaseMs }) });
+    return true;
+  }
+
   async releaseSeatLine({ id, token }: { id: string; token: string }): Promise<void> {
     const held = this.store.seatLineLeases.get(id);
     if (held?.token === token) this.store.seatLineLeases.delete(id);

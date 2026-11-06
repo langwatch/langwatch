@@ -8,7 +8,7 @@ import type {
   SeatRepairRow,
 } from "../repositories/seat-event-subscription.repository.ts";
 import type { BillingSubscription } from "../rules/billing-stripe-shapes.rules.ts";
-import { SeatLineLeaseService } from "./seat-line-lease.service.ts";
+import { type SeatLineGuard, SeatLineLeaseService } from "./seat-line-lease.service.ts";
 
 const logger = createLogger("langwatch:billing:seatLineRepair");
 
@@ -79,7 +79,7 @@ export class SeatLineRepairService {
         const held = await this.lease.hold({
           id: repair.id,
           waitMs: 0,
-          work: () => this.repair(repair),
+          work: (guard) => this.repair({ repair, guard }),
         });
         if (!held.held || held.value === "pending") {
           outcome.pending += 1;
@@ -96,7 +96,13 @@ export class SeatLineRepairService {
   }
 
   /** Moves the line back while Stripe still bills the lift; answers whether the record settles. */
-  private async repair(repair: SeatRepairRow): Promise<"settled" | "pending"> {
+  private async repair({
+    repair,
+    guard,
+  }: {
+    repair: SeatRepairRow;
+    guard: SeatLineGuard;
+  }): Promise<"settled" | "pending"> {
     // A seat change since the pass read the list replaced or cleared this record: leave it.
     if (!(await this.subscriptions.isSeatRepairPending({ id: repair.id, record: repair }))) {
       return "settled";
@@ -109,6 +115,7 @@ export class SeatLineRepairService {
     const seatItem = this.seatItemOf(subscription);
     if (seatItem.quantity !== repair.liftedQuantity) return "settled";
     if (UNCHANGEABLE_STATUSES.has(subscription.status)) return "pending";
+    await guard.beforeWrite();
     await this.stripeSubscriptions.updateSubscription({
       subscriptionId: repair.stripeSubscriptionId,
       change: {

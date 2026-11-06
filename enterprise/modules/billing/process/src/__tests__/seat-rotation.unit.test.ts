@@ -88,6 +88,20 @@ describe("Growth seat changes", () => {
 
   const planSeats = async () => (await plans.getActivePlan("org_1")).maxMembers;
 
+  /** Holds the next Stripe read until `resume` is called, as a slow call would. */
+  const pauseNextRead = () => {
+    const read = stripeSubscriptions.getSubscription.bind(stripeSubscriptions);
+    const pause = { resume: () => {} };
+    const spy = vi
+      .spyOn(stripeSubscriptions, "getSubscription")
+      .mockImplementationOnce(async (input) => {
+        const subscription = await read(input);
+        await new Promise<void>((resolve) => (pause.resume = resolve));
+        return subscription;
+      });
+    return { pause, restore: () => spy.mockRestore() };
+  };
+
   beforeEach(() => {
     vi.useFakeTimers({ now: NOW.epochMilliseconds, toFake: ["Date", "setTimeout"] });
     store = MemoryBillingStore.create();
@@ -211,6 +225,7 @@ describe("Growth seat changes", () => {
         subscriptions: createApiFixture<MemorySeatEventSubscriptionRepository>({
           findSeatCandidates: (input) => repository.findSeatCandidates(input),
           claimSeatLine: (input) => repository.claimSeatLine(input),
+          renewSeatLine: (input) => repository.renewSeatLine(input),
           releaseSeatLine: (input) => repository.releaseSeatLine(input),
           keepSeats: (input) => repository.keepSeats(input),
           reactivateWithSeats: async () => {
@@ -326,6 +341,28 @@ describe("Growth seat changes", () => {
       });
     });
 
+    /** @scenario "A seat change that waited plans from the seats as the change before it left them" */
+    it("plans a waiting change from the kept seats the decrease before it recorded", async () => {
+      const paused = pauseNextRead();
+      const lowering = seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 3 });
+      await vi.advanceTimersByTimeAsync(0);
+      paused.restore();
+      const raising = seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 4 });
+      await vi.advanceTimersByTimeAsync(500);
+
+      paused.pause.resume();
+      await lowering;
+      seedProvider(3);
+      await vi.advanceTimersByTimeAsync(500);
+      await raising;
+
+      expect(stripeSubscriptions.updates.map((update) => update.change)).toEqual([
+        { items: [{ id: "si_seat", quantity: 3 }], prorationBehavior: "none" },
+        { items: [{ id: "si_seat", quantity: 4 }], prorationBehavior: "none" },
+      ]);
+      expect(await planSeats()).toBe(5);
+    });
+
     /** @scenario "A seat change refused while another one keeps running" */
     it("refuses a seat change while another holds the seat line past the wait", async () => {
       await MemorySeatEventSubscriptionRepository.create(store).claimSeatLine({
@@ -366,6 +403,7 @@ describe("Growth seat changes", () => {
         subscriptions: createApiFixture<MemorySeatEventSubscriptionRepository>({
           findSeatCandidates: (input) => repository.findSeatCandidates(input),
           claimSeatLine: (input) => repository.claimSeatLine(input),
+          renewSeatLine: (input) => repository.renewSeatLine(input),
           releaseSeatLine: (input) => repository.releaseSeatLine(input),
           keepSeats: (input) => repository.keepSeats(input),
           recordSeatRepair: async () => {
@@ -509,6 +547,7 @@ describe("Growth seat changes", () => {
         subscriptions: createApiFixture<MemorySeatEventSubscriptionRepository>({
           findSeatRepairs: (input) => repository.findSeatRepairs(input),
           claimSeatLine: (input) => repository.claimSeatLine(input),
+          renewSeatLine: (input) => repository.renewSeatLine(input),
           releaseSeatLine: (input) => repository.releaseSeatLine(input),
           isSeatRepairPending: async (input) => {
             vi.advanceTimersByTime(1);
@@ -556,6 +595,26 @@ describe("Growth seat changes", () => {
           prorationBehavior: "always_invoice",
         }),
       ]);
+    });
+
+    /** @scenario "A seat line repair whose lease ran out and was taken over does not write" */
+    it("stops without writing when its lease ran out and another holder took it", async () => {
+      const paused = pauseNextRead();
+      const repairing = repairs.repairSeatLines();
+      await vi.advanceTimersByTimeAsync(0);
+      paused.restore();
+      vi.setSystemTime(Date.now() + SEAT_LINE_LEASE_MS + 1);
+      const takeover = await MemorySeatEventSubscriptionRepository.create(store).claimSeatLine({
+        id: "sub_db_1",
+        leaseMs: SEAT_LINE_LEASE_MS,
+      });
+      expect(takeover.claimed).toBe(true);
+
+      paused.pause.resume();
+
+      expect(await repairing).toMatchObject({ repaired: 0, pending: 1, failed: 0 });
+      expect(stripeSubscriptions.updates).toEqual([]);
+      expect(store.seatRepairs.get("sub_db_1")).toMatchObject({ quantity: 3, liftedQuantity: 5 });
     });
 
     /** @scenario "A seat line repair skips a subscription a seat change is working on" */

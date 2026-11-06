@@ -27,7 +27,7 @@ import {
 import { planSeatChange, type SeatChangePlan, seatsKeptAt } from "../rules/seat-kept.rules.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import { SeatCheckoutSessionService } from "./seat-checkout-session.service.ts";
-import { SeatLineLeaseService } from "./seat-line-lease.service.ts";
+import { type SeatLineGuard, SeatLineLeaseService } from "./seat-line-lease.service.ts";
 import { SeatLineMoveService } from "./seat-line-move.service.ts";
 import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.service.ts";
 
@@ -148,11 +148,8 @@ export class SeatEventSubscriptionService {
   }
 
   /** The subscription, its provider record, and the seat line to change. */
-  private async loadSeatChangeTarget(
-    organizationId: string,
-    found?: Awaited<ReturnType<SeatEventSubscriptionService["findSeatSubscription"]>>,
-  ) {
-    const subscription = found ?? (await this.findSeatSubscription(organizationId));
+  private async loadSeatChangeTarget(organizationId: string) {
+    const subscription = await this.findSeatSubscription(organizationId);
 
     const stripeSubscription = await this.stripeSubscriptions.getSubscription({
       subscriptionId: subscription.stripeSubscriptionId,
@@ -289,7 +286,8 @@ export class SeatEventSubscriptionService {
     const held = await this.lease.hold({
       id: found.id,
       waitMs: SEAT_CHANGE_WAIT_MS,
-      work: () => this.changeSeats({ organizationId, found, totalMembers, prorationDate }),
+      work: (guard) =>
+        this.changeSeats({ organizationId, leased: found.id, totalMembers, prorationDate, guard }),
     });
     if (!held.held) throw new SeatChangeInProgressError();
 
@@ -299,16 +297,21 @@ export class SeatEventSubscriptionService {
   /** The seat change itself, run while it holds the subscription's seat line. */
   private async changeSeats({
     organizationId,
-    found,
+    leased,
     totalMembers,
     prorationDate,
+    guard,
   }: {
     organizationId: string;
-    found: Awaited<ReturnType<SeatEventSubscriptionService["findSeatSubscription"]>>;
+    /** The subscription whose seat line lease this change holds. */
+    leased: string;
     totalMembers: number;
     prorationDate: number;
+    guard: SeatLineGuard;
   }): Promise<void> {
-    const target = await this.loadSeatChangeTarget(organizationId, found);
+    // Read again under the lease: a change it waited behind may have moved the seats it keeps.
+    const target = await this.loadSeatChangeTarget(organizationId);
+    if (target.subscription.id !== leased) throw new SeatChangeInProgressError();
     const { subscription, stripeSubscription, seatItem } = target;
     const plan = this.planChange({ target, requested: totalMembers });
 
@@ -326,6 +329,7 @@ export class SeatEventSubscriptionService {
       billed: seatItem.quantity ?? subscription.maxMembers ?? 0,
       plan,
       prorationDate,
+      guard,
     });
 
     await this.subscriptions.reactivateWithSeats({

@@ -406,6 +406,21 @@ Feature: Seat rotation
       And the repair stays pending for the next pass
 
     @unit
+    Scenario: A seat change that waited plans from the seats as the change before it left them
+      Given an administrator lowers the seats from 5 to 3 while another raise to 4 waits behind it
+      When the raise to 4 runs
+      Then it reads the 5 kept seats the decrease recorded
+      And the payment provider changes the quantity to 4 with no proration
+
+    @unit
+    Scenario: A seat line repair whose lease ran out and was taken over does not write
+      Given the subscription records that Stripe should bill 3 seats while Stripe bills 5
+      And the seat line repair read Stripe, then its lease ran out and a seat change took it
+      When the seat line repair goes on
+      Then the payment provider is not asked to change anything
+      And the repair stays pending for the next pass
+
+    @unit
     Scenario: A seat change refused while another one keeps running
       Given a seat change is working on the subscription and does not finish
       When an administrator raises the seats

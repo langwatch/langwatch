@@ -80,6 +80,8 @@ export abstract class SeatEventSubscriptionRepository {
   }): Promise<void>;
   /** Takes the seat line lease unless another holder's has not run out; it lasts `leaseMs`. */
   abstract claimSeatLine(input: { id: string; leaseMs: number }): Promise<SeatLineClaim>;
+  /** Extends the lease by `leaseMs` only while `token` holds it and it has not run out. */
+  abstract renewSeatLine(input: { id: string; token: string; leaseMs: number }): Promise<boolean>;
   /** Gives the lease back, only while `token` still holds it. */
   abstract releaseSeatLine(input: { id: string; token: string }): Promise<void>;
 }

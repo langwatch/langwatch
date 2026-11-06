@@ -12,6 +12,7 @@ import type {
 } from "../rules/billing-stripe-shapes.rules.ts";
 import { seatChange } from "../rules/seat-event-quote.rules.ts";
 import type { SeatChangePlan } from "../rules/seat-kept.rules.ts";
+import type { SeatLineGuard } from "./seat-line-lease.service.ts";
 
 const logger = createLogger("langwatch:billing:seatLineMove");
 
@@ -48,6 +49,7 @@ export class SeatLineMoveService {
     billed,
     plan,
     prorationDate,
+    guard,
   }: {
     id: string;
     organizationId: string;
@@ -56,6 +58,7 @@ export class SeatLineMoveService {
     billed: number;
     plan: SeatChangePlan;
     prorationDate: number;
+    guard: SeatLineGuard;
   }): Promise<{ repairsUpTo: Instant }> {
     const startedAt = nowInstant();
     const [first] = plan.steps;
@@ -68,8 +71,9 @@ export class SeatLineMoveService {
           liftedQuantity: lift.quantity,
         })
       : null;
-    const moveTo = (quantity: number, prorationBehavior: "always_invoice" | "none") =>
-      this.stripeSubscriptions.updateSubscription({
+    const moveTo = async (quantity: number, prorationBehavior: "always_invoice" | "none") => {
+      await guard.beforeWrite();
+      return this.stripeSubscriptions.updateSubscription({
         subscriptionId: stripeSubscription.id,
         change: seatChange({
           subscription: stripeSubscription,
@@ -79,6 +83,7 @@ export class SeatLineMoveService {
           prorationBehavior,
         }),
       });
+    };
 
     let lifted = false;
     try {

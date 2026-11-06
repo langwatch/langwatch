@@ -14,6 +14,7 @@ import {
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import type { SeatLineClaim } from "../../seat-event-subscription.repository.ts";
 import { PrismaSeatEventSubscriptionRepository } from "../prisma.seat-event-subscription.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -145,20 +146,24 @@ describe.skipIf(!DB_URL)("PrismaSeatEventSubscriptionRepository seat line repair
   });
 
   /** @scenario "A seat line repair skips a subscription a seat change is working on" */
-  it("lets one holder take the seat line until it releases it or the lease runs out", async () => {
+  it("lets one holder take, renew and release the seat line until the lease runs out", async () => {
     const id = await seed("lease");
+    const tokenOf = (claim: SeatLineClaim) => {
+      if (!claim.claimed) throw new Error("the seat line was not claimed");
+      return claim.token;
+    };
 
-    const first = await subscriptions.claimSeatLine({ id, leaseMs: 60_000 });
-    expect(first.claimed).toBe(true);
+    const first = tokenOf(await subscriptions.claimSeatLine({ id, leaseMs: 60_000 }));
+    expect(await subscriptions.claimSeatLine({ id, leaseMs: 60_000 })).toEqual({ claimed: false });
+    expect(await subscriptions.renewSeatLine({ id, token: first, leaseMs: 60_000 })).toBe(true);
+    expect(await subscriptions.renewSeatLine({ id, token: "other", leaseMs: 60_000 })).toBe(false);
+    await subscriptions.releaseSeatLine({ id, token: "other" });
     expect(await subscriptions.claimSeatLine({ id, leaseMs: 60_000 })).toEqual({ claimed: false });
 
-    await subscriptions.releaseSeatLine({ id, token: "someone-else" });
-    expect(await subscriptions.claimSeatLine({ id, leaseMs: 60_000 })).toEqual({ claimed: false });
-
-    if (first.claimed) await subscriptions.releaseSeatLine({ id, token: first.token });
-    const expiring = await subscriptions.claimSeatLine({ id, leaseMs: 1 });
-    expect(expiring.claimed).toBe(true);
+    await subscriptions.releaseSeatLine({ id, token: first });
+    const expiring = tokenOf(await subscriptions.claimSeatLine({ id, leaseMs: 1 }));
     await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(await subscriptions.renewSeatLine({ id, token: expiring, leaseMs: 60_000 })).toBe(false);
     expect((await subscriptions.claimSeatLine({ id, leaseMs: 60_000 })).claimed).toBe(true);
   });
 });
