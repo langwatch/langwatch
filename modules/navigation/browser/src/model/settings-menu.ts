@@ -38,6 +38,7 @@ import {
   FolderSync,
   Receipt,
   Ticket,
+  TicketPercent,
   UserSearch,
   BookUser,
   type LucideIcon,
@@ -392,6 +393,7 @@ export function cloudAdminGroup(): SettingsMenuGroup {
     items: [
       { label: "Subscriptions", href: "/ops/cloud/subscriptions", icon: Receipt },
       { label: "Licenses", href: "/ops/cloud/licenses", icon: Ticket },
+      { label: "Coupons", href: "/ops/cloud/coupons", icon: TicketPercent },
       { label: "Self-hosted installs", href: "/ops/cloud/self-hosted-instances", icon: Server },
       { label: "Bug reports", href: "/ops/cloud/bug-reports", icon: Bug },
     ],

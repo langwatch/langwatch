@@ -18,3 +18,6 @@ export * from "./subscription.trpc.ts";
 export * from "./billing.config.ts";
 
 export * from "./billing-lifecycle-events.ts";
+export * from "./billing-coupon-request.ts";
+export * from "./billing-coupons.schemas.ts";
+export * from "./billing-coupons.trpc.ts";

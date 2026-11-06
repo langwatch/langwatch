@@ -8,6 +8,7 @@ import Stripe from "stripe";
 
 import type { BillingStripeChannels } from "../billing-stripe.channels.ts";
 import { HttpConnectedInvoicingChannel } from "./http.connected-invoicing.channel.ts";
+import { HttpStripeCouponsChannel } from "./http.stripe-coupons.channel.ts";
 import { HttpStripeCustomersChannel } from "./http.stripe-customers.channel.ts";
 import { HttpStripeInvoicesChannel } from "./http.stripe-invoices.channel.ts";
 import { HttpStripeMetersChannel } from "./http.stripe-meters.channel.ts";
@@ -41,6 +42,7 @@ export function composeHttpBillingStripe({
     subscriptions: HttpStripeSubscriptionsChannel.create({ stripe }),
     invoices: HttpStripeInvoicesChannel.create({ stripe }),
     prices: HttpStripePricesChannel.create({ stripe }),
+    coupons: HttpStripeCouponsChannel.create({ stripe }),
     meters: HttpStripeMetersChannel.create({ stripe }),
     connectedInvoicing: HttpConnectedInvoicingChannel.create({
       stripe,
