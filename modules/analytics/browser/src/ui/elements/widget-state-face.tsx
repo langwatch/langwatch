@@ -151,19 +151,19 @@ export function WidgetNoAccessFace({ what, ask }: { what: string; ask: string })
 }
 
 // Narrow or short cards drop the title row's spacing so the face still fits.
-const TIGHT_FACE = "@container (max-width: 340px) or (max-height: 157px)";
+const TIGHT_FACE = "@container (width <= 340px) or (height <= 157px)";
 // A clamp counts lines, not height, so each band sets a count its height holds: 158 leaves 102px
 // for text; 98 leaves 46, or 18 under two rows of buttons. Chakra re-sorts container queries, so
 // bands must not overlap on one property.
-const NARROW_FACE = "@container (max-width: 340px) and (min-height: 158px)";
-const SHORT_FACE = "@container (max-height: 157px)";
-const SHORT_WIDE_FACE = "@container (min-width: 241px) and (max-height: 157px)";
-const SHORT_SMALL_FACE = "@container (max-width: 240px) and (max-height: 157px)";
-// Wide and 158 to 169 high, five lines need 80px and the default 68 slices the fifth, so four.
-const MID_WIDE_FACE =
-  "@container (min-width: 341px) and (min-height: 158px) and (max-height: 169px)";
+const NARROW_FACE = "@container (width <= 340px) and (height > 157px)";
+const SHORT_FACE = "@container (height <= 157px)";
+const SHORT_WIDE_FACE = "@container (width > 240px) and (height <= 157px)";
+const SHORT_SMALL_FACE = "@container (width <= 240px) and (height <= 157px)";
+// Wide and 158 to 177 high, five lines need 80px and the default 68 slices the fifth, so four;
+// five show from 178 high, with a margin.
+const MID_WIDE_FACE = "@container (width > 340px) and (height > 157px) and (height <= 177px)";
 // Tall cards have the room to show a long message whole.
-const TALL_FACE = "@container (min-height: 278px)";
+const TALL_FACE = "@container (height >= 278px)";
 
 // Clipped away but still read by screen readers, so the full words stay the accessible name.
 const VISUALLY_HIDDEN = {
@@ -256,8 +256,10 @@ export function WidgetFailedFace({
                 ...HIDE_SHORT_WORDS,
                 ...(note ? {} : { [MID_WIDE_FACE]: { lineClamp: 4 } }),
                 [TALL_FACE]: { lineClamp: "none" },
-                [SHORT_WIDE_FACE]: { lineClamp: note || hasEdits ? 1 : 2 },
+                // The side padding keeps the clamp's last dot clear of the clipped edge.
+                [SHORT_WIDE_FACE]: { lineClamp: note || hasEdits ? 1 : 2, paddingInline: "2px" },
                 [SHORT_SMALL_FACE]: {
+                  paddingInline: "2px",
                   lineClamp: hasEdits || shortMessage ? 1 : 2,
                   ...(shortMessage ? SHORT_WORDS_ONLY_HERE : {}),
                 },

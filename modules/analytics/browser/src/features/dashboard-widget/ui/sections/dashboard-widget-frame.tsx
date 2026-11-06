@@ -12,7 +12,7 @@ import type {
 import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, Text } from "@langwatch/design-system/primitives";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAnalyticsPeriod } from "../../../../behavior/use-analytics-period.ts";
 import { useFrameDiagnostic } from "../../../../behavior/use-frame-diagnostic.ts";
@@ -175,6 +175,11 @@ function WidgetFrameOverWindow({
   useEffect(() => onFaceChange?.(face.kind), [onFaceChange, face.kind]);
   const limitFailed = face.kind === "failed" && isWidgetLimitFailure(face.error.code);
   useEffect(() => onLimitFailureChange?.(limitFailed), [onLimitFailureChange, limitFailed]);
+  // The card swaps this frame out once a limit-failed widget's sources are emptied; the board
+  // would keep counting it unless the frame says so. The ref avoids re-firing on each render.
+  const limitFailureChange = useRef(onLimitFailureChange);
+  limitFailureChange.current = onLimitFailureChange;
+  useEffect(() => () => limitFailureChange.current?.(false), []);
   const limitsLine = limits.join(" · ");
   useEffect(() => onLimitsChange?.(limitsLine), [onLimitsChange, limitsLine]);
 

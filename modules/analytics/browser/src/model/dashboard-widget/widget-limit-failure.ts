@@ -42,7 +42,7 @@ const EDITABLE_MESSAGE: Readonly<Record<string, string>> = {
 
 /** Whether `code` is one of the two resource limits that have their own words. */
 export function isWidgetLimitFailure(code: string): boolean {
-  return code in EDITABLE_MESSAGE;
+  return Object.hasOwn(EDITABLE_MESSAGE, code);
 }
 
 /** The limit wording for `code`, or null when the failure keeps its existing message. */
@@ -53,10 +53,10 @@ export function widgetLimitWords({
   code: string;
   audience: WidgetLimitAudience | undefined;
 }): WidgetLimitWords | null {
-  const editable = EDITABLE_MESSAGE[code];
-  if (!audience || !editable) return null;
+  if (!audience || !isWidgetLimitFailure(code)) return null;
+  const editable = EDITABLE_MESSAGE[code] as string;
   if (audience.kind === "built_in") return { message: BUILT_IN_MESSAGE };
-  const shortMessage = SHORT_MESSAGE[code];
+  const shortMessage = Object.hasOwn(SHORT_MESSAGE, code) ? SHORT_MESSAGE[code] : undefined;
   const canEdit = audience.onEditWithLangy !== undefined || audience.onEditCode !== undefined;
   return canEdit
     ? { message: editable, ...(shortMessage ? { shortMessage } : {}) }
@@ -70,7 +70,7 @@ export function widgetLimitWords({
 
 /** A limit failure as the editor preview prints it: the reason, then the registry's remedy. */
 export function editorLimitError(error: ChartQueryError): ChartQueryError {
-  const reason = EDITABLE_MESSAGE[error.code];
+  const reason = isWidgetLimitFailure(error.code) ? EDITABLE_MESSAGE[error.code] : undefined;
   return reason
     ? { ...error, title: "Couldn't load", message: `${reason} ${error.message}` }
     : error;

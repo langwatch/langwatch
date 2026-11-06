@@ -207,6 +207,7 @@ const boardWidget = ({
   periodKey?: string;
   onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
   onEmptyChange?: (empty: boolean) => void;
+  onLimitFailureChange?: (limited: boolean) => void;
   limitAudience?: WidgetLimitAudience;
 }) => (
   <AnalyticsHostProvider value={host}>
@@ -544,6 +545,20 @@ describe("given a widget on a board", () => {
       });
 
       expect(screen.queryByTestId("widget-state-face")).toBeNull();
+    });
+  });
+  describe("when a frame that ended on a limit leaves the board", () => {
+    /** @scenario "A widget that ended on a limit stops counting when its card leaves" */
+    it("reports that it no longer failed on a limit", async () => {
+      const onLimitFailureChange = vi.fn();
+      const run = frameRuns(() => Promise.reject(OUT_OF_MEMORY));
+      const { unmount } = render(boardWidget({ onLimitFailureChange }));
+      await run();
+      expect(onLimitFailureChange).toHaveBeenLastCalledWith(true);
+
+      unmount();
+
+      expect(onLimitFailureChange).toHaveBeenLastCalledWith(false);
     });
   });
 });

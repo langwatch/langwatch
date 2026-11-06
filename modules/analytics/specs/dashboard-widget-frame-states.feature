@@ -383,6 +383,12 @@ Feature: A dashboard widget frame shows what its queries report
       Then the warning goes
 
     @integration
+    Scenario: A widget that ended on a limit stops counting when its card leaves
+      Given a board widget that ended on a memory or time limit failure
+      When its card is replaced, such as by the empty sources view
+      Then the board no longer counts that widget
+
+    @integration
     Scenario: Failures that are not limits are not counted
       Given a board of three widgets
       When two of them fail for another reason, or one fails on a limit and one for another reason

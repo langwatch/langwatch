@@ -6,7 +6,7 @@
 import type { ChartQueryError } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { describe, expect, it } from "vitest";
 
-import { editorLimitError } from "../widget-limit-failure.ts";
+import { editorLimitError, isWidgetLimitFailure } from "../widget-limit-failure.ts";
 
 describe("editorLimitError", () => {
   /** @scenario "A limit failure in the preview names the reason and the remedy" */
@@ -49,5 +49,13 @@ describe("editorLimitError", () => {
       message: "You may not see this.",
     };
     expect(editorLimitError(error)).toBe(error);
+  });
+});
+
+describe("isWidgetLimitFailure", () => {
+  it("is false for names an object inherits", () => {
+    expect(isWidgetLimitFailure("constructor")).toBe(false);
+    expect(isWidgetLimitFailure("toString")).toBe(false);
+    expect(isWidgetLimitFailure("query_timeout")).toBe(true);
   });
 });
