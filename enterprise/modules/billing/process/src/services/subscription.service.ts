@@ -10,6 +10,7 @@ import {
   SeatBillingUnavailableError,
   stripePricesFile,
   type StripePriceName,
+  SubscriptionAlreadyActiveError,
   SubscriptionCreationFailedError,
   UserEmailRequiredError,
   SubscriptionStatus,
@@ -202,27 +203,14 @@ export class BillingSubscriptionService {
       return { url };
     }
 
+    // Every member may start a subscription; changing or cancelling a live
+    // one is the billing portal's, which only an administrator opens.
     const lastSubscription = await this.repository.findLastNonCancelled(organizationId);
     if (
       lastSubscription?.stripeSubscriptionId &&
       lastSubscription.status !== SubscriptionStatus.PENDING
     ) {
-      if (plan === PlanTypes.FREE) {
-        return this.cancelSubscription({
-          stripeSubscriptionId: lastSubscription.stripeSubscriptionId,
-          subscriptionId: lastSubscription.id,
-          baseUrl,
-        });
-      }
-
-      return this.upgradeSubscription({
-        stripeSubscriptionId: lastSubscription.stripeSubscriptionId,
-        subscriptionId: lastSubscription.id,
-        plan,
-        tracesToAdd,
-        membersToAdd,
-        baseUrl,
-      });
+      throw new SubscriptionAlreadyActiveError();
     }
 
     if (plan === PlanTypes.FREE) {
@@ -359,63 +347,6 @@ export class BillingSubscriptionService {
 
   listInvoices({ organizationId }: { organizationId: string }): Promise<BillingDisplayInvoice[]> {
     return this.invoices.listInvoices({ organizationId });
-  }
-
-  private async cancelSubscription({
-    stripeSubscriptionId,
-    subscriptionId,
-    baseUrl,
-  }: {
-    stripeSubscriptionId: string;
-    subscriptionId: string;
-    baseUrl: string;
-  }): Promise<{ url: string | null }> {
-    const response = await this.stripeSubscriptions.cancelSubscription({
-      subscriptionId: stripeSubscriptionId,
-    });
-    if (response.status === "canceled") {
-      await this.repository.updateStatus({
-        id: subscriptionId,
-        status: SubscriptionStatus.CANCELLED,
-      });
-    }
-
-    return { url: `${baseUrl}/settings/subscription` };
-  }
-
-  private async upgradeSubscription({
-    stripeSubscriptionId,
-    subscriptionId,
-    plan,
-    tracesToAdd,
-    membersToAdd,
-    baseUrl,
-  }: {
-    stripeSubscriptionId: string;
-    subscriptionId: string;
-    plan: PlanType;
-    tracesToAdd: number;
-    membersToAdd: number;
-    baseUrl: string;
-  }): Promise<{ url: string | null }> {
-    const current = await this.stripeSubscriptions.getSubscription({
-      subscriptionId: stripeSubscriptionId,
-    });
-    const itemsToUpdate = this.itemCalculator.getItemsToUpdate({
-      currentItems: current.items,
-      plan,
-      tracesToAdd,
-      membersToAdd,
-    });
-    const response = await this.stripeSubscriptions.updateSubscription({
-      subscriptionId: stripeSubscriptionId,
-      change: { items: itemsToUpdate },
-    });
-    if (response.status === "active") {
-      await this.repository.updatePlan({ id: subscriptionId, plan });
-    }
-
-    return { url: `${baseUrl}/settings/subscription?success` };
   }
 
   private async createNewCheckout({

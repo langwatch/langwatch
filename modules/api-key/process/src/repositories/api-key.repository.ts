@@ -39,6 +39,7 @@ export type ApiKeyUpdateRecord = {
   revokedAt?: Instant | null;
   lastUsedAt?: Instant;
   hashedSecret?: string;
+  lookupId?: string;
 };
 
 /** Private persistence boundary for the API-key aggregate. */
@@ -63,6 +64,16 @@ export abstract class ApiKeyRepository {
     id: string;
     organizationId: string;
     cause: ApiKeyRevocationCause;
+  }): Promise<ApiKeyRow>;
+  /**
+   * Swaps a live key's secret for a new lookup id and hash, fenced on `revokedAt` like
+   * `revoke`. Throws `ApiKeyAlreadyRevokedError` when no live key of that id is in the org.
+   */
+  abstract rotateSecret(input: {
+    id: string;
+    organizationId: string;
+    lookupId: string;
+    hashedSecret: string;
   }): Promise<ApiKeyRow>;
   abstract updateLastUsedAt(input: { id: string }): Promise<void>;
   abstract upgradeHash(input: { id: string; hashedSecret: string }): Promise<void>;
