@@ -1,7 +1,4 @@
-import {
-  CONTACT_SALES_URL,
-  DEFAULT_LICENSE_PURCHASE_URL,
-} from "@langwatch/enterprise-licensing-contract";
+import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import type { SeatApprovalPath } from "@langwatch/organization-contract";
 
 /** The plan fields the approval path is decided from. */
@@ -16,6 +13,9 @@ export type SeatApprovalPlan = Readonly<{
 
 /** The subscription settings page every self-serve plan is upgraded from. */
 export const SUBSCRIPTION_SETTINGS_PATH = "/settings/subscription";
+
+/** The licence settings page, where a self-hosted licence buys or renews its seats. */
+export const LICENSE_SETTINGS_PATH = "/settings/license";
 
 /**
  * How an administrator approves one more seat, from how the organization pays (ruling R6):
@@ -42,7 +42,7 @@ export function seatApprovalPath({
   };
   if (!isSaas) {
     return plan.planSource === "license" && plan.type === "GROWTH"
-      ? { kind: "upgrade_licence", url: DEFAULT_LICENSE_PURCHASE_URL }
+      ? { kind: "upgrade_licence", url: LICENSE_SETTINGS_PATH }
       : contactSales;
   }
   const accountManaged =

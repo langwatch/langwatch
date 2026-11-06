@@ -687,7 +687,7 @@ interface Input {
   email: string;
   addressProof: string;
 }
-type Output = z.infer<typeof signUpEnrollmentSchema>; // ../contract/src/front-door.responses.ts:106
+type Output = z.infer<typeof signUpEnrollmentSchema>; // ../contract/src/front-door.responses.ts:110
 
 // auth.route
 // Input: frontDoorRouteInputSchema, ../contract/src/front-door.schemas.ts:24
@@ -703,7 +703,7 @@ interface Input {
   email: string;
   callbackUrl?: string;
 }
-// Output: signUpVerificationRequestSchema, ../contract/src/front-door.responses.ts:21
+// Output: signUpVerificationRequestSchema, ../contract/src/front-door.responses.ts:25
 type Output =
   | {
       sent: true;
@@ -727,7 +727,7 @@ interface Output {
 
 // auth.requestFreshInvite
 type Input = z.infer<typeof frontDoorInviteCodeInputSchema>; // ../contract/src/front-door.schemas.ts:76
-// Output: frontDoorAskedSchema, ../contract/src/front-door.responses.ts:38
+// Output: frontDoorAskedSchema, ../contract/src/front-door.responses.ts:42
 interface Output {
   asked: boolean;
 }
@@ -735,7 +735,7 @@ interface Output {
 // auth.myAddressConfirmation
 // Input: inline, ../contract/src/auth.trpc.ts:70
 type Input = unknown;
-// Output: addressConfirmationSchema, ../contract/src/front-door.responses.ts:77
+// Output: addressConfirmationSchema, ../contract/src/front-door.responses.ts:81
 interface Output {
   email: string | null;
   confirmed: boolean;
@@ -747,7 +747,7 @@ interface Output {
 interface Input {
   codeChallenge: string;
 }
-// Output: frontDoorOwnAddressSentSchema, ../contract/src/front-door.responses.ts:32
+// Output: frontDoorOwnAddressSentSchema, ../contract/src/front-door.responses.ts:36
 interface Output {
   sent: true;
   identifierId: string;
@@ -756,7 +756,7 @@ interface Output {
 // auth.priorSession
 // Input: inline, ../contract/src/auth.trpc.ts:79
 type Input = unknown;
-// Output: priorSessionSchema, ../contract/src/front-door.responses.ts:86
+// Output: priorSessionSchema, ../contract/src/front-door.responses.ts:90
 type Output =
   | {
       kind: "expired";

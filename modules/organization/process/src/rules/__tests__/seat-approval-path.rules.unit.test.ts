@@ -2,11 +2,11 @@
  * How one more seat is approved, from how the organization pays (ruling R6).
  * @see modules/organization/specs/seat-requests.feature
  */
-import { DEFAULT_LICENSE_PURCHASE_URL } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   type SeatApprovalPlan,
+  LICENSE_SETTINGS_PATH,
   SUBSCRIPTION_SETTINGS_PATH,
   seatApprovalPath,
 } from "../seat-approval-path.rules.ts";
@@ -103,7 +103,7 @@ describe("seatApprovalPath", () => {
     it("buys more licence seats", () => {
       const path = pathFor({ isSaas: false, plan: { planSource: "license", type: "GROWTH" } });
 
-      expect(path).toEqual({ kind: "upgrade_licence", url: DEFAULT_LICENSE_PURCHASE_URL });
+      expect(path).toEqual({ kind: "upgrade_licence", url: LICENSE_SETTINGS_PATH });
     });
   });
 

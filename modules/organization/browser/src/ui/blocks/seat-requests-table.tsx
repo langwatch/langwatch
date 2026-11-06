@@ -27,7 +27,7 @@ const PATH_ACTION: Record<
 > = {
   upgrade_plan: { label: "Upgrade your plan", isExternal: false },
   contact_sales: { label: "Contact LangWatch to increase your plan", isExternal: true },
-  upgrade_licence: { label: "Buy more licence seats", isExternal: true },
+  upgrade_licence: { label: "Buy more licence seats", isExternal: false },
 };
 
 /**

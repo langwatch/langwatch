@@ -150,6 +150,7 @@ Feature: Seat requests when an organization is over its seat limit
       Given a self-hosted deployment on a Growth licence
       When an administrator lists the open seat requests
       Then the approval path is "upgrade_licence"
+      And it links to the licence settings page, where the licence buys more seats
 
     @unit
     Scenario: Any other self-hosted licence approves by contacting LangWatch
