@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  breakdownGapMessage,
   dailyBars,
   chartAxis,
   fullSeats,
@@ -140,5 +141,21 @@ describe("liteRow", () => {
 describe("fullSeats", () => {
   it("shows only the count where the plan does not cap seats", () => {
     expect(fullSeats({ used: 12, plan: { ...FREE, maxMembers: 9_999 } })).toBe("12");
+  });
+});
+
+describe("breakdownGapMessage", () => {
+  const ok = { isError: false, isDailyUnavailable: false, isProjectsUnavailable: false };
+
+  it("says nothing when both halves loaded, including a plan with no daily series", () => {
+    expect(breakdownGapMessage(ok)).toBeNull();
+  });
+
+  it("names the half that failed", () => {
+    expect(breakdownGapMessage({ ...ok, isDailyUnavailable: true })).toMatch(/^The month by day /);
+    expect(breakdownGapMessage({ ...ok, isProjectsUnavailable: true })).toMatch(
+      /^The month by project /,
+    );
+    expect(breakdownGapMessage({ ...ok, isError: true })).toMatch(/by day and by project/);
   });
 });

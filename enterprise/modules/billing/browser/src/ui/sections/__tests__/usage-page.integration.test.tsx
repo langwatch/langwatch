@@ -430,6 +430,7 @@ describe("the usage page", () => {
         within(screen.getByTestId("usage-events-card")).getByText("Traces this month"),
       ).toBeInTheDocument();
       expect(screen.queryAllByTestId("daily-bar")).toHaveLength(0);
+      expect(screen.queryByTestId("usage-breakdown-unavailable")).not.toBeInTheDocument();
     });
 
     /** @scenario "A plan without Lite seats shows no Lite row" */
