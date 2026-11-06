@@ -1,6 +1,7 @@
 import { Box, chakra, Flex, Text, VStack } from "@langwatch/design-system/primitives";
 import { Sparkles } from "lucide-react";
 
+import type { GuidedDeploymentField } from "../../model/guided-credential-fields.ts";
 import { GuidedFieldLabel } from "./guided-provider-panel.tsx";
 
 /** A typed model or deployment name, with the hint that says when to type it. */
@@ -60,7 +61,7 @@ export function GuidedChatModelField({
   locked,
   providerName,
   modelPlaceholder,
-  deploymentPlaceholder,
+  deploymentField,
 }: {
   guidedModels: string[];
   pickedModel: string | undefined;
@@ -71,7 +72,7 @@ export function GuidedChatModelField({
   locked: boolean;
   providerName: string;
   modelPlaceholder: string | undefined;
-  deploymentPlaceholder: string | undefined;
+  deploymentField: GuidedDeploymentField | undefined;
 }) {
   if (guidedModels.length === 0) {
     return (
@@ -94,14 +95,14 @@ export function GuidedChatModelField({
         onPick={onPick}
         locked={locked}
       />
-      {deploymentPlaceholder !== undefined && (
+      {deploymentField && (
         <GuidedTypedModelInput
-          label="Deployment name"
+          label={deploymentField.label}
           value={typedModel}
           onType={onType}
-          placeholder={deploymentPlaceholder}
+          placeholder={deploymentField.placeholder}
           locked={locked}
-          hint="Pick the model you deployed. If your deployment has a different name, type it instead."
+          hint={deploymentField.hint}
         />
       )}
     </VStack>

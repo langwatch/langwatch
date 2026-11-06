@@ -195,8 +195,13 @@ describe("validateProviderApiKey", () => {
     });
 
     /** @scenario "Azure reports a missing deployment by its name" */
-    it("names the deployment Azure could not find on 404", async () => {
-      mockFetch.mockResolvedValueOnce({ ok: false, status: 404 });
+    it("names the deployment Azure could not find on a DeploymentNotFound 404", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        text: async () =>
+          JSON.stringify({ error: { code: "DeploymentNotFound", message: "No such deployment." } }),
+      });
 
       const result = await probeAzure();
 
@@ -204,6 +209,13 @@ describe("validateProviderApiKey", () => {
       expect(result.valid ? undefined : result.domainError.meta).toMatchObject({
         deployment: "gpt-acme",
       });
+    });
+
+    /** @scenario "A bare Azure 404 does not claim the key works" */
+    it("reports a 404 without Azure's deployment code as a plain refusal", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 404, text: async () => "Not Found" });
+
+      expect(codeOf(await probeAzure())).toBe("provider_refused");
     });
 
     /** @scenario "Azure answering past authentication proves the credential" */
@@ -223,6 +235,7 @@ describe("validateProviderApiKey", () => {
       });
     });
 
+    /** @scenario "An Azure credential routed through an API gateway is not checked" */
     it("does not check a credential routed through an API gateway", async () => {
       const result = await probeAzure({
         ...azureKeys,

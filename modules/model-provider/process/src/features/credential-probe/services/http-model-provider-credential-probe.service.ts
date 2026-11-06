@@ -111,6 +111,11 @@ function isProbeable({
   return !(provider === "azure" && customKeys.AZURE_API_GATEWAY_BASE_URL?.trim());
 }
 
+/** Whether a check that names no model, such as a stored-credential one, can ask this provider. */
+function isProbeableWithoutModel(provider: string): boolean {
+  return !NOT_PROBEABLE.has(provider) && !PROBE_NEEDS_MODEL.has(provider);
+}
+
 /**
  * The credential-shaped reasons we decline to ask: nothing usable to send,
  * or nowhere to send it.
@@ -210,7 +215,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
     }
 
     // A stored-credential check names no model, so a provider that probes one is skipped.
-    if (!isProbeable({ provider, customKeys: {}, model: undefined })) {
+    if (!isProbeableWithoutModel(provider)) {
       return unchecked("provider_not_probeable");
     }
 

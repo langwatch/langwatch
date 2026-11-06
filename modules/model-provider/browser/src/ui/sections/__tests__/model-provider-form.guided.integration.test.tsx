@@ -253,6 +253,36 @@ describe("the shared provider form in its guided presentation", () => {
     });
   });
 
+  describe("when an Azure row is already stored with its own models", () => {
+    /** @scenario "Azure connects with the picked model as the deployment" */
+    it("keeps the stored models and adds only the final pick", async () => {
+      const [recommended, other] = findRecommendedChatModels({ provider: "openai", limit: 4 });
+      if (!recommended || !other) throw new Error("OpenAI offers fewer than two chat models");
+      listing.rows = [
+        {
+          ...keyedRow({
+            providerKey: "azure",
+            apiKey: "AZURE_OPENAI_API_KEY",
+            baseUrl: "AZURE_OPENAI_ENDPOINT",
+            storedBaseUrl: "https://acme.openai.azure.com",
+          }),
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+          customModels: [{ modelId: "acme-older", displayName: "acme-older", mode: "chat" }],
+        },
+      ];
+      renderGuided("azure");
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: other }));
+      await user.click(screen.getByRole("button", { name: "Connect" }));
+
+      await screen.findByRole("button", { name: "Connected" });
+      const saved = updateProvider.mock.calls.at(-1)?.[0] as {
+        customModels: { modelId: string }[];
+      };
+      expect(saved.customModels.map((entry) => entry.modelId)).toEqual(["acme-older", other]);
+    });
+  });
+
   describe("when Azure has no deployment by the typed name", () => {
     const refusal = {
       code: "provider_deployment_not_found",

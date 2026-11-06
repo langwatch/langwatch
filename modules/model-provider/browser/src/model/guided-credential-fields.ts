@@ -21,9 +21,12 @@ export type GuidedPanelSpec = {
   modelPlaceholder?: string;
   /** Whose catalog the chips come from, when the provider hosts another vendor's models. */
   modelCatalog?: string;
-  /** Offers a typed deployment name under the chips, for one that differs from the model. */
-  deploymentPlaceholder?: string;
+  /** A typed name under the chips, for a deployment named other than its model. */
+  deploymentField?: GuidedDeploymentField;
 };
+
+/** The typed deployment name a provider offers under its chips. */
+export type GuidedDeploymentField = { label: string; placeholder: string; hint: string };
 
 const apiKey = (placeholder: string, key: string): GuidedCredentialField => ({
   key,
@@ -66,7 +69,11 @@ export const GUIDED_PANEL_SPECS: Record<string, GuidedPanelSpec> = {
       apiKey("", "AZURE_OPENAI_API_KEY"),
     ],
     modelCatalog: "openai",
-    deploymentPlaceholder: "only if it differs from the model",
+    deploymentField: {
+      label: "Deployment name",
+      placeholder: "only if it differs from the model",
+      hint: "Pick the model you deployed. If your deployment has a different name, type it instead.",
+    },
   },
   bedrock: {
     name: "Bedrock",
