@@ -13,14 +13,11 @@ import {
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  CONTACT_SALES_URL,
-  DEFAULT_LICENSE_PURCHASE_URL,
-} from "@langwatch/enterprise-licensing-contract";
+import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import { ArrowUpRight, KeyRound, Upload, X } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { formatFileSize } from "../../model/license-status.ts";
+import { formatFileSize, licenseTextOfFile } from "../../model/license-status.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
 
 type ActivationMethod = "code" | "file" | "key";
@@ -34,7 +31,18 @@ interface NoLicenseCardProps {
   onActivationCodeChange: (value: string) => void;
   onCodeActivate: () => void;
   isActivating: boolean;
+  /** Whether the viewer may manage the organization; without it the card only informs. */
+  canManage: boolean;
+  /** `replace` enters a new license over the installed one, in one step. */
+  mode?: "install" | "replace";
+  /** Closes the replace form without changing anything. */
+  onCancel?: () => void;
 }
+
+/** Why a chosen file was not taken, in the words the operator can act on. */
+const NOT_A_LICENSE_FILE =
+  "This file does not contain a LangWatch license. Choose the license file from your order email, or paste the key instead.";
+const UNREADABLE_FILE = "This file could not be read. Choose it again, or paste the key instead.";
 
 export function NoLicenseCard({
   licenseKey,
@@ -45,70 +53,25 @@ export function NoLicenseCard({
   onActivationCodeChange,
   onCodeActivate,
   isActivating,
+  canManage,
+  mode = "install",
+  onCancel,
 }: NoLicenseCardProps) {
   const host = useLicensingHost();
-  const purchaseLinkUrl = host.licensePurchaseUrl() ?? DEFAULT_LICENSE_PURCHASE_URL;
+  const purchaseLinkUrl = host.licensePurchaseUrl();
 
   const [activationMethod, setActivationMethod] = useState<ActivationMethod>("code");
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
+  const [uploadedFile, setUploadedFile] = useState<ChosenLicenseFile | null>(null);
   const handleMethodChange = (method: ActivationMethod) => {
     setActivationMethod(method);
   };
-
-  const handleFileSelect = useCallback((file: File) => {
-    if (!file.name.endsWith(".langwatch-license")) {
-      return;
-    }
-    setUploadedFile(file);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragging(false);
-      const file = e.dataTransfer.files[0];
-      if (file) handleFileSelect(file);
-    },
-    [handleFileSelect],
-  );
-
-  const handleDropzoneClick = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const handleFileInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) handleFileSelect(file);
-    },
-    [handleFileSelect],
-  );
-
-  const handleRemoveFile = useCallback(() => {
-    setUploadedFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }, []);
 
   const handleActivate = useCallback(() => {
     const activations: Record<ActivationMethod, () => void> = {
       code: onCodeActivate,
       key: onActivate,
       file: () => {
-        if (uploadedFile && onFileActivate) readLicenseFile(uploadedFile, onFileActivate);
+        if (uploadedFile && onFileActivate) onFileActivate(uploadedFile.licenseText);
       },
     };
     activations[activationMethod]();
@@ -120,47 +83,44 @@ export function NoLicenseCard({
     key: licenseKey.trim().length > 0,
   };
   const isActivateDisabled = isActivating || !hasInput[activationMethod];
+  const isReplacing = mode === "replace";
+
+  if (!canManage) {
+    return (
+      <Card
+        title="No license installed"
+        description="Running without a license. Some features may be limited."
+        status="neutral"
+        icon={<KeyRound size={16} />}
+        badge={<StatusChip label="Open source" tone="neutral" />}
+      >
+        <Text fontSize="sm" color="fg.muted" data-testid="license-admin-only">
+          An organization admin can activate a license.
+        </Text>
+      </Card>
+    );
+  }
 
   return (
     <Card
-      title="No license installed"
-      description="Running without a license. Some features may be limited."
+      title={isReplacing ? "Replace license" : "No license installed"}
+      description={
+        isReplacing
+          ? "Enter the renewed or reissued license. It takes the place of the current one in one step, so the organization keeps its license throughout."
+          : "Running without a license. Some features may be limited."
+      }
       status="neutral"
       icon={<KeyRound size={16} />}
-      badge={<StatusChip label="Open source" tone="neutral" />}
+      badge={isReplacing ? void 0 : <StatusChip label="Open source" tone="neutral" />}
       footer={
-        <>
-          <Button
-            variant="outline"
-            colorPalette="orange"
-            size="sm"
-            onClick={handleActivate}
-            data-testid="license-activate"
-            loading={isActivating}
-            disabled={isActivateDisabled}
-          >
-            Activate license
-          </Button>
-          {purchaseLinkUrl && (
-            <Tooltip content="After purchase, your license will be generated and delivered to your email.">
-              <Button asChild variant="outline" size="sm">
-                <Link href={purchaseLinkUrl} isExternal>
-                  Purchase license
-                  <ArrowUpRight size={14} />
-                </Link>
-              </Button>
-            </Tooltip>
-          )}
-          <Link
-            href={CONTACT_SALES_URL}
-            isExternal
-            color="orange.fg"
-            fontSize="sm"
-            _hover={{ textDecoration: "underline" }}
-          >
-            Contact sales →
-          </Link>
-        </>
+        <ActivationFooter
+          isReplacing={isReplacing}
+          onActivate={handleActivate}
+          onCancel={onCancel}
+          isActivating={isActivating}
+          isActivateDisabled={isActivateDisabled}
+          purchaseLinkUrl={purchaseLinkUrl}
+        />
       }
     >
       <VStack align="stretch" gap={2}>
@@ -178,70 +138,11 @@ export function NoLicenseCard({
           />
 
           {activationMethod === "file" && (
-            <Box width="full">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".langwatch-license"
-                style={{ display: "none" }}
-                onChange={handleFileInputChange}
-              />
-              {uploadedFile ? (
-                <Card variant="nested">
-                  <HStack justify="space-between" width="full">
-                    <HStack gap={3}>
-                      <Upload size={20} />
-                      <VStack align="start" gap={0}>
-                        <Text fontSize="sm" fontWeight="medium">
-                          {uploadedFile.name}
-                        </Text>
-                        <Text fontSize="xs" color="fg.muted">
-                          {formatFileSize(uploadedFile.size)}
-                        </Text>
-                      </VStack>
-                    </HStack>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleRemoveFile}
-                      disabled={isActivating}
-                      aria-label="Remove file"
-                    >
-                      <X size={16} />
-                    </Button>
-                  </HStack>
-                </Card>
-              ) : (
-                <Box
-                  borderWidth="2px"
-                  borderStyle="dashed"
-                  borderRadius="lg"
-                  padding={6}
-                  width="full"
-                  cursor="pointer"
-                  onClick={handleDropzoneClick}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  borderColor={isDragging ? "orange.emphasized" : "border"}
-                  backgroundColor={isDragging ? "orange.subtle" : "transparent"}
-                  transition="all 0.2s"
-                  _hover={{ borderColor: "orange.emphasized" }}
-                >
-                  <VStack gap={2}>
-                    <Box color="fg.muted">
-                      <Upload size={24} />
-                    </Box>
-                    <Text fontSize="sm" color="fg.muted" textAlign="center">
-                      Drop your license here
-                    </Text>
-                    <Text fontSize="xs" color="fg.muted">
-                      Click to browse
-                    </Text>
-                  </VStack>
-                </Box>
-              )}
-            </Box>
+            <LicenseFileField
+              uploadedFile={uploadedFile}
+              onChosen={setUploadedFile}
+              isActivating={isActivating}
+            />
           )}
 
           {activationMethod === "code" && (
@@ -285,11 +186,193 @@ export function NoLicenseCard({
   );
 }
 
-/** Reads a dropped license file as text and hands its content on. */
-function readLicenseFile(file: File, onRead: (content: string) => void): void {
-  const reader = new FileReader();
-  reader.onload = () => {
-    if (typeof reader.result === "string") onRead(reader.result);
+type ChosenLicenseFile = { file: File; licenseText: string };
+
+function ActivationFooter({
+  isReplacing,
+  onActivate,
+  onCancel,
+  isActivating,
+  isActivateDisabled,
+  purchaseLinkUrl,
+}: {
+  isReplacing: boolean;
+  onActivate: () => void;
+  onCancel?: () => void;
+  isActivating: boolean;
+  isActivateDisabled: boolean;
+  purchaseLinkUrl: string | undefined;
+}) {
+  return (
+    <>
+      <Button
+        variant="outline"
+        colorPalette="orange"
+        size="sm"
+        onClick={onActivate}
+        data-testid={isReplacing ? "license-replace-submit" : "license-activate"}
+        loading={isActivating}
+        disabled={isActivateDisabled}
+      >
+        {isReplacing ? "Replace license" : "Activate license"}
+      </Button>
+      {isReplacing && onCancel ? (
+        <Button variant="ghost" size="sm" onClick={onCancel} disabled={isActivating}>
+          Cancel
+        </Button>
+      ) : null}
+      {!isReplacing && purchaseLinkUrl && (
+        <Tooltip content="After purchase, your license will be generated and delivered to your email.">
+          <Button asChild variant="outline" size="sm">
+            <Link href={purchaseLinkUrl} isExternal>
+              Purchase license
+              <ArrowUpRight size={14} />
+            </Link>
+          </Button>
+        </Tooltip>
+      )}
+      {!isReplacing && (
+        <Link
+          href={CONTACT_SALES_URL}
+          isExternal
+          color="orange.fg"
+          fontSize="sm"
+          _hover={{ textDecoration: "underline" }}
+        >
+          Contact sales →
+        </Link>
+      )}
+    </>
+  );
+}
+
+/** The dropzone: a file is judged by its content, so a mail client may have renamed it. */
+function LicenseFileField({
+  uploadedFile,
+  onChosen,
+  isActivating,
+}: {
+  uploadedFile: ChosenLicenseFile | null;
+  onChosen: (chosen: ChosenLicenseFile | null) => void;
+  isActivating: boolean;
+}) {
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Each selection takes a number; a read finishing after a newer selection, a removal or
+  // unmount is dropped.
+  const selection = useRef(0);
+  useEffect(
+    () => () => {
+      selection.current += 1;
+    },
+    [],
+  );
+
+  const handleFileSelect = (file: File) => {
+    const current = ++selection.current;
+    setFileError(null);
+    onChosen(null);
+    void file.text().then(
+      (text) => {
+        if (current !== selection.current) return;
+        const licenseText = licenseTextOfFile({ text, size: file.size });
+        if (licenseText === null) setFileError(NOT_A_LICENSE_FILE);
+        else onChosen({ file, licenseText });
+      },
+      () => {
+        if (current === selection.current) setFileError(UNREADABLE_FILE);
+      },
+    );
   };
-  reader.readAsText(file);
+
+  const handleRemoveFile = () => {
+    selection.current += 1;
+    onChosen(null);
+    setFileError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  return (
+    <Box width="full">
+      <input
+        ref={fileInputRef}
+        type="file"
+        data-testid="license-file-input"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFileSelect(file);
+        }}
+      />
+      {uploadedFile ? (
+        <Card variant="nested">
+          <HStack justify="space-between" width="full">
+            <HStack gap={3}>
+              <Upload size={20} />
+              <VStack align="start" gap={0}>
+                <Text fontSize="sm" fontWeight="medium">
+                  {uploadedFile.file.name}
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  {formatFileSize(uploadedFile.file.size)}
+                </Text>
+              </VStack>
+            </HStack>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRemoveFile}
+              disabled={isActivating}
+              aria-label="Remove file"
+            >
+              <X size={16} />
+            </Button>
+          </HStack>
+        </Card>
+      ) : (
+        <Box
+          borderWidth="2px"
+          borderStyle="dashed"
+          borderRadius="lg"
+          padding={6}
+          width="full"
+          cursor="pointer"
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            const file = e.dataTransfer.files[0];
+            if (file) handleFileSelect(file);
+          }}
+          borderColor={isDragging ? "orange.emphasized" : "border"}
+          backgroundColor={isDragging ? "orange.subtle" : "transparent"}
+          transition="all 0.2s"
+          _hover={{ borderColor: "orange.emphasized" }}
+        >
+          <VStack gap={2}>
+            <Box color="fg.muted">
+              <Upload size={24} />
+            </Box>
+            <Text fontSize="sm" color="fg.muted" textAlign="center">
+              Drop your license here
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Click to browse
+            </Text>
+          </VStack>
+        </Box>
+      )}
+      {fileError ? (
+        <Text fontSize="sm" color="red.fg" marginTop={2} data-testid="license-file-error">
+          {fileError}
+        </Text>
+      ) : null}
+    </Box>
+  );
 }

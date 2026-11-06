@@ -33,8 +33,8 @@ export abstract class LicensingHostApi {
 
   /**
    * Where an operator without a license goes to buy one: the deployment's
-   * own Stripe link when it publishes one, undefined otherwise — so the
-   * card falls back to the public pricing page instead of a dead link.
+   * own Stripe link when it publishes one. Undefined hides the purchase
+   * button.
    */
   abstract licensePurchaseUrl(): string | undefined;
 

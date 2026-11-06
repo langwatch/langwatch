@@ -8,6 +8,7 @@ import type {
   BillingPurchasedLineItem,
   BillingSubscription,
   BillingSubscriptionChange,
+  BillingSubscriptionCheckout,
   BillingSubscriptionPreviewChange,
 } from "../../rules/billing-stripe-shapes.rules.ts";
 import { StripeSubscriptionsChannel } from "../stripe-subscriptions.channel.ts";
@@ -96,6 +97,24 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
       priceId: item.price?.id ?? null,
       quantity: item.quantity ?? null,
     }));
+  }
+
+  async findSubscriptionCheckouts({
+    subscriptionId,
+  }: {
+    subscriptionId: string;
+  }): Promise<BillingSubscriptionCheckout[]> {
+    const page = await this.stripe.checkout.sessions.list({
+      subscription: subscriptionId,
+      limit: 1,
+    });
+    return page.data.map((session) => {
+      const link = session.payment_link;
+      return {
+        checkoutSessionId: session.id,
+        paymentLinkId: (typeof link === "string" ? link : link?.id) ?? null,
+      };
+    });
   }
 
   async createBillingPortalSession({

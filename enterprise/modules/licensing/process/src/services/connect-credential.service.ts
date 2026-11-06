@@ -42,6 +42,11 @@ export type ConnectCredentialOutcome =
     }
   | { ok: false; code: ConnectCredentialRefusalCode };
 
+/** An expired license admitted to collect its renewal, or the expiry refusal. */
+export type RenewalCollectOutcome =
+  | { ok: true; license: IssuedLicenseRecord & { organizationId: string; instanceId: string } }
+  | { ok: false; code: "connect_license_expired" };
+
 type ManagedKeyOutcome =
   | { ok: true; virtualKeyId: string }
   | { ok: false; code: ConnectCredentialRefusalCode };
@@ -90,6 +95,30 @@ export class ConnectCredentialService {
       license: { ...row, organizationId: row.organizationId, instanceId },
       virtualKeyId: key.virtualKeyId,
     };
+  }
+
+  /**
+   * The narrow credential an expired license keeps: the sync that collects its own
+   * waiting renewal, from the install it is already bound to. It binds nothing, touches
+   * no managed key and grants no hosted service; anything else reads as expired.
+   */
+  async resolveRenewalCollect(input: {
+    token: string;
+    instanceId: string | null | undefined;
+  }): Promise<RenewalCollectOutcome> {
+    const instanceId = input.instanceId?.trim() ?? "";
+    if (!isLicenseTokenShape(input.token) || !isInstanceIdShape(instanceId)) {
+      return refuseRenewal();
+    }
+    const row = await this.options.repository.findByTokenHash(
+      await registryHashForToken(input.token),
+    );
+    if (!row?.organizationId || row.instanceId !== instanceId) return refuseRenewal();
+    if (statusOfIssuedLicense(row, this.options.now()) !== "expired") return refuseRenewal();
+
+    const renewal = await this.options.repository.findByReplacesId(row.id);
+    if (!renewal?.pendingDeliveryLicense || renewal.revokedAt) return refuseRenewal();
+    return { ok: true, license: { ...row, organizationId: row.organizationId, instanceId } };
   }
 
   /** What the active license behind one managed key is entitled to; empty
@@ -203,6 +232,10 @@ export class ConnectCredentialService {
       actorId: this.options.systemActorId,
     });
   }
+}
+
+function refuseRenewal(): RenewalCollectOutcome {
+  return { ok: false, code: "connect_license_expired" };
 }
 
 function refuse(code: ConnectCredentialRefusalCode): ConnectCredentialOutcome {
