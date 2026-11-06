@@ -109,7 +109,10 @@ describe("inlinePageStyles", () => {
     const clientLink = '<link rel="stylesheet" crossorigin href="/assets/index-a.css">';
     const page = `<html><head>${placeholder}${clientLink}</head><body><main class="css-here"></main></body></html>`;
     const result = inlinePageStyles({
-      rules: ["@layer recipes{.css-here{color:red}.css-there{color:blue}}"],
+      rules: [
+        "@font-face{font-family:Inter;font-display:optional;src:url(/inter.woff2)}",
+        "@layer recipes{.css-here{color:red}.css-there{color:blue}}",
+      ],
       clientCss: [".docs-shell{display:grid}"],
       clientLinks: [clientLink],
       scripts: [],
@@ -124,9 +127,8 @@ describe("inlinePageStyles", () => {
 
     /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
     it("inlines the page's rules and asks for the shared sheet only after load", () => {
-      expect(home).toContain(
-        styleHead({ css: "@layer recipes{.css-here{color:red}}", href: `/docs/${result.file}` }),
-      );
+      expect(home).toContain("@font-face{font-family:Inter");
+      expect(home).toContain("@layer recipes{.css-here{color:red}}");
       expect(home).toContain(
         `<link data-docs-style rel="stylesheet" data-href="/docs/${result.file}">`,
       );
@@ -142,6 +144,11 @@ describe("inlinePageStyles", () => {
       const css = result.files.get(result.file) ?? "";
       expect(css).toContain(".css-there");
       expect(css).toContain(".docs-shell");
+    });
+
+    /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
+    it("leaves the font faces to each page, so the late sheet cannot swap a font in", () => {
+      expect(result.files.get(result.file)).not.toContain("@font-face");
     });
   });
 });

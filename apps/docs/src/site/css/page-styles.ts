@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { criticalCss, customPropertyNames, markupNames, scriptedNames } from "./critical.ts";
 import { darkFallbackCss, darkFallbackHead } from "./dark-fallback.ts";
 import { minifyCss } from "./minify.ts";
-import { parseStylesheet } from "./stylesheet.ts";
+import { parseStylesheet, serializeStylesheet, type CssNode } from "./stylesheet.ts";
 
 /* The page paints from the rules inlined in its head. The shared sheet (every server and island
    rule) names its address in `data-href`, so the browser does not ask for it until the page has
@@ -14,6 +14,16 @@ const loadSharedSheet =
 
 export function styleHead({ css, href }: { css: string; href: string }) {
   return `<style>${css.replaceAll("</style", "<\\/style")}</style><link data-docs-style rel="stylesheet" data-href="${href}"><script>${loadSharedSheet}</script>`;
+}
+
+/* Every page inlines its font faces. Declared again in the sheet that arrives after load, a face
+   with `font-display: optional` would swap in a font the page had already drawn without. */
+function withoutFontFaces({ nodes }: { nodes: CssNode[] }): CssNode[] {
+  return nodes.flatMap((node): CssNode[] => {
+    if (node.kind === "verbatim") return /^\s*@font-face\b/i.test(node.text) ? [] : [node];
+    if (node.kind === "rule") return [node];
+    return [{ ...node, children: withoutFontFaces({ nodes: node.children }) }];
+  });
 }
 
 /**
@@ -40,8 +50,9 @@ export function inlinePageStyles({
   href: (file: string) => string;
 }) {
   const css = minifyCss({ css: [...rules, ...clientCss].join("\n") });
-  const file = `assets/docs-${createHash("sha256").update(css).digest("hex").slice(0, 16)}.css`;
   const nodes = parseStylesheet({ css });
+  const shared = serializeStylesheet({ nodes: withoutFontFaces({ nodes }) });
+  const file = `assets/docs-${createHash("sha256").update(shared).digest("hex").slice(0, 16)}.css`;
   const dark = darkFallbackCss({ nodes });
   const darkFile = `assets/docs-dark-${createHash("sha256").update(dark).digest("hex").slice(0, 16)}.css`;
   const names = new Map<string, Set<string>>();
@@ -77,7 +88,7 @@ export function inlinePageStyles({
   }
   return {
     files: new Map([
-      [file, css],
+      [file, shared],
       [darkFile, dark],
     ]),
     file,
