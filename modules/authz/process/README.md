@@ -45,7 +45,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable authorization boundary. This is deliberately a structural interface: callers can use an installed AuthzModule without receiving its services, repositories, or transport adapters.
 
-Peers call these through the token, declared at `../contract/src/authz.api.ts:48`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/authz.api.ts:49`; nothing else in this package is public.
 
 #### `isDemoProject`
 
@@ -519,6 +519,22 @@ Every live platform operator, oldest first.
 listPlatformOperators(): Promise<Platform.AuthzListPlatformOperatorsOutput>;
 ```
 
+#### `listBillingMembers`
+
+Who holds the Billing role on an enabled membership, oldest grant first.
+
+```typescript
+listBillingMembers(args: Billing.AuthzListBillingMembersInput): Promise<readonly Billing.AuthzBillingMember[]>;
+```
+
+#### `setBillingRole`
+
+Grants or revokes the Billing role; idempotent. Refuses a person with no membership.
+
+```typescript
+setBillingRole(args: Billing.AuthzSetBillingRoleInput): Promise<void>;
+```
+
 #### `findPermissionsBeyondCaller`
 
 The escalation rule every door shares: what of these the caller lacks at that scope.
@@ -779,7 +795,7 @@ interface Response {
 
 ### `authz`
 
-Contract `src/transport/authz.trpc.ts:30`, router `src/transport/authz.trpc.ts:81`.
+Contract `src/transport/authz.trpc.ts:34`, router `src/transport/authz.trpc.ts:95`.
 
 | Procedure                    | Kind     | Gate                                                                                                                                                                       | Input                                                | Output                                                |
 | ---------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------- |
@@ -788,9 +804,11 @@ Contract `src/transport/authz.trpc.ts:30`, router `src/transport/authz.trpc.ts:8
 | `authz.createGrant`          | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                                                                | inline                                               | `grantSchema`                                         |
 | `authz.changeGrantRole`      | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                                                                | inline                                               | `grantSchema`                                         |
 | `authz.revokeGrant`          | mutation | Permission `organization:manage`                                                                                                                                           | inline                                               | `grantRevokedSchema`                                  |
-| `authz.listManagedGrants`    | query    | Permission `organization:manage`                                                                                                                                           | `authzListManagedBindingsForOrganizationInputSchema` | `authzListManagedBindingsForOrganizationOutputSchema` |
-| `authz.listMemberGrants`     | query    | Permission `organization:manage`                                                                                                                                           | `authzListManagedBindingsForUserInputSchema`         | `authzListManagedBindingsForUserOutputSchema`         |
+| `authz.listManagedGrants`    | query    | Permission `members:view`                                                                                                                                                  | `authzListManagedBindingsForOrganizationInputSchema` | `authzListManagedBindingsForOrganizationOutputSchema` |
+| `authz.listMemberGrants`     | query    | Permission `members:view`                                                                                                                                                  | `authzListManagedBindingsForUserInputSchema`         | `authzListManagedBindingsForUserOutputSchema`         |
 | `authz.applyMemberGrants`    | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                                                                | inline                                               | `authzBindingMutationSuccessSchema`                   |
+| `authz.listBillingMembers`   | query    | Permission `members:view`                                                                                                                                                  | `authzListBillingMembersInputSchema`                 | inline                                                |
+| `authz.setMemberBillingRole` | mutation | Permission `organization:manage`                                                                                                                                           | inline                                               | inline                                                |
 
 ```typescript
 // authz.effectivePermissions
@@ -813,11 +831,11 @@ type Input = z.infer<typeof authzListGrantsInputSchema>; // ../contract/src/auth
 type Output = z.infer<typeof grantPageSchema>; // ../contract/src/authz-grants-rest.schemas.ts:115
 
 // authz.createGrant
-// Input: authzCreateGrantInputSchema.omit(IMPLIED_BY_SESSION) (inline, src/transport/authz.trpc.ts:40)
+// Input: authzCreateGrantInputSchema.omit(IMPLIED_BY_SESSION) (inline, src/transport/authz.trpc.ts:44)
 type Output = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-rest.schemas.ts:64
 
 // authz.changeGrantRole
-// Input: inline, src/transport/authz.trpc.ts:44
+// Input: inline, src/transport/authz.trpc.ts:48
 interface Input {
   organizationId: string;
   grantId: string;
@@ -826,7 +844,7 @@ interface Input {
 type Output = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-rest.schemas.ts:64
 
 // authz.revokeGrant
-// Input: inline, src/transport/authz.trpc.ts:48
+// Input: inline, src/transport/authz.trpc.ts:52
 interface Input {
   organizationId: string;
   grantId: string;
@@ -860,7 +878,7 @@ type Output = {
 }[];
 
 // authz.applyMemberGrants
-// Input: inline, src/transport/authz.trpc.ts:60
+// Input: inline, src/transport/authz.trpc.ts:64
 interface Input {
   organizationId: string;
   userId: string;
@@ -873,6 +891,28 @@ interface Input {
   }[];
 }
 // Output: authzBindingMutationSuccessSchema, ../contract/src/authz.grant-management.ts:278
+interface Output {
+  success: true;
+}
+
+// authz.listBillingMembers
+// Input: authzListBillingMembersInputSchema, ../contract/src/authz-billing-role.commands.ts:16
+interface Input {
+  organizationId: string;
+}
+// Output: inline, src/transport/authz.trpc.ts:69
+type Output = {
+  userId: string;
+}[];
+
+// authz.setMemberBillingRole
+// Input: inline, src/transport/authz.trpc.ts:73
+interface Input {
+  organizationId: string;
+  userId: string;
+  holds: boolean;
+}
+// Output: inline, src/transport/authz.trpc.ts:75
 interface Output {
   success: true;
 }

@@ -430,6 +430,10 @@ function MemberListRow({
   onSetDisabled: ReturnType<typeof useMemberDisableAction>["setMemberDisabled"];
   onRequestRemoval: (target: RemovalTarget) => void;
 }) {
+  // One shared read for every row: the query cache answers all but the first.
+  const billingMembers = api.authz.listBillingMembers.useQuery({ organizationId });
+  const holdsBilling = !!billingMembers.data?.some((holder) => holder.userId === member.userId);
+
   return (
     <PersonIdentityRow
       name={member.user.name}
@@ -448,6 +452,11 @@ function MemberListRow({
           {member.role === "DEVELOPER" && (
             <Badge colorPalette="teal" size="sm">
               Developer
+            </Badge>
+          )}
+          {holdsBilling && (
+            <Badge colorPalette="purple" size="sm" data-testid="member-billing-badge">
+              Billing
             </Badge>
           )}
           <MemberStatusChip member={member} />

@@ -150,6 +150,16 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   OrganizationUser: {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && hasUserBound(clause),
   },
+  // "Which organizations hold this person waiting" is a READ bounded by the named user.
+  SeatRequest: {
+    extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && hasUserBound(clause),
+  },
+  // The worker's digest sweep reads which organizations hold unmailed notices, fleet-wide;
+  // a notice names one address and its organization, never customer content.
+  OrganizationAccessNotice: {
+    extraBound: ({ clause, action }) =>
+      READ_ACTIONS.has(action) && clauseField(clause, "mailedAt") === null,
+  },
   Team: {},
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it

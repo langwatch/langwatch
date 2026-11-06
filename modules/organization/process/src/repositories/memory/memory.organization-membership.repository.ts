@@ -595,6 +595,24 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return { outcome: "created", seat, pending };
   }
 
+  async findMembershipStates({ userId }: { userId: string }): Promise<
+    {
+      organizationId: string;
+      organizationName: string;
+      role: OrganizationUserRole;
+      disabled: boolean;
+    }[]
+  > {
+    return this.memory.organizationUsers
+      .filter((row) => row.userId === userId)
+      .map((row) => ({
+        organizationId: row.organizationId,
+        organizationName: this.memory.organizations.get(row.organizationId)?.name ?? "",
+        role: row.role,
+        disabled: row.disabledAt !== null,
+      }));
+  }
+
   async countMembershipsForUser({ userId }: { userId: string }): Promise<number> {
     return this.memory.organizationUsers.filter((row) => row.userId === userId).length;
   }

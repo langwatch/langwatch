@@ -9,7 +9,10 @@ import { format } from "@langwatch/time";
 import { Pencil, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { BuiltinRoleCard as BuiltinRole } from "../../model/builtin-roles.ts";
+import type {
+  BILLING_ROLE_CARD,
+  BuiltinRoleCard as BuiltinRole,
+} from "../../model/builtin-roles.ts";
 import type { GrantScope, Holder } from "../../model/role-holders.ts";
 import { permissionsNeedingOrganizationScope } from "../../model/role-permissions.ts";
 import { PermissionTokenList } from "../elements/permission-token.tsx";
@@ -50,6 +53,44 @@ export function BuiltinRoleCard({
             ? `Everything ${card.inheritsFrom} has, and`
             : "The base every other role builds on"}
         </SectionEyebrow>
+        <PermissionTokenList permissions={card.headline} limit={card.headline.length} readable />
+        <Text textStyle="caption" color="fg.subtle">
+          {totalPermissions} permissions in total
+        </Text>
+      </CardSection>
+    </Card>
+  );
+}
+
+/** The Billing role: what it lets a person do, and how many hold it. It takes no seat. */
+export function BillingRoleCard({
+  card,
+  people,
+  totalPermissions,
+  onOpenDetail,
+}: {
+  card: typeof BILLING_ROLE_CARD;
+  people: number | null;
+  totalPermissions: number;
+  onOpenDetail: () => void;
+}) {
+  return (
+    <Card
+      titleLevel={3}
+      status="neutral"
+      title={card.name}
+      badge={<PeopleCount people={people} />}
+      description={card.description}
+      bodyLayout="spaced"
+      footer={
+        <Button size="xs" variant="ghost" color="fg.muted" onClick={onOpenDetail}>
+          See what it can do
+        </Button>
+      }
+      data-testid="builtin-role-billing"
+    >
+      <CardSection>
+        <SectionEyebrow>Held beside any other role</SectionEyebrow>
         <PermissionTokenList permissions={card.headline} limit={card.headline.length} readable />
         <Text textStyle="caption" color="fg.subtle">
           {totalPermissions} permissions in total

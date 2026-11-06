@@ -54,6 +54,7 @@ import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
 import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
 import { AuthzAggregateReadAuditService } from "../services/authz-aggregate-read-audit.service.ts";
+import { AuthzBillingRoleService } from "../services/authz-billing-role.service.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
 import {
@@ -174,6 +175,8 @@ export class AuthzModule implements AuthzApi {
    * Absent on an app built by {@link AuthzModule.fromServices}, which composes no platform tier.
    */
   #platformOperators: AuthzPlatformOperatorsService | undefined;
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no Billing role. */
+  #billingRoles: AuthzBillingRoleService | undefined;
   /** Absent on an app built by {@link AuthzModule.fromServices}, which audits no aggregate read. */
   #aggregateReads: AuthzAggregateReadAuditService | undefined;
   /** Absent on an app built by {@link AuthzModule.fromServices}, which records no offboarding. */
@@ -190,6 +193,7 @@ export class AuthzModule implements AuthzApi {
       memberships?: AuthzPermissionService;
       sessionVersions?: AuthzSessionVersionService;
       platformOperators?: AuthzPlatformOperatorsService;
+      billingRoles?: AuthzBillingRoleService;
       aggregateReads?: AuthzAggregateReadAuditService;
       memberOffboardings?: AuthzMemberOffboardedNoticeService;
       eventing?: Readonly<{
@@ -209,6 +213,7 @@ export class AuthzModule implements AuthzApi {
     this.#migration = options.migration;
     this.#sessionVersions = options.sessionVersions;
     this.#platformOperators = options.platformOperators;
+    this.#billingRoles = options.billingRoles;
     this.#aggregateReads = options.aggregateReads;
     this.#memberOffboardings = options.memberOffboardings;
   }
@@ -277,6 +282,12 @@ export class AuthzModule implements AuthzApi {
       ledger,
       newGrantId: newAuthzGrantId,
     });
+    const billingRoles = AuthzBillingRoleService.create({
+      grants: repositories.billingGrants,
+      standings: repositories.userStandings,
+      ledger,
+      newGrantId: newAuthzGrantId,
+    });
     const userStandings = AuthzUserStandingService.create({
       standings: repositories.userStandings,
       platformOperators,
@@ -338,6 +349,7 @@ export class AuthzModule implements AuthzApi {
       memberships: permissions,
       sessionVersions,
       platformOperators,
+      billingRoles,
       aggregateReads,
       memberOffboardings,
       eventing: { pipeline, dispatcher },
@@ -492,6 +504,8 @@ export class AuthzModule implements AuthzApi {
   revokePlatformOperator: AuthzApi["revokePlatformOperator"] = (a) =>
     this.platformOperators().revoke(a);
   listPlatformOperators: AuthzApi["listPlatformOperators"] = () => this.platformOperators().list();
+  listBillingMembers: AuthzApi["listBillingMembers"] = (a) => this.billingRoles().listMembers(a);
+  setBillingRole: AuthzApi["setBillingRole"] = (a) => this.billingRoles().setRole(a);
 
   getSessionVersion: AuthzApi["getSessionVersion"] = (a) => {
     if (!this.#sessionVersions) {
@@ -585,6 +599,16 @@ export class AuthzModule implements AuthzApi {
       );
     }
     return this.#platformOperators;
+  }
+
+  private billingRoles(): AuthzBillingRoleService {
+    if (!this.#billingRoles) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it holds no Billing " +
+          "role: compose it through AuthzModule.create to grant, revoke or list it.",
+      );
+    }
+    return this.#billingRoles;
   }
 
   private memberships(): AuthzPermissionService {

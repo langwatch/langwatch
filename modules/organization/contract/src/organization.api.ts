@@ -31,6 +31,14 @@ import type {
   RenameOrganizationGroupInput,
   RemoveOrganizationGroupGrantInput,
 } from "./features/group/group.ts";
+import type {
+  HeldMemberships,
+  OpenSeatRequests,
+  RecordRefusedSignInInput,
+  RefusedSignInOutcome,
+  SeatRequestResolved,
+  SeatRequestScope,
+} from "./features/seat-request/seat-request.ts";
 import type { TeamWithProjects } from "./features/team/team.responses.ts";
 import type {
   CreateOrganizationTeamWithMembersInput,
@@ -440,6 +448,20 @@ export interface OrganizationApi {
       origin?: OrganizationJoinOrigin;
     }>,
   ): Promise<OrganizationAdmission>;
+  /**
+   * After an identity provider refused a sign-in tied to an address: `seat_limit` when an
+   * arrival would be held pending (a seat request is opened, flagged refused), else records a
+   * refusal notice.
+   */
+  recordRefusedSignIn(input: RecordRefusedSignInInput): Promise<RefusedSignInOutcome>;
+  /** The organization's open seat requests and how a seat is approved for it (ruling R6). */
+  listOpenSeatRequests(input: Readonly<{ organizationId: string }>): Promise<OpenSeatRequests>;
+  /** Gives the person the full seat they asked for; refuses `member_seat_limit_reached`. */
+  approveSeatRequest(input: SeatRequestScope, by: OrganizationCaller): Promise<SeatRequestResolved>;
+  /** Closes the request; the membership stays as it is. */
+  declineSeatRequest(input: SeatRequestScope, by: OrganizationCaller): Promise<SeatRequestResolved>;
+  /** The caller's memberships they cannot use, with whom to contact (ruling R2). */
+  getHeldMemberships(by: OrganizationCaller): Promise<HeldMemberships>;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
   memberOrganizationIds(
     input: Readonly<{ userId: string; organizationIds: string[] }>,

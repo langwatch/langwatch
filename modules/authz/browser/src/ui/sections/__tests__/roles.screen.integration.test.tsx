@@ -33,6 +33,9 @@ const { api, state } = vi.hoisted(() => {
       authz: { listManagedGrants: { invalidate: state.invalidateBindings } },
     }),
     authz: {
+      listBillingMembers: {
+        useQuery: () => ({ data: [], isLoading: false, isError: false }),
+      },
       listManagedGrants: {
         useQuery: () => ({ data: state.bindings, isLoading: false, isError: false }),
       },
@@ -136,7 +139,8 @@ describe("the Roles screen", () => {
       expect(screen.getByText("Member")).toBeInTheDocument();
       expect(screen.getByText("Viewer")).toBeInTheDocument();
       expect(screen.getByText("Predefined roles")).toBeInTheDocument();
-      expect(screen.getAllByRole("button", { name: "See what it can do" })).toHaveLength(3);
+      expect(screen.getByText("Billing")).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "See what it can do" })).toHaveLength(4);
     });
 
     /** @scenario The three built-in roles are listed beside the custom ones */
@@ -215,13 +219,15 @@ describe("the Roles screen", () => {
     });
 
     /** @scenario A reader without the grant cannot create a role */
-    it("disables the create control without organization:manage", () => {
+    /** @scenario "A Member lists members and roles" */
+    it("hides the create control without organization:manage", () => {
       renderWithAuthzHost(
         <RolesScreen />,
         new FakeAuthzHost({ grants: new Set(["organization:view"]) }),
       );
 
-      expect(screen.getByRole("button", { name: /New role/ })).toBeDisabled();
+      expect(screen.getByText("Predefined roles")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /New role/ })).toBeNull();
     });
 
     /** @scenario An administrator defines a custom role */

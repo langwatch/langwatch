@@ -16,6 +16,7 @@ import { generate } from "@langwatch/ksuid";
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
+import type * as Billing from "./authz-billing-role.commands.ts";
 import type * as authzGrantEventsModule from "./authz-grant.events.ts";
 import type * as Grants from "./authz-grants-rest.schemas.ts";
 import type * as Platform from "./authz-platform-operators.commands.ts";
@@ -242,6 +243,12 @@ export interface AuthzApi {
   revokePlatformOperator(args: Platform.AuthzRevokePlatformOperatorInput): Promise<void>;
   /** Every live platform operator, oldest first. */
   listPlatformOperators(): Promise<Platform.AuthzListPlatformOperatorsOutput>;
+  /** Who holds the Billing role on an enabled membership, oldest grant first. */
+  listBillingMembers(
+    args: Billing.AuthzListBillingMembersInput,
+  ): Promise<readonly Billing.AuthzBillingMember[]>;
+  /** Grants or revokes the Billing role; idempotent. Refuses a person with no membership. */
+  setBillingRole(args: Billing.AuthzSetBillingRoleInput): Promise<void>;
   /** The escalation rule every door shares: what of these the caller lacks at that scope. */
   findPermissionsBeyondCaller(
     args: Grants.AuthzFindPermissionsBeyondCallerInput,

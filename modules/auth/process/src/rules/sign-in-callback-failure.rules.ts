@@ -1,4 +1,5 @@
 import { GENERIC_SIGN_IN_ERROR_CODE, signInErrorMayCross } from "@langwatch/auth-contract";
+import { parseSignInIdpKind, type RefusedSignInClassification } from "@langwatch/identity-contract";
 
 /** The query parameters that survive a withheld failure: an allowlist, so a new one is withheld. */
 const CARRIED_THROUGH = ["callbackUrl"] as const;
@@ -115,4 +116,35 @@ function errorPageTargetOf({
     // A Location we cannot parse is one we cannot rewrite; it passes as it came.
     return [];
   }
+}
+
+/** The code a refusal crosses as when the organization is out of seats for the person. */
+const SEAT_LIMIT_CODE = "seat_limit_reached";
+
+/**
+ * A provider refusal's redirect, once classified: the seat-limit code when the organization would
+ * hold the person for a seat, else `access_denied` with the provider kind when it is admitted.
+ * The reference replaces any trace id, so the card and the log line carry the same one.
+ * @see specs/identity/idp-refused-sign-in.feature
+ */
+export function refusedSignInLocationOf({
+  location,
+  verdict,
+  reference,
+}: {
+  location: string;
+  verdict: Pick<RefusedSignInClassification, "outcome" | "idp"> | undefined;
+  reference: string;
+}): string {
+  const target = new URL(location);
+  target.searchParams.delete("idp");
+  target.searchParams.set("trace", reference);
+  if (verdict?.outcome === "seat_limit") {
+    target.searchParams.set("error", SEAT_LIMIT_CODE);
+    return target.toString();
+  }
+  target.searchParams.set("error", PROVIDER_REFUSAL_CODE);
+  const idp = parseSignInIdpKind(verdict?.idp);
+  if (idp) target.searchParams.set("idp", idp);
+  return target.toString();
 }

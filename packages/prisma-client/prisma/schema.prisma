@@ -1103,6 +1103,62 @@ model OrganizationUser {
   @@index([departmentId])
 }
 
+/// A person asked for a full seat the organization had no room for (modules/organization/specs/
+/// seat-requests.feature). One row per organization and address; reopening reuses the row.
+model SeatRequest {
+  id               String    @id
+  organizationId   String
+  /// Lowercased address of the person asking.
+  email            String
+  /// Null when only the address is known (a sign-in the identity provider refused).
+  userId           String?
+  name             String?
+  /// OPEN | APPROVED | DECLINED
+  status           String
+  /// pending | lite | idp_refused: how the person was left when the request opened.
+  source           String
+  /// The identity provider also refused this person's sign-in.
+  idpRefused       Boolean   @default(false)
+  /// okta | entra | google | onelogin | jumpcloud | ping | auth0 | oidc | saml
+  idpKind          String?
+  /// When sales were told about this request; reset when it reopens.
+  salesNotifiedAt  DateTime?
+  openedAt         DateTime
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
+
+  @@unique([organizationId, email])
+  @@index([organizationId, status])
+  @@index([userId])
+}
+
+/// The mail outbox for seat requests and refused sign-ins: at most one row per organization,
+/// kind, address and UTC day; held rows go out together as one digest per 24 hours.
+model OrganizationAccessNotice {
+  id             String    @id
+  organizationId String
+  /// seat_request | idp_refused
+  kind           String
+  email          String
+  name           String?
+  idp            String?
+  /// UTC day the notice was recorded on, YYYY-MM-DD.
+  dayKey         String
+  /// Whether the seat request it announces was also refused by the identity provider.
+  idpRefused     Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  /// Null while held for the next digest.
+  mailedAt       DateTime?
+  /// immediate | digest, once mailed.
+  delivery       String?
+
+  @@unique([organizationId, kind, email, dayKey])
+  @@index([organizationId, mailedAt])
+  @@index([mailedAt])
+}
+
 model Team {
   id             String       @id @default(nanoid())
   name           String

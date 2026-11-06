@@ -1839,6 +1839,31 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     }
   }
 
+  async findMembershipStates({ userId }: { userId: string }): Promise<
+    {
+      organizationId: string;
+      organizationName: string;
+      role: OrganizationUserRole;
+      disabled: boolean;
+    }[]
+  > {
+    const rows = await this.prisma.organizationUser.findMany({
+      where: { userId },
+      select: {
+        organizationId: true,
+        role: true,
+        disabledAt: true,
+        organization: { select: { name: true } },
+      },
+    });
+    return rows.map((row) => ({
+      organizationId: row.organizationId,
+      organizationName: row.organization.name,
+      role: row.role,
+      disabled: row.disabledAt !== null,
+    }));
+  }
+
   async countMembershipsForUser({ userId }: { userId: string }): Promise<number> {
     return this.prisma.organizationUser.count({ where: { userId } });
   }

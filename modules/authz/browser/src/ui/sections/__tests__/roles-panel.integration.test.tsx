@@ -35,6 +35,9 @@ const { api, state } = vi.hoisted(() => {
       delete: { useMutation: mutation },
     },
     authz: {
+      listBillingMembers: {
+        useQuery: () => ({ data: [], isLoading: false, isError: false }),
+      },
       listManagedGrants: {
         useQuery: () => ({
           data: state.assignmentsError ? undefined : state.assignments,
@@ -253,7 +256,7 @@ describe("given the roles of an organization", () => {
 
       expect(screen.queryByRole("button", { name: /Edit/ })).toBeNull();
       expect(screen.queryByRole("button", { name: /Delete/ })).toBeNull();
-      expect(screen.getByRole("button", { name: /New role/ })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: /New role/ })).toBeNull();
     });
   });
 

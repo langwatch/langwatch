@@ -22,6 +22,11 @@ import { monitorAutoPausedEmailTemplate } from "./monitor-auto-paused-email.tsx"
 import { organizationMfaRequirementEmailTemplate } from "./organization-mfa-requirement-email.tsx";
 import type { MailTemplate } from "./registry.ts";
 import { resetPasswordEmailTemplate } from "./reset-password-email.tsx";
+import {
+  accessNoticeDigestTemplate,
+  idpRefusedSignInTemplate,
+  seatRequestTemplate,
+} from "./seat-request-emails.tsx";
 import { signUpVerificationEmailTemplate } from "./sign-up-verification-email.tsx";
 import {
   ssoDomainProofLapsedTemplate,
@@ -47,6 +52,9 @@ export const mailTemplates: readonly MailTemplate[] = [
   joinRequestRejectedTemplate,
   joinRequestExpiredTemplate,
   domainAutoJoinedTemplate,
+  seatRequestTemplate,
+  idpRefusedSignInTemplate,
+  accessNoticeDigestTemplate,
   ssoDomainProofWaveringTemplate,
   ssoDomainProofLapsedTemplate,
   organizationMfaRequirementEmailTemplate,

@@ -8,12 +8,20 @@ import type {
   BrowserSessionResolution,
   BrowserSessionVerification,
 } from "@langwatch/auth-contract";
+import type { IdentityApi } from "@langwatch/identity-contract";
 import type * as observabilityModule from "@langwatch/observability";
+import type * as tracingModule from "@langwatch/observability/tracing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { IdTokenIssuerRefusalChannel } from "../../channels/http/http.id-token-issuer-refusal.channel.ts";
 import { OAuthProfileEmailChannel } from "../../channels/http/http.oauth-profile-email.channel.ts";
+import {
+  SIGN_IN_HINT_COOKIE,
+  SIGN_IN_HINT_TTL_MS,
+  signInHintSealer,
+} from "../../rules/sign-in-hint.rules.ts";
 import { AuthDoorService, type AuthDoorDeps } from "../auth-door.service.ts";
 
 const loggerSpies = vi.hoisted(() => ({
@@ -26,6 +34,14 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   ...(await importOriginal<typeof observabilityModule>()),
   createLogger: () => loggerSpies,
 }));
+const activeTrace = vi.hoisted(() => ({ id: undefined as string | undefined }));
+vi.mock("@langwatch/observability/tracing", async (importOriginal) => ({
+  ...(await importOriginal<typeof tracingModule>()),
+  getActiveTraceId: () => activeTrace.id,
+}));
+
+const HINT_SECRET = "test-session-secret";
+const NOW_MS = 15 * 24 * 60 * 60 * 1000;
 
 const BASE_URL = "https://app.test";
 const SESSION_COOKIE = "better-auth.session_token=abc.sig";
@@ -66,7 +82,12 @@ function door(overrides: Partial<AuthDoorDeps> = {}) {
     deriveQueryCacheKey: ({ sessionId, impersonatorId, epoch }) =>
       `key-for-${sessionId}-${impersonatorId}-${epoch}`,
     // Two epochs and a day in: the server's clock alone names the epoch.
-    now: () => Temporal.Instant.fromEpochMilliseconds(15 * 24 * 60 * 60 * 1000),
+    now: () => Temporal.Instant.fromEpochMilliseconds(NOW_MS),
+    signInHints: () => signInHintSealer({ secret: HINT_SECRET }),
+    refusedSignIns: createApiFixture<IdentityApi>({
+      classifyRefusedSignIn: async () => ({ organizationId: null, idp: null, outcome: "refused" }),
+    }),
+    newReferenceId: () => "ref_generated",
     ...overrides,
   });
 
@@ -370,30 +391,13 @@ describe("AuthDoorService", () => {
     it("keeps only the code on the redirect and logs it at warn without the description", async () => {
       loggerSpies.warn.mockClear();
       loggerSpies.error.mockClear();
-      const world = door({
-        betterAuth: async () => ({
-          handler: async () =>
-            new Response(null, {
-              status: 302,
-              headers: {
-                location: `${BASE_URL}/auth/error?error=access_denied&error_description=User+is+not+assigned`,
-              },
-            }),
-        }),
-      });
-
-      const answered = await world.service.betterAuthHandshake(
-        new Request(`${BASE_URL}/api/auth/sso/callback/conn_1?code=c`),
-      );
+      const answered = await refusing().service.betterAuthHandshake(refusedCallback());
 
       const location = new URL(answered.headers.get("location") ?? "");
       expect(location.searchParams.get("error")).toBe("access_denied");
       expect(location.searchParams.has("error_description")).toBe(false);
       expect(loggerSpies.error).not.toHaveBeenCalled();
       expect(loggerSpies.warn).toHaveBeenCalledTimes(1);
-      const [fields] = loggerSpies.warn.mock.calls[0] ?? [];
-      expect(Object.keys(fields ?? {}).toSorted()).toEqual(["code", "traceId"]);
-      expect(fields).toMatchObject({ code: "access_denied" });
       expect(JSON.stringify(loggerSpies.warn.mock.calls)).not.toContain("not assigned");
     });
   });
@@ -588,6 +592,265 @@ describe("given Microsoft returning to the redirect URI Azure app registrations 
       expect(new URL(handler.mock.calls[0]?.[0].url ?? "").pathname).toBe(
         "/api/auth/callback/google",
       );
+    });
+  });
+});
+
+const REFUSED_LOCATION = `${BASE_URL}/auth/error?error=access_denied&error_description=User+is+not+assigned`;
+const CONNECTION = "ssoc_acme";
+
+function refusing(overrides: Partial<AuthDoorDeps> = {}) {
+  return door({
+    betterAuth: async () => ({
+      handler: async () =>
+        new Response(null, { status: 302, headers: { location: REFUSED_LOCATION } }),
+    }),
+    ...overrides,
+  });
+}
+
+function sealedHint({
+  email = "new.hire@acme.com",
+  providerId = CONNECTION,
+  issuedAt = NOW_MS - 60_000,
+  secret = HINT_SECRET,
+}: { email?: string; providerId?: string; issuedAt?: number; secret?: string } = {}): string {
+  return signInHintSealer({ secret }).seal({ email, providerId, issuedAt });
+}
+
+function refusedCallback({
+  path = `/api/auth/sso/callback/${CONNECTION}`,
+  hint,
+}: { path?: string; hint?: string } = {}): Request {
+  return new Request(`${BASE_URL}${path}?error=access_denied&state=s`, {
+    headers: hint === undefined ? {} : { cookie: `other=1; ${SIGN_IN_HINT_COOKIE}=${hint}` },
+  });
+}
+
+function classifier(answer: Awaited<ReturnType<IdentityApi["classifyRefusedSignIn"]>>) {
+  const calls: Parameters<IdentityApi["classifyRefusedSignIn"]>[0][] = [];
+  const refusedSignIns = createApiFixture<IdentityApi>({
+    classifyRefusedSignIn: async (input) => {
+      calls.push(input);
+      return answer;
+    },
+  });
+  return { refusedSignIns, calls };
+}
+
+const locationOf = (response: Response) => new URL(response.headers.get("location") ?? "");
+
+describe("given an identity provider that refused a sign-in started on our page", () => {
+  describe("when the organization would hold the person for want of a seat", () => {
+    /** @scenario "A refused person the organization would hold for a seat sees the seat-limit screen first" */
+    it("sends the seat-limit code and hands identity the hinted address", async () => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: "org_1",
+        idp: "okta",
+        outcome: "seat_limit",
+      });
+
+      const answered = await refusing({ refusedSignIns }).service.betterAuthHandshake(
+        refusedCallback({ hint: sealedHint() }),
+      );
+
+      expect(locationOf(answered).searchParams.get("error")).toBe("seat_limit_reached");
+      expect(locationOf(answered).searchParams.has("idp")).toBe(false);
+      expect(calls).toEqual([
+        { refusedBy: { kind: "connection", connectionId: CONNECTION }, email: "new.hire@acme.com" },
+      ]);
+    });
+  });
+
+  describe("when the organization has a seat free", () => {
+    /** @scenario "A refused person at an organization with seats free is told the provider refused" */
+    it("sends access_denied with the provider kind", async () => {
+      const { refusedSignIns } = classifier({
+        organizationId: "org_1",
+        idp: "okta",
+        outcome: "refused",
+      });
+
+      const answered = await refusing({ refusedSignIns }).service.betterAuthHandshake(
+        refusedCallback({ hint: sealedHint() }),
+      );
+
+      expect(locationOf(answered).searchParams.get("error")).toBe("access_denied");
+      expect(locationOf(answered).searchParams.get("idp")).toBe("okta");
+    });
+  });
+
+  describe("when the callback carries no hint", () => {
+    /** @scenario "Without a known address nobody is told and no seat is requested" */
+    it("asks identity with no address", async () => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: "org_1",
+        idp: "entra",
+        outcome: "refused",
+      });
+
+      const answered = await refusing({ refusedSignIns }).service.betterAuthHandshake(
+        refusedCallback(),
+      );
+
+      expect(calls[0]?.email).toBeNull();
+      expect(locationOf(answered).searchParams.get("idp")).toBe("entra");
+    });
+  });
+
+  describe("when the hint is tampered, signed with another key or expired", () => {
+    /** @scenario "A forged or tampered hint cookie is ignored" */
+    it.each([
+      ["tampered", () => `${sealedHint()}x`],
+      ["re-signed", () => sealedHint({ secret: "another-secret" })],
+      ["expired", () => sealedHint({ issuedAt: NOW_MS - SIGN_IN_HINT_TTL_MS - 1 })],
+      ["from the future", () => sealedHint({ issuedAt: NOW_MS + 10 * 60 * 1000 })],
+    ])("treats the address as unknown when %s", async (_label, hint) => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: null,
+        idp: null,
+        outcome: "refused",
+      });
+
+      await refusing({ refusedSignIns }).service.betterAuthHandshake(
+        refusedCallback({ hint: hint() }),
+      );
+
+      expect(calls[0]?.email).toBeNull();
+    });
+  });
+
+  describe("when the hint was set for another provider", () => {
+    /** @scenario "A hint for another provider is ignored" */
+    it("treats the address as unknown", async () => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: null,
+        idp: null,
+        outcome: "refused",
+      });
+
+      await refusing({ refusedSignIns }).service.betterAuthHandshake(
+        refusedCallback({ hint: sealedHint({ providerId: "ssoc_other" }) }),
+      );
+
+      expect(calls[0]?.email).toBeNull();
+    });
+  });
+
+  describe("when the refusal is answered", () => {
+    /** @scenario "The card's reference is the one the log line carries" */
+    it("logs one warning with the reference and no address, and redirects with that reference", async () => {
+      loggerSpies.warn.mockClear();
+      activeTrace.id = "trace_active";
+      const { refusedSignIns } = classifier({
+        organizationId: "org_1",
+        idp: "okta",
+        outcome: "refused",
+      });
+
+      const answered = await refusing({ refusedSignIns }).service.betterAuthHandshake(
+        refusedCallback({ hint: sealedHint() }),
+      );
+      activeTrace.id = undefined;
+
+      expect(loggerSpies.warn).toHaveBeenCalledTimes(1);
+      const [fields] = loggerSpies.warn.mock.calls[0] ?? [];
+      expect(fields).toEqual({
+        reference: "trace_active",
+        providerId: CONNECTION,
+        organizationId: "org_1",
+        idp: "okta",
+        outcome: "refused",
+      });
+      expect(JSON.stringify(loggerSpies.warn.mock.calls)).not.toContain("new.hire");
+      expect(locationOf(answered).searchParams.get("trace")).toBe("trace_active");
+    });
+
+    /** @scenario "Without an active trace a generated reference is logged and shown" */
+    it("generates a reference when no trace is active", async () => {
+      loggerSpies.warn.mockClear();
+
+      const answered = await refusing().service.betterAuthHandshake(refusedCallback());
+
+      expect(loggerSpies.warn.mock.calls[0]?.[0]).toMatchObject({ reference: "ref_generated" });
+      expect(locationOf(answered).searchParams.get("trace")).toBe("ref_generated");
+    });
+
+    /** @scenario "The hint is set when a sign-in starts and dropped once the callback answers" */
+    it("clears the hint cookie on the callback's answer", async () => {
+      const answered = await refusing().service.betterAuthHandshake(
+        refusedCallback({ hint: sealedHint() }),
+      );
+
+      const cookie = answered.headers.get("set-cookie") ?? "";
+      expect(cookie).toContain(`${SIGN_IN_HINT_COOKIE}=;`);
+      expect(cookie).toContain("Max-Age=0");
+    });
+  });
+
+  describe("when classifying the refusal fails", () => {
+    /** @scenario "A failure classifying the refusal still lands on the plain refusal" */
+    it("still redirects with access_denied and the reference", async () => {
+      loggerSpies.error.mockClear();
+      const refusedSignIns = createApiFixture<IdentityApi>({
+        classifyRefusedSignIn: async () => {
+          throw new Error("organization unavailable");
+        },
+      });
+
+      const answered = await refusing({ refusedSignIns }).service.betterAuthHandshake(
+        refusedCallback({ hint: sealedHint() }),
+      );
+
+      expect(answered.status).toBe(302);
+      expect(locationOf(answered).searchParams.get("error")).toBe("access_denied");
+      expect(locationOf(answered).searchParams.has("idp")).toBe(false);
+      expect(locationOf(answered).searchParams.get("trace")).toBe("ref_generated");
+      expect(loggerSpies.error).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given a provider sign-in started on our page with a typed address", () => {
+  const start = (body: unknown) =>
+    new Request(`${BASE_URL}/api/auth/sign-in/sso`, {
+      method: "POST",
+      headers: { origin: BASE_URL, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  describe("when Better Auth accepts the start", () => {
+    /** @scenario "The hint is set when a sign-in starts and dropped once the callback answers" */
+    it("sets a signed, httpOnly, SameSite=Lax hint for 15 minutes and still hands Better Auth the body", async () => {
+      const world = door();
+      const body = { providerId: CONNECTION, loginHint: "New.Hire@acme.com", callbackURL: "/" };
+
+      const answered = await world.service.betterAuthHandshake(start(body));
+
+      await expect(world.handler.mock.calls[0]![0].text()).resolves.toBe(JSON.stringify(body));
+      const cookie = answered.headers.get("set-cookie") ?? "";
+      expect(cookie).toMatch(new RegExp(`^${SIGN_IN_HINT_COOKIE.replace(".", "\\.")}=[^;]+;`));
+      expect(cookie).toContain("HttpOnly");
+      expect(cookie).toContain("SameSite=Lax");
+      expect(cookie).toContain(`Max-Age=${SIGN_IN_HINT_TTL_MS / 1000}`);
+      const value = cookie.split(";")[0]!.split("=")[1]!;
+      expect(
+        signInHintSealer({ secret: HINT_SECRET }).decode({ value, nowMs: NOW_MS }),
+      ).toMatchObject({ email: "new.hire@acme.com", providerId: CONNECTION });
+    });
+  });
+
+  describe("when Better Auth refuses the start", () => {
+    it("sets no hint", async () => {
+      const world = door({
+        betterAuth: async () => ({ handler: async () => new Response(null, { status: 400 }) }),
+      });
+
+      const answered = await world.service.betterAuthHandshake(
+        start({ providerId: CONNECTION, loginHint: "a@acme.com" }),
+      );
+
+      expect(answered.headers.get("set-cookie")).toBeNull();
     });
   });
 });

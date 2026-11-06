@@ -2,6 +2,7 @@
 
 import { type AuthzPermission } from "@langwatch/authorization";
 import {
+  BILLING_ROLE_KEY,
   builtinRolePermissions,
   roleKeyForTeamRole,
   type TeamUserRole,
@@ -51,6 +52,19 @@ export const BUILTIN_ROLE_CARDS: readonly BuiltinRoleCard[] = [
     headline: ["traces:view", "analytics:view", "datasets:view"],
   },
 ];
+
+/** The Billing role: beside the ladder, not on it, because it takes no seat. */
+export const BILLING_ROLE_CARD = {
+  name: "Billing",
+  description:
+    "Pays for the organization: changes the plan and seats, sees invoices, and approves seat requests. Takes no seat.",
+  headline: ["subscription:manage", "seatRequests:manage", "members:view"],
+} as const;
+
+/** Every permission the Billing role holds. */
+export function billingRoleGrantedPermissions(): AuthzPermission[] {
+  return [...builtinRolePermissions(BILLING_ROLE_KEY)] as AuthzPermission[];
+}
 
 /** Every permission a built-in role holds, as the viewer reads membership. */
 export function builtinRoleGrantedPermissions(

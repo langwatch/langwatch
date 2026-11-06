@@ -33,6 +33,9 @@ const { api, state } = vi.hoisted(() => {
         },
       },
       revokeGrant: { useMutation: mutation },
+      listBillingMembers: {
+        useQuery: () => ({ data: [], isLoading: false, isError: false }),
+      },
       listManagedGrants: {
         useQuery: (_input: unknown, options: { enabled?: boolean }) => {
           if (options.enabled) state.bindingReads += 1;

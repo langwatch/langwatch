@@ -18,6 +18,7 @@ import {
 } from "../../../model/directory-tabs.ts";
 import { useOrganizationHost, type OrganizationHostApi } from "../../../model/organization-host.ts";
 import { PermissionAlert } from "../../elements/permission-alert.tsx";
+import { SeatRequestsCard } from "../seat-requests-card.tsx";
 import DepartmentsScreen from "./departments.screen.tsx";
 import GroupsScreen from "./groups.screen.tsx";
 import MembersScreen from "./members.screen.tsx";
@@ -113,9 +114,10 @@ function DirectoryTabs({
           label: "People",
           count: counts.people,
           content: (
-            <Box paddingTop={3}>
+            <VStack paddingTop={3} gap={3} align="stretch">
+              <SeatRequestsCard />
               <MembersScreen />
-            </Box>
+            </VStack>
           ),
         },
         {

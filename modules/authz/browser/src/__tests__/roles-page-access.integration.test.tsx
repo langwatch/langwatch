@@ -18,6 +18,7 @@ const { api } = vi.hoisted(() => {
     }),
     authz: {
       listManagedGrants: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
+      listBillingMembers: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
     },
     role: {
       getAll: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },

@@ -92,6 +92,14 @@ Main's `usageLimits.notifyResourceLimitReached`: the ops Slack alert for a reach
 notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void>;
 ```
 
+#### `notifySalesOfSeatRequest`
+
+Tells sales that a person waits for a seat in an organization whose plan only sales can grow, on the subscriptions Slack channel. SaaS only; the caller sends it once per request. Never throws.
+
+```typescript
+notifySalesOfSeatRequest(input: { organizationId: string; organizationName: string; plan: string; seats: number; requestedSeats: number; }): Promise<void>;
+```
+
 #### `getPricingModel`
 
 The organization's pricing model column, which is empty for organizations never migrated.
@@ -225,7 +233,7 @@ interface Output {
 
 ### `subscription`
 
-Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscription.trpc.ts:88`.
+Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscription.trpc.ts:90`.
 
 | Procedure                            | Kind     | Gate                              | Input                     | Output                           |
 | ------------------------------------ | -------- | --------------------------------- | ------------------------- | -------------------------------- |
@@ -357,12 +365,12 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                | Environment variable                           | Declared at                            |
 | ------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
-| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:174`           |
-| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:175`           |
-| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:176`           |
-| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:177`           |
-| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:178`           |
-| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:179`           |
+| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:175`           |
+| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:176`           |
+| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:177`           |
+| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:178`           |
+| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:179`           |
+| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:180`           |
 | config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:13` |
 | config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:15` |
 | config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:23` |

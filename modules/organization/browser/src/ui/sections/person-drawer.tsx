@@ -9,8 +9,9 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
+import { Switch } from "@langwatch/design-system/switch";
 import type { UiPersonDrawerProps } from "@langwatch/organization-contract";
-import { Ban, KeyRound, ShieldCheck, Trash2, Undo2, UserCog } from "lucide-react";
+import { Ban, CreditCard, KeyRound, ShieldCheck, Trash2, Undo2, UserCog } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { HandledErrorAlert } from "../../behavior/handled-error-form.tsx";
@@ -72,6 +73,11 @@ function PersonDetail({
   );
   const provenance = useMemberProvenance({ organizationId, enabled: canManage });
   const twoStep = useTwoStepRequirement({ organizationId, canManage });
+  const billingMembers = api.authz.listBillingMembers.useQuery(
+    { organizationId },
+    { enabled: canManage },
+  );
+  const holdsBilling = !!billingMembers.data?.some((holder) => holder.userId === userId);
 
   if (!canManage) {
     return (
@@ -103,6 +109,11 @@ function PersonDetail({
             {person.role === "DEVELOPER" ? (
               <Badge colorPalette="teal" size="sm">
                 Developer
+              </Badge>
+            ) : null}
+            {holdsBilling ? (
+              <Badge colorPalette="purple" size="sm" data-testid="person-billing-badge">
+                Billing
               </Badge>
             ) : null}
             {person.user.deactivatedAt ? (
@@ -169,6 +180,13 @@ function PersonDetail({
         />
       </SettingsSection>
 
+      <BillingRoleSection
+        organizationId={organizationId}
+        userId={person.userId}
+        holdsBilling={holdsBilling}
+        loading={billingMembers.isLoading}
+      />
+
       {isSelf ? null : (
         <PersonActions
           organizationId={organizationId}
@@ -178,6 +196,48 @@ function PersonDetail({
         />
       )}
     </VStack>
+  );
+}
+
+/** Billing sits beside any other role and takes no seat; only an administrator toggles it. */
+function BillingRoleSection({
+  organizationId,
+  userId,
+  holdsBilling,
+  loading,
+}: {
+  organizationId: string;
+  userId: string;
+  holdsBilling: boolean;
+  loading: boolean;
+}) {
+  const showErrorToast = useShowErrorToast();
+  const queryClient = api.useUtils();
+  const setBilling = api.authz.setMemberBillingRole.useMutation({
+    onSuccess: () => void queryClient.authz.listBillingMembers.invalidate(),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't change Billing" }),
+  });
+
+  return (
+    <SettingsSection title="Billing" icon={<CreditCard size={18} />} divided={false}>
+      <VStack align="start" gap={2} width="full">
+        <Switch
+          size="sm"
+          data-testid="person-billing-switch"
+          checked={holdsBilling}
+          disabled={loading || setBilling.isPending}
+          inputProps={{ "aria-label": "Billing role" }}
+          onCheckedChange={(event) =>
+            setBilling.mutate({ organizationId, userId, holds: event.checked === true })
+          }
+        >
+          <Text fontSize="sm">Pays for the organization</Text>
+        </Switch>
+        <Text fontSize="xs" color="fg.muted">
+          Changes the plan and seats, sees invoices, and approves seat requests. Takes no seat.
+        </Text>
+      </VStack>
+    </SettingsSection>
   );
 }
 

@@ -73,6 +73,7 @@ import {
 } from "../services/billing-alert-cooldown.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
 import { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
+import type { CheckoutBillingRoles } from "../services/billing-starter-role.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
 import {
   EEWebhookService,
@@ -211,6 +212,7 @@ export class BillingModule
       repositories: setup.repositories,
       config: setup.config,
       peers: setup.dependencies,
+      billingRoles: setup.dependencies.authorization,
       stripe,
       usageReporting: () =>
         StripeUsageReportingBuilder.create({
@@ -332,6 +334,7 @@ export class BillingModule
     webhook,
     subscription,
     lifecycle,
+    billingRoles,
   }: {
     repositories: Pick<
       BillingRepositories,
@@ -368,6 +371,8 @@ export class BillingModule
     subscription?: SubscriptionComposition;
     /** Records the checkout and subscription changes for peers; absent where a suite composes none. */
     lifecycle?: BillingLifecycleAnnouncerService;
+    /** Hands the Billing role to a checkout's starter; absent where a suite composes none. */
+    billingRoles?: CheckoutBillingRoles;
   }): BillingModule {
     const { isSaas, nodeEnvironment } = config;
     const repository = repositories.connectedBilling;
@@ -441,6 +446,7 @@ export class BillingModule
             licensePaymentLinkId: config.licensePaymentLinkId,
             connectedBilling: billing,
             announcer: lifecycle,
+            billingRoles,
           })
         : BillingModule.#undispatchedWebhook(),
       subscriptions:
@@ -564,6 +570,7 @@ export class BillingModule
     customerId: string;
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
+    startedByUserId?: string;
   }): Promise<{ url: string | null }> {
     return this.#subscriptionDoor.subscriptions.createOrUpdateSubscription(input);
   }
@@ -631,8 +638,11 @@ export class BillingModule
     licensePaymentLinkId,
     connectedBilling,
     announcer,
+    billingRoles,
   }: {
     announcer: BillingLifecycleAnnouncerService | undefined;
+    /** The Billing role a completed checkout hands its starter. */
+    billingRoles: CheckoutBillingRoles | undefined;
     webhook: StripeWebhookComposition;
     isSaas: boolean;
     stripe: BillingStripe;
@@ -654,6 +664,7 @@ export class BillingModule
       licensePurchaseHandler: webhook.licensePurchase,
       host: webhook.host,
       connectedBilling,
+      ...(billingRoles ? { billingRoles } : {}),
       ...(announcer ? { announcer } : {}),
     });
     return StripeWebhookReceiptService.create({
@@ -734,6 +745,16 @@ export class BillingModule
 
   notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void> {
     return this.#resourceLimitAlerts.notifyResourceLimitReached(input);
+  }
+
+  notifySalesOfSeatRequest(input: {
+    organizationId: string;
+    organizationName: string;
+    plan: string;
+    seats: number;
+    requestedSeats: number;
+  }): Promise<void> {
+    return this.#resourceLimitAlerts.notifySalesOfSeatRequest(input);
   }
 
   getPricingModel(input: {

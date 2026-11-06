@@ -742,6 +742,7 @@ export const APP_ERROR_CODES = [
   "scope_input_mismatch",
   "scope_not_in_organization",
   "seat_billing_unavailable",
+  "seat_request_not_found",
   "secret_absent",
   "secret_already_revealed",
   "secret_claimed_twice",

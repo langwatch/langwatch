@@ -14,13 +14,14 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Plus, ShieldCheck } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { authzApi, type RouterOutputs } from "../../behavior/authz-api.ts";
 import { useAuthzHost } from "../../model/authz-host.ts";
 import {
+  BILLING_ROLE_CARD,
+  billingRoleGrantedPermissions,
   BUILTIN_ROLE_CARDS,
   builtinRoleGrantedPermissions,
   peopleHoldingBuiltinRole,
@@ -31,7 +32,7 @@ import {
   peopleHoldingCustomRole,
   scopesOfCustomRole,
 } from "../../model/role-holders.ts";
-import { BuiltinRoleCard, CustomRoleCard } from "../blocks/role-cards.tsx";
+import { BillingRoleCard, BuiltinRoleCard, CustomRoleCard } from "../blocks/role-cards.tsx";
 import { RoleDetailDialog } from "../blocks/role-detail-dialog.tsx";
 import { SectionErrorNotice } from "../elements/section-error-notice.tsx";
 import { RoleDialog } from "./role-dialog.tsx";
@@ -67,6 +68,10 @@ export function RolesPanel({
     { organizationId },
     { enabled: !!organizationId },
   );
+  const billingMembers = authzApi.authz.listBillingMembers.useQuery(
+    { organizationId },
+    { enabled: !!organizationId },
+  );
   const assignmentRows = assignments.data ?? NO_ASSIGNMENTS;
   // Losing the assignments costs the counts and holders, never the roles;
   // null is "unknown", not zero.
@@ -89,7 +94,7 @@ export function RolesPanel({
       <VStack align="stretch" width="full" gap={4}>
         <SectionHeading
           title="Predefined roles"
-          hint="Three roles cover most teams. They cannot be changed or deleted."
+          hint="Three roles cover most teams, and Billing sits beside any of them. They cannot be changed or deleted."
         />
         {assignmentsUnavailable && (
           <SectionErrorNotice title="Couldn't work out who holds each role" />
@@ -120,6 +125,19 @@ export function RolesPanel({
               }
             />
           ))}
+          <BillingRoleCard
+            card={BILLING_ROLE_CARD}
+            people={billingMembers.data ? billingMembers.data.length : null}
+            totalPermissions={billingRoleGrantedPermissions().length}
+            onOpenDetail={() =>
+              setDialog({
+                kind: "detail",
+                title: BILLING_ROLE_CARD.name,
+                description: BILLING_ROLE_CARD.description,
+                permissions: billingRoleGrantedPermissions(),
+              })
+            }
+          />
         </Box>
       </VStack>
 
@@ -128,21 +146,17 @@ export function RolesPanel({
           title="Custom roles"
           hint="Scoped grants for people who need one thing and nothing else."
           right={
-            <Tooltip
-              content="You need permission to manage this organization to write a role."
-              disabled={canManage}
-            >
+            canManage ? (
               <Button
                 size="sm"
                 colorPalette="orange"
                 onClick={() => setDialog({ kind: "create" })}
-                disabled={!canManage}
                 data-testid="authz-role-create"
               >
                 <Plus size={14} aria-hidden />
                 New role
               </Button>
-            </Tooltip>
+            ) : null
           }
         />
 

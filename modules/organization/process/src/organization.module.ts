@@ -5,6 +5,7 @@ import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { OrganizationModule } from "./app/organization.app.ts";
 import { organizationChannels } from "./channels/organization-channels.registry.ts";
+import { accessDigestEventing } from "./eventing/organization-access-digest.pipeline.ts";
 import { organizationAuditEventing } from "./eventing/organization-audit.pipeline.ts";
 import { organizationLifecycleEventing } from "./eventing/organization-lifecycle.pipeline.ts";
 import { privateDataplaneRecorderEventing } from "./eventing/organization-private-dataplane.pipeline.ts";
@@ -19,6 +20,7 @@ import { organizationManagementRest } from "./transport/organization-management.
 import { organizationTrpcTransport } from "./transport/organization.trpc.ts";
 import { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
 import { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-workspace-features.trpc.ts";
+import { seatRequestTrpcTransport } from "./transport/seat-request.trpc.ts";
 import { teamsRest } from "./transport/team.rest.ts";
 import { teamTrpcTransport } from "./transport/team.trpc.ts";
 
@@ -37,6 +39,7 @@ export const organizationProcessModule: PublishedProcessModule<
     groupTrpcTransport,
     licenseEnforcementTrpcTransport,
     personalWorkspaceFeaturesTrpcTransport,
+    seatRequestTrpcTransport,
     organizationManagementRest,
     organizationsProvisioningRest,
     groupsRest,
@@ -52,6 +55,7 @@ export const organizationProcessModule: PublishedProcessModule<
   .withEventing(organizationLifecycleEventing)
   .withEventing(organizationAuditEventing)
   .withEventing(privateDataplaneRecorderEventing)
+  .withEventing(accessDigestEventing)
   // Old images record no presence fact: run once none serves (ADR-173 §3).
   .withMigrations(({ app }) => [
     defineMigrationStep({

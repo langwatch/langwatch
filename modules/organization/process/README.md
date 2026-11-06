@@ -6,13 +6,13 @@ The server half of [organization](../README.md). Organisations and who is in the
 
 ## Installation
 
-`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withMigrations(…)`, `src/organization.module.ts:29`.
+`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, seatRequestTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withEventing(accessDigestEventing).withMigrations(…)`, `src/organization.module.ts:31`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:241`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:249`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -302,6 +302,46 @@ Admits somebody on the seat the licence leaves free (ADR-129, ADR-171, admission
 
 ```typescript
 createMembership(input: Readonly<{ organizationId: string; userId: string; admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>; /** The seat the admitting caller decided (ADR-171 v6); absent is the joiner seat. */ seat?: "MEMBER" | "DEVELOPER"; /** Where a join request was made, written on the Developer admission audit row. */ origin?: OrganizationJoinOrigin; }>): Promise<OrganizationAdmission>;
+```
+
+#### `recordRefusedSignIn`
+
+After an identity provider refused a sign-in tied to an address: `seat_limit` when an arrival would be held pending (a seat request is opened, flagged refused), else records a refusal notice.
+
+```typescript
+recordRefusedSignIn(input: RecordRefusedSignInInput): Promise<RefusedSignInOutcome>;
+```
+
+#### `listOpenSeatRequests`
+
+The organization's open seat requests and how a seat is approved for it (ruling R6).
+
+```typescript
+listOpenSeatRequests(input: Readonly<{ organizationId: string }>): Promise<OpenSeatRequests>;
+```
+
+#### `approveSeatRequest`
+
+Gives the person the full seat they asked for; refuses `member_seat_limit_reached`.
+
+```typescript
+approveSeatRequest(input: SeatRequestScope, by: OrganizationCaller): Promise<SeatRequestResolved>;
+```
+
+#### `declineSeatRequest`
+
+Closes the request; the membership stays as it is.
+
+```typescript
+declineSeatRequest(input: SeatRequestScope, by: OrganizationCaller): Promise<SeatRequestResolved>;
+```
+
+#### `getHeldMemberships`
+
+The caller's memberships they cannot use, with whom to contact (ruling R2).
+
+```typescript
+getHeldMemberships(by: OrganizationCaller): Promise<HeldMemberships>;
 ```
 
 #### `isMember`
@@ -2124,6 +2164,54 @@ type Input = z.infer<typeof personalWorkspaceFeaturesScopeSchema>; // ../contrac
 type Output = z.infer<typeof personalFeaturesSchema>; // ../contract/src/personal-workspace.ts:101
 ```
 
+### `seatRequest`
+
+Contract `../contract/src/features/seat-request/seat-request.trpc.ts:14`, router `src/transport/seat-request.trpc.ts:18`.
+
+| Procedure                       | Kind     | Gate                                                                                                                                  | Input                        | Output                      |
+| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | --------------------------- |
+| `seatRequest.listOpen`          | query    | Permission `seatRequests:view`                                                                                                        | `organizationApiScopeSchema` | `openSeatRequestsSchema`    |
+| `seatRequest.approve`           | mutation | Permission `seatRequests:manage`                                                                                                      | `seatRequestScopeSchema`     | `seatRequestResolvedSchema` |
+| `seatRequest.decline`           | mutation | Permission `seatRequests:manage`                                                                                                      | `seatRequestScopeSchema`     | `seatRequestResolvedSchema` |
+| `seatRequest.myHeldMemberships` | query    | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | inline                       | `heldMembershipsSchema`     |
+
+```typescript
+// seatRequest.listOpen
+type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
+type Output = z.infer<typeof openSeatRequestsSchema>; // ../contract/src/features/seat-request/seat-request.ts:75
+
+// seatRequest.approve
+// Input: seatRequestScopeSchema, ../contract/src/features/seat-request/seat-request.ts:83
+interface Input {
+  organizationId: string;
+  seatRequestId: string;
+}
+// Output: seatRequestResolvedSchema, ../contract/src/features/seat-request/seat-request.ts:93
+interface Output {
+  outcome: "enabled" | "promoted" | "invited" | "already_member" | "declined";
+}
+
+// seatRequest.decline
+type Input = z.infer<typeof seatRequestScopeSchema>; // ../contract/src/features/seat-request/seat-request.ts:83
+type Output = z.infer<typeof seatRequestResolvedSchema>; // ../contract/src/features/seat-request/seat-request.ts:93
+
+// seatRequest.myHeldMemberships
+// Input: inline, ../contract/src/features/seat-request/seat-request.trpc.ts:28
+type Input = Record<string, unknown>;
+// Output: heldMembershipsSchema, ../contract/src/features/seat-request/seat-request.ts:116
+interface Output {
+  hasActiveMembership: boolean;
+  held: {
+    organizationId: string;
+    organizationName: string;
+    reason: "seat_limit" | "access_turned_off";
+    contacts: {
+      name: string;
+    }[];
+  }[];
+}
+```
+
 ### `team`
 
 Contract `../contract/src/features/team/team.trpc.ts:25`, router `src/transport/team.trpc.ts:9`.
@@ -2230,6 +2318,14 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
+### Pipeline `organization_access_notice_digest` (aggregate `global`)
+
+Declared at `src/eventing/organization-access-digest.pipeline.ts:33`.
+
+| Kind            | Name                 | Handles                                                                              | Declared at                                              |
+| --------------- | -------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| process manager | `accessNoticeDigest` | every 15 min (`ACCESS_DIGEST_INTERVAL_MS = 15 * 60 * 1000`); intents `send` (outbox) | `src/eventing/organization-access-digest.pipeline.ts:38` |
+
 ### Pipeline `organization_audit` (aggregate `organization_audit`)
 
 Declared at `src/eventing/organization-audit.pipeline.ts:46`. Events: `organizationAuditRecordedEventSchema`.
@@ -2282,10 +2378,11 @@ Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedE
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:301`           |
-| config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
-| config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
-| config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |
-| config | `publicBaseUrl`               | `BASE_HOST`               | `../contract/src/organization.config.ts:21` |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:311`           |
+| config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:18` |
+| config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:19` |
+| config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:20` |
+| config | `publicBaseUrl`               | `BASE_HOST`               | `../contract/src/organization.config.ts:22` |
+| config | `isSaas`                      | `IS_SAAS`                 | `../contract/src/organization.config.ts:24` |
 
 <!-- readme:generated:end -->
