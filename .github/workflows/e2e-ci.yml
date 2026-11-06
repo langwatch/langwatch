@@ -356,6 +356,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
+    # Advisory until the journeys prove stable: a failure here must not fail pr.yml's
+    # e2e call, which the required e2e-complete and ci-complete checks read.
+    continue-on-error: true
+    timeout-minutes: 45
     permissions:
       contents: read
       actions: write
@@ -514,8 +518,8 @@ jobs:
           done
           curl -sf http://localhost:5599/healthz > /dev/null || { cat paymentsim.log; exit 1; }
 
-          cd dev/tests/agentic-e2e && pnpm test --project=billing
-          TEST_EXIT=$?
+          TEST_EXIT=0
+          (cd dev/tests/agentic-e2e && pnpm test --project=billing) || TEST_EXIT=$?
 
           kill $APP_PID $WORKER_PID $SIM_PID || true
           exit $TEST_EXIT
@@ -545,8 +549,6 @@ jobs:
           retention-days: 7
 
   e2e-complete:
-    # e2e-cloud-billing stays advisory until its journeys have proved stable; it reports
-    # as its own check rather than blocking every pull request.
     needs: [changes, e2e]
     if: always()
     runs-on: ubuntu-latest
@@ -554,4 +556,4 @@ jobs:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: e2e, e2e-cloud-billing
+          allowed-skips: e2e
