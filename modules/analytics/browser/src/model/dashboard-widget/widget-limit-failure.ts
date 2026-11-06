@@ -3,6 +3,8 @@
  * every other failure keeps the error registry's own message.
  */
 
+import type { ChartQueryError } from "@langwatch/analytics-contract/chart-frame-protocol";
+
 /** Who reads the card, which decides whether the limit is theirs to fix. */
 export type WidgetLimitAudience =
   | { readonly kind: "built_in" }
@@ -50,4 +52,12 @@ export function widgetLimitWords({
         message: editable,
         note: "Ask someone who can edit this dashboard to change the query.",
       };
+}
+
+/** A limit failure as the editor preview prints it: the reason, then the registry's remedy. */
+export function editorLimitError(error: ChartQueryError): ChartQueryError {
+  const reason = EDITABLE_MESSAGE[error.code];
+  return reason
+    ? { ...error, title: "Couldn't load", message: `${reason} ${error.message}` }
+    : error;
 }
