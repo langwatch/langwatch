@@ -681,7 +681,6 @@ const LEGACY_INERT: string[] = [
   // @unimplemented and names the tag it becomes; the change that binds a file's first scenario
   // removes its entry here.
   "specs/datasets/storage-object-only/content-move-and-cleanup.feature",
-  "specs/datasets/storage-object-only/other-postgres-copies.feature",
   "specs/datasets/storage-object-only/postgres-layout-code-removal.feature",
   "specs/datasets/storage-object-only/records-table-retirement.feature",
   "specs/datasets/storage-object-only/single-file-conversion.feature",

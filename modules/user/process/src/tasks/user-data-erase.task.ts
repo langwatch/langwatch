@@ -1,9 +1,13 @@
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
 import type { GdprUserDataEraseRepository } from "../repositories/user-data-erase.repository.ts";
 
 const logger = createLogger("langwatch:task:user-data-erase");
+
+/** The dataset module's erasure of what its datasets keep in object storage. */
+type DatasetContentEraser = Pick<DatasetApi, "eraseStoredContent">;
 
 type GdprUserDataEraseOutcome = {
   userId: string;
@@ -64,10 +68,12 @@ async function checkBlockingConditions(
  */
 export async function runGdprUserDataErase({
   repository,
+  datasetContent,
   email,
   execute,
 }: {
   repository: GdprUserDataEraseRepository;
+  datasetContent: DatasetContentEraser;
   email: string;
   execute: boolean;
 }): Promise<GdprUserDataEraseOutcome> {
@@ -115,6 +121,13 @@ export async function runGdprUserDataErase({
   const soleOwnedOrgIds = soleOwnedOrgs.map((org) => org.id);
   const projectIds = projects.map((project) => project.id);
 
+  // Objects first: the dataset rows the transaction deletes are what name them. A failure here
+  // leaves every row, so a re-run finds the same objects again.
+  if (projectIds.length > 0) {
+    const { datasets } = await datasetContent.eraseStoredContent({ projectIds });
+    logger.info({ userId, datasets }, "GDPR erase removed dataset objects");
+  }
+
   // The erased fact commits with this transaction, through user's fact outbox.
   await repository.eraseUserAndOwnedResources({
     userId,
@@ -141,16 +154,21 @@ export class UserDataEraseTask extends Task {
   readonly description =
     "Deletes a user's Postgres data for a GDPR erasure request. Pass the email, then --execute to write.";
 
-  private constructor(private readonly repository: () => GdprUserDataEraseRepository) {
+  private constructor(
+    private readonly repository: () => GdprUserDataEraseRepository,
+    private readonly datasetContent: DatasetContentEraser,
+  ) {
     super();
   }
 
   static create({
     repository,
+    datasetContent,
   }: {
     repository: () => GdprUserDataEraseRepository;
+    datasetContent: DatasetContentEraser;
   }): UserDataEraseTask {
-    return new UserDataEraseTask(repository);
+    return new UserDataEraseTask(repository, datasetContent);
   }
 
   async run({ args }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -162,6 +180,7 @@ export class UserDataEraseTask extends Task {
     }
     await runGdprUserDataErase({
       repository: this.repository(),
+      datasetContent: this.datasetContent,
       email,
       execute: args.includes("--execute"),
     });
@@ -171,6 +190,10 @@ export class UserDataEraseTask extends Task {
 /** The task, over the erasure repository the container built from user's registry. */
 export function createGdprUserDataEraseRunner(options: {
   repository: GdprUserDataEraseRepository;
+  datasetContent: DatasetContentEraser;
 }): UserDataEraseTask {
-  return UserDataEraseTask.create({ repository: () => options.repository });
+  return UserDataEraseTask.create({
+    repository: () => options.repository,
+    datasetContent: options.datasetContent,
+  });
 }

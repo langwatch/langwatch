@@ -239,6 +239,7 @@ export class UserModule implements UserApi {
   readonly #account: UserAccountService;
   readonly #peers: UserAppDependencies;
   readonly #authReads: UserChannels["authReads"];
+  readonly #datasetContent: UserChannels["datasetContent"];
   readonly #directory: UserOrganizationDirectoryService;
   readonly #avatarObjects: UserAvatarObjectService;
   readonly #rateLimits: UserRateLimitRepository;
@@ -271,6 +272,7 @@ export class UserModule implements UserApi {
     this.#account = UserAccountService.create();
     this.#peers = input.dependencies;
     this.#authReads = input.channels.authReads;
+    this.#datasetContent = input.channels.datasetContent;
     this.#directory = input.directory;
     this.#avatarObjects = input.avatarObjects;
     this.#rateLimits = input.rateLimits;
@@ -278,6 +280,16 @@ export class UserModule implements UserApi {
     this.#passwords = input.passwords;
     this.#now = input.now;
     this.#facts = input.facts;
+  }
+
+  /**
+   * The GDPR erasure's first step: dataset removes what the projects' datasets keep in object
+   * storage, while the rows that name those objects still exist. Not part of UserApi.
+   */
+  eraseStoredDatasetContent(input: {
+    projectIds: readonly string[];
+  }): Promise<{ datasets: number }> {
+    return this.#datasetContent.eraseStoredContent(input);
   }
 
   /** Resolves the caller allowed to read a personal workspace. */

@@ -8,6 +8,7 @@ export function completeDatasetApi(overrides: Partial<DatasetApi> = {}): Dataset
   return {
     upsertDataset: unused,
     countUsage: unused,
+    eraseStoredContent: unused,
     validateDatasetName: unused,
     findNextAvailableName: unused,
     listDatasets: unused,

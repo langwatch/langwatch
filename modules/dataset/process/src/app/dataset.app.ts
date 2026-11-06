@@ -99,6 +99,7 @@ import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 import { versionAuthorUserIds, withAuthorNames } from "../rules/dataset-version-author.rules.ts";
 import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
 import { DatasetAttachmentUploadService } from "../services/dataset-attachment-upload.service.ts";
+import { DatasetContentEraseService } from "../services/dataset-content-erase.service.ts";
 import { DatasetContentService } from "../services/dataset-content.service.ts";
 import { DatasetInlineAttachmentService } from "../services/dataset-inline-attachment.service.ts";
 import { DatasetNormalizeService } from "../services/dataset-normalize.service.ts";
@@ -205,6 +206,7 @@ export class DatasetModule implements DatasetApi {
   #versions: DatasetVersionService;
   #versionRetention: DatasetVersionRetentionService;
   #versionBackfill: DatasetVersionBackfillService;
+  #contentErase: DatasetContentEraseService;
   #recordContentEdit: DatasetVersionCommands["recordContentEdit"] | null = null;
   #recordVersionRestored: DatasetVersionCommands["recordVersionRestored"] | null = null;
   readonly #users: UserApi;
@@ -311,6 +313,14 @@ export class DatasetModule implements DatasetApi {
       versions: repositories.versions,
       service: this.#versions,
       projects: dependencies.projects,
+    });
+
+    this.#contentErase = DatasetContentEraseService.create({
+      datasets: repositories.datasets,
+      chunks,
+      versions: repositories.versions,
+      versionContent: repositories.versionContent,
+      singleFiles: repositories.singleFiles,
     });
 
     this.#batchEvaluations = repositories.batchEvaluations;
@@ -651,6 +661,11 @@ export class DatasetModule implements DatasetApi {
    */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<DatasetUsageCount> {
     return this.#count.countUsage(input);
+  }
+
+  /** Every object the projects' datasets keep, removed ahead of an erasure deleting their rows. */
+  eraseStoredContent(input: { projectIds: readonly string[] }): Promise<{ datasets: number }> {
+    return this.#contentErase.eraseStoredContent(input);
   }
 
   platformUrl(input: { projectSlug: string; path: string }): string {

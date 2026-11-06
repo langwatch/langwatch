@@ -21,9 +21,6 @@
 #     (modules/analytics/process/src/features/lwql-catalogue/rules/lwql-postgres-view-catalog.rules.ts:418-429).
 #   - The usage report's dataset_records counts records-table rows
 #     (modules/ops/contract/src/usage-report.ts:342-346).
-#   - Erasing an organization deletes records-table rows and dataset rows only
-#     (modules/user/process/src/repositories/prisma/prisma.user-data-erase.repository.ts:268-269);
-#     chunks, version chunks and single files stay in object storage.
 # Noted, not changed by this epic: prompt few-shot demonstrations (prompt config), Langy
 # conversation projections, ClickHouse experiment_run_items.DatasetEntry, and the 24 h Redis run plan.
 #
@@ -79,12 +76,15 @@ Feature: Copies of dataset rows outside the records table are removed or moved
 
   Rule: Erasing an organization's data erases its dataset content in object storage
 
-    # becomes @integration
-    @unimplemented
+    # Bound at both seams with in-memory stores: the erasure asks the dataset module to remove the
+    # objects before its transaction deletes the rows, and the dataset module removes every kind.
+    @unit
     Scenario: Erasing an organization removes its dataset chunks, version chunks and single files
       Given an organization with a dataset stored in object storage, a saved version of it and a single-file dataset
       When the organization's data is erased
       Then none of those datasets' objects remain in object storage
+      And an upload staged for one of its datasets is removed too
+      And the objects go before the rows that name them, so a failed erasure can be run again
 
   Rule: Queries and reports stop counting on the records table
 
