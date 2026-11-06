@@ -128,6 +128,7 @@ Feature: A sign-in the company's identity provider refused says who refused it
     When the provider sends a refused person to that URL
     Then the person is sent to the sign-in error screen with the code "access_denied" and the provider kind
     And the organization is not told and no mail is sent, since nothing names the person
+    And the sign-in's hint is dropped, so the next visit does not call it unfinished
     And a refusal page URL naming no known connection still lands on the plain refusal
 
   @unit

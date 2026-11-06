@@ -237,7 +237,7 @@ export class AuthDoorService {
       method: request.method,
     });
     if (refusedConnectionId !== undefined) {
-      return this.landOnRefusalCard({ connectionId: refusedConnectionId });
+      return this.landOnRefusalCard({ request, connectionId: refusedConnectionId });
     }
 
     const betterAuth = await this.deps.betterAuth();
@@ -445,7 +445,13 @@ export class AuthDoorService {
    * The refusal page an admin set on their identity provider: the same card as a refused
    * callback, naming the provider kind only. No mail, since no round trip names the person.
    */
-  private async landOnRefusalCard({ connectionId }: { connectionId: string }): Promise<Response> {
+  private async landOnRefusalCard({
+    request,
+    connectionId,
+  }: {
+    request: Request;
+    connectionId: string;
+  }): Promise<Response> {
     const reference = getActiveTraceId() ?? this.deps.newReferenceId();
     let verdict: RefusedSignInClassification | undefined;
     try {
@@ -476,7 +482,15 @@ export class AuthDoorService {
       verdict: verdict && { idp: verdict.idp, outcome: "refused" },
       reference,
     });
-    return new Response(null, { status: 302, headers: { location, "cache-control": "no-store" } });
+    const headers = new Headers({ location, "cache-control": "no-store" });
+    // The sign-in ended here, so the next visit does not call it unfinished.
+    if (extractSignInHintCookie(request.headers.get("cookie")) !== undefined) {
+      headers.append(
+        "set-cookie",
+        buildClearedSignInHintCookie({ secure: this.deps.baseUrl().startsWith("https:") }),
+      );
+    }
+    return new Response(null, { status: 302, headers });
   }
 
   /**

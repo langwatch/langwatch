@@ -1133,6 +1133,25 @@ describe("given an identity provider that sends refused people to its access err
     });
   });
 
+  describe("when the browser still holds the hint of the sign-in that was refused", () => {
+    /** @scenario "A provider's access error page can send the person to our refusal card" */
+    it("drops it, so the next visit does not call the sign-in unfinished", async () => {
+      const { refusedSignIns } = classifier({
+        organizationId: "org_1",
+        idp: "okta",
+        outcome: "refused",
+      });
+
+      const answered = await door({ refusedSignIns }).service.betterAuthHandshake(
+        new Request(`${BASE_URL}/api/auth/sso/refused/${CONNECTION}`, {
+          headers: { cookie: `${SIGN_IN_HINT_COOKIE}=${sealedHint()}` },
+        }),
+      );
+
+      expect(answered.headers.get("set-cookie")).toContain(`${SIGN_IN_HINT_COOKIE}=;`);
+    });
+  });
+
   describe("when the URL names no connection that classifies", () => {
     /** @scenario "A provider's access error page can send the person to our refusal card" */
     it("still lands on the plain refusal", async () => {
