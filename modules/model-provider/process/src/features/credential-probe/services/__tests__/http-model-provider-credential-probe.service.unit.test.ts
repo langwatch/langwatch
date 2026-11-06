@@ -187,6 +187,16 @@ describe("validateProviderApiKey", () => {
       expect(url).not.toContain("azure-key-1234");
     });
 
+    /** @scenario "An Azure credential is checked at its own api-version" */
+    it("uses the credential's AZURE_OPENAI_API_VERSION when it carries one", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+      await probeAzure({ ...azureKeys, AZURE_OPENAI_API_VERSION: "2024-10-21" });
+
+      const [url] = mockFetch.mock.calls[0] as [string];
+      expect(url).toContain("?api-version=2024-10-21");
+    });
+
     /** @scenario "Azure reports a refused key as a bad key" */
     it.each([401, 403])("reports an invalid key on %i", async (status) => {
       mockFetch.mockResolvedValueOnce({ ok: false, status });

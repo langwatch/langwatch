@@ -86,6 +86,22 @@ export function extractUpstreamCode(body: unknown): string | undefined {
   return typeof code === "string" && code.trim() ? code.trim() : undefined;
 }
 
+/**
+ * Whether Azure itself said the deployment is missing. A wrong endpoint path answers 404
+ * too, before the key is looked at, so the status alone proves nothing.
+ */
+export function isAzureDeploymentNotFound({
+  provider,
+  status,
+  code,
+}: {
+  provider: string;
+  status: number;
+  code: string | undefined;
+}): boolean {
+  return provider === "azure" && status === 404 && code === "DeploymentNotFound";
+}
+
 /** Reads Google's `google.rpc.ErrorInfo` reason out of `error.details[]`. */
 export function extractUpstreamReason(body: unknown): string | undefined {
   if (typeof body !== "object" || body === null) return undefined;

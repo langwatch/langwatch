@@ -223,6 +223,12 @@ Feature: Credential Validation
     And the key travels in the api-key header, never in the URL
 
   @unit
+  Scenario: An Azure credential is checked at its own api-version
+    Given an Azure credential that sets AZURE_OPENAI_API_VERSION
+    When I call validateProviderApiKey for it
+    Then the chat completion is posted at that api-version, the one execution will use
+
+  @unit
   Scenario: Azure reports a refused key as a bad key
     Given Azure answers the check with 401 or 403
     Then the key is reported as refused

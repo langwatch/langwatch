@@ -15,6 +15,7 @@ import {
   extractUpstreamMessage,
   extractUpstreamReason,
   geminiRefusalKind,
+  isAzureDeploymentNotFound,
   redactApiKey,
 } from "../../../rules/model-provider-probe-upstream.rules.ts";
 import type { ProbeContext } from "./model-provider-probe-chain.service.ts";
@@ -26,8 +27,6 @@ import type { ModelProviderEgressResponse } from "./ssrf-model-provider-egress.s
 export type ProbeResponse = ModelProviderEgressResponse;
 
 const logger = createLogger("langwatch:api:providerValidation");
-
-const AZURE_DEPLOYMENT_NOT_FOUND = "DeploymentNotFound";
 
 /**
  * Reads the provider's own explanation for a refusal. Never throws: an
@@ -157,12 +156,9 @@ export async function handleHttpError({
     );
   }
 
-  // A wrong endpoint path also answers 404, so only Azure's own code names the deployment.
   if (
-    context.provider === "azure" &&
-    response.status === 404 &&
-    code === AZURE_DEPLOYMENT_NOT_FOUND &&
-    context.model
+    context.model &&
+    isAzureDeploymentNotFound({ provider: context.provider, status: response.status, code })
   ) {
     return refusal(
       new ProviderDeploymentNotFoundError({

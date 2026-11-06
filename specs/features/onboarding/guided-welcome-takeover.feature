@@ -236,6 +236,14 @@ Feature: Guided welcome flow and takeover screens
     And the connection saves that model as the provider's model and Langy runs on it
 
   @integration
+  Scenario: Connecting a stored Azure row keeps its own models
+    Given an Azure row is already stored with models of its own
+    And the recommended model pill is picked
+    When I pick another model pill and connect
+    Then the saved models are the stored ones plus that pick
+    And the recommended model is not saved
+
+  @integration
   Scenario: A typed Azure deployment name wins over the picked model
     Given I selected Azure and typed an endpoint and a key
     When I type a deployment name

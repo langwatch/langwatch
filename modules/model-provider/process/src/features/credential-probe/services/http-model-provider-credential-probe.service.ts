@@ -339,6 +339,7 @@ export class HttpModelProviderCredentialProbeService extends ModelProviderCreden
         apiRoot: deployedBaseUrl ? undefined : providerApiRoots[provider],
         agentPlatform,
         model: probedModel,
+        azureApiVersion: customKeys.AZURE_OPENAI_API_VERSION,
       }),
       context: {
         provider,

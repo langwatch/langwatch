@@ -254,7 +254,7 @@ describe("the shared provider form in its guided presentation", () => {
   });
 
   describe("when an Azure row is already stored with its own models", () => {
-    /** @scenario "Azure connects with the picked model as the deployment" */
+    /** @scenario "Connecting a stored Azure row keeps its own models" */
     it("keeps the stored models and adds only the final pick", async () => {
       const [recommended, other] = findRecommendedChatModels({ provider: "openai", limit: 4 });
       if (!recommended || !other) throw new Error("OpenAI offers fewer than two chat models");
