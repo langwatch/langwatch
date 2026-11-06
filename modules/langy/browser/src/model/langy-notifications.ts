@@ -146,7 +146,7 @@ const PUSH_SETUP_PROBLEMS: Record<LangyPushSetupFailure, { line: string; retryab
     retryable: false,
   },
   server_unreachable: {
-    line: "Notifications are on, but this browser couldn't reach LangWatch to finish setting them up, so none will arrive yet. Check your connection and try again.",
+    line: "Notifications are on, but this browser couldn't reach LangWatch to finish setting them up, so they may not arrive. Check your connection and try again.",
     retryable: true,
   },
   browser_refused: {
@@ -154,7 +154,7 @@ const PUSH_SETUP_PROBLEMS: Record<LangyPushSetupFailure, { line: string; retryab
     retryable: true,
   },
   save_failed: {
-    line: "Notifications are on, but LangWatch couldn't save this browser for them, so none will arrive yet. Try again in a moment.",
+    line: "Notifications are on, but LangWatch couldn't save this browser for them, so they may not arrive. Try again in a moment.",
     retryable: true,
   },
   push_service_refused: {

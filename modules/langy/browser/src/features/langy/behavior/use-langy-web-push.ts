@@ -43,6 +43,8 @@ export function projectSlugOfLink(url: string): string | null {
 }
 
 let setupFailure: LangyPushSetupFailure | null = null;
+/** Bumped by every setup and turn-off, so only the latest one may write the failure. */
+let setupAttempt = 0;
 const setupFailureListeners = new Set<() => void>();
 
 function recordSetupFailure(next: LangyPushSetupFailure | null): void {
@@ -53,6 +55,12 @@ function recordSetupFailure(next: LangyPushSetupFailure | null): void {
 
 function readSetupFailure(): LangyPushSetupFailure | null {
   return setupFailure;
+}
+
+/** Forgets the last failure and any setup still on its way; for a fresh page in tests. */
+export function resetLangyPushSetupFailure(): void {
+  setupAttempt += 1;
+  recordSetupFailure(null);
 }
 
 /** Why this browser's last push setup failed, shared by every caller; null once one worked. */
@@ -77,16 +85,18 @@ export function useLangyPushDevice(): {
   const forget = api.notification.unsubscribeWebPush.useMutation();
 
   const subscribe = async () => {
+    setupAttempt += 1;
+    const attempt = setupAttempt;
     const failure = await subscribeThisBrowser({
       fetchPublicKey: () => utils.notification.webPushPublicKey.fetch({}),
       save: (input) => save.mutateAsync(input),
     });
-    recordSetupFailure(failure);
+    if (attempt === setupAttempt) recordSetupFailure(failure);
     return failure === null;
   };
 
   const unsubscribe = async () => {
-    recordSetupFailure(null);
+    resetLangyPushSetupFailure();
     const endpoint = await removeWebPushSubscription();
     if (endpoint) await forget.mutateAsync({ endpoint }).catch(() => undefined);
   };

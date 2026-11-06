@@ -84,7 +84,11 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
 }));
 
 import { langyPushSetupProblem } from "../../../../../model/langy-notifications.ts";
-import { LangyNotificationsMenuGroup } from "../langy-notifications-menu-group.tsx";
+import { resetLangyPushSetupFailure } from "../../../behavior/use-langy-web-push.ts";
+import {
+  LANGY_NOTIFICATIONS_MENU_RETRY,
+  LangyNotificationsMenuGroup,
+} from "../langy-notifications-menu-group.tsx";
 import {
   LANGY_NOTIFICATIONS_BLOCKED_LINE,
   LANGY_NOTIFICATIONS_DECLINE_LABEL,
@@ -150,6 +154,7 @@ beforeEach(() => {
   push.forgotten = [];
   push.browserEndpoint = null;
   push.saveFails = false;
+  resetLangyPushSetupFailure();
 });
 
 afterEach(() => {
@@ -339,7 +344,7 @@ describe("the Notifications section of Langy's menu", () => {
   });
 
   describe("given I turn notifications on but this browser could not be saved for them", () => {
-    it("says why under the Notifications item", async () => {
+    it("says why under the Notifications item and offers to set it up again", async () => {
       installNotification({ permission: "granted" });
       push.saveFails = true;
       renderMenu();
@@ -348,11 +353,14 @@ describe("the Notifications section of Langy's menu", () => {
 
       expect(await screen.findByText(langyPushSetupProblem("save_failed").line)).toBeDefined();
 
-      // Turned off again, which forgets the failure, so it does not reach the next test.
-      fireEvent.click(await screen.findByText("Notifications", { selector: "p" }));
+      push.saveFails = false;
+      fireEvent.click(await screen.findByText(LANGY_NOTIFICATIONS_MENU_RETRY));
+
+      await waitFor(() => expect(push.subscribed).toHaveLength(1));
       await waitFor(() =>
-        expect(save).toHaveBeenCalledWith({ topic: "langy", choice: "declined" }),
+        expect(screen.queryByText(langyPushSetupProblem("save_failed").line)).toBeNull(),
       );
+      expect(screen.queryByText(LANGY_NOTIFICATIONS_MENU_RETRY)).toBeNull();
     });
   });
 

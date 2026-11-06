@@ -19,6 +19,8 @@ const server = vi.hoisted(() => ({
   saveError: null as unknown,
   /** Reading the installation's public key fails, as when the server is unreachable. */
   keyFails: false,
+  /** Holds the key read until released, to turn notifications off while setup is on its way. */
+  keyGate: null as Promise<void> | null,
 }));
 const worker = vi.hoisted(() => ({
   handler: null as null | {
@@ -50,6 +52,7 @@ vi.mock("../../../../behavior/langy-api.ts", () => ({
       notification: {
         webPushPublicKey: {
           fetch: async () => {
+            if (server.keyGate) await server.keyGate;
             if (server.keyFails) throw new TypeError("Failed to fetch");
             return { publicKey: "dmFwaWQta2V5" };
           },
@@ -88,7 +91,12 @@ import {
   langyTabNotifies,
   type LangyPushSetupFailure,
 } from "../../../../model/langy-notifications.ts";
-import { useLangyPushSetupFailure, useLangyWebPush } from "../use-langy-web-push.ts";
+import {
+  resetLangyPushSetupFailure,
+  useLangyPushDevice,
+  useLangyPushSetupFailure,
+  useLangyWebPush,
+} from "../use-langy-web-push.ts";
 
 const ENDPOINT = "https://fcm.googleapis.com/fcm/send/laptop";
 
@@ -159,6 +167,8 @@ beforeEach(() => {
   server.invalidated = 0;
   server.saveError = null;
   server.keyFails = false;
+  server.keyGate = null;
+  resetLangyPushSetupFailure();
   browserPush.supported = true;
   browserPush.subscribeFails = false;
   browserPush.held = null;
@@ -273,6 +283,25 @@ describe("why setting up this browser failed, for the person to act on", () => {
     installBrowserPush();
 
     expect(await settledFailure()).toBe("unsupported");
+  });
+
+  it("keeps the failure cleared when notifications are turned off while setup is on its way", async () => {
+    let release = () => undefined as void;
+    server.keyGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.keyFails = true;
+    const { result } = renderHook(() => ({
+      device: useLangyPushDevice(),
+      failure: useLangyPushSetupFailure(),
+    }));
+
+    const setup = result.current.device.subscribe();
+    await result.current.device.unsubscribe();
+    release();
+    await setup;
+
+    expect(result.current.failure).toBeNull();
   });
 
   it("clears the failure once a later attempt subscribes", async () => {
