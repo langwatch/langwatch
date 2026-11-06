@@ -44153,7 +44153,7 @@ The picker is one list: LangWatch's **Evals Preview** first, then the models on 
     <Frame>
       <img
         src="/images/instant-evals/own-model-picker.png"
-        alt="Edit default models drawer for the ACME organization, with the Instant Evals picker open on LangWatch Evals Preview and OpenAI Decisions API"
+        alt="Edit default models drawer for the ACME organization, with the Instant Evals picker open: Evals Preview first, then Decisions API on OpenAI ticked, then models whose provider has no key yet"
       />
     </Frame>
   </Step>
