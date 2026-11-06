@@ -8,7 +8,7 @@ Feature: A sign-in the company's identity provider refused says who refused it
   # unsigned: anybody can open it with any query string. So the screen never names an
   # organization or a person, and the only address the door trusts is the one carried in a
   # signed, short-lived, httpOnly cookie set when the sign-in started on our own page.
-  # Seat requests and the waiting screen behind them: specs/organization (lane S1).
+  # Seat requests and the waiting screen behind them: modules/organization/specs/seat-requests.feature.
 
   Background:
     Given an organization with a single sign-on connection to Okta on a verified domain
