@@ -99,14 +99,16 @@ type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
 };
 
 /**
- * A widget over a window its caller owns. A new SQL statement or sources list starts it over, so
- * no answer to an earlier query stays on the card; the period and grain re-run it in place
- * through the dashboard context (dashboards-v2 AC201d).
+ * A widget over a window its caller owns. A new SQL statement, sources list, span or step starts
+ * it over, so no answer to an earlier query or period stays on the card; a refresh moves only the
+ * window's end and re-runs it in place, keeping the chart if the run fails (dashboards-v2 AC201d).
  */
 export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWindowProps) {
   const parsed = dashboardWidgetDefinitionSchema.safeParse(props.graph);
   const queries = parsed.success ? JSON.stringify(parsed.data.queries) : "";
-  return <WidgetFrameOverWindow key={`${props.id}:${queries}`} {...props} parsed={parsed} />;
+  const span = props.timeWindow.end - props.timeWindow.start;
+  const key = `${props.id}:${queries}:${span}:${props.granularitySeconds ?? ""}`;
+  return <WidgetFrameOverWindow key={key} {...props} parsed={parsed} />;
 }
 
 /** The outcome of reading a row's graph, parsed once by the caller. */
@@ -231,7 +233,7 @@ function WidgetFrameOverWindow({
     onSetUp: (target) => onNavigate({ target, params: {} }),
   });
 
-  // The frame stays mounted under a face, so a new period can bring the chart back.
+  // The frame stays mounted under a face, so a retry or a refresh can bring the chart back.
   return (
     <Box position="relative" height="full">
       <Box visibility={cover ? "hidden" : "visible"} aria-hidden={cover ? true : undefined}>
