@@ -44121,23 +44121,23 @@ Instant Evals run on **LangWatch Evals Preview** by default, billed as in [Limit
 
 ## The models you can pick
 
-The picker groups models under their provider, as it does chat models, and names each by its model only.
+The picker is one list: LangWatch's **Evals Preview** first, then the models on your own keys. Each row shows its provider's logo and a title. OpenAI's and Azure's `gpt-6-luna` both read **Decisions API**, and the logo tells them apart. The other titles name the provider and the model. A model whose provider has no key yet is listed but greyed out, with a line saying which key to add.
 
-| Provider to add       | Model in the picker  | What the provider needs                                                                  |
-| --------------------- | -------------------- | ---------------------------------------------------------------------------------------- |
-| OpenAI                | gpt-6-luna           | API key. Runs on the OpenAI Decisions API                                                |
-| Azure OpenAI          | gpt-6-luna           | API key, endpoint and a `gpt-6-luna` deployment on your resource. See [Azure](#azure)    |
-| Azure OpenAI          | Microsoft Decision 1 | API key, endpoint and a Microsoft Decision 1 deployment on Azure AI Foundry. See [Azure](#azure) |
-| Inception             | Mercury Decide       | API key                                                                                  |
-| Perplexity            | Decider v1.2         | API key                                                                                  |
-| Perplexity            | Decider Flash v1.2   | API key                                                                                  |
-| Cloudflare Workers AI | Clef                 | Account id and API token                                                                 |
-| Cloudflare Workers AI | Clef Flash           | Account id and API token                                                                 |
-| TypeSafe              | Jev 1.14             | API key                                                                                  |
-| OpenRouter            | Jev 1.14             | API key                                                                                  |
-| OpenRouter            | Microsoft Decision 1 | API key                                                                                  |
-| OpenRouter            | Liquid d1.1          | API key                                                                                  |
-| Fireworks             | Rune                 | API key                                                                                  |
+| Provider to add       | Model in the picker             | What the provider needs                                                                          |
+| --------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| OpenAI                | Decisions API                   | API key. Runs on the OpenAI Decisions API                                                        |
+| Azure OpenAI          | Decisions API                   | API key, endpoint and a `gpt-6-luna` deployment on your resource. See [Azure](#azure)            |
+| Azure OpenAI          | Azure Microsoft Decision 1      | API key, endpoint and a Microsoft Decision 1 deployment on Azure AI Foundry. See [Azure](#azure) |
+| Inception             | Inception Mercury Decide        | API key                                                                                          |
+| Perplexity            | Perplexity Decider v1.2         | API key                                                                                          |
+| Perplexity            | Perplexity Decider Flash v1.2   | API key                                                                                          |
+| Cloudflare Workers AI | Cloudflare Clef                 | Account id and API token                                                                         |
+| Cloudflare Workers AI | Cloudflare Clef Flash           | Account id and API token                                                                         |
+| TypeSafe              | TypeSafe Jev 1.14               | API key                                                                                          |
+| OpenRouter            | OpenRouter Jev 1.14             | API key                                                                                          |
+| OpenRouter            | OpenRouter Microsoft Decision 1 | API key                                                                                          |
+| OpenRouter            | OpenRouter Liquid d1.1          | API key                                                                                          |
+| Fireworks             | Fireworks Rune                  | API key                                                                                          |
 
 `gpt-6-luna` runs on the OpenAI Decisions API, so it needs that model on your OpenAI or Azure account. The other models need no OpenAI account.
 
