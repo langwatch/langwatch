@@ -74,7 +74,7 @@ function previewHint(preview: LangWatchDecisionPreview): string {
  * that column, otherwise listed with why not. The judge router flag (ADR-190) shows the rest;
  * off, only the ones that fill the column are listed.
  */
-export function langwatchDecisionOptions({
+function langwatchDecisionOptions({
   role,
   isJudgeRouted,
 }: {
@@ -132,40 +132,17 @@ export function decisionModelPickerOptions({
 }
 
 /**
- * The organization's own decision models in the Judge picker: the Instant Evals list's own rows,
- * listed whatever the router flag, never pickable. A scenario judge makes chat calls, which a
- * decision model does not answer, so the server refuses one for Judge (ADR-182).
- */
-function judgeOwnDecisionOptions(decisionOptions: ModelPickerOption[]): ModelPickerOption[] {
-  return decisionOptions
-    .filter((option) => isOwnDecisionModelId(option.value))
-    .map((option) => ({ ...option, disabled: true, hint: onlyFillsHint(["INSTANT_EVALS"]) }));
-}
-
-/**
- * One column's picker: the options above the inherit entry, then the rest. Instant Evals lists
- * decision models only; Judge lists the decision models on top, unpickable, then the LLMs.
+ * One column's picker. Instant Evals lists decision models only; every other column, Judge
+ * included, lists the LLMs (ADR-182).
  */
 export function rolePickerOptions({
   role,
   decisionOptions,
   llmOptions,
-  isJudgeRouted,
 }: {
   role: ModelRole;
   decisionOptions: ModelPickerOption[];
   llmOptions: ModelPickerOption[];
-  isJudgeRouted: boolean;
-}): { leading: ModelPickerOption[]; options: ModelPickerOption[] } {
-  if (role === "INSTANT_EVALS") return { leading: [], options: decisionOptions };
-  if (role === "JUDGE") {
-    return {
-      leading: [
-        ...langwatchDecisionOptions({ role, isJudgeRouted }),
-        ...judgeOwnDecisionOptions(decisionOptions),
-      ],
-      options: llmOptions,
-    };
-  }
-  return { leading: [], options: llmOptions };
+}): ModelPickerOption[] {
+  return role === "INSTANT_EVALS" ? decisionOptions : llmOptions;
 }

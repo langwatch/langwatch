@@ -81,43 +81,18 @@ Feature: Judge column in Default models
   # --- The Judge picker ---
 
   @unit
-  Scenario: The Judge picker lists decision models before LLMs
+  Scenario: The Judge picker lists no decision model
     Given the judge router flag is on for my organization
+    And own decision models are on for my organization
     When the Judge picker's choices are built
-    Then "Evals Preview", "Scenario Judge Preview" and "Search Preview" come first, each with its "Optimized for" line
-    And my organization's own decision models follow, none of them pickable
-    And the LLMs follow
-
-  @unit
-  Scenario: The Judge picker lists the own decision models the Instant Evals picker lists
-    Given own decision models are on for my organization
-    And the judge router flag is off
-    When the Judge picker's choices are built
-    Then every own decision model the Instant Evals picker lists comes first, in the same order
-    And each is tagged "Instant Evals only" and cannot be picked
+    Then no LangWatch decision model and no own decision model is listed
+    And the LLMs are the choices
 
   @integration
   Scenario: The Judge picker offers only models that can judge a scenario
     Given the judge router flag is on for my organization
+    And own decision models are on for my organization
     When I open the Judge picker
-    Then the three LangWatch decision models sit on top, above the inherit row, and cannot be picked yet
-    And my organization's own decision models follow them, above the inherit row
-    And every LLM reads as its provider icon and model id, with no description and no provider heading
-
-  @integration
-  Scenario: With the router flag off the Judge picker lists no LangWatch model
-    Given the judge router flag is off for my organization
-    When I open the Judge picker
-    Then no LangWatch decision model is listed
+    Then no decision model is listed
     And the inherit row comes first, then the LLMs
-
-  @integration
-  Scenario: The Judge picker lists my own decision models with the router flag off
-    Given own decision models are on for my organization
-    And the judge router flag is off
-    And my organization has an OpenAI key but no Inception key
-    When I open the Judge picker
-    Then every own decision model sits above the inherit row, in catalogue order, and none can be picked
-    And "OpenAI Decisions (gpt-6-luna)" reads what it is, tagged "Instant Evals only"
-    And "Inception Mercury Decide" says "Add an Inception key in Model Providers to use it."
-    And no LangWatch decision model is listed
+    And every LLM reads as its provider icon and model id, with no description and no provider heading

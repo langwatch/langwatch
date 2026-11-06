@@ -6,7 +6,8 @@
  */
 import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithModelProviderHost } from "../../../testing.tsx";
@@ -17,6 +18,7 @@ const mockGetDefaultModels = vi.fn();
 const mockGetInheritedValues = vi.fn();
 const mockListAllForProjectForFrontend = vi.fn();
 const mockListDecisionModels = vi.fn();
+const mockSave = vi.fn();
 
 // The drawer asks the judge router and own decision model flags; off unless a case turns one on.
 const flagsOn = new Set<string>();
@@ -58,7 +60,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
         useQuery: (input: unknown, options: unknown) => mockListDecisionModels(input, options),
       },
       saveDefaultModelsConfig: {
-        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+        useMutation: () => ({ mutateAsync: mockSave, isPending: false }),
       },
     },
   },
@@ -235,6 +237,48 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       expect(optionTitled("OpenAI Decisions (gpt-6-luna)")).toHaveTextContent(
         "OpenAI's Decisions API, on your OpenAI key.",
       );
+    });
+  });
+
+  describe("given a config row that sets nothing", () => {
+    const emptyRow = { ...CONFIG_ROW, config: {} };
+    beforeEach(() => {
+      mockGetDefaultModels.mockReturnValue({
+        data: { ...PAYLOAD, configs: [emptyRow] },
+        isLoading: false,
+      });
+      mockSave.mockResolvedValue({ id: "cfg_1" });
+    });
+
+    /** @scenario "Picking Evals Preview stores it, so a wider scope cannot take the column over" */
+    it("stores Evals Preview when it is picked, as the config's only value", async () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
+      await userEvent.setup().click(trigger);
+      await userEvent.setup().click(optionTitled("Evals Preview"));
+      fireEvent.click(screen.getByTestId("config-save"));
+
+      await vi.waitFor(() => expect(mockSave).toHaveBeenCalled());
+      const saved = mockSave.mock.calls[0]?.[0] as { config: Record<string, string> };
+      expect(saved.config).toEqual({ INSTANT_EVALS: HOSTED.value });
+    });
+  });
+
+  describe("given a config row that pins Evals Preview", () => {
+    beforeEach(() => {
+      mockGetDefaultModels.mockReturnValue({
+        data: { ...PAYLOAD, configs: [{ ...CONFIG_ROW, config: { INSTANT_EVALS: HOSTED.value } }] },
+        isLoading: false,
+      });
+    });
+
+    it("lists the inherit entry so the pin can be cleared", () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      expect(
+        within(instantEvalsListbox()).getByTestId("provider-model-selector-inherit"),
+      ).toBeInTheDocument();
     });
   });
 

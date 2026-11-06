@@ -159,56 +159,8 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
   });
 
   /** @scenario "The Judge picker offers only models that can judge a scenario" */
-  it("puts LangWatch's decision models above the inherit row, unpickable, then plain LLM rows", () => {
+  it("lists no decision model, the inherit row first, then plain LLM rows", () => {
     flagsOn.add(JUDGE_ROUTER_FLAG);
-    renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
-
-    const listbox = judgeListbox();
-    expect(listbox.querySelector('[data-part="item-group-label"]')).toBeNull();
-    const rows = within(listbox).getAllByRole("option", { hidden: true });
-    expect(rows.slice(0, 3).map((row) => row.querySelector("p")?.textContent)).toEqual([
-      "Evals Preview",
-      "Scenario Judge Preview",
-      "Search Preview",
-    ]);
-    expect(rows[0]).toHaveTextContent("Optimized for evals, routed");
-    expect(rows[1]).toHaveTextContent("Optimized for scenario judge");
-    expect(rows[1]).toHaveTextContent("Coming soon");
-    for (const row of rows.slice(0, 3)) expect(row).toHaveAttribute("aria-disabled", "true");
-    expect(rows[3]?.dataset.testid).toBe("provider-model-selector-inherit");
-
-    const llmRows = rows
-      .slice(4)
-      // A "Latest" alias keeps the model it resolves to as its line; a model id has none.
-      .filter((row) => !isLatestAlias(row.dataset.value ?? ""));
-    expect(llmRows.length).toBeGreaterThan(0);
-    for (const row of llmRows) {
-      expect(row.querySelector("svg, img")).not.toBeNull();
-      expect(row.querySelector('[data-testid="model-option-subtitle"]')).toBeNull();
-      expect(row).not.toHaveAttribute("aria-disabled", "true");
-    }
-  });
-
-  /** @scenario "The Judge picker offers only models that can judge a scenario" */
-  it("lists the organization's own decision models under LangWatch's, above the inherit row", () => {
-    flagsOn.add(JUDGE_ROUTER_FLAG);
-    flagsOn.add(OWN_DECISION_MODEL_FLAG);
-    renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
-
-    const rows = within(judgeListbox()).getAllByRole("option", { hidden: true });
-    const inheritAt = rows.findIndex(
-      (row) => row.dataset.testid === "provider-model-selector-inherit",
-    );
-    expect(rows.slice(3, inheritAt).map((row) => row.dataset.value)).toEqual(
-      OWN_DECISION_MODEL_IDS,
-    );
-    for (const row of rows.slice(0, inheritAt)) {
-      expect(row).toHaveAttribute("aria-disabled", "true");
-    }
-  });
-
-  /** @scenario "The Judge picker lists my own decision models with the router flag off" */
-  it("lists every own decision model on top with the router flag off, unpickable, with its key line", () => {
     flagsOn.add(OWN_DECISION_MODEL_FLAG);
     mockListDecisionModels.mockReturnValue({
       data: [
@@ -219,34 +171,24 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
     });
     renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
-    const rows = within(judgeListbox()).getAllByRole("option", { hidden: true });
-    const inheritAt = rows.findIndex(
-      (row) => row.dataset.testid === "provider-model-selector-inherit",
-    );
-    const decisionRows = rows.slice(0, inheritAt);
-    expect(decisionRows.map((row) => row.dataset.value)).toEqual(OWN_DECISION_MODEL_IDS);
-    for (const row of decisionRows) {
-      expect(row).toHaveAttribute("aria-disabled", "true");
-      expect(row).toHaveTextContent("Instant Evals only");
-    }
-    const openai = decisionRows.find((row) => row.dataset.value === "openai/decisions:gpt-6-luna");
-    expect(openai).toHaveTextContent("OpenAI's Decisions API, on your OpenAI key.");
-    const inception = decisionRows.find(
-      (row) => row.dataset.value === "inception/decisions:mercury-decide",
-    );
-    expect(inception).toHaveTextContent("Add an Inception key in Model Providers to use it.");
-    expect(rows.some((row) => (row.dataset.value ?? "").startsWith("langwatch/"))).toBe(false);
-  });
-
-  /** @scenario "With the router flag off the Judge picker lists no LangWatch model" */
-  it("lists no LangWatch model with the router flag off, the inherit row first", () => {
-    renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
-
     const listbox = judgeListbox();
-    expect(within(listbox).queryByText(/Preview$/)).not.toBeInTheDocument();
+    expect(listbox.querySelector('[data-part="item-group-label"]')).toBeNull();
     const rows = within(listbox).getAllByRole("option", { hidden: true });
     expect(rows[0]?.dataset.testid).toBe("provider-model-selector-inherit");
-    expect(rows.some((row) => (row.dataset.value ?? "").startsWith("langwatch/"))).toBe(false);
+    const values = rows.map((row) => row.dataset.value ?? "");
+    expect(values.some((value) => value.startsWith("langwatch/"))).toBe(false);
+    expect(values.some((value) => OWN_DECISION_MODEL_IDS.includes(value))).toBe(false);
+
+    const llmRows = rows
+      .slice(1)
+      // A "Latest" alias keeps the model it resolves to as its line; a model id has none.
+      .filter((row) => !isLatestAlias(row.dataset.value ?? ""));
+    expect(llmRows.length).toBeGreaterThan(0);
+    for (const row of llmRows) {
+      expect(row.querySelector("svg, img")).not.toBeNull();
+      expect(row.querySelector('[data-testid="model-option-subtitle"]')).toBeNull();
+      expect(row).not.toHaveAttribute("aria-disabled", "true");
+    }
   });
 
   /** @scenario "An unset Judge row inherits the Default model" */

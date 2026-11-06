@@ -387,6 +387,14 @@ Feature: Instant Evals decision model column in Default models
     And every row shows its provider icon, its title and a one-line description
 
   @integration
+  Scenario: Picking Evals Preview stores it, so a wider scope cannot take the column over
+    Given the Instant Evals column is not set at any scope
+    When I pick "Evals Preview" for the Instant Evals column and save
+    Then the config stores "Evals Preview" for the Instant Evals column
+    And a config whose only value is that pin can be saved
+    And once it is stored, the inherit entry is listed so the pin can be cleared
+
+  @integration
   Scenario: A model two providers offer is told apart by its provider
     Given the flag is on for my organization
     And my project has an OpenAI key and an Azure OpenAI key

@@ -258,8 +258,7 @@ function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
 
 /**
  * One flat list in the caller's order, each row with its provider icon, so no headings.
- * `inheritOption` adds an "Inherit" entry (emits `INHERIT_SENTINEL`), faint when unset;
- * `leadingOptions` sit above it.
+ * `inheritOption` adds an "Inherit" entry (emits `INHERIT_SENTINEL`) on top, faint when unset.
  */
 export function ProviderModelSelector({
   model,
@@ -268,7 +267,6 @@ export function ProviderModelSelector({
   size = "full",
   disabled = false,
   inheritOption,
-  leadingOptions = [],
   labelFor = (modelId) => modelId,
 }: {
   model: string;
@@ -287,8 +285,6 @@ export function ProviderModelSelector({
     /** Short label above the model, e.g. "Inherit (from organization)" or "Not configured". */
     label: string;
   };
-  /** Options listed above the inherit entry, such as LangWatch's own decision models. */
-  leadingOptions?: ModelPickerOption[];
   /** Label for a model id not among the options (a value saved before its provider went). */
   labelFor?: (modelId: string) => string;
 }) {
@@ -299,11 +295,8 @@ export function ProviderModelSelector({
     ...option,
     icon: providerIconFor(option.value, iconSlotFor(size)),
   });
-  const leading = leadingOptions.map(withIcon);
-  const rest = (query.data ?? []).map(withIcon);
-  const selectOptions = [...leading, ...rest];
-  const filteredLeading = filterModels(leading, modelSearch);
-  const filteredModels = filterModels(rest, modelSearch);
+  const selectOptions = (query.data ?? []).map(withIcon);
+  const filteredModels = filterModels(selectOptions, modelSearch);
   const isModelId = (id: string) => !selectOptions.find((option) => option.value === id)?.subtitle;
 
   // Render the inherit placeholder in the trigger when the user hasn't
@@ -325,7 +318,6 @@ export function ProviderModelSelector({
       }
     : null;
   const allFilteredModels: ModelOption[] = [
-    ...filteredLeading,
     ...(inheritItem ? [inheritItem] : []),
     ...filteredModels,
   ];
@@ -377,15 +369,10 @@ export function ProviderModelSelector({
           e.preventDefault();
           e.stopPropagation();
         }}
-        onValueChange={(change) => {
-          const selectedValue = change.value[0];
-          if (selectedValue) {
-            // Inherit sentinel rides the same callback as a normal pick;
-            // the caller maps `INHERIT_SENTINEL` to "clear the key" so the
-            // cascade walks up. Direct model pick stays an exact-value
-            // write.
-            onChange(selectedValue);
-          }
+        // Every pick reaches the caller, the ticked row included, so a value shown by default can
+        // be stored. `INHERIT_SENTINEL` rides the same callback; the caller maps it to a clear.
+        onSelect={({ value: selectedValue }) => {
+          if (selectedValue) onChange(selectedValue);
         }}
         loopFocus={true}
         scrollToIndexFn={scrollToListItem}
@@ -443,9 +430,6 @@ export function ProviderModelSelector({
             </Box>
           </Field.Root>
           <Select.List data-testid="provider-model-selector-list">
-            {filteredLeading.map((item) => (
-              <ModelItem key={item.value} item={item} size={size} />
-            ))}
             {inheritOption && inheritItem && (
               <InheritItem
                 labelFor={labelFor}

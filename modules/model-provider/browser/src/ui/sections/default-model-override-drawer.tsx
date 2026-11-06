@@ -572,9 +572,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
               onSetOverride={setOverride}
               displayNames={displayNames}
               pickerOptionFor={pickerOptionFor}
-              pickerFor={(llmOptions) =>
-                rolePickerOptions({ role, decisionOptions, llmOptions, isJudgeRouted })
-              }
+              pickerFor={(llmOptions) => rolePickerOptions({ role, decisionOptions, llmOptions })}
             />
           ))}
         </VStack>
@@ -619,17 +617,15 @@ function RoleRow({
   displayNames: Record<string, string>;
   /** The picker entry for one model id: its label and the line under it. */
   pickerOptionFor: (modelValue: string) => ModelPickerOption;
-  /** This row's picker from its LLM entries: what sits above the inherit entry, then the rest. */
-  pickerFor: (llmOptions: ModelPickerOption[]) => {
-    leading: ModelPickerOption[];
-    options: ModelPickerOption[];
-  };
+  /** This row's picker options from its LLM entries. */
+  pickerFor: (llmOptions: ModelPickerOption[]) => ModelPickerOption[];
 }) {
   const current = config[role] ?? "";
-  const picker = pickerFor(
+  const pickerOptions = pickerFor(
     roleSelectModelOptions({ options: modelOptions, role }).map(pickerOptionFor),
   );
-  // Unset already runs on this listed model, so it shows checked and picking it stays unset.
+  // Unset already runs on this listed model, so it shows checked. Picking it stores the pin, so a
+  // wider scope can't take the column over; the inherit entry returns to clear a stored value.
   const unsetDefault = roleInherit.isUnsetDefault ? roleInherit.model : undefined;
   const canExpand = features.length > 0;
   const ChevronIcon = expanded ? ChevronDown : ChevronRight;
@@ -661,10 +657,9 @@ function RoleRow({
         <Box width="240px" flexShrink={0}>
           <ProviderModelSelector
             model={current || unsetDefault || ""}
-            query={{ data: picker.options, isLoading: false }}
-            leadingOptions={picker.leading}
-            onChange={(m) => onSetOverride(role, m === unsetDefault ? null : m)}
-            inheritOption={unsetDefault ? undefined : roleInherit}
+            query={{ data: pickerOptions, isLoading: false }}
+            onChange={(m) => onSetOverride(role, m)}
+            inheritOption={unsetDefault && !current ? undefined : roleInherit}
             disabled={unsupportedAtScope}
             labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
           />
