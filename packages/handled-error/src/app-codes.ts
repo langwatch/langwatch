@@ -809,6 +809,7 @@ export const APP_ERROR_CODES = [
   "step_after_unknown",
   "storage_not_writable",
   "stored_object_files_rate_limited",
+  "subscription_already_active",
   "subscription_ambiguous",
   "subscription_not_linked",
   "subscription_service_unavailable",
