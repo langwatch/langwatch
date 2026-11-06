@@ -36,7 +36,9 @@ vi.mock("../organization-api.ts", () => {
         return {};
       },
     }),
-    invalidate: vi.fn(),
+    invalidate: async () => {
+      calls.push({ path: `${path}:invalidate`, input: undefined });
+    },
   });
   const namespace = (prefix: string): Record<string, unknown> =>
     new Proxy(endpoint(prefix) as Record<string, unknown>, {
@@ -82,6 +84,7 @@ function ApproveButton() {
 }
 
 const approvals = () => calls.filter((call) => call.path === "seatRequest.approve");
+const invalidations = () => calls.filter((call) => call.path.endsWith(":invalidate"));
 const expansions = () => calls.filter((call) => call.path === "subscription.addTeamMemberOrEvents");
 
 describe("useSeatRequests approve", () => {
@@ -142,10 +145,9 @@ describe("useSeatRequests approve", () => {
       const { onConfirm } = openSeats.mock.calls[0]![0] as { onConfirm: () => Promise<void> };
       await onConfirm();
 
-      expect(calls.map((call) => call.path)).toEqual([
-        "subscription.addTeamMemberOrEvents",
-        "seatRequest.approve",
-      ]);
+      expect(
+        calls.map((call) => call.path).filter((path) => !path.endsWith(":invalidate")),
+      ).toEqual(["subscription.addTeamMemberOrEvents", "seatRequest.approve"]);
       expect(expansions()[0]!.input).toEqual({
         organizationId: ORG,
         plan: "GROWTH_SEAT_EUR_MONTHLY",
@@ -154,6 +156,24 @@ describe("useSeatRequests approve", () => {
         totalMembers: 6,
         totalTraces: 0,
       });
+    });
+
+    /** @scenario "Approve on a live Stripe seat subscription adds the seat, then approves" */
+    it("rereads the seat totals when the approval fails after the seat was bought", async () => {
+      state.open = stripeSeats();
+      state.failing.add("seatRequest.approve");
+      const { host } = renderWithOrganizationHost(<ApproveButton />);
+
+      await userEvent.click(screen.getByText("Approve"));
+      const { onConfirm } = openSeats.mock.calls[0]![0] as { onConfirm: () => Promise<void> };
+      await onConfirm();
+
+      expect(expansions()).toHaveLength(1);
+      expect(calls.map((call) => call.path)).toContain("seatRequest.listOpen:invalidate");
+      expect(calls.map((call) => call.path)).toContain("licenseEnforcement.checkLimit:invalidate");
+      expect(host.failures).toEqual([
+        expect.objectContaining({ fallbackTitle: "Couldn't approve the seat request" }),
+      ]);
     });
 
     /** @scenario "A failed seat expansion approves nothing" */
@@ -168,6 +188,7 @@ describe("useSeatRequests approve", () => {
 
       expect(expansions()).toHaveLength(1);
       expect(approvals()).toHaveLength(0);
+      expect(invalidations()).toHaveLength(0);
       expect(host.failures).toEqual([
         expect.objectContaining({ fallbackTitle: "Couldn't add the seat" }),
       ]);

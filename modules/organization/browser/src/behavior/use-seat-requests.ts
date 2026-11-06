@@ -97,6 +97,8 @@ export function useSeatRequests({
           showErrorToast({ error, fallbackTitle: "Couldn't add the seat" });
           return;
         }
+        // The seat is bought whether or not the approval lands; reread the totals either way.
+        refresh();
         await approveNow(request);
       },
     });
