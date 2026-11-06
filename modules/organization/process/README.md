@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:250`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:248`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -1956,7 +1956,7 @@ type Input = z.infer<typeof limitScopeSchema>; // ../contract/src/license-enforc
 
 ### `organization`
 
-Contract `../contract/src/organization.trpc.ts:94`, router `src/transport/organization.trpc.ts:80`.
+Contract `../contract/src/organization.trpc.ts:92`, router `src/transport/organization.trpc.ts:80`.
 
 | Procedure                                              | Kind     | Gate                                                                                                                                  | Input                                            | Output                                 |
 | ------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------- |
@@ -1979,7 +1979,7 @@ Contract `../contract/src/organization.trpc.ts:94`, router `src/transport/organi
 
 ```typescript
 // organization.createAndAssign
-type Input = z.infer<typeof organizationApiCreateAndAssignInputSchema>; // ../contract/src/organization.trpc.ts:64
+type Input = z.infer<typeof organizationApiCreateAndAssignInputSchema>; // ../contract/src/organization.trpc.ts:62
 // Output: organizationCreatedSchema, ../contract/src/organization.responses.ts:29
 interface Output {
   success: true;
@@ -1995,13 +1995,13 @@ interface Output {
 }
 
 // organization.deleteMember
-// Input: organizationApiRemoveMemberInputSchema, ../contract/src/seat-hold.ts:19
+// Input: organizationApiRemoveMemberInputSchema, ../contract/src/organization.responses.ts:449
 interface Input {
   organizationId: string;
   userId: string;
   giveSeatToUserId?: string | null;
 }
-// Output: organizationMemberRemovedSchema, ../contract/src/seat-hold.ts:36
+// Output: organizationMemberRemovedSchema, ../contract/src/organization.responses.ts:466
 interface Output {
   success: true;
   seatGivenToUserId: string | null;
@@ -2014,7 +2014,7 @@ interface Input {
   userId: string;
   organizationId: string;
 }
-// Output: organizationSeatRemovalPreviewSchema, ../contract/src/seat-hold.ts:59
+// Output: organizationSeatRemovalPreviewSchema, ../contract/src/organization.responses.ts:489
 interface Output {
   holdsFullSeat: boolean;
   seatFreesAt: unknown | null;
@@ -2027,7 +2027,7 @@ interface Output {
 
 // organization.listHeldSeats
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
-// Output: organizationHeldSeatsSchema, ../contract/src/seat-hold.ts:82
+// Output: organizationHeldSeatsSchema, ../contract/src/organization.responses.ts:512
 interface Output {
   heldSeats: {
     userId: string;
@@ -2056,7 +2056,7 @@ interface Output {
 interface Input {
   isDemo?: boolean;
 }
-// Output: organizationFullyLoadedListSchema, ../contract/src/organization.trpc.ts:79
+// Output: organizationFullyLoadedListSchema, ../contract/src/organization.trpc.ts:77
 type Output = unknown[];
 
 // organization.getScopeGraph

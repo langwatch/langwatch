@@ -29,6 +29,10 @@ import {
   organizationMemberRoleChangedSchema,
   organizationUserRowsSchema,
   organizationWriteAckSchema,
+  organizationApiRemoveMemberInputSchema,
+  organizationHeldSeatsSchema,
+  organizationMemberRemovedSchema,
+  organizationSeatRemovalPreviewSchema,
 } from "./organization.responses.ts";
 import {
   organizationApiAuditLogsInputSchema,
@@ -43,12 +47,6 @@ import {
 } from "./organization.trpc-schemas.ts";
 import { organizationIntentSchema } from "./organization.ts";
 import { organizationApiScopeGraphInputSchema, scopeGraphSchema } from "./scope-graph.ts";
-import {
-  organizationApiRemoveMemberInputSchema,
-  organizationHeldSeatsSchema,
-  organizationMemberRemovedSchema,
-  organizationSeatRemovalPreviewSchema,
-} from "./seat-hold.ts";
 
 /** The first organization a person creates, and the name they gave it. */
 const organizationApiCreateAndAssignInputSchemaDefinition = z.object({

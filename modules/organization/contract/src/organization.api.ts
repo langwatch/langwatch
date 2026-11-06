@@ -64,6 +64,10 @@ import type {
   OrganizationListedInvite,
   OrganizationInvitedMemberIds,
   OrganizationPendingInviteApplied,
+  OrganizationApiRemoveMemberInput,
+  OrganizationHeldSeats,
+  OrganizationMemberRemoved,
+  OrganizationSeatRemovalPreview,
 } from "./organization.responses.ts";
 import type {
   Organization,
@@ -108,12 +112,6 @@ import type {
   PersonalWorkspaceFeaturesInput,
 } from "./personal-workspace.ts";
 import type { ScopeGraphOrganization } from "./scope-graph.ts";
-import type {
-  OrganizationApiRemoveMemberInput,
-  OrganizationHeldSeats,
-  OrganizationMemberRemoved,
-  OrganizationSeatRemovalPreview,
-} from "./seat-hold.ts";
 
 export interface OrganizationCaller {
   readonly id: string;
