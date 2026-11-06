@@ -50,7 +50,12 @@ export async function fetchStars({
     }
     failure = `GitHub answered ${response.status}`;
   } catch (error) {
-    failure = error instanceof Error ? error.message : String(error);
+    /* Node's fetch says only "fetch failed"; the reason, a connect timeout say, is its cause. */
+    const cause = error instanceof Error ? error.cause : undefined;
+    failure = [error, cause]
+      .filter((part) => part !== undefined)
+      .map((part) => (part instanceof Error ? part.message : String(part)))
+      .join(": ");
   }
   console.warn(`[docs-site] star count not read (${failure}); using the last one kept`);
   try {

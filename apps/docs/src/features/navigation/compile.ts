@@ -1,3 +1,4 @@
+export { readStars } from "./compile/github-stars.ts";
 export { pageLastModified } from "./compile/last-modified.ts";
 export { docsNavPlugin } from "./compile/nav-plugin.ts";
 export { buildNav, openapiPages, pageDates, readDocsConfig, type DocsItem } from "./compile/nav.ts";
