@@ -340,6 +340,7 @@ export interface LwqlPrismaRows {
     readonly openedAt: "DateTime";
     readonly resolvedAt: "DateTime?";
     readonly resolvedByUserId: "String?";
+    readonly seatPendingSince: "DateTime?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };

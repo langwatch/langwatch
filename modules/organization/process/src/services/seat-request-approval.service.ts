@@ -1,4 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
+import type { Logger } from "@langwatch/observability";
 import {
   MemberSeatLimitReachedError,
   OrganizationUserRole,
@@ -21,6 +22,11 @@ import type { SeatRequestMemberships, SeatRequestPeers } from "./seat-request.se
 /** How often a claim whose seat could not be given is handed back before giving up. */
 const RELEASE_ATTEMPTS = 3;
 const RELEASE_PAUSE_MS = 100;
+/**
+ * An approval still giving its seat this long after it claimed the request never gave it: the
+ * seat wait (15 s) and the writes are long done by then, so the request is reopened.
+ */
+export const SEAT_PENDING_GRACE_MS = 10 * 60 * 1000;
 
 type Dependencies = Readonly<{
   requests: SeatRequestRepository;
@@ -29,6 +35,7 @@ type Dependencies = Readonly<{
   seats: Pick<OrganizationSeatLicense, "checkLimit">;
   peers: Pick<SeatRequestPeers, "inviteMember">;
   now: () => number;
+  logger: Pick<Logger, "warn">;
   wait?: (ms: number) => Promise<void>;
 }>;
 
@@ -99,9 +106,15 @@ export class SeatRequestApprovalService {
       if (!(isFull && membership.disabledAt === null)) {
         await this.assertFullSeatFree({ organizationId, by });
       }
-      return {
-        outcome: await this.giveFullSeat({ organizationId, request, membership, isFull, by }),
-      };
+      const outcome = await this.giveFullSeat({
+        organizationId,
+        request,
+        membership,
+        isFull,
+        by,
+      });
+      await this.settle(claim);
+      return { outcome };
     } catch (error) {
       await this.release({ claim, refusal: error });
       const refusal = readSeatRefusal(error);
@@ -109,6 +122,58 @@ export class SeatRequestApprovalService {
         throw new MemberSeatLimitReachedError({ meta: refusal.limit });
       throw error;
     }
+  }
+
+  /**
+   * Reopens the organization's approvals whose seat never landed (a crash between the claim and
+   * the seat write, or a claim that could not be handed back), so they are back on every list.
+   * One whose person holds an enabled full seat after all is only marked settled.
+   */
+  async reopenStranded({ organizationId }: { organizationId: string }): Promise<void> {
+    const { requests } = this.dependencies;
+    const stranded = await requests.findSeatPending({
+      organizationId,
+      since: this.now() - SEAT_PENDING_GRACE_MS,
+    });
+    for (const request of stranded) {
+      if (request.resolvedAt === null) continue;
+      const at = request.resolvedAt;
+      const membership = await this.membershipOf({ organizationId, request });
+      const isSeated =
+        membership !== null &&
+        membership.disabledAt === null &&
+        (membership.role === OrganizationUserRole.MEMBER ||
+          membership.role === OrganizationUserRole.ADMIN);
+      if (isSeated) {
+        await requests.settleSeat({ organizationId, id: request.id, at });
+        continue;
+      }
+      await requests.release({
+        organizationId,
+        id: request.id,
+        resolvedByUserId: request.resolvedByUserId,
+        at,
+      });
+      this.dependencies.logger.warn(
+        { organizationId, seatRequestId: request.id },
+        "reopened an approved seat request whose seat never landed",
+      );
+    }
+  }
+
+  /**
+   * Marks the seat given. The seat stands either way, so a failed mark is logged, not thrown;
+   * reopenStranded later finds the person seated and only marks it settled.
+   */
+  private async settle(claim: Claim): Promise<void> {
+    await this.dependencies.requests
+      .settleSeat({ organizationId: claim.organizationId, id: claim.id, at: claim.at })
+      .catch((error: unknown) => {
+        this.dependencies.logger.warn(
+          { error, organizationId: claim.organizationId, seatRequestId: claim.id },
+          "could not mark a seat request's seat as given",
+        );
+      });
   }
 
   private now(): number {

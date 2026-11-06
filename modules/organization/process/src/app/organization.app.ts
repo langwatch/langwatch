@@ -682,7 +682,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#infrastructure.seatLease.acquire(input);
   }
 
-  renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void> {
+  renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<boolean> {
     return this.#infrastructure.seatLease.renew(input);
   }
 
@@ -1821,10 +1821,11 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     // Custom roles too: the member's seat, read by the write, must not move under it.
     await this.#infrastructure.seats.withSeat({
       organizationId,
-      work: async () => {
+      work: async (lease) => {
         if (!isOrganizationApiCustomRole(input.role)) {
           await this.#assertBuiltInTeamRoleAllowed({ organizationId, input });
         }
+        await lease.assertHeld();
         await this.updateTeamMemberRole(input, by);
       },
     });

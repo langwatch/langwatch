@@ -205,7 +205,14 @@ export class SeatRequestService {
     return rows.some((row) => row.organizationId === organizationId && row.status === "OPEN");
   }
 
+  /** Approvals whose seat never landed are reopened first, so they are on the list again. */
   async listOpen({ organizationId }: { organizationId: string }): Promise<OpenSeatRequests> {
+    await this.approval.reopenStranded({ organizationId }).catch((error: unknown) => {
+      this.dependencies.logger.warn(
+        { error, organizationId },
+        "could not reopen stranded seat request approvals",
+      );
+    });
     const [rows, approval] = await Promise.all([
       this.dependencies.requests.findOpen({ organizationId }),
       this.approvalOf({ organizationId }),

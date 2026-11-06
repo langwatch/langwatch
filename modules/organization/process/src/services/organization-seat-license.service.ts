@@ -9,7 +9,10 @@ import {
 } from "@langwatch/entitlement-contract";
 import { seatsFree, type LimitCheckResult, type LimitType } from "@langwatch/organization-contract";
 
-import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
+import type {
+  OrganizationSeatRepository,
+  SeatLease,
+} from "../repositories/organization-seat.repository.ts";
 import type { SeatLimitNoticeService } from "./seat-limit-notice.service.ts";
 
 /**
@@ -36,7 +39,10 @@ export interface OrganizationSeatLicense {
    * no other seat-taking write on the organization runs meanwhile. Taken once per write path,
    * never from inside another `withSeat` on the same organization.
    */
-  withSeat<T>(input: { organizationId: string; work: () => Promise<T> }): Promise<T>;
+  withSeat<T>(input: {
+    organizationId: string;
+    work: (lease: SeatLease) => Promise<T>;
+  }): Promise<T>;
 
   /** Whether one more of `resource` fits inside the organization's plan. Answers rather than
    * throws, since only the caller knows how to turn a refusal into a named error. */
@@ -78,7 +84,10 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
     },
   ) {}
 
-  withSeat<T>(input: { organizationId: string; work: () => Promise<T> }): Promise<T> {
+  withSeat<T>(input: {
+    organizationId: string;
+    work: (lease: SeatLease) => Promise<T>;
+  }): Promise<T> {
     return this.options.memberships.withSeatLock(input);
   }
 

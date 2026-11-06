@@ -135,7 +135,7 @@ export class OrganizationMemberRoleService {
     } else {
       await this.dependencies.seats.withSeat({
         organizationId,
-        work: async () => {
+        work: async (lease) => {
           const result = await this.dependencies.seats.checkLimit({
             organizationId,
             resource: "members",
@@ -146,6 +146,7 @@ export class OrganizationMemberRoleService {
               meta: { limitType: result.limitType, current: result.current, max: result.max },
             });
           }
+          await lease.assertHeld();
           await this.repo.setMemberDisabled({ organizationId, userId, disabled });
         },
       });
@@ -282,7 +283,7 @@ export class OrganizationMemberRoleService {
 
     return this.dependencies.seats.withSeat({
       organizationId,
-      work: async () => {
+      work: async (lease) => {
         await this.dependencies.seats.assertRoleChangeAllowed({
           organizationId,
           currentRole: currentMember.role,
@@ -290,6 +291,7 @@ export class OrganizationMemberRoleService {
           role,
           user: params.planUser,
         });
+        await lease.assertHeld();
         return this.repo.updateMemberRole({
           organizationId,
           userId,

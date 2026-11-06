@@ -159,6 +159,46 @@ Feature: Seat requests when an organization is over its seat limit
       Then the lease's expiry moves out by the lease time
 
     @integration
+    Scenario: A seat change whose lease was taken over writes nothing
+      Given a seat change holds the organization's seat lease
+      And its lease expires while it is still counting seats
+      And a second seat change takes the lease and writes
+      When the first seat change is about to write its seat
+      Then it is refused with "seat_change_busy"
+      And only the second seat change's write landed
+
+    @unit
+    Scenario: An approval whose seat never landed is reopened
+      Given an administrator approved a held person's seat request an hour ago
+      And the approval stopped before the seat was given
+      When an administrator lists the open seat requests
+      Then the request is open again
+      And the person is still held
+
+    @unit
+    Scenario: An approval still giving its seat is left alone
+      Given an administrator approved a held person's seat request a minute ago
+      And the seat is not given yet
+      When an administrator lists the open seat requests
+      Then the request is not on the list
+
+    @unit
+    Scenario: An approval whose seat landed but was never marked is settled, not reopened
+      Given an administrator approved a held person's seat request
+      And the person was enabled as a full member
+      But the approval could not mark the seat as given
+      When an administrator lists the open seat requests an hour later
+      Then the request stays approved and is marked as given
+
+    @unit
+    Scenario: A directory admission whose lease was taken over writes no membership
+      Given a directory admission holds the organization's seat lease through the organization Api
+      And the lease went to another seat change before the membership write
+      When the admission is about to write the membership
+      Then it is refused with "seat_change_busy"
+      And the admission still releases its own lease
+
+    @integration
     Scenario: Two single sign-on arrivals for the last free full seat at once: exactly one gets it
       Given exactly one full member seat is free
       When "first@acme.example" and "second@acme.example" arrive by single sign-on at the same moment asking for a full seat
