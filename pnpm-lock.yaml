@@ -16806,6 +16806,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/aws-client':
+        specifier: workspace:*
+        version: link:../../../packages/aws-client
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
