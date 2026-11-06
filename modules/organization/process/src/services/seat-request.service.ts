@@ -460,8 +460,12 @@ export class SeatRequestService {
     organizationId: string;
     userId: string;
   }): Promise<{ name: string | null; email: string | null } | undefined> {
-    const rows = await this.dependencies.members.findMembersWithDepartments({ organizationId });
-    const row = rows.find((candidate) => candidate.userId === userId);
+    const row = await this.dependencies.members
+      .getMembership({ organizationId, userId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "member_not_found") return undefined;
+        throw error;
+      });
     return row ? { name: row.user.name, email: row.user.email?.toLowerCase() ?? null } : undefined;
   }
 
