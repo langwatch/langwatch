@@ -58,6 +58,30 @@ findPendingInvitationsByEmail(input: Readonly<{ email: string }>): Promise<Pendi
 deleteMember(input: Readonly<{ organizationId: string; userId: string }>, by: OrganizationCaller | null): Promise<void>;
 ```
 
+#### `acquireSeatLease`
+
+Takes the organization's seat lease for a caller that writes a seat-holding row itself (a directory admission): waits while another seat change holds it, then refuses seat_change_busy. The holder renews it every `renewEveryMs` and releases it in a finally.
+
+```typescript
+acquireSeatLease(input: Readonly<{ organizationId: string }>): Promise<Readonly<{ holder: string; renewEveryMs: number }>>;
+```
+
+#### `renewSeatLease`
+
+Pushes this holder's lease expiry out again; a lease taken over meanwhile is left alone.
+
+```typescript
+renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void>;
+```
+
+#### `releaseSeatLease`
+
+Drops this holder's seat lease, and only its own.
+
+```typescript
+releaseSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void>;
+```
+
 #### `setMemberDisabled`
 
 ```typescript
@@ -2379,7 +2403,7 @@ Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedE
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:311`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:313`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:18` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:19` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:20` |

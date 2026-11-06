@@ -346,16 +346,6 @@ describe("Prisma table ownership lint", () => {
       ]);
     });
 
-    /** @scenario "A reader whose only access is an admitted write still uses the share" */
-    it("keeps a reader whose only access is an admitted write", () => {
-      const built = world('return db.project.update({ where: { id: "p" } });');
-      const admitted = [
-        { ...SHARED[0]!, writes: [{ reader: "entitlement", file: WRITER, reason: "x" }] },
-      ];
-
-      expect(messages(built, admitted)).toEqual([]);
-    });
-
     /** @scenario "A share's write exception that matches no write is reported" */
     it("reports a write exception whose file no longer writes the table", () => {
       const built = world("return db.project.findMany({});");
@@ -432,7 +422,6 @@ describe("Prisma table ownership lint", () => {
         "organization",
         ["authz", "data-privacy", "billing", "entitlement", "licensing"],
       ],
-      ["OrganizationSeatLease", "organization", ["scim"]],
       ["Organization", "organization", ["scim", "entitlement", "billing", "licensing"]],
       ["User", "user", ["billing"]],
       ["OrganizationLicense", "licensing", ["organization"]],
@@ -445,7 +434,6 @@ describe("Prisma table ownership lint", () => {
       ["user", "prisma.user-data-erase.repository.ts"],
       ["authz", "prisma.authz-admission.repository.ts"],
       ["authz", "prisma.authz-ledger-read.repository.ts"],
-      ["scim", "prisma.scim-seat.repository.ts"],
       ["billing", "prisma.billing-account-facts.repository.ts"],
     ]);
   });

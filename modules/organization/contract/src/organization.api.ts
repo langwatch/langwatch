@@ -290,6 +290,18 @@ export interface OrganizationApi {
     input: Readonly<{ organizationId: string; userId: string }>,
     by: OrganizationCaller | null,
   ): Promise<void>;
+  /**
+   * Takes the organization's seat lease for a caller that writes a seat-holding row itself (a
+   * directory admission): waits while another seat change holds it, then refuses
+   * seat_change_busy. The holder renews it every `renewEveryMs` and releases it in a finally.
+   */
+  acquireSeatLease(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<Readonly<{ holder: string; renewEveryMs: number }>>;
+  /** Pushes this holder's lease expiry out again; a lease taken over meanwhile is left alone. */
+  renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void>;
+  /** Drops this holder's seat lease, and only its own. */
+  releaseSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void>;
   setMemberDisabled(
     input: Readonly<{ organizationId: string; userId: string; disabled: boolean }>,
     by: OrganizationCaller | null,

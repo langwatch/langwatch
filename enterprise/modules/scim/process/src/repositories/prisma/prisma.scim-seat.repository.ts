@@ -1,9 +1,5 @@
 import { countMemberSeats } from "@langwatch/entitlement-contract";
-import {
-  type OrganizationMemberSeats,
-  SeatChangeBusyError,
-} from "@langwatch/organization-contract";
-import { type LeaseStore, withLease } from "@langwatch/prisma-client";
+import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
 import {
   INVITE_STATUS,
   OrganizationUserRole,
@@ -28,41 +24,6 @@ const permissionsSchema = z.array(z.string());
 
 type Holder = Readonly<{ role: OrganizationUserRole; permissions: string[] | undefined }>;
 
-/** A lease written inside a caller's transaction would stay invisible until it commits. */
-function isRootClient(database: PrismaScimSeatDatabase): database is PrismaClient {
-  return "$transaction" in database;
-}
-
-/** Organization's seat lease row, written the way its own seat repository writes it. */
-function seatLeaseStore({
-  prisma,
-  organizationId,
-}: {
-  prisma: PrismaClient;
-  organizationId: string;
-}): LeaseStore {
-  return {
-    acquire: async ({ holder, ttlMs }) => {
-      const taken = await prisma.$queryRaw<{ holder: string }[]>`
-INSERT INTO "OrganizationSeatLease" ("organizationId", "holder", "expiresAt")
-VALUES (${organizationId}, ${holder}, now() + make_interval(secs => ${ttlMs / 1000}))
-ON CONFLICT ("organizationId") DO UPDATE
-  SET "holder" = EXCLUDED."holder", "expiresAt" = EXCLUDED."expiresAt"
-  WHERE "OrganizationSeatLease"."expiresAt" < now()
-RETURNING "holder"`;
-      return taken.length > 0;
-    },
-    renew: async ({ holder, ttlMs }) => {
-      await prisma.$executeRaw`
-UPDATE "OrganizationSeatLease" SET "expiresAt" = now() + make_interval(secs => ${ttlMs / 1000})
-WHERE "organizationId" = ${organizationId} AND "holder" = ${holder}`;
-    },
-    release: async ({ holder }) => {
-      await prisma.organizationSeatLease.deleteMany({ where: { organizationId, holder } });
-    },
-  };
-}
-
 /** Seat counts over organization's membership and invitation rows, through its shares (PC-SCIM-SEAT). */
 export class PrismaScimSeatRepository implements ScimSeatRepository {
   static create(prisma: PrismaScimSeatDatabase): PrismaScimSeatRepository {
@@ -70,21 +31,6 @@ export class PrismaScimSeatRepository implements ScimSeatRepository {
   }
 
   private constructor(private readonly prisma: PrismaScimSeatDatabase) {}
-
-  /** The same lease row organization's seat writes take (SHARED_PRISMA_TABLES). */
-  async withSeatLock<T>({
-    organizationId,
-    work,
-  }: Readonly<{ organizationId: string; work: () => Promise<T> }>): Promise<T> {
-    if (!isRootClient(this.prisma)) {
-      throw new Error("The seat lease needs the root client, not a transaction");
-    }
-    return withLease({
-      store: seatLeaseStore({ prisma: this.prisma, organizationId }),
-      work,
-      onBusy: () => new SeatChangeBusyError(),
-    });
-  }
 
   async countMemberSeats({
     organizationId,

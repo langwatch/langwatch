@@ -187,6 +187,7 @@ import type { OrganizationLifecycleSenders } from "../services/organization-life
 import type { OrganizationGrantCache } from "../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 import { OrganizationScopeGraphService } from "../services/organization-scope-graph.service.ts";
+import { OrganizationSeatLeaseService } from "../services/organization-seat-lease.service.ts";
 import { OrganizationSeatLicenseService } from "../services/organization-seat-license.service.ts";
 import type {
   OrganizationSeatLicense,
@@ -250,6 +251,7 @@ type OrganizationInfrastructure = Readonly<{
   seats: OrganizationSeatLicense;
   /** The full and lite seats an organization holds, as a licence and a plan count them. */
   seatCounts: OrganizationSeatRepository;
+  seatLease: OrganizationSeatLeaseService;
   /** The invitations this deployment administers. */
   invitations: OrganizationInvitations;
   /**
@@ -470,6 +472,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         notices: seatLimits,
       }),
       seatCounts,
+      seatLease: OrganizationSeatLeaseService.create(seatCounts),
       invitations: OrganizationInvitationsService.create({
         invites: inviteService,
         repository: invites,
@@ -671,6 +674,20 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     by: OrganizationCaller | null,
   ): Promise<void> {
     return this.#dependencies.membership.deleteMember({ ...input, actingUserId: by?.id ?? null });
+  }
+
+  acquireSeatLease(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<Readonly<{ holder: string; renewEveryMs: number }>> {
+    return this.#infrastructure.seatLease.acquire(input);
+  }
+
+  renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void> {
+    return this.#infrastructure.seatLease.renew(input);
+  }
+
+  releaseSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void> {
+    return this.#infrastructure.seatLease.release(input);
   }
 
   /**

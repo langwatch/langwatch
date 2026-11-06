@@ -20,4 +20,10 @@ export abstract class OrganizationSeatRepository {
    * organization from inside `work` waits on itself.
    */
   abstract withSeatLock<T>(input: { organizationId: string; work: () => Promise<T> }): Promise<T>;
+  /** The same lease for a holder outside this process's `work`, and how often it renews it. */
+  abstract acquireSeatLease(input: {
+    organizationId: string;
+  }): Promise<{ holder: string; renewEveryMs: number }>;
+  abstract renewSeatLease(input: { organizationId: string; holder: string }): Promise<void>;
+  abstract releaseSeatLease(input: { organizationId: string; holder: string }): Promise<void>;
 }

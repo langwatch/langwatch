@@ -7,6 +7,4 @@ import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
  */
 export interface ScimSeatRepository {
   countMemberSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationMemberSeats>;
-  /** Runs `work` holding organization's seat lease, the one its own seat writes hold. */
-  withSeatLock<T>(input: Readonly<{ organizationId: string; work: () => Promise<T> }>): Promise<T>;
 }

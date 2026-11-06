@@ -3,7 +3,13 @@ import {
   type OrganizationMemberSeats,
   SeatChangeBusyError,
 } from "@langwatch/organization-contract";
-import { type LeaseStore, withLease } from "@langwatch/prisma-client";
+import {
+  acquireLease,
+  LEASE_TTL_MS,
+  type LeaseStore,
+  RENEW_EVERY_MS,
+  withLease,
+} from "@langwatch/prisma-client";
 import {
   INVITE_STATUS,
   OrganizationUserRole,
@@ -126,14 +132,50 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
     organizationId: string;
     work: () => Promise<T>;
   }): Promise<T> {
-    if (!isRootClient(this.prisma)) {
-      throw new Error("The seat lease needs the root client, not a transaction");
-    }
     return withLease({
-      store: seatLeaseStore({ prisma: this.prisma, organizationId }),
+      store: this.leaseStore(organizationId),
       work,
       onBusy: () => new SeatChangeBusyError(),
     });
+  }
+
+  async acquireSeatLease({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ holder: string; renewEveryMs: number }> {
+    const holder = await acquireLease({
+      store: this.leaseStore(organizationId),
+      onBusy: () => new SeatChangeBusyError(),
+    });
+    return { holder, renewEveryMs: RENEW_EVERY_MS };
+  }
+
+  renewSeatLease({
+    organizationId,
+    holder,
+  }: {
+    organizationId: string;
+    holder: string;
+  }): Promise<void> {
+    return this.leaseStore(organizationId).renew({ holder, ttlMs: LEASE_TTL_MS });
+  }
+
+  releaseSeatLease({
+    organizationId,
+    holder,
+  }: {
+    organizationId: string;
+    holder: string;
+  }): Promise<void> {
+    return this.leaseStore(organizationId).release({ holder });
+  }
+
+  private leaseStore(organizationId: string): LeaseStore {
+    if (!isRootClient(this.prisma)) {
+      throw new Error("The seat lease needs the root client, not a transaction");
+    }
+    return seatLeaseStore({ prisma: this.prisma, organizationId });
   }
 
   /** Every seat in one read: full, lite and Developer, live invitations included. */

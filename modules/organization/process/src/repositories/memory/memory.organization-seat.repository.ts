@@ -82,6 +82,37 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
     }
   }
 
+  /** Each held lease's way to let the next hold on its organization start. */
+  readonly #leaseHolders = new Map<string, () => void>();
+
+  /** Joins the same queue `withSeatLock` holds, until the holder releases. */
+  async acquireSeatLease({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ holder: string; renewEveryMs: number }> {
+    const previous = this.#seatQueues.get(organizationId) ?? Promise.resolve();
+    let release: () => void = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.#seatQueues.set(
+      organizationId,
+      previous.then(() => released),
+    );
+    await previous;
+    const holder = `memory-lease-${this.#leaseHolders.size + 1}-${organizationId}`;
+    this.#leaseHolders.set(holder, release);
+    return { holder, renewEveryMs: 5_000 };
+  }
+
+  async renewSeatLease(): Promise<void> {}
+
+  async releaseSeatLease({ holder }: { organizationId: string; holder: string }): Promise<void> {
+    this.#leaseHolders.get(holder)?.();
+    this.#leaseHolders.delete(holder);
+  }
+
   async getMemberCount(organizationId: string): Promise<number> {
     return this.#count(organizationId, isFullMember);
   }

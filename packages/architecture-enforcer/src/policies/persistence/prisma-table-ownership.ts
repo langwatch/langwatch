@@ -96,21 +96,6 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
     ],
   },
   {
-    table: "OrganizationSeatLease",
-    owner: "organization",
-    readers: ["scim"],
-    reason:
-      "scim counts and writes a provisioned person's seat under the same per-organization lease organization's seat writes hold, so the two never both take the last seat (PC-SCIM-SEAT)",
-    writes: [
-      {
-        reader: "scim",
-        file: "enterprise/modules/scim/process/src/repositories/prisma/prisma.scim-seat.repository.ts",
-        reason:
-          "taking, renewing and dropping the lease is the read-and-claim itself; a peer call cannot hold it across scim's own membership write",
-      },
-    ],
-  },
-  {
     table: "Organization",
     owner: "organization",
     readers: ["scim", "entitlement", "billing", "licensing"],
@@ -749,7 +734,7 @@ function sharedFindings({
           ),
         );
 
-      if (readerStillUses({ root, item, reader, access })) return writes;
+      if (access.some((entry) => !entry.write)) return writes;
 
       return [
         ...writes,
@@ -763,24 +748,6 @@ function sharedFindings({
 
     return [...readers, ...staleWrites({ root, item, written })];
   });
-}
-
-/** A read is use, and so is an admitted write: a lease row is taken and dropped, never read. */
-function readerStillUses({
-  root,
-  item,
-  reader,
-  access,
-}: {
-  root: string;
-  item: SharedPrismaTable;
-  reader: string;
-  access: readonly ShareAccess[];
-}): boolean {
-  return access.some(
-    (entry) =>
-      !entry.write || admittedWrite({ item, reader, file: relative(root, entry.file) }) !== void 0,
-  );
 }
 
 function admittedWrite({

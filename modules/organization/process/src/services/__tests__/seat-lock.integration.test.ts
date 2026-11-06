@@ -28,6 +28,7 @@ import { PrismaSeatRequestRepository } from "../../repositories/prisma/prisma.se
 import type { OrganizationAccessNoticeService } from "../organization-access-notice.service.ts";
 import { OrganizationMemberAdmissionService } from "../organization-member-admission.service.ts";
 import { OrganizationMemberRoleService } from "../organization-member-role.service.ts";
+import { OrganizationSeatLeaseService } from "../organization-seat-lease.service.ts";
 import { OrganizationSeatLicenseService } from "../organization-seat-license.service.ts";
 import { SeatLimitNoticeService } from "../seat-limit-notice.service.ts";
 import { SeatRequestService, type SeatRequestPeers } from "../seat-request.service.ts";
@@ -67,6 +68,18 @@ class DelayedCountSeatRepository extends OrganizationSeatRepository {
 
   withSeatLock<T>(input: { organizationId: string; work: () => Promise<T> }): Promise<T> {
     return this.inner.withSeatLock(input);
+  }
+
+  acquireSeatLease(input: { organizationId: string }) {
+    return this.inner.acquireSeatLease(input);
+  }
+
+  renewSeatLease(input: { organizationId: string; holder: string }): Promise<void> {
+    return this.inner.renewSeatLease(input);
+  }
+
+  releaseSeatLease(input: { organizationId: string; holder: string }): Promise<void> {
+    return this.inner.releaseSeatLease(input);
   }
 }
 
@@ -246,6 +259,30 @@ describe.skipIf(!DB_URL)("two seat-taking writes for the last free full seat", (
         "EXTERNAL",
         "MEMBER",
       ]);
+    });
+  });
+
+  describe("when a directory admission holds the seat lease through the organization Api", () => {
+    /** @scenario "A seat lease taken through the organization Api holds off the organization's own seat writes" */
+    it("keeps the organization's own seat write waiting until the lease is released", async () => {
+      const seatRepository = PrismaOrganizationSeatRepository.create(prisma);
+      const lease = OrganizationSeatLeaseService.create(seatRepository);
+      const organizationId = `${namespace}-api-lease`;
+      const events: string[] = [];
+
+      const { holder } = await lease.acquire({ organizationId });
+      const write = seatRepository.withSeatLock({
+        organizationId,
+        work: async () => {
+          events.push("organization write");
+        },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      events.push("directory released");
+      await lease.release({ organizationId, holder });
+      await write;
+
+      expect(events).toEqual(["directory released", "organization write"]);
     });
   });
 
