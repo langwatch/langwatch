@@ -93,7 +93,7 @@ export function seatUsageCount({
   return serverMembersCount === undefined ? pageCount : serverMembersCount + plannedFullMembers;
 }
 
-/** Which change blocks the page shows; a free plan upgrades once seats change or overflow. */
+/** Which change blocks the page shows; a free plan is always offered the upgrade. */
 export function subscriptionChangesRequired({
   flags,
   hasSeatChanges,
@@ -111,12 +111,8 @@ export function subscriptionChangesRequired({
     !isEnterprisePlan &&
     !isLicenseOverride &&
     hasSeatChanges;
-  // A free plan over its seats is offered the upgrade up front, not after an invite is refused.
   const isUpgradePlanRequired =
-    ((isDeveloperPlan && (hasSeatChanges || isOverPlanSeats)) ||
-      isTieredLegacyPaidPlan ||
-      isLicenseOverride) &&
-    !isEnterprisePlan;
+    (isDeveloperPlan || isTieredLegacyPaidPlan || isLicenseOverride) && !isEnterprisePlan;
   const planUpgradeRequired = isDeveloperPlan
     ? hasSeatChanges && !isEnterprisePlan
     : isUpgradePlanRequired;

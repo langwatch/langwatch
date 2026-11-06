@@ -325,58 +325,35 @@ describe("BillingSubscriptionService", () => {
   });
 
   describe("createOrUpdateSubscription()", () => {
-    describe("when cancelling to FREE with existing subscription", () => {
-      /** @scenario EESubscriptionService cancels subscription when downgrading to free */
-      it("cancels Stripe subscription and updates status via repository", async () => {
-        repository.findLastNonCancelled.mockResolvedValue(
-          subscriptionRecord({
-            id: "sub_db_1",
-            stripeSubscriptionId: "sub_stripe_1",
-            status: SubscriptionStatus.ACTIVE,
-          }),
-        );
-        stripeSubscriptions.seed({ subscription: providerSubscription({}) });
+    describe("when a live subscription exists", () => {
+      /** @scenario "A checkout is refused while a subscription is live" */
+      it.each([PlanTypes.FREE, PlanTypes.ACCELERATE])(
+        "refuses a checkout for %s and leaves the live one alone",
+        async (plan) => {
+          repository.findLastNonCancelled.mockResolvedValue(
+            subscriptionRecord({
+              id: "sub_db_1",
+              stripeSubscriptionId: "sub_stripe_1",
+              status: SubscriptionStatus.ACTIVE,
+            }),
+          );
+          stripeSubscriptions.seed({ subscription: providerSubscription({}) });
 
-        const result = await service.createOrUpdateSubscription({
-          organizationId: "org_123",
-          baseUrl: "https://app.test",
-          plan: PlanTypes.FREE,
-          customerId: "cus_123",
-        });
+          await expect(
+            service.createOrUpdateSubscription({
+              organizationId: "org_123",
+              baseUrl: "https://app.test",
+              plan,
+              customerId: "cus_123",
+            }),
+          ).rejects.toMatchObject({ code: "subscription_already_active" });
 
-        expect(result.url).toBe("https://app.test/settings/subscription");
-        expect(stripeSubscriptions.cancellations).toEqual([{ subscriptionId: "sub_stripe_1" }]);
-        expect(repository.updateStatus).toHaveBeenCalledWith({
-          id: "sub_db_1",
-          status: SubscriptionStatus.CANCELLED,
-        });
-      });
-    });
-
-    describe("when upgrading existing subscription", () => {
-      it("updates Stripe subscription items and plan via repository", async () => {
-        repository.findLastNonCancelled.mockResolvedValue(
-          subscriptionRecord({
-            id: "sub_db_1",
-            stripeSubscriptionId: "sub_stripe_1",
-            status: SubscriptionStatus.ACTIVE,
-          }),
-        );
-        stripeSubscriptions.seed({ subscription: providerSubscription({}) });
-
-        const result = await service.createOrUpdateSubscription({
-          organizationId: "org_123",
-          baseUrl: "https://app.test",
-          plan: PlanTypes.ACCELERATE,
-          customerId: "cus_123",
-        });
-
-        expect(result.url).toBe("https://app.test/settings/subscription?success");
-        expect(repository.updatePlan).toHaveBeenCalledWith({
-          id: "sub_db_1",
-          plan: PlanTypes.ACCELERATE,
-        });
-      });
+          expect(stripeSubscriptions.cancellations).toEqual([]);
+          expect(repository.updateStatus).not.toHaveBeenCalled();
+          expect(repository.updatePlan).not.toHaveBeenCalled();
+          expect(repository.createPending).not.toHaveBeenCalled();
+        },
+      );
     });
 
     describe("when creating new subscription", () => {
@@ -452,61 +429,6 @@ describe("BillingSubscriptionService", () => {
             customerId: "cus_123",
           }),
         ).rejects.toThrow("Stripe checkout failed");
-      });
-    });
-
-    describe("when upgrading and stripe subscriptions.update throws", () => {
-      it("does not call repository.updatePlan", async () => {
-        repository.findLastNonCancelled.mockResolvedValue(
-          subscriptionRecord({
-            id: "sub_db_1",
-            stripeSubscriptionId: "sub_stripe_1",
-            status: SubscriptionStatus.ACTIVE,
-          }),
-        );
-        stripeSubscriptions.seed({ subscription: providerSubscription({}) });
-        stripeSubscriptions.refuse({
-          operation: "updateSubscription",
-          error: new Error("Stripe update failed"),
-        });
-
-        await expect(
-          service.createOrUpdateSubscription({
-            organizationId: "org_123",
-            baseUrl: "https://app.test",
-            plan: PlanTypes.ACCELERATE,
-            customerId: "cus_123",
-          }),
-        ).rejects.toThrow("Stripe update failed");
-
-        expect(repository.updatePlan).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when cancelling and stripe subscriptions.cancel throws", () => {
-      it("does not call repository.updateStatus", async () => {
-        repository.findLastNonCancelled.mockResolvedValue(
-          subscriptionRecord({
-            id: "sub_db_1",
-            stripeSubscriptionId: "sub_stripe_1",
-            status: SubscriptionStatus.ACTIVE,
-          }),
-        );
-        stripeSubscriptions.refuse({
-          operation: "cancelSubscription",
-          error: new Error("Stripe cancel failed"),
-        });
-
-        await expect(
-          service.createOrUpdateSubscription({
-            organizationId: "org_123",
-            baseUrl: "https://app.test",
-            plan: PlanTypes.FREE,
-            customerId: "cus_123",
-          }),
-        ).rejects.toThrow("Stripe cancel failed");
-
-        expect(repository.updateStatus).not.toHaveBeenCalled();
       });
     });
   });

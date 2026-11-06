@@ -2,8 +2,16 @@ import dns, { type LookupAddress } from "node:dns";
 import { isIP } from "node:net";
 
 import { createLogger } from "@langwatch/observability";
-import { Agent, type Response as FetchResponse, fetch as undiciFetch } from "undici";
+import {
+  Agent,
+  type Dispatcher,
+  Pool,
+  type Response as FetchResponse,
+  ProxyAgent,
+  fetch as undiciFetch,
+} from "undici";
 
+import { type OutboundProxyConfig, resolveProxyForDestination } from "../proxy/outbound-proxy.ts";
 import { classify } from "./address.ts";
 import {
   redactUrlForLog,
@@ -65,6 +73,42 @@ function formatConnectionError(err: Error, hostname: string, port: number): Erro
 }
 
 /**
+ * The outbound proxy setting could not be turned into a proxy. A class, so the
+ * catch below does not blame the destination. It carries no cause: the parse
+ * error repeats the setting's value, which may hold proxy credentials.
+ */
+export class OutboundProxyMisconfiguredError extends Error {
+  constructor() {
+    super("The outbound proxy setting (HTTPS_PROXY or HTTP_PROXY) is not a valid proxy URL");
+    this.name = "OutboundProxyMisconfiguredError";
+  }
+}
+
+/**
+ * The operator's proxy failed this hop: it could not be reached, or it refused
+ * the tunnel. Names the proxy's host and port, never its credentials, so the
+ * destination is not blamed for the deployment's own network.
+ */
+export class OutboundProxyUnreachableError extends Error {
+  constructor({ proxy, detail }: { proxy: URL; detail: string }) {
+    super(`The outbound proxy at ${proxy.host} failed: ${detail}`);
+    this.name = "OutboundProxyUnreachableError";
+  }
+}
+
+/** Whether a failure, or any cause under it, came from the proxy rather than the destination. */
+function isProxyFailure({ error, proxy }: { error: unknown; proxy: URL }): boolean {
+  const port = Number(proxy.port || (proxy.protocol === "https:" ? 443 : 80));
+  for (let at = error; at instanceof Error; at = (at as { cause?: unknown }).cause) {
+    if (/^Proxy response \(\d+\)/.test(at.message)) return true;
+    const failed = at as { port?: unknown; hostname?: unknown; address?: unknown };
+    if (failed.hostname === proxy.hostname) return true;
+    if (failed.port === port && failed.address !== undefined) return true;
+  }
+  return false;
+}
+
+/**
  * The receiver redirected and this caller declined the hop. A class, not a
  * message, so it passes untouched through the catch below that rewrites
  * every plain `Error` as "Connection failed" via `formatConnectionError`.
@@ -95,6 +139,14 @@ export interface FencedFetchOptions extends RequestInit {
   headersTimeoutMs?: number;
   /** Socket-level bound on inactivity while streaming the response body. */
   bodyTimeoutMs?: number;
+  /** The deployment's outbound proxy. Absent, or excluded by `NO_PROXY`: the pinned connection. */
+  proxy?: OutboundProxyConfig;
+  /**
+   * A judged hop the caller routes around `proxy`, on the pinned connection.
+   * Asked per hop, redirects included. A route, never a policy: the hop was
+   * already judged, and the pinned socket still refuses a metadata address.
+   */
+  bypassProxy?: (hop: SsrfValidationResult) => boolean;
 }
 
 interface AgentTimeoutOptions {
@@ -170,6 +222,72 @@ function createGuardedAgent({
   });
 }
 
+/** A tunnel through the operator's proxy, with the same TLS and timeout policy as a pinned hop. */
+function createProxyAgent({
+  proxyUrl,
+  tls,
+  timeouts,
+}: {
+  proxyUrl: string;
+  tls: EgressTlsPolicy;
+  timeouts: AgentTimeoutOptions;
+}): ProxyAgent {
+  return new ProxyAgent({
+    ...timeouts,
+    uri: proxyUrl,
+    requestTls: { rejectUnauthorized: tls.rejectUnauthorized },
+    // The client to the proxy gets the same bounds, so a stalled CONNECT times out too.
+    clientFactory: (origin, options) => new Pool(origin, { ...options, ...timeouts }),
+  });
+}
+
+/**
+ * How this hop travels: through the proxy for its scheme when one applies to
+ * its host, else pinned. The policy has already judged the hop; the proxy only carries it and
+ * resolves the name itself, so the operator's proxy owns that address.
+ */
+function createDispatcher({
+  validated,
+  init,
+  tls,
+}: {
+  validated: SsrfValidationResult;
+  init: FencedFetchOptions | undefined;
+  tls: EgressTlsPolicy;
+}): { dispatcher: Dispatcher; proxy: URL | undefined } {
+  const timeouts = resolveAgentTimeouts(init);
+  const proxyUrl =
+    init?.proxy && !init.bypassProxy?.(validated)
+      ? resolveProxyForDestination({
+          config: init.proxy,
+          hostname: validated.hostname,
+          protocol: validated.protocol,
+        })
+      : undefined;
+  if (proxyUrl) {
+    logger.debug(
+      { hostname: validated.hostname },
+      "Sending the judged hop through the outbound proxy",
+    );
+    try {
+      return {
+        dispatcher: createProxyAgent({ proxyUrl, tls, timeouts }),
+        proxy: new URL(proxyUrl),
+      };
+    } catch {
+      throw new OutboundProxyMisconfiguredError();
+    }
+  }
+
+  const resolvedIp = getResolvedIpForPinning(validated);
+  const dispatcher = createGuardedAgent({
+    pinnedIp: resolvedIp && isIP(resolvedIp) !== 0 ? resolvedIp : null,
+    tls,
+    timeouts,
+  });
+  return { dispatcher, proxy: undefined };
+}
+
 function getResolvedIpForPinning(result: SsrfValidationResult): string | null {
   switch (result.type) {
     case "resolved":
@@ -199,14 +317,12 @@ export async function fetchValidatedDestination(
   }
 
   const requestUrl = `${validated.protocol}//${validated.hostname}:${validated.port}${validated.path}`;
-  const resolvedIp = getResolvedIpForPinning(validated);
-  const dispatcher = createGuardedAgent({
-    pinnedIp: resolvedIp && isIP(resolvedIp) !== 0 ? resolvedIp : null,
-    tls,
-    timeouts: resolveAgentTimeouts(init),
-  });
+  let dispatcher: Dispatcher | undefined;
+  let proxy: URL | undefined;
 
   try {
+    // Inside the try, so the dispatcher is destroyed on every later failure.
+    ({ dispatcher, proxy } = createDispatcher({ validated, init, tls }));
     const response = await undiciFetch(requestUrl, {
       method: init?.method,
       // Entries, not the `Headers` instance: two copies of the undici types
@@ -241,22 +357,38 @@ export async function fetchValidatedDestination(
     void dispatcher.close().catch(() => undefined);
     return response;
   } catch (err) {
-    void dispatcher.destroy().catch(() => undefined);
-    // Our own refusal, not the network's. Everything below rewrites an error
-    // into "Connection failed to host:port: …", the right shape for a socket
-    // problem and the wrong one for a decision this module made.
-    if (err instanceof RedirectRefusedError) {
-      throw err;
-    }
-    if (err instanceof Error) {
-      const cause = (err as Error & { cause?: Error }).cause;
-      if (cause) {
-        throw formatConnectionError(cause, validated.hostname, validated.port);
-      }
-      throw formatConnectionError(err, validated.hostname, validated.port);
-    }
-    throw err;
+    void dispatcher?.destroy().catch(() => undefined);
+    throw failureFor({ err, validated, proxy });
   }
+}
+
+/**
+ * What a failed hop throws. Our own refusals and the operator's proxy pass
+ * through; a failure the proxy caused names the proxy; anything else is
+ * rewritten as "Connection failed to host:port: …", a socket problem's shape.
+ */
+function failureFor({
+  err,
+  validated,
+  proxy,
+}: {
+  err: unknown;
+  validated: SsrfValidationResult;
+  proxy: URL | undefined;
+}): unknown {
+  if (
+    err instanceof RedirectRefusedError ||
+    err instanceof OutboundProxyMisconfiguredError ||
+    err instanceof OutboundProxyUnreachableError ||
+    !(err instanceof Error)
+  ) {
+    return err;
+  }
+  const cause = (err as Error & { cause?: Error }).cause;
+  if (proxy && isProxyFailure({ error: err, proxy })) {
+    return new OutboundProxyUnreachableError({ proxy, detail: (cause ?? err).message });
+  }
+  return formatConnectionError(cause ?? err, validated.hostname, validated.port);
 }
 
 async function followRedirect({

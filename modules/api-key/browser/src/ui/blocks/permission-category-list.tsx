@@ -114,17 +114,20 @@ export function PermissionCategoryList({
   selections,
   userPermissions,
   onChange,
+  categories = PERMISSION_CATEGORIES,
 }: {
   selections: Record<string, PermissionSelection>;
   userPermissions: string[];
   onChange: (next: Record<string, PermissionSelection>) => void;
+  /** The rows and what each level grants; the CLI approval passes `cliPermissionCategories()`. */
+  categories?: readonly PermissionCategory[];
 }) {
   return (
     <Box width="full" borderWidth="1px" borderColor="border" borderRadius="lg" paddingX={4}>
-      {PERMISSION_CATEGORIES.map((category, i) => (
+      {categories.map((category, i) => (
         <Box
           key={category.key}
-          borderBottomWidth={i < PERMISSION_CATEGORIES.length - 1 ? "1px" : 0}
+          borderBottomWidth={i < categories.length - 1 ? "1px" : 0}
           borderColor="border.muted"
         >
           <PermissionRow

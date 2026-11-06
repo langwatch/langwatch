@@ -72,7 +72,7 @@ export function isModelAllowedForFeature({
 /**
  * A restricted model may be the LANGY or FAST role default. FAST features in
  * {@link CODEX_NON_GATEWAY_FAST_FEATURE_KEYS} step over it at resolution time.
- * DEFAULT and EMBEDDINGS carry general inference and stay closed.
+ * DEFAULT, EMBEDDINGS and JUDGE carry general inference and stay closed.
  */
 export function isModelAllowedAsRoleDefault(modelId: string, role: ModelRole): boolean {
   // The Instant Evals column holds decision models only, and no other role holds one (ADR-182).
