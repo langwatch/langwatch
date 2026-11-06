@@ -9,6 +9,7 @@ import {
 import type { EventingCommands } from "@langwatch/eventing";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
+import { nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
 import type { NurturingChannels } from "../channels/nurturing.channels.ts";
@@ -74,6 +75,7 @@ export class NurturingModule implements NurturingApi {
       milestones: repositories.milestones,
       projects: repositories.projects,
       organizations: dependencies.organizations,
+      clock: { nowMs: () => nowInstant().epochMilliseconds },
     });
     return new NurturingModule(
       buildNurturingPipeline({

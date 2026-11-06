@@ -1,4 +1,5 @@
 import { AuthApi } from "@langwatch/auth-contract";
+import { parseOutboundProxyConfig } from "@langwatch/egress";
 import type { IdentityServerConfig } from "@langwatch/identity-contract";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
@@ -40,6 +41,7 @@ export class HttpIdentityChannels {
   }): Promise<IdentityChannels> {
     const mailer: MailSender = { send: (content) => bound.notifications.sendEmail(content) };
     const baseUrl = config.publicBaseUrl ?? "";
+    const proxy = parseOutboundProxyConfig(config.outboundProxy);
     const signupAnnouncements = await secrets.into(internalSlackSignupsWebhook, (webhookUrl) =>
       webhookUrl ? SlackSignupAnnouncementChannel.create({ webhookUrl }) : undefined,
     );
@@ -56,10 +58,12 @@ export class HttpIdentityChannels {
       }),
       ssoDomainProofFiles: HttpsSsoDomainProofFileChannel.create({
         policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
+        proxy,
       }),
       // Auth owns the operator's IdP allowlist; asked per discovery, not at boot.
       ssoIssuerDiscovery: HttpsSsoIssuerDiscoveryChannel.create({
         policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
+        proxy,
         dialableInternalOrigins: () => bound.authReads.findDialableIdentityProviderOrigins(),
       }),
       ssoBreakGlassWarnings: LoggedSsoBreakGlassWarningChannel.create(),

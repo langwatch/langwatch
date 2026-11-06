@@ -114,6 +114,7 @@ function storedCard({ answer }: { answer: UiProcedureAnswer }) {
         dashboardId="board-1"
         boardName="Weekly review"
         period={PERIOD}
+        periodKey="30d:auto"
         isWriting={false}
         onEdit={vi.fn()}
         onDuplicate={vi.fn()}
@@ -144,6 +145,7 @@ function curatedCard({ answer }: { answer: UiProcedureAnswer }) {
         rowSpan={4}
         timeWindow={{ start: PERIOD.periodStart, end: PERIOD.periodEnd }}
         granularitySeconds={PERIOD.granularitySeconds}
+        periodKey="30d:auto"
       />
     ),
     host,
