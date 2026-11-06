@@ -34,9 +34,11 @@ export async function fetchStars({
   cacheFile: string;
   token?: string;
 }): Promise<StarsRead> {
+  let failure = "";
   try {
     const response = await fetch(REPOSITORY_API_URL, {
-      signal: AbortSignal.timeout(4000),
+      /* The build reads this while it encodes media, which can stall a short wait. */
+      signal: AbortSignal.timeout(20_000),
       headers: { accept: GITHUB_ACCEPT, ...(token ? { authorization: `Bearer ${token}` } : {}) },
     });
     const count = starCount({ body: await response.json() });
@@ -46,9 +48,11 @@ export async function fetchStars({
       writeFileSync(cacheFile, JSON.stringify(read));
       return read;
     }
-  } catch {
-    // Fall back to the last successful public count.
+    failure = `GitHub answered ${response.status}`;
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error);
   }
+  console.warn(`[docs-site] star count not read (${failure}); using the last one kept`);
   try {
     const cached = JSON.parse(readFileSync(cacheFile, "utf8"));
     const count = Number.isInteger(cached.count) ? (cached.count as number) : null;

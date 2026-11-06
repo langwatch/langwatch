@@ -14,7 +14,12 @@ beforeEach(() => {
   cacheFile = path.join(dir, "docs-site/stars.json");
 });
 
+beforeEach(() => {
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+});
+
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   rmSync(dir, { recursive: true, force: true });
 });
@@ -22,7 +27,7 @@ afterEach(() => {
 function githubAnswers({ ok, body }: { ok: boolean; body: unknown }) {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () => ({ ok, json: async () => body })),
+    vi.fn(async () => ({ ok, status: ok ? 200 : 403, json: async () => body })),
   );
 }
 
@@ -70,6 +75,17 @@ describe("fetchStars", () => {
       await fetchStars({ cacheFile });
       const [, init] = vi.mocked(fetch).mock.calls[0] ?? [];
       expect(new Headers(init?.headers).has("authorization")).toBe(false);
+    });
+  });
+
+  describe("when GitHub refuses the build", () => {
+    /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
+    it("says so in the build log", async () => {
+      githubAnswers({ ok: false, body: { message: "rate limited" } });
+      await fetchStars({ cacheFile });
+      expect(vi.mocked(console.warn)).toHaveBeenCalledWith(
+        expect.stringContaining("star count not read"),
+      );
     });
   });
 
