@@ -616,8 +616,16 @@ export class TraceSummaryFoldProjection
       models: totals.models,
     });
 
+    // Frozen before the log timing seeds `occurredAt`, so the anchor is the accept time the
+    // analytics fold freezes too: one partition and TTL address for the trace (ADR-071).
+    const { storageAnchorMs } = anchorStorageTime({
+      state,
+      eventOccurredAtMs: contribution.acceptedAtMs,
+    });
+
     return {
       ...state,
+      storageAnchorMs,
       traceId: state.traceId || contribution.traceId,
       ...io,
       ...accumulateLogTiming({

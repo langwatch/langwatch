@@ -13,6 +13,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceAnalyticsFoldProjection } from "../trace-derived.projection.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import { createInitState, createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
@@ -148,6 +149,23 @@ describe("TraceSummaryFoldProjection, given a logs-only Grok turn", () => {
 
     expect(state.occurredAt).toBe(0);
     expect(state.totalDurationMs).toBe(0);
+  });
+
+  it("freezes the storage anchor where the analytics fold does: the first accept time", () => {
+    const turn = grokTurn();
+    const summary = makeProjection();
+    const analytics = TraceAnalyticsFoldProjection.create({
+      store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
+      traceCanonicalisation: canonicalisation,
+      runtime: createTestRuntime(),
+    });
+
+    const summaryState = turn.reduce((s, e) => summary.apply(s, e), summary.init());
+    const analyticsState = turn.reduce((s, e) => analytics.apply(s, e), analytics.init());
+
+    expect(summaryState.storageAnchorMs).toBe(turn[0]!.occurredAt);
+    expect(analyticsState.storageAnchorMs).toBe(summaryState.storageAnchorMs);
+    expect(summaryState.occurredAt).toBe(TURN_START_MS);
   });
 
   it("ignores a record whose clock is days off its accept time", () => {
