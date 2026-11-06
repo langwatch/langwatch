@@ -26,13 +26,7 @@ export function findCouponRequestProblems({
   if (!Number.isFinite(percentOff) || percentOff < 1 || percentOff > 100) {
     problems.push({ field: "percentOff", message: "The discount must be between 1% and 100%" });
   }
-  if (
-    duration === "repeating" &&
-    (durationInMonths === undefined ||
-      !Number.isInteger(durationInMonths) ||
-      durationInMonths < 1 ||
-      durationInMonths > MAX_DURATION_MONTHS)
-  ) {
+  if (duration === "repeating" && !isMonthCount(durationInMonths)) {
     problems.push({ field: "durationInMonths", message: "Say how many months the discount lasts" });
   }
   if (!CODE_PATTERN.test(code)) {
@@ -48,6 +42,12 @@ export function findCouponRequestProblems({
     problems.push({ field: "expiresAt", message: "The expiry date must be in the future" });
   }
   return problems;
+}
+
+/** Whether a repeating coupon's month count is a whole number Stripe takes. */
+function isMonthCount(months: number | undefined): boolean {
+  if (months === undefined) return false;
+  return Number.isInteger(months) && months >= 1 && months <= MAX_DURATION_MONTHS;
 }
 
 /** Whether `iso` names an instant after `now`; an unreadable date is not in the future. */

@@ -97,5 +97,8 @@ export const resolveGrowthCheckoutProducts = (
     if (!product) throw new Error(`No product recorded for ${name} in ${environment} mode`);
     return product;
   };
-  return { seats: productOf("GROWTH_SEAT_EUR_MONTHLY"), events: productOf("GROWTH_EVENTS_EUR_MONTHLY") };
+  return {
+    seats: productOf("GROWTH_SEAT_EUR_MONTHLY"),
+    events: productOf("GROWTH_EVENTS_EUR_MONTHLY"),
+  };
 };

@@ -307,7 +307,10 @@ export class BillingProviderUnavailableError extends HandledError {
   }
 }
 
-/** A coupon the operator asked for that the Growth checkout could not use; nothing reached Stripe. */
+/**
+ * A coupon the operator asked for that the Growth checkout could not use; nothing
+ * reached Stripe.
+ */
 export class BillingCouponInvalidError extends HandledError {
   declare readonly code: "billing_coupon_invalid";
 
@@ -337,7 +340,10 @@ export class BillingCouponCodeTakenError extends HandledError {
   }
 }
 
-/** Coupons are LangWatch Cloud's, over its payment provider; off Cloud or without the key they refuse. */
+/**
+ * Coupons are LangWatch Cloud's, over its payment provider; off Cloud or without the
+ * key they refuse.
+ */
 export class BillingCouponsUnavailableError extends HandledError {
   declare readonly code: "billing_coupons_unavailable";
 

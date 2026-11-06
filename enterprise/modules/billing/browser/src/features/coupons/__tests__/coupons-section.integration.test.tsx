@@ -157,7 +157,9 @@ describe("CouponsSection", () => {
       expect(
         screen.getByText(/No code discounts the first charge up to the 1st of next month/),
       ).toBeInTheDocument();
-      expect(screen.getByText(/the discount months count from the day of checkout/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/the discount months count from the day of checkout/),
+      ).toBeInTheDocument();
     });
   });
 
@@ -208,7 +210,9 @@ describe("CouponsSection", () => {
       await fill("Code", "half off!");
       fireEvent.click(await screen.findByRole("button", { name: "Create coupon" }));
 
-      expect(await screen.findByText("The discount must be between 1% and 100%")).toBeInTheDocument();
+      expect(
+        await screen.findByText("The discount must be between 1% and 100%"),
+      ).toBeInTheDocument();
       expect(
         screen.getByText("Codes use letters, digits, dashes and underscores"),
       ).toBeInTheDocument();

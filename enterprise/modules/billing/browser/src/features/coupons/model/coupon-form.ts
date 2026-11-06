@@ -55,15 +55,19 @@ export function couponRequestFrom(draft: CouponDraft): CreateCouponRequest {
     ...(name ? { name } : {}),
     code: draft.code.trim(),
     includeEvents: draft.includeEvents,
-    ...(draft.maxRedemptions.trim() === ""
-      ? {}
-      : { maxRedemptions: Number(draft.maxRedemptions) }),
+    ...(draft.maxRedemptions.trim() === "" ? {} : { maxRedemptions: Number(draft.maxRedemptions) }),
     ...(draft.expiresOn ? { expiresAt: `${draft.expiresOn}T23:59:59Z` } : {}),
   };
 }
 
 /** The first problem with each field, as the shared rule names it. */
-export function couponProblemsOf({ draft, now }: { draft: CouponDraft; now: Instant }): CouponProblems {
+export function couponProblemsOf({
+  draft,
+  now,
+}: {
+  draft: CouponDraft;
+  now: Instant;
+}): CouponProblems {
   const problems: CouponProblems = {};
   for (const { field, message } of findCouponRequestProblems({
     request: couponRequestFrom(draft),
@@ -101,7 +105,9 @@ const PRODUCT_NAMES = { growth_seats: "Growth Seats", growth_events: "Growth Eve
 export function productsLabel(products: readonly CouponProduct[] | null): string {
   if (!products) return "All products";
   if (products.length === 0) return "No products";
-  return products.map((product) => (product.role ? PRODUCT_NAMES[product.role] : product.id)).join(", ");
+  return products
+    .map((product) => (product.role ? PRODUCT_NAMES[product.role] : product.id))
+    .join(", ");
 }
 
 /** "3 of 10" or "3". */

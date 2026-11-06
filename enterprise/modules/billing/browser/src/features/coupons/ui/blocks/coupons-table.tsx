@@ -2,6 +2,7 @@
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Badge, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import type { CouponView, PromotionCodeView } from "@langwatch/enterprise-billing-contract";
+import { Temporal } from "@langwatch/time";
 
 import {
   discountLabel,
@@ -14,7 +15,7 @@ const COLUMN_COUNT = 8;
 
 const dateLabel = (iso: string | null) =>
   iso
-    ? new Date(iso).toLocaleDateString("en", { dateStyle: "medium", timeZone: "UTC" })
+    ? Temporal.Instant.from(iso).toLocaleString("en", { dateStyle: "medium", timeZone: "UTC" })
     : "Never";
 
 /** Every coupon as a row, each of its promotion codes beneath it with its checkout verdict. */

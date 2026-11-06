@@ -67,8 +67,8 @@ export class BillingCouponService {
       this.#coupons.listPromotionCodes(),
     ]);
     const now = this.#nowSeconds();
-    const views = [...coupons]
-      .sort((a, b) => b.created - a.created)
+    const views = coupons
+      .toSorted((a, b) => b.created - a.created)
       .map((coupon) =>
         this.#view({
           coupon,
@@ -146,21 +146,23 @@ export class BillingCouponService {
       currency: coupon.currency,
       duration: coupon.duration,
       durationInMonths: coupon.durationInMonths,
-      products: nameCouponProducts({ coupon, products }),
+      products: coupon.products
+        ? nameCouponProducts({ productIds: coupon.products, products })
+        : null,
       valid: coupon.valid,
       timesRedeemed: coupon.timesRedeemed,
       maxRedemptions: coupon.maxRedemptions,
-      redeemBy: isoOf(coupon.redeemBy),
+      redeemBy: coupon.redeemBy === null ? null : isoAt(coupon.redeemBy),
       createdAt: isoAt(coupon.created),
-      codes: [...codes]
-        .sort((a, b) => b.created - a.created)
+      codes: codes
+        .toSorted((a, b) => b.created - a.created)
         .map((code) => ({
           id: code.id,
           code: code.code,
           active: code.active,
           timesRedeemed: code.timesRedeemed,
           maxRedemptions: code.maxRedemptions,
-          expiresAt: isoOf(code.expiresAt),
+          expiresAt: code.expiresAt === null ? null : isoAt(code.expiresAt),
           createdAt: isoAt(code.created),
           firstTimeTransaction: code.firstTimeTransaction,
           minimumAmount: code.minimumAmount,
@@ -179,9 +181,4 @@ export class BillingCouponService {
 /** Stripe's epoch seconds as an ISO instant. */
 function isoAt(seconds: number): string {
   return Temporal.Instant.fromEpochMilliseconds(seconds * 1000).toString();
-}
-
-/** An optional Stripe instant, absent where Stripe holds none. */
-function isoOf(seconds: number | null): string | null {
-  return seconds === null ? null : isoAt(seconds);
 }
