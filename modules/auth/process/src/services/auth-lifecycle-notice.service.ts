@@ -1,5 +1,6 @@
 import type { AppPage } from "@langwatch/auth-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
+import type { OrganizationUserRole } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type {
@@ -66,7 +67,12 @@ export class AuthLifecycleNoticeService {
   }
 
   ssoAutoAdded(
-    input: Readonly<{ userId: string; organizationId: string; organizationName: string }>,
+    input: Readonly<{
+      userId: string;
+      organizationId: string;
+      organizationName: string;
+      role: OrganizationUserRole;
+    }>,
   ): void {
     this.#send(this.#senders?.recordSsoAutoAdded, {
       tenantId: input.organizationId,
@@ -74,6 +80,7 @@ export class AuthLifecycleNoticeService {
       userId: input.userId,
       organizationId: input.organizationId,
       organizationName: input.organizationName,
+      role: input.role,
     });
   }
 
