@@ -4,7 +4,7 @@
  * the Postgres records table (ADR-032 v13, born on storage).
  * @see specs/datasets/large-dataset-storage.feature
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { DatasetChunkRepository } from "../../repositories/dataset-chunk.repository.ts";
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";
@@ -32,6 +32,19 @@ function failingChunkWrites(): { repositories: DatasetRepositories; reaped: stri
   };
 
   return { repositories: { ...repositories, chunks }, reaped };
+}
+
+/** The memory repositories, real chunk writes kept, with every reap recorded. */
+function recordingReaps(): { repositories: DatasetRepositories; reaped: string[] } {
+  const repositories = MemoryDatasetRepositories.create();
+  const reaped: string[] = [];
+  const deleteChunksFrom = repositories.chunks.deleteChunksFrom.bind(repositories.chunks);
+  vi.spyOn(repositories.chunks, "deleteChunksFrom").mockImplementation(async (input) => {
+    reaped.push(input.datasetId);
+    await deleteChunksFrom(input);
+  });
+
+  return { repositories, reaped };
 }
 
 async function storedRecordCount(
@@ -131,6 +144,56 @@ describe("creating a dataset", () => {
       ).rejects.toThrow("object storage is unavailable");
 
       expect(await repositories.datasets.findBySlug({ projectId, slug: "never-born" })).toBeNull();
+      expect(reaped).toHaveLength(1);
+    });
+  });
+
+  describe("when the dataset row insert fails after the chunks were written", () => {
+    /** @scenario "A failed create leaves no dataset behind" */
+    it("leaves no dataset row and reaps the written chunks", async () => {
+      const { repositories, reaped } = recordingReaps();
+      vi.spyOn(repositories.content, "create").mockRejectedValue(
+        new Error("the database is unavailable"),
+      );
+      const app = createDatasetTestApp({ repositories });
+
+      await expect(
+        app.upsertDataset({
+          projectId,
+          name: "Row Lost",
+          columnTypes,
+          datasetRecords: [{ question: "written, then orphaned" }],
+        }),
+      ).rejects.toThrow("the database is unavailable");
+
+      expect(await repositories.datasets.findBySlug({ projectId, slug: "row-lost" })).toBeNull();
+      expect(reaped).toHaveLength(1);
+    });
+  });
+
+  describe("given two rows with the same id", () => {
+    /** @scenario "A new dataset refuses two rows with the same id" */
+    it("refuses the create, leaves no dataset row and reaps what it wrote", async () => {
+      const { repositories, reaped } = recordingReaps();
+      const app = createDatasetTestApp({ repositories });
+
+      const failure = await app
+        .upsertDataset({
+          projectId,
+          name: "Twin Ids",
+          columnTypes,
+          datasetRecords: [
+            { id: "rec_twin", question: "first" },
+            { id: "rec_twin", question: "second" },
+          ],
+        })
+        .then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+
+      expect(failure).toMatchObject({ code: "dataset_duplicate_record_id" });
+      expect(await repositories.datasets.findBySlug({ projectId, slug: "twin-ids" })).toBeNull();
       expect(reaped).toHaveLength(1);
     });
   });
