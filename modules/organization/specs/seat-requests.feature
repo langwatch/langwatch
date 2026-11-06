@@ -154,6 +154,26 @@ Feature: Seat requests when an organization is over its seat limit
       When an administrator lists the open seat requests
       Then the approval path says a seat is free
 
+    @integration
+    Scenario: Approve with a seat free approves at once
+      Given a full member seat is free
+      When an administrator presses Approve on a seat request
+      Then the request is approved without opening the seats upgrade
+
+    @integration
+    Scenario: Approve on a live Stripe seat subscription adds the seat, then approves
+      Given the approval path is "stripe_seats" from 5 seats to 6
+      When an administrator presses Approve and confirms the seats upgrade
+      Then the subscription is raised to 6 seats
+      And then the request is approved
+
+    @integration
+    Scenario: A failed seat expansion approves nothing
+      Given the approval path is "stripe_seats"
+      When the administrator confirms the seats upgrade and adding the seat fails
+      Then an error says the seat could not be added
+      And the request is not approved
+
     @unit
     Scenario: Sales hear about a seat request from an account-managed organization once
       Given the organization is on a negotiated licence on LangWatch Cloud
