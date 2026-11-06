@@ -34,8 +34,9 @@ Feature: Useful release updates in the documentation
     Then the update fits one line at desktop and phone widths in both themes
     And it is static with or without reduced motion
     And the release link opens the matching notes on the changelog page
+    And while a docs announcement the reader can dismiss shows, the release update waits behind it, so one notice line shows at a time
+    But an announcement the reader cannot dismiss leaves the release update in view
     And the announcement sits on a tinted ground while the release update stays on paper
-    And both dismiss buttons are the same compact size and line up
     When the reader dismisses the update
     Then it stays dismissed on another page and after reloading
     But a different release is shown again
@@ -43,10 +44,10 @@ Feature: Useful release updates in the documentation
 
   @e2e
   Scenario: Find contextual agent setup
-    Given a reader opens a guide
+    Given a reader opens an Observability guide
     When they follow the sidebar coding-agent setup link
     Then the coding-agent quickstart opens
-    And the launcher remains available on the home page and API reference
+    And the launcher remains available on the other Observability pages
 
   @unit
   Scenario: Read release notes without repeated commit links
