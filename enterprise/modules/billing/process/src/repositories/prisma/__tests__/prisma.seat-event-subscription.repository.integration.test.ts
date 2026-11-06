@@ -145,10 +145,10 @@ describe.skipIf(!DB_URL)("PrismaSeatEventSubscriptionRepository seat line repair
     expect(await pendingOfRun()).toEqual([]);
   });
 
-  /** @scenario "The seat count a seat line reconciles to ignores the provider's own updates" */
-  it("records a reconcile and reads the seat change's count as its target", async () => {
-    const id = await seed("reconcile");
-    expect(await subscriptions.findSeatLineTarget({ id })).toBe(3);
+  /** @scenario "The seat line quantity a pending write settles to ignores the provider's own updates" */
+  it("records writes ahead under the lease and reads the seat change's count as the target", async () => {
+    const id = await seed("write-ahead");
+    expect(await subscriptions.findSeatLineTarget({ id })).toEqual({ quantity: 3, at: null });
 
     await subscriptions.reactivateWithSeats({
       id,
@@ -158,15 +158,39 @@ describe.skipIf(!DB_URL)("PrismaSeatEventSubscriptionRepository seat line repair
     });
     // A provider update event writes maxMembers only; the target stays the change's count.
     await prisma.subscription.update({ where: { id }, data: { maxMembers: 3 } });
-    expect(await subscriptions.findSeatLineTarget({ id })).toBe(6);
+    expect(await subscriptions.findSeatLineTarget({ id })).toMatchObject({ quantity: 6 });
 
-    const record = await subscriptions.recordSeatLineReconcile({ id });
-    expect(await pendingOfRun()).toEqual([
-      expect.objectContaining({ id, quantity: null, liftedQuantity: null, since: record.since }),
-    ]);
-    expect(await subscriptions.isSeatRepairPending({ id, record })).toBe(true);
-    await subscriptions.clearSeatRepair({ id, record });
-    expect(await pendingOfRun()).toEqual([]);
+    const first = await subscriptions.claimSeatLine({ id, leaseMs: 60_000 });
+    if (!first.claimed) throw new Error("expected the lease");
+    const opened = await subscriptions.beginSeatLineWrite({
+      id,
+      token: first.token,
+      leaseMs: 60_000,
+      quantity: 4,
+    });
+    if (!opened.held || !opened.opened) throw new Error("expected an opened write");
+    const kept = await subscriptions.beginSeatLineWrite({
+      id,
+      token: first.token,
+      leaseMs: 60_000,
+      quantity: 5,
+    });
+    expect(kept).toEqual({ held: true, opened: null });
+    expect(
+      await subscriptions.beginSeatLineWrite({ id, token: "other", leaseMs: 60_000, quantity: 7 }),
+    ).toEqual({ held: false });
+    expect(await subscriptions.findSeatLineWrite({ id })).toMatchObject({
+      quantities: [4, 5],
+      since: opened.opened,
+    });
+    expect(
+      await subscriptions.finishSeatLineWrite({ id, token: "other", opened: opened.opened }),
+    ).toBe(false);
+    expect(
+      await subscriptions.finishSeatLineWrite({ id, token: first.token, opened: opened.opened }),
+    ).toBe(true);
+    expect(await subscriptions.findSeatLineWrite({ id })).toBeNull();
+    await subscriptions.releaseSeatLine({ id, token: first.token });
   });
 
   /** @scenario "A seat line repair skips a subscription a seat change is working on" */

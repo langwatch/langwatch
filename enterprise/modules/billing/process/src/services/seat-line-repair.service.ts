@@ -1,10 +1,11 @@
 import { isGrowthSeatPrice, type StripePriceMap } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type {
   SeatEventSubscriptionRepository,
+  SeatLineWriteRow,
   SeatRepairRow,
 } from "../repositories/seat-event-subscription.repository.ts";
 import type { BillingSubscription } from "../rules/billing-stripe-shapes.rules.ts";
@@ -37,9 +38,9 @@ export type SeatLineRepairOutcome = {
 };
 
 /**
- * Puts a seat line right with no proration (specs/licensing/seat-rotation.feature). A lift record
- * moves only a line still at the recorded lift; any other count is a charge that went through or a
- * later change, cleared untouched. A reconcile record moves the line to the last change's count.
+ * Puts a line a seat change left lifted back to the recorded quantity with no proration
+ * (specs/licensing/seat-rotation.feature). Only a line still at the recorded lift moves; any other
+ * count is a charge that went through or a later change, cleared without touching Stripe.
  */
 export class SeatLineRepairService {
   private readonly stripeSubscriptions: Pick<
@@ -96,7 +97,104 @@ export class SeatLineRepairService {
         if (await this.countFailure({ repair, error })) outcome.flagged += 1;
       }
     }
+    // Lifts first: a write left behind is then settled against the line as they left it.
+    await this.settleWrites({ sentBefore: recordedBefore, outcome });
     return outcome;
+  }
+
+  /** Settles every write left pending past the grace window into `outcome`. */
+  private async settleWrites({
+    sentBefore,
+    outcome,
+  }: {
+    sentBefore: Instant;
+    outcome: SeatLineRepairOutcome;
+  }): Promise<void> {
+    for (const write of await this.subscriptions.findSeatLineWrites({ sentBefore })) {
+      try {
+        const held = await this.lease.hold({
+          id: write.id,
+          waitMs: 0,
+          work: (guard) => this.settleWrite({ write, guard }),
+        });
+        if (!held.held || held.value === "pending") {
+          outcome.pending += 1;
+          continue;
+        }
+        outcome.repaired += 1;
+      } catch (error) {
+        outcome.failed += 1;
+        if (await this.countWriteFailure({ write, error })) outcome.flagged += 1;
+      }
+    }
+  }
+
+  /**
+   * Settles writes their holder never cleared. A seat change finished after them set the count;
+   * otherwise a line at a count they wrote landed and stands, and any other line goes back to the
+   * last finished change's count.
+   */
+  private async settleWrite({
+    write,
+    guard,
+  }: {
+    write: SeatLineWriteRow;
+    guard: SeatLineGuard;
+  }): Promise<"settled" | "pending"> {
+    const pending = await this.subscriptions.findSeatLineWrite({ id: write.id });
+    if (!pending?.since.equals(write.since)) return "settled";
+    const settle = (accepted: number | null) =>
+      this.subscriptions.settleSeatLineWrite({ id: write.id, since: write.since, accepted });
+    const subscription = await this.stripeSubscriptions.getSubscription({
+      subscriptionId: write.stripeSubscriptionId,
+    });
+    if (ENDED_STATUSES.has(subscription.status)) return settle(null).then(() => "settled");
+    const seatItem = this.seatItemOf(subscription);
+    const target = await this.subscriptions.findSeatLineTarget({ id: write.id });
+    const changedSince = target.at !== null && Temporal.Instant.compare(target.at, write.since) > 0;
+    const billed = seatItem.quantity;
+    if (!changedSince && billed != null && pending.quantities.includes(billed)) {
+      return settle(billed).then(() => "settled");
+    }
+    const quantity = target.quantity;
+    if (quantity === null) throw new Error("The subscription has no seat count to settle to");
+    if (seatItem.quantity !== quantity) {
+      if (UNCHANGEABLE_STATUSES.has(subscription.status)) return "pending";
+      await guard.write({
+        quantity,
+        send: () =>
+          this.stripeSubscriptions.updateSubscription({
+            subscriptionId: write.stripeSubscriptionId,
+            change: { items: [{ id: seatItem.id, quantity }], prorationBehavior: "none" },
+            timeoutMs: SEAT_LINE_WRITE_TIMEOUT_MS,
+          }),
+      });
+    }
+    await settle(null);
+    return "settled";
+  }
+
+  /** Records a failed settle; answers whether this attempt raised the Ops flag. */
+  private async countWriteFailure({
+    write,
+    error,
+  }: {
+    write: SeatLineWriteRow;
+    error: unknown;
+  }): Promise<boolean> {
+    const attempts = write.attempts + 1;
+    const raisesFlag = !write.flaggedAt && attempts >= SEAT_REPAIR_FLAG_AFTER_ATTEMPTS;
+    const flaggedAt = write.flaggedAt ?? (raisesFlag ? nowInstant() : null);
+    logger.error(
+      { error, organizationId: write.organizationId, subscriptionId: write.stripeSubscriptionId },
+      "seat line write left pending could not be settled; the next pass retries it",
+    );
+    await this.subscriptions
+      .recordSeatLineWriteFailure({ id: write.id, since: write.since, attempts, flaggedAt })
+      .catch((recordError: unknown) => {
+        logger.error({ error: recordError, subscriptionId: write.id }, "seat write count failed");
+      });
+    return raisesFlag;
   }
 
   /** Moves the line back while Stripe still bills the lift; answers whether the record settles. */
@@ -117,29 +215,22 @@ export class SeatLineRepairService {
     });
     if (ENDED_STATUSES.has(subscription.status)) return "settled";
     const seatItem = this.seatItemOf(subscription);
-    if (repair.liftedQuantity !== null && seatItem.quantity !== repair.liftedQuantity) {
-      return "settled";
-    }
-    const quantity = repair.quantity ?? (await this.seatLineTarget(repair.id));
-    if (seatItem.quantity === quantity) return "settled";
+    if (seatItem.quantity !== repair.liftedQuantity) return "settled";
     if (UNCHANGEABLE_STATUSES.has(subscription.status)) return "pending";
+    const subscriptionId = repair.stripeSubscriptionId;
     await guard.write({
-      quantity,
+      quantity: repair.quantity,
       send: () =>
         this.stripeSubscriptions.updateSubscription({
-          subscriptionId: repair.stripeSubscriptionId,
-          change: { items: [{ id: seatItem.id, quantity }], prorationBehavior: "none" },
+          subscriptionId,
+          change: {
+            items: [{ id: seatItem.id, quantity: repair.quantity }],
+            prorationBehavior: "none",
+          },
           timeoutMs: SEAT_LINE_WRITE_TIMEOUT_MS,
         }),
     });
     return "settled";
-  }
-
-  /** The seat count a reconcile puts the line to; with none known the repair fails toward Ops. */
-  private async seatLineTarget(id: string): Promise<number> {
-    const target = await this.subscriptions.findSeatLineTarget({ id });
-    if (target === null) throw new Error("The subscription has no seat count to reconcile to");
-    return target;
   }
 
   private seatItemOf(subscription: BillingSubscription) {

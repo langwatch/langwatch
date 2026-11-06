@@ -56,8 +56,10 @@ interface AdminSubscription {
   maxAutomations: number | null;
   /** The seat quantity billing could not put back at Stripe, flagged once its retries ran out. */
   seatRepairQuantity?: number | null;
-  /** The seat quantity the last seat change set; a repair with no quantity puts the line to it. */
+  /** The seat quantity the last seat change set; a pending write is settled back to it. */
   seatLineQuantity?: number | null;
+  /** Set once a Stripe seat line write left pending could not be settled after its retries. */
+  seatLineWriteFlaggedAt?: string | null;
   seatRepairFlaggedAt?: string | null;
   organization?: { id: string; name: string; slug: string };
   createdAt: string;
@@ -232,11 +234,19 @@ export default function SubscriptionsView() {
   );
 }
 
+/** The seat count a flagged seat line should bill: the lift's way back, else the last change's. */
+function flaggedSeatLineQuantity(subscription: AdminSubscription): number | null {
+  if (subscription.seatRepairFlaggedAt) return subscription.seatRepairQuantity ?? null;
+  if (subscription.seatLineWriteFlaggedAt) {
+    return subscription.seatLineQuantity ?? subscription.maxMembers;
+  }
+  return null;
+}
+
 /** Billing's flag for a seat line Stripe still bills wrong after its repair retries. */
 function SeatRepairBadge({ subscription }: { subscription: AdminSubscription }) {
-  const quantity =
-    subscription.seatRepairQuantity ?? subscription.seatLineQuantity ?? subscription.maxMembers;
-  if (!subscription.seatRepairFlaggedAt || quantity == null) return null;
+  const quantity = flaggedSeatLineQuantity(subscription);
+  if (quantity == null) return null;
   return (
     <Badge size="sm" colorPalette="red">
       Seat line needs repair: {quantity} {quantity === 1 ? "seat" : "seats"}

@@ -18761,13 +18761,67 @@
           "documentation": "The seat quantity the last finished seat change set the seat line to; provider events never write it."
         },
         {
+          "name": "seatLineQuantityAt",
+          "columnName": "seatLineQuantityAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seatLineWriteQuantities",
+          "columnName": "seatLineWriteQuantities",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "A Stripe seat line write recorded before it is sent and cleared once it is known to have\nfinished under the lease; one left behind is settled by the seat line repair.\nEvery seat quantity written while this record was pending."
+        },
+        {
+          "name": "seatLineWriteSince",
+          "columnName": "seatLineWriteSince",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The first write still pending; a later holder's write keeps it."
+        },
+        {
+          "name": "seatLineWriteAt",
+          "columnName": "seatLineWriteAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The latest write sent; the repair waits a grace window after it."
+        },
+        {
+          "name": "seatLineWriteAttempts",
+          "columnName": "seatLineWriteAttempts",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seatLineWriteFlaggedAt",
+          "columnName": "seatLineWriteFlaggedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "seatRepairQuantity",
           "columnName": "seatRepairQuantity",
           "type": "Int",
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "The seat quantity Stripe should bill if a seat change stops after lifting the seat line; null with\nseatRepairSince set means the line goes back to seatLineQuantity."
+          "documentation": "The seat quantity Stripe should bill if a seat change stops after lifting the seat line; null once settled."
         },
         {
           "name": "seatRepairLiftedQuantity",

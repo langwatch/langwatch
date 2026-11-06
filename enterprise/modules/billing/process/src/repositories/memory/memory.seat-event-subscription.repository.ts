@@ -9,7 +9,10 @@ import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
   type SeatLineClaim,
-  type SeatLiftRecord,
+  type SeatLineTarget,
+  type SeatLineWrite,
+  type SeatLineWriteRow,
+  type SeatLineWriteStart,
   type SeatRepairRecord,
   type SeatRepairRow,
   type SeatSubscriptionRow,
@@ -93,7 +96,6 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
       seatsKept: null,
       seatsKeptUntil: null,
     });
-    this.store.seatLineTargets.set(id, input.maxMembers);
     return { id };
   }
 
@@ -130,7 +132,7 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
       seatsKept: kept?.seats ?? null,
       seatsKeptUntil: kept?.until ?? null,
     };
-    this.store.seatLineTargets.set(id, maxMembers);
+    this.store.seatLineTargets.set(id, { quantity: maxMembers, at: nowInstant() });
     const pending = this.store.seatRepairs.get(id);
     if (pending && Temporal.Instant.compare(pending.since, repairsUpTo) <= 0) {
       this.store.seatRepairs.delete(id);
@@ -145,30 +147,7 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
     id: string;
     quantity: number;
     liftedQuantity: number;
-  }): Promise<SeatLiftRecord> {
-    const since = this.writeSeatRepair({ id, quantity, liftedQuantity });
-    return { quantity, liftedQuantity, since };
-  }
-
-  async recordSeatLineReconcile({ id }: { id: string }): Promise<SeatRepairRecord> {
-    const since = this.writeSeatRepair({ id, quantity: null, liftedQuantity: null });
-    return { quantity: null, liftedQuantity: null, since };
-  }
-
-  async findSeatLineTarget({ id }: { id: string }): Promise<number | null> {
-    const subscription = this.store.subscriptions.find((row) => row.id === id);
-    return this.store.seatLineTargets.get(id) ?? subscription?.maxMembers ?? null;
-  }
-
-  private writeSeatRepair({
-    id,
-    quantity,
-    liftedQuantity,
-  }: {
-    id: string;
-    quantity: number | null;
-    liftedQuantity: number | null;
-  }): Instant {
+  }): Promise<SeatRepairRecord> {
     const since = Temporal.Instant.fromEpochMilliseconds(nowInstant().epochMilliseconds);
     this.store.seatRepairs.set(id, {
       quantity,
@@ -177,7 +156,7 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
       attempts: 0,
       flaggedAt: null,
     });
-    return since;
+    return { quantity, liftedQuantity, since };
   }
 
   async findSeatRepairs({ recordedBefore }: { recordedBefore: Instant }): Promise<SeatRepairRow[]> {
@@ -253,6 +232,124 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
     if (held?.token !== token || Temporal.Instant.compare(held.until, now) <= 0) return false;
     this.store.seatLineLeases.set(id, { token, until: now.add({ milliseconds: leaseMs }) });
     return true;
+  }
+
+  async beginSeatLineWrite({
+    id,
+    token,
+    leaseMs,
+    quantity,
+  }: {
+    id: string;
+    token: string;
+    leaseMs: number;
+    quantity: number;
+  }): Promise<SeatLineWriteStart> {
+    const now = Temporal.Instant.fromEpochMilliseconds(nowInstant().epochMilliseconds);
+    if (!this.holds({ id, token, now })) return { held: false };
+    this.store.seatLineLeases.set(id, { token, until: now.add({ milliseconds: leaseMs }) });
+    const pending = this.store.seatLineWrites.get(id);
+    if (pending) {
+      this.store.seatLineWrites.set(id, {
+        ...pending,
+        quantities: [...pending.quantities, quantity],
+        at: now,
+      });
+      return { held: true, opened: null };
+    }
+    this.store.seatLineWrites.set(id, {
+      quantities: [quantity],
+      since: now,
+      at: now,
+      attempts: 0,
+      flaggedAt: null,
+    });
+    return { held: true, opened: now };
+  }
+
+  async finishSeatLineWrite({
+    id,
+    token,
+    opened,
+  }: {
+    id: string;
+    token: string;
+    opened: Instant;
+  }): Promise<boolean> {
+    if (!this.holds({ id, token, now: nowInstant() })) return false;
+    const pending = this.store.seatLineWrites.get(id);
+    if (!pending?.since.equals(opened)) return false;
+    this.store.seatLineWrites.delete(id);
+    return true;
+  }
+
+  async findSeatLineWrites({ sentBefore }: { sentBefore: Instant }): Promise<SeatLineWriteRow[]> {
+    const rows: SeatLineWriteRow[] = [];
+    for (const [id, write] of this.store.seatLineWrites) {
+      const subscription = this.store.subscriptions.find((row) => row.id === id);
+      if (!subscription?.stripeSubscriptionId) continue;
+      if (Temporal.Instant.compare(write.at, sentBefore) >= 0) continue;
+      rows.push({
+        ...write,
+        id,
+        organizationId: subscription.organizationId,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
+      });
+    }
+    return rows.toSorted((a, b) => a.since.epochMilliseconds - b.since.epochMilliseconds);
+  }
+
+  async findSeatLineWrite({ id }: { id: string }): Promise<SeatLineWrite | null> {
+    const pending = this.store.seatLineWrites.get(id);
+    return pending
+      ? { quantities: pending.quantities, since: pending.since, at: pending.at }
+      : null;
+  }
+
+  async findSeatLineTarget({ id }: { id: string }): Promise<SeatLineTarget> {
+    const target = this.store.seatLineTargets.get(id);
+    if (target) return target;
+    const subscription = this.store.subscriptions.find((row) => row.id === id);
+    return { quantity: subscription?.maxMembers ?? null, at: null };
+  }
+
+  async settleSeatLineWrite({
+    id,
+    since,
+    accepted,
+  }: {
+    id: string;
+    since: Instant;
+    accepted: number | null;
+  }): Promise<void> {
+    const pending = this.store.seatLineWrites.get(id);
+    if (!pending?.since.equals(since)) return;
+    this.store.seatLineWrites.delete(id);
+    if (accepted !== null) {
+      this.store.seatLineTargets.set(id, { quantity: accepted, at: nowInstant() });
+    }
+  }
+
+  async recordSeatLineWriteFailure({
+    id,
+    since,
+    attempts,
+    flaggedAt,
+  }: {
+    id: string;
+    since: Instant;
+    attempts: number;
+    flaggedAt: Instant | null;
+  }): Promise<void> {
+    const pending = this.store.seatLineWrites.get(id);
+    if (!pending?.since.equals(since)) return;
+    this.store.seatLineWrites.set(id, { ...pending, attempts, flaggedAt });
+  }
+
+  /** Whether `token` holds the subscription's lease and it has not run out. */
+  private holds({ id, token, now }: { id: string; token: string; now: Instant }): boolean {
+    const held = this.store.seatLineLeases.get(id);
+    return held?.token === token && Temporal.Instant.compare(held.until, now) > 0;
   }
 
   async releaseSeatLine({ id, token }: { id: string; token: string }): Promise<void> {

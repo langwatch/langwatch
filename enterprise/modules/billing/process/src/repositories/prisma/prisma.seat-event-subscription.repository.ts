@@ -10,7 +10,10 @@ import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
   type SeatLineClaim,
-  type SeatLiftRecord,
+  type SeatLineTarget,
+  type SeatLineWrite,
+  type SeatLineWriteRow,
+  type SeatLineWriteStart,
   type SeatRepairRecord,
   type SeatRepairRow,
   type SeatSubscriptionRow,
@@ -23,6 +26,15 @@ const NO_SEAT_REPAIR = {
   seatRepairSince: null,
   seatRepairAttempts: null,
   seatRepairFlaggedAt: null,
+};
+
+/** The write-ahead columns of a subscription with no seat line write pending. */
+const NO_SEAT_LINE_WRITE = {
+  seatLineWriteQuantities: [],
+  seatLineWriteSince: null,
+  seatLineWriteAt: null,
+  seatLineWriteAttempts: null,
+  seatLineWriteFlaggedAt: null,
 };
 
 /** Only what this repository touches. */
@@ -84,7 +96,7 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
     maxMembers: number;
   }): Promise<{ id: string }> {
     return this.prisma.subscription.create({
-      data: { ...input, seatLineQuantity: input.maxMembers, status: "PENDING" },
+      data: { ...input, status: "PENDING" },
       select: { id: true },
     });
   }
@@ -113,6 +125,7 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
         status: "ACTIVE",
         maxMembers,
         seatLineQuantity: maxMembers,
+        seatLineQuantityAt: toDate(nowInstant()),
         endDate: null,
         seatsKept: kept?.seats ?? null,
         seatsKeptUntil: kept ? toDate(kept.until) : null,
@@ -132,33 +145,7 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
     id: string;
     quantity: number;
     liftedQuantity: number;
-  }): Promise<SeatLiftRecord> {
-    const since = await this.writeSeatRepair({ id, quantity, liftedQuantity });
-    return { quantity, liftedQuantity, since };
-  }
-
-  async recordSeatLineReconcile({ id }: { id: string }): Promise<SeatRepairRecord> {
-    const since = await this.writeSeatRepair({ id, quantity: null, liftedQuantity: null });
-    return { quantity: null, liftedQuantity: null, since };
-  }
-
-  async findSeatLineTarget({ id }: { id: string }): Promise<number | null> {
-    const row = await this.prisma.subscription.findUnique({
-      where: { id },
-      select: { seatLineQuantity: true, maxMembers: true },
-    });
-    return row?.seatLineQuantity ?? row?.maxMembers ?? null;
-  }
-
-  private async writeSeatRepair({
-    id,
-    quantity,
-    liftedQuantity,
-  }: {
-    id: string;
-    quantity: number | null;
-    liftedQuantity: number | null;
-  }): Promise<Instant> {
+  }): Promise<SeatRepairRecord> {
     // Whole milliseconds, as the column keeps them, so the record matches its row exactly.
     const since = fromDate(toDate(nowInstant()));
     await this.prisma.subscription.update({
@@ -171,12 +158,14 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
         seatRepairFlaggedAt: null,
       },
     });
-    return since;
+    return { quantity, liftedQuantity, since };
   }
 
   async findSeatRepairs({ recordedBefore }: { recordedBefore: Instant }): Promise<SeatRepairRow[]> {
     const rows = await this.prisma.subscription.findMany({
       where: {
+        seatRepairQuantity: { not: null },
+        seatRepairLiftedQuantity: { not: null },
         seatRepairSince: { lt: toDate(recordedBefore) },
         stripeSubscriptionId: { not: null },
       },
@@ -193,7 +182,10 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
       },
     });
     return rows.flatMap((row) =>
-      row.seatRepairSince !== null && row.stripeSubscriptionId !== null
+      row.seatRepairQuantity !== null &&
+      row.seatRepairLiftedQuantity !== null &&
+      row.seatRepairSince !== null &&
+      row.stripeSubscriptionId !== null
         ? [
             {
               id: row.id,
@@ -281,6 +273,150 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
     return count === 1;
   }
 
+  async beginSeatLineWrite({
+    id,
+    token,
+    leaseMs,
+    quantity,
+  }: {
+    id: string;
+    token: string;
+    leaseMs: number;
+    quantity: number;
+  }): Promise<SeatLineWriteStart> {
+    // Whole milliseconds, as the column keeps them, so `opened` matches its row exactly.
+    const now = fromDate(toDate(nowInstant()));
+    const held = { id, seatLineLeaseToken: token, seatLineLeaseUntil: { gt: toDate(now) } };
+    const write = {
+      seatLineLeaseUntil: toDate(now.add({ milliseconds: leaseMs })),
+      seatLineWriteAt: toDate(now),
+    };
+    const opened = await this.prisma.subscription.updateMany({
+      where: { ...held, seatLineWriteSince: null },
+      data: {
+        ...write,
+        seatLineWriteQuantities: [quantity],
+        seatLineWriteSince: toDate(now),
+        seatLineWriteAttempts: 0,
+      },
+    });
+    if (opened.count === 1) return { held: true, opened: now };
+    const kept = await this.prisma.subscription.updateMany({
+      where: held,
+      data: { ...write, seatLineWriteQuantities: { push: quantity } },
+    });
+    return kept.count === 1 ? { held: true, opened: null } : { held: false };
+  }
+
+  async finishSeatLineWrite({
+    id,
+    token,
+    opened,
+  }: {
+    id: string;
+    token: string;
+    opened: Instant;
+  }): Promise<boolean> {
+    const { count } = await this.prisma.subscription.updateMany({
+      where: {
+        id,
+        seatLineLeaseToken: token,
+        seatLineLeaseUntil: { gt: toDate(nowInstant()) },
+        seatLineWriteSince: toDate(opened),
+      },
+      data: NO_SEAT_LINE_WRITE,
+    });
+    return count === 1;
+  }
+
+  async findSeatLineWrites({ sentBefore }: { sentBefore: Instant }): Promise<SeatLineWriteRow[]> {
+    const rows = await this.prisma.subscription.findMany({
+      where: { seatLineWriteAt: { lt: toDate(sentBefore) }, stripeSubscriptionId: { not: null } },
+      orderBy: { seatLineWriteSince: "asc" },
+      select: {
+        id: true,
+        organizationId: true,
+        stripeSubscriptionId: true,
+        seatLineWriteQuantities: true,
+        seatLineWriteSince: true,
+        seatLineWriteAt: true,
+        seatLineWriteAttempts: true,
+        seatLineWriteFlaggedAt: true,
+      },
+    });
+    return rows.flatMap((row) => {
+      const { stripeSubscriptionId } = row;
+      if (stripeSubscriptionId === null) return [];
+      return seatLineWritesOf(row).map((write) => ({
+        ...write,
+        id: row.id,
+        organizationId: row.organizationId,
+        stripeSubscriptionId,
+        attempts: row.seatLineWriteAttempts ?? 0,
+        flaggedAt: row.seatLineWriteFlaggedAt ? fromDate(row.seatLineWriteFlaggedAt) : null,
+      }));
+    });
+  }
+
+  async findSeatLineWrite({ id }: { id: string }): Promise<SeatLineWrite | null> {
+    const row = await this.prisma.subscription.findUnique({
+      where: { id },
+      select: { seatLineWriteQuantities: true, seatLineWriteSince: true, seatLineWriteAt: true },
+    });
+    return row ? (seatLineWritesOf(row)[0] ?? null) : null;
+  }
+
+  async findSeatLineTarget({ id }: { id: string }): Promise<SeatLineTarget> {
+    const row = await this.prisma.subscription.findUnique({
+      where: { id },
+      select: { seatLineQuantity: true, seatLineQuantityAt: true, maxMembers: true },
+    });
+    return {
+      quantity: row?.seatLineQuantity ?? row?.maxMembers ?? null,
+      at: row?.seatLineQuantityAt ? fromDate(row.seatLineQuantityAt) : null,
+    };
+  }
+
+  async settleSeatLineWrite({
+    id,
+    since,
+    accepted,
+  }: {
+    id: string;
+    since: Instant;
+    accepted: number | null;
+  }): Promise<void> {
+    await this.prisma.subscription.updateMany({
+      where: { id, seatLineWriteSince: toDate(since) },
+      data: {
+        ...NO_SEAT_LINE_WRITE,
+        ...(accepted === null
+          ? {}
+          : { seatLineQuantity: accepted, seatLineQuantityAt: toDate(nowInstant()) }),
+      },
+    });
+  }
+
+  async recordSeatLineWriteFailure({
+    id,
+    since,
+    attempts,
+    flaggedAt,
+  }: {
+    id: string;
+    since: Instant;
+    attempts: number;
+    flaggedAt: Instant | null;
+  }): Promise<void> {
+    await this.prisma.subscription.updateMany({
+      where: { id, seatLineWriteSince: toDate(since) },
+      data: {
+        seatLineWriteAttempts: attempts,
+        seatLineWriteFlaggedAt: flaggedAt ? toDate(flaggedAt) : null,
+      },
+    });
+  }
+
   async releaseSeatLine({ id, token }: { id: string; token: string }): Promise<void> {
     await this.prisma.subscription.updateMany({
       where: { id, seatLineLeaseToken: token },
@@ -297,4 +433,20 @@ function sameRepair({ id, record }: { id: string; record: SeatRepairRecord }) {
     seatRepairLiftedQuantity: record.liftedQuantity,
     seatRepairSince: toDate(record.since),
   };
+}
+
+/** The pending writes a row holds: one record, or none. */
+function seatLineWritesOf(row: {
+  seatLineWriteQuantities: number[];
+  seatLineWriteSince: Date | null;
+  seatLineWriteAt: Date | null;
+}): SeatLineWrite[] {
+  if (row.seatLineWriteSince === null || row.seatLineWriteAt === null) return [];
+  return [
+    {
+      quantities: row.seatLineWriteQuantities,
+      since: fromDate(row.seatLineWriteSince),
+      at: fromDate(row.seatLineWriteAt),
+    },
+  ];
 }

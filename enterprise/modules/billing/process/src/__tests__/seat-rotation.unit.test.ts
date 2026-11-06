@@ -230,6 +230,8 @@ describe("Growth seat changes", () => {
           claimSeatLine: (input) => repository.claimSeatLine(input),
           renewSeatLine: (input) => repository.renewSeatLine(input),
           releaseSeatLine: (input) => repository.releaseSeatLine(input),
+          beginSeatLineWrite: (input) => repository.beginSeatLineWrite(input),
+          finishSeatLineWrite: (input) => repository.finishSeatLineWrite(input),
           keepSeats: (input) => repository.keepSeats(input),
           reactivateWithSeats: async () => {
             throw new Error("database unavailable");
@@ -408,6 +410,8 @@ describe("Growth seat changes", () => {
           claimSeatLine: (input) => repository.claimSeatLine(input),
           renewSeatLine: (input) => repository.renewSeatLine(input),
           releaseSeatLine: (input) => repository.releaseSeatLine(input),
+          beginSeatLineWrite: (input) => repository.beginSeatLineWrite(input),
+          finishSeatLineWrite: (input) => repository.finishSeatLineWrite(input),
           keepSeats: (input) => repository.keepSeats(input),
           recordSeatRepair: async () => {
             throw new Error("database unavailable");
@@ -489,7 +493,7 @@ describe("Growth seat changes", () => {
     });
 
     /** @scenario "A seat line write that lands after a seat change took its lease is put right" */
-    it("records a reconcile for a late write and the next pass restores the newer count", async () => {
+    it("leaves a late write pending and the next pass restores the newer count", async () => {
       const send = stripeSubscriptions.updateSubscription.bind(stripeSubscriptions);
       const stall = { resume: () => {} };
       const writes = vi
@@ -514,10 +518,7 @@ describe("Growth seat changes", () => {
         items: [{ id: "si_seat", quantity: 3 }],
         prorationBehavior: "none",
       });
-      expect(store.seatRepairs.get("sub_db_1")).toMatchObject({
-        quantity: null,
-        liftedQuantity: null,
-      });
+      expect(store.seatLineWrites.size).toBe(1);
       writes.mockRestore();
       stripeSubscriptions.updates.length = 0;
 
@@ -526,36 +527,7 @@ describe("Growth seat changes", () => {
       expect(stripeSubscriptions.updates.map((update) => update.change)).toEqual([
         { items: [{ id: "si_seat", quantity: 6 }], prorationBehavior: "none" },
       ]);
-      expect(store.seatRepairs.size).toBe(0);
-    });
-
-    /** @scenario "A seat line write that lands after a seat change took its lease is put right" */
-    it("retries recording the reconcile when the database refuses it at first", async () => {
-      const refusals = vi
-        .spyOn(MemorySeatEventSubscriptionRepository.prototype, "recordSeatLineReconcile")
-        .mockRejectedValueOnce(new Error("database unavailable"))
-        .mockRejectedValueOnce(new Error("database unavailable"));
-      const send = stripeSubscriptions.updateSubscription.bind(stripeSubscriptions);
-      const stall = { resume: () => {} };
-      const writes = vi
-        .spyOn(stripeSubscriptions, "updateSubscription")
-        .mockImplementationOnce(async (input) => {
-          await new Promise<void>((resolve) => (stall.resume = resolve));
-          return send(input);
-        });
-      const repairing = repairs.repairSeatLines();
-      await vi.advanceTimersByTimeAsync(0);
-      vi.setSystemTime(Date.now() + SEAT_LINE_LEASE_MS + 1);
-      await seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 });
-
-      stall.resume();
-      await vi.advanceTimersByTimeAsync(10_000);
-
-      expect(await repairing).toMatchObject({ repaired: 0, pending: 1 });
-      expect(refusals).toHaveBeenCalledTimes(3);
-      expect(store.seatRepairs.get("sub_db_1")).toMatchObject({ quantity: null });
-      writes.mockRestore();
-      refusals.mockRestore();
+      expect(store.seatLineWrites.size).toBe(0);
     });
 
     /** @scenario "Seat line writes give up well inside the lease" */
@@ -618,6 +590,7 @@ describe("Growth seat changes", () => {
     /** @scenario "A seat line a later change moved is left alone" */
     it("clears the repair without a change when a later change moved the line", async () => {
       seedProvider(4);
+      store.seatLineTargets.set("sub_db_1", { quantity: 4, at: Temporal.Now.instant() });
 
       await repairs.repairSeatLines();
 
@@ -633,6 +606,7 @@ describe("Growth seat changes", () => {
         prices,
         subscriptions: createApiFixture<MemorySeatEventSubscriptionRepository>({
           findSeatRepairs: (input) => repository.findSeatRepairs(input),
+          findSeatLineWrites: async () => [],
           claimSeatLine: (input) => repository.claimSeatLine(input),
           renewSeatLine: (input) => repository.renewSeatLine(input),
           releaseSeatLine: (input) => repository.releaseSeatLine(input),
@@ -699,7 +673,8 @@ describe("Growth seat changes", () => {
 
       paused.pause.resume();
 
-      expect(await repairing).toMatchObject({ repaired: 0, pending: 1, failed: 0 });
+      // The lift record and the writes the refused change left both wait for the next pass.
+      expect(await repairing).toMatchObject({ repaired: 0, pending: 2, failed: 0 });
       expect(stripeSubscriptions.updates).toEqual([]);
       expect(store.seatRepairs.get("sub_db_1")).toMatchObject({ quantity: 3, liftedQuantity: 5 });
     });
@@ -712,7 +687,7 @@ describe("Growth seat changes", () => {
       });
       const reads = stripeSubscriptions.reads.length;
 
-      expect(await repairs.repairSeatLines()).toMatchObject({ repaired: 0, pending: 1 });
+      expect(await repairs.repairSeatLines()).toMatchObject({ repaired: 0, pending: 2 });
       expect(stripeSubscriptions.reads).toHaveLength(reads);
       expect(stripeSubscriptions.updates).toEqual([]);
       expect(store.seatRepairs.get("sub_db_1")).toMatchObject({ quantity: 3, liftedQuantity: 5 });
@@ -735,7 +710,7 @@ describe("Growth seat changes", () => {
 
       expect(await repairs.repairSeatLines()).toEqual({
         repaired: 0,
-        pending: 1,
+        pending: 2,
         failed: 0,
         flagged: 0,
       });
@@ -797,46 +772,47 @@ describe("Growth seat changes", () => {
       ]);
     });
   });
-  describe("when a seat line is recorded to match its seat count", () => {
-    let repairs: SeatLineRepairService;
-    let repository: MemorySeatEventSubscriptionRepository;
-
-    beforeEach(async () => {
-      await seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 });
-      seedProvider(6);
-      stripeSubscriptions.updates.length = 0;
-      repository = MemorySeatEventSubscriptionRepository.create(store);
-      repairs = SeatLineRepairService.create({
+  describe("when the database fails around a Stripe seat line write", () => {
+    const repairsOn = () =>
+      SeatLineRepairService.create({
         stripeSubscriptions,
-        subscriptions: repository,
+        subscriptions: MemorySeatEventSubscriptionRepository.create(store),
         prices,
       });
-    });
 
-    /** @scenario "A seat line already at the seat count clears its reconcile without a change" */
-    it("clears the reconcile without a change when Stripe bills the seat count", async () => {
-      await repository.recordSeatLineReconcile({ id: "sub_db_1" });
-      vi.setSystemTime(Date.now() + SEAT_REPAIR_GRACE_MS + 1);
+    /** @scenario "A database outage right after a Stripe write still leaves a repair that runs" */
+    it("keeps the write pending after a refused clear and the repair settles it", async () => {
+      const clear = vi
+        .spyOn(MemorySeatEventSubscriptionRepository.prototype, "finishSeatLineWrite")
+        .mockRejectedValueOnce(new Error("database unavailable"));
 
-      expect(await repairs.repairSeatLines()).toMatchObject({ repaired: 1 });
-      expect(stripeSubscriptions.updates).toHaveLength(0);
-      expect(store.seatRepairs.size).toBe(0);
-    });
-
-    /** @scenario "The seat count a seat line reconciles to ignores the provider's own updates" */
-    it("reconciles to the seat change's count after a provider event reported another", async () => {
+      await expect(
+        seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 3 }),
+      ).rejects.toThrow("database unavailable");
+      clear.mockRestore();
       seedProvider(3);
-      const synced = lifecycle.handleSubscriptionUpdated({ subscription: PROVIDER_AT_THREE });
-      await vi.advanceTimersByTimeAsync(2000);
-      await synced;
-      expect(store.subscriptions[0]?.maxMembers).toBe(3);
-      await repository.recordSeatLineReconcile({ id: "sub_db_1" });
-      vi.setSystemTime(Date.now() + SEAT_REPAIR_GRACE_MS + 1);
+      expect(store.seatLineWrites.get("sub_db_1")).toMatchObject({ quantities: [3] });
+      stripeSubscriptions.updates.length = 0;
 
-      expect(await repairs.repairSeatLines()).toMatchObject({ repaired: 1 });
-      expect(stripeSubscriptions.updates.map((update) => update.change)).toEqual([
-        { items: [{ id: "si_seat", quantity: 6 }], prorationBehavior: "none" },
-      ]);
+      vi.setSystemTime(Date.now() + SEAT_REPAIR_GRACE_MS + 1);
+      expect(await repairsOn().repairSeatLines()).toMatchObject({ repaired: 1, failed: 0 });
+      expect(stripeSubscriptions.updates).toHaveLength(0);
+      expect(store.seatLineTargets.get("sub_db_1")).toMatchObject({ quantity: 3 });
+      expect(store.seatLineWrites.size).toBe(0);
+    });
+
+    /** @scenario "A seat line write the database refuses to record ahead is never sent" */
+    it("never calls Stripe when the write cannot be recorded ahead", async () => {
+      const record = vi
+        .spyOn(MemorySeatEventSubscriptionRepository.prototype, "beginSeatLineWrite")
+        .mockRejectedValueOnce(new Error("database unavailable"));
+
+      await expect(
+        seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 6 }),
+      ).rejects.toThrow("database unavailable");
+
+      expect(stripeSubscriptions.updates).toHaveLength(0);
+      record.mockRestore();
     });
   });
 

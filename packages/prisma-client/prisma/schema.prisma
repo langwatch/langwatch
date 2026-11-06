@@ -4598,8 +4598,18 @@ model Subscription {
   seatsKeptUntil        DateTime?
   /// The seat quantity the last finished seat change set the seat line to; provider events never write it.
   seatLineQuantity      Int?
-  /// The seat quantity Stripe should bill if a seat change stops after lifting the seat line; null with
-  /// seatRepairSince set means the line goes back to seatLineQuantity.
+  seatLineQuantityAt    DateTime?
+  /// A Stripe seat line write recorded before it is sent and cleared once it is known to have
+  /// finished under the lease; one left behind is settled by the seat line repair.
+  /// Every seat quantity written while this record was pending.
+  seatLineWriteQuantities Int[] @default([])
+  /// The first write still pending; a later holder's write keeps it.
+  seatLineWriteSince    DateTime?
+  /// The latest write sent; the repair waits a grace window after it.
+  seatLineWriteAt       DateTime?
+  seatLineWriteAttempts Int?
+  seatLineWriteFlaggedAt DateTime?
+  /// The seat quantity Stripe should bill if a seat change stops after lifting the seat line; null once settled.
   seatRepairQuantity    Int?
   /// The quantity the change lifted the line to; the repair moves the line back only while Stripe still bills it.
   seatRepairLiftedQuantity Int?

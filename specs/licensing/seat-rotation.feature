@@ -427,26 +427,34 @@ Feature: Seat rotation
       And the lease ran out and a seat change raised the seats to 6 meanwhile
       When the repair's write lands and Stripe shows 3 seats
       Then the repair is not counted as repaired
-      And the subscription records that its seat line should match its seat count, retrying a refused record
+      And the subscription still records the write the repair sent
       When the seat line repair runs after the grace window
       Then the payment provider changes the quantity to 6 with no proration
-      And the repair is cleared
+      And no seat line write is left pending
 
     @unit
-    Scenario: A seat line already at the seat count clears its reconcile without a change
-      Given the subscription records that its seat line should match its seat count of 6
-      And Stripe bills 6 seats
-      When the seat line repair runs
+    Scenario: A database outage right after a Stripe write still leaves a repair that runs
+      Given an organization with 5 seats
+      When an administrator lowers the seats to 3, Stripe takes the write and the database refuses clearing it
+      Then the change errors
+      And the subscription still records the write of 3 seats
+      When the seat line repair runs after the grace window
       Then the payment provider is not asked to change anything
-      And the repair is cleared
+      And the seat line quantity is 3 and no seat line write is left pending
 
     @unit
-    Scenario: The seat count a seat line reconciles to ignores the provider's own updates
+    Scenario: A seat line write the database refuses to record ahead is never sent
+      Given an organization with 5 seats
+      When an administrator raises the seats to 6 and recording the write ahead fails
+      Then the change errors
+      And the payment provider is not asked to change anything
+
+    @integration
+    Scenario: The seat line quantity a pending write settles to ignores the provider's own updates
       Given a seat change set the seats to 6
       And a provider update event then reported 3 seats
-      And the subscription records that its seat line should match its seat count
-      When the seat line repair runs
-      Then the payment provider changes the quantity to 6 with no proration
+      Then the seat line quantity the repair settles to is still 6
+      And a write recorded ahead stays pending until it is cleared by the write that opened it
 
     @unit
     Scenario: Seat line writes give up well inside the lease

@@ -10,9 +10,6 @@ const logger = createLogger("langwatch:billing:seatLineLease");
  * outlasts any seat change's Stripe calls; a holder that stopped frees the line when it runs out.
  */
 export const SEAT_LINE_LEASE_MS = 5 * 60 * 1000;
-/** Tries at recording a late write's reconcile, a database blip apart, before only logging it. */
-export const RECONCILE_RECORD_ATTEMPTS = 5;
-const RECONCILE_RECORD_BACKOFF_MS = 1000;
 /** How often a waiting seat change asks for the lease again. */
 const SEAT_LINE_POLL_MS = 250;
 /**
@@ -25,9 +22,9 @@ export const SEAT_LINE_WRITE_TIMEOUT_MS = 60 * 1000;
 export type SeatLineHold<T> = { held: true; value: T } | { held: false };
 
 /**
- * Wraps every Stripe write: renews the lease before it and checks it after. Lost before, the work
- * stops unwritten; lost after, the write may have overwritten the newer holder's, so it records a
- * reconcile for the seat line repair and stops.
+ * Wraps every Stripe write. Before it, one step renews the lease and records the write; refused,
+ * Stripe is never called. After it, the record is cleared only while the lease is still held, so a
+ * lost lease, a crash or a database outage leaves it for the seat line repair to settle.
  */
 export type SeatLineGuard = {
   write: <R>(input: { quantity: number; send: () => Promise<R> }) => Promise<R>;
@@ -49,7 +46,11 @@ export class SeatLineLeaseService {
   private constructor(
     private readonly subscriptions: Pick<
       SeatEventSubscriptionRepository,
-      "claimSeatLine" | "renewSeatLine" | "releaseSeatLine" | "recordSeatLineReconcile"
+      | "claimSeatLine"
+      | "renewSeatLine"
+      | "releaseSeatLine"
+      | "beginSeatLineWrite"
+      | "finishSeatLineWrite"
     >,
   ) {}
 
@@ -58,7 +59,11 @@ export class SeatLineLeaseService {
   }: {
     subscriptions: Pick<
       SeatEventSubscriptionRepository,
-      "claimSeatLine" | "renewSeatLine" | "releaseSeatLine" | "recordSeatLineReconcile"
+      | "claimSeatLine"
+      | "renewSeatLine"
+      | "releaseSeatLine"
+      | "beginSeatLineWrite"
+      | "finishSeatLineWrite"
     >;
   }): SeatLineLeaseService {
     return new SeatLineLeaseService(subscriptions);
@@ -82,19 +87,23 @@ export class SeatLineLeaseService {
     }
     if (!claim.claimed) return { held: false };
     const { token } = claim;
-    const renew = () =>
-      this.subscriptions.renewSeatLine({ id, token, leaseMs: SEAT_LINE_LEASE_MS });
     // Stripe has no conditional update: a write that stalls past the lease can still land after
-    // a takeover. SEAT_LINE_WRITE_TIMEOUT_MS bounds that, and the check after it records a
-    // reconcile the next repair pass settles against the newer holder's seat count.
+    // a takeover. SEAT_LINE_WRITE_TIMEOUT_MS bounds that, and the record written ahead of every
+    // write stays until the repair pass settles it against the newer holder's seat count.
     const guard: SeatLineGuard = {
       write: async ({ quantity, send }) => {
-        if (!(await renew())) throw new SeatLineLeaseLostError();
+        const start = await this.subscriptions.beginSeatLineWrite({
+          id,
+          token,
+          leaseMs: SEAT_LINE_LEASE_MS,
+          quantity,
+        });
+        if (!start.held) throw new SeatLineLeaseLostError();
         const sent = await send();
-        if (!(await renew())) {
-          await this.recordLateWrite({ id, quantity });
-          throw new SeatLineLeaseLostError();
-        }
+        const held = start.opened
+          ? await this.subscriptions.finishSeatLineWrite({ id, token, opened: start.opened })
+          : await this.subscriptions.renewSeatLine({ id, token, leaseMs: SEAT_LINE_LEASE_MS });
+        if (!held) throw new SeatLineLeaseLostError();
         return sent;
       },
     };
@@ -110,31 +119,5 @@ export class SeatLineLeaseService {
         logger.warn({ error, subscriptionId: id }, "seat line lease release failed");
       });
     }
-  }
-
-  /** A write that landed after a takeover: the next repair pass puts the line to the seat count. */
-  private async recordLateWrite({ id, quantity }: { id: string; quantity: number }): Promise<void> {
-    let lastError: unknown = null;
-    for (let attempt = 1; attempt <= RECONCILE_RECORD_ATTEMPTS; attempt += 1) {
-      if (attempt > 1) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, (attempt - 1) * RECONCILE_RECORD_BACKOFF_MS),
-        );
-      }
-      try {
-        await this.subscriptions.recordSeatLineReconcile({ id });
-        logger.warn(
-          { subscriptionId: id, quantity },
-          "seat line written after its lease was taken over; reconcile recorded for the repair pass",
-        );
-        return;
-      } catch (error) {
-        lastError = error;
-      }
-    }
-    logger.error(
-      { error: lastError, subscriptionId: id, quantity },
-      "seat line written after its lease was taken over and the reconcile could not be recorded",
-    );
   }
 }

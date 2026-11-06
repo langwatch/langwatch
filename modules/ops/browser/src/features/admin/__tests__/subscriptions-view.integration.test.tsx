@@ -35,8 +35,9 @@ const { rows } = vi.hoisted(() => {
         id: "sub-reconcile",
         stripeSubscriptionId: "sub_stripe_reconcile",
         seatRepairQuantity: null,
+        seatRepairFlaggedAt: null,
         seatLineQuantity: 6,
-        seatRepairFlaggedAt: "2026-11-06T12:00:00.000Z",
+        seatLineWriteFlaggedAt: "2026-11-06T12:00:00.000Z",
       },
       {
         ...base,
