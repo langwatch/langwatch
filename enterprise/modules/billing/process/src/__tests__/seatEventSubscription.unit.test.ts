@@ -58,6 +58,10 @@ const createMockSubscriptions = (): {
   createPendingSeatCheckout: vi.fn().mockResolvedValue({ id: "sub_new_1" }),
   keepSeats: vi.fn(),
   reactivateWithSeats: vi.fn(),
+  recordSeatRepair: vi.fn(),
+  findSeatRepairs: vi.fn().mockResolvedValue([]),
+  clearSeatRepair: vi.fn(),
+  recordSeatRepairFailure: vi.fn(),
 });
 
 /** A row with no seats kept from an earlier decrease. */

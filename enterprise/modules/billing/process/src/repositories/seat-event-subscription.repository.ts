@@ -13,6 +13,16 @@ export type SeatSubscriptionRow = {
   seatsKeptUntil: Instant | null;
 };
 
+/** A seat line Stripe should be put back to, recorded when putting it back was refused. */
+export type SeatRepairRow = {
+  id: string;
+  organizationId: string;
+  stripeSubscriptionId: string;
+  quantity: number;
+  attempts: number;
+  flaggedAt: Instant | null;
+};
+
 /** The subscription rows a growth-seat checkout and a seat change write. */
 export abstract class SeatEventSubscriptionRepository {
   /** The organization's ACTIVE and CANCELLED subscriptions, newest first. */
@@ -31,5 +41,18 @@ export abstract class SeatEventSubscriptionRepository {
     id: string;
     maxMembers: number;
     kept: KeptSeats | null;
+  }): Promise<void>;
+  /** Records the quantity Stripe should bill, replacing an earlier repair and its count. */
+  abstract recordSeatRepair(input: { id: string; quantity: number }): Promise<void>;
+  /** Every subscription with a seat line repair pending, oldest first. */
+  abstract findSeatRepairs(): Promise<SeatRepairRow[]>;
+  /** Clears the repair, only while it still asks for `quantity`: a newer one stays. */
+  abstract clearSeatRepair(input: { id: string; quantity: number }): Promise<void>;
+  /** Counts a failed repair, with the instant it was flagged to Ops once it was. */
+  abstract recordSeatRepairFailure(input: {
+    id: string;
+    quantity: number;
+    attempts: number;
+    flaggedAt: Instant | null;
   }): Promise<void>;
 }

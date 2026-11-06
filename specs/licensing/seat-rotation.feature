@@ -280,6 +280,57 @@ Feature: Seat rotation
       When an administrator raises the seats
       Then the payment provider invoices the prorated difference at once
 
+    @unit
+    Scenario: A refused charge after a lift puts the seat line back
+      Given an organization lowered its seats from 5 to 3 and keeps 5 until the period ends
+      When an administrator raises the seats to 6 and the payment provider refuses the charge
+      Then the seat line is put back to 3 seats with no proration
+
+    @unit
+    Scenario: A seat line Stripe refused to put back is recorded for repair
+      Given an organization lowered its seats from 5 to 3 and keeps 5 until the period ends
+      When an administrator raises the seats to 6 and the payment provider refuses the charge
+      And the payment provider also refuses putting the seat line back
+      Then the subscription records that Stripe should bill 3 seats
+
+    @unit
+    Scenario: A seat line Stripe refused to put back is repaired later
+      Given the subscription records that Stripe should bill 3 seats while Stripe bills 5
+      When the seat line repair runs
+      Then the payment provider changes the quantity to 3 with no proration
+      And the repair is cleared
+
+    @unit
+    Scenario: A seat line Stripe already bills right clears its repair without a change
+      Given the subscription records that Stripe should bill 3 seats and Stripe bills 3
+      When the seat line repair runs
+      Then the payment provider is not asked to change anything
+      And the repair is cleared
+
+    @unit
+    Scenario: A later seat change replaces a pending repair
+      Given the subscription records that Stripe should bill 3 seats
+      When an administrator changes the seats and the payment provider accepts it
+      Then the repair is cleared
+
+    @unit
+    Scenario: A seat line still wrong after retries is flagged to Ops
+      Given the subscription records that Stripe should bill 3 seats
+      When the seat line repair is refused 5 times
+      Then the subscription is flagged as needing a seat line repair
+      And the next repair that succeeds clears the flag
+
+    @integration
+    Scenario: Ops sees which subscriptions need a seat line repair
+      Given a subscription is flagged as needing a seat line repair to 3 seats
+      When an operator opens the Ops subscriptions list
+      Then its row reads "Seat line needs repair: 3 seats"
+
+    @unit
+    Scenario: The seat line repair runs every 15 minutes
+      When the seat line repair process wakes
+      Then it asks billing for one repair pass
+
     @integration
     Scenario: The seat drawer explains a lower count
       When an administrator sets the seats from 5 to 3 in the seat drawer

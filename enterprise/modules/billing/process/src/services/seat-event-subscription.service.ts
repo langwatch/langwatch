@@ -353,8 +353,8 @@ export class SeatEventSubscriptionService {
       // A charge refused after the lift puts the line back, so the next cycle bills as before.
       if (lifted && seatItem.quantity != null) {
         const billedBefore = seatItem.quantity;
-        await moveTo(billedBefore, "none").catch((rollbackError: unknown) => {
-          // Stripe now bills the lifted count from the next cycle; this record is how it is found.
+        await moveTo(billedBefore, "none").catch(async (rollbackError: unknown) => {
+          // Stripe would bill the lifted count next cycle; the seat line repair puts it back.
           logger.error(
             {
               error: rollbackError,
@@ -362,8 +362,16 @@ export class SeatEventSubscriptionService {
               subscriptionId: subscription.stripeSubscriptionId,
               billedBefore,
             },
-            "seat line left lifted: the charge and putting the line back both failed",
+            "seat line left lifted: the charge and putting the line back both failed; repair recorded",
           );
+          await this.subscriptions
+            .recordSeatRepair({ id: subscription.id, quantity: billedBefore })
+            .catch((recordError: unknown) => {
+              logger.error(
+                { error: recordError, organizationId, billedBefore },
+                "seat line left lifted and its repair could not be recorded",
+              );
+            });
         });
       }
       throw error;

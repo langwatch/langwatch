@@ -4596,6 +4596,12 @@ model Subscription {
   /// Seats paid for this period that stay usable after a seat decrease, until seatsKeptUntil.
   seatsKept             Int?
   seatsKeptUntil        DateTime?
+  /// The seat quantity Stripe should bill after it refused putting a lifted seat line back; null once repaired.
+  seatRepairQuantity    Int?
+  seatRepairSince       DateTime?
+  seatRepairAttempts    Int?
+  /// Set once the seat line repair has failed often enough that Ops should look at it.
+  seatRepairFlaggedAt   DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]

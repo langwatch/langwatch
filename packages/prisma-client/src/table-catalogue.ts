@@ -2188,6 +2188,10 @@ export const prismaModelFieldCatalogue = {
     "maxAutomations",
     "seatsKept",
     "seatsKeptUntil",
+    "seatRepairQuantity",
+    "seatRepairSince",
+    "seatRepairAttempts",
+    "seatRepairFlaggedAt",
     "organization",
     "invoices"
   ],

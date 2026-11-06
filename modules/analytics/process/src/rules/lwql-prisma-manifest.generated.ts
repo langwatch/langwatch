@@ -1733,6 +1733,10 @@ export interface LwqlPrismaRows {
     readonly maxAutomations: "Int?";
     readonly seatsKept: "Int?";
     readonly seatsKeptUntil: "DateTime?";
+    readonly seatRepairQuantity: "Int?";
+    readonly seatRepairSince: "DateTime?";
+    readonly seatRepairAttempts: "Int?";
+    readonly seatRepairFlaggedAt: "DateTime?";
   };
   readonly Invoice: {
     readonly id: "String";

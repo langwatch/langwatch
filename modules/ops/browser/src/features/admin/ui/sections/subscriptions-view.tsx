@@ -54,6 +54,9 @@ interface AdminSubscription {
   maxDashboards: number | null;
   maxCustomGraphs: number | null;
   maxAutomations: number | null;
+  /** The seat quantity billing could not put back at Stripe, flagged once its retries ran out. */
+  seatRepairQuantity?: number | null;
+  seatRepairFlaggedAt?: string | null;
   organization?: { id: string; name: string; slug: string };
   createdAt: string;
 }
@@ -182,9 +185,12 @@ export default function SubscriptionsView() {
                   </Badge>
                 </ListTable.Cell>
                 <ListTable.Cell>
-                  <Badge size="sm" colorPalette={statusColor[sub.status]}>
-                    {sub.status}
-                  </Badge>
+                  <HStack gap={1} wrap="wrap">
+                    <Badge size="sm" colorPalette={statusColor[sub.status]}>
+                      {sub.status}
+                    </Badge>
+                    <SeatRepairBadge subscription={sub} />
+                  </HStack>
                 </ListTable.Cell>
                 <ListTable.Cell>{sub.stripeSubscriptionId ?? <EmptyCell />}</ListTable.Cell>
                 <ListTable.Cell>
@@ -221,6 +227,17 @@ export default function SubscriptionsView() {
         onClose={() => setCreating(false)}
       />
     </>
+  );
+}
+
+/** Billing's flag for a seat line Stripe still bills wrong after its repair retries. */
+function SeatRepairBadge({ subscription }: { subscription: AdminSubscription }) {
+  const quantity = subscription.seatRepairQuantity;
+  if (!subscription.seatRepairFlaggedAt || quantity == null) return null;
+  return (
+    <Badge size="sm" colorPalette="red">
+      Seat line needs repair: {quantity} {quantity === 1 ? "seat" : "seats"}
+    </Badge>
   );
 }
 

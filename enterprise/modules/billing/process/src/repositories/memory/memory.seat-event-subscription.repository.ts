@@ -3,11 +3,12 @@ import {
   type GrowthSeatPlanType,
 } from "@langwatch/enterprise-billing-contract";
 import { generate } from "@langwatch/ksuid";
-import { nowInstant } from "@langwatch/time";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
+  type SeatRepairRow,
   type SeatSubscriptionRow,
 } from "../seat-event-subscription.repository.ts";
 import type { MemoryBillingStore } from "./memory.billing.store.ts";
@@ -123,5 +124,51 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
       seatsKept: kept?.seats ?? null,
       seatsKeptUntil: kept?.until ?? null,
     };
+    this.store.seatRepairs.delete(id);
+  }
+
+  async recordSeatRepair({ id, quantity }: { id: string; quantity: number }): Promise<void> {
+    this.store.seatRepairs.set(id, { quantity, since: nowInstant(), attempts: 0, flaggedAt: null });
+  }
+
+  async findSeatRepairs(): Promise<SeatRepairRow[]> {
+    const rows: (SeatRepairRow & { since: Instant })[] = [];
+    for (const [id, repair] of this.store.seatRepairs) {
+      const subscription = this.store.subscriptions.find((row) => row.id === id);
+      if (!subscription?.stripeSubscriptionId) continue;
+      rows.push({
+        id,
+        organizationId: subscription.organizationId,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
+        quantity: repair.quantity,
+        attempts: repair.attempts,
+        flaggedAt: repair.flaggedAt,
+        since: repair.since,
+      });
+    }
+    return rows
+      .toSorted((a, b) => a.since.epochMilliseconds - b.since.epochMilliseconds)
+      .map(({ since: _since, ...row }) => row);
+  }
+
+  async clearSeatRepair({ id, quantity }: { id: string; quantity: number }): Promise<void> {
+    const pending = this.store.seatRepairs.get(id);
+    if (pending?.quantity === quantity) this.store.seatRepairs.delete(id);
+  }
+
+  async recordSeatRepairFailure({
+    id,
+    quantity,
+    attempts,
+    flaggedAt,
+  }: {
+    id: string;
+    quantity: number;
+    attempts: number;
+    flaggedAt: Instant | null;
+  }): Promise<void> {
+    const current = this.store.seatRepairs.get(id);
+    if (current?.quantity !== quantity) return;
+    this.store.seatRepairs.set(id, { ...current, attempts, flaggedAt });
   }
 }

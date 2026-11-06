@@ -6,7 +6,7 @@ The server half of [billing](../README.md). Billing: subscriptions, invoices and
 
 ## Installation
 
-`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:43`.
+`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withEventing(seatLineRepairEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:44`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -344,6 +344,14 @@ Declared at `src/eventing/connected-billing.pipeline.ts:73`. Events: `connectedC
 | process manager | `connectedBillingTick`             | every 5 min (`CONNECTED_BILLING_FIRST_DELAY_MS = 5 * 60 * 1000`); intents `tick` (outbox) | `src/eventing/connected-billing.pipeline.ts:80` |
 | process manager | `seatInvoicing`                    | every 1 min (`SEAT_INVOICING_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)           | `src/eventing/connected-billing.pipeline.ts:97` |
 
+### Pipeline `billing_seat_line_repair` (aggregate `global`)
+
+Declared at `src/eventing/seat-line-repair.pipeline.ts:40`.
+
+| Kind            | Name             | Handles                                                                                   | Declared at                                    |
+| --------------- | ---------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| process manager | `seatLineRepair` | every 15 min (`SEAT_LINE_REPAIR_INTERVAL_MS = 15 * 60 * 1000`); intents `repair` (outbox) | `src/eventing/seat-line-repair.pipeline.ts:46` |
+
 ### Tasks
 
 Run by the tasks process, before serve.
@@ -357,12 +365,12 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                | Environment variable                           | Declared at                            |
 | ------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
-| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:184`           |
-| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:185`           |
-| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:186`           |
-| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:187`           |
-| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:188`           |
-| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:189`           |
+| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:189`           |
+| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:190`           |
+| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:191`           |
+| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:192`           |
+| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:193`           |
+| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:194`           |
 | config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:13` |
 | config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:15` |
 | config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:23` |

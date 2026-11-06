@@ -88,6 +88,10 @@ import { PlanLimitAlertService } from "../services/plan-limit-alert.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
+import {
+  type SeatLineRepairOutcome,
+  SeatLineRepairService,
+} from "../services/seat-line-repair.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
@@ -158,6 +162,7 @@ type SubscriptionComposition = Readonly<{
 type SubscriptionDoor = Readonly<{
   customers: CustomerService;
   subscriptions: BillingSubscriptionService;
+  seatLines: SeatLineRepairService;
 }>;
 
 type ConnectedBilling = Readonly<{
@@ -537,6 +542,11 @@ export class BillingModule
         notifier: subscription.notifier,
         stripeErrors,
         seatsInUse,
+      }),
+      seatLines: SeatLineRepairService.create({
+        stripeSubscriptions,
+        subscriptions: repositories.seatEventSubscriptions,
+        prices,
       }),
     };
   }
@@ -1045,6 +1055,12 @@ export class BillingModule
       throw new Error("This billing app was composed without a lifecycle pipeline");
     }
     return this.#lifecycle;
+  }
+
+  /** Puts back seat lines Stripe refused to roll back; nothing where no subscription door is composed. */
+  async repairSeatLines(): Promise<SeatLineRepairOutcome> {
+    if (!this.#subscriptions) return { repaired: 0, failed: 0, flagged: 0 };
+    return this.#subscriptions.seatLines.repairSeatLines();
   }
 
   /** Every row it reads and every invoice it raises is Cloud's: an install runs nothing. */

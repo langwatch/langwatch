@@ -18752,6 +18752,42 @@
           "documentation": ""
         },
         {
+          "name": "seatRepairQuantity",
+          "columnName": "seatRepairQuantity",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The seat quantity Stripe should bill after it refused putting a lifted seat line back; null once repaired."
+        },
+        {
+          "name": "seatRepairSince",
+          "columnName": "seatRepairSince",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seatRepairAttempts",
+          "columnName": "seatRepairAttempts",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seatRepairFlaggedAt",
+          "columnName": "seatRepairFlaggedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Set once the seat line repair has failed often enough that Ops should look at it."
+        },
+        {
           "name": "organization",
           "columnName": "organization",
           "type": "Organization",
