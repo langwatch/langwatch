@@ -88,3 +88,40 @@ const usageStatsSchemaDefinition = z
 export interface UsageStatsSchema extends Named<typeof usageStatsSchemaDefinition> {}
 export const usageStatsSchema: UsageStatsSchema = usageStatsSchemaDefinition;
 export type UsageStats = z.infer<typeof usageStatsSchema>;
+
+/** One UTC day's count this month: `date` is `YYYY-MM-DD`. */
+const usageDaySchemaDefinition = z.object({ date: z.string(), count: z.number() }).strict();
+export interface UsageDaySchema extends Named<typeof usageDaySchemaDefinition> {}
+export const usageDaySchema: UsageDaySchema = usageDaySchemaDefinition;
+export type UsageDay = z.infer<typeof usageDaySchema>;
+
+/** One project's share of the month, named as the limit email names it. */
+const projectUsageShareSchemaDefinition = z
+  .object({ projectId: z.string(), name: z.string(), count: z.number() })
+  .strict();
+export interface ProjectUsageShareSchema extends Named<typeof projectUsageShareSchemaDefinition> {}
+export const projectUsageShareSchema: ProjectUsageShareSchema = projectUsageShareSchemaDefinition;
+export type ProjectUsageShare = z.infer<typeof projectUsageShareSchema>;
+
+/**
+ * The month on the usage page: every day of the UTC month, and the projects that used it, the
+ * busiest first. `days` is null when the meter counts by month only (traces) or could not
+ * answer; `projects` is null when the counting store could not answer.
+ */
+const usageMonthBreakdownSchemaDefinition = z
+  .object({
+    /** `YYYY-MM`, UTC. */
+    month: z.string(),
+    /** `YYYY-MM-DD`: the first day of next month, when the count starts again. */
+    resetsOn: z.string(),
+    usageUnit: usageUnitSchema,
+    days: usageDaySchema.array().nullable(),
+    projects: projectUsageShareSchema.array().nullable(),
+  })
+  .strict();
+export interface UsageMonthBreakdownSchema extends Named<
+  typeof usageMonthBreakdownSchemaDefinition
+> {}
+export const usageMonthBreakdownSchema: UsageMonthBreakdownSchema =
+  usageMonthBreakdownSchemaDefinition;
+export type UsageMonthBreakdown = z.infer<typeof usageMonthBreakdownSchema>;

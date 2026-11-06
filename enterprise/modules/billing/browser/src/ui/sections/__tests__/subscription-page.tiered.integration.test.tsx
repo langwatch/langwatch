@@ -211,7 +211,7 @@ describe("<SubscriptionPage/>", () => {
         renderSubscriptionPage();
 
         await waitFor(() => {
-          expect(screen.getByRole("heading", { name: "Subscription" })).toBeInTheDocument();
+          expect(screen.getByRole("heading", { name: "Plan & billing" })).toBeInTheDocument();
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
           expect(screen.getByTestId("contact-sales-block")).toBeInTheDocument();
         });

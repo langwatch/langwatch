@@ -1,25 +1,40 @@
 /**
- * Organization usage at /settings/usage. One row of tiles per deployment shape
- * (hosted plan / self-hosted license / open-source). No chrome.
+ * Organization usage at /settings/usage: on hosted, the plan strip, the month's events day by
+ * day, each project's share and the seats; self-hosted keeps its licence tiles above the month.
+ * @see specs/licensing/usage-page.feature
  */
 
 import { Link } from "@langwatch/browser-host/link";
 import { Banner } from "@langwatch/design-system/banner";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { StatTile, StatTileFigure, StatTileSkeleton } from "@langwatch/design-system/stat-tile";
-import { PlanTypes } from "@langwatch/enterprise-billing-contract";
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
+import type { UsageMonthBreakdown } from "@langwatch/entitlement-contract";
+import { ArrowRight } from "lucide-react";
 
-import { billingApi } from "../../behavior/billing-api.ts";
+import { billingApi, type UsageRead } from "../../behavior/billing-api.ts";
+import { useBillingPricingService } from "../../behavior/use-billing-pricing-service.ts";
 import { useBillingHost } from "../../model/billing-host.ts";
-import {
-  getPlanActionLabel,
-  planManagementUrl,
-  shouldShowPlanLimits,
-} from "../../model/plan-management-url.ts";
+import { parseGrowthSeatPlanType, type Currency } from "../../model/billing-plans.ts";
+import { SUBSCRIPTION_PATH, UPGRADE_TO_GROWTH_HREF } from "../../model/checkout-intent.ts";
+import { getPlanActionLabel, planManagementUrl } from "../../model/plan-management-url.ts";
 import { PricingModel } from "../../model/prisma-types.ts";
+import {
+  barHeights,
+  chartAxis,
+  fullSeats,
+  liteRow,
+  monthEvents,
+  planStrip,
+  shortDate,
+  type UsagePagePlan,
+} from "../../model/usage-page-state.ts";
+import { UsageEventsCard, type UsageEventsCardState } from "../blocks/usage-events-card.tsx";
+import { UsagePlanStrip } from "../blocks/usage-plan-strip.tsx";
+import { UsageProjectsCard } from "../blocks/usage-projects-card.tsx";
+import { UsageSeatsCard } from "../blocks/usage-seats-card.tsx";
 import {
   mapLicenseStatusToLimits,
   mapUsageToLimits,
@@ -27,6 +42,7 @@ import {
   ResourceLimitsDisplay,
 } from "./resource-limits/resource-limits-display.tsx";
 import { SaasPageOpened } from "./saas-page-opened.tsx";
+import { useSubscriptionCurrency } from "./use-subscription-currency.ts";
 
 /** The plan the limits belong to, as the first tile of the row. */
 function PlanTile({ planLabel, chipLabel }: { planLabel: string; chipLabel?: string }) {
@@ -102,6 +118,92 @@ function limitsReadState({
   };
 }
 
+/** The events card from the month's count, the plan and the daily breakdown. */
+function eventsCardState({
+  usage,
+  breakdown,
+  plan,
+  pricingModel,
+  currency,
+}: {
+  usage: { data?: UsageRead; isLoading: boolean; isError: boolean };
+  breakdown: UsageMonthBreakdown | undefined;
+  plan: UsagePagePlan | undefined;
+  pricingModel: PricingModel | null | undefined;
+  currency: Currency;
+}): UsageEventsCardState {
+  if (usage.isError) return { kind: "unavailable" };
+  if (!usage.data || !plan) return { kind: "loading" };
+  const count = usage.data.currentMonthMessagesCount;
+  if (count === null) return { kind: "unavailable" };
+  const events = monthEvents({ count, plan, pricingModel, currency });
+  if (count === 0) {
+    return { kind: "empty", included: events.included?.startsWith("of ") ? events.included : null };
+  }
+  const days = breakdown?.days;
+  const chart = days
+    ? {
+        heights: barHeights(days),
+        axis: chartAxis(days),
+        summary: `Events per day this month, from ${chartAxis(days)[0] ?? ""}.`,
+      }
+    : null;
+  return { kind: "month", events, chart };
+}
+
+/** The plan strip, events, projects and seats a hosted organization reads. */
+function HostedUsage({
+  organizationId,
+  pricingModel,
+  plan,
+  usage,
+}: {
+  organizationId: string;
+  pricingModel: PricingModel | null | undefined;
+  plan: UsagePagePlan | undefined;
+  usage: { data?: UsageRead; isLoading: boolean; isError: boolean };
+}) {
+  const { currency: detectedCurrency } = useSubscriptionCurrency(organizationId);
+  const seatPrices = useBillingPricingService().getGrowthSeatPriceCents();
+  const breakdown = billingApi.limits.getMonthBreakdown.useQuery(
+    { organizationId },
+    { enabled: !!organizationId, refetchOnWindowFocus: false },
+  );
+  const growth = plan ? parseGrowthSeatPlanType(plan.type) : null;
+  const currency = growth?.currency ?? detectedCurrency;
+  const seatPriceCents = growth ? seatPrices[growth.currency][growth.billingInterval] : 0;
+  const projects = breakdown.data?.projects ?? [];
+
+  return (
+    <>
+      {plan && (
+        <UsagePlanStrip
+          strip={planStrip({ plan, currency, seatPriceCents })}
+          actionHref={plan.free ? UPGRADE_TO_GROWTH_HREF : SUBSCRIPTION_PATH}
+        />
+      )}
+      <UsageEventsCard
+        state={eventsCardState({ usage, breakdown: breakdown.data, plan, pricingModel, currency })}
+        resetsOn={breakdown.data ? `Resets on ${shortDate(breakdown.data.resetsOn)}` : undefined}
+      />
+      {projects.length > 0 && usage.data?.currentMonthMessagesCount !== 0 && (
+        <UsageProjectsCard projects={projects} />
+      )}
+      {plan && usage.data && (
+        <UsageSeatsCard
+          fullSeats={fullSeats({ used: usage.data.membersCount, plan })}
+          lite={liteRow({
+            plan,
+            pricingModel,
+            isSaaS: true,
+            liteCount: usage.data.membersLiteCount,
+          })}
+        />
+      )}
+    </>
+  );
+}
+
 export default function UsageScreen() {
   const host = useBillingHost();
   const organization = host.organization();
@@ -139,18 +241,6 @@ export default function UsageScreen() {
     isSelfHosted && licenseStatus.data && !licenseStatus.data.hasLicense && usage.data;
 
   const saasPlan = activePlan.data ?? usage.data?.activePlan;
-  const showLimits = shouldShowPlanLimits({
-    isFree: saasPlan?.free ?? true,
-    isEnterprise: saasPlan?.type === PlanTypes.ENTERPRISE,
-    pricingModel: organization?.pricingModel,
-    planSource: saasPlan?.planSource,
-  });
-  const saasActionLabel = getPlanActionLabel({
-    isSaaS: true,
-    isFree: saasPlan?.free ?? true,
-    isEnterprise: saasPlan?.type === PlanTypes.ENTERPRISE,
-    hasValidLicense: false,
-  });
   const licensedActionLabel = getPlanActionLabel({
     isSaaS: false,
     isFree: false,
@@ -173,33 +263,41 @@ export default function UsageScreen() {
   );
   const actionHref = isSelfHosted && !hasValidLicense ? "/settings/license" : planManagementHref;
   const selfHostedActionLabel = hasValidLicense ? licensedActionLabel : unlicensedActionLabel;
-  const actionLabel = isSelfHosted ? selfHostedActionLabel : saasActionLabel;
 
   return (
     <>
       <SaasPageOpened page="settings_usage" />
       <PageLayout.Header>
-        <PageLayout.Heading>Usage and billing</PageLayout.Heading>
+        <PageLayout.Heading>Usage</PageLayout.Heading>
         <Spacer />
-        {isSaaS !== undefined && actionFor({ href: actionHref, label: actionLabel })}
+        {isSaaS === true && (
+          <PageLayout.HeaderButton asChild>
+            <Link unstyled href={SUBSCRIPTION_PATH} data-testid="usage-plan-billing-link">
+              <HStack as="span" gap={1}>
+                Plan & billing <ArrowRight size={14} aria-hidden />
+              </HStack>
+            </Link>
+          </PageLayout.HeaderButton>
+        )}
+        {isSaaS === false && actionFor({ href: actionHref, label: selfHostedActionLabel })}
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
-        <Text color="fg.muted">How much this organization uses, against what its plan allows.</Text>
+      <VStack gap={4} width="full" align="stretch" paddingTop={4}>
+        <Text color="fg.muted">
+          What this organization used this month, against what its plan includes.
+        </Text>
 
-        {usage.data && isSaaS && (
-          <ResourceLimitsTiles
-            planLabel={saasPlan?.free ? "Free" : (saasPlan?.name ?? "Plan")}
-            chipLabel="Current"
-            limits={mapUsageToLimits(usage.data, saasPlan ?? usage.data.activePlan)}
-            showLimits={showLimits}
-            showLiteMembers={showLiteMembers}
-            messagesLabel={messagesLabel}
+        {isSaaS && (
+          <HostedUsage
+            organizationId={organizationId}
+            pricingModel={organization?.pricingModel}
+            plan={saasPlan}
+            usage={usage}
           />
         )}
 
-        {isLoadingLimits && <StatTileSkeleton columns={showLiteMembers ? 4 : 3} />}
+        {isLoadingLimits && !isSaaS && <StatTileSkeleton columns={showLiteMembers ? 4 : 3} />}
 
-        {hasLimitsError && (
+        {hasLimitsError && !isSaaS && (
           <Banner status="error">
             Unable to load resource limits. Please refresh the page or contact support if the issue
             persists.

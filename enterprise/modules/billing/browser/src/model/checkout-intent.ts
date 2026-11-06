@@ -11,6 +11,9 @@ import type { BillingInterval } from "./billing-plans.ts";
 
 export const SUBSCRIPTION_PATH = "/settings/subscription";
 
+/** Where the usage page's Upgrade to Growth lands: Plan & billing, whose plan card upgrades. */
+export const UPGRADE_TO_GROWTH_HREF = SUBSCRIPTION_PATH;
+
 const checkoutIntentSchema = z.object({
   checkout: z.literal("growth"),
   interval: z.enum(["monthly", "annual"]),
