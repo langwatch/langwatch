@@ -86,6 +86,61 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
     });
   });
 
+  describe("when callers race to resolve a request, claim its sales notice or claim a notice", () => {
+    /** @scenario "Sales hear about a seat request from an account-managed organization once" */
+    it("lets exactly one of them win each claim", async () => {
+      const email = "racer@acme.example";
+      const { request } = await requests.open({
+        id: `${namespace}-r1`,
+        organizationId,
+        email,
+        userId: null,
+        name: null,
+        source: "pending",
+        idpRefused: false,
+        idpKind: null,
+        at: 50_000,
+      });
+      const [notice] = await notices.record({
+        id: `${namespace}-rn`,
+        organizationId,
+        kind: "seat_request",
+        email,
+        name: null,
+        idp: null,
+        idpRefused: false,
+        dayKey: "2026-11-08",
+        at: 50_000,
+      });
+
+      const sales = await Promise.all(
+        Array.from({ length: 5 }, (_, index) =>
+          requests.claimSalesNotice({ id: request.id, at: 51_000 + index }),
+        ),
+      );
+      const mailed = await Promise.all(
+        Array.from({ length: 5 }, (_, index) =>
+          notices.markMailed({ ids: [notice!.id], at: 52_000 + index }),
+        ),
+      );
+      const resolved = await Promise.all(
+        (["APPROVED", "DECLINED", "DECLINED"] as const).map((status, index) =>
+          requests.resolve({
+            organizationId,
+            id: request.id,
+            status,
+            resolvedByUserId: `user-${index}`,
+            at: 53_000 + index,
+          }),
+        ),
+      );
+
+      expect(sales.filter(Boolean)).toHaveLength(1);
+      expect(mailed.filter((ids) => ids.length > 0)).toHaveLength(1);
+      expect(resolved.filter(Boolean)).toHaveLength(1);
+    });
+  });
+
   describe("when the same notice is recorded twice in a day and claimed twice", () => {
     /** @scenario "A notice whose mail reached nobody is retried by the next arrival that day" */
     it("stores one row, hands it back while unmailed and claims it for mail once", async () => {

@@ -13,12 +13,13 @@ import type {
   SeatRequestRow,
 } from "../seat-request.repository.ts";
 
-type PrismaSeatRequestDatabase = Pick<PrismaClient, "seatRequest">;
+type PrismaSeatRequestDatabase = Pick<PrismaClient, "seatRequest" | "$transaction">;
 
 type StoredSeatRequest = Prisma.SeatRequestGetPayload<Record<string, never>>;
 
+/** Reopening, resolving and the sales claim read then write, so each runs SERIALIZABLE. */
 export class PrismaSeatRequestRepository
-  extends PrismaRepository.for("SeatRequest")
+  extends PrismaRepository.transactionalFor("SeatRequest")
   implements SeatRequestRepository
 {
   private constructor(prisma: PrismaSeatRequestDatabase) {
@@ -60,34 +61,37 @@ export class PrismaSeatRequestRepository
         return { request: rowOf(raced), outcome: "already_open" };
       }
     }
-    if (existing.status === "OPEN") {
-      const updated = await this.prisma.seatRequest.update({
+    return this.serializableTransaction(async (transaction) => {
+      const current = await transaction.seatRequest.findUniqueOrThrow({ where });
+      if (current.status === "OPEN") {
+        const updated = await transaction.seatRequest.update({
+          where,
+          data: {
+            userId: current.userId ?? input.userId,
+            name: current.name ?? input.name,
+            idpRefused: current.idpRefused || input.idpRefused,
+            idpKind: input.idpKind ?? current.idpKind,
+          },
+        });
+        return { request: rowOf(updated), outcome: "already_open" as const };
+      }
+      const reopened = await transaction.seatRequest.update({
         where,
         data: {
-          userId: existing.userId ?? input.userId,
-          name: existing.name ?? input.name,
-          idpRefused: existing.idpRefused || input.idpRefused,
-          idpKind: input.idpKind ?? existing.idpKind,
+          userId: input.userId ?? current.userId,
+          name: input.name ?? current.name,
+          status: "OPEN",
+          source: input.source,
+          idpRefused: input.idpRefused,
+          idpKind: input.idpKind,
+          openedAt: new Date(input.at),
+          resolvedAt: null,
+          resolvedByUserId: null,
+          salesNotifiedAt: null,
         },
       });
-      return { request: rowOf(updated), outcome: "already_open" };
-    }
-    const reopened = await this.prisma.seatRequest.update({
-      where,
-      data: {
-        userId: input.userId ?? existing.userId,
-        name: input.name ?? existing.name,
-        status: "OPEN",
-        source: input.source,
-        idpRefused: input.idpRefused,
-        idpKind: input.idpKind,
-        openedAt: new Date(input.at),
-        resolvedAt: null,
-        resolvedByUserId: null,
-        salesNotifiedAt: null,
-      },
+      return { request: rowOf(reopened), outcome: "reopened" as const };
     });
-    return { request: rowOf(reopened), outcome: "reopened" };
   }
 
   async findOpen({ organizationId }: { organizationId: string }): Promise<SeatRequestRow[]> {
@@ -113,23 +117,37 @@ export class PrismaSeatRequestRepository
   }
 
   async resolve(input: Parameters<SeatRequestRepository["resolve"]>[0]): Promise<boolean> {
-    const result = await this.prisma.seatRequest.updateMany({
-      where: { id: input.id, organizationId: input.organizationId, status: "OPEN" },
-      data: {
-        status: input.status,
-        resolvedAt: new Date(input.at),
-        resolvedByUserId: input.resolvedByUserId,
-      },
+    return this.serializableTransaction(async (transaction) => {
+      const open = await transaction.seatRequest.findFirst({
+        where: { id: input.id, organizationId: input.organizationId, status: "OPEN" },
+        select: { id: true },
+      });
+      if (!open) return false;
+      await transaction.seatRequest.update({
+        where: { id: input.id },
+        data: {
+          status: input.status,
+          resolvedAt: new Date(input.at),
+          resolvedByUserId: input.resolvedByUserId,
+        },
+      });
+      return true;
     });
-    return result.count > 0;
   }
 
   async claimSalesNotice({ id, at }: { id: string; at: number }): Promise<boolean> {
-    const result = await this.prisma.seatRequest.updateMany({
-      where: { id, status: "OPEN", salesNotifiedAt: null },
-      data: { salesNotifiedAt: new Date(at) },
+    return this.serializableTransaction(async (transaction) => {
+      const unclaimed = await transaction.seatRequest.findFirst({
+        where: { id, status: "OPEN", salesNotifiedAt: null },
+        select: { id: true },
+      });
+      if (!unclaimed) return false;
+      await transaction.seatRequest.update({
+        where: { id },
+        data: { salesNotifiedAt: new Date(at) },
+      });
+      return true;
     });
-    return result.count > 0;
   }
 
   async findForUser({ userId }: { userId: string }): Promise<SeatRequestRow[]> {
