@@ -49,6 +49,14 @@ void describe("given the nightly workflow", () => {
         );
       }
     });
+
+    /** @scenario "The nightly grants the permissions its called jobs request" */
+    void it("grants the permissions requested by the gateway matrix", () => {
+      const gatewayCall = /^  gateway-matrix:\n((?: {4}.*\n|\n)*)/m.exec(nightly)?.[1] ?? "";
+      assert.match(gatewayCall, /^ {6}contents: read$/m);
+      assert.match(gatewayCall, /^ {6}pull-requests: read$/m);
+      assert.match(gatewayCall, /^ {6}id-token: write$/m);
+    });
   });
 
   void describe("when the concurrency settings are read", () => {
