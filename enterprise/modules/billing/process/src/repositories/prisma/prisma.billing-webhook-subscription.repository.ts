@@ -84,6 +84,13 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.cancelTrialSubscriptions(organizationId);
   }
 
+  findSupersededBySeatEvent(input: {
+    organizationId: string;
+    excludeSubscriptionId: string;
+  }): Promise<CancelledSubscription[]> {
+    return this.subscriptions.findSupersededBySeatEvent(input);
+  }
+
   migrateToSeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;

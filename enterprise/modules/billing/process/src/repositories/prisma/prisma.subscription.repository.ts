@@ -203,30 +203,23 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     // Once the migration lands, restore the updateMany query filtering on isTrial.
   }
 
+  async findSupersededBySeatEvent(input: {
+    organizationId: string;
+    excludeSubscriptionId: string;
+  }): Promise<{ stripeSubscriptionId: string | null }[]> {
+    return this.prisma.subscription.findMany({
+      where: supersededBySeatEventWhere(input),
+      select: { stripeSubscriptionId: true },
+    });
+  }
+
   async migrateToSeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
   }): Promise<{ stripeSubscriptionId: string | null }[]> {
-    const TIERED_PLAN_TYPES: PlanTypes[] = [
-      PlanTypes.LAUNCH,
-      PlanTypes.ACCELERATE,
-      PlanTypes.LAUNCH_ANNUAL,
-      PlanTypes.ACCELERATE_ANNUAL,
-      PlanTypes.PRO,
-      PlanTypes.GROWTH,
-    ];
-
     return this.prisma.$transaction(async (tx) => {
       const oldSubs = await tx.subscription.findMany({
-        where: {
-          organizationId: input.organizationId,
-          id: { not: input.excludeSubscriptionId },
-          status: {
-            not: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
-          },
-          stripeSubscriptionId: { not: null },
-          plan: { in: TIERED_PLAN_TYPES as PrismaPlanTypes[] },
-        },
+        where: supersededBySeatEventWhere(input),
       });
 
       for (const oldSub of oldSubs) {
@@ -263,4 +256,27 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
 
     return { ...subscriptionRecordOf(row), organization: row.organization };
   }
+}
+
+const TIERED_PLAN_TYPES: PlanTypes[] = [
+  PlanTypes.LAUNCH,
+  PlanTypes.ACCELERATE,
+  PlanTypes.LAUNCH_ANNUAL,
+  PlanTypes.ACCELERATE_ANNUAL,
+  PlanTypes.PRO,
+  PlanTypes.GROWTH,
+];
+
+/** Live tiered subscriptions of the organization other than the seat subscription itself. */
+function supersededBySeatEventWhere(input: {
+  organizationId: string;
+  excludeSubscriptionId: string;
+}) {
+  return {
+    organizationId: input.organizationId,
+    id: { not: input.excludeSubscriptionId },
+    status: { not: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus },
+    stripeSubscriptionId: { not: null },
+    plan: { in: TIERED_PLAN_TYPES as PrismaPlanTypes[] },
+  };
 }

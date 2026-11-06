@@ -92,6 +92,13 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
     await this.subscriptions.cancelTrialSubscriptions(organizationId);
   }
 
+  async findSupersededBySeatEvent(input: {
+    organizationId: string;
+    excludeSubscriptionId: string;
+  }): Promise<CancelledSubscription[]> {
+    return this.subscriptions.findSupersededBySeatEvent(input);
+  }
+
   async migrateToSeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
