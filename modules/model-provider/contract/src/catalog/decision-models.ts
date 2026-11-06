@@ -21,8 +21,8 @@ export type LangWatchDecisionPreview = Readonly<{
 }>;
 
 /**
- * LangWatch's decision models, first in the decision and Judge pickers. Only Evals Preview is
- * hosted; the others are listed as coming soon. Making one pickable is adding its column here.
+ * LangWatch's decision models, first in the Instant Evals picker. Only Evals Preview is hosted;
+ * the others are listed as coming soon. Making one pickable is adding its column here.
  */
 export const LANGWATCH_DECISION_PREVIEWS: readonly LangWatchDecisionPreview[] = [
   { id: LANGWATCH_DECISION_MODEL_ID, ...EVALS_PREVIEW, fills: ["INSTANT_EVALS"] },

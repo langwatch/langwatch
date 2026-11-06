@@ -42,7 +42,7 @@ describe("DECISION_MODELS", () => {
 
   /** @scenario "A decision model's title names its provider and its model" */
   it.each(OWN_ENTRIES.map((entry) => [entry.id, entry] as const))(
-    "%s's title opens with its provider's name",
+    "%s's full name opens with its provider's name",
     (_, entry) => {
       const providerName = findModelProviderDefinition(entry.provider)?.name ?? "";
       const firstWord = providerName.split(" ")[0] ?? "";
@@ -56,7 +56,7 @@ describe("DECISION_MODELS", () => {
     expect(hosted).toMatchObject({ label: "Evals Preview", description: "Optimized for evals" });
   });
 
-  it("never gives two models the same title, so one model on two providers reads apart", () => {
+  it("never gives two models the same full name, while the picker title (pickerLabel) may repeat", () => {
     const labels = DECISION_MODELS.map((entry) => entry.label);
     expect(new Set(labels).size).toBe(labels.length);
     expect(labels).toEqual(
