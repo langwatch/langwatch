@@ -253,13 +253,13 @@ export function WidgetFailedFace({
               flexShrink={0}
               title={message}
               css={{
+                // The side padding keeps the clamp's last dot clear of the clipped edge.
+                paddingInline: "2px",
                 ...HIDE_SHORT_WORDS,
                 ...(note ? {} : { [MID_WIDE_FACE]: { lineClamp: 4 } }),
                 [TALL_FACE]: { lineClamp: "none" },
-                // The side padding keeps the clamp's last dot clear of the clipped edge.
-                [SHORT_WIDE_FACE]: { lineClamp: note || hasEdits ? 1 : 2, paddingInline: "2px" },
+                [SHORT_WIDE_FACE]: { lineClamp: note || hasEdits ? 1 : 2 },
                 [SHORT_SMALL_FACE]: {
-                  paddingInline: "2px",
                   lineClamp: hasEdits || shortMessage ? 1 : 2,
                   ...(shortMessage ? SHORT_WORDS_ONLY_HERE : {}),
                 },
