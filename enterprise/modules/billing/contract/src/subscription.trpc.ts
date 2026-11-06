@@ -39,7 +39,7 @@ export const subscriptionTrpc = defineTrpcContract("subscription")
       plan: subscribablePlanSchema,
       upgradeMembers: z.boolean(),
       upgradeTraces: z.boolean(),
-      totalMembers: z.number(),
+      totalMembers: z.number().int().nonnegative(),
       totalTraces: z.number(),
       // Echoed back from `previewProration` so the charge prices the same
       // instant the customer was quoted. Optional: a caller that never showed

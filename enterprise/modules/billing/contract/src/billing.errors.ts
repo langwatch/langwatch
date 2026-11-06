@@ -52,6 +52,20 @@ export class InvalidPlanError extends HandledError {
   }
 }
 
+/** A seat count below the minimum: the full seats in use, and never below one. */
+export class SeatQuantityBelowInUseError extends HandledError {
+  declare readonly code: "seat_quantity_below_in_use";
+
+  constructor({ requested, minimum }: { requested: number; minimum: number }) {
+    super("seat_quantity_below_in_use", `Seats can't go below ${minimum}`, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { requested, minimum },
+    });
+    this.name = "SeatQuantityBelowInUseError";
+  }
+}
+
 /** Seat billing not configured; platform fault, not provider. */
 export class SeatBillingUnavailableError extends HandledError {
   declare readonly code: "seat_billing_unavailable";

@@ -350,6 +350,11 @@ export class LicenseService extends LicensingServiceContract {
     return { removed: true };
   }
 
+  /** Full member seats in use now, the same count the seat limit is enforced on. */
+  countFullSeatsInUse(organizationId: string): Promise<number> {
+    return this.repository.getMemberCount(organizationId);
+  }
+
   private async getResourceCounts(
     organizationId: string,
     plan: LicensePlanLimits,

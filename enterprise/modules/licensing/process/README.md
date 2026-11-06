@@ -356,6 +356,14 @@ What a customer's licenses add up to commercially, right now.
 getContractTerms(input: { organizationId: string }): Promise<ContractTerms>;
 ```
 
+#### `countFullSeatsInUse`
+
+Full member seats an organization uses now: active members and live invitations.
+
+```typescript
+countFullSeatsInUse(input: { organizationId: string }): Promise<number>;
+```
+
 #### `getConnectedSeats`
 
 The seats a connected customer holds and last reported, for its statement and overview.

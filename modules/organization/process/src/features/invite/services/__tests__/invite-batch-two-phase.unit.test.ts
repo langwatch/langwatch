@@ -19,7 +19,8 @@ function serviceWithRecordingOrder() {
   const invites: OrganizationInviteRepository = createApiFixture<OrganizationInviteRepository>({
     getOrganizationWithMembers: async () => ORGANIZATION,
     findMemberEmails: async () => [],
-    hasOpenInviteForEmail: async () => false,
+    hasPendingInviteForEmail: async () => false,
+    deletePaymentPendingInvitesForEmail: async () => 0,
     findTeamIdsInOrganization: async ({ teamIds }: { teamIds: string[] }) => teamIds,
     findCustomRolePermissions: async () => [],
     findPersonalTeamsInScopes: async () => [],

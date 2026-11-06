@@ -8,7 +8,7 @@ import {
 } from "../decision-model-options.ts";
 
 const HOSTED = { value: LANGWATCH_DECISION_MODEL_ID, label: "Evals Preview" };
-const OPENAI = { value: "openai/decisions:gpt-6-luna", label: "OpenAI Decisions (gpt-6-luna)" };
+const OPENAI = { value: "openai/decisions:gpt-6-luna", label: "OpenAI Decisions" };
 const LANGWATCH_TITLES = ["Evals Preview", "Scenario Judge Preview", "Search Preview"];
 
 describe("decisionModelPickerOptions", () => {
