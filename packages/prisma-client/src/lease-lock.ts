@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 
+import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
+
+const logger = createLogger("langwatch:postgres:lease");
 
 /** How long a caller waits for the lease in all, and the pause between two tries. */
 const DEFAULT_WAIT_MS = 15_000;
@@ -89,7 +92,9 @@ export async function withLease<T>({
 }): Promise<T> {
   const holder = await acquireLease({ store, onBusy, waitMs, deps });
   const renewal = setInterval(() => {
-    store.renew({ holder, ttlMs: LEASE_TTL_MS }).catch(() => undefined);
+    store.renew({ holder, ttlMs: LEASE_TTL_MS }).catch((error: unknown) => {
+      logger.warn({ error, holder }, "lease renewal failed; the lease may expire mid-work");
+    });
   }, RENEW_EVERY_MS);
   try {
     return await work();

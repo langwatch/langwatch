@@ -151,6 +151,14 @@ Feature: Seat requests when an organization is over its seat limit
       Then the seat change waits until the directory admission releases the lease
 
     @integration
+    Scenario: Renewing a seat lease extends only the holder's own lease
+      Given a directory admission holds the organization's seat lease
+      When a different holder renews the lease
+      Then the lease's expiry does not move
+      When the directory admission renews the lease
+      Then the lease's expiry moves out by the lease time
+
+    @integration
     Scenario: Two single sign-on arrivals for the last free full seat at once: exactly one gets it
       Given exactly one full member seat is free
       When "first@acme.example" and "second@acme.example" arrive by single sign-on at the same moment asking for a full seat

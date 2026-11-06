@@ -286,6 +286,36 @@ describe.skipIf(!DB_URL)("two seat-taking writes for the last free full seat", (
     });
   });
 
+  describe("when the holder of a seat lease renews it", () => {
+    /** @scenario "Renewing a seat lease extends only the holder's own lease" */
+    it("pushes out that holder's expiry and leaves a lease held by someone else alone", async () => {
+      const lease = OrganizationSeatLeaseService.create(
+        PrismaOrganizationSeatRepository.create(prisma),
+      );
+      const organizationId = `${namespace}-renew`;
+      const expiry = async () =>
+        (await prisma.organizationSeatLease.findUniqueOrThrow({ where: { organizationId } }))
+          .expiresAt;
+
+      const { holder } = await lease.acquire({ organizationId });
+      try {
+        await prisma.organizationSeatLease.update({
+          where: { organizationId },
+          data: { expiresAt: new Date(Date.now() + 1_000) },
+        });
+        const shortened = await expiry();
+
+        await lease.renew({ organizationId, holder: "someone-else" });
+        expect(await expiry()).toEqual(shortened);
+
+        await lease.renew({ organizationId, holder });
+        expect((await expiry()).getTime()).toBeGreaterThan(shortened.getTime() + 10_000);
+      } finally {
+        await lease.release({ organizationId, holder });
+      }
+    });
+  });
+
   describe("when many organizations change seats at once on a pool of two connections", () => {
     /** @scenario "Seat changes on many organizations at once never starve the connection pool" */
     it("completes every one, since a held lease pins no connection", async () => {

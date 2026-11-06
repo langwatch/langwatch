@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
+
+const logger = createLogger("langwatch:scim:seat-lease");
 
 /** The organization operations a directory admission holds its seat lease through. */
 export type ScimSeatLeaseApi = Pick<
@@ -34,7 +37,12 @@ export class ScimSeatLeaseService implements ScimSeatLock {
   }: Readonly<{ organizationId: string; work: () => Promise<T> }>): Promise<T> {
     const { holder, renewEveryMs } = await this.lease.acquireSeatLease({ organizationId });
     const renewal = setInterval(() => {
-      this.lease.renewSeatLease({ organizationId, holder }).catch(() => undefined);
+      this.lease.renewSeatLease({ organizationId, holder }).catch((error: unknown) => {
+        logger.warn(
+          { error, organizationId, holder },
+          "seat lease renewal failed; the lease may expire mid-admission",
+        );
+      });
     }, renewEveryMs);
     try {
       return await work();
