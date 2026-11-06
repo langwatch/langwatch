@@ -3033,7 +3033,9 @@ export const prismaModelFieldCatalogue = {
   "LicenseRenewalClaim": [
     "stripeInvoiceId",
     "stripeSubscriptionId",
+    "claimToken",
     "claimedAt",
+    "issuedLicense",
     "deliveredAt",
     "licenseId"
   ],

@@ -109,6 +109,13 @@ Feature: Renewing and replacing a self-hosted licence
     When this organization's plan is resolved
     Then it runs on the open source plan
 
+  @unit
+  Scenario: An environment licence for another organization gives this one no hosted services
+    Given LANGWATCH_LICENSE_KEY holds a licence naming a hosted service, bound to another organization
+    And this organization stored no licence
+    When this organization reads its hosted services or calls LangWatch
+    Then it holds no credential and is shown as unlicensed for hosted services
+
   @integration
   Scenario: The License page shows a licence installed from the environment
     Given LANGWATCH_LICENSE_KEY holds a signed licence and the organization stored none

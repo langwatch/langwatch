@@ -191,18 +191,25 @@ describe("EEWebhookService license renewals", () => {
 
     describe("when the renewal email fails", () => {
       /** @scenario "A failed renewal delivery is retried by Stripe" */
-      it("answers 500 and delivers on Stripe's retry", async () => {
-        const { webhook, delivery, claims } = webhookWithRenewal();
+      it("answers 500 and mails the licence it already minted on Stripe's retry", async () => {
+        const { webhook, generator, delivery, claims } = webhookWithRenewal();
         delivery.sendLicenseEmail.mockRejectedValueOnce(new Error("mail down"));
 
         const failed = await webhook.handleEvent(invoiceEvent());
         expect(failed).toMatchObject({ status: "error", httpStatus: 500 });
-        expect(claims.rows.has("in_renewal")).toBe(false);
+        expect(claims.rows.get("in_renewal")?.deliveredAt).toBeNull();
 
         const retried = await webhook.handleEvent(invoiceEvent());
         expect(retried).toEqual({ status: "ok" });
+        expect(generator.generate).toHaveBeenCalledTimes(1);
+        expect(delivery.recordLicense).toHaveBeenCalledTimes(1);
         expect(delivery.sendLicenseEmail).toHaveBeenCalledTimes(2);
-        expect(claims.rows.get("in_renewal")?.deliveredAt).toBeInstanceOf(Temporal.Instant);
+        expect(delivery.sendLicenseEmail).toHaveBeenLastCalledWith(
+          expect.objectContaining({ licenseKey: "key-1" }),
+        );
+        const row = claims.rows.get("in_renewal");
+        expect(row?.deliveredAt).toBeInstanceOf(Temporal.Instant);
+        expect(row?.issuedLicense).toBeNull();
       });
     });
 

@@ -26370,6 +26370,15 @@
           "documentation": ""
         },
         {
+          "name": "claimToken",
+          "columnName": "claimToken",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Fences completion and release to the delivery that holds the claim."
+        },
+        {
           "name": "claimedAt",
           "columnName": "claimedAt",
           "type": "DateTime",
@@ -26377,6 +26386,15 @@
           "isList": false,
           "isOptional": false,
           "documentation": ""
+        },
+        {
+          "name": "issuedLicense",
+          "columnName": "issuedLicense",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The signed licence between minting and mailing, so a retry mails it again instead of minting another; cleared once delivered."
         },
         {
           "name": "deliveredAt",
@@ -26394,7 +26412,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "The `licenseId` inside the delivered licence, never the key itself."
+          "documentation": "The `licenseId` inside the delivered licence."
         }
       ]
     },

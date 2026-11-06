@@ -7241,9 +7241,13 @@ model ConnectedStatement {
 model LicenseRenewalClaim {
   stripeInvoiceId      String    @id
   stripeSubscriptionId String
+  /// Fences completion and release to the delivery that holds the claim.
+  claimToken           String
   claimedAt            DateTime
+  /// The signed licence between minting and mailing, so a retry mails it again instead of minting another; cleared once delivered.
+  issuedLicense        Json?
   deliveredAt          DateTime?
-  /// The `licenseId` inside the delivered licence, never the key itself.
+  /// The `licenseId` inside the delivered licence.
   licenseId            String?
 }
 

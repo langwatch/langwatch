@@ -44,41 +44,104 @@ describe.skipIf(!DB_URL)("PrismaLicenseRenewalClaimRepository", () => {
     await prisma.$disconnect();
   });
 
+  const issued = {
+    licenseKey: "signed-key",
+    licenseData: {
+      licenseId: "lic-1",
+      plan: { type: "GROWTH" },
+      expiresAt: "2028-01-01T00:00:00Z",
+      organizationName: "ACME",
+    },
+  };
+  const tokenOf = (answer: Awaited<ReturnType<typeof claim>>) => {
+    if (answer.outcome !== "claimed") throw new Error(`expected a claim, got ${answer.outcome}`);
+    return answer.token;
+  };
+
   describe("given two deliveries of one paid renewal invoice", () => {
     /** @scenario "Only one delivery claims a renewal invoice" */
     it("lets the first claim, refuses the concurrent second, then reports it delivered", async () => {
       const invoiceId = `${run}_concurrent`;
 
       const answers = await Promise.all([claim(invoiceId, now), claim(invoiceId, now)]);
-      expect(answers.toSorted()).toEqual(["claimed", "in_flight"]);
+      expect(answers.map((answer) => answer.outcome).toSorted()).toEqual(["claimed", "in_flight"]);
+      const token = tokenOf(answers.find((answer) => answer.outcome === "claimed") ?? answers[0]);
 
-      await claims.markDelivered({
-        stripeInvoiceId: invoiceId,
-        licenseId: "lic-1",
-        deliveredAt: now,
-      });
-      await claims.release({ stripeInvoiceId: invoiceId });
+      expect(
+        await claims.markDelivered({
+          stripeInvoiceId: invoiceId,
+          token,
+          licenseId: "lic-1",
+          deliveredAt: now,
+        }),
+      ).toBe(true);
+      await claims.release({ stripeInvoiceId: invoiceId, token });
 
-      expect(await claim(invoiceId, later(LEASE_MS * 2))).toBe("delivered");
+      expect((await claim(invoiceId, later(LEASE_MS * 2))).outcome).toBe("delivered");
     });
   });
 
   describe("given a claim never delivered", () => {
-    it("is taken over once the lease has passed", async () => {
+    it("is taken over once the lease has passed, and the stale holder can neither complete nor release it", async () => {
       const invoiceId = `${run}_stale`;
-      expect(await claim(invoiceId, now)).toBe("claimed");
+      const stale = tokenOf(await claim(invoiceId, now));
 
-      expect(await claim(invoiceId, later(1000))).toBe("in_flight");
-      expect(await claim(invoiceId, later(LEASE_MS + 1))).toBe("claimed");
+      expect((await claim(invoiceId, later(1000))).outcome).toBe("in_flight");
+      const current = tokenOf(await claim(invoiceId, later(LEASE_MS + 1)));
+
+      await claims.release({ stripeInvoiceId: invoiceId, token: stale });
+      expect(
+        await claims.markDelivered({
+          stripeInvoiceId: invoiceId,
+          token: stale,
+          licenseId: "lic-stale",
+          deliveredAt: now,
+        }),
+      ).toBe(false);
+      expect((await claim(invoiceId, later(LEASE_MS + 2))).outcome).toBe("in_flight");
+      expect(
+        await claims.markDelivered({
+          stripeInvoiceId: invoiceId,
+          token: current,
+          licenseId: "lic-1",
+          deliveredAt: now,
+        }),
+      ).toBe(true);
     });
 
     it("is claimed afresh after a release", async () => {
       const invoiceId = `${run}_released`;
-      expect(await claim(invoiceId, now)).toBe("claimed");
+      const token = tokenOf(await claim(invoiceId, now));
 
-      await claims.release({ stripeInvoiceId: invoiceId });
+      await claims.release({ stripeInvoiceId: invoiceId, token });
 
-      expect(await claim(invoiceId, now)).toBe("claimed");
+      expect((await claim(invoiceId, now)).outcome).toBe("claimed");
+    });
+  });
+
+  describe("given a licence minted but not mailed", () => {
+    it("hands the minted licence to the next claim and clears it once delivered", async () => {
+      const invoiceId = `${run}_minted`;
+      const first = tokenOf(await claim(invoiceId, now));
+      expect(await claims.recordIssued({ stripeInvoiceId: invoiceId, token: first, issued })).toBe(
+        true,
+      );
+
+      await claims.release({ stripeInvoiceId: invoiceId, token: first });
+
+      const retry = await claim(invoiceId, later(1000));
+      expect(retry).toMatchObject({ outcome: "claimed", issued });
+      await claims.markDelivered({
+        stripeInvoiceId: invoiceId,
+        token: tokenOf(retry),
+        licenseId: "lic-1",
+        deliveredAt: now,
+      });
+      const row = await prisma.licenseRenewalClaim.findUnique({
+        where: { stripeInvoiceId: invoiceId },
+      });
+      expect(row?.issuedLicense).toBeNull();
+      expect(row?.licenseId).toBe("lic-1");
     });
   });
 });

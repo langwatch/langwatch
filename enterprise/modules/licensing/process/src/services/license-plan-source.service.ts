@@ -8,6 +8,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 
 import type { OrganizationLicense } from "../repositories/organization-license.repository.ts";
+import { instanceKeyLicensesOrganization } from "../rules/license-key.rules.ts";
 
 /** An organization that no longer exists holds no licence: plan reads answer unlicensed. */
 const unlicensedWhenMissing = (error: unknown): { licenseKey: null } => {
@@ -60,8 +61,9 @@ export class LicensePlanSourceService {
     if (licenseKey) return { licenseKey, source: "stored" };
     const instanceKey = this.instanceLicenseKey;
     if (!instanceKey) return { licenseKey: null, source: null };
-    const claimed = this.cryptography.parseLicenseKey(instanceKey)?.data.organizationId;
-    if (claimed !== void 0 && claimed !== organizationId) return { licenseKey: null, source: null };
+    const boundOrganizationId = this.cryptography.parseLicenseKey(instanceKey)?.data.organizationId;
+    if (!instanceKeyLicensesOrganization({ boundOrganizationId, organizationId }))
+      return { licenseKey: null, source: null };
     return { licenseKey: instanceKey, source: "environment" };
   }
 

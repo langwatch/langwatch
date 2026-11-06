@@ -31,7 +31,10 @@ import {
   connectServicesNamedBy,
   enabledConnectServices,
 } from "../rules/connect-entitlement.rules.ts";
-import { licenseKeyFingerprint } from "../rules/license-key.rules.ts";
+import {
+  instanceKeyLicensesOrganization,
+  licenseKeyFingerprint,
+} from "../rules/license-key.rules.ts";
 import type { InstanceIdentityService } from "./instance-identity.service.ts";
 import type { LicenseLogger } from "./license.service.ts";
 import type { LicensingCustomerFactsService } from "./licensing-customer-facts.service.ts";
@@ -95,7 +98,7 @@ export class ConnectInstallService {
     if (!this.deps.deployment.permitted) return [];
 
     const organization = await this.deps.organizations.findById(organizationId);
-    const licenseKey = this.licenseKeyOf(organization);
+    const licenseKey = this.licenseKeyOf({ organizationId, organization });
     if (!licenseKey || !this.namesHostedService(licenseKey)) return [];
 
     const token = this.tokenOf(licenseKey);
@@ -115,7 +118,7 @@ export class ConnectInstallService {
   async findEntitledServices(organizationId: string): Promise<ConnectService[]> {
     if (!this.deps.deployment.permitted) return [];
     const organization = await this.deps.organizations.findById(organizationId);
-    return this.entitledOf(organization);
+    return this.entitledOf({ organizationId, organization });
   }
 
   /** The entitled services, less the ones an administrator switched off. */
@@ -123,7 +126,7 @@ export class ConnectInstallService {
     if (!this.deps.deployment.permitted) return [];
     const organization = await this.deps.organizations.findById(organizationId);
     return enabledConnectServices({
-      entitled: this.entitledOf(organization),
+      entitled: this.entitledOf({ organizationId, organization }),
       disabled: organization?.servicesDisabled ?? [],
     });
   }
@@ -150,7 +153,7 @@ export class ConnectInstallService {
   }): Promise<ConnectServiceState> {
     if (!this.deps.deployment.permitted) return { isEntitled: false, isSwitchedOn: false };
     const organization = await this.deps.organizations.findById(organizationId);
-    const isEntitled = this.entitledOf(organization).includes(service);
+    const isEntitled = this.entitledOf({ organizationId, organization }).includes(service);
     const isSwitchedOff = (organization?.servicesDisabled ?? []).includes(service);
     return { isEntitled, isSwitchedOn: isEntitled && !isSwitchedOff };
   }
@@ -212,7 +215,7 @@ export class ConnectInstallService {
     if (!this.deps.deployment.permitted) return false;
     for (const organizationId of await this.deps.organizations.findLicensedOrganizationIds()) {
       const organization = await this.deps.organizations.findById(organizationId);
-      if (this.entitledOf(organization).length > 0) return true;
+      if (this.entitledOf({ organizationId, organization }).length > 0) return true;
     }
     return false;
   }
@@ -223,7 +226,7 @@ export class ConnectInstallService {
     if (!deployment.permitted) return { deployment: "off" };
 
     const organization = await this.deps.organizations.findById(organizationId);
-    const entitled = this.entitledOf(organization);
+    const entitled = this.entitledOf({ organizationId, organization });
     const base = {
       deployment: "on",
       gatewayHost: new URL(deployment.gatewayEndpoint).host,
@@ -314,7 +317,7 @@ export class ConnectInstallService {
     });
     await this.deps.facts.connectServiceSwitched({ organizationId, service, enabled });
     const enabledServices = enabledConnectServices({
-      entitled: this.entitledOf(organization),
+      entitled: this.entitledOf({ organizationId, organization }),
       disabled: servicesDisabled,
     });
     // Organization applies the switch seconds later: the slot follows this answer, not a re-read.
@@ -393,14 +396,34 @@ export class ConnectInstallService {
 
   /**
    * Falls back to the instance-wide license, so a deployment licensed through
-   * one key is entitled on every organization it carries.
+   * one key is entitled on every organization it carries, except one the key
+   * is bound to another organization than.
    */
-  private licenseKeyOf(organization: ConnectOrganizationRecord | null): string | undefined {
-    return organization?.license ?? this.deps.instanceLicenseKey() ?? void 0;
+  private licenseKeyOf({
+    organizationId,
+    organization,
+  }: {
+    organizationId: string;
+    organization: ConnectOrganizationRecord | null;
+  }): string | undefined {
+    if (organization?.license) return organization.license;
+    const instanceKey = this.deps.instanceLicenseKey();
+    if (!instanceKey) return void 0;
+    const boundOrganizationId =
+      this.deps.cryptography.parseLicenseKey(instanceKey)?.data.organizationId;
+    return instanceKeyLicensesOrganization({ boundOrganizationId, organizationId })
+      ? instanceKey
+      : void 0;
   }
 
-  private entitledOf(organization: ConnectOrganizationRecord | null): ConnectService[] {
-    const licenseKey = this.licenseKeyOf(organization);
+  private entitledOf({
+    organizationId,
+    organization,
+  }: {
+    organizationId: string;
+    organization: ConnectOrganizationRecord | null;
+  }): ConnectService[] {
+    const licenseKey = this.licenseKeyOf({ organizationId, organization });
     if (!licenseKey) return [];
 
     const result = this.deps.cryptography.validateLicense({

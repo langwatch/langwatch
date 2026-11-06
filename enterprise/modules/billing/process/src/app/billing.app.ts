@@ -144,7 +144,7 @@ type StripeWebhookComposition = Readonly<{
   /** Main's licence purchase: signs, records, mails and announces; absent without the key. */
   licensePurchase?: LicensePurchaseHandler;
   /** Delivers a renewed licence subscription's next term, as a purchase is; absent without the key. */
-  licenseRenewal?: Pick<LicensePurchaseService, "deliverRenewal">;
+  licenseRenewal?: Pick<LicensePurchaseService, "mintRenewal" | "sendRenewal">;
   /** Clears a trial's licence once its subscription activates; licensing owns it. */
   licenses: Pick<LicensingApi, "removeLicense" | "getLicenseStatus">;
 }>;

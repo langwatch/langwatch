@@ -67,7 +67,8 @@ Feature: Self-Serving License Purchase
   Scenario: A failed renewal delivery is retried by Stripe
     Given sending the renewal license email fails
     When Stripe retries the same invoice event
-    Then the renewal license is generated and emailed on the retry
+    Then the renewal license minted on the first attempt is emailed on the retry
+    And no second license is minted for the invoice
 
   @unit
   Scenario: Renewal of a subscription not bought through the license payment link is untouched

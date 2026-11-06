@@ -3,7 +3,9 @@
 CREATE TABLE IF NOT EXISTS "LicenseRenewalClaim" (
     "stripeInvoiceId" TEXT NOT NULL,
     "stripeSubscriptionId" TEXT NOT NULL,
+    "claimToken" TEXT NOT NULL,
     "claimedAt" TIMESTAMP(3) NOT NULL,
+    "issuedLicense" JSONB,
     "deliveredAt" TIMESTAMP(3),
     "licenseId" TEXT,
 

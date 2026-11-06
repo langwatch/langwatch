@@ -111,5 +111,24 @@ export function licenseTextOfFile({ text, size }: { text: string; size: number }
   if (size > MAX_LICENSE_FILE_BYTES) return null;
   const trimmed = text.trim();
   if (detectLicenseInputForm(trimmed).form === "activation_code") return trimmed;
-  return LICENSE_KEY_TEXT.test(trimmed.replace(/\s+/g, "")) ? trimmed : null;
+  const compact = trimmed.replace(/\s+/g, "");
+  return LICENSE_KEY_TEXT.test(compact) && isSignedLicenseShape(compact) ? trimmed : null;
+}
+
+/** A signed key decodes to JSON holding the licence `data` and its `signature`. */
+function isSignedLicenseShape(base64: string): boolean {
+  try {
+    const decoded: unknown = JSON.parse(atob(base64.replace(/-/g, "+").replace(/_/g, "/")));
+    return (
+      typeof decoded === "object" &&
+      decoded !== null &&
+      "signature" in decoded &&
+      typeof decoded.signature === "string" &&
+      "data" in decoded &&
+      typeof decoded.data === "object" &&
+      decoded.data !== null
+    );
+  } catch {
+    return false;
+  }
 }

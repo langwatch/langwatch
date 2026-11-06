@@ -15,7 +15,7 @@ import { StatusChip } from "@langwatch/design-system/settings-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import { ArrowUpRight, KeyRound, Upload, X } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { formatFileSize, licenseTextOfFile } from "../../model/license-status.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
@@ -42,6 +42,7 @@ interface NoLicenseCardProps {
 /** Why a chosen file was not taken, in the words the operator can act on. */
 const NOT_A_LICENSE_FILE =
   "This file does not contain a LangWatch license. Choose the license file from your order email, or paste the key instead.";
+const UNREADABLE_FILE = "This file could not be read. Choose it again, or paste the key instead.";
 
 export function NoLicenseCard({
   licenseKey,
@@ -258,18 +259,35 @@ function LicenseFileField({
   const [fileError, setFileError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Each selection takes a number; a read finishing after a newer selection, a removal or
+  // unmount is dropped.
+  const selection = useRef(0);
+  useEffect(
+    () => () => {
+      selection.current += 1;
+    },
+    [],
+  );
 
   const handleFileSelect = (file: File) => {
+    const current = ++selection.current;
     setFileError(null);
     onChosen(null);
-    void file.text().then((text) => {
-      const licenseText = licenseTextOfFile({ text, size: file.size });
-      if (licenseText === null) setFileError(NOT_A_LICENSE_FILE);
-      else onChosen({ file, licenseText });
-    });
+    void file.text().then(
+      (text) => {
+        if (current !== selection.current) return;
+        const licenseText = licenseTextOfFile({ text, size: file.size });
+        if (licenseText === null) setFileError(NOT_A_LICENSE_FILE);
+        else onChosen({ file, licenseText });
+      },
+      () => {
+        if (current === selection.current) setFileError(UNREADABLE_FILE);
+      },
+    );
   };
 
   const handleRemoveFile = () => {
+    selection.current += 1;
     onChosen(null);
     setFileError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";

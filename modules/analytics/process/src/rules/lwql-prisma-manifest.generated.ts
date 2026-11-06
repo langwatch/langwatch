@@ -2521,7 +2521,9 @@ export interface LwqlPrismaRows {
   readonly LicenseRenewalClaim: {
     readonly stripeInvoiceId: "String";
     readonly stripeSubscriptionId: "String";
+    readonly claimToken: "String";
     readonly claimedAt: "DateTime";
+    readonly issuedLicense: "Json?";
     readonly deliveredAt: "DateTime?";
     readonly licenseId: "String?";
   };

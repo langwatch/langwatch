@@ -160,32 +160,51 @@ export class LicensePurchaseService {
     });
   }
 
-  /** Signs and delivers the next term's licence of a renewed licence subscription. */
-  async deliverRenewal(renewal: LicenseRenewal): Promise<{ licenseId: string }> {
-    return this.issue(renewal);
+  /** Signs the next term's licence of a renewed licence subscription and records it. */
+  async mintRenewal(renewal: LicenseRenewal): Promise<GeneratedLicense> {
+    return this.mint(renewal);
   }
 
-  private async issue({
+  /** Mails a minted renewal and tells the team; safe to call again after a failure. */
+  async sendRenewal({
+    renewal,
+    license,
+  }: {
+    renewal: LicenseRenewal;
+    license: GeneratedLicense;
+  }): Promise<void> {
+    await this.send({ ...renewal, license });
+  }
+
+  private async issue(input: {
+    email: string;
+    organizationName: string;
+    seats: number;
+    amountPaid: number;
+    currency: string;
+  }): Promise<void> {
+    const license = await this.mint(input);
+    await this.send({ ...input, license });
+  }
+
+  private async mint({
     email,
     organizationName,
     seats: quantity,
     expiresAt,
-    amountPaid,
-    currency,
   }: {
     email: string;
     organizationName: string;
     seats: number;
     expiresAt?: Instant;
-    amountPaid: number;
-    currency: string;
-  }): Promise<{ licenseId: string }> {
-    const { licenseKey, licenseData } = await this.generateLicense.generate({
+  }): Promise<GeneratedLicense> {
+    const generated = await this.generateLicense.generate({
       organizationName,
       email,
       maxMembers: quantity,
       ...(expiresAt ? { expiresAt } : {}),
     });
+    const { licenseKey, licenseData } = generated;
 
     logger.info(
       {
@@ -206,7 +225,22 @@ export class LicensePurchaseService {
       );
       this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
     }
+    return generated;
+  }
 
+  private async send({
+    email,
+    seats: quantity,
+    amountPaid,
+    currency,
+    license: { licenseKey, licenseData },
+  }: {
+    email: string;
+    seats: number;
+    amountPaid: number;
+    currency: string;
+    license: GeneratedLicense;
+  }): Promise<void> {
     const unlockedFeatures = await this.tryResolveUnlockedFeatures(licenseData.plan.type);
     await this.delivery.sendLicenseEmail({
       email,
@@ -228,7 +262,6 @@ export class LicensePurchaseService {
       amountPaid,
       currency,
     });
-    return { licenseId: licenseData.licenseId };
   }
 
   /**

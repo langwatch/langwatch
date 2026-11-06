@@ -7,7 +7,13 @@ import type Stripe from "stripe";
 import type { StripeSubscriptionsChannel } from "../../../channels/stripe-subscriptions.channel.ts";
 import type { BillingWebhookSubscriptionRepository } from "../../../repositories/billing-webhook-subscription.repository.ts";
 import type { LicenseRenewalClaimRepository } from "../../../repositories/license-renewal-claim.repository.ts";
-import type { LicenseRenewal } from "./license-purchase.service.ts";
+import type { GeneratedLicense, LicenseRenewal } from "./license-purchase.service.ts";
+
+/** Mints and mails a renewal in two steps, so a failed mail is retried without minting again. */
+export type LicenseRenewalIssuer = {
+  mintRenewal(renewal: LicenseRenewal): Promise<GeneratedLicense>;
+  sendRenewal(input: { renewal: LicenseRenewal; license: GeneratedLicense }): Promise<void>;
+};
 
 const logger = createLogger("langwatch:billing:licenseRenewal");
 
@@ -45,7 +51,7 @@ export class LicenseRenewalService {
       subscriptions: Pick<BillingWebhookSubscriptionRepository, "findByStripeId">;
       stripeSubscriptions: Pick<StripeSubscriptionsChannel, "findSubscriptionCheckouts">;
       claims: LicenseRenewalClaimRepository;
-      issuer: { deliverRenewal(renewal: LicenseRenewal): Promise<{ licenseId: string }> };
+      issuer: LicenseRenewalIssuer;
       now: () => Instant;
     },
   ) {}
@@ -55,7 +61,7 @@ export class LicenseRenewalService {
     subscriptions: Pick<BillingWebhookSubscriptionRepository, "findByStripeId">;
     stripeSubscriptions: Pick<StripeSubscriptionsChannel, "findSubscriptionCheckouts">;
     claims: LicenseRenewalClaimRepository;
-    issuer: { deliverRenewal(renewal: LicenseRenewal): Promise<{ licenseId: string }> };
+    issuer: LicenseRenewalIssuer;
     now?: () => Instant;
   }): LicenseRenewalService {
     return new LicenseRenewalService({ ...options, now: options.now ?? nowInstant });
@@ -74,25 +80,54 @@ export class LicenseRenewalService {
       now: this.deps.now(),
       leaseMs: LICENSE_RENEWAL_CLAIM_LEASE_MS,
     });
-    if (claim === "delivered") {
+    if (claim.outcome === "delivered") {
       logger.info({ invoiceId: invoice.id }, "License renewal already delivered for this invoice");
       return "already_delivered";
     }
-    if (claim === "in_flight") return "in_flight";
+    if (claim.outcome === "in_flight") return "in_flight";
 
+    const held = { stripeInvoiceId: invoice.id, token: claim.token };
     try {
-      const { licenseId } = await this.deps.issuer.deliverRenewal(renewalOf(invoice));
-      await this.deps.claims.markDelivered({
-        stripeInvoiceId: invoice.id,
-        licenseId,
-        deliveredAt: this.deps.now(),
-      });
+      const renewal = renewalOf(invoice);
+      const license = claim.issued ?? (await this.mintAndKeep({ renewal, held }));
+      if (!license) return "in_flight";
+      await this.deps.issuer.sendRenewal({ renewal, license });
+      const { licenseId } = license.licenseData;
+      if (
+        !(await this.deps.claims.markDelivered({
+          ...held,
+          licenseId,
+          deliveredAt: this.deps.now(),
+        }))
+      ) {
+        logger.warn(
+          { invoiceId: invoice.id, licenseId },
+          "License renewal claim was taken over while mailing",
+        );
+      }
       logger.info({ invoiceId: invoice.id, licenseId }, "License renewal delivered");
       return "renewed";
     } catch (error) {
-      await this.deps.claims.release({ stripeInvoiceId: invoice.id });
+      await this.deps.claims.release(held);
       throw error;
     }
+  }
+
+  /** Null when another delivery took the claim over before the licence could be kept on it. */
+  private async mintAndKeep({
+    renewal,
+    held,
+  }: {
+    renewal: LicenseRenewal;
+    held: { stripeInvoiceId: string; token: string };
+  }): Promise<GeneratedLicense | null> {
+    const license = await this.deps.issuer.mintRenewal(renewal);
+    if (await this.deps.claims.recordIssued({ ...held, issued: license })) return license;
+    logger.error(
+      { invoiceId: held.stripeInvoiceId, licenseId: license.licenseData.licenseId },
+      "License renewal claim was taken over after minting; this licence is not mailed",
+    );
+    return null;
   }
 
   /** A subscription billing knows is a Cloud plan, so only unknown ones cost a Stripe read. */

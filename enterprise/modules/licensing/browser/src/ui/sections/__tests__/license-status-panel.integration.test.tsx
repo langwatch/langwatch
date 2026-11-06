@@ -316,5 +316,29 @@ describe("LicenseStatusPanel", () => {
       expect(actions.upload).not.toHaveBeenCalled();
       expect(actions.activate).not.toHaveBeenCalled();
     });
+
+    it("refuses a long base64 blob that does not decode to a signed licence", async () => {
+      await dropFile({
+        name: "photo.txt",
+        content: Buffer.from("x".repeat(200)).toString("base64"),
+      });
+
+      expect(await screen.findByTestId("license-file-error")).toBeDefined();
+      expect(actions.upload).not.toHaveBeenCalled();
+    });
+
+    it("says so when the file cannot be read", async () => {
+      const unreadable = new File(["x"], "license.txt", { type: "text/plain" });
+      Object.defineProperty(unreadable, "text", { value: () => Promise.reject(new Error("gone")) });
+      const user = userEvent.setup();
+      const { container } = renderWith({ hasLicense: false, valid: false });
+      await user.click(screen.getByText("License file"));
+      const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]');
+      if (!fileInput) throw new Error("the file method rendered no file input");
+      await user.upload(fileInput, unreadable);
+
+      expect(await screen.findByText(/could not be read/)).toBeDefined();
+      expect(actions.upload).not.toHaveBeenCalled();
+    });
   });
 });
