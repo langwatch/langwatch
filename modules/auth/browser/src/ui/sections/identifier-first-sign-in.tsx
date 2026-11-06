@@ -15,6 +15,7 @@ import { usePasskeyAutofill } from "../../behavior/use-passkey-autofill.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
+import { ssoHandOffFailureMessage } from "../../model/auth-failure-message.ts";
 import { signUpHref } from "../../model/carried-email.ts";
 import type { FrontDoorDepth } from "../../model/ground-palette.ts";
 import { usePublishFrontDoorStage } from "../../model/ground-stage.ts";
@@ -530,6 +531,8 @@ export function RoutedToConnection({
   const method: SignInMethod | undefined = decision.methodSet[0];
   const dialed = useRef(false);
   const [waitIsVisible, setWaitIsVisible] = useState(false);
+  // A refused start never leaves this page, so it stops the spinner and says so.
+  const [refusal, setRefusal] = useState<string | null>(null);
 
   useEffect(() => {
     if (!autoStart || !method || dialed.current) return;
@@ -537,7 +540,9 @@ export function RoutedToConnection({
     // Parked here too: the people routed by address are the dial nobody presses.
     rememberPendingMethod(method);
     onAutoStart?.();
-    void signIn(method.id, { callbackUrl, loginHint });
+    void signIn(method.id, { callbackUrl, loginHint }).then((result) => {
+      if (result && result.ok !== true) setRefusal(ssoHandOffFailureMessage(result));
+    });
   }, [autoStart, method, callbackUrl, loginHint, onAutoStart]);
 
   useEffect(() => {
@@ -546,14 +551,20 @@ export function RoutedToConnection({
   }, []);
 
   if (!method) return null;
-  if (autoStart && !waitIsVisible) return null;
+  if (autoStart && !waitIsVisible && refusal === null) return null;
 
+  const waiting = autoStart && refusal === null;
   return (
     <AuthCard title={title}>
+      <HandledErrorAlert
+        description={refusal ?? undefined}
+        fallbackTitle="Could not start log-in"
+        testId="routed-to-connection-refused"
+      />
       <HStack gap={3}>
-        {autoStart && <Spinner size="sm" color="orange.fg" />}
+        {waiting && <Spinner size="sm" color="orange.fg" />}
         <Text data-testid="routed-to-connection">
-          {autoStart
+          {waiting
             ? `Taking you to your organization's sign-in with ${signInMethodLabel(method)}.`
             : `Log in with ${signInMethodLabel(method)} to continue.`}
         </Text>

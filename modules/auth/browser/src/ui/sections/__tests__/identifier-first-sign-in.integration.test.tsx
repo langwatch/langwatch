@@ -26,7 +26,7 @@ const {
   routeErrorRef: { current: null as unknown },
   requestSignUpVerificationMock: vi.fn(),
   registerMock: vi.fn(),
-  signInMock: vi.fn(),
+  signInMock: vi.fn(async (): Promise<unknown> => undefined),
   replaceMock: vi.fn(),
   hardNavigateMock: vi.fn(),
   sessionRef: { current: { data: null as unknown } },
@@ -353,6 +353,31 @@ describe("given the identifier-first sign-in screen", () => {
       expect(routeMock).toHaveBeenCalledTimes(2);
       expect(routeMock).toHaveBeenLastCalledWith({ identifier: "sam@acme.com", breakGlass: false });
       expect(signInMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("stops the spinner and says so when the provider sign-in is refused", async () => {
+      signInMock.mockResolvedValueOnce({
+        ok: false,
+        error: "Untrusted OIDC discovery URL",
+        code: "discovery_untrusted_origin",
+        status: 400,
+      });
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
+        outcome: "redirect_to_connection",
+        connectionId: "org:acme",
+        methodSet: [oktaMethod],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@acme.com");
+
+      const refused = await screen.findByTestId("routed-to-connection-refused");
+      expect(refused).toHaveTextContent(/ask your administrator/i);
+      expect(refused).not.toHaveTextContent(/untrusted/i);
+      expect(screen.getByTestId("routed-to-connection")).toHaveTextContent(
+        /^Log in with .+ to continue\.$/,
+      );
     });
 
     /** @scenario "A provider my address was routed to is badged once it lets me in" */
