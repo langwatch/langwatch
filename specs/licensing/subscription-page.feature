@@ -286,3 +286,37 @@ Feature: Subscription Page Plan Management
       And one invite to my organization is still open and another has expired
       When I upgrade to the Growth plan
       Then the checkout is for 3 seats
+
+  # ============================================================================
+  # A checkout asked for by the plans page starts on arrival
+  # ============================================================================
+
+  Rule: Arriving from the plans page "Upgrade now" opens Stripe Checkout
+
+    The plans page sends the reader here with the interval and currency they
+    picked. The page prices the seats it already counts and leaves for
+    Stripe Checkout, so one click on "Upgrade now" reaches the payment page
+    instead of landing back on the page the reader came from.
+
+    @integration
+    Scenario: The plans page upgrade opens the Growth checkout
+      Given my organization is on the Free plan with 2 members
+      When I arrive on the subscription page from the plans page asking for the annual Growth plan in USD
+      Then a Growth checkout for 2 seats, billed annually in USD, is created
+      And I am sent to the Stripe Checkout page it answers
+      And the checkout request is removed from the address, so returning from Stripe does not start another
+
+    @integration
+    Scenario: A checkout request is dropped when the organization cannot buy Growth here
+      Given my organization is already on the Growth plan
+      When I arrive on the subscription page asking for the Growth checkout
+      Then no checkout is created
+      And the checkout request is removed from the address
+
+    @integration
+    Scenario: A refused checkout tells the reader why and stays on the page
+      Given my organization is on the Free plan with 2 members
+      And I am not allowed to manage the organization's billing
+      When I arrive on the subscription page asking for the Growth checkout
+      Then I see why the upgrade could not start
+      And I stay on the subscription page

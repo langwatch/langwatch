@@ -89,6 +89,10 @@ class CapabilityBillingHost extends BillingHostApi {
     this.navigation.navigate(to);
   }
 
+  replace(to: string): void {
+    this.navigation.replace(to);
+  }
+
   leaveTo(url: string): void {
     uiLeaveTo(url);
   }

@@ -44,6 +44,7 @@ import { ContactSalesBlock } from "./contact-sales/index.ts";
 import { CurrentPlanBlock } from "./current-plan-block.tsx";
 import { InvoicesBlock } from "./invoices-block.tsx";
 import { SubscriptionPageHeader } from "./subscription-page-header.tsx";
+import { useCheckoutIntent } from "./use-checkout-intent.ts";
 import { useDrawerSave } from "./use-drawer-save.ts";
 import { useSubscriptionActions } from "./use-subscription-actions.ts";
 import { useSubscriptionCurrency } from "./use-subscription-currency.ts";
@@ -128,6 +129,11 @@ function currentPlanPricingFor({
     seatCount,
     perSeatPrice: monthlyEquivalent,
   };
+}
+
+/** The plan, seat usage and members have all answered. */
+function pageDataSettled({ waiting, hasPlan }: { waiting: boolean[]; hasPlan: boolean }) {
+  return hasPlan && !waiting.some(Boolean);
 }
 
 /**
@@ -251,6 +257,24 @@ export function SubscriptionPage() {
   });
 
   const isPlanLoading = !organization || activePlan.isLoading || isCurrencyLoading;
+  const { isUpgradeSeatsRequired, isUpgradePlanRequired, updateRequired } =
+    subscriptionChangesRequired({
+      flags,
+      hasSeatChanges: plannedUsers.length > 0 || deletedSeatCount > 0,
+      isOverPlanSeats,
+    });
+  useCheckoutIntent({
+    isReady: pageDataSettled({
+      waiting: [isPlanLoading, usage.isLoading, organizationWithMembers.isLoading],
+      hasPlan: !!plan,
+    }),
+    isUpgradeAvailable: isUpgradePlanRequired,
+    billingPeriod,
+    currency,
+    setBillingPeriod,
+    setCurrency: setSelectedCurrency,
+    startCheckout: handleUpgrade,
+  });
   if (isPlanLoading || activePlan.isError || !plan) {
     return (
       <>
@@ -302,12 +326,6 @@ export function SubscriptionPage() {
     isDeveloperPlan,
   });
 
-  const { isUpgradeSeatsRequired, isUpgradePlanRequired, updateRequired } =
-    subscriptionChangesRequired({
-      flags,
-      hasSeatChanges: plannedUsers.length > 0 || deletedSeatCount > 0,
-      isOverPlanSeats,
-    });
   const isSelfManagedPaidPlan = !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride;
 
   return (

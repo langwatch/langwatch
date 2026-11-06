@@ -69,6 +69,10 @@ class TestBillingHost extends BillingHostApi {
     this.navigations.push(to);
   }
 
+  replace(to: string): void {
+    this.navigations.push(to);
+  }
+
   leaveTo(url: string): void {
     this.departures.push(url);
   }
