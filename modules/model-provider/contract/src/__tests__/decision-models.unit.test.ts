@@ -59,12 +59,7 @@ describe("DECISION_MODELS", () => {
   it("never gives two models the same full name, while the picker title (pickerLabel) may repeat", () => {
     const labels = DECISION_MODELS.map((entry) => entry.label);
     expect(new Set(labels).size).toBe(labels.length);
-    expect(labels).toEqual(
-      expect.arrayContaining([
-        "OpenAI Decisions (gpt-6-luna)",
-        "Azure OpenAI Decisions (gpt-6-luna)",
-      ]),
-    );
+    expect(labels).toEqual(expect.arrayContaining(["OpenAI Decisions", "Azure OpenAI Decisions"]));
   });
 
   /** @scenario "A decision model's title names its provider and its model" */
