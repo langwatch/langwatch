@@ -58,6 +58,8 @@ export interface LangyChatTransportDeps {
   client: LangyTurnClient;
   /** Read the current turn inputs at send time (owns projectId → fixes regenerate). */
   getContext: () => LangyTurnRequestContext;
+  /** A send is starting: the panel notes where it leaves from, for `onIds` to check against. */
+  onSendStart: () => void;
   /**
    * Adopt the conversation + turn the server started in `projectId`. Answering `false` means the
    * panel moved somewhere else while the send was in flight: the turn is not streamed here.
@@ -114,6 +116,7 @@ export function createLangyChatTransport(deps: LangyChatTransportDeps): ChatTran
   const regenerations = new Map<string, number>();
   return {
     async sendMessages(options) {
+      deps.onSendStart();
       const ctx = deps.getContext();
       const idempotencyKey = turnIdempotencyKey({ options, regenerations });
       const { conversationId, turnId } = await startTurn({

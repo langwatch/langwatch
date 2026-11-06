@@ -50,6 +50,7 @@ function makeTransport(
       conversationId: null,
       ...context,
     }),
+    onSendStart: vi.fn(),
     onIds,
     onSignal: vi.fn(),
     onTurnSettled: vi.fn(),
@@ -276,6 +277,23 @@ describe("createLangyChatTransport", () => {
       });
       // And it got far enough to open the live stream.
       expect(subscription).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a send starts", () => {
+    it("tells the panel before it starts the turn, so the panel knows where it left from", async () => {
+      const calls: string[] = [];
+      const { transport } = makeTransport(
+        {},
+        {
+          onSendStart: () => calls.push("send start"),
+          onIds: () => (calls.push("named"), true),
+        },
+      );
+
+      await transport.sendMessages(options());
+
+      expect(calls).toEqual(["send start", "named"]);
     });
   });
 

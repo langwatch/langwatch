@@ -299,9 +299,10 @@ export function useLangyPanelTransport({
         getContext: () => {
           const ctx = turnContextRef.current;
           if (!ctx) throw new Error("Langy turn context not ready");
-          // Read once per send: where the send left from, checked again once it is named.
-          sentScopeRef.current = useLangyStore.getState().activeConversationScope;
           return ctx;
+        },
+        onSendStart: () => {
+          sentScopeRef.current = useLangyStore.getState().activeConversationScope;
         },
         onIds: ({ conversationId, turnId, projectId: sentFrom }) => {
           // The conversation exists either way, so a kickoff still learns which one it made.
