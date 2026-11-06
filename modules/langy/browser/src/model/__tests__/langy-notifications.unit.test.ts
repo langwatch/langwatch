@@ -189,7 +189,8 @@ describe("langyPushSetupProblem", () => {
 
   it("says the tab is the fallback where the tab notifies, and only that pushes may not arrive elsewhere", () => {
     expect(langyPushSetupProblem("browser_refused").line).toMatch(/while this tab stays open/);
-    // A subscription stored on an earlier visit can still be pushed to, so neither line says none arrive.
+    // A subscription stored on an earlier visit can still be pushed to,
+    // so neither line says that none arrive.
     expect(langyPushSetupProblem("server_unreachable").line).toMatch(/may not arrive/);
     expect(langyPushSetupProblem("save_failed").line).toMatch(/may not arrive/);
   });
