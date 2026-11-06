@@ -38,6 +38,15 @@ Feature: The dashboard widget editor knows the runtime its code runs in
       When the editor's declarations are compared with what the frame provides
       Then a member the frame provides without a declaration fails the comparison
 
+  Rule: The preview names a limit failure
+
+    @unit
+    Scenario: A limit failure in the preview names the reason and the remedy
+      Given the widget's query fails on the memory or the time limit
+      When the editor preview prints the rejection
+      Then the title is "Couldn't load" and the message gives the reason, then the remedy
+      And any other failure is printed unchanged
+
   Rule: Query rows are typed from the last run
 
     @unit

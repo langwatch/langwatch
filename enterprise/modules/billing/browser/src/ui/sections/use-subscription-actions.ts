@@ -115,7 +115,8 @@ export function useSubscriptionActions({
 
   const handleUpgrade = async () => {
     if (!organizationId) return;
-    const invites = plannedInvites(plannedUsers);
+    // A member who may not invite still buys the seats; an admin sends the invitations.
+    const invites = host.canInviteMembers() ? plannedInvites(plannedUsers) : [];
 
     await leaveToAnsweredUrl({
       host,
