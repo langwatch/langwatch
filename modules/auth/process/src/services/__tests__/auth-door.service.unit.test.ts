@@ -896,6 +896,32 @@ describe("given an identity provider that refused a sign-in started on our page"
         vi.useRealTimers();
       }
     });
+
+    it("logs a classification that fails after the redirect stopped waiting, with its reference", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      loggerSpies.warn.mockClear();
+      try {
+        const late = new Error("identity answered late and failed");
+        const refusedSignIns = createApiFixture<IdentityApi>({
+          classifyRefusedSignIn: () =>
+            new Promise((_resolve, reject) => setTimeout(() => reject(late), 5_000)),
+        });
+
+        const pending = refusing({ refusedSignIns }).service.betterAuthHandshake(
+          refusedCallback({ hint: sealedHint() }),
+        );
+        await vi.advanceTimersByTimeAsync(3_000);
+        const reference = locationOf(await pending).searchParams.get("trace");
+        await vi.advanceTimersByTimeAsync(2_000);
+
+        expect(loggerSpies.warn).toHaveBeenCalledWith(
+          { error: late, reference },
+          "classifying a refused sign-in failed after the redirect stopped waiting on it",
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe("when the callback carries no hint", () => {
