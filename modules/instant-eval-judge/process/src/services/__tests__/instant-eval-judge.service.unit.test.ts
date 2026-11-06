@@ -581,6 +581,20 @@ describe("given a judge call on an own decision model", () => {
       ]);
     });
 
+    it("writes a redelivered call under the same request id as the first delivery", async () => {
+      const ledger = MemoryInstantEvalProviderSpendChannel.create();
+      const { service } = harness({ decisionAnswer, spend: ledger });
+
+      await service.judge({ ...call, decisionModel, requestKey: "evaluation-7" });
+      await service.judge({ ...call, decisionModel, requestKey: "evaluation-7" });
+
+      const requestIds = ledger.recorded.map(({ requestId }) => requestId);
+      expect(requestIds).toEqual([
+        "instant_eval_decision_model:instantevaljudge_evaluation-7:inception/decisions:mercury-decide",
+        "instant_eval_decision_model:instantevaljudge_evaluation-7:inception/decisions:mercury-decide",
+      ]);
+    });
+
     it("logs a ledger refusal and keeps the verdict", async () => {
       const { service, lines } = harness({
         decisionAnswer,

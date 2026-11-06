@@ -7,11 +7,9 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 import {
-  type BatchClusteringParams,
   CLUSTERING_ERROR_CODES,
   ClusteringError,
   type ClusteringErrorCode,
-  type IncrementalClusteringParams,
   type TopicClusteringResponse,
   type TopicClusteringSubtopic,
   type TopicClusteringTopic,
@@ -650,19 +648,6 @@ function assignmentOccurredAt(traceOccurredAtMs: number | undefined): number {
 const requestKeyOf = (runContext: ClusteringRunContext | undefined): { requestKey?: string } =>
   runContext ? { requestKey: `run:${runContext.runId}:page-${runContext.page}` } : {};
 
-export const fetchTopicsBatchClustering = (
-  deps: TopicClusteringRunnerDeps,
-  projectId: string,
-  params: BatchClusteringParams,
-): Promise<TopicClusteringFetch> => requestClustering(deps, { projectId, mode: "batch", params });
-
-export const fetchTopicsIncrementalClustering = (
-  deps: TopicClusteringRunnerDeps,
-  projectId: string,
-  params: IncrementalClusteringParams,
-): Promise<TopicClusteringFetch> =>
-  requestClustering(deps, { projectId, mode: "incremental", params });
-
 type ClusteringCall = TopicClusteringRequest extends infer R
   ? R extends TopicClusteringRequest
     ? Omit<R, "signal">
@@ -686,7 +671,7 @@ const clusteringCodeOfRefusal = (error: LangevalsClusteringError): ClusteringErr
   CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE;
 
 /** The whole exchange, staging upload and body read included, lives inside the deadline. */
-const requestClustering = async (
+export const requestClustering = async (
   deps: TopicClusteringRunnerDeps,
   call: ClusteringCall,
 ): Promise<TopicClusteringFetch> => {

@@ -108,7 +108,10 @@ const HTTP_STATUS = {
 /** The error code each widget id answers with; a widget not listed answers with rows. */
 type Failures = Record<string, keyof typeof HTTP_STATUS>;
 
-/** `dashboardWidgets.update` stores what it is sent, as the server does; an unset list is dropped. */
+/**
+ * `dashboardWidgets.update` stores what it is sent, as the server does; an unset list is
+ * dropped.
+ */
 function boardServer(failures: Failures, widgets: readonly StoredWidget[] = WIDGETS) {
   const stored = widgets.map((each) => structuredClone(each));
   return (call: UiProcedureCall): Promise<unknown> => {
@@ -208,7 +211,10 @@ class AddressedHost extends StubAnalyticsHost {
   }
 }
 
-/** The board under a new host object for each address, as the router hands one; the editor opens. */
+/**
+ * The board under a new host object for each address, as the router hands one; the editor
+ * opens.
+ */
 function AddressedBoard({ host }: { host: AddressedHost }) {
   const [atAddress, setAtAddress] = useState(host);
   useEffect(() => {

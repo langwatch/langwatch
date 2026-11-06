@@ -63,6 +63,7 @@ const ORGANIZATION = `org-platform-${run}`;
 const PROVIDER_ROW = `mp-openai-${run}`;
 const COST_NANO_USD = 156_000_000;
 const REQUEST_ID = `topic_clustering:run:run-${run}:page-0:openai/text-embedding-3-large`;
+const SEARCH_REQUEST_ID = `evaluation:${run}:openai/gpt-5-search`;
 
 /** An organization-wide monthly budget on the stored OpenAI row. */
 function organizationBudget(): GatewayResolvedBudget {
@@ -296,6 +297,35 @@ describe.skipIf(!enabled)("platform provider usage on the ledger (real ClickHous
           Cost: String(COST_NANO_USD),
         },
       ]);
+    });
+  });
+
+  describe("given an evaluator call that ran web searches", () => {
+    beforeAll(async () => {
+      await protocol.recordProviderUsage({
+        requestId: SEARCH_REQUEST_ID,
+        projectId: TENANT,
+        model: "openai/gpt-5-search",
+        modelProviderId: PROVIDER_ROW,
+        requestType: "evaluation",
+        usage: { input_tokens: 400, output_tokens: 80, web_search_requests: 3 },
+        durationMs: 1_200,
+        occurredAt: Date.now(),
+      });
+    }, 120_000);
+
+    it("stores the search count on the spend row and folds it back", async () => {
+      const spend = await rows<{ WebSearchRequests: number | string }>(
+        `SELECT WebSearchRequests
+         FROM gateway_spend FINAL
+         WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String}`,
+        SEARCH_REQUEST_ID,
+      );
+      expect(spend.map((row) => Number(row.WebSearchRequests))).toEqual([3]);
+
+      const context = { aggregateId: SEARCH_REQUEST_ID, tenantId: createTenantId(TENANT) };
+      const read = await store.get(SEARCH_REQUEST_ID, context);
+      expect(read.kind === "folded" && read.state.usage?.web_search_requests).toBe(3);
     });
   });
 });

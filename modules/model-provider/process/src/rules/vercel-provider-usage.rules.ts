@@ -11,7 +11,6 @@ export type ProviderStreamPart =
     ? Part
     : never;
 
-/** The ledger quantities of one answered call: input counts only the uncached prompt (ADR-193). */
 /** The token quantities a chat call reports, as the ledger names them. */
 type ChatCallQuantities = Required<
   Pick<
@@ -24,6 +23,7 @@ type ChatCallQuantities = Required<
   >
 >;
 
+/** The ledger quantities of one answered call: input counts only the uncached prompt (ADR-193). */
 export function vercelSpendUsageOf(usage: ProviderCallUsage | undefined): ChatCallQuantities {
   if (!usage) return NO_QUANTITIES;
   const cacheRead = usage.inputTokens.cacheRead ?? 0;

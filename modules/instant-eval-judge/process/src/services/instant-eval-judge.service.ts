@@ -103,7 +103,10 @@ export class InstantEvalJudgeService {
     signal,
     decisionModel,
     route,
-  }: InstantEvalClassification): Promise<InstantEvalJudgement> {
+    requestKey,
+  }: InstantEvalClassification & {
+    requestKey?: string | undefined;
+  }): Promise<InstantEvalJudgement> {
     const signalArgs = signal ? [signal] : [];
     if (decisionModel) {
       const startedAt = this.deps.now().epochMilliseconds;
@@ -116,6 +119,7 @@ export class InstantEvalJudgeService {
         model: decisionModel.model,
         providerUsage,
         startedAt,
+        requestKey,
       });
       return judgement;
     }
@@ -134,16 +138,19 @@ export class InstantEvalJudgeService {
     model,
     providerUsage,
     startedAt,
+    requestKey,
   }: {
     projectId: string;
     model: string;
     providerUsage: InstantEvalDecisionModelAnswer["providerUsage"];
     startedAt: number;
+    requestKey: string | undefined;
   }): Promise<void> {
     if (!providerUsage || !this.deps.spend) return;
     const occurredAt = this.deps.now().epochMilliseconds;
+    const callId = instantEvalJudgeSpendRequestId({ requestKey, mint: this.deps.mintRequestId });
     const entry = {
-      requestId: `${OWN_DECISION_MODEL_REQUEST_TYPE}:${this.deps.mintRequestId()}:${model}`,
+      requestId: `${OWN_DECISION_MODEL_REQUEST_TYPE}:${callId}:${model}`,
       projectId,
       model,
       requestType: OWN_DECISION_MODEL_REQUEST_TYPE,
@@ -167,7 +174,8 @@ export class InstantEvalJudgeService {
   async judge({ requestKey, ...call }: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer> {
     const { projectId, decisionModel } = call;
     if (decisionModel) {
-      return { outcome: "judged", judgement: await this.classifyOnce(call), priceUsd: 0 };
+      const judgement = await this.classifyOnce({ ...call, requestKey });
+      return { outcome: "judged", judgement, priceUsd: 0 };
     }
     // Off cloud nothing judges, so the project's placement is never the reason to give. A routed
     // call needs no hosted classifier key: boot checks the keys its table can reach.

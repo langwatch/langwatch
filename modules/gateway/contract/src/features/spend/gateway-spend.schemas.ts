@@ -157,7 +157,7 @@ const spendUsageSchemaDefinition = z.object({
   /** Images the response carried. Observability only, never priced. */
   image_count: z.number().int().min(0).default(0),
   /** Web search tool calls the provider ran, each priced at the model's per-query rate. */
-  web_search_requests: z.number().int().min(0).optional(),
+  web_search_requests: z.number().int().min(0).default(0),
 });
 export interface SpendUsageSchema extends Named<typeof spendUsageSchemaDefinition> {}
 export const spendUsageSchema: SpendUsageSchema = spendUsageSchemaDefinition;
