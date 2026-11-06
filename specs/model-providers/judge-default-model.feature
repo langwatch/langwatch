@@ -77,3 +77,17 @@ Feature: Judge column in Default models
     Given I picked a Default model in the drawer
     When I look at the Judge row
     Then it inherits that Default model
+
+  # --- The Judge picker ---
+
+  @unit
+  Scenario: The Judge picker lists decision models before LLMs
+    Given a decision model the Judge column may hold
+    When the Judge picker's choices are built
+    Then that decision model comes before every LLM
+
+  @integration
+  Scenario: The Judge picker offers only models that can judge a scenario
+    When I open the Judge picker
+    Then every LLM reads as its provider icon and model id, with no description and no provider heading
+    And no Instant Evals decision model is offered, since none can judge a scenario yet

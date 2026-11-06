@@ -38,6 +38,7 @@ import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import {
   DECISION_MODEL_DISPLAY_NAMES,
   decisionModelPickerOptions,
+  rolePickerModels,
 } from "../../model/decision-model-options.ts";
 import { MODEL_ROLE_LABEL } from "../../model/default-model-cascade.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
@@ -60,7 +61,7 @@ const ROLE_BLURB: Record<ModelRole, string> = {
   LANGY: "The model Langy chats and works with.",
   EMBEDDINGS: "Semantic vectors used by topic clustering and similar features.",
   INSTANT_EVALS:
-    "The decision model Instant Evals answer with. LangWatch Instant Preview unless you pick your own.",
+    "The decision model Instant Evals answer with. LangWatch Evals Preview unless you pick your own.",
   JUDGE: "The model scenario runs judge with. Uses the Default model unless you pick one.",
 };
 
@@ -268,27 +269,25 @@ function modelOptionsByRoleFor({
   const enabledEntries: [string, ProviderRow][] = providers
     .filter((p) => p.enabled === true)
     .map((p) => [p.provider, p]);
-  const aliasChatOptions = aliasChatOptionsFor(new Set(enabledEntries.map(([key]) => key)));
-  const chatOptions = modelOptionsForMode({
-    enabledEntries,
-    hasProviderLoadError,
-    isLoading,
-    mode: "chat",
-  });
+  const llmModels = [
+    ...aliasChatOptionsFor(new Set(enabledEntries.map(([key]) => key))),
+    ...modelOptionsForMode({ enabledEntries, hasProviderLoadError, isLoading, mode: "chat" }),
+  ];
+  const decisionModels = decisionOptions.map((option) => option.value);
+  const ordered = (role: ModelRole) => rolePickerModels({ role, decisionModels, llmModels });
 
   return {
-    DEFAULT: [...aliasChatOptions, ...chatOptions],
-    FAST: [...aliasChatOptions, ...chatOptions],
-    LANGY: [...aliasChatOptions, ...chatOptions],
-    JUDGE: [...aliasChatOptions, ...chatOptions],
+    DEFAULT: ordered("DEFAULT"),
+    FAST: ordered("FAST"),
+    LANGY: ordered("LANGY"),
+    JUDGE: ordered("JUDGE"),
     EMBEDDINGS: modelOptionsForMode({
       enabledEntries,
       hasProviderLoadError,
       isLoading,
       mode: "embedding",
     }),
-    // Decision models only, never the chat catalogue (ADR-182 decision 2).
-    INSTANT_EVALS: decisionOptions.map((option) => option.value),
+    INSTANT_EVALS: ordered("INSTANT_EVALS"),
   };
 }
 
@@ -455,9 +454,14 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       enabled: !!projectId && open,
     },
   );
+  const { enabled: isOwnModelEnabled } = useFeatureFlag(
+    FrontendFlags.release_instant_evals_own_decision_model,
+    { projectId: projectId ?? NOT_TARGETED, organizationId, enabled: !!projectId && open },
+  );
   const decisionOptions = decisionModelPickerOptions({
     pickable: pickableDecisionModels.data,
     isJudgeRouted,
+    isOwnModelEnabled,
   });
   const modelOptionsByRole = modelOptionsByRoleFor({
     decisionOptions,
@@ -613,6 +617,8 @@ function RoleRow({
   pickerOptionFor: (modelValue: string) => ModelPickerOption;
 }) {
   const current = config[role] ?? "";
+  // Unset already runs on this listed model, so it shows checked and picking it stays unset.
+  const unsetDefault = roleInherit.isUnsetDefault ? roleInherit.model : undefined;
   const canExpand = features.length > 0;
   const ChevronIcon = expanded ? ChevronDown : ChevronRight;
 
@@ -642,13 +648,13 @@ function RoleRow({
         <Box flex={1} />
         <Box width="240px" flexShrink={0}>
           <ProviderModelSelector
-            model={current}
+            model={current || unsetDefault || ""}
             query={{
               data: roleSelectModelOptions({ options: modelOptions, role }).map(pickerOptionFor),
               isLoading: false,
             }}
-            onChange={(m) => onSetOverride(role, m)}
-            inheritOption={roleInherit}
+            onChange={(m) => onSetOverride(role, m === unsetDefault ? null : m)}
+            inheritOption={unsetDefault ? undefined : roleInherit}
             disabled={unsupportedAtScope}
             labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
           />
@@ -778,7 +784,12 @@ function FeatureRow({
   );
 }
 
-export type InheritOptionShape = { model?: string; label: string };
+export type InheritOptionShape = {
+  model?: string;
+  label: string;
+  /** The model an unset role runs on and the picker lists itself (Instant Evals: Evals Preview). */
+  isUnsetDefault?: boolean;
+};
 
 /**
  * Toast copy for the save outcome. Saving an edit with every key on
@@ -822,7 +833,9 @@ export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | un
 export function buildInheritOption(entry: InheritedEntry, role?: ModelRole): InheritOptionShape {
   const hit = inheritHitOption(entry);
   if (hit) return hit;
-  if (role === "INSTANT_EVALS") return { model: LANGWATCH_DECISION_MODEL_ID, label: "Default" };
+  if (role === "INSTANT_EVALS") {
+    return { model: LANGWATCH_DECISION_MODEL_ID, label: "Default", isUnsetDefault: true };
+  }
   return { label: "Not configured" };
 }
 

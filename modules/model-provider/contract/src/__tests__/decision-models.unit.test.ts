@@ -8,6 +8,7 @@ import {
   azureResourceOf,
   DECISION_MODELS,
   isOwnDecisionModelId,
+  LANGWATCH_DECISION_MODEL_ID,
 } from "../catalog/decision-models.ts";
 import { findModelProviderDefinition } from "../model-provider-registry.ts";
 
@@ -38,20 +39,32 @@ describe("DECISION_MODELS", () => {
     },
   );
 
-  /** @scenario "A decision model reads as its model name, as a chat model does" */
-  it.each(DECISION_MODELS.map((entry) => [entry.id, entry] as const))(
-    "%s names the model only, never its provider",
+  /** @scenario "A decision model's title names its provider and its model" */
+  it.each(OWN_ENTRIES.map((entry) => [entry.id, entry] as const))(
+    "%s's title opens with its provider's name",
     (_, entry) => {
-      const providerNames = [
-        entry.provider,
-        findModelProviderDefinition(entry.provider)?.name ?? "",
-      ];
-      const label = entry.label.toLowerCase();
-      for (const name of providerNames.filter(Boolean))
-        expect(label).not.toContain(name.toLowerCase());
-      expect(entry.label).not.toMatch(/\(|Decisions API/);
+      const providerName = findModelProviderDefinition(entry.provider)?.name ?? "";
+      const firstWord = providerName.split(" ")[0] ?? "";
+      expect(firstWord).not.toBe("");
+      expect(entry.label.startsWith(firstWord)).toBe(true);
     },
   );
+
+  it("names LangWatch's hosted model for what it is optimized for", () => {
+    const hosted = DECISION_MODELS.find((entry) => entry.id === LANGWATCH_DECISION_MODEL_ID);
+    expect(hosted).toMatchObject({ label: "Evals Preview", description: "Optimized for evals" });
+  });
+
+  it("never gives two models the same title, so one model on two providers reads apart", () => {
+    const labels = DECISION_MODELS.map((entry) => entry.label);
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        "OpenAI Decisions (gpt-6-luna)",
+        "Azure OpenAI Decisions (gpt-6-luna)",
+      ]),
+    );
+  });
 
   it("never repeats an id", () => {
     const ids = DECISION_MODELS.map((entry) => entry.id);

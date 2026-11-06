@@ -27,8 +27,10 @@ export const allModelOptions = modelSelectorOptions.map((option) => option.value
 export type ModelPickerOption = {
   label: string;
   value: string;
-  /** Under the label: what an alias like `openai/latest` currently resolves to. */
+  /** Under the label: what an alias resolves to, or what a decision model is. */
   subtitle?: string;
+  /** Listed but not pickable: a decision model whose provider has no key yet. */
+  disabled?: boolean;
 };
 
 /**

@@ -354,34 +354,58 @@ Feature: Instant Evals decision model column in Default models
   Scenario: The Default models table shows an Instant Evals column defaulting to LangWatch Instant Preview
     When I open Settings > Model Providers > Default models
     Then I see an "Instant Evals" column
-    And it reads "Instant Preview" with the LangWatch mark where nothing is set
+    And it reads "Evals Preview" with the LangWatch mark where nothing is set
 
   @unit
-  Scenario: A decision model reads as its model name, as a chat model does
+  Scenario: A decision model's title names its provider and its model
     When a decision model is listed in a picker
-    Then its label is the model name only, such as "gpt-6-luna" or "Microsoft Decision 1"
-    And its provider is shown by the provider heading and icon, never written in the label
+    Then its title names the provider and the model, such as "OpenAI Decisions (gpt-6-luna)" or "Inception Mercury Decide"
+    And LangWatch's hosted model reads "Evals Preview", described as "Optimized for evals"
 
   @integration
   Scenario: The drawer offers only decision models for the Instant Evals column
     Given the flag is off for my organization
     When I edit the Instant Evals column
-    Then I can pick only "LangWatch Instant Preview"
+    Then I can pick only "Evals Preview"
+    And no other decision model is listed, not even with a hint to add a key
 
   @integration
   Scenario: The drawer offers only the decision models that would run
     Given the flag is on for my organization
     And my project has an OpenAI key and no Inception key
     When I edit the Instant Evals column
-    Then I can pick "LangWatch Instant Preview" and "OpenAI Decisions API"
-    And "Inception Mercury Decide" is not offered, so every pick I can make runs
+    Then I can pick "Evals Preview" and "OpenAI Decisions (gpt-6-luna)"
+    And "Inception Mercury Decide" is listed but cannot be picked, so every pick I can make runs
+
+  @integration
+  Scenario: The decision model picker is one flat list with LangWatch's models first
+    Given the flag is on for my organization
+    When I edit the Instant Evals column
+    Then "Evals Preview" is the first row, checked while the column is unset
+    And no row is a provider heading or a separate "Default" row
+    And every row shows its provider icon, its title and a one-line description
+
+  @integration
+  Scenario: A model two providers offer is told apart by its provider
+    Given the flag is on for my organization
+    And my project has an OpenAI key and an Azure OpenAI key
+    When I edit the Instant Evals column
+    Then "OpenAI Decisions (gpt-6-luna)" and "Azure OpenAI Decisions (gpt-6-luna)" are two rows
+
+  @integration
+  Scenario: A decision model whose provider has no key says how to enable it
+    Given the flag is on for my organization
+    And my project has no Inception key
+    When I edit the Instant Evals column
+    Then "Inception Mercury Decide" reads "Add an Inception key in Model Providers to use it."
+    And it cannot be picked
 
   @unit
   Scenario: With the router flag on LangWatch Instant Preview says it routes
     Given the judge router flag is on for my organization
     When the Instant Evals choices are built
-    Then "LangWatch Instant Preview" says a decision model answers what it is sure of and an LLM the rest
-    And with the router flag off it reads "Hosted by LangWatch and billed with your plan."
+    Then "Evals Preview" reads "Optimized for evals, routed"
+    And with the router flag off it reads "Optimized for evals"
 
   @integration
   Scenario: The drawer asks about the picked scopes, not the page's project

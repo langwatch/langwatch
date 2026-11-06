@@ -4,6 +4,7 @@
  * reads the Default model while unset. Binds specs/model-providers/judge-default-model.feature.
  */
 import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
+import { isLatestAlias } from "@langwatch/model-provider-contract";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -92,11 +93,19 @@ function roleRowLabels() {
   return screen.getAllByTestId(/^role-row-[a-z_]+-label$/).map((label) => label.textContent ?? "");
 }
 
-function optionValues(role: string) {
+function listboxOf(role: string) {
   const trigger = within(screen.getByTestId(`role-row-${role}`)).getByRole("combobox");
   const listbox = document.getElementById(trigger.getAttribute("aria-controls") ?? "");
   if (!listbox) throw new Error(`no listbox for the ${role} row`);
-  return within(listbox)
+  return listbox;
+}
+
+function judgeListbox() {
+  return listboxOf("judge");
+}
+
+function optionValues(role: string) {
+  return within(listboxOf(role))
     .getAllByRole("option", { hidden: true })
     .filter((option) => option.dataset.testid !== "provider-model-selector-inherit")
     .map((option) => option.textContent ?? "");
@@ -130,6 +139,33 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
     expect(
       within(screen.getByTestId("role-row-judge-features")).getByText("Scenario judge"),
     ).toBeInTheDocument();
+  });
+
+  /** @scenario "The Judge picker offers only models that can judge a scenario" */
+  it("lists LLMs by icon and model id with no description, and no Instant Evals model", () => {
+    mockListDecisionModels.mockReturnValue({
+      data: [
+        { value: "langwatch/instant-evals", label: "Evals Preview" },
+        { value: "openai/decisions:gpt-6-luna", label: "OpenAI Decisions (gpt-6-luna)" },
+      ],
+      isLoading: false,
+    });
+    renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+    const listbox = judgeListbox();
+    expect(listbox.querySelector('[data-part="item-group-label"]')).toBeNull();
+    expect(within(listbox).queryByText("Evals Preview")).not.toBeInTheDocument();
+    expect(within(listbox).queryByText(/OpenAI Decisions/)).not.toBeInTheDocument();
+    const options = within(listbox)
+      .getAllByRole("option", { hidden: true })
+      .filter((option) => option.dataset.testid !== "provider-model-selector-inherit")
+      // A "Latest" alias keeps the model it resolves to as its line; a model id has none.
+      .filter((option) => !isLatestAlias(option.dataset.value ?? ""));
+    expect(options.length).toBeGreaterThan(0);
+    for (const option of options) {
+      expect(option.querySelector("svg, img")).not.toBeNull();
+      expect(option.querySelector('[data-testid="model-option-subtitle"]')).toBeNull();
+    }
   });
 
   /** @scenario "An unset Judge row inherits the Default model" */

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- * The Instant Evals column offers decision models only, LangWatch Instant Preview first, and
- * only the ones the server says would run from the picked scopes, not the page's project (ADR-182).
+ * The Instant Evals column lists decision models in one flat list, Evals Preview first; only the
+ * ones the server says would run from the picked scopes can be picked (ADR-182).
  * Binds specs/model-providers/instant-evals-decision-model.feature.
  */
 import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
@@ -17,9 +17,13 @@ const mockGetInheritedValues = vi.fn();
 const mockListAllForProjectForFrontend = vi.fn();
 const mockListDecisionModels = vi.fn();
 
-// The drawer asks the judge router flag; off unless a case turns it on.
+// The drawer asks the judge router and own decision model flags; off unless a case turns one on.
+const flagsOn = new Set<string>();
 vi.mock("@langwatch/feature-flag-client", () => ({
-  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+  useFeatureFlag: (flag: { name: string }) => ({
+    enabled: flagsOn.has(flag.name),
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
@@ -82,16 +86,31 @@ const PAYLOAD = {
   features: [],
 };
 
-const HOSTED = { value: "langwatch/instant-evals", label: "Instant Preview" };
+const OWN_MODEL_FLAG = "release_instant_evals_own_decision_model";
+const HOSTED = { value: "langwatch/instant-evals", label: "Evals Preview" };
 const OPENAI_DECISIONS = {
   value: "openai/decisions:gpt-6-luna",
-  label: "gpt-6-luna",
+  label: "OpenAI Decisions (gpt-6-luna)",
+};
+const AZURE_DECISIONS = {
+  value: "azure/decisions:gpt-6-luna",
+  label: "Azure OpenAI Decisions (gpt-6-luna)",
 };
 
 function instantEvalsOptions() {
   return within(instantEvalsListbox())
     .getAllByRole("option", { hidden: true })
     .filter((option) => option.dataset.testid !== "provider-model-selector-inherit");
+}
+
+function pickable(options: HTMLElement[]) {
+  return options.filter((option) => option.getAttribute("aria-disabled") !== "true");
+}
+
+function optionTitled(title: string) {
+  const option = instantEvalsOptions().find((row) => within(row).queryByText(title));
+  if (!option) throw new Error(`no option titled ${title}`);
+  return option;
 }
 
 function instantEvalsListbox() {
@@ -115,57 +134,104 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
     });
     mockListDecisionModels.mockReturnValue({ data: [HOSTED], isLoading: false });
   });
-  afterEach(() => cleanup());
+  afterEach(() => {
+    flagsOn.clear();
+    cleanup();
+  });
 
-  describe("given the server offers only LangWatch Instant Preview", () => {
+  describe("given own decision models are off for the organization", () => {
     /** @scenario "The drawer offers only decision models for the Instant Evals column" */
-    it("offers only LangWatch Instant Preview, never a chat model or an own model", () => {
+    it("offers only Evals Preview, never a chat model, an own model or an add-a-key hint", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const options = instantEvalsOptions();
       expect(options).toHaveLength(1);
-      expect(options[0]).toHaveTextContent("Instant Preview");
+      expect(options[0]).toHaveTextContent("Evals Preview");
       const listbox = instantEvalsListbox();
       expect(within(listbox).queryByText(/gpt-5\.5/)).not.toBeInTheDocument();
-      expect(within(listbox).queryByText("Mercury Decide")).not.toBeInTheDocument();
+      expect(within(listbox).queryByText("Inception Mercury Decide")).not.toBeInTheDocument();
+      expect(within(listbox).queryByText(/key in Model Providers/)).not.toBeInTheDocument();
     });
 
-    it("reads LangWatch Instant Preview as the value when nothing is set", () => {
+    it("reads Evals Preview as the value when nothing is set", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
-      expect(trigger).toHaveTextContent("Instant Preview");
+      expect(trigger).toHaveTextContent("Evals Preview");
       expect(trigger).not.toHaveTextContent("Not configured");
     });
   });
 
-  describe("given the server says the project's OpenAI decision model would run", () => {
-    beforeEach(() =>
+  describe("given own decision models are on and the project's OpenAI decision model would run", () => {
+    beforeEach(() => {
+      flagsOn.add(OWN_MODEL_FLAG);
       mockListDecisionModels.mockReturnValue({
         data: [HOSTED, OPENAI_DECISIONS],
         isLoading: false,
-      }),
-    );
-
-    /** @scenario "The drawer offers only the decision models that would run" */
-    it("offers LangWatch Instant Preview first, then exactly the models the server offers", () => {
-      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
-
-      const labels = instantEvalsOptions().map((option) => option.textContent ?? "");
-      expect(labels).toHaveLength(2);
-      expect(labels[0]).toContain("Instant Preview");
-      expect(labels[1]).toContain("gpt-6-luna");
-      expect(
-        within(instantEvalsListbox()).getByText("OpenAI Decisions API, on your OpenAI key."),
-      ).toBeInTheDocument();
+      });
     });
 
-    it("never offers a model whose provider key is missing, so a pick always runs", () => {
+    /** @scenario "The drawer offers only the decision models that would run" */
+    it("lets only the models the server offers be picked, so every pick runs", () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const titles = pickable(instantEvalsOptions()).map((option) => option.textContent ?? "");
+      expect(titles).toHaveLength(2);
+      expect(titles[0]).toContain("Evals Preview");
+      expect(titles[1]).toContain("OpenAI Decisions (gpt-6-luna)");
+      expect(optionTitled("Inception Mercury Decide")).toHaveAttribute("aria-disabled", "true");
+    });
+
+    /** @scenario "The decision model picker is one flat list with LangWatch's models first" */
+    it("lists Evals Preview first and checked, with no heading or Default row, every row described", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const listbox = instantEvalsListbox();
-      expect(within(listbox).queryByText("Mercury Decide")).not.toBeInTheDocument();
-      expect(within(listbox).queryByText(/key in Model Providers first/)).not.toBeInTheDocument();
+      expect(listbox.querySelector('[data-part="item-group-label"]')).toBeNull();
+      expect(
+        within(listbox).queryByTestId("provider-model-selector-inherit"),
+      ).not.toBeInTheDocument();
+      const options = instantEvalsOptions();
+      expect(options[0]).toHaveTextContent("Evals Preview");
+      expect(options[0]).toHaveAttribute("aria-selected", "true");
+      expect(options[0]).toHaveTextContent("Optimized for evals");
+      for (const option of options) {
+        expect(option.querySelector("svg, img")).not.toBeNull();
+        expect(option.querySelector('[data-testid="model-option-subtitle"]')).not.toBeNull();
+      }
+    });
+
+    /** @scenario "A decision model whose provider has no key says how to enable it" */
+    it("tells how to enable a model whose provider has no key, and keeps it unpickable", () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const inception = optionTitled("Inception Mercury Decide");
+      expect(inception).toHaveTextContent("Add an Inception key in Model Providers to use it.");
+      expect(inception).toHaveAttribute("aria-disabled", "true");
+      expect(optionTitled("OpenAI Decisions (gpt-6-luna)")).toHaveTextContent(
+        "OpenAI's Decisions API, on your OpenAI key.",
+      );
+    });
+  });
+
+  describe("given OpenAI and Azure both offer gpt-6-luna", () => {
+    beforeEach(() => {
+      flagsOn.add(OWN_MODEL_FLAG);
+      mockListDecisionModels.mockReturnValue({
+        data: [HOSTED, OPENAI_DECISIONS, AZURE_DECISIONS],
+        isLoading: false,
+      });
+    });
+
+    /** @scenario "A model two providers offer is told apart by its provider" */
+    it("lists the two as rows titled by their provider", () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const titles = pickable(instantEvalsOptions()).map((option) => option.textContent ?? "");
+      expect(titles.some((title) => title.includes("OpenAI Decisions (gpt-6-luna)"))).toBe(true);
+      expect(titles.some((title) => title.includes("Azure OpenAI Decisions (gpt-6-luna)"))).toBe(
+        true,
+      );
     });
   });
 
@@ -182,7 +248,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       expect(options).toMatchObject({ enabled: true });
     });
 
-    it("asks nothing and offers only LangWatch Instant Preview with no scope picked", () => {
+    it("asks nothing and offers only Evals Preview with no scope picked", () => {
       mockListDecisionModels.mockReturnValue({ data: undefined, isLoading: false });
       renderWithModelProviderHost(<DefaultModelOverrideDrawer />);
 
@@ -191,7 +257,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       expect(options).toMatchObject({ enabled: false });
       const offered = instantEvalsOptions();
       expect(offered).toHaveLength(1);
-      expect(offered[0]).toHaveTextContent("Instant Preview");
+      expect(offered[0]).toHaveTextContent("Evals Preview");
     });
   });
 });
