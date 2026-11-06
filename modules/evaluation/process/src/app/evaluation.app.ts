@@ -44,6 +44,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
+import { ProjectApi } from "@langwatch/project-contract";
 import { openAiApiKey, Secret } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -81,6 +82,7 @@ import {
   EVAL_INPUTS_PREVIEW_BYTES,
   EvaluationInputsOffloadService,
 } from "../features/execution/services/evaluation-inputs-offload.service.ts";
+import { EvaluationJudgeRoutingService } from "../features/execution/services/evaluation-judge-routing.service.ts";
 import { EvaluationLoopMetricsService } from "../features/execution/services/evaluation-loop-metrics.service.ts";
 import { EvaluationModelCascadeService } from "../features/execution/services/evaluation-model-cascade.service.ts";
 import { EvaluationSettingsRecoverySwitchService } from "../features/execution/services/evaluation-settings-recovery-switch.service.ts";
@@ -271,6 +273,8 @@ export class EvaluationModule implements EvaluationApiContract {
     judges: InstantEvalJudgeApi,
     /** Mints the own-only proof each evaluation_runs read is fenced by; a leaf (AGG-EVAL-PROOF). */
     authz: AuthzApi,
+    /** A project's organization, so the judge router flag is read with its organization rule. */
+    projects: ProjectApi,
   };
   static readonly secrets = {
     openAi: openAiApiKey,
@@ -436,6 +440,10 @@ export class EvaluationModule implements EvaluationApiContract {
       workflowExecutor: WorkflowEvaluationService.create(dependencies.workflows),
       judges: dependencies.judges,
       decisionModels: dependencies.modelProviders,
+      judgeRouting: EvaluationJudgeRoutingService.create({
+        flags: dependencies.featureFlags,
+        projects: dependencies.projects,
+      }),
       installEnvironment: environment.read(),
       telemetry,
     });

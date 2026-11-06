@@ -6,6 +6,7 @@ import {
   type FeatureDescriptor,
   findFeatureByKey,
   featuresByRole,
+  UNSET_ROLE_FALLBACK,
 } from "../model-feature-registry.ts";
 
 describe("feature registry", () => {
@@ -30,17 +31,23 @@ describe("feature registry", () => {
     expect(f?.displayName).toBe("AI search");
   });
 
-  /** @scenario "User-simulator and judge are registered as DEFAULT-role features" */
-  it("registers the scenario simulator and judge as DEFAULT-role features", () => {
+  /** @scenario "User-simulator is a DEFAULT-role feature and judge a JUDGE-role feature" */
+  it("registers the scenario simulator under DEFAULT and the judge under JUDGE", () => {
     expect(findFeatureByKey("scenarios.user_simulator")[0]?.role).toBe("DEFAULT");
-    expect(findFeatureByKey("scenarios.judge")[0]?.role).toBe("DEFAULT");
+    expect(findFeatureByKey("scenarios.judge")[0]?.role).toBe("JUDGE");
   });
 
-  /** @scenario "New scenario model features surface under the Default role expansion" */
-  it("surfaces the scenario simulator and judge under the DEFAULT role expansion", () => {
+  /** @scenario "The user-simulator surfaces under the Default role expansion" */
+  it("surfaces the scenario simulator, not the judge, under the DEFAULT role expansion", () => {
     const defaultKeys = featuresByRole("DEFAULT").map((f) => f.key);
     expect(defaultKeys).toContain("scenarios.user_simulator");
-    expect(defaultKeys).toContain("scenarios.judge");
+    expect(defaultKeys).not.toContain("scenarios.judge");
+  });
+
+  /** @scenario "The scenario judge is the Judge role's feature" */
+  it("makes the scenario judge the JUDGE role's one feature, falling back to DEFAULT", () => {
+    expect(featuresByRole("JUDGE").map((f) => f.key)).toEqual(["scenarios.judge"]);
+    expect(UNSET_ROLE_FALLBACK.JUDGE).toBe("DEFAULT");
   });
 
   describe("given the run-time agent-under-test feature", () => {
