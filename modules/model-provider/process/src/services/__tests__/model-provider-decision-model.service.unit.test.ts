@@ -133,7 +133,7 @@ function rowOf({
 
 describe("ModelProviderDecisionModelService.resolve", () => {
   describe("when the column is unset", () => {
-    /** @scenario "An unset column runs on LangWatch Instant Preview" */
+    /** @scenario "An unset column runs on LangWatch Evals Preview" */
     it("answers langwatch", async () => {
       const { service } = harness({
         stored: new ModelNotConfiguredError({ ...UNSET_ERROR.feature, ...UNSET_ERROR.rest }),
@@ -282,7 +282,7 @@ describe("ModelProviderDecisionModelService.resolve", () => {
       });
     });
 
-    /** @scenario "A caller picking LangWatch Instant Preview runs on the hosted model" */
+    /** @scenario "A caller picking LangWatch Evals Preview runs on the hosted model" */
     it("answers langwatch for the hosted id, whatever the column holds", async () => {
       const { service, providerLookups } = harness({ stored: OPENAI_DECISIONS });
 
@@ -316,7 +316,7 @@ describe("ModelProviderDecisionModelService.resolve", () => {
 });
 
 describe("ModelProviderDecisionModelService.listPickable", () => {
-  /** @scenario "With the flag off only LangWatch Instant Preview is offered" */
+  /** @scenario "With the flag off only LangWatch Evals Preview is offered" */
   it("offers the hosted model alone when the flag is off", async () => {
     const { service } = harness({ stored: OPENAI_DECISIONS, isFlagOn: false });
 

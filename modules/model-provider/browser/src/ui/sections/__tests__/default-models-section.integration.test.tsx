@@ -222,7 +222,7 @@ describe("given the Default Models table", () => {
   });
 
   describe("given the Instant Evals column", () => {
-    /** @scenario "The Default models table shows an Instant Evals column defaulting to LangWatch Instant Preview" */
+    /** @scenario "The Default models table shows an Instant Evals column defaulting to LangWatch Evals Preview" */
     it("reads Evals Preview where nothing is set, never Not configured", () => {
       renderSection();
 

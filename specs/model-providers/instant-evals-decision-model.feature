@@ -3,7 +3,7 @@ Feature: Instant Evals decision model column in Default models
   I want to pick the decision model Instant Evals run on, per organization, team or project
   So that Instant Evals run on LangWatch's hosted model by default, or on our own provider key
 
-  # ADR-182. LangWatch Instant Preview is the hosted, metered default. An own decision model
+  # ADR-182. LangWatch Evals Preview is the hosted, metered default. An own decision model
   # runs on the organization's key, unmetered and uncapped, behind the
   # release_instant_evals_own_decision_model flag, on by default. A broken own key never falls back.
 
@@ -20,10 +20,10 @@ Feature: Instant Evals decision model column in Default models
   # --- Resolving the column ---
 
   @unit
-  Scenario: An unset column runs on LangWatch Instant Preview
+  Scenario: An unset column runs on LangWatch Evals Preview
     Given the Instant Evals column is not set at any scope
     When the project's decision model is resolved
-    Then it resolves to LangWatch Instant Preview
+    Then it resolves to LangWatch Evals Preview
 
   @unit
   Scenario: An own decision model with a key resolves with its endpoint and key
@@ -140,11 +140,11 @@ Feature: Instant Evals decision model column in Default models
     Then it resolves as unavailable because it is not enabled
 
   @unit
-  Scenario: A caller picking LangWatch Instant Preview runs on the hosted model
+  Scenario: A caller picking LangWatch Evals Preview runs on the hosted model
     Given the flag is on for the organization
     And the Instant Evals column is "Cloudflare Clef"
-    When the decision model is resolved for a caller picking "LangWatch Instant Preview"
-    Then it resolves to LangWatch Instant Preview
+    When the decision model is resolved for a caller picking "LangWatch Evals Preview"
+    Then it resolves to LangWatch Evals Preview
     And no provider row is read
 
   @unit
@@ -161,15 +161,15 @@ Feature: Instant Evals decision model column in Default models
     And the Instant Evals column is not set at any scope
     And the project has an enabled OpenAI row with a key
     When one caller resolves with a pick and another resolves with none
-    Then the second answers LangWatch Instant Preview, not the first caller's pick
+    Then the second answers LangWatch Evals Preview, not the first caller's pick
 
   # --- Offering the models ---
 
   @unit
-  Scenario: With the flag off only LangWatch Instant Preview is offered
+  Scenario: With the flag off only LangWatch Evals Preview is offered
     Given the flag is off for the organization
     When the project's pickable decision models are listed
-    Then only "LangWatch Instant Preview" is offered
+    Then only "LangWatch Evals Preview" is offered
 
   @unit
   Scenario: With the flag on the models that would run are offered
@@ -177,7 +177,7 @@ Feature: Instant Evals decision model column in Default models
     And the project has an enabled OpenAI row with a key
     And the project has no Inception row
     When the project's pickable decision models are listed
-    Then "LangWatch Instant Preview" is offered first
+    Then "LangWatch Evals Preview" is offered first
     And "OpenAI Decisions API" is offered
     And "Inception Mercury Decide" is not offered
 
@@ -202,7 +202,7 @@ Feature: Instant Evals decision model column in Default models
     Given the flag is on for the organization
     And only project "A" has an enabled OpenAI row with a key
     When the pickable decision models are listed for a config on the organization
-    Then only "LangWatch Instant Preview" is offered
+    Then only "LangWatch Evals Preview" is offered
 
   @unit
   Scenario: A config on several scopes is offered only what every scope runs
@@ -351,7 +351,7 @@ Feature: Instant Evals decision model column in Default models
   # --- Settings UI ---
 
   @integration
-  Scenario: The Default models table shows an Instant Evals column defaulting to LangWatch Instant Preview
+  Scenario: The Default models table shows an Instant Evals column defaulting to LangWatch Evals Preview
     When I open Settings > Model Providers > Default models
     Then I see an "Instant Evals" column
     And it reads "Evals Preview" with the LangWatch mark where nothing is set
@@ -412,7 +412,7 @@ Feature: Instant Evals decision model column in Default models
     And it cannot be picked
 
   @unit
-  Scenario: With the router flag on LangWatch Instant Preview says it routes
+  Scenario: With the router flag on LangWatch Evals Preview says it routes
     Given the judge router flag is on for my organization
     When the Instant Evals choices are built
     Then "Evals Preview" reads "Optimized for evals, routed"
@@ -423,7 +423,7 @@ Feature: Instant Evals decision model column in Default models
     Given I am on project "C"
     When I edit a config row scoped to the organization
     Then the Instant Evals choices are asked for the organization scope
-    And with no scope picked only "LangWatch Instant Preview" is offered
+    And with no scope picked only "LangWatch Evals Preview" is offered
 
   @integration
   Scenario: Each decision model provider draws its own brand mark
