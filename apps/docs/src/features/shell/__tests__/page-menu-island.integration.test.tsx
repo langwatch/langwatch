@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 // @vitest-environment jsdom
 import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { COMPONENT_RUNTIME, islandPackages } from "../../../testing/island-packages.ts";
 import { LANGWATCH_MCP_URL, PageMenu } from "../ui/page-menu.tsx";
@@ -44,7 +44,12 @@ vi.hoisted(() => {
         return Promise.resolve();
       },
     },
+    configurable: true,
   });
+});
+/* Files share one window, so the stub must not outlive this file. */
+afterAll(() => {
+  Reflect.deleteProperty(navigator, "clipboard");
 });
 
 document.body.innerHTML = renderToStaticMarkup(

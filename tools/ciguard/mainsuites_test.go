@@ -66,7 +66,7 @@ func TestMainRunsThePackageSuitesAsOneQueuedJob(t *testing.T) {
 			"needs.changes.outputs.suites-one-job == 'true' && '[1, 2, 3, 4, 5, 6, 7, 8]'",
 		},
 		"the 45-minute cap on main": {
-			"timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}",
+			"timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 180 || 45 }}",
 			"timeout-minutes: 45",
 		},
 		"a fixed shard total": {
@@ -96,7 +96,7 @@ func TestMainSuitesReportsRatherThanFailsOnOtherLegalShapes(t *testing.T) {
 			"matrix: ${{ fromJSON(needs.changes.outputs.suites-matrix) }}",
 		},
 		"a numeric timeout": {
-			"timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}",
+			"timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 180 || 45 }}",
 			"timeout-minutes: 45",
 		},
 	} {
