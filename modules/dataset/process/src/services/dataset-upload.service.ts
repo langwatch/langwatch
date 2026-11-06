@@ -8,6 +8,7 @@ import {
   DatasetImportSourceRefusedError,
   DatasetNameTakenError,
   DatasetNotFoundError,
+  DatasetRecordsTableWriteRefusedError,
   UploadNotPendingError,
   UploadValidationError,
   type AppendStoredObjectToDatasetInput,
@@ -33,7 +34,7 @@ import { nowInstant } from "@langwatch/time";
 import type { DatasetUpload } from "../app/dataset.app.ts";
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
-import type { DatasetRecordContentRepository } from "../repositories/dataset-record-content.repository.ts";
+import type { DatasetRecordRepository } from "../repositories/dataset-record.repository.ts";
 import type { DatasetRow } from "../repositories/dataset.repository.ts";
 import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
 import {
@@ -64,7 +65,8 @@ const DATASET_KSUID_RESOURCE = "dataset";
 
 type DatasetUploadServiceOptions = {
   datasets: DatasetContentRepository;
-  records: DatasetRecordContentRepository;
+  /** The records table a dataset not yet moved to object storage is appended to. */
+  records: DatasetRecordRepository;
   chunks: DatasetChunkRepository;
   storedObjects: StoredObjectApi;
   /** The limits the project's organization answers for this upload. */
@@ -82,7 +84,7 @@ export class DatasetUploadService implements DatasetUpload {
   }
   private readonly chunks: DatasetChunkService;
   private readonly datasets: DatasetContentRepository;
-  private readonly records: DatasetRecordContentRepository;
+  private readonly records: DatasetRecordRepository;
   private readonly storage: DatasetChunkRepository;
   private readonly storedObjects: StoredObjectApi;
   private readonly requestBounds: Pick<DatasetRequestBoundsService, "limits">;
@@ -162,22 +164,58 @@ export class DatasetUploadService implements DatasetUpload {
     if (isSingleFileDataset(dataset) && this.singleFile) {
       await this.singleFile.appendRecords({ dataset, records: stamped });
     } else if (dataset.contentLayout === "s3_jsonl") {
-      await this.chunks.append({
-        dataset,
-        projectId,
-        entries: stamped.map(({ entry }) => entry),
-        forcedIds: stamped.map(({ id }) => id),
-        storage: this.storage,
-      });
-    } else {
-      await this.records.createMany({
-        records: stamped.map(({ id, entry }) => ({ id, entry: stripNullBytes(entry) })),
-        datasetId: dataset.id,
-        projectId,
+      await this.appendToChunks({ dataset, stamped });
+    } else if ((await this.appendToRecordsTable({ dataset, stamped })) === "moved") {
+      await this.appendToChunks({
+        dataset: await this.findDataset(dataset.id, projectId),
+        stamped,
       });
     }
 
     return { datasetId: dataset.id, recordsCreated: stamped.length };
+  }
+
+  private async appendToChunks({
+    dataset,
+    stamped,
+  }: {
+    dataset: DatasetRow;
+    stamped: { id: string; entry: Record<string, unknown> }[];
+  }): Promise<void> {
+    await this.chunks.append({
+      dataset,
+      projectId: dataset.projectId,
+      entries: stamped.map(({ entry }) => entry),
+      forcedIds: stamped.map(({ id }) => id),
+      storage: this.storage,
+    });
+  }
+
+  /**
+   * Under the dataset lock the content move commits its flip under, so the move either sees
+   * these rows or flips first: then the table refuses them and they go to the chunks instead.
+   */
+  private async appendToRecordsTable({
+    dataset,
+    stamped,
+  }: {
+    dataset: DatasetRow;
+    stamped: { id: string; entry: Record<string, unknown> }[];
+  }): Promise<"appended" | "moved"> {
+    const key = { datasetId: dataset.id, projectId: dataset.projectId };
+    const entries = stamped.map(({ id, entry }) => ({
+      ...(stripNullBytes(entry) as Record<string, unknown>),
+      id,
+    }));
+    try {
+      await this.records.withDatasetLock(key, (locked) => locked.createMany({ ...key, entries }));
+      return "appended";
+    } catch (error) {
+      if (!(error instanceof DatasetRecordsTableWriteRefusedError)) throw error;
+      const moved = await this.findDataset(dataset.id, dataset.projectId);
+      if (moved.contentLayout !== "s3_jsonl") throw error;
+      return "moved";
+    }
   }
 
   /**

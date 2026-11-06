@@ -11,6 +11,7 @@ import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generat
 import { prismaTables } from "@langwatch/prisma-client/ownership";
 
 import { lockedView } from "../../rules/dataset-record-lock.rules.ts";
+import { assertRecordsTableHolds } from "../../rules/dataset-records-table.rules.ts";
 import type {
   DatasetRecordRepository,
   LockedDatasetRecords,
@@ -152,6 +153,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
   }): Promise<DatasetRecord[]> {
+    await refuseObjectStorageDataset(this.database, input);
     await this.database.datasetRecord.createMany({
       data: input.entries.map(({ id, ...entry }) => ({
         id,
@@ -177,6 +179,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
     projectId: string;
     entry: Record<string, unknown>;
   }): Promise<DatasetRecord> {
+    await refuseObjectStorageDataset(this.database, input);
     const changed = await this.database.datasetRecord.updateMany({
       where: {
         id: input.id,
@@ -255,6 +258,21 @@ function lockedRecords({
   });
 }
 
+/**
+ * The records-table guard, read with the caller's client: under the dataset's lock it sees the
+ * layout the content move commits under the same lock, so no flip lands between check and write.
+ */
+async function refuseObjectStorageDataset(
+  client: DatasetRecordClient,
+  input: { datasetId: string; projectId: string },
+): Promise<void> {
+  const dataset = await client.dataset.findFirst({
+    where: { id: input.datasetId, projectId: input.projectId },
+    select: { id: true, contentLayout: true, useS3: true },
+  });
+  assertRecordsTableHolds(dataset);
+}
+
 /** Deletes the dataset's entries and writes these in their place, in the client's transaction. */
 async function replaceEntries({
   client,
@@ -267,6 +285,7 @@ async function replaceEntries({
   projectId: string;
   entries: (DatasetRecordInput & { id: string })[];
 }): Promise<void> {
+  await refuseObjectStorageDataset(client, { datasetId, projectId });
   const writtenAt = Date.now();
   await client.datasetRecord.deleteMany({ where: { datasetId, projectId } });
   for (let start = 0; start < entries.length; start += REPLACE_BATCH_SIZE) {

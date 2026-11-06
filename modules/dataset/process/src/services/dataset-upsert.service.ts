@@ -243,6 +243,7 @@ export class DatasetUpsertService {
       name,
       slug,
       columnTypes: parsed.columnTypes,
+      contentLayout: "postgres",
     });
     if (parsed.datasetRecords && parsed.datasetRecords.length > 0) {
       await options.records.createMany({

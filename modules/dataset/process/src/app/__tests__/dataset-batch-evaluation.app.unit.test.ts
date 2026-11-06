@@ -20,6 +20,7 @@ async function harness() {
     name: "Golden set",
     slug: "golden-set",
     columnTypes,
+    contentLayout: "postgres",
   });
 
   return { app, repositories, dataset };

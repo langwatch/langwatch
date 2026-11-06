@@ -17,7 +17,6 @@ const STORED_DEFAULTS = {
   mapping: null,
   useS3: false,
   s3RecordCount: null,
-  contentLayout: "postgres",
   status: "ready",
   statusError: null,
   stagingKey: null,
@@ -104,6 +103,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
       name: input.name,
       slug: input.slug,
       columnTypes: input.columnTypes,
+      contentLayout: input.contentLayout,
       createdAt: written.createdAt ?? now,
       updatedAt: written.updatedAt ?? now,
     };
