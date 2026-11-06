@@ -37,6 +37,7 @@ import {
   extractCallbackSource,
   extractEchoedRoundTrip,
   extractRoundTripValue,
+  MAX_CALLBACK_FORM_BYTES,
   extractSignInHintCookie,
   extractSignInStartHint,
   extractHintedAddress,
@@ -268,7 +269,11 @@ export class AuthDoorService {
   }): Promise<string | undefined> {
     if (request.method !== "POST" || !isSignInCallbackPath({ pathname })) return undefined;
     try {
-      return await request.clone().text();
+      const read = await readBoundedText({
+        request: request.clone(),
+        maxBytes: MAX_CALLBACK_FORM_BYTES,
+      });
+      return read.kind === "read" ? read.text : undefined;
     } catch {
       return undefined;
     }
@@ -354,12 +359,19 @@ export class AuthDoorService {
       errorPageUrl,
       traceId,
       providerRefused,
+      isCallback: isSignInCallbackPath({ pathname: new URL(request.url).pathname }),
     });
     if (redirect.kind === "pass") return response;
     let location = redirect.location;
     if (redirect.kind === "provider_refused") {
-      location = await this.classifyRefusal({ request, location, traceId, echoedRoundTrip });
-    } else {
+      location = await this.classifyRefusal({
+        request,
+        location,
+        traceId,
+        echoedRoundTrip,
+        answeredCode: redirect.answeredCode,
+      });
+    } else if (redirect.kind === "withhold") {
       logger.error(
         { code: redirect.code, description: redirect.description, traceId: traceId ?? null },
         "a sign-in failed for a reason we have not written down; the person was sent a generic refusal",
@@ -380,11 +392,14 @@ export class AuthDoorService {
     location,
     traceId,
     echoedRoundTrip,
+    answeredCode,
   }: {
     request: Request;
     location: string;
     traceId: string | undefined;
     echoedRoundTrip: string | undefined;
+    /** What Better Auth answered, e.g. `saml_no_assertion` for a posted SAML refusal. */
+    answeredCode: string;
   }): Promise<string> {
     const reference = traceId ?? this.deps.newReferenceId();
     const source = extractCallbackSource({ pathname: new URL(request.url).pathname });
@@ -399,7 +414,17 @@ export class AuthDoorService {
         : undefined;
       const email = extractHintedAddress({ hint, providerId: hintProviderId, echoedRoundTrip });
       try {
-        verdict = await this.deps.refusedSignIns.classifyRefusedSignIn({ refusedBy, email });
+        const answer = await withinClassificationTime(
+          this.deps.refusedSignIns.classifyRefusedSignIn({ refusedBy, email }),
+        );
+        if (answer === "timed_out") {
+          logger.warn(
+            { reference, providerId: hintProviderId },
+            "classifying a refused sign-in took too long; the person was sent the plain refusal",
+          );
+        } else {
+          verdict = answer;
+        }
       } catch (error) {
         logger.error(
           { error, reference, providerId: hintProviderId },
@@ -413,6 +438,7 @@ export class AuthDoorService {
       {
         reference,
         providerId: source?.hintProviderId ?? null,
+        answeredCode,
         organizationId: verdict?.organizationId ?? null,
         idp: verdict?.idp ?? null,
         outcome: verdict?.outcome ?? "refused",
@@ -421,6 +447,53 @@ export class AuthDoorService {
     );
     return refusedSignInLocationOf({ location, verdict, reference });
   }
+}
+
+/** How long a refused sign-in's redirect waits on classifying it; the recording carries on. */
+const CLASSIFICATION_WAIT_MS = 3_000;
+
+async function withinClassificationTime<Value>(
+  pending: Promise<Value>,
+): Promise<Value | "timed_out"> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<"timed_out">((resolve) => {
+    timer = setTimeout(() => resolve("timed_out"), CLASSIFICATION_WAIT_MS);
+  });
+  pending.catch(() => void 0);
+  try {
+    return await Promise.race([pending, timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+type BoundedRead = { kind: "read"; text: string } | { kind: "too_large" };
+
+/** A request body's text, unless it passes `maxBytes`: the rest is then never buffered. */
+async function readBoundedText({
+  request,
+  maxBytes,
+}: {
+  request: Request;
+  maxBytes: number;
+}): Promise<BoundedRead> {
+  if (Number(request.headers.get("content-length") ?? 0) > maxBytes) return { kind: "too_large" };
+  if (!request.body) return { kind: "read", text: "" };
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      // A cloned body's cancel settles only once the other branch ends, so it is not awaited.
+      void reader.cancel().catch(() => void 0);
+      return { kind: "too_large" };
+    }
+    chunks.push(value);
+  }
+  return { kind: "read", text: Buffer.concat(chunks).toString("utf8") };
 }
 
 /** The round-trip value a sign-in start's answer carries in its provider URL, body or redirect. */

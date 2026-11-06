@@ -114,7 +114,7 @@ export function extractRoundTripValue({
 }
 
 /** A posted callback form past this size is not read. */
-const MAX_CALLBACK_FORM_BYTES = 512 * 1024;
+export const MAX_CALLBACK_FORM_BYTES = 512 * 1024;
 
 /** The round-trip value a callback echoes: `state` on its query, or `RelayState`/`state` posted. */
 export function extractEchoedRoundTrip({

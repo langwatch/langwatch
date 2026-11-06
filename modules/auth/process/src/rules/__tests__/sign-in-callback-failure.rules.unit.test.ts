@@ -143,4 +143,57 @@ describe("signInErrorRedirectOf", () => {
       );
     });
   });
+
+  describe("given a callback whose failure Better Auth sent somewhere other than the error page", () => {
+    const fromCallback = (location: string, providerRefused = false) =>
+      signInErrorRedirectOf({
+        status: 302,
+        location,
+        errorPageUrl,
+        traceId: "trace_1",
+        isCallback: true,
+        providerRefused,
+      });
+
+    /** @scenario "A callback failure always lands on the sign-in error screen" */
+    it("moves an unwritten code onto the error page as the generic failure", () => {
+      const redirect = fromCallback(
+        "https://app.test/?error=saml_no_assertion&error_description=SAML+response+contains+no+assertions",
+      );
+
+      expect(redirect.kind).toBe("withhold");
+      const location = new URL((redirect as { location: string }).location);
+      expect(location.pathname).toBe("/auth/error");
+      expect(location.searchParams.get("error")).toBe("sign_in_failed");
+      expect(location.searchParams.get("error_description")).toBeNull();
+    });
+
+    /** @scenario "A callback failure always lands on the sign-in error screen" */
+    it("moves an admitted code onto the error page as itself", () => {
+      const redirect = fromCallback("https://app.test/?error=state_mismatch");
+
+      expect(redirect).toEqual({
+        kind: "misdirected",
+        location: expect.stringContaining("https://app.test/auth/error?"),
+      });
+      expect(new URL((redirect as { location: string }).location).searchParams.get("error")).toBe(
+        "state_mismatch",
+      );
+    });
+
+    /** @scenario "A callback failure always lands on the sign-in error screen" */
+    it("treats a posted refusal as the provider's refusal", () => {
+      expect(fromCallback("https://app.test/?error=saml_no_assertion", true).kind).toBe(
+        "provider_refused",
+      );
+    });
+
+    it("leaves another site, another page and a redirect without an error alone", () => {
+      expect(fromCallback("https://elsewhere.test/?error=x")).toEqual({ kind: "pass" });
+      expect(fromCallback("https://app.test/settings/sso?error=invalid_provider")).toEqual({
+        kind: "pass",
+      });
+      expect(fromCallback("https://app.test/")).toEqual({ kind: "pass" });
+    });
+  });
 });

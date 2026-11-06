@@ -86,6 +86,26 @@ Feature: A sign-in the company's identity provider refused says who refused it
     And a Response whose status is Success keeps the generic failure
 
   @unit
+  Scenario: A callback failure always lands on the sign-in error screen
+    Given Better Auth answers a callback with an error redirect to this deployment's root
+    And it went there because the RelayState could not be read
+    Then the door moves it onto the error screen
+    And an admitted code keeps its own wording, a posted refusal is the provider's refusal
+    And anything else is the generic failure
+
+  @unit
+  Scenario: An oversized posted callback is not read for its status
+    When a form posted to a sign-in callback is larger than 512 KiB
+    Then the door stops reading its copy at that size and reads no status from it
+    And Better Auth still receives the whole body
+
+  @unit
+  Scenario: A refused sign-in's redirect never waits long on classifying it
+    Given classifying a refusal has not answered within 3 seconds
+    Then the person is sent the plain refusal with its reference
+    And the classification carries on, so the request and its mail still land
+
+  @unit
   Scenario: A SAML Response's status is read from its top-level StatusCode only
     When the posted SAMLResponse names a top-level status other than Success
     Then it reads as refused

@@ -36,7 +36,9 @@ const PROVIDER_REFUSAL_CODE = "access_denied";
 /** What the boundary does with one redirect Better Auth answered. */
 type SignInErrorRedirect =
   | { kind: "pass" }
-  | { kind: "provider_refused"; code: string; location: string }
+  /** An admitted code a callback sent somewhere other than the error screen, moved onto it. */
+  | { kind: "misdirected"; location: string }
+  | { kind: "provider_refused"; code: string; answeredCode: string; location: string }
   | { kind: "withhold"; code: string; description: string; location: string };
 
 /**
@@ -49,6 +51,7 @@ export function signInErrorRedirectOf({
   errorPageUrl,
   traceId,
   providerRefused = false,
+  isCallback = false,
 }: {
   status: number;
   location: string | null;
@@ -56,9 +59,11 @@ export function signInErrorRedirectOf({
   traceId: string | undefined;
   /** The provider said no in a shape Better Auth names otherwise: a SAML Response's status. */
   providerRefused?: boolean;
+  /** A callback's failure lands on the error screen wherever Better Auth pointed it. */
+  isCallback?: boolean;
 }): SignInErrorRedirect {
   if (status < 300 || status >= 400 || !location) return { kind: "pass" };
-  const [target] = errorPageTargetOf({ location, errorPageUrl });
+  const [target, onErrorPage] = errorPageTargetOf({ location, errorPageUrl, isCallback });
   if (!target) return { kind: "pass" };
   const code = target.searchParams.get("error");
   if (!code) return { kind: "pass" };
@@ -72,9 +77,15 @@ export function signInErrorRedirectOf({
       code: PROVIDER_REFUSAL_CODE,
       traceId,
     });
-    return { kind: "provider_refused", code: PROVIDER_REFUSAL_CODE, location };
+    return { kind: "provider_refused", code: PROVIDER_REFUSAL_CODE, answeredCode: code, location };
   }
-  if (signInErrorMayCross(code)) return { kind: "pass" };
+  if (signInErrorMayCross(code)) {
+    if (onErrorPage) return { kind: "pass" };
+    return {
+      kind: "misdirected",
+      location: rebuiltLocation({ target, errorPageUrl, code, traceId }),
+    };
+  }
 
   return {
     kind: "withhold",
@@ -107,19 +118,28 @@ function rebuiltLocation({
 }
 
 /** The redirect target when it is the sign-in error page itself; a relative Location resolves. */
+/**
+ * The redirect's target and whether it is the error screen. On a callback, an `error` sent to the
+ * app's root counts too: Better Auth falls back there when it cannot read the RelayState. Other
+ * pages are left alone, since the SSO test returns its errors to its own settings page.
+ */
 function errorPageTargetOf({
   location,
   errorPageUrl,
+  isCallback,
 }: {
   location: string;
   errorPageUrl: string;
-}): URL[] {
+  isCallback: boolean;
+}): [] | [URL, boolean] {
   try {
     const errorPage = new URL(errorPageUrl);
     const target = new URL(location, errorPage);
-    const isErrorPage =
-      target.origin === errorPage.origin && target.pathname === errorPage.pathname;
-    return isErrorPage ? [target] : [];
+    const sameOrigin = target.origin === errorPage.origin;
+    const isErrorPage = sameOrigin && target.pathname === errorPage.pathname;
+    if (isErrorPage) return [target, true];
+    const isRoot = sameOrigin && target.pathname === "/";
+    return isCallback && isRoot && target.searchParams.has("error") ? [target, false] : [];
   } catch {
     // A Location we cannot parse is one we cannot rewrite; it passes as it came.
     return [];

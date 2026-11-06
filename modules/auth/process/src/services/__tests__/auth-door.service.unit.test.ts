@@ -832,6 +832,71 @@ describe("given an identity provider that refused a sign-in started on our page"
     });
   });
 
+  describe("when a posted callback is larger than any provider response", () => {
+    /** @scenario "An oversized posted callback is not read for its status" */
+    it("reads no status from it and still hands Better Auth the whole body", async () => {
+      const { refusedSignIns, calls } = classifier({
+        organizationId: "org_1",
+        idp: "saml",
+        outcome: "seat_limit",
+      });
+      const received: number[] = [];
+      const world = door({
+        refusedSignIns,
+        betterAuth: async () => ({
+          handler: async (forwarded: Request) => {
+            received.push((await forwarded.text()).length);
+            return new Response(null, {
+              status: 302,
+              headers: { location: SAML_NO_ASSERTION_LOCATION },
+            });
+          },
+        }),
+      });
+      const posted = samlPost({
+        status: "urn:oasis:names:tc:SAML:2.0:status:Responder",
+        hint: sealedHint(),
+      });
+      const padded = `${await posted.text()}&pad=${"a".repeat(600 * 1024)}`;
+
+      const answered = await world.service.betterAuthHandshake(
+        new Request(posted.url, { method: "POST", headers: posted.headers, body: padded }),
+      );
+
+      expect(locationOf(answered).searchParams.get("error")).toBe("sign_in_failed");
+      expect(calls).toEqual([]);
+      expect(received).toEqual([padded.length]);
+    });
+  });
+
+  describe("when classifying the refusal does not answer in time", () => {
+    /** @scenario "A refused sign-in's redirect never waits long on classifying it" */
+    it("sends the plain refusal with its reference while the classification carries on", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const calls: unknown[] = [];
+        const refusedSignIns = createApiFixture<IdentityApi>({
+          classifyRefusedSignIn: (input) => {
+            calls.push(input);
+            return new Promise(() => void 0);
+          },
+        });
+
+        const pending = refusing({ refusedSignIns }).service.betterAuthHandshake(
+          refusedCallback({ hint: sealedHint() }),
+        );
+        await vi.advanceTimersByTimeAsync(3_000);
+        const answered = await pending;
+
+        expect(calls).toHaveLength(1);
+        expect(locationOf(answered).searchParams.get("error")).toBe("access_denied");
+        expect(locationOf(answered).searchParams.get("trace")).toBeTruthy();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("when the callback carries no hint", () => {
     /** @scenario "Without a known address nobody is told and no seat is requested" */
     it("asks identity with no address", async () => {
@@ -910,6 +975,7 @@ describe("given an identity provider that refused a sign-in started on our page"
       expect(fields).toEqual({
         reference: "trace_active",
         providerId: CONNECTION,
+        answeredCode: "access_denied",
         organizationId: "org_1",
         idp: "okta",
         outcome: "refused",
