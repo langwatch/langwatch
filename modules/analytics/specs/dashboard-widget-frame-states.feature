@@ -52,6 +52,26 @@ Feature: A dashboard widget frame shows what its queries report
       When a later run of it fails
       Then the card still shows the widget's own face
 
+    @integration
+    Scenario: A failed refresh of the same period keeps the chart on the card
+      Given a widget whose query answered for the last 7 days
+      When the board refreshes on its schedule, the window ends later, and the run fails
+      Then the card still shows the widget's own face
+      # A window of the same length and step is the same period: only its end moved
+
+    @integration
+    Scenario: A query that fails after the period changes shows the failed state
+      Given a widget whose query answered for the last 7 days
+      When the reader chooses the last 30 days and the query fails
+      Then the card says it couldn't load the widget
+      And the rows of the last 7 days are not shown under the 30 days label
+
+    @integration
+    Scenario: A failed card goes back to loading while a new period runs
+      Given a widget that failed to load
+      When the reader chooses another period
+      Then the card shows its loading skeleton in place of the failed state
+
   Rule: A widget says it is loading until its data arrives
 
     A board opens with every widget's queries in flight. A card that stays blank reads as

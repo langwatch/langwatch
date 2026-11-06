@@ -196,6 +196,7 @@ const boardWidget = ({
   project?: AnalyticsHostProject;
   host?: StubAnalyticsHost;
   graph?: unknown;
+  timeWindow?: { start: number; end: number };
   onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
   onEmptyChange?: (empty: boolean) => void;
 }) => (
@@ -307,6 +308,52 @@ describe("given a widget on a board", () => {
       const run = frameRuns(() => answers.shift() ?? Promise.reject(BROKEN));
       render(boardWidget({}));
       await run();
+      await run();
+
+      expect(screen.queryByTestId("widget-state-face")).toBeNull();
+    });
+  });
+
+  describe("when the period changes and the query then fails", () => {
+    const LAST_7_DAYS = { start: 1_000, end: 2_000 };
+    const LAST_30_DAYS = { start: 1_000, end: 4_000 };
+
+    /** @scenario "A query that fails after the period changes shows the failed state" */
+    it("shows the failed state, never the earlier period's rows", async () => {
+      const answers = [Promise.resolve(resultWith(report({}))), Promise.reject(BROKEN)];
+      answers[1]?.catch(() => undefined);
+      const run = frameRuns(() => answers.shift() ?? Promise.reject(BROKEN));
+      const { rerender } = render(boardWidget({ timeWindow: LAST_7_DAYS }));
+      await run();
+
+      rerender(boardWidget({ timeWindow: LAST_30_DAYS }));
+      await run();
+
+      expect(screen.getByText("Couldn't load Cost per trace")).toBeTruthy();
+    });
+
+    /** @scenario "A failed card goes back to loading while a new period runs" */
+    it("takes a failed card back to loading while the new period runs", async () => {
+      const run = frameRuns(() => Promise.reject(BROKEN));
+      const { rerender } = render(boardWidget({ timeWindow: LAST_7_DAYS }));
+      await run();
+      expect(screen.getByText("Couldn't load Cost per trace")).toBeTruthy();
+
+      rerender(boardWidget({ timeWindow: LAST_30_DAYS }));
+
+      expect(screen.queryByTestId("widget-state-face")).toBeNull();
+      expect(loadingFace()).not.toBeNull();
+    });
+
+    /** @scenario "A failed refresh of the same period keeps the chart on the card" */
+    it("keeps the chart when a scheduled refresh of the same period fails", async () => {
+      const answers = [Promise.resolve(resultWith(report({}))), Promise.reject(BROKEN)];
+      answers[1]?.catch(() => undefined);
+      const run = frameRuns(() => answers.shift() ?? Promise.reject(BROKEN));
+      const { rerender } = render(boardWidget({ timeWindow: LAST_7_DAYS }));
+      await run();
+
+      rerender(boardWidget({ timeWindow: { start: 61_000, end: 62_000 } }));
       await run();
 
       expect(screen.queryByTestId("widget-state-face")).toBeNull();
