@@ -196,7 +196,6 @@ function InheritItem({
  */
 function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
   const isDescribed = !!item.subtitle;
-  // The tag sits on the second line when there is one, so the title is never the part cut short.
   const hint = item.hint ? (
     <Text
       fontSize="2xs"
@@ -236,7 +235,7 @@ function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
             >
               {item.label}
             </Text>
-            {!isDescribed && hint}
+            {hint}
           </HStack>
           {isDescribed && (
             <HStack gap={2} minWidth={0}>
@@ -249,7 +248,6 @@ function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
               >
                 {item.subtitle}
               </Text>
-              {hint}
             </HStack>
           )}
         </Box>
@@ -390,6 +388,8 @@ export function ProviderModelSelector({
           }
         }}
         loopFocus={true}
+        // A narrow trigger still opens a list wide enough for a title, its tag and a full line.
+        positioning={{ sameWidth: false }}
         highlightedValue={highlightedValue}
         onHighlightChange={(details) => {
           setHighlightedValue(details.highlightedValue);
@@ -405,7 +405,11 @@ export function ProviderModelSelector({
         >
           <Select.ValueText placeholder={selectValueText}>{() => selectValueText}</Select.ValueText>
         </Select.Trigger>
-        <Select.Content padding={1}>
+        <Select.Content
+          padding={1}
+          minWidth="max(var(--reference-width), 20rem)"
+          maxWidth="min(28rem, calc(100vw - 2rem))"
+        >
           <Field.Root asChild>
             <Box
               position="sticky"
