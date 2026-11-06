@@ -68,7 +68,10 @@ export type DecisionModelEntry = Readonly<{
   provider: string;
   /** The full name: provider and model, so one model on two providers reads apart in text. */
   label: string;
-  /** A picker row's title when it differs from `label`; the row's provider icon names the provider. */
+  /**
+   * A picker row's title when it differs from `label`; the row's provider icon names the
+   * provider.
+   */
   pickerLabel?: string;
   description: string;
   /** Absent for the hosted classifier, which the judge reaches through its own client. */
