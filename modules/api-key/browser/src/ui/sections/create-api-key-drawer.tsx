@@ -165,7 +165,11 @@ function focusKeyField({
   fallback: RefObject<HTMLElement | null>;
 }) {
   const target = targets[field].current ?? fallback.current;
-  if (field === "name") target?.focus();
+  if (field === "name") return target?.focus();
+  // A missing expiry means Custom with no date: the date input, not the select trigger.
+  const dateInput =
+    field === "expiration" ? target?.querySelector<HTMLElement>("input[type='date']") : null;
+  if (dateInput) dateInput.focus();
   else focusWithin(target);
 }
 
@@ -759,6 +763,7 @@ export function CreateApiKeyDrawer({
             {expirationPreset === "custom" && (
               <Input
                 type="date"
+                aria-label="Expiry date"
                 value={customDate}
                 min={minCustomDate}
                 onChange={(e) => setCustomDate(e.target.value)}

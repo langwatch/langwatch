@@ -275,6 +275,16 @@ describe("given a new key", () => {
       expect(screen.getByTestId("api-key-expiration-hint")).toHaveTextContent("Pick a date");
       expect(onCreate).not.toHaveBeenCalled();
     });
+
+    /** @scenario "A custom expiry asks for its date before the key is minted" */
+    it("focuses the date input, not the expiry choice", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+      fireEvent.change(nameInput(), { target: { value: "CI" } });
+      await chooseExpiration({ user, label: "Custom..." });
+      await user.click(createButton());
+      await waitFor(() => expect(screen.getByLabelText("Expiry date")).toHaveFocus());
+    });
   });
 
   describe("when another expiry is chosen and then No expiration again", () => {

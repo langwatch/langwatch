@@ -430,15 +430,15 @@ An [ingestion template](/ai-governance/ingestion-templates) mints an ingestion k
   </Step>
 
   <Step title="Fill in the drawer">
-    - **Key type**: shown to organization admins only. Other members always create a personal key
+    - **Key type**: shown to organization admins only, with a picker for the member who owns a personal key. Other members always create a personal key for themselves
     - **Name**: for example `Local dev` or `MCP key`
     - **Scope**: the projects, teams or the organization the key can access. The current project is picked for you
     - **Expiration**: **No expiration** by default, or 7, 30, 60 or 90 days, or **Custom**
 
-    That is all a first key needs: it gets all your permissions on that scope. Open **Advanced** to change the rest:
+    That is all a first key needs: it gets all of its owner's permissions on that scope. The owner is you, or the member an admin picked, and the key never holds more than they do. Open **Advanced** to change the rest:
 
     - **Description**: optional
-    - **Permissions**: **All** gives the key your own permissions on each scope. **Restricted** lets you pick read or write per [permission category](#permission-categories)
+    - **Permissions**: **All** gives the key its owner's permissions on each scope. **Restricted** lets you pick read or write per [permission category](#permission-categories)
   </Step>
 
   <Step title="Copy the key">

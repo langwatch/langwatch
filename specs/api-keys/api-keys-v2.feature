@@ -332,6 +332,7 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Given "ada" has named a new key and chosen a custom expiry with no date
       When she submits the create drawer
       Then the expiry field asks her for a date
+      And focus lands on the date input, not on the expiry choice
       And no key is minted
 
     @integration
