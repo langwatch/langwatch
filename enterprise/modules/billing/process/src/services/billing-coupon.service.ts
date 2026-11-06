@@ -17,6 +17,7 @@ import {
   type PromotionCodeTarget,
 } from "@langwatch/enterprise-billing-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
+import Stripe from "stripe";
 
 import type {
   StripeCoupon,
@@ -27,23 +28,28 @@ import {
   judgePromotionCode,
   nameCouponProducts,
 } from "../rules/coupon-checkout-compatibility.rules.ts";
+import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
 
 export class BillingCouponService {
   readonly #coupons: StripeCouponsChannel;
   readonly #products: GrowthCheckoutProducts;
+  readonly #stripeErrors: StripeErrorTranslator;
   readonly #now: () => Instant;
 
   private constructor({
     coupons,
     products,
+    stripeErrors,
     now,
   }: {
     coupons: StripeCouponsChannel;
     products: GrowthCheckoutProducts;
+    stripeErrors: StripeErrorTranslator;
     now: () => Instant;
   }) {
     this.#coupons = coupons;
     this.#products = products;
+    this.#stripeErrors = stripeErrors;
     this.#now = now;
   }
 
@@ -51,21 +57,22 @@ export class BillingCouponService {
     coupons: StripeCouponsChannel;
     /** The Growth Seats and Events products of the deployment's Stripe mode. */
     products: GrowthCheckoutProducts;
+    stripeErrors: StripeErrorTranslator;
     now?: () => Instant;
   }): BillingCouponService {
     return new BillingCouponService({
       coupons: input.coupons,
       products: input.products,
+      stripeErrors: input.stripeErrors,
       now: input.now ?? nowInstant,
     });
   }
 
   /** Every coupon, newest first, each with its codes newest first. */
   async list(): Promise<CouponList> {
-    const [coupons, codes] = await Promise.all([
-      this.#coupons.listCoupons(),
-      this.#coupons.listPromotionCodes(),
-    ]);
+    const [coupons, codes] = await this.#calling(() =>
+      Promise.all([this.#coupons.listCoupons(), this.#coupons.listPromotionCodes()]),
+    );
     const now = this.#nowSeconds();
     const views = coupons
       .toSorted((a, b) => b.created - a.created)
@@ -90,7 +97,7 @@ export class BillingCouponService {
       for (const { field, message } of problems) (fieldErrors[field] ??= []).push(message);
       throw new BillingCouponInvalidError(fieldErrors);
     }
-    const existing = await this.#coupons.listPromotionCodes();
+    const existing = await this.#calling(() => this.#coupons.listPromotionCodes());
     const wanted = request.code.toLowerCase();
     if (existing.some((code) => code.active && code.code.toLowerCase() === wanted)) {
       throw new BillingCouponCodeTakenError(request.code);
@@ -99,13 +106,15 @@ export class BillingCouponService {
     const products = request.includeEvents
       ? [this.#products.seats, this.#products.events]
       : [this.#products.seats];
-    const coupon = await this.#coupons.createCoupon({
-      name: request.name || undefined,
-      percentOff: request.percentOff,
-      duration: request.duration,
-      durationInMonths: request.duration === "repeating" ? request.durationInMonths : undefined,
-      products,
-    });
+    const coupon = await this.#calling(() =>
+      this.#coupons.createCoupon({
+        name: request.name || undefined,
+        percentOff: request.percentOff,
+        duration: request.duration,
+        durationInMonths: request.duration === "repeating" ? request.durationInMonths : undefined,
+        products,
+      }),
+    );
     let code: StripePromotionCode;
     try {
       code = await this.#coupons.createPromotionCode({
@@ -117,14 +126,16 @@ export class BillingCouponService {
           : undefined,
       });
     } catch (failure) {
-      await this.#coupons.deleteCoupon({ couponId: coupon.id });
-      throw failure;
+      // Best-effort cleanup: the operator needs why the code failed, not why the delete did.
+      await this.#coupons.deleteCoupon({ couponId: coupon.id }).catch(() => undefined);
+      if (isCodeTaken(failure)) throw new BillingCouponCodeTakenError(request.code);
+      throw this.#stripeErrors.translate(failure);
     }
     return this.#view({ coupon, codes: [code], now: this.#nowSeconds() });
   }
 
   async deactivateCode(input: PromotionCodeTarget): Promise<PromotionCodeTarget> {
-    await this.#coupons.deactivatePromotionCode(input);
+    await this.#calling(() => this.#coupons.deactivatePromotionCode(input));
     return { promotionCodeId: input.promotionCodeId };
   }
 
@@ -173,9 +184,26 @@ export class BillingCouponService {
     };
   }
 
+  /** Runs a Stripe call; a rate limit or an unreachable Stripe names the provider unavailable. */
+  async #calling<T>(call: () => Promise<T>): Promise<T> {
+    try {
+      return await call();
+    } catch (error) {
+      throw this.#stripeErrors.translate(error);
+    }
+  }
+
   #nowSeconds(): number {
     return Math.floor(this.#now().epochMilliseconds / 1000);
   }
+}
+
+/** Stripe refused the code because an active one already holds it, taken since the check. */
+function isCodeTaken(error: unknown): boolean {
+  return (
+    error instanceof Stripe.errors.StripeInvalidRequestError &&
+    error.code === "promotion_code_already_exists"
+  );
 }
 
 /** Stripe's epoch seconds as an ISO instant. */

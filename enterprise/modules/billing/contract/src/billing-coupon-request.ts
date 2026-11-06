@@ -10,7 +10,7 @@ import { Temporal, type Instant } from "@langwatch/time";
 import type { CouponInputProblem, CreateCouponRequest } from "./billing-coupons.schemas.ts";
 
 /** Stripe's own ceiling on a repeating coupon is generous; three years keeps typos out. */
-const MAX_DURATION_MONTHS = 36;
+export const MAX_DURATION_MONTHS = 36;
 const CODE_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** Every field the request gets wrong, judged at `now`; empty when it may be created. */
@@ -26,8 +26,13 @@ export function findCouponRequestProblems({
   if (!Number.isFinite(percentOff) || percentOff < 1 || percentOff > 100) {
     problems.push({ field: "percentOff", message: "The discount must be between 1% and 100%" });
   }
-  if (duration === "repeating" && !isMonthCount(durationInMonths)) {
+  if (duration === "repeating" && durationInMonths === undefined) {
     problems.push({ field: "durationInMonths", message: "Say how many months the discount lasts" });
+  } else if (duration === "repeating" && !isMonthCount(durationInMonths)) {
+    problems.push({
+      field: "durationInMonths",
+      message: `Use a whole number of months from 1 to ${MAX_DURATION_MONTHS}`,
+    });
   }
   if (!CODE_PATTERN.test(code)) {
     problems.push({

@@ -14,7 +14,10 @@ vi.mock("../../../../features/admin/ui/sections/licenses-view.tsx", () => ({
 }));
 
 // Billing lends the coupons page body; the screen only decides whether it is shown.
-vi.mock("@langwatch/browser-host/lent", () => ({ Lent: () => <p>coupons page</p> }));
+vi.mock("@langwatch/browser-host/lent", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  Lent: () => <p>coupons page</p>,
+}));
 
 describe("given the Cloud admin licenses page", () => {
   it("renders the page with cloud ops", () => {
