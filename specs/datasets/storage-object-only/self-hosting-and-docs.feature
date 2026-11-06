@@ -8,8 +8,6 @@
 # LANGWATCH_LOCAL_STORAGE_PATH, default /var/lib/langwatch/objects
 # (packages/process-stores/src/open-stores.ts:61-90). Once Postgres stops holding a copy, that
 # folder is the only copy:
-#   - docker compose mounts no volume there for app or workers (infra/compose.yml:4-69, :147-150),
-#     so each container has its own folder, lost when the container is recreated;
 #   - the chart falls back to the container layer when neither dataplane nor the local volume is
 #     enabled (charts/langwatch/templates/_helpers.tpl:210-218);
 #   - the chart still names a dataset migration Job that no template creates
@@ -30,12 +28,15 @@ Feature: Self-hosted installs keep dataset files safe once Postgres holds no cop
 
   Rule: Every install keeps dataset files on storage that survives a restart
 
-    # becomes @integration
-    @unimplemented
+    # Bound at the compose file and the image, not a running stack: the default local storage
+    # root the stores resolve is the path both services mount.
+    @unit
     Scenario: Docker compose keeps dataset files on one volume shared by the app and the workers
       Given the docker compose install with no object storage configured
-      When a dataset is created through the app and the app and workers containers are recreated
-      Then the workers and the app both read the dataset's rows from the same volume
+      When its app and workers services are read
+      Then both mount the same named volume at the default local storage root
+      And the volume is declared by the compose file, so recreating the containers keeps it
+      And the image creates that folder for the user the chart runs the containers as
 
     # becomes @unit
     @unimplemented
