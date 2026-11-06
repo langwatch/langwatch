@@ -1,3 +1,5 @@
+-- IRREVERSIBLE: adds the SeatRequest and OrganizationAccessNotice tables and their indexes.
+-- A rollback leaves them in place; dropping them is an operator step confirmed in Ops.
 -- Seat requests and their mail outbox (modules/organization/specs/seat-requests.feature).
 -- Both tables are new, so nothing here locks a table the serving release writes.
 CREATE TABLE IF NOT EXISTS "SeatRequest" (
