@@ -107,8 +107,10 @@ and checks every redirect again.
 
 `NO_PROXY` only chooses a direct connection: it does not lift that check. An
 identity provider inside your network needs its origin in
-`SSO_TRUSTED_IDP_ORIGINS`. LangWatch then reaches that origin directly, never
-through the proxy, so it needs no `NO_PROXY` entry.
+`SSO_TRUSTED_IDP_ORIGINS`. LangWatch then reads its discovery document
+directly, never through the proxy, so that read needs no `NO_PROXY` entry. If
+you also turn on Node's environment proxy (below), add the identity provider's
+hosts to `NO_PROXY` so the rest of sign-in reaches them directly too.
 
 The proxy looks up the hostname itself, so LangWatch cannot hold the connection
 to the address it checked. Configure the proxy to refuse every address that is
@@ -133,7 +135,8 @@ If you start the app and workers with `NODE_USE_ENV_PROXY=1` (or
 `--use-env-proxy` in `NODE_OPTIONS`), Node sends these sign-in requests through
 `HTTPS_PROXY` too (unless `NO_PROXY` names the host), and LangWatch reads the
 sign-in discovery document through the proxy to match. Then the proxy must
-allow your identity provider's discovery, token, keys and user info endpoints.
+allow your identity provider's discovery, token, keys and user info endpoints,
+unless `NO_PROXY` names their hosts.
 
 ### Microsoft Entra ID
 
