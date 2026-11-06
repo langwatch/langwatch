@@ -67,7 +67,12 @@ async function installStyles({ next }: { next: Document }) {
       const present = [...document.querySelectorAll<HTMLLinkElement>("link[data-docs-style]")].find(
         (link) => sheetHref(link) === sheetHref(source),
       );
-      /* The shared sheet loads after the page; wait if it is still on its way. */
+      /* The shared sheet loads after the page. A click before that asks for it now rather than
+         waiting for the rest of the page; either way, wait while it is on its way. */
+      if (present?.dataset.href !== undefined) {
+        present.href = sheetHref(present);
+        present.removeAttribute("data-href");
+      }
       if (present)
         return present.sheet
           ? Promise.resolve()

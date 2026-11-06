@@ -48,12 +48,14 @@ function writeCache({ value }: { value: unknown }) {
 describe("fetchStars", () => {
   describe("when GitHub answers with a count", () => {
     /** @scenario "Show the live GitHub star count, refreshed from the build's and kept for an hour" */
-    it("stamps when GitHub reported it and keeps both in the cache", async () => {
+    it("stamps the day GitHub reported it and keeps both in the cache", async () => {
       githubAnswers({ ok: true, body: { stargazers_count: 7000 } });
       const before = Date.now();
       const read = await fetchStars({ cacheFile });
       expect(read.count).toBe(7000);
-      expect(read.at).toBeGreaterThanOrEqual(before);
+      expect(read.at).toBeLessThanOrEqual(before);
+      expect(read.at).toBeGreaterThan(before - 24 * 60 * 60 * 1000);
+      expect((read.at ?? 1) % (24 * 60 * 60 * 1000)).toBe(0);
       expect(JSON.parse(readFileSync(cacheFile, "utf8"))).toEqual(read);
     });
   });

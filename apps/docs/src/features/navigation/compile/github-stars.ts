@@ -11,6 +11,8 @@ const defaultCacheFile = path.join(cacheRoot, "docs-site/stars.json");
 /** A star count and when GitHub reported it, in epoch milliseconds; both null when unknown. */
 export type StarsRead = { count: number | null; at: number | null };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 let starsRead: Promise<StarsRead> | undefined;
 
 /** The public star count, read once per process; the last known count if GitHub is down. */
@@ -44,7 +46,9 @@ export async function fetchStars({
     const count = starCount({ body: await response.json() });
     if (response.ok && count !== null) {
       mkdirSync(path.dirname(cacheFile), { recursive: true });
-      const read = { count, at: nowInstant().epochMilliseconds };
+      /* The start of the day, so a build the same day keeps the same pages and render cache. */
+      const at = Math.floor(nowInstant().epochMilliseconds / DAY_MS) * DAY_MS;
+      const read = { count, at };
       writeFileSync(cacheFile, JSON.stringify(read));
       return read;
     }
