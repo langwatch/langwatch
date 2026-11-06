@@ -5,7 +5,7 @@
  * @see modules/analytics/specs/dashboard-widget-frame-states.feature
  */
 
-import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
+import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -25,7 +25,7 @@ vi.mock("../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx", () => ({
   ),
 }));
 
-import { handledErrorEnvelope, lwqlResult } from "../../../__tests__/lwql-fixtures.ts";
+import { lwqlResult } from "../../../__tests__/lwql-fixtures.ts";
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
 import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
@@ -64,9 +64,19 @@ const WIDGETS = [
 
 const BANNER = "limit-failed-widgets-banner";
 const TOO_MUCH_DATA = "This project has too much data for them in the selected period.";
+/** Each card says these only when its failure's code reached it; a lost code reads as unknown. */
+const TIME_LIMIT_WORDS = "Its query ran past the time a widget may take.";
+const UNKNOWN_COLUMN_WORDS = "Check the column names against the dataset's columns.";
+
+/** The status the server answers each code with. */
+const HTTP_STATUS = {
+  query_memory_exceeded: 422,
+  query_timeout: 504,
+  lwql_unknown_identifier: 400,
+} as const;
 
 /** The error code each widget id answers with; a widget not listed answers with rows. */
-type Failures = Record<string, string>;
+type Failures = Record<string, keyof typeof HTTP_STATUS>;
 
 function boardServer(failures: Failures) {
   return (call: UiProcedureCall): Promise<unknown> => {
@@ -82,7 +92,7 @@ function boardServer(failures: Failures) {
         const id = WIDGETS.find((each) => sql.endsWith(`-- ${each.id}`))?.id ?? "";
         const code = failures[id];
         return code
-          ? Promise.reject(handledErrorEnvelope({ code }))
+          ? Promise.reject(new UiProcedureRefusal(code, HTTP_STATUS[code]))
           : Promise.resolve(lwqlResult({ rows: [{ n: 1 }] }));
       }
       default:
@@ -146,6 +156,7 @@ describe("given a board of three widgets", () => {
       await openBoard({ "w-2": "query_timeout" });
 
       expect(await screen.findByText("Couldn't load Cost per trace")).toBeTruthy();
+      expect(screen.getByText(TIME_LIMIT_WORDS)).toBeTruthy();
       expect(screen.queryByTestId(BANNER)).toBeNull();
     });
   });
@@ -170,12 +181,13 @@ describe("given a board of three widgets", () => {
     /** @scenario "Failures that are not limits are not counted" */
     it("shows no warning for two other failures or for one limit and one other", async () => {
       await openBoard({ "w-2": "lwql_unknown_identifier", "w-3": "lwql_unknown_identifier" });
-      expect(await screen.findAllByText(/^Couldn't load/)).toHaveLength(2);
+      expect(await screen.findAllByText(UNKNOWN_COLUMN_WORDS)).toHaveLength(2);
       expect(screen.queryByTestId(BANNER)).toBeNull();
       cleanup();
 
       await openBoard({ "w-2": "query_timeout", "w-3": "lwql_unknown_identifier" });
-      expect(await screen.findAllByText(/^Couldn't load/)).toHaveLength(2);
+      expect(await screen.findByText(TIME_LIMIT_WORDS)).toBeTruthy();
+      expect(screen.getByText(UNKNOWN_COLUMN_WORDS)).toBeTruthy();
       expect(screen.queryByTestId(BANNER)).toBeNull();
     });
   });
