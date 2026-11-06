@@ -536,6 +536,68 @@ describe("when a version is restored", () => {
     ]);
   });
 
+  describe("when the dataset's rows are still in the records table", () => {
+    /** A dataset kept in the records table, holding these rows there. */
+    async function recordsTableDataset(rows: { id: string; input: string }[]) {
+      const datasetId = await createDataset([]);
+      await repositories.content.update({
+        id: datasetId,
+        projectId: PROJECT,
+        data: {
+          contentLayout: "postgres",
+          rowCount: null,
+          chunkCount: null,
+          sizeBytes: null,
+          chunkOffsets: null,
+        },
+      });
+      await repositories.records.createMany({ datasetId, projectId: PROJECT, entries: rows });
+      return datasetId;
+    }
+
+    /** @scenario "Restoring a version of a dataset still in the records table moves it to object storage" */
+    it("writes the version's rows to object storage and leaves the table's rows", async () => {
+      const datasetId = await recordsTableDataset([
+        { id: "a", input: "first" },
+        { id: "b", input: "second" },
+      ]);
+      await save(datasetId);
+      await app.batchCreateRecords({
+        projectId: PROJECT,
+        slugOrId: datasetId,
+        entries: [
+          { id: "c", input: "third" },
+          { id: "d", input: "fourth" },
+        ],
+      });
+      await save(datasetId);
+      await app.deleteRecords({ projectId: PROJECT, slugOrId: datasetId, recordIds: ["c"] });
+
+      await app.restoreVersion({ projectId: PROJECT, datasetId, version: 2 });
+
+      const stored = await repositories.content.getOne({ id: datasetId, projectId: PROJECT });
+      expect(stored).toMatchObject({ contentLayout: "s3_jsonl", useS3: false, rowCount: 4 });
+      const chunkRows = await repositories.chunks.readChunks({
+        projectId: PROJECT,
+        datasetId,
+        chunkCount: stored.chunkCount ?? 0,
+      });
+      expect(chunkRows).toEqual([
+        { id: "a", entry: { input: "first" } },
+        { id: "b", entry: { input: "second" } },
+        { id: "c", entry: { input: "third" } },
+        { id: "d", entry: { input: "fourth" } },
+      ]);
+      const current = await app.getDatasetWithRecords({
+        projectId: PROJECT,
+        slugOrId: datasetId,
+        limitMb: null,
+      });
+      expect(current.records.map((record) => record.id)).toEqual(["a", "b", "c", "d"]);
+      await expect(repositories.records.count({ datasetId, projectId: PROJECT })).resolves.toBe(3);
+    });
+  });
+
   /** @scenario "Restoring a version writes a new version" */
   it("records the restore so every open read of the dataset refreshes", async () => {
     const restoredEvents: unknown[] = [];

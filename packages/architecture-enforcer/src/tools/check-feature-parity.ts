@@ -687,7 +687,6 @@ const LEGACY_INERT: string[] = [
   "specs/datasets/storage-object-only/self-hosting-and-docs.feature",
   "specs/datasets/storage-object-only/single-file-conversion.feature",
   "specs/datasets/storage-object-only/storage-progress-observability.feature",
-  "specs/datasets/storage-object-only/write-paths.feature",
 ];
 
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */

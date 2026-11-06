@@ -1,10 +1,9 @@
 # Epic: dataset content lives only in object storage; Postgres keeps dataset metadata.
 # Decision record: dev/docs/adr/032-datasets-s3-jsonl.md (D1, D7, I-PG, v13).
 #
-# EVERY SCENARIO HERE IS @unimplemented ON PURPOSE, and only until it binds. Each names the tag it
-# becomes in a comment above it; the commit that makes it pass swaps the tag and adds the
-# `@scenario` annotation in the same change, and removes this file from LEGACY_INERT in
-# packages/architecture-enforcer/src/tools/check-feature-parity.ts once the first one binds.
+# A scenario still tagged @unimplemented is planned, not built, and names the tag it becomes in a
+# comment above it; the commit that makes it pass swaps the tag and adds the `@scenario`
+# annotation in the same change.
 #
 # Out of this file on purpose: create and copy. They are fixed on their own branch, with scenarios
 # in specs/datasets/large-dataset-storage.feature ("A new dataset is created directly in object
@@ -25,10 +24,9 @@ Feature: Every write puts dataset rows in object storage
 
   Rule: A dataset in object storage never gains rows in the records table
 
-    # The records repository writes whatever it is handed: createMany, update and replaceAll take
-    # no layout (repositories/prisma/prisma.dataset-record.repository.ts:137-195). ADR-032 I-PG.
-    # becomes @unit
-    @unimplemented
+    # createMany, update and replaceAll read the dataset's layout first, under the caller's lock
+    # when it holds one (rules/dataset-records-table.rules.ts). ADR-032 I-PG.
+    @unit
     Scenario: A records-table write for a dataset kept in object storage is refused
       Given a dataset whose rows are kept in object storage
       When any part of the dataset module asks the records table to store rows for it
@@ -39,8 +37,7 @@ Feature: Every write puts dataset rows in object storage
     # dataset.upsert (dataset.trpc.ts:17), MCP and both SDKs all reach the same create service.
     # The record shape {id, datasetId, projectId, entry, createdAt, updatedAt} is the public
     # contract (modules/dataset/contract/src/dataset.ts:239-248) and must not change.
-    # becomes @integration
-    @unimplemented
+    @integration
     Scenario: A dataset created with rows through the public API answers exactly as before
       Given an API key for a project
       When a dataset named "support-tickets" is created through the REST API with two rows that carry their own ids
@@ -50,13 +47,10 @@ Feature: Every write puts dataset rows in object storage
 
   Rule: Rows added to a dataset that has not been moved yet are never lost to the move
 
-    # The upload append writes records-table rows without the dataset lock
-    # (services/dataset-upload.service.ts:171-176 through
-    # repositories/prisma/prisma.dataset-record-content.repository.ts:31-33), while the move's flip
-    # takes it (prisma.dataset-migration.repository.ts:103-107). tRPC and REST row writes already
-    # go through the lock (services/dataset-record.service.ts:400-409).
-    # becomes @integration
-    @unimplemented
+    # The upload append writes records-table rows under the dataset lock the move's flip takes
+    # (services/dataset-upload.service.ts, prisma.dataset-migration.repository.ts); a flip that
+    # lands first makes the table refuse them, and they go to the chunks instead.
+    @integration
     Scenario: A file appended to a dataset that is being moved keeps every row
       Given a dataset whose 3 rows are still in the records table
       And the move of its content to object storage has read those rows but not yet committed
@@ -64,10 +58,9 @@ Feature: Every write puts dataset rows in object storage
       Then the move leaves the dataset where it is for its next pass
       And after the next pass the dataset reads 5 rows from object storage
 
-    # Restore on a records-table dataset rewrites the table (services/dataset-version.service.ts:477-480);
-    # version rows already live in object storage, so the restore is a free move.
-    # becomes @unit
-    @unimplemented
+    # Version rows already live in object storage, so the restore writes them as the dataset's
+    # chunks and flips it (services/dataset-version.service.ts).
+    @unit
     Scenario: Restoring a version of a dataset still in the records table moves it to object storage
       Given a dataset whose rows are still in the records table
       And a saved version 2 of that dataset with 4 rows

@@ -30,13 +30,54 @@ type Backend = Readonly<{
   records: () => DatasetRecordRepository;
   mine: () => string;
   theirs: () => string;
+  /** Marks a dataset as keeping its rows in object storage, as the content move does. */
+  moveToObjectStorage: (input: { datasetId: string; projectId: string }) => Promise<void>;
 }>;
 
 const columns = [{ name: "input", type: "string" as const }];
 
 function contractCases(backend: Backend): void {
   const create = (name: string, projectId = backend.mine()) =>
-    backend.datasets().create({ projectId, name, slug: name, columnTypes: columns });
+    backend
+      .datasets()
+      .create({ projectId, name, slug: name, columnTypes: columns, contentLayout: "postgres" });
+
+  describe("when the dataset keeps its rows in object storage", () => {
+    /** @scenario "A records-table write for a dataset kept in object storage is refused" */
+    it("refuses every records-table write for it, naming it, and adds no row", async () => {
+      const dataset = await create("moved");
+      const projectId = backend.mine();
+      await backend.moveToObjectStorage({ datasetId: dataset.id, projectId });
+      const refused = {
+        code: "dataset_records_table_write_refused",
+        meta: { datasetId: dataset.id },
+      };
+      const entries = [{ id: "moved-1", input: "one" }];
+
+      await expect(
+        backend.records().createMany({ datasetId: dataset.id, projectId, entries }),
+      ).rejects.toMatchObject(refused);
+      await expect(
+        backend.records().replaceAll({ datasetId: dataset.id, projectId, entries }),
+      ).rejects.toMatchObject(refused);
+      await expect(
+        backend.records().update({
+          id: "moved-1",
+          datasetId: dataset.id,
+          projectId,
+          entry: { input: "two" },
+        }),
+      ).rejects.toMatchObject(refused);
+      await expect(
+        backend
+          .records()
+          .withDatasetLock({ datasetId: dataset.id, projectId }, (locked) =>
+            locked.createMany({ datasetId: dataset.id, projectId, entries }),
+          ),
+      ).rejects.toMatchObject(refused);
+      await expect(backend.records().count({ datasetId: dataset.id, projectId })).resolves.toBe(0);
+    });
+  });
 
   describe("when a dataset is written and read back", () => {
     /** @scenario "The memory and Postgres dataset repositories answer alike" */
@@ -395,7 +436,13 @@ function contractCases(backend: Backend): void {
     it("answers id-ordered pages after the cursor, archived included, never another project's", async () => {
       const datasets = backend.datasets();
       const add = (name: string, projectId = backend.mine()) =>
-        datasets.create({ projectId, name, slug: name, columnTypes: columns });
+        datasets.create({
+          projectId,
+          name,
+          slug: name,
+          columnTypes: columns,
+          contentLayout: "postgres",
+        });
       const kept = await add("inventory-kept");
       const archived = await add("inventory-archived");
       await datasets.archive({
@@ -462,6 +509,12 @@ describe("given the memory dataset repositories", () => {
     records: () => MemoryDatasetRecordRepository.create({ database }),
     mine: () => "project-mine",
     theirs: () => "project-theirs",
+    moveToObjectStorage: async ({ datasetId, projectId }) => {
+      database.putDataset({
+        ...database.getDataset(projectId, datasetId),
+        contentLayout: "s3_jsonl",
+      });
+    },
   });
 });
 
@@ -540,6 +593,7 @@ describe.skipIf(!databaseUrl)("given the Postgres dataset repositories", () => {
         name: "migrated",
         slug: "migrated",
         columnTypes: columns,
+        contentLayout: "postgres",
       });
       await PrismaDatasetRecordRepository.create({ prisma: prisma() }).createMany({
         datasetId: dataset.id,
@@ -569,6 +623,12 @@ describe.skipIf(!databaseUrl)("given the Postgres dataset repositories", () => {
     records: () => PrismaDatasetRecordRepository.create({ prisma: prisma() }),
     mine: () => mine,
     theirs: () => theirs,
+    moveToObjectStorage: async ({ datasetId, projectId }) => {
+      await prisma().dataset.update({
+        where: { id: datasetId, projectId },
+        data: { contentLayout: "s3_jsonl" },
+      });
+    },
   });
 });
 import { createLogger } from "@langwatch/observability";

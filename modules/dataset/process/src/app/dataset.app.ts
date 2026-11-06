@@ -252,7 +252,7 @@ export class DatasetModule implements DatasetApi {
       records: repositories.records,
       uploads: DatasetUploadService.create({
         datasets: repositories.content,
-        records: repositories.recordContent,
+        records: repositories.records,
         chunks,
         storedObjects: dependencies.storedObjects,
         requestBounds: this.#requestBounds,

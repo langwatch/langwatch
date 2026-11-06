@@ -20,9 +20,9 @@ import type {
   CreateDatasetInput,
   UpdateDatasetInput,
 } from "../../repositories/dataset-content.repository.ts";
-import type { DatasetRecordContentRepository } from "../../repositories/dataset-record-content.repository.ts";
 import type { DatasetRow } from "../../repositories/dataset.repository.ts";
 import { MemoryDatasetContentRepository } from "../../repositories/memory/memory.dataset-content.repository.ts";
+import { MemoryDatasetRecordRepository } from "../../repositories/memory/memory.dataset-record.repository.ts";
 import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
 import { DatasetUploadService } from "../dataset-upload.service.ts";
 
@@ -157,10 +157,14 @@ function harness({
     },
   });
 
-  const records: DatasetRecordContentRepository = {
-    createMany: async ({ records: written, datasetId, projectId }) => {
-      inlineRecords.push(...written);
-      return written.map(({ id }) => ({
+  const records = Object.assign(MemoryDatasetRecordRepository.create({ database }), {
+    createMany: async ({
+      entries,
+      datasetId,
+      projectId,
+    }: Parameters<MemoryDatasetRecordRepository["createMany"]>[0]) => {
+      inlineRecords.push(...entries.map(({ id, ...entry }) => ({ id, entry })));
+      return entries.map(({ id }) => ({
         id,
         datasetId,
         projectId,
@@ -169,7 +173,7 @@ function harness({
         updatedAt: new Date(0),
       }));
     },
-  };
+  });
 
   const storageError = new Error("object storage is unavailable");
   const storage: DatasetChunkRepository = {
