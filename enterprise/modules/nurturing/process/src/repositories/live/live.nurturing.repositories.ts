@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { NurturingRepositories } from "../nurturing.repositories.ts";
-import { PostgresNurturingRepositories } from "../prisma/prisma.nurturing.repositories.ts";
 import {
   type NurturingOperatorReadsMember,
   PrismaNurturingUsageOrganizationsRepository,
 } from "../prisma/prisma.nurturing-usage-organizations.repository.ts";
+import { PostgresNurturingRepositories } from "../prisma/prisma.nurturing.repositories.ts";
 import {
   type NurturingClaimRedis,
   RedisNurturingClaimRepository,

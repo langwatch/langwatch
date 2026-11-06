@@ -71,7 +71,7 @@ function customerIo(statuses: number[]) {
   const batches: GroupCall[][] = [];
   const fetchFn = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
     const status = statuses.shift() ?? 200;
-    if (status < 300) batches.push(JSON.parse(String(init?.body)).batch);
+    if (status < 300) batches.push(JSON.parse(init?.body as string).batch);
     return new Response(null, { status });
   });
   const service = NurturingService.create({
@@ -86,7 +86,10 @@ function customerIo(statuses: number[]) {
 /** Organizations recorded at their own times, owners answering from the projects they hold. */
 async function syncOver(
   organizations: readonly Organization[],
-  { statuses = [], failingProjects = new Set<string>() }: {
+  {
+    statuses = [],
+    failingProjects = new Set<string>(),
+  }: {
     statuses?: number[];
     failingProjects?: Set<string>;
   } = {},
@@ -97,7 +100,8 @@ async function syncOver(
     clock.at = organization.writtenAt ?? NOW - DAY_MS;
     await milestones.recordOrganization({
       organizationId: organization.id,
-      adminUserId: organization.admin === undefined ? `admin-of-${organization.id}` : organization.admin,
+      adminUserId:
+        organization.admin === undefined ? `admin-of-${organization.id}` : organization.admin,
       seeded: false,
     });
     if (organization.lastTraceAt !== undefined) {
@@ -108,7 +112,10 @@ async function syncOver(
     }
   }
   const projects = organizations.flatMap((organization) =>
-    (organization.projects ?? []).map((project) => ({ ...project, organizationId: organization.id })),
+    (organization.projects ?? []).map((project) => ({
+      ...project,
+      organizationId: organization.id,
+    })),
   );
   const projectsOf = (projectIds: readonly string[]) =>
     projects.filter((project) => projectIds.includes(project.id));
@@ -179,7 +186,10 @@ describe("NurturingOrganizationUsageService", () => {
           evaluators: 1,
           traces: { traces: 2, errors: 1, totalCost: 0.25, lastFailedTraceAt: failedAt },
         },
-        { id: "project-b", traces: { traces: 1, errors: 0, totalCost: 0.5, lastFailedTraceAt: null } },
+        {
+          id: "project-b",
+          traces: { traces: 1, errors: 0, totalCost: 0.5, lastFailedTraceAt: null },
+        },
       ],
     };
 
@@ -346,7 +356,10 @@ describe("NurturingOrganizationUsageService", () => {
   describe("given 250 qualifying organizations", () => {
     /** @scenario Every qualifying organization gets exactly one group call */
     it("sends each exactly one group call, in pages of 100", async () => {
-      const ids = Array.from({ length: 250 }, (_, index) => `org-${String(index).padStart(3, "0")}`);
+      const ids = Array.from(
+        { length: 250 },
+        (_, index) => `org-${String(index).padStart(3, "0")}`,
+      );
       const { service, cio } = await syncOver(ids.map((id) => ({ id })));
 
       await service.syncAll({ now: NOW });

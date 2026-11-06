@@ -47,9 +47,9 @@ export class MemoryNurturingMilestonesRepository
     since,
     afterId,
     limit,
-  }: Parameters<
-    NurturingUsageOrganizationsRepository["findRecentlyActive"]
-  >[0]): Promise<NurturingUsageOrganization[]> {
+  }: Parameters<NurturingUsageOrganizationsRepository["findRecentlyActive"]>[0]): Promise<
+    NurturingUsageOrganization[]
+  > {
     const isActive = (organizationId: string) => {
       const lastTraceAt = this.#lastTraceAt.get(organizationId);
       if (lastTraceAt !== undefined) return lastTraceAt >= since;

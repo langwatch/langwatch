@@ -34,9 +34,9 @@ export class PrismaNurturingUsageOrganizationsRepository implements NurturingUsa
     since,
     afterId,
     limit,
-  }: Parameters<
-    NurturingUsageOrganizationsRepository["findRecentlyActive"]
-  >[0]): Promise<NurturingUsageOrganization[]> {
+  }: Parameters<NurturingUsageOrganizationsRepository["findRecentlyActive"]>[0]): Promise<
+    NurturingUsageOrganization[]
+  > {
     const at = new Date(since);
     const rows = await this.prisma.nurturingOrganization.findMany({
       where: {

@@ -63,7 +63,12 @@ describe("usageGroupCall", () => {
   describe("given an organization's counts and a failed trace", () => {
     /** @scenario An active organization's usage reaches Customer.io as one group call */
     it("groups the admin into the organization with the counts and the failed time in seconds", () => {
-      const call = usageGroupCall({ organizationId: "org-1", adminUserId: "admin-1", usage, syncedAt });
+      const call = usageGroupCall({
+        organizationId: "org-1",
+        adminUserId: "admin-1",
+        usage,
+        syncedAt,
+      });
 
       expect(call).toEqual({
         type: "group",
@@ -84,7 +89,12 @@ describe("usageGroupCall", () => {
 
     /** @scenario The group call carries only the usage traits */
     it("sends exactly the usage traits, so name, plan, size and onboarding stay as they are", () => {
-      const call = usageGroupCall({ organizationId: "org-1", adminUserId: "admin-1", usage, syncedAt });
+      const call = usageGroupCall({
+        organizationId: "org-1",
+        adminUserId: "admin-1",
+        usage,
+        syncedAt,
+      });
 
       expect(call.type === "group" && Object.keys(call.traits ?? {}).toSorted()).toEqual(
         USAGE_TRAIT_KEYS.toSorted(),

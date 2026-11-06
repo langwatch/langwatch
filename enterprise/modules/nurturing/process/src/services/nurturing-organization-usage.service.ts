@@ -58,7 +58,8 @@ export class NurturingOrganizationUsageService {
     const day = utcDayOf(now);
     let unsynced = 0;
     let afterId: string | undefined;
-    for (;;) {
+    let more = true;
+    while (more) {
       const page = await this.dependencies.organizations.findRecentlyActive({
         since,
         limit: PAGE_SIZE,
@@ -66,11 +67,13 @@ export class NurturingOrganizationUsageService {
       });
       unsynced += await this.#syncPage({ page, since, day, now });
       const last = page.at(-1);
-      if (page.length < PAGE_SIZE || !last) break;
-      afterId = last.organizationId;
+      more = page.length === PAGE_SIZE && last !== undefined;
+      afterId = last?.organizationId;
     }
     if (unsynced > 0) {
-      throw new Error(`${unsynced} organizations' usage was not synced; their claims are given back`);
+      throw new Error(
+        `${unsynced} organizations' usage was not synced; their claims are given back`,
+      );
     }
   }
 

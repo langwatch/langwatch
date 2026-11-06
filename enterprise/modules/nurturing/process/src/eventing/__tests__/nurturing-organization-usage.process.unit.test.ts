@@ -103,8 +103,8 @@ describe("the organization usage sync tick", () => {
       now: () => 0,
     });
 
-    expect(pipeline.processManagers.get(ORGANIZATION_USAGE_PROCESS_NAME)?.config.schedule).toEqual(
-      { everyMs: 60 * 60 * 1000 },
-    );
+    expect(pipeline.processManagers.get(ORGANIZATION_USAGE_PROCESS_NAME)?.config.schedule).toEqual({
+      everyMs: 60 * 60 * 1000,
+    });
   });
 });

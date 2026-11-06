@@ -39,7 +39,10 @@ export abstract class CustomerIoChannel {
     return this.trackEvent(input);
   }
 
-  /** As batch, but rejects when the channel knows Customer.io did not take it; as trackEventOrThrow. */
+  /**
+   * As batch, but rejects when the channel knows Customer.io did not take it; as
+   * trackEventOrThrow.
+   */
   batchOrThrow(calls: CioBatchCall[]): Promise<void> {
     return this.batch(calls);
   }

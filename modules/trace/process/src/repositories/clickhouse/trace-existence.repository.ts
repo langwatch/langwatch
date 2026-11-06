@@ -168,7 +168,8 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
     const perProject = await Promise.all(
       [...new Set(projectIds)].map(async (projectId) => {
         const client = await this.resolveClient(projectId);
-        // A ReplacingMergeTree holds a trace once per version until merged: argMax takes the newest.
+        // A ReplacingMergeTree holds a trace once per version until merged: argMax takes the
+        // newest.
         const result = await client.query({
           query: `
             SELECT
