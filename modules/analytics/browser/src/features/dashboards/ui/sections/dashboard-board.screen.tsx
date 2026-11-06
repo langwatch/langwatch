@@ -225,6 +225,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 boardName={board.name}
                 widgets={widgets}
                 period={period}
+                periodKey={`${range}:${grain}`}
                 isWriting={boardWidgets.isWriting}
                 onEmptyChange={({ widget, empty: showsNoData }) =>
                   empty.report({ key: widget.id, empty: showsNoData })

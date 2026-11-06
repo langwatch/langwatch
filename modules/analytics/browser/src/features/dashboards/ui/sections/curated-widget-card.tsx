@@ -25,6 +25,7 @@ export function CuratedWidgetCard({
   rowSpan,
   timeWindow,
   granularitySeconds,
+  periodKey,
   onAskLangy,
   onEmptyChange,
   onLimitFailureChange,
@@ -39,6 +40,8 @@ export function CuratedWidgetCard({
   rowSpan: number;
   timeWindow: { start: number; end: number };
   granularitySeconds: BoardPeriod["granularitySeconds"];
+  /** The reader's chosen period, such as "1h:auto"; with it, only a new choice starts the widget over. */
+  periodKey: string;
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
   onAskLangy?: () => void;
   /** Told whether the card shows none of the widget's data. */
@@ -75,6 +78,7 @@ export function CuratedWidgetCard({
         maxHeight={widgetBodyHeightPx(rowSpan)}
         timeWindow={timeWindow}
         granularitySeconds={granularitySeconds}
+        periodKey={periodKey}
         onFaceChange={setFace}
         limitAudience={{ kind: "built_in" }}
         onExportChange={csvExport.onExportChange}

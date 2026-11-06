@@ -18,6 +18,7 @@ export function BoardWidgetsGrid({
   boardName,
   widgets,
   period,
+  periodKey,
   isWriting,
   langyFor,
   onEdit,
@@ -33,6 +34,8 @@ export function BoardWidgetsGrid({
   boardName: string;
   widgets: readonly BoardWidget[];
   period: BoardPeriod;
+  /** The reader's chosen period, such as "1h:auto"; with it, only a new choice starts the widget over. */
+  periodKey: string;
   isWriting: boolean;
   /** What each card may ask Langy; absent when Langy is not available. */
   langyFor?: (widget: BoardWidget) => WidgetCardLangy;
@@ -65,6 +68,7 @@ export function BoardWidgetsGrid({
             dashboardId={dashboardId}
             boardName={boardName}
             period={period}
+            periodKey={periodKey}
             isWriting={isWriting}
             {...(langyFor ? { langy: langyFor(widget) } : {})}
             onEdit={onEdit && (({ withLangy }) => onEdit({ widget, withLangy }))}

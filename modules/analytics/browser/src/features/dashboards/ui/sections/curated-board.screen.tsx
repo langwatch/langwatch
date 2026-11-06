@@ -104,6 +104,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
               boardName={board.name}
               widgets={board.widgets}
               period={period}
+              periodKey={`${range}:${grain}`}
               onAskLangy={
                 langy.enabled
                   ? (widget) => langy.ask(widgetPromptDraft({ widget, board: subject, period }))

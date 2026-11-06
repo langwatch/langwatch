@@ -23,6 +23,7 @@ export function CuratedWidgetsGrid({
   boardName,
   widgets,
   period,
+  periodKey,
   onAskLangy,
   onEmptyChange,
   onLimitFailureChange,
@@ -33,6 +34,8 @@ export function CuratedWidgetsGrid({
   boardName: string;
   widgets: readonly BoardTemplateWidget[];
   period: BoardPeriod;
+  /** The reader's chosen period, such as "1h:auto"; with it, only a new choice starts the widget over. */
+  periodKey: string;
   /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
   onAskLangy?: (widget: BoardTemplateWidget) => void;
   /** Told whether each widget shows none of its data. */
@@ -68,6 +71,7 @@ export function CuratedWidgetsGrid({
             rowSpan={rowSpan}
             timeWindow={timeWindow}
             granularitySeconds={granularitySeconds}
+            periodKey={periodKey}
             onAskLangy={onAskLangy && (() => onAskLangy(widget))}
             onEmptyChange={onEmptyChange && ((empty) => onEmptyChange({ widget, empty }))}
             onLimitFailureChange={

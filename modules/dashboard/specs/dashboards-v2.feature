@@ -1878,8 +1878,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When its SQL changes, saved from the editor, by Langy or through the API
     Then the card starts the widget over and runs the new SQL
     And the earlier answer is not shown for the new query
-    # What a run is keyed by: widget id, its queries (sources included), the period's span and its
-    # grain start the frame over; a refresh moves only the window's end and re-runs it. Nothing
+    # What a run is keyed by: widget id, its queries (sources included), the chosen period and its
+    # grain start the frame over; a refresh of the same choice moves only the window's end. Nothing
     # else caches a result: analytics.lwql.query is a mutation, and the server keeps no LangWatchQL cache
 
   # ---------------------------------------------------------------------------

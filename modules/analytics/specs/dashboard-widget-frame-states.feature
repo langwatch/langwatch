@@ -91,12 +91,18 @@ Feature: A dashboard widget frame shows what its queries report
       Given a widget whose query answered for the last 7 days
       When the board refreshes on its schedule, the window ends later, and the run fails
       Then the card still shows the widget's own face
-      # A window of the same length and step is the same period: only its end moved
+      # A refresh is the same selection with only its end moved
 
     @integration
     Scenario: A query that fails after the period changes shows the failed state
       Given a widget whose query answered for the last 7 days
       When the reader chooses the last 30 days and the query fails
+      Then the card says it couldn't load the widget
+
+    @integration
+    Scenario: Changing to another period of the same length starts the widget over
+      Given a widget whose query answered for the last hour
+      When the reader chooses Live and the query fails
       Then the card says it couldn't load the widget
       And the rows of the last 7 days are not shown under the 30 days label
 

@@ -47,6 +47,7 @@ export function BoardWidgetCard({
   dashboardId,
   boardName,
   period,
+  periodKey,
   isWriting,
   langy,
   onEdit,
@@ -62,6 +63,8 @@ export function BoardWidgetCard({
   /** The board's name, which an exported file is named for. */
   boardName: string;
   period: BoardPeriod;
+  /** The reader's chosen period, such as "1h:auto"; with it, only a new choice starts the widget over. */
+  periodKey: string;
   isWriting: boolean;
   langy?: WidgetCardLangy;
   /**
@@ -152,6 +155,7 @@ export function BoardWidgetCard({
           maxHeight={widgetBodyHeightPx(widget.placement.rowSpan)}
           timeWindow={timeWindow}
           granularitySeconds={granularitySeconds}
+          periodKey={periodKey}
           onFaceChange={setFace}
           limitAudience={{
             kind: "editable",

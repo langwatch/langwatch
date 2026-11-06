@@ -91,6 +91,8 @@ export function DashboardWidgetFrame(props: DashboardWidgetFrameProps) {
 type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
   readonly timeWindow: { start: number; end: number };
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+  /** The reader's chosen period; absent, the span and step tell a new period from a refresh. */
+  readonly periodKey?: string;
   /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
   readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
   /** Who reads the card; with it, a memory or time limit failure gets its own words and actions. */
@@ -108,15 +110,16 @@ type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
 };
 
 /**
- * A widget over a window its caller owns. A new SQL statement, sources list, span or step starts
- * it over, so no answer to an earlier query or period stays on the card; a refresh moves only the
- * window's end and re-runs it in place, keeping the chart if the run fails (dashboards-v2 AC201d).
+ * A widget over a window its caller owns. A new SQL statement, sources list, or chosen period and
+ * step starts it over, so no earlier answer stays on the card. A refresh of the same choice moves
+ * only the window's end and keeps the chart if the run fails (dashboards-v2 AC201d).
  */
 export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWindowProps) {
   const parsed = dashboardWidgetDefinitionSchema.safeParse(props.graph);
   const queries = parsed.success ? JSON.stringify(parsed.data.queries) : "";
   const span = props.timeWindow.end - props.timeWindow.start;
-  const key = `${props.id}:${queries}:${span}:${props.granularitySeconds ?? ""}`;
+  const period = props.periodKey ?? `${span}:${props.granularitySeconds ?? ""}`;
+  const key = `${props.id}:${queries}:${period}`;
   return <WidgetFrameOverWindow key={key} {...props} parsed={parsed} />;
 }
 

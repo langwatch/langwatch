@@ -204,6 +204,7 @@ const boardWidget = ({
   host?: StubAnalyticsHost;
   graph?: unknown;
   timeWindow?: { start: number; end: number };
+  periodKey?: string;
   onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
   onEmptyChange?: (empty: boolean) => void;
   limitAudience?: WidgetLimitAudience;
@@ -412,6 +413,20 @@ describe("given a widget on a board", () => {
       expect(screen.getByText("Couldn't load Cost per trace")).toBeTruthy();
     });
 
+    /** @scenario "Changing to another period of the same length starts the widget over" */
+    it("starts over when another period has the same span", async () => {
+      const answers = [Promise.resolve(resultWith(report({}))), Promise.reject(BROKEN)];
+      answers[1]?.catch(() => undefined);
+      const run = frameRuns(() => answers.shift() ?? Promise.reject(BROKEN));
+      const { rerender } = render(boardWidget({ timeWindow: LAST_7_DAYS, periodKey: "1h:auto" }));
+      await run();
+
+      rerender(boardWidget({ timeWindow: LAST_7_DAYS, periodKey: "live:auto" }));
+      await run();
+
+      expect(screen.getByText("Couldn't load Cost per trace")).toBeTruthy();
+    });
+
     /** @scenario "A failed card goes back to loading while a new period runs" */
     it("takes a failed card back to loading while the new period runs", async () => {
       const run = frameRuns(() => Promise.reject(BROKEN));
@@ -430,10 +445,10 @@ describe("given a widget on a board", () => {
       const answers = [Promise.resolve(resultWith(report({}))), Promise.reject(BROKEN)];
       answers[1]?.catch(() => undefined);
       const run = frameRuns(() => answers.shift() ?? Promise.reject(BROKEN));
-      const { rerender } = render(boardWidget({ timeWindow: LAST_7_DAYS }));
+      const { rerender } = render(boardWidget({ timeWindow: LAST_7_DAYS, periodKey: "7d:auto" }));
       await run();
 
-      rerender(boardWidget({ timeWindow: { start: 61_000, end: 62_000 } }));
+      rerender(boardWidget({ timeWindow: { start: 61_000, end: 62_000 }, periodKey: "7d:auto" }));
       await run();
 
       expect(screen.queryByTestId("widget-state-face")).toBeNull();
