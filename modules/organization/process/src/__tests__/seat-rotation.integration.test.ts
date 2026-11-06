@@ -7,6 +7,7 @@ import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
  * @see specs/licensing/seat-rotation.feature
  */
 import { createLogger } from "@langwatch/observability";
+import { MemberSeatLimitReachedError } from "@langwatch/organization-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -673,6 +674,19 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
         seatPendingSince: null,
       });
       expect(attachedBindings).toContainEqual({ organizationId, userId: qux, role: "MEMBER" });
+    });
+
+    /** @scenario "Enabling a person waiting for a seat is refused while no full seat fits" */
+    it("keeps a waiting person waiting when no full seat fits, even with Lite seats free", async () => {
+      const { organizationId, waitingIds } = await acme({ waiting: ["Qux"] });
+      const qux = waitingIds[0]!;
+
+      await expect(
+        memberships.setMemberDisabled({ organizationId, userId: qux, disabled: false }),
+      ).rejects.toBeInstanceOf(MemberSeatLimitReachedError);
+
+      expect((await membershipOf(organizationId, qux))?.seatPendingSince).not.toBeNull();
+      expect((await membershipOf(organizationId, qux))?.disabledAt).not.toBeNull();
     });
 
     /** @scenario "A hold that ends admits the person waiting longest" */

@@ -9,6 +9,7 @@ import {
   type TeamUserRole,
   CannotDisableSelfError,
   PersonalWorkspaceNotManagedHereError,
+  MemberSeatLimitReachedError,
 } from "@langwatch/organization-contract";
 
 import type {
@@ -125,18 +126,24 @@ export class OrganizationMemberRoleService {
 
     await this.repo.getMembership({ organizationId, userId });
 
-    // A person waiting for a seat has no grant yet: enabling them is admitting them.
-    if (
-      !disabled &&
-      (await this.dependencies.seatHolds.isWaiting({ organizationId, userId })) &&
-      (await this.dependencies.memberSeats.admitWaitingMember({
+    // A person waiting for a seat has no grant yet: enabling them is admitting them, on a full
+    // seat only, so they keep waiting while none fits.
+    if (!disabled && (await this.dependencies.seatHolds.isWaiting({ organizationId, userId }))) {
+      const admitted = await this.dependencies.memberSeats.admitWaitingMember({
         organizationId,
         userId,
         actingUserId: actingUser?.id ?? null,
         caller: { type: "system" },
-      }))
-    ) {
-      return;
+      });
+      if (admitted) return;
+      const limit = await this.dependencies.seats.checkLimit({
+        organizationId,
+        resource: "members",
+        user: actingUser ?? undefined,
+      });
+      throw new MemberSeatLimitReachedError({
+        meta: { limitType: limit.limitType, current: limit.current, max: limit.max },
+      });
     }
 
     const seat = disabled

@@ -202,6 +202,14 @@ Feature: Seat rotation
       Then "Qux" is a full member with access
 
     @integration
+    Scenario: Enabling a person waiting for a seat is refused while no full seat fits
+      Given 5 of 5 full member seats are in use and Lite seats are free
+      And "Qux" is waiting for a full member seat
+      When an administrator enables "Qux"
+      Then the enable is refused because every full member seat is taken
+      And "Qux" is still waiting
+
+    @integration
     Scenario: A failed seat handover still removes the member
       Given "Bar" took their seat 45 days ago
       And "Qux" is waiting for a full member seat
