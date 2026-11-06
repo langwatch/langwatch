@@ -305,7 +305,7 @@ describe("<SubscriptionPage/> upgrade path for every organization that can pay",
   it.each(cases)(
     "when on $plan.name with members $size.name its seats, a viewer who $viewer.name invite, paying in $currency, usage $usage.name: every upgrade button starts a Growth checkout",
     async ({ plan, size, viewer, currency, usage }) => {
-      const seats = createMockPlan(plan.plan).maxMembers ?? 2;
+      const seats = createMockPlan(plan.plan).maxMembers;
       const memberCount = Math.max(1, seats + size.membersRelativeToSeats);
       givenPlan(plan);
       givenMembers({ count: memberCount, seats, loaded: usage.loaded });

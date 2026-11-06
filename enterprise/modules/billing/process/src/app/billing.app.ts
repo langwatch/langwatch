@@ -24,6 +24,7 @@ import {
   type ConnectedOnboardRequest,
   type ConnectedRenewRequest,
   getStripeEnvironmentFromNodeEnv,
+  PlanTypes,
   type RenewalCompletion,
   type ReportUsageForMonthCommandData,
   type ResourceLimitNotifierInput,
@@ -566,9 +567,10 @@ export class BillingModule
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
   }): Promise<{ url: string | null }> {
-    return BillingModule.#checkouts.track("subscription", () =>
-      this.#subscriptionDoor.subscriptions.createOrUpdateSubscription(input),
-    );
+    const subscribe = () => this.#subscriptionDoor.subscriptions.createOrUpdateSubscription(input);
+    // Choosing Free answers the subscription page back; no payment page opens, so no checkout.
+    if (input.plan === PlanTypes.FREE) return subscribe();
+    return BillingModule.#checkouts.track("subscription", subscribe);
   }
 
   async createBillingPortalSession(input: {
@@ -613,13 +615,14 @@ export class BillingModule
     customerEmail: string | null;
   }): Promise<{ url: string | null; subscriptionId: string }> {
     const { customerEmail, ...checkout } = input;
-    return BillingModule.#checkouts.track("seat_checkout", async () => {
-      const customerId = await this.getOrCreateCustomerId({
-        user: { email: customerEmail },
-        organizationId: input.organizationId,
-      });
-      return this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId });
+    // Customer creation stays outside the count, as it does before the subscription door.
+    const customerId = await this.getOrCreateCustomerId({
+      user: { email: customerEmail },
+      organizationId: input.organizationId,
     });
+    return BillingModule.#checkouts.track("seat_checkout", () =>
+      this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId }),
+    );
   }
 
   async listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]> {
@@ -627,9 +630,6 @@ export class BillingModule
   }
 
   /** Main's `EEWebhookService` behind the callback, over billing's own rows. */
-  /** Checkout starts, refusals and completions; the series the checkout-volume alert reads. */
-  static readonly #checkouts = BillingCheckoutMeterService.create();
-
   static #composeStripeWebhook({
     webhook,
     isSaas,
@@ -696,6 +696,8 @@ export class BillingModule
     return this.#stripeWebhook.receiveStripeWebhook(input);
   }
 
+  /** Checkout starts, refusals and completions; the series the checkout-volume alert reads. */
+  static readonly #checkouts = BillingCheckoutMeterService.create();
   readonly #stripeWebhook: StripeWebhookReceiptService;
   readonly #subscriptions: SubscriptionDoor | undefined;
   readonly #connected: ConnectedBilling | undefined;

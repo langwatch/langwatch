@@ -4,7 +4,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 
 /** Pinned: the checkout-volume alert reads this series by name. */
-const BILLING_CHECKOUT_TOTAL_METRIC_NAME = "billing_checkout_total";
+export const BILLING_CHECKOUT_TOTAL_METRIC_NAME = "billing_checkout_total";
 
 /** Which door the checkout came through. */
 export type BillingCheckoutFlow = "subscription" | "seat_checkout";
@@ -14,13 +14,19 @@ export type BillingCheckoutFlow = "subscription" | "seat_checkout";
  * throws nothing and logs nothing; the only trace it leaves is starts going quiet.
  */
 export class BillingCheckoutMeterService {
-  static create(checkouts: CounterHandle = defaultCounter()): BillingCheckoutMeterService {
-    return new BillingCheckoutMeterService(checkouts);
+  static create(): BillingCheckoutMeterService {
+    return new BillingCheckoutMeterService(
+      counter({
+        name: BILLING_CHECKOUT_TOTAL_METRIC_NAME,
+        description:
+          "Billing checkouts by stage (started, failed, completed), flow and failure reason",
+      }),
+    );
   }
 
   private constructor(private readonly checkouts: CounterHandle) {}
 
-  /** Runs one checkout request: a URL answered is a start, anything else a failure by code. */
+  /** Runs one checkout request: a payment page answered is a start, anything else a failure. */
   async track<T extends { url: string | null }>(
     flow: BillingCheckoutFlow,
     request: () => Promise<T>,
@@ -29,13 +35,13 @@ export class BillingCheckoutMeterService {
     try {
       result = await request();
     } catch (error) {
-      this.checkouts.inc({ stage: "failed", flow, code: failureCode(error) });
+      this.checkouts.inc({ stage: "failed", flow, reason: failureReason(error) });
       throw error;
     }
     if (result.url) {
       this.checkouts.inc({ stage: "started", flow });
     } else {
-      this.checkouts.inc({ stage: "failed", flow, code: "no_checkout_url" });
+      this.checkouts.inc({ stage: "failed", flow, reason: "no_checkout_url" });
     }
     return result;
   }
@@ -45,13 +51,6 @@ export class BillingCheckoutMeterService {
   }
 }
 
-function failureCode(error: unknown): string {
+function failureReason(error: unknown): string {
   return error instanceof HandledError ? error.code : "unhandled";
-}
-
-function defaultCounter(): CounterHandle {
-  return counter({
-    name: BILLING_CHECKOUT_TOTAL_METRIC_NAME,
-    description: "Billing checkouts by stage (started, failed, completed), flow and failure code",
-  });
 }

@@ -13,20 +13,32 @@ Feature: Checkout volume is measured
   @unit
   Scenario: A refused checkout is counted with its error code
     When an organization's checkout is refused because it already has a live subscription
-    Then one failed checkout is counted with the code "subscription_already_active"
+    Then one failed checkout is counted with the reason "subscription_already_active"
     And the refusal still reaches the caller
 
   @unit
   Scenario: An unexpected checkout failure is counted without its internals
     When starting a checkout fails for a reason billing did not anticipate
-    Then one failed checkout is counted with the code "unhandled"
+    Then one failed checkout is counted with the reason "unhandled"
 
   @unit
   Scenario: A checkout that answers no payment page is counted as failed
     When the payment provider answers no page to continue on
-    Then one failed checkout is counted with the code "no_checkout_url"
+    Then one failed checkout is counted with the reason "no_checkout_url"
 
   @unit
   Scenario: A completed checkout is counted
     When the payment provider reports a checkout as completed
     Then one completed checkout is counted
+
+  @unit
+  Scenario: Both checkout doors and the completion webhook are counted
+    Given billing runs on LangWatch Cloud with a payment provider
+    When a Growth seat checkout opens, a checkout for a plan with no price is refused, and a completed checkout is delivered
+    Then one started, one failed and one completed checkout are counted
+
+  @unit
+  Scenario: Choosing the Free plan is not counted as a checkout
+    Given billing runs on LangWatch Cloud with a payment provider
+    When an organization chooses the Free plan
+    Then no checkout is counted
