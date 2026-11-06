@@ -58,10 +58,15 @@ function ownModelOption({
   };
 }
 
+/** The tag on a decision model listed in a column it cannot fill. */
+function onlyFillsHint(fills: readonly ModelRole[]): string {
+  return `${fills.map((role) => MODEL_ROLE_LABEL[role]).join(", ")} only`;
+}
+
 /** Why a LangWatch decision model is listed but cannot fill this column. */
 function previewHint(preview: LangWatchDecisionPreview): string {
   if (preview.fills.length === 0) return "Coming soon";
-  return `${preview.fills.map((role) => MODEL_ROLE_LABEL[role]).join(", ")} only`;
+  return onlyFillsHint(preview.fills);
 }
 
 /**
@@ -91,6 +96,21 @@ export function langwatchDecisionOptions({
   });
 }
 
+/** The own-key catalogue in order, while own models are on and the server has answered. */
+function ownDecisionOptions({
+  pickable,
+  isOwnModelEnabled,
+}: {
+  pickable: readonly BuiltInModel[] | undefined;
+  isOwnModelEnabled: boolean;
+}): ModelPickerOption[] {
+  if (!isOwnModelEnabled || pickable === undefined) return [];
+  const offered = new Set(pickable.map((model) => model.value));
+  return DECISION_MODELS.filter((entry) => isOwnDecisionModelId(entry.id)).map((entry) =>
+    ownModelOption({ entry, offered }),
+  );
+}
+
 /**
  * The decision model picker: LangWatch's models first, then the own-key catalogue in order. Only
  * what the server says would run can be picked; with own models on, the rest say which key to
@@ -105,20 +125,26 @@ export function decisionModelPickerOptions({
   isJudgeRouted: boolean;
   isOwnModelEnabled: boolean;
 }): ModelPickerOption[] {
-  const offered = new Set((pickable ?? []).map((model) => model.value));
-  const listsOwnModels = isOwnModelEnabled && pickable !== undefined;
-  const ownModels = listsOwnModels
-    ? DECISION_MODELS.filter((entry) => isOwnDecisionModelId(entry.id))
-    : [];
   return [
     ...langwatchDecisionOptions({ role: "INSTANT_EVALS", isJudgeRouted }),
-    ...ownModels.map((entry) => ownModelOption({ entry, offered })),
+    ...ownDecisionOptions({ pickable, isOwnModelEnabled }),
   ];
 }
 
 /**
+ * The organization's own decision models in the Judge picker: the Instant Evals list's own rows,
+ * listed whatever the router flag, never pickable. A scenario judge makes chat calls, which a
+ * decision model does not answer, so the server refuses one for Judge (ADR-182).
+ */
+function judgeOwnDecisionOptions(decisionOptions: ModelPickerOption[]): ModelPickerOption[] {
+  return decisionOptions
+    .filter((option) => isOwnDecisionModelId(option.value))
+    .map((option) => ({ ...option, disabled: true, hint: onlyFillsHint(["INSTANT_EVALS"]) }));
+}
+
+/**
  * One column's picker: the options above the inherit entry, then the rest. Instant Evals lists
- * decision models only; Judge lists LangWatch's decision models on top, then the LLMs.
+ * decision models only; Judge lists the decision models on top, unpickable, then the LLMs.
  */
 export function rolePickerOptions({
   role,
@@ -133,7 +159,13 @@ export function rolePickerOptions({
 }): { leading: ModelPickerOption[]; options: ModelPickerOption[] } {
   if (role === "INSTANT_EVALS") return { leading: [], options: decisionOptions };
   if (role === "JUDGE") {
-    return { leading: langwatchDecisionOptions({ role, isJudgeRouted }), options: llmOptions };
+    return {
+      leading: [
+        ...langwatchDecisionOptions({ role, isJudgeRouted }),
+        ...judgeOwnDecisionOptions(decisionOptions),
+      ],
+      options: llmOptions,
+    };
   }
   return { leading: [], options: llmOptions };
 }

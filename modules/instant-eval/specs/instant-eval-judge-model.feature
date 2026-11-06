@@ -596,6 +596,15 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And the own decision model is one of the options
 
     @integration
+    Scenario: The picker names a decision model by its catalogue title, an LLM by its id
+      Given the server answers with OpenAI Decisions and Azure OpenAI Decisions on gpt-6-luna
+      And the project's OpenAI provider offers the LLM gpt-6-luna
+      When a member opens the model picker on an LLM judge
+      Then the decision rows read "OpenAI Decisions (gpt-6-luna)" and "Azure OpenAI Decisions (gpt-6-luna)"
+      And the OpenAI row says "OpenAI's Decisions API, on your OpenAI key."
+      And the OpenAI group still lists the LLM as "gpt-6-luna"
+
+    @integration
     Scenario: The picker offers Instant Evals alone when the server offers no own model
       Given a project the server releases Instant Evals for
       And the server answers with the hosted model only

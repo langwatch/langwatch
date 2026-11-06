@@ -1,6 +1,6 @@
 /** Which models a picker offers, from the providers a project has stored. Pure: consumers fetch. */
 import { isCodexModel, isModelAllowedForFeature } from "./catalog/codex-restrictions.ts";
-import { isOwnDecisionModelId } from "./catalog/decision-models.ts";
+import { findDecisionModel, isOwnDecisionModelId } from "./catalog/decision-models.ts";
 import { allLitellmModels } from "./catalog/model-catalog.ts";
 import type { ModelOption } from "./model-options.ts";
 import { buildCustomModelDisplayNames, modelDisplayLabel } from "./model-provider-display-names.ts";
@@ -263,13 +263,18 @@ export function modelSelectionFrom({
     mode,
     isCustom: customModelIdSet.has(modelValue),
   }));
-  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label }) => ({
-    label,
-    value,
-    isDisabled: false,
-    mode,
-    isBuiltIn: true,
-  }));
+  // A decision model's line comes from the catalogue, as its title does on the server.
+  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label }) => {
+    const subtitle = findDecisionModel(value)?.description;
+    return {
+      label,
+      value,
+      isDisabled: false,
+      mode,
+      isBuiltIn: true,
+      ...(subtitle ? { subtitle } : {}),
+    };
+  });
   const builtInGroups: GroupedModelOptions =
     builtInOptions.length === 0
       ? []

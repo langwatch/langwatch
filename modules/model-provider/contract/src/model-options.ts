@@ -10,6 +10,8 @@ export type ModelOption = {
   isCustom?: boolean;
   /** Served by LangWatch's own offer, so no provider row of the project's has to carry it. */
   isBuiltIn?: boolean;
+  /** One line under the title: what a decision model is, from its catalogue entry. */
+  subtitle?: string;
 };
 
 export const modelSelectorOptions: ModelOption[] = Object.entries(allLitellmModels).map(

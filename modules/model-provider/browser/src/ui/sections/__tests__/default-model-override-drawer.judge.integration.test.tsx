@@ -4,7 +4,12 @@
  * reads the Default model while unset. Binds specs/model-providers/judge-default-model.feature.
  */
 import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
-import { isLatestAlias } from "@langwatch/model-provider-contract";
+import {
+  DECISION_MODELS,
+  isLatestAlias,
+  isOwnDecisionModelId,
+  LANGWATCH_DECISION_MODEL_ID,
+} from "@langwatch/model-provider-contract";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,7 +22,6 @@ const mockGetInheritedValues = vi.fn();
 const mockListAllForProjectForFrontend = vi.fn();
 const mockListDecisionModels = vi.fn();
 
-// The drawer asks the judge router flag; off unless a case turns it on.
 // The drawer asks the judge router and own decision model flags; off unless a case turns one on.
 const flagsOn = new Set<string>();
 vi.mock("@langwatch/feature-flag-client", () => ({
@@ -27,6 +31,10 @@ vi.mock("@langwatch/feature-flag-client", () => ({
   }),
 }));
 const JUDGE_ROUTER_FLAG = "release_instant_evals_judge_router";
+const OWN_DECISION_MODEL_FLAG = "release_instant_evals_own_decision_model";
+const OWN_DECISION_MODEL_IDS = DECISION_MODELS.filter((entry) =>
+  isOwnDecisionModelId(entry.id),
+).map((entry) => entry.id);
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
@@ -179,6 +187,55 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
       expect(row.querySelector('[data-testid="model-option-subtitle"]')).toBeNull();
       expect(row).not.toHaveAttribute("aria-disabled", "true");
     }
+  });
+
+  /** @scenario "The Judge picker offers only models that can judge a scenario" */
+  it("lists the organization's own decision models under LangWatch's, above the inherit row", () => {
+    flagsOn.add(JUDGE_ROUTER_FLAG);
+    flagsOn.add(OWN_DECISION_MODEL_FLAG);
+    renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+    const rows = within(judgeListbox()).getAllByRole("option", { hidden: true });
+    const inheritAt = rows.findIndex(
+      (row) => row.dataset.testid === "provider-model-selector-inherit",
+    );
+    expect(rows.slice(3, inheritAt).map((row) => row.dataset.value)).toEqual(
+      OWN_DECISION_MODEL_IDS,
+    );
+    for (const row of rows.slice(0, inheritAt)) {
+      expect(row).toHaveAttribute("aria-disabled", "true");
+    }
+  });
+
+  /** @scenario "The Judge picker lists my own decision models with the router flag off" */
+  it("lists every own decision model on top with the router flag off, unpickable, with its key line", () => {
+    flagsOn.add(OWN_DECISION_MODEL_FLAG);
+    mockListDecisionModels.mockReturnValue({
+      data: [
+        { value: LANGWATCH_DECISION_MODEL_ID, label: "Evals Preview" },
+        { value: "openai/decisions:gpt-6-luna", label: "OpenAI Decisions (gpt-6-luna)" },
+      ],
+      isLoading: false,
+    });
+    renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+    const rows = within(judgeListbox()).getAllByRole("option", { hidden: true });
+    const inheritAt = rows.findIndex(
+      (row) => row.dataset.testid === "provider-model-selector-inherit",
+    );
+    const decisionRows = rows.slice(0, inheritAt);
+    expect(decisionRows.map((row) => row.dataset.value)).toEqual(OWN_DECISION_MODEL_IDS);
+    for (const row of decisionRows) {
+      expect(row).toHaveAttribute("aria-disabled", "true");
+      expect(row).toHaveTextContent("Instant Evals only");
+    }
+    const openai = decisionRows.find((row) => row.dataset.value === "openai/decisions:gpt-6-luna");
+    expect(openai).toHaveTextContent("OpenAI's Decisions API, on your OpenAI key.");
+    const inception = decisionRows.find(
+      (row) => row.dataset.value === "inception/decisions:mercury-decide",
+    );
+    expect(inception).toHaveTextContent("Add an Inception key in Model Providers to use it.");
+    expect(rows.some((row) => (row.dataset.value ?? "").startsWith("langwatch/"))).toBe(false);
   });
 
   /** @scenario "With the router flag off the Judge picker lists no LangWatch model" */

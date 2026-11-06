@@ -107,8 +107,10 @@ describe("rolePickerOptions", () => {
   });
   const llmOptions = [{ label: "gpt-6.1-sol", value: "openai/gpt-6.1-sol" }];
 
+  const ownOptions = decisionOptions.filter((option) => option.value.includes("/decisions:"));
+
   /** @scenario "The Judge picker lists decision models before LLMs" */
-  it("puts LangWatch's three decision models on top of the Judge picker, then the LLMs", () => {
+  it("puts LangWatch's three decision models on top of the Judge picker, then own ones, then the LLMs", () => {
     const { leading, options } = rolePickerOptions({
       role: "JUDGE",
       decisionOptions,
@@ -116,23 +118,59 @@ describe("rolePickerOptions", () => {
       isJudgeRouted: true,
     });
 
-    expect(leading.map((option) => [option.label, option.subtitle])).toEqual([
+    expect(leading.slice(0, 3).map((option) => [option.label, option.subtitle])).toEqual([
       ["Evals Preview", "Optimized for evals, routed"],
       ["Scenario Judge Preview", "Optimized for scenario judge"],
       ["Search Preview", "Optimized for search"],
     ]);
-    expect(leading.every((option) => option.disabled)).toBe(true);
-    expect(leading.map((option) => option.hint)).toEqual([
+    expect(leading.slice(0, 3).map((option) => option.hint)).toEqual([
       "Instant Evals only",
       "Coming soon",
       "Coming soon",
     ]);
+    expect(leading.slice(3).map((option) => option.value)).toEqual(
+      ownOptions.map((option) => option.value),
+    );
+    expect(leading.every((option) => option.disabled)).toBe(true);
     expect(options).toEqual(llmOptions);
   });
 
-  it("lists no LangWatch model in the Judge picker with the router flag off", () => {
+  /** @scenario "The Judge picker lists the own decision models the Instant Evals picker lists" */
+  it("lists the Instant Evals picker's own models in the Judge picker with the router flag off, unpickable", () => {
+    const { leading, options } = rolePickerOptions({
+      role: "JUDGE",
+      decisionOptions,
+      llmOptions,
+      isJudgeRouted: false,
+    });
+
+    expect(ownOptions.length).toBeGreaterThan(1);
+    expect(leading.map((option) => option.value)).toEqual(ownOptions.map((option) => option.value));
+    expect(leading.some((option) => option.value.startsWith("langwatch/"))).toBe(false);
+    for (const option of leading) {
+      expect(option.disabled).toBe(true);
+      expect(option.hint).toBe("Instant Evals only");
+    }
+    // What a model is, or which key to add, reads as it does in the Instant Evals picker.
+    expect(leading.map((option) => option.subtitle)).toEqual(
+      ownOptions.map((option) => option.subtitle),
+    );
+    expect(options).toEqual(llmOptions);
+  });
+
+  it("lists no decision model in the Judge picker with own models and the router flag off", () => {
+    const noOwn = decisionModelPickerOptions({
+      pickable: [HOSTED],
+      isJudgeRouted: false,
+      isOwnModelEnabled: false,
+    });
     expect(
-      rolePickerOptions({ role: "JUDGE", decisionOptions, llmOptions, isJudgeRouted: false }),
+      rolePickerOptions({
+        role: "JUDGE",
+        decisionOptions: noOwn,
+        llmOptions,
+        isJudgeRouted: false,
+      }),
     ).toEqual({ leading: [], options: llmOptions });
   });
 

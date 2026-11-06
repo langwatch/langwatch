@@ -3,6 +3,7 @@
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { findDecisionModel } from "@langwatch/model-provider-contract";
 import { cleanup, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -109,6 +110,41 @@ describe("<ModelSelector/>", () => {
       const listbox = screen.getByRole("listbox", { hidden: true });
       expect(within(listbox).getAllByText("Decision models")).toHaveLength(1);
       expect(within(listbox).getByText("OpenAI")).toBeInTheDocument();
+    });
+  });
+
+  describe("given decision models the server titles from the catalogue", () => {
+    /** @scenario "The picker names a decision model by its catalogue title, an LLM by its id" */
+    it("titles each decision row by its catalogue name and line, and leaves the LLM as its id", () => {
+      storedProviders.current = [STORED_OPENAI];
+      const decisionModels = ["openai/decisions:gpt-6-luna", "azure/decisions:gpt-6-luna"].map(
+        (id) => ({ value: id, label: findDecisionModel(id)?.label ?? id }),
+      );
+
+      renderWithDesignSystem(
+        <ModelSelector
+          model=""
+          options={["openai/gpt-6-luna"]}
+          onChange={() => undefined}
+          builtInModels={decisionModels}
+        />,
+      );
+
+      const listbox = screen.getByRole("listbox", { hidden: true });
+      const rows = within(listbox).getAllByRole("option", { hidden: true });
+      const rowFor = (value: string) => rows.find((row) => row.dataset.value === value);
+      expect(rowFor("openai/decisions:gpt-6-luna")).toHaveTextContent(
+        "OpenAI Decisions (gpt-6-luna)",
+      );
+      expect(rowFor("openai/decisions:gpt-6-luna")).toHaveTextContent(
+        "OpenAI's Decisions API, on your OpenAI key.",
+      );
+      expect(rowFor("azure/decisions:gpt-6-luna")).toHaveTextContent(
+        "Azure OpenAI Decisions (gpt-6-luna)",
+      );
+      const llm = rowFor("openai/gpt-6-luna");
+      expect(llm?.textContent).toBe("gpt-6-luna");
+      expect(within(llm!).queryByTestId("model-option-subtitle")).not.toBeInTheDocument();
     });
   });
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Box, createListCollection, Field, HStack, Input, Text } from "../../primitives.ts";
 import { InputGroup } from "../forms/input-group.tsx";
-import { Select } from "../forms/select.tsx";
+import { scrollToListItem, Select } from "../forms/select.tsx";
 import { inferProvider, ProviderIconGlyph } from "./provider-icons.tsx";
 
 const MODEL_ICON_SIZE = "16px";
@@ -388,6 +388,7 @@ export function ProviderModelSelector({
           }
         }}
         loopFocus={true}
+        scrollToIndexFn={scrollToListItem}
         // A narrow trigger still opens a list wide enough for a title, its tag and a full line.
         positioning={{ sameWidth: false }}
         highlightedValue={highlightedValue}
@@ -409,12 +410,12 @@ export function ProviderModelSelector({
           padding={1}
           minWidth="max(var(--reference-width), 20rem)"
           maxWidth="min(28rem, calc(100vw - 2rem))"
+          // Only the rows scroll, below the search, so none passes behind it.
+          overflow="hidden"
         >
           <Field.Root asChild>
             <Box
-              position="sticky"
-              top={0}
-              zIndex="1"
+              flexShrink={0}
               background="bg.panel"
               paddingX={1}
               paddingY={1}
@@ -441,21 +442,23 @@ export function ProviderModelSelector({
               </InputGroup>
             </Box>
           </Field.Root>
-          {filteredLeading.map((item) => (
-            <ModelItem key={item.value} item={item} size={size} />
-          ))}
-          {inheritOption && inheritItem && (
-            <InheritItem
-              labelFor={labelFor}
-              inheritIcon={inheritIcon}
-              inheritItem={inheritItem}
-              label={inheritOption.label}
-              model={inheritOption.model}
-            />
-          )}
-          {filteredModels.map((item) => (
-            <ModelItem key={item.value} item={item} size={size} />
-          ))}
+          <Select.List data-testid="provider-model-selector-list">
+            {filteredLeading.map((item) => (
+              <ModelItem key={item.value} item={item} size={size} />
+            ))}
+            {inheritOption && inheritItem && (
+              <InheritItem
+                labelFor={labelFor}
+                inheritIcon={inheritIcon}
+                inheritItem={inheritItem}
+                label={inheritOption.label}
+                model={inheritOption.model}
+              />
+            )}
+            {filteredModels.map((item) => (
+              <ModelItem key={item.value} item={item} size={size} />
+            ))}
+          </Select.List>
         </Select.Content>
       </Select.Root>
       {query.error ? (
