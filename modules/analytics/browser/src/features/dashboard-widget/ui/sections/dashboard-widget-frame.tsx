@@ -110,16 +110,17 @@ type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
 };
 
 /**
- * A widget over a window its caller owns. A new SQL statement, sources list, or chosen period and
- * step starts it over, so no earlier answer stays on the card. A refresh of the same choice moves
- * only the window's end and keeps the chart if the run fails (dashboards-v2 AC201d).
+ * A widget over a window its caller owns. A new SQL statement, sources list, code, or chosen
+ * period and step starts it over, so no earlier answer stays on the card. A refresh of the same
+ * choice moves only the window's end and keeps the chart if the run fails (dashboards-v2 AC201d).
  */
 export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWindowProps) {
   const parsed = dashboardWidgetDefinitionSchema.safeParse(props.graph);
   const queries = parsed.success ? JSON.stringify(parsed.data.queries) : "";
+  const code = parsed.success ? parsed.data.code : "";
   const span = props.timeWindow.end - props.timeWindow.start;
   const period = props.periodKey ?? `${span}:${props.granularitySeconds ?? ""}`;
-  const key = `${props.id}:${queries}:${period}`;
+  const key = `${props.id}:${queries}:${code}:${period}`;
   return <WidgetFrameOverWindow key={key} {...props} parsed={parsed} />;
 }
 

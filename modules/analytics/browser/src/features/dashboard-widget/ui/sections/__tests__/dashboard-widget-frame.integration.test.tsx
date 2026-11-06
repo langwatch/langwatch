@@ -355,11 +355,11 @@ describe("given a widget on a board", () => {
       expect(screen.queryByRole("button", { name: "Edit with Langy" })).toBeNull();
     });
 
-    /** @scenario "The smallest cards show short words and keep the full words for readers" */
+    /** @scenario "A failed limit card carries short words beside the full words" */
     it.each([
       [OUT_OF_MEMORY, "The query used more memory than a widget may use.", "Hit the memory limit."],
       [TIMED_OUT, "The query ran past the time a widget may take.", "Hit the time limit."],
-    ])("renders short words beside the full ones for %#", async (error, full, short) => {
+    ])("holds hidden short words beside the full ones for %#", async (error, full, short) => {
       const run = frameRuns(() => Promise.reject(error));
       render(boardWidget({ limitAudience: { kind: "editable" } }));
       await run();
@@ -375,7 +375,7 @@ describe("given a widget on a board", () => {
       );
     });
 
-    /** @scenario "The smallest cards show short words and keep the full words for readers" */
+    /** @scenario "A failed limit card carries short words beside the full words" */
     it("gives a built-in card no short words", async () => {
       const run = frameRuns(() => Promise.reject(OUT_OF_MEMORY));
       render(boardWidget({ limitAudience: { kind: "built_in" } }));
@@ -502,6 +502,25 @@ describe("given a widget on a board", () => {
 
       rerender(boardWidget({ timeWindow: { start: 61_000, end: 62_000 }, periodKey: "7d:auto" }));
       await run();
+
+      expect(screen.queryByTestId("widget-state-face")).toBeNull();
+    });
+  });
+
+  describe("when a failed widget's code is saved with the same queries", () => {
+    /** @scenario "Saving new code with the same queries starts the widget over" */
+    it("starts over and drops the failure", async () => {
+      const run = frameRuns(() => Promise.reject(OUT_OF_MEMORY));
+      const { rerender } = render(boardWidget({ limitAudience: { kind: "built_in" } }));
+      await run();
+      expect(screen.getByText("Couldn't load")).toBeTruthy();
+
+      rerender(
+        boardWidget({
+          graph: { ...GRAPH, code: "export default function Widget() { return 1; }" },
+          limitAudience: { kind: "built_in" },
+        }),
+      );
 
       expect(screen.queryByTestId("widget-state-face")).toBeNull();
     });

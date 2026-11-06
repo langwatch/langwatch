@@ -69,12 +69,25 @@ Feature: A dashboard widget frame shows what its queries report
       And it offers no edit action
 
     @integration
-    Scenario: The smallest cards show short words and keep the full words for readers
+    Scenario: A failed limit card carries short words beside the full words
+      Given a stored widget that fails on a limit
+      When the card shows the failure
+      Then it holds "Hit the memory limit." or "Hit the time limit." hidden from screen readers
+      And a reader who cannot edit also has "Ask someone to edit it." in the same way
+      And the full message and note stay in the title and are what a screen reader reads
+
+    @e2e @unimplemented
+    Scenario: The smallest cards show only the short words
       Given a stored widget that fails on a limit, on a card of three rows
       When the card is as narrow as 240px and as short as 157px
-      Then the card shows "Hit the memory limit." or "Hit the time limit."
-      And a reader who cannot edit also sees "Ask someone to edit it."
-      And the full message and note stay in the title and are what a screen reader reads
+      Then the card shows the short words and not the full ones
+
+    @e2e @unimplemented
+    Scenario: Cards of other sizes show the whole message within their room
+      Given a stored widget that fails on a limit, with a message of five lines
+      When the card is at least 341px wide and 158px to 169px high
+      Then the card shows four lines of the message when there is no note
+      And a card at least 278px high shows the message in full
 
     @integration
     Scenario: Edit actions wait while the board is being written
@@ -119,6 +132,12 @@ Feature: A dashboard widget frame shows what its queries report
       When the reader chooses Live and the query fails
       Then the card says it couldn't load the widget
       And the rows of the last hour are not shown under the Live label
+
+    @integration
+    Scenario: Saving new code with the same queries starts the widget over
+      Given a widget that failed on a limit
+      When its code is saved with the same queries
+      Then the card no longer shows the failed state
 
     @integration
     Scenario: A failed card goes back to loading while a new period runs
