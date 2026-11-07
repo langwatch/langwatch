@@ -37,6 +37,7 @@ describe("OrganizationMembershipService", () => {
   const mockRepo: OrganizationMembershipRepository = {
     createMembership: vi.fn(),
     readJoinerSeat: vi.fn(),
+    findMembershipStates: vi.fn(),
     findPersonalTeamsInScopes: vi.fn(),
     findSharedTeamIds: vi.fn(),
     findTeamGrants: vi.fn(),
@@ -86,6 +87,7 @@ describe("OrganizationMembershipService", () => {
     checkLimit: mockCheckLimit,
     assertRoleChangeAllowed: mockAssertRoleChangeAllowed,
     holdsFullSeat: mockHoldsFullSeat,
+    withSeat: ({ work }) => work(),
   };
   const seatNotices: OrganizationSeatRevocationNotice = {
     memberDisabled: mockMemberDisabled,

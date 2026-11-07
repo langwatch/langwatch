@@ -48,6 +48,12 @@ Feature: Ops seat sharing check
     Then the check holds no reading for it
 
   @unit
+  Scenario: A paid plan with uncapped seats is not checked
+    Given a paid organization whose plan sells uncapped seats (the UNLIMITED sentinel)
+    When the seat sharing check runs
+    Then the check holds no reading for it
+
+  @unit
   Scenario: An organization the check cannot read is skipped and the rest are kept
     Given two organizations on paid plans
     And reading the plan of one of them fails
@@ -61,6 +67,13 @@ Feature: Ops seat sharing check
     When it wakes for the first time
     Then it asks for a check at once
     And it asks again only once a day has passed since the last check
+
+  @unit
+  Scenario: A failed check waits for the next day and the outbox is still pruned
+    Given the seat sharing check throws
+    When the daily tick runs
+    Then the failure is logged and the tick finishes
+    And dispatched check rows older than 7 days are pruned
 
   @unit
   Scenario: A deployment without Cloud admin neither runs nor serves the check

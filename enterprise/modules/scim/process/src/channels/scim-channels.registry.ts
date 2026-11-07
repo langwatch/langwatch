@@ -9,8 +9,14 @@ import { SlackScimSyncSummaryChannel } from "./slack/slack.scim-sync-summary.cha
 
 /** Every channel bound to a module that SCIM holds, as the container hands them to the class. */
 export interface ScimChannels {
-  /** A deleted directory user leaves through organization, which owns the membership row. */
-  readonly members: Pick<OrganizationApi, "deleteMember">;
+  /**
+   * A deleted directory user leaves through organization, which owns the membership row; an
+   * admission holds organization's seat lease through it.
+   */
+  readonly members: Pick<
+    OrganizationApi,
+    "deleteMember" | "acquireSeatLease" | "renewSeatLease" | "releaseSeatLease"
+  >;
   /** Absent where SLACK_CHANNEL_SIGNUPS is unset: each push summary is skipped with a warning. */
   readonly syncSummaries: ScimSyncSummaryChannel | undefined;
 }

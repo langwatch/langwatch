@@ -388,6 +388,16 @@ export abstract class OrganizationMembershipRepository {
     origin?: "web" | "cli";
   }) => Promise<OrganizationAdmission>;
 
+  /** Every membership the person holds, with its organization's name and whether it is off. */
+  abstract findMembershipStates: (input: { userId: string }) => Promise<
+    {
+      organizationId: string;
+      organizationName: string;
+      role: OrganizationUserRole;
+      disabled: boolean;
+    }[]
+  >;
+
   /** Every membership row the person holds, disabled ones included. */
   abstract countMembershipsForUser: (input: { userId: string }) => Promise<number>;
 

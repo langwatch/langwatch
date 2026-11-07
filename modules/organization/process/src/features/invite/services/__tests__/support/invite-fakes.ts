@@ -685,6 +685,10 @@ export class FakeSeatCensus implements OrganizationInviteSeatCensus {
   isViewOnlyCustomRole(): boolean {
     return true;
   }
+
+  withSeatLock<T>({ work }: { work: () => Promise<T> }): Promise<T> {
+    return work();
+  }
 }
 
 /** An unlimited plan, unless a test builds its own `Plan`. */

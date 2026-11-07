@@ -23,4 +23,8 @@ export class InviteSeatCensusService implements OrganizationInviteSeatCensus {
   isViewOnlyCustomRole(permissions: string[]): boolean {
     return isViewOnlyCustomRole(permissions);
   }
+
+  withSeatLock<T>(input: { organizationId: string; work: () => Promise<T> }): Promise<T> {
+    return this.memberships.withSeatLock(input);
+  }
 }

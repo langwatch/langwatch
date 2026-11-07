@@ -69,6 +69,7 @@ const viewWith = (live: Connection | null): SsoSetupPageView => ({
     singleLogoutUrl: "https://app/slo",
     entityId: "https://app/entity",
     metadataUrl: "https://app/metadata",
+    refusalPageUrl: "https://app.test/api/auth/sso/refused/ssoc_1",
   },
 });
 

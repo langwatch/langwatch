@@ -3,6 +3,7 @@ import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { PersonalTeamScopeReader } from "../features/personal-workspace/services/personal-team-scope.service.ts";
 import type { OrganizationScopeGraphReader } from "../services/organization-scope-graph.service.ts";
 import type { GroupRepository } from "./group.repository.ts";
+import type { OrganizationAccessNoticeRepository } from "./organization-access-notice.repository.ts";
 import type { OrganizationDeparturesRepository } from "./organization-departures.repository.ts";
 import type { OrganizationInviteRateLimitRepository } from "./organization-invite-rate-limit.repository.ts";
 import type { OrganizationInviteRepository } from "./organization-invite.repository.ts";
@@ -12,6 +13,7 @@ import type { OrganizationUserDirectoryRepository } from "./organization-user-di
 import type { OrganizationRepository } from "./organization.repository.ts";
 import type { PrivateClickHouseRoutesRepository } from "./private-clickhouse-routes.repository.ts";
 import type { PrivateS3AccountsRepository } from "./private-s3-accounts.repository.ts";
+import type { SeatRequestRepository } from "./seat-request.repository.ts";
 import type { SignUpPolicyRepository } from "./sign-up-policy.repository.ts";
 import type { TeamRepository } from "./team.repository.ts";
 
@@ -43,4 +45,8 @@ export interface OrganizationRepositories {
   /** The private ClickHouse routes and S3 accounts this deployment names, by variable. */
   readonly privateClickHouseRoutes: PrivateClickHouseRoutesRepository;
   readonly privateS3Accounts: PrivateS3AccountsRepository;
+  /** Seat requests, one row per organization and address. */
+  readonly seatRequests: SeatRequestRepository;
+  /** The mail outbox for seat requests and refused sign-ins. */
+  readonly accessNotices: OrganizationAccessNoticeRepository;
 }

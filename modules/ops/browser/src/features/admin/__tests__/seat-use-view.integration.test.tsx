@@ -99,6 +99,7 @@ describe("Feature: Ops seat sharing check on the Cloud seat use page", () => {
       const acme = rowOf("ACME");
       expect(within(acme).getByText("12 people on 5 seats")).toBeInTheDocument();
       expect(within(acme).getByText("Seat sharing 2.4x")).toBeInTheDocument();
+      expect(within(acme).getByText("Growth")).toBeInTheDocument();
       const even = rowOf("Even");
       expect(within(even).getByText("6 people on 3 seats")).toBeInTheDocument();
       expect(within(even).queryByText(/Seat sharing/)).toBeNull();

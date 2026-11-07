@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { OrganizationInviteRepository } from "../../../../repositories/organization-invite.repository.ts";
 import { InviteCreationService } from "../invite-creation.service.ts";
-import { makeInvite, makeOrganization } from "./support/invite-fakes.ts";
+import { FakeSeatCensus, makeInvite, makeOrganization } from "./support/invite-fakes.ts";
 
 const ORGANIZATION = { ...makeOrganization({ id: "organization-1", name: "Acme" }), members: [] };
 
@@ -42,7 +42,7 @@ function serviceWithRecordingOrder() {
 
   const service = InviteCreationService.create({
     invites,
-    seats: { getMemberCount: async () => 0, getMembersLiteCount: async () => 0 } as never,
+    seats: new FakeSeatCensus(),
     plans: { getActivePlan: async () => ({ maxMembers: 100, maxMembersLite: 100 }) } as never,
     grants: { attachBindings: vi.fn(), revokeBindingsWhere: vi.fn() } as never,
     roles: {} as never,

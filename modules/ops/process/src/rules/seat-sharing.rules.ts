@@ -7,6 +7,7 @@ import {
   SEAT_SHARING_WINDOW_DAYS,
   type SeatSharingReading,
 } from "@langwatch/ops-contract";
+import { UNLIMITED } from "@langwatch/plans";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -24,6 +25,11 @@ export function isSeatSharingCheckDue({
   lastCheckedAt: number | null;
 }): boolean {
   return lastCheckedAt === null || at - lastCheckedAt >= DAY_MS;
+}
+
+/** Whether a plan sells a capped number of seats; uncapped plans use the finite UNLIMITED. */
+export function hasCappedSeats(maxMembers: number): boolean {
+  return Number.isFinite(maxMembers) && maxMembers < UNLIMITED;
 }
 
 /** The people who held a seat in the window, each once. */

@@ -12,6 +12,7 @@ import type { UserApi } from "@langwatch/user-contract";
 
 import type { SeatSharingCheckRepository } from "../repositories/seat-sharing-check.repository.ts";
 import {
+  hasCappedSeats,
   seatHoldersInWindow,
   seatSharingReading,
   seatSharingWindowStart,
@@ -130,7 +131,7 @@ export class SeatSharingCheckService {
   }): Promise<SeatSharingReading[]> {
     const { plans, organizations } = this.deps.peers;
     const plan = await plans.getActivePlan({ organizationId });
-    if (plan.free || !Number.isFinite(plan.maxMembers)) return [];
+    if (plan.free || !hasCappedSeats(plan.maxMembers)) return [];
     const holders = seatHoldersInWindow(
       await organizations.findSeatOccupantsSince({ organizationId, since }),
     );

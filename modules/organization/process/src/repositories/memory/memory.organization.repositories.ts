@@ -4,6 +4,7 @@ import type { OrganizationRepositories } from "../organization.repositories.ts";
 import { PrivateClickHouseRoutesRepository } from "../private-clickhouse-routes.repository.ts";
 import { PrivateS3AccountsRepository } from "../private-s3-accounts.repository.ts";
 import { MemoryGroupRepository } from "./memory.group.repository.ts";
+import { MemoryOrganizationAccessNoticeRepository } from "./memory.organization-access-notice.repository.ts";
 import { MemoryOrganizationDeparturesRepository } from "./memory.organization-departures.repository.ts";
 import { MemoryOrganizationInviteRateLimitRepository } from "./memory.organization-invite-rate-limit.repository.ts";
 import { MemoryOrganizationInviteRepository } from "./memory.organization-invite.repository.ts";
@@ -14,6 +15,7 @@ import { MemoryOrganizationDatabase } from "./memory.organization.database.ts";
 import { MemoryOrganizationRepository } from "./memory.organization.repository.ts";
 import { MemoryPersonalTeamScopeRepository } from "./memory.personal-team-scope.repository.ts";
 import { MemoryScopeGraphRepository } from "./memory.scope-graph.repository.ts";
+import { MemorySeatRequestRepository } from "./memory.seat-request.repository.ts";
 import { MemorySignUpPolicyRepository } from "./memory.sign-up-policy.repository.ts";
 import { MemoryTeamRepository } from "./memory.team.repository.ts";
 
@@ -49,6 +51,8 @@ export function memoryOrganizationRepositories({
     userDirectory: MemoryOrganizationUserDirectoryRepository.create({ memory }),
     privateClickHouseRoutes: new MemoryPrivateClickHouseRoutesRepository(),
     privateS3Accounts: new MemoryPrivateS3AccountsRepository(),
+    seatRequests: MemorySeatRequestRepository.create(),
+    accessNotices: MemoryOrganizationAccessNoticeRepository.create(),
   };
 }
 

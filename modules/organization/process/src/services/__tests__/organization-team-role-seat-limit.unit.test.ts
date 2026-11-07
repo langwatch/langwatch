@@ -31,7 +31,12 @@ function serviceWhere(options: {
       findCustomRolePermissions,
     }),
     creations: { created: vi.fn(), reportError: vi.fn() },
-    seats: { checkLimit: vi.fn(), assertRoleChangeAllowed, holdsFullSeat: vi.fn(async () => true) },
+    seats: {
+      checkLimit: vi.fn(),
+      assertRoleChangeAllowed,
+      holdsFullSeat: vi.fn(async () => true),
+      withSeat: ({ work }) => work(),
+    },
     seatNotices: { memberDisabled: vi.fn(), memberEnabled: vi.fn() },
     grantCache: { invalidateOrganization: vi.fn() },
     testArrivals: { standingFor: async (): Promise<{ testing: false }> => ({ testing: false }) },

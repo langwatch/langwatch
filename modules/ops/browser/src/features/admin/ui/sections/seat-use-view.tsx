@@ -3,13 +3,13 @@ import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Text } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { SEAT_SHARING_WINDOW_DAYS } from "@langwatch/ops-contract";
 import { SearchX } from "lucide-react";
 import { useState } from "react";
 import { useDebounce } from "use-debounce";
 
 import { useAdminList } from "../../behavior/use-admin-resource.ts";
 import { useSeatSharingChecks } from "../../behavior/use-seat-sharing-checks.ts";
-import { PRICING_MODEL_LABELS, type PricingModel } from "../../model/admin-enums.ts";
 import {
   SEAT_SHARING_FILTERS,
   flaggedOrganizationIds,
@@ -17,7 +17,7 @@ import {
   type SeatSharingCheck,
   type SeatSharingFilter,
 } from "../../model/seat-sharing.ts";
-import { AdminDate, formatDateTime } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
 import { SeatSharingCell } from "../elements/seat-sharing-cell.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 
@@ -30,7 +30,6 @@ interface SeatUseOrganization {
   id: string;
   name: string;
   slug: string;
-  pricingModel: PricingModel;
   createdAt: string;
 }
 
@@ -46,6 +45,7 @@ export default function SeatUseView() {
   const [sharingFilter, setSharingFilter] = useState<SeatSharingFilter>("all");
   const overSeats = sharingFilter === "over";
   const readings = readingsByOrganization(lastCheck);
+  const windowDays = lastCheck?.windowDays ?? SEAT_SHARING_WINDOW_DAYS;
 
   const list = useAdminList<SeatUseOrganization>("organization", {
     pagination: { page, perPage: PAGE_SIZE },
@@ -110,8 +110,8 @@ export default function SeatUseView() {
             <ListTable.ColumnHeader>ID</ListTable.ColumnHeader>
             <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
             <ListTable.ColumnHeader>Slug</ListTable.ColumnHeader>
-            <ListTable.ColumnHeader>Plan model</ListTable.ColumnHeader>
-            <ListTable.ColumnHeader>Seat use, 30 days</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Plan</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Seat use, {windowDays} days</ListTable.ColumnHeader>
             <ListTable.ColumnHeader>Created</ListTable.ColumnHeader>
           </ListTable.Row>
         </ListTable.Header>
@@ -136,7 +136,7 @@ export default function SeatUseView() {
               <ListTable.Cell>
                 {org.slug && <InlineCode variant="neutral">{org.slug}</InlineCode>}
               </ListTable.Cell>
-              <ListTable.Cell>{PRICING_MODEL_LABELS[org.pricingModel]}</ListTable.Cell>
+              <ListTable.Cell>{readings.get(org.id)?.planName ?? <EmptyCell />}</ListTable.Cell>
               <ListTable.Cell>
                 <SeatSharingCell reading={readings.get(org.id)} />
               </ListTable.Cell>
@@ -164,8 +164,9 @@ function SeatSharingSummary({
   const status = seatSharingStatus({ check, isLoading, failed });
   return (
     <Text fontSize="sm" color={failed ? "fg.error" : "fg.muted"}>
-      {status} Flagged when distinct people active in the last 30 days go over 2x seats. Customers
-      never see this.
+      {status} Flagged when distinct people active in the last{" "}
+      {check?.windowDays ?? SEAT_SHARING_WINDOW_DAYS} days go over 2x seats. Customers never see
+      this.
     </Text>
   );
 }

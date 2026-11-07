@@ -129,6 +129,12 @@ Feature: Permission resolution
     Then the action is allowed
     But every configuration and gateway permission is refused
 
+  Scenario: A lite member reads who is in the organization on any project
+    Given a lite member
+    When the Users page asks members:view on their active project
+    Then the read is allowed
+    But inviting, approving and changing roles stay refused
+
   # ==========================================================================
   # Resolution over stored rows
   # ==========================================================================

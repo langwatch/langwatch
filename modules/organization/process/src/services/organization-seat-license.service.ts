@@ -31,6 +31,13 @@ type OrganizationSeatDecision = LimitCheckResult;
  * requirement are all one decision — "may this organization make this change on its plan."
  */
 export interface OrganizationSeatLicense {
+  /**
+   * The one way a seat-taking write runs: its seat check and its write go inside `work`, and
+   * no other seat-taking write on the organization runs meanwhile. Taken once per write path,
+   * never from inside another `withSeat` on the same organization.
+   */
+  withSeat<T>(input: { organizationId: string; work: () => Promise<T> }): Promise<T>;
+
   /** Whether one more of `resource` fits inside the organization's plan. Answers rather than
    * throws, since only the caller knows how to turn a refusal into a named error. */
   checkLimit(input: {
@@ -73,6 +80,10 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
       notices: Pick<SeatLimitNoticeService, "reached">;
     },
   ) {}
+
+  withSeat<T>(input: { organizationId: string; work: () => Promise<T> }): Promise<T> {
+    return this.options.memberships.withSeatLock(input);
+  }
 
   async checkLimit(input: {
     organizationId: string;

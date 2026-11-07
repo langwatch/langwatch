@@ -15,7 +15,6 @@ import {
   type UserApi,
 } from "@langwatch/user-contract";
 
-import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
 import type {
   ScimRepository,
   ScimUserRecord,
@@ -49,6 +48,7 @@ import {
   nameFromScimRequest,
   scimUserOf,
 } from "../rules/scim-user.rules.ts";
+import type { ScimSeats } from "./scim-seat-lease.service.ts";
 import type { ScimSyncLifecycle } from "./scim-sync-lifecycle.service.ts";
 
 /** The person this organization holds, and what it says about them. */
@@ -96,7 +96,7 @@ export class ScimProvisioningService {
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
-    seats: ScimSeatRepository;
+    seats: ScimSeats;
     plans: Pick<EntitlementApi, "getActivePlan">;
     connections: ScimHeldConnections;
   }) {
@@ -137,7 +137,7 @@ export class ScimProvisioningService {
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
-    seats: ScimSeatRepository;
+    seats: ScimSeats;
     plans: Pick<EntitlementApi, "getActivePlan">;
     connections: ScimHeldConnections;
   }): ScimProvisioningService {

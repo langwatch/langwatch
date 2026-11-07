@@ -28,6 +28,8 @@ export interface OrganizationInviteSeatCensus {
    * lite seat from being sold the permissions of a full one.
    */
   isViewOnlyCustomRole(permissions: string[]): boolean;
+  /** The organization's seat lock, held while a batch is counted and written. */
+  withSeatLock<T>(input: { organizationId: string; work: () => Promise<T> }): Promise<T>;
 }
 
 /**

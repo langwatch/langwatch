@@ -180,11 +180,18 @@ describe("the directory's status band", () => {
 });
 
 describe("given a plan that does not carry directory sync", () => {
-  it("says it is an Enterprise feature rather than that the read failed", () => {
+  it("says in one line that sync is on Enterprise, with no upsell card", () => {
     state.readError = { data: { error: { code: "enterprise_plan_required" } } };
     renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
 
-    expect(screen.getByText("Directory sync on Enterprise")).toBeInTheDocument();
+    expect(
+      screen.getByText("Sync people from your identity provider on Enterprise."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Compare plans" })).toHaveAttribute(
+      "href",
+      "/settings/plans",
+    );
+    expect(screen.queryByText("Directory sync on Enterprise")).not.toBeInTheDocument();
     expect(screen.queryByTestId("directory-summary")).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,13 @@
 export {
+  acquireLease,
+  LEASE_TTL_MS,
+  LeaseBusyError,
+  type LeaseDeps,
+  type LeaseStore,
+  RENEW_EVERY_MS,
+  withLease,
+} from "./lease-lock.ts";
+export {
   PrismaConfigService,
   type PrismaConfiguration,
   type PrismaConfigurationInput,

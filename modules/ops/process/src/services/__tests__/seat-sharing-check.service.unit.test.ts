@@ -210,6 +210,25 @@ describe("SeatSharingCheckService", () => {
     });
   });
 
+  describe("given a paid organization whose plan has uncapped seats", () => {
+    /** @scenario "A paid plan with uncapped seats is not checked" */
+    it("holds no reading for it", async () => {
+      const { service } = harness({
+        organizations: {
+          "org-uncapped": {
+            plan: plan({ maxMembers: Number.MAX_SAFE_INTEGER }),
+            occupants: { fullSeatHolderIds: ["a"], departedIds: [] },
+          },
+        },
+        signedIn: ["a"],
+      });
+
+      const check = await service.run();
+
+      expect(check.readings).toEqual([]);
+    });
+  });
+
   describe("given one of two paid organizations cannot be read", () => {
     /** @scenario "An organization the check cannot read is skipped and the rest are kept" */
     it("keeps the other one and logs the failure with the organization id", async () => {
