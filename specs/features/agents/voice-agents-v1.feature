@@ -669,13 +669,38 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     When the browser retries the finish
     Then the run completes with no duplicate messages
 
-  # 7973 AC6
+  # 8032 AC1
+  # started is first-wins and deduped per run; the refresh event carries the retry's metadata.
   @unit @regression
-  Scenario: A re-driven finish keeps the first attempt's metadata
-    Given a run for the session was started twice with different metadata
-    When a snapshot and the finish are folded onto it
-    Then the run keeps the first attempt's metadata
-    And it reaches the finished status with the snapshot's messages
+  Scenario: A re-driven finish refreshes the run's metadata to the second attempt
+    Given a run started with a first attempt's metadata
+    When a metadata refresh carrying the second attempt's fields is folded onto it
+    Then the run's refreshed fields win while its other metadata is kept
+
+  # 8032 AC2
+  @unit @regression
+  Scenario: A metadata refresh does not disturb the run's terminal status
+    Given a finished run
+    When a metadata refresh is folded onto it
+    Then the run stays finished and takes the refreshed metadata
+
+  # 8032 AC3
+  # The refresh always carries audioUrl, null when the attempt has no recording,
+  # so the fold clears a stale link instead of keeping the omitted key.
+  @unit @regression
+  Scenario: A re-drive that lost its recording clears the run's audio link
+    Given a run whose first attempt carried a recording url
+    When a metadata refresh carrying a null audio url is folded onto it
+    Then the run's audio url is cleared while its other refreshed fields win
+
+  # 8032 AC4
+  # Re-drives share the call's end time, so the refresh is keyed on its attempt:
+  # a retry of one attempt dedupes, and the attempt accepted last wins.
+  @unit @regression
+  Scenario: Two re-drives at the same end time each keep their own refresh
+    Given two re-drives of one finished call with different recording metadata
+    When the run's event log is replayed, deduped and ordered as a refold does
+    Then both refreshes survive and the later re-drive's recording is the run's
 
   # ---------------------------------------------------------------------------
   # Talk to it authorization and the cutoff marker (#8021)
