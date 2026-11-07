@@ -302,6 +302,7 @@ function grantRow(input: GrantInput): GrantRowShape {
     createdByUserId: null,
     expiresAt: null,
     maxViews: null,
+    condition: null,
     occurredAt: at(T0),
     ...input,
   };
