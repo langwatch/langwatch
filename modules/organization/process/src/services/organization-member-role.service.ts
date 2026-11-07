@@ -8,7 +8,6 @@ import {
   OrganizationUserRole,
   type TeamUserRole,
   CannotDisableSelfError,
-  MemberSeatLimitReachedError,
   PersonalWorkspaceNotManagedHereError,
 } from "@langwatch/organization-contract";
 
@@ -16,7 +15,12 @@ import type {
   OrganizationMembershipRepository,
   UpdateMemberRoleResult,
 } from "../repositories/organization-membership.repository.ts";
+import type { SeatLease } from "../repositories/organization-seat.repository.ts";
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
+import {
+  customRoleIdsOf,
+  customRolePermissionsOf,
+} from "../rules/custom-role-permissions.rules.ts";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import {
@@ -27,10 +31,12 @@ import type {
   OrganizationGrantCeilingService,
   OrganizationIntendedGrant,
 } from "./organization-grant-ceiling.service.ts";
+import type { OrganizationMemberSeatService } from "./organization-member-seat.service.ts";
 import type {
   OrganizationSeatLicense,
   OrganizationPlanUser,
 } from "./organization-seat-license.service.ts";
+import type { SeatHoldService } from "./seat-hold.service.ts";
 
 /**
  * Records a seat taken away or given back. User ends the person's browser sessions from the
@@ -71,29 +77,15 @@ async function findCustomRolePermissionGrants({
   organizationId: string;
   currentTeamBindings: { customRoleId: string | null }[];
 }): Promise<string[]> {
-  const customRoleIds = currentTeamBindings
-    .map((binding) => binding.customRoleId)
-    .filter((id): id is string => !!id);
+  const customRoleIds = customRoleIdsOf({ bindings: currentTeamBindings });
   if (customRoleIds.length === 0) {
     return [];
   }
-
   const permissionsPerRole = await repository.findCustomRolePermissions({
     organizationId,
     customRoleIds,
   });
-  const allPermissions: string[] = [];
-  for (const permissions of permissionsPerRole) {
-    // `permissions` is a Json column, so the row decides the shape, not the
-    // type: read it defensively the way every other permission reader does.
-    if (Array.isArray(permissions)) {
-      allPermissions.push(
-        ...permissions.filter((permission): permission is string => typeof permission === "string"),
-      );
-    }
-  }
-
-  return allPermissions;
+  return customRolePermissionsOf({ permissionsPerRole });
 }
 
 type OrganizationMemberRoleDependencies = {
@@ -102,6 +94,10 @@ type OrganizationMemberRoleDependencies = {
   seatNotices: OrganizationSeatRevocationNotice;
   grantCache: OrganizationGrantCache;
   ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
+  /** The 30-day seat hold a disable writes (seat-rotation.feature). */
+  seatHolds: SeatHoldService;
+  /** The seat an enable or a role change takes or leaves. */
+  memberSeats: OrganizationMemberSeatService;
 };
 
 export class OrganizationMemberRoleService {
@@ -131,25 +127,24 @@ export class OrganizationMemberRoleService {
     await this.repo.getMembership({ organizationId, userId });
 
     if (disabled) {
-      await this.repo.setMemberDisabled({ organizationId, userId, disabled });
-    } else {
-      await this.dependencies.seats.withSeat({
+      const seat = await this.dependencies.seatHolds.releaseOf({
         organizationId,
-        work: async (lease) => {
-          const result = await this.dependencies.seats.checkLimit({
-            organizationId,
-            resource: "members",
-            user: actingUser ?? undefined,
-          });
-          if (!result.allowed) {
-            throw new MemberSeatLimitReachedError({
-              meta: { limitType: result.limitType, current: result.current, max: result.max },
-            });
-          }
-          await lease.assertHeld();
-          await this.repo.setMemberDisabled({ organizationId, userId, disabled });
-        },
+        userId,
+        reason: "DISABLED",
       });
+      await this.repo.setMemberDisabled({ organizationId, userId, disabled, seat });
+    } else {
+      const admitted = await this.dependencies.seats.withSeat({
+        organizationId,
+        work: (lease) =>
+          this.dependencies.memberSeats.enableUnderSeatLease({
+            organizationId,
+            userId,
+            actingUser,
+            lease,
+          }),
+      });
+      if (admitted) return;
     }
 
     if (disabled) {
@@ -169,11 +164,8 @@ export class OrganizationMemberRoleService {
       });
     }
 
-    // Disabling is a plain column write, not a grant write, so nothing else
-    // retires the authorization snapshots cached for this organization. An
-    // admin who has just revoked someone's access must not have to wait for a
-    // cache to age out before it is true, and re-enabling must not leave the
-    // person locked out for the same window.
+    // A plain column write retires no cached authorization snapshot, so drop them here: a
+    // revoke takes effect now, and a re-enable does not lock the person out meanwhile.
     await this.dependencies.grantCache.invalidateOrganization({ organizationId });
   }
 
@@ -283,25 +275,43 @@ export class OrganizationMemberRoleService {
 
     return this.dependencies.seats.withSeat({
       organizationId,
-      work: async (lease) => {
-        await this.dependencies.seats.assertRoleChangeAllowed({
-          organizationId,
-          currentRole: currentMember.role,
-          userPermissions,
-          role,
-          user: params.planUser,
-        });
-        await lease.assertHeld();
-        return this.repo.updateMemberRole({
-          organizationId,
-          userId,
-          role,
-          effectiveTeamRoleUpdates,
-          currentUserId,
-          caller,
-        });
-      },
+      work: (lease) =>
+        this.writeRoleChange({
+          change: { organizationId, userId, role, effectiveTeamRoleUpdates, currentUserId, caller },
+          currentMember,
+          oldPermissions: userPermissions,
+          planUser: params.planUser,
+          lease,
+        }),
     });
+  }
+
+  /** The role change's seat and its write, under the seat lease the caller holds. */
+  private async writeRoleChange({
+    change,
+    currentMember,
+    oldPermissions,
+    planUser,
+    lease,
+  }: {
+    change: Parameters<OrganizationMembershipRepository["updateMemberRole"]>[0];
+    currentMember: { role: OrganizationUserRole; disabledAt: unknown };
+    oldPermissions: string[] | undefined;
+    planUser: OrganizationPlanUser | undefined;
+    lease: SeatLease;
+  }): Promise<UpdateMemberRoleResult> {
+    const { organizationId, userId, role } = change;
+    const seat = await this.dependencies.memberSeats.seatOnRoleChange({
+      organizationId,
+      userId,
+      active: currentMember.disabledAt === null,
+      oldRole: currentMember.role,
+      oldPermissions,
+      role,
+      planUser,
+    });
+    await lease.assertHeld();
+    return this.repo.updateMemberRole({ ...change, seat });
   }
 
   /**

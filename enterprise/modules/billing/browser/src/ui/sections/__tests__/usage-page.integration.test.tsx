@@ -230,7 +230,7 @@ describe("the usage page", () => {
     beforeEach(() => given({ plan: FREE_PLAN, count: 31_800 }));
 
     /** @scenario "A Free organization sees its plan and the upgrade on top" */
-    it("leads with the Free plan, what it includes and the upgrade to Plan & billing", () => {
+    it("leads with the Free plan, what it includes and the upgrade that opens the Growth seat dialog", () => {
       renderPage();
 
       const strip = screen.getByTestId("usage-plan-strip");
@@ -242,7 +242,7 @@ describe("the usage page", () => {
       expect(screen.getByTestId("usage-upgrade-button")).toHaveTextContent("Upgrade to Growth");
       expect(screen.getByTestId("usage-upgrade-button")).toHaveAttribute(
         "href",
-        "/settings/subscription",
+        "/settings/subscription?checkout=growth",
       );
       expect(screen.getByRole("heading", { name: "Usage" })).toBeInTheDocument();
     });

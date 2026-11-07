@@ -17,7 +17,7 @@ import { billingApi, type UsageRead } from "../../behavior/billing-api.ts";
 import { useBillingPricingService } from "../../behavior/use-billing-pricing-service.ts";
 import { useBillingHost } from "../../model/billing-host.ts";
 import { parseGrowthSeatPlanType, type Currency } from "../../model/billing-plans.ts";
-import { SUBSCRIPTION_PATH, UPGRADE_TO_GROWTH_HREF } from "../../model/checkout-intent.ts";
+import { SUBSCRIPTION_PATH, UPGRADE_DIALOG_HREF } from "../../model/checkout-intent.ts";
 import { getPlanActionLabel, planManagementUrl } from "../../model/plan-management-url.ts";
 import { PricingModel } from "../../model/prisma-types.ts";
 import {
@@ -186,7 +186,7 @@ function HostedUsage({
       {plan && (
         <UsagePlanStrip
           strip={planStrip({ plan, currency, seatPriceCents })}
-          actionHref={plan.free ? UPGRADE_TO_GROWTH_HREF : SUBSCRIPTION_PATH}
+          actionHref={plan.free ? UPGRADE_DIALOG_HREF : SUBSCRIPTION_PATH}
         />
       )}
       <UsageEventsCard
@@ -273,7 +273,7 @@ export default function UsageScreen() {
       </Link>
     </PageLayout.HeaderButton>
   );
-  const actionHref = isSelfHosted && !hasValidLicense ? "/settings/license" : planManagementHref;
+  const actionHref = hasValidLicense ? planManagementHref : "/settings/license";
   const selfHostedActionLabel = hasValidLicense ? licensedActionLabel : unlicensedActionLabel;
 
   return (

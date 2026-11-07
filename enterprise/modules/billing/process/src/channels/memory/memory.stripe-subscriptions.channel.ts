@@ -30,10 +30,14 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
   readonly previews: { subscriptionId: string; change: BillingSubscriptionPreviewChange }[] = [];
   private readonly held = new Map<string, BillingSubscription>();
   private readonly lineItems = new Map<string, BillingPurchasedLineItem[]>();
+  private readonly refusals = new Map<
+    Operation,
+    { error: Error; allowed: number; times: number }
+  >();
   private readonly subscriptionCheckouts = new Map<string, BillingSubscriptionCheckout>();
   readonly checkoutLookups: string[] = [];
-  private readonly refusals = new Map<Operation, Error>();
   private preview: BillingInvoicePreview | undefined;
+  private readonly previewsByQuantity = new Map<number, BillingInvoicePreview>();
 
   private constructor() {
     super();
@@ -70,14 +74,28 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     this.subscriptionCheckouts.set(subscriptionId, checkout);
   }
 
-  /** What every invoice preview answers from now on. */
-  seedPreview({ preview }: { preview: BillingInvoicePreview }): void {
-    this.preview = preview;
+  /** What every invoice preview answers from now on, or only one moving the line to `quantity`. */
+  seedPreview({ preview, quantity }: { preview: BillingInvoicePreview; quantity?: number }): void {
+    if (quantity === undefined) this.preview = preview;
+    else this.previewsByQuantity.set(quantity, preview);
   }
 
-  /** Makes `operation` throw `error` from now on, as a failing provider would. */
-  refuse({ operation, error }: { operation: Operation; error: Error }): void {
-    this.refusals.set(operation, error);
+  /**
+   * Makes `operation` throw `error`, as a failing provider would: after `allowed` more calls
+   * succeed (default none), for `times` calls (default every one from then on).
+   */
+  refuse({
+    operation,
+    error,
+    allowed = 0,
+    times = Number.POSITIVE_INFINITY,
+  }: {
+    operation: Operation;
+    error: Error;
+    allowed?: number;
+    times?: number;
+  }): void {
+    this.refusals.set(operation, { error, allowed, times });
   }
 
   async getSubscription({
@@ -96,6 +114,7 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
   }: {
     subscriptionId: string;
     change: BillingSubscriptionChange;
+    timeoutMs?: number;
   }): Promise<BillingSubscription> {
     this.throwIfRefused("updateSubscription");
     const subscription = this.find(subscriptionId);
@@ -170,13 +189,23 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
   }): Promise<BillingInvoicePreview> {
     this.throwIfRefused("previewInvoice");
     this.previews.push({ subscriptionId, change });
-    if (!this.preview) throw new Error("no scripted Stripe invoice preview");
-    return this.preview;
+    const quantity = change.items?.[0]?.quantity;
+    const preview =
+      (quantity === undefined ? undefined : this.previewsByQuantity.get(quantity)) ?? this.preview;
+    if (!preview) throw new Error("no scripted Stripe invoice preview");
+    return preview;
   }
 
   private throwIfRefused(operation: Operation): void {
     const refusal = this.refusals.get(operation);
-    if (refusal) throw refusal;
+    if (!refusal) return;
+    if (refusal.allowed > 0) {
+      refusal.allowed -= 1;
+      return;
+    }
+    refusal.times -= 1;
+    if (refusal.times <= 0) this.refusals.delete(operation);
+    throw refusal.error;
   }
 
   private find(subscriptionId: string): BillingSubscription {

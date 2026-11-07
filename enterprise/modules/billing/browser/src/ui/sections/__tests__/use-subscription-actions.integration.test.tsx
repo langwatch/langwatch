@@ -17,11 +17,6 @@ import { useSubscriptionActions } from "../use-subscription-actions.ts";
 const createSubscription = vi.fn(async (_input: unknown) => ({ url: "https://checkout" }));
 const upgradeWithInvites = vi.fn(async (_input: unknown) => ({ url: "https://checkout" }));
 
-vi.mock("@langwatch/browser-host/lent", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  useLentHooks: () => ({ openSeats: vi.fn() }),
-}));
-
 vi.mock("../../../behavior/billing-api.ts", () => ({
   billingApi: {
     subscription: {
@@ -91,11 +86,6 @@ function upgradeAs(host: MemberHost) {
         organizationId: "org-1",
         currency: "EUR",
         billingPeriod: "monthly",
-        totalFullMembers: 3,
-        plannedUsers: [
-          { id: "p1", email: "finance@acme.test", memberType: "FullMember" },
-          { id: "p2", email: "ops@acme.test", memberType: "FullMember" },
-        ],
         onSeatsUpdated: vi.fn(),
         organizationWithMembers: { refetch: vi.fn() },
       }),
@@ -114,7 +104,9 @@ describe("given planned seats with email addresses", () => {
       const host = new MemberHost(false);
       const { result } = upgradeAs(host);
 
-      await act(() => result.current.handleUpgrade());
+      await act(() =>
+        result.current.handleUpgrade({ seats: 3, emails: ["finance@acme.test", "ops@acme.test"] }),
+      );
 
       expect(upgradeWithInvites).not.toHaveBeenCalled();
       expect(createSubscription).toHaveBeenCalledWith(
@@ -128,7 +120,9 @@ describe("given planned seats with email addresses", () => {
     it("sends the invitations with the checkout", async () => {
       const { result } = upgradeAs(new MemberHost(true));
 
-      await act(() => result.current.handleUpgrade());
+      await act(() =>
+        result.current.handleUpgrade({ seats: 3, emails: ["finance@acme.test", "ops@acme.test"] }),
+      );
 
       expect(createSubscription).not.toHaveBeenCalled();
       expect(upgradeWithInvites).toHaveBeenCalledWith(

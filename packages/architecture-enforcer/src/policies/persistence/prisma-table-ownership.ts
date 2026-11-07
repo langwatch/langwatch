@@ -96,6 +96,13 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
     ],
   },
   {
+    table: "SeatHold",
+    owner: "organization",
+    readers: ["entitlement", "licensing", "scim"],
+    reason:
+      "a removed, disabled or demoted full member's seat stays counted until 30 days after they took it (seat-rotation.feature): entitlement counts held seats for usage stats, licensing for a licence's seat limits and scim to place a provisioned person, through the same count as OrganizationUser, never OrganizationApi (R-C1f, R40)",
+  },
+  {
     table: "Organization",
     owner: "organization",
     readers: ["scim", "entitlement", "billing", "licensing"],

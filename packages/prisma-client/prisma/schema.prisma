@@ -1097,10 +1097,40 @@ model OrganizationUser {
   /// removing and rejoining therefore cannot revive a delayed old attach.
   membershipStamp String @default(dbgenerated("gen_random_uuid()::text"))
 
+  /// When this membership started holding the full seat it holds now; null means createdAt.
+  /// Anchors the 30-day seat hold (specs/licensing/seat-rotation.feature).
+  fullSeatSince DateTime?
+
+  /// Set when admission wrote this membership disabled because no seat was free: the person
+  /// is waiting for one. Cleared when the membership is enabled.
+  seatPendingSince DateTime?
+
   @@id([userId, organizationId])
   @@index([organizationId])
   @@index([userId])
   @@index([departmentId])
+}
+
+/// A full seat still counted after the person who took it stopped holding it (removed,
+/// disabled or demoted), until 30 days after they took it (specs/licensing/seat-rotation.feature).
+/// One per organization and person; a return within the hold takes the seat back.
+model SeatHold {
+  id             String   @id
+  organizationId String
+  userId         String
+  /// Display copy for the Users list, kept because a removed person has no membership row.
+  email          String?
+  name           String?
+  /// When the person took the seat this hold keeps.
+  seatTakenAt    DateTime
+  /// seatTakenAt plus 30 days; expired holds are ignored by every count and deleted hourly.
+  heldUntil      DateTime
+  /// REMOVED | DISABLED | DEMOTED
+  reason         String
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, userId])
+  @@index([heldUntil])
 }
 
 /// A person asked for a full seat the organization had no room for (modules/organization/specs/
@@ -4628,6 +4658,33 @@ model Subscription {
   maxDashboards         Int?
   maxCustomGraphs       Int?
   maxAutomations        Int?
+  /// Seats paid for this period that stay usable after a seat decrease, until seatsKeptUntil.
+  seatsKept             Int?
+  seatsKeptUntil        DateTime?
+  /// The seat quantity the last finished seat change set the seat line to; provider events never write it.
+  seatLineQuantity      Int?
+  seatLineQuantityAt    DateTime?
+  /// A Stripe seat line write recorded before it is sent and cleared once it is known to have
+  /// finished under the lease; one left behind is settled by the seat line repair.
+  /// Every seat quantity written while this record was pending.
+  seatLineWriteQuantities Int[] @default([])
+  /// The first write still pending; a later holder's write keeps it.
+  seatLineWriteSince    DateTime?
+  /// The latest write sent; the repair waits a grace window after it.
+  seatLineWriteAt       DateTime?
+  seatLineWriteAttempts Int?
+  seatLineWriteFlaggedAt DateTime?
+  /// The seat quantity Stripe should bill if a seat change stops after lifting the seat line; null once settled.
+  seatRepairQuantity    Int?
+  /// The quantity the change lifted the line to; the repair moves the line back only while Stripe still bills it.
+  seatRepairLiftedQuantity Int?
+  seatRepairSince       DateTime?
+  seatRepairAttempts    Int?
+  /// Set once the seat line repair has failed often enough that Ops should look at it.
+  seatRepairFlaggedAt   DateTime?
+  /// The lease a seat change or seat line repair holds while it reads and moves the seat line.
+  seatLineLeaseToken    String?
+  seatLineLeaseUntil    DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]

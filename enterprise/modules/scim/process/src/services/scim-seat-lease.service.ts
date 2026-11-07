@@ -25,7 +25,8 @@ export interface ScimSeatLock {
 }
 
 /** What an admission is held to: the seat counts, read and written under the seat lease. */
-export type ScimSeats = Pick<ScimSeatRepository, "countMemberSeats"> & ScimSeatLock;
+export type ScimSeats = Pick<ScimSeatRepository, "countMemberSeats" | "findLiveHoldUserIds"> &
+  ScimSeatLock;
 
 /**
  * Organization's seat lease, taken through its Api: acquired (or refused seat_change_busy after

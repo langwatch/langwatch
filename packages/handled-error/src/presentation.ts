@@ -4117,6 +4117,11 @@ const presentations = {
     describe: () =>
       "A Developer seat works in your own project only. Ask an admin for a Member seat if you need shared projects.",
   },
+  developer_seats_unavailable: {
+    // No Developer seat price is configured for the subscription's currency and interval.
+    title: "Developer seats aren't sold on this plan yet",
+    describe: () => "Nothing was charged. Contact us at sales@langwatch.ai to add Developer seats.",
+  },
   dataset_column_type_change_unsupported: {
     // Customer fault in the ADR-045 sense: they asked for something the format
     // can't do, and there is a way to get where they were going.

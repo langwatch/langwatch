@@ -247,6 +247,7 @@ export const APP_ERROR_CODES = [
   "department_not_found",
   "developer_seat_no_shared_access",
   "developer_seat_restricted",
+  "developer_seats_unavailable",
   "docs_origin_not_registered",
   "dspy_step_not_found",
   "duplicate_invite",
