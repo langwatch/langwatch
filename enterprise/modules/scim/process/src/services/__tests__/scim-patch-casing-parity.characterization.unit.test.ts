@@ -24,7 +24,11 @@ import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 const openSeats = {
   countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
   findLiveHoldUserIds: async () => [],
-  withSeatLock: <T>({ work }: { work: () => Promise<T> }): Promise<T> => work(),
+  withSeatLock: <T>({
+    work,
+  }: {
+    work: (lease: { assertHeld(): Promise<void> }) => Promise<T>;
+  }): Promise<T> => work({ assertHeld: async () => {} }),
 };
 
 const patchSchema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";

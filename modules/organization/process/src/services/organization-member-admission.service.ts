@@ -133,7 +133,7 @@ export class OrganizationMemberAdmissionService {
     const requested = seat ?? (await this.repo.readJoinerSeat({ organizationId }));
     const admission = await this.dependencies.seats.withSeat({
       organizationId,
-      work: async () => {
+      work: async (lease) => {
         // A person back within their hold takes the held seat, not a second one.
         const [hold] =
           requested === "MEMBER"
@@ -142,6 +142,7 @@ export class OrganizationMemberAdmissionService {
         const decided = hold
           ? admissionSeat({ requested, fullSeatFree: true, liteSeatFree: true })
           : await this.decideSeat({ organizationId, userId, requested });
+        await lease.assertHeld();
         return this.repo.createMembership({
           organizationId,
           userId,

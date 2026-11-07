@@ -11,7 +11,7 @@ Organisations and who is in them: membership, invites, teams, groups and persona
 | Classification | core (`modules/catalogue.json`)                                                                                             |
 | Subjects       | group, invite, membership, organization, personal-workspace, personal-workspace-features, team                              |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                                 |
-| Api token      | `OrganizationApi` = `moduleApi<OrganizationApi>()("organization")`, `contract/src/organization.api.ts:929` (157 operations) |
+| Api token      | `OrganizationApi` = `moduleApi<OrganizationApi>()("organization")`, `contract/src/organization.api.ts:932` (157 operations) |
 | Other token    | `TeamManagementApi`, `process/src/transport/team.rest.ts:60`                                                                |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                                  |
 
@@ -20,7 +20,7 @@ Organisations and who is in them: membership, invites, teams, groups and persona
 | Kind                           | Name                                                                                                                                                                  | Declared at                                                                          |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | Postgres table                 | `OrganizationAccessNotice`                                                                                                                                            | `process/src/repositories/prisma/prisma.organization-access-notice.repository.ts:16` |
-| Postgres table                 | `OrganizationSeatLease`                                                                                                                                               | `process/src/repositories/prisma/prisma.organization-seat.repository.ts:93`          |
+| Postgres table                 | `OrganizationSeatLease`                                                                                                                                               | `process/src/repositories/prisma/prisma.organization-seat.repository.ts:94`          |
 | Postgres table                 | `Organization`                                                                                                                                                        | `process/src/repositories/prisma/prisma.scope-graph.repository.ts:14`                |
 | Postgres table                 | `OrganizationUser`                                                                                                                                                    | `process/src/repositories/prisma/prisma.scope-graph.repository.ts:14`                |
 | Postgres table                 | `SeatHold`                                                                                                                                                            | `process/src/repositories/prisma/prisma.seat-hold.repository.ts:25`                  |

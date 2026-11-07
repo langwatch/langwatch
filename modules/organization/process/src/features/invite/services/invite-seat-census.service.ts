@@ -1,6 +1,9 @@
 import { isViewOnlyCustomRole } from "@langwatch/entitlement-contract";
 
-import type { OrganizationSeatRepository } from "../../../repositories/organization-seat.repository.ts";
+import type {
+  OrganizationSeatRepository,
+  SeatLease,
+} from "../../../repositories/organization-seat.repository.ts";
 import type { OrganizationInviteSeatCensus } from "../../../rules/invite-contracts.rules.ts";
 import type { SeatHoldService } from "../../../services/seat-hold.service.ts";
 
@@ -45,7 +48,10 @@ export class InviteSeatCensusService implements OrganizationInviteSeatCensus {
     return this.holds.takeBackHeldSeat(input);
   }
 
-  withSeatLock<T>(input: { organizationId: string; work: () => Promise<T> }): Promise<T> {
+  withSeatLock<T>(input: {
+    organizationId: string;
+    work: (lease: SeatLease) => Promise<T>;
+  }): Promise<T> {
     return this.memberships.withSeatLock(input);
   }
 }

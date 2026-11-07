@@ -605,6 +605,7 @@ export const prismaModelFieldCatalogue = {
     "openedAt",
     "resolvedAt",
     "resolvedByUserId",
+    "seatPendingSince",
     "createdAt",
     "updatedAt"
   ],

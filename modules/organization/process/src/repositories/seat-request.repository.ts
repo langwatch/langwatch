@@ -62,6 +62,13 @@ export abstract class SeatRequestRepository {
     resolvedByUserId: string | null;
     at: number;
   }): Promise<void>;
+  /** Marks the approval made at `at` as having given its seat. */
+  abstract settleSeat(input: { organizationId: string; id: string; at: number }): Promise<void>;
+  /** Approvals whose seat was still not given before `since`: their seat never landed. */
+  abstract findSeatPending(input: {
+    organizationId: string;
+    since: number;
+  }): Promise<SeatRequestRow[]>;
   /** Claims the one sales notice of this opening; false when it was claimed already. */
   abstract claimSalesNotice(input: { id: string; at: number }): Promise<boolean>;
   /** Every request naming this person, in any organization. */

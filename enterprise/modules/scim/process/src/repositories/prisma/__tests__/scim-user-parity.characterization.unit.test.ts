@@ -24,7 +24,11 @@ import type { ScimRepository } from "../../scim.repository.ts";
 const openSeats = {
   countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
   findLiveHoldUserIds: async () => [],
-  withSeatLock: <T>({ work }: { work: () => Promise<T> }): Promise<T> => work(),
+  withSeatLock: <T>({
+    work,
+  }: {
+    work: (lease: { assertHeld(): Promise<void> }) => Promise<T>;
+  }): Promise<T> => work({ assertHeld: async () => {} }),
 };
 
 const now = new Date("2026-08-25T12:00:00.000Z");

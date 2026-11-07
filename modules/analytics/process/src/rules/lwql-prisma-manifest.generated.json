@@ -3781,6 +3781,15 @@
           "documentation": ""
         },
         {
+          "name": "seatPendingSince",
+          "columnName": "seatPendingSince",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Set when an approval claims the request, cleared once its seat is given; an approval\nstill pending long after is one whose seat never landed, and is reopened."
+        },
+        {
           "name": "createdAt",
           "columnName": "createdAt",
           "type": "DateTime",

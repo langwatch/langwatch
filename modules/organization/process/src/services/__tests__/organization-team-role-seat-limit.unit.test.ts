@@ -34,7 +34,11 @@ function serviceWhere(options: {
       }),
     }),
     creations: { created: vi.fn(), reportError: vi.fn() },
-    seats: { checkLimit: vi.fn(), assertRoleChangeAllowed, withSeat: ({ work }) => work() },
+    seats: {
+      checkLimit: vi.fn(),
+      assertRoleChangeAllowed,
+      withSeat: ({ work }) => work({ assertHeld: async () => {} }),
+    },
     seatNotices: { memberDisabled: vi.fn(), memberEnabled: vi.fn() },
     grantCache: { invalidateOrganization: vi.fn() },
     testArrivals: { standingFor: async (): Promise<{ testing: false }> => ({ testing: false }) },

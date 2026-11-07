@@ -12,6 +12,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { MemoryAccessNoticeMailChannel } from "../../../channels/memory/memory.access-notice-mail.channel.ts";
 import { MemoryOrganizationDatabase } from "../../../repositories/memory/memory.organization.database.ts";
+import { MemorySeatRequestRepository } from "../../../repositories/memory/memory.seat-request.repository.ts";
 import type { OrganizationLifecycleSenders } from "../../../services/organization-lifecycle-notice.service.ts";
 import { OrganizationModule } from "../../organization.app.ts";
 import { organizationModuleSetup } from "./organization-module-setup.ts";
@@ -157,6 +158,9 @@ export async function application(
 
   /** The seat request rows, whose writes a test may make fail. */
   const seatRequests = setup.repositories.seatRequests;
+  if (!(seatRequests instanceof MemorySeatRequestRepository)) {
+    throw new Error("the seat request fixture runs on the memory repository");
+  }
 
   return {
     app,

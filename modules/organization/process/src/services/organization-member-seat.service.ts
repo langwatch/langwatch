@@ -12,6 +12,7 @@ import {
 } from "@langwatch/organization-contract";
 
 import type { OrganizationMembershipRepository } from "../repositories/organization-membership.repository.ts";
+import type { SeatLease } from "../repositories/organization-seat.repository.ts";
 import type { SeatTransition } from "../repositories/seat-hold.repository.ts";
 import type { SeatRequestRepository } from "../repositories/seat-request.repository.ts";
 import type {
@@ -147,12 +148,13 @@ export class OrganizationMemberSeatService {
     try {
       const admitted = await this.dependencies.seats.withSeat({
         organizationId,
-        work: () =>
+        work: (lease) =>
           this.admitWaitingMember({
             organizationId,
             userId: giveSeatToUserId,
             actingUserId,
             caller,
+            lease,
           }),
       });
       return { seatGivenToUserId: admitted ? giveSeatToUserId : null, seatHandoverFailed: false };
@@ -172,11 +174,13 @@ export class OrganizationMemberSeatService {
     userId,
     actingUserId,
     caller,
+    lease,
   }: {
     organizationId: string;
     userId: string;
     actingUserId: string | null;
     caller: AuthzGrantCaller;
+    lease: SeatLease;
   }): Promise<boolean> {
     const { seatHolds, seats, seatNotices, grantCache } = this.dependencies;
     if (!(await seatHolds.isWaiting({ organizationId, userId }))) return false;
@@ -187,6 +191,7 @@ export class OrganizationMemberSeatService {
     // One write turns the waiting row into an enabled MEMBER carrying its grant intent; the grant
     // needs a live membership, so it lands after, and an unfinished one resumes (ADR-129).
     const grantId = newAuthzGrantId();
+    await lease.assertHeld();
     const enabled = await this.repo.admitWaitingMember({
       organizationId,
       userId,
@@ -324,7 +329,7 @@ export class OrganizationMemberSeatService {
       try {
         admitted += await this.dependencies.seats.withSeat({
           organizationId,
-          work: () => this.admitWaitingMembers({ organizationId }),
+          work: (lease) => this.admitWaitingMembers({ organizationId, lease }),
         });
         await seatHolds.deleteEnded({ organizationId, now });
       } catch (error) {
@@ -341,8 +346,10 @@ export class OrganizationMemberSeatService {
   /** Gives free full seats to the people waiting longest; answers how many were admitted. */
   private async admitWaitingMembers({
     organizationId,
+    lease,
   }: {
     organizationId: string;
+    lease: SeatLease;
   }): Promise<number> {
     let admitted = 0;
     for (const waiting of await this.dependencies.seatHolds.findWaitingMembers({
@@ -353,6 +360,7 @@ export class OrganizationMemberSeatService {
         userId: waiting.userId,
         actingUserId: null,
         caller: { type: "system" },
+        lease,
       });
       if (!given) break;
       admitted += 1;

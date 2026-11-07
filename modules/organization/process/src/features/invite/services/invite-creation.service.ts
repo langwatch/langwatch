@@ -324,7 +324,7 @@ export class InviteCreationService {
     // Phase 1, under the seat lock: count, validate and write, no side effects.
     const createdRecords = await this.deps.seats.withSeatLock({
       organizationId,
-      work: async () => {
+      work: async (lease) => {
         await this.checkLicenseLimits({
           organizationId,
           newInvites: invites.map((invite) => ({
@@ -335,6 +335,7 @@ export class InviteCreationService {
           user,
         });
         const validInvites = await this.validatedInvites({ organizationId, invites, isStrict });
+        await lease.assertHeld();
         return this.invites.withTransaction(
           (transaction) =>
             this.persistInvites({

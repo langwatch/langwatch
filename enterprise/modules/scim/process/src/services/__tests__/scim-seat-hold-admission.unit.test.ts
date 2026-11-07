@@ -55,7 +55,7 @@ function seatsWith({ heldBy }: { heldBy: string[] }): ScimSeats {
   return {
     countMemberSeats: async () => ({ fullMembers: 1, liteMembers: 0, developers: 0 }),
     findLiveHoldUserIds: async () => heldBy,
-    withSeatLock: ({ work }) => work(),
+    withSeatLock: ({ work }) => work({ assertHeld: async () => {} }),
   };
 }
 

@@ -116,10 +116,10 @@ acquireSeatLease(input: Readonly<{ organizationId: string }>): Promise<Readonly<
 
 #### `renewSeatLease`
 
-Pushes this holder's lease expiry out again; a lease taken over meanwhile is left alone.
+Pushes this holder's lease expiry out again; false when the lease is no longer this holder's, so a caller about to write a seat-holding row must not write it.
 
 ```typescript
-renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void>;
+renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<boolean>;
 ```
 
 #### `releaseSeatLease`

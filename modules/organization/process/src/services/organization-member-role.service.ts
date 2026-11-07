@@ -16,6 +16,7 @@ import type {
   OrganizationMembershipRepository,
   UpdateMemberRoleResult,
 } from "../repositories/organization-membership.repository.ts";
+import type { SeatLease } from "../repositories/organization-seat.repository.ts";
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
 import {
   customRoleIdsOf,
@@ -136,7 +137,7 @@ export class OrganizationMemberRoleService {
     } else {
       const admitted = await this.dependencies.seats.withSeat({
         organizationId,
-        work: () => this.enableUnderSeatLease({ organizationId, userId, actingUser }),
+        work: (lease) => this.enableUnderSeatLease({ organizationId, userId, actingUser, lease }),
       });
       if (admitted) return;
     }
@@ -174,10 +175,12 @@ export class OrganizationMemberRoleService {
     organizationId,
     userId,
     actingUser,
+    lease,
   }: {
     organizationId: string;
     userId: string;
     actingUser?: OrganizationPlanUser | null;
+    lease: SeatLease;
   }): Promise<boolean> {
     if (await this.dependencies.seatHolds.isWaiting({ organizationId, userId })) {
       const admitted = await this.dependencies.memberSeats.admitWaitingMember({
@@ -185,6 +188,7 @@ export class OrganizationMemberRoleService {
         userId,
         actingUserId: actingUser?.id ?? null,
         caller: { type: "system" },
+        lease,
       });
       if (admitted) return true;
       const limit = await this.dependencies.seats.checkLimit({
@@ -201,6 +205,7 @@ export class OrganizationMemberRoleService {
       userId,
       actingUser: actingUser ?? undefined,
     });
+    await lease.assertHeld();
     await this.repo.setMemberDisabled({ organizationId, userId, disabled: false, seat });
     return false;
   }
@@ -311,7 +316,7 @@ export class OrganizationMemberRoleService {
 
     return this.dependencies.seats.withSeat({
       organizationId,
-      work: async () => {
+      work: async (lease) => {
         const seat = await this.dependencies.memberSeats.seatOnRoleChange({
           organizationId,
           userId,
@@ -321,6 +326,7 @@ export class OrganizationMemberRoleService {
           role,
           planUser: params.planUser,
         });
+        await lease.assertHeld();
         return this.repo.updateMemberRole({
           organizationId,
           userId,
