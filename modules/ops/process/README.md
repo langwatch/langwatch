@@ -1627,7 +1627,7 @@ interface Output {
 
 ### `ops`
 
-Contract `../contract/src/ops-platform.trpc.ts:30`, router `src/transport/ops-platform.trpc.ts:15`.
+Contract `../contract/src/ops-platform.trpc.ts:29`, router `src/transport/ops-platform.trpc.ts:15`.
 
 | Procedure                   | Kind     | Gate                             | Input                               | Output                               |
 | --------------------------- | -------- | -------------------------------- | ----------------------------------- | ------------------------------------ |
@@ -1645,7 +1645,7 @@ Contract `../contract/src/ops-platform.trpc.ts:30`, router `src/transport/ops-pl
 
 ```typescript
 // ops.listFeatureFlags
-// Input: inline, ../contract/src/ops-platform.trpc.ts:37
+// Input: inline, ../contract/src/ops-platform.trpc.ts:36
 type Input = unknown;
 type Output = z.infer<typeof operatorFeatureFlagCatalogueSchema>; // ../../feature-flag/contract/src/feature-flag.schemas.ts:76
 
@@ -1669,13 +1669,13 @@ interface Input {
 type Output = z.infer<typeof opsOkOutputSchema>; // ../contract/src/ops-feature-flag.ts:13
 
 // ops.listBlobQueues
-// Input: inline, ../contract/src/ops-platform.trpc.ts:53
+// Input: inline, ../contract/src/ops-platform.trpc.ts:52
 type Input = unknown;
 // Output: opsQueueNameListSchema, ../contract/src/ops.responses.ts:275
 type Output = string[];
 
 // ops.getBlobStoreStats
-// Input: inline, ../contract/src/ops-platform.trpc.ts:57
+// Input: inline, ../contract/src/ops-platform.trpc.ts:56
 type Input = unknown;
 // Output: opsBlobStoreStatsSchema, ../contract/src/blob-store.ts:76
 interface Output {
@@ -1706,7 +1706,7 @@ interface Input {
   projectId: string;
   hash: string;
 }
-// Output: inline, ../contract/src/ops-platform.trpc.ts:66
+// Output: inline, ../contract/src/ops-platform.trpc.ts:65
 type Output = {
   queueName: string;
   projectId: string;
@@ -1741,9 +1741,9 @@ interface Output {
 }
 
 // ops.findSeatSharingChecks
-// Input: inline, ../contract/src/ops-platform.trpc.ts:78
+// Input: inline, ../contract/src/ops-platform.trpc.ts:77
 type Input = unknown;
-// Output: inline, ../contract/src/ops-platform.trpc.ts:79
+// Output: inline, ../contract/src/ops-platform.trpc.ts:78
 type Output = {
   checkedAt: number;
   windowDays: number;

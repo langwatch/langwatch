@@ -149,8 +149,8 @@ import type {
   OpsOperatorPermission,
   OpsPipelineRegistrations,
   OpsScope,
+  SeatSharingCheck,
 } from "./ops.responses.ts";
-import type { SeatSharingCheck } from "./seat-sharing.ts";
 
 export type DiscoverAggregatesInput = {
   projectionNames: string[];

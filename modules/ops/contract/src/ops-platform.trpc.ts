@@ -24,8 +24,7 @@ import {
   opsSetFeatureFlagInputSchema,
   opsSetFeatureFlagRulesInputSchema,
 } from "./ops-feature-flag.ts";
-import { opsQueueNameListSchema } from "./ops.responses.ts";
-import { seatSharingCheckSchema } from "./seat-sharing.ts";
+import { opsQueueNameListSchema, seatSharingCheckSchema } from "./ops.responses.ts";
 
 export const opsPlatformTrpc = defineTrpcContract("ops")
   /**
