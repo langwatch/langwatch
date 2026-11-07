@@ -44,6 +44,7 @@ vi.hoisted(() => {
         return Promise.resolve();
       },
     },
+    configurable: true,
   });
 });
 
