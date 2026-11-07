@@ -32,7 +32,10 @@ import {
   definePipeline,
   type EventingSetup,
 } from "@langwatch/eventing";
-import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import {
+  ORGANIZATION_AGGREGATE_TYPE,
+  OrganizationNotFoundError,
+} from "@langwatch/organization-contract";
 import { Temporal } from "@langwatch/time";
 import { USER_ERASED_EVENT_TYPE, userErasedEventDataSchema } from "@langwatch/user-contract";
 
@@ -60,7 +63,6 @@ import {
   integrationMethodChosenEventSchema,
   inviteAcceptedEventSchema,
   membersInvitedEventSchema,
-  ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_LIFECYCLE_PIPELINE_NAME,
   organizationCreatedEventSchema,
   organizationMemberDisabledEventSchema,

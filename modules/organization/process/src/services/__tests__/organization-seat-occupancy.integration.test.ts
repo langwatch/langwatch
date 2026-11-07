@@ -7,6 +7,7 @@ import { EventLogReadSeat } from "@langwatch/eventing";
 import { EventRepositoryMemory } from "@langwatch/eventing/testing";
 import { createLogger } from "@langwatch/observability";
 import {
+  ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
   ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
 } from "@langwatch/organization-contract";
@@ -19,7 +20,6 @@ import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-clien
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { ORGANIZATION_AGGREGATE_TYPE } from "../../eventing/organization-lifecycle.events.ts";
 import { EventingOrganizationDeparturesRepository } from "../../repositories/eventing/eventing.organization-departures.repository.ts";
 import { PrismaOrganizationSeatRepository } from "../../repositories/prisma/prisma.organization-seat.repository.ts";
 import { OrganizationSeatOccupancyService } from "../organization-seat-occupancy.service.ts";

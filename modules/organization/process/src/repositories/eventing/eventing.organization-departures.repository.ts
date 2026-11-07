@@ -1,14 +1,12 @@
 import { createTenantId, type EventReadSeat } from "@langwatch/eventing";
 import {
+  ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
   ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
 } from "@langwatch/organization-contract";
 import { z } from "zod";
 
 import { OrganizationDeparturesRepository } from "../organization-departures.repository.ts";
-
-/** The aggregate the organization records its member facts on. */
-const ORGANIZATION_AGGREGATE_TYPE = "organization";
 
 /** The one read this repository takes: one organization's lifecycle stream. */
 type OrganizationEventReads = Pick<EventReadSeat, "findAggregateEvents">;
