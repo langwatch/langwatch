@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from "vitest";
  * the store registered.
  * @see specs/traces-v2/instant-eval-search.feature
  */
-import { useFilterStore } from "../../../../behavior/explorer.store.ts";
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { useInstantEvalRuns } from "../use-instant-eval-runs.ts";
 
 const WINDOW = { from: 1_000, to: 2_000 };
@@ -24,6 +24,8 @@ beforeEach(() => {
     debouncedTimeRange: WINDOW,
     evalRuns: {},
   });
+  // Another suite in this worker may leave the conversations lens active, which targets threads.
+  useViewStore.setState({ activeLensId: "all-traces" });
 });
 
 describe("given a query with an eval chip", () => {
