@@ -589,7 +589,11 @@ describe("when a version is restored", () => {
   it("refuses a legacy single-file dataset", async () => {
     const datasetId = await createDataset();
     await save(datasetId);
-    await repositories.content.update({ id: datasetId, projectId: PROJECT, data: { useS3: true } });
+    await repositories.content.update({
+      id: datasetId,
+      projectId: PROJECT,
+      data: { useS3: true, contentLayout: "postgres" },
+    });
 
     await expect(
       app.restoreVersion({ projectId: PROJECT, datasetId, version: 1 }),
