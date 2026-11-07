@@ -579,3 +579,16 @@ export class DatasetVersionTooLargeError extends HandledError {
     this.name = "DatasetVersionTooLargeError";
   }
 }
+
+/** A deterministic id was reused with another scope or different content. */
+export class DatasetRecordConflictError extends HandledError {
+  declare readonly code: "dataset_record_conflict";
+
+  constructor(id: string) {
+    super("dataset_record_conflict", `Dataset row ${id} conflicts with an earlier write.`, {
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "DatasetRecordConflictError";
+  }
+}

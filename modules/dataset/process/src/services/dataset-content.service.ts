@@ -316,13 +316,19 @@ export class DatasetContentService implements DatasetContent {
     const entries = input.entries.map(({ id: _id, ...entry }) => entry);
     entries.forEach((entry) => assertStoredRowWithinLimit(entry));
     const storage = this.storage;
-    await this.chunks.append({
+    const written = await this.chunks.append({
       dataset,
       projectId: input.projectId,
       entries,
       forcedIds,
       storage,
+      skipDuplicates: input.skipDuplicates,
+      readBackExisting: input.readBackExisting,
+      verifyExisting: input.verifyExisting,
     });
+    if (written.records) {
+      return written.records.map((record) => toDatasetRecord(record, dataset));
+    }
     return entries.map((entry, index) => toDatasetRecord({ id: forcedIds[index], entry }, dataset));
   }
 

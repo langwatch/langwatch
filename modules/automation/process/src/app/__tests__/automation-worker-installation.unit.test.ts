@@ -12,7 +12,12 @@ import {
  * The automation module installed on the worker role: the pipeline it hosts, over memory.
  */
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { type Dataset, type DatasetApi, InvalidColumnError } from "@langwatch/dataset-contract";
+import {
+  type Dataset,
+  type DatasetApi,
+  type DatasetRecord,
+  InvalidColumnError,
+} from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -43,6 +48,21 @@ import { AutomationPersistCapService } from "../../features/runaway/services/per
 
 const qaDataset = async (): Promise<Dataset> =>
   ({ id: "dataset-1", name: "qa", columnTypes: [{ name: "question", type: "string" }] }) as Dataset;
+
+/** A dataset that stored every row, so the writer's id check sees the write land. */
+function storedRows(input: Parameters<DatasetApi["batchCreateRecords"]>[0]): DatasetRecord[] {
+  return input.entries.map(
+    ({ id, ...entry }) =>
+      ({
+        id: id ?? "generated-id",
+        datasetId: "dataset-1",
+        projectId: input.projectId,
+        entry,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      }) as DatasetRecord,
+  );
+}
 
 const CONFIG: AutomationServerConfig = {
   emailHourlyCap: 100,
@@ -381,7 +401,7 @@ describe("given a memory-tier worker settling a match end to end", () => {
               throw new InvalidColumnError(refusal);
             }
             appended.push(input);
-            return [];
+            return storedRows(input);
           },
         }),
       });
@@ -410,9 +430,9 @@ describe("given a memory-tier worker settling a match end to end", () => {
         entitlement: planWithCeiling(1),
         dataset: createApiFixture<DatasetApi>({
           findBySlugOrId: qaDataset,
-          batchCreateRecords: async ({ slugOrId }) => {
-            appended.push(slugOrId);
-            return [];
+          batchCreateRecords: async (input) => {
+            appended.push(input.slugOrId);
+            return storedRows(input);
           },
         }),
       });
@@ -538,9 +558,9 @@ async function breachedWorker(input: {
     }),
     dataset: createApiFixture<DatasetApi>({
       findBySlugOrId: qaDataset,
-      batchCreateRecords: async ({ slugOrId }) => {
-        appended.push(slugOrId);
-        return [];
+      batchCreateRecords: async (input) => {
+        appended.push(input.slugOrId);
+        return storedRows(input);
       },
     }),
   });

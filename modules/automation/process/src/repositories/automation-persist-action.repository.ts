@@ -12,6 +12,7 @@ export abstract class AutomationPersistActionRepository {
     datasetId: string;
     projectId: string;
     triggerId: string;
+    traceId: string;
     datasetRecords: DatasetRecordEntry[];
   }): Promise<void>;
 }

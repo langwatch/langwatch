@@ -884,7 +884,10 @@ describe("given datasets created before versioning", () => {
   /** @scenario "Existing datasets get version 1 in the background" */
   it("gives each ready dataset version 1, once", async () => {
     const first = await createDataset();
-    const second = await createDataset();
+    const second = await createDataset([
+      { id: "second-a", input: "first" },
+      { id: "second-b", input: "second" },
+    ]);
 
     const { report } = await run();
     const again = await run();
@@ -915,7 +918,7 @@ describe("given datasets created before versioning", () => {
       projectId: "project-0",
       name: "fails-once",
       columnTypes: [{ name: "input", type: "string" }],
-      datasetRecords: [{ id: "a", input: "x" }],
+      datasetRecords: [{ id: "project-0-a", input: "x" }],
     });
     await createDataset();
     vi.spyOn(repositories.versions, "create").mockRejectedValueOnce(new Error("disk full"));
@@ -939,7 +942,7 @@ describe("given datasets created before versioning", () => {
       projectId: "project-0",
       name: "finished-before",
       columnTypes: [{ name: "input", type: "string" }],
-      datasetRecords: [{ id: "a", input: "x" }],
+      datasetRecords: [{ id: "project-0-a", input: "x" }],
     });
     const datasetId = await createDataset();
 
