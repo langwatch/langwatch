@@ -36,7 +36,7 @@ exports[`the @langwatch/eventing public surface > given the . entry > exports ex
   "EventUpcastReader: class [findActiveUpcasts]",
   "EventUtils: object",
   "FoldCacheEntryUnreadableError: class []",
-  "FoldProjectionExecutor: class [appliedIdsForCommit, applyOutOfOrderRefold, assertUndecodableIsRecoverable, assertUndecodableWasRebuilt, dropAlreadyApplied, execute, executeBatch, handleAbsentMiss, historyReadGap, loadWithApplied, matchesEventTypes, readHistoryUntilComplete, readWideningBack, rebuild, refoldBatchAfterMiss, refoldUpToDelivered, refoldWithDelivered, shouldRefoldOnMiss, streamRefoldUpToDelivered, trustsAbsentMiss]",
+  "FoldProjectionExecutor: class [appliedIdsForCommit, applyOutOfOrderRefold, assertUndecodableIsRecoverable, assertUndecodableWasRebuilt, dropAlreadyApplied, execute, executeBatch, handleAbsentMiss, historyReadGap, loadWithApplied, matchesEventTypes, readHistoryUntilComplete, readWideningBack, rebuild, refoldBatchAfterMiss, refoldUpToDelivered, refoldWithDelivered, shouldRefoldOnMiss, streamHistoryForRebuild, streamRebuild, streamRefoldUpToDelivered, trustsAbsentMiss]",
   "HANDOFF_PROCESS_NAME: string",
   "HandlerError: class []",
   "InMemoryProcessStore: class [appendIntents, commit, countPendingMessages, deleteConsumedInboxBatch, deleteDeadOutboxBatch, deleteDispatchedBefore, deleteDispatchedOutboxBatch, deleteMessage, deleteOutboxBatch, findByRef, findDueWakes, findFailedAttempts, findInstances, findMessagesByRef, findProcessKeys, hasConsumedSource, insertMessages, leaseDueMessages, leaseDueWakes, markDispatched, markFailed, recordFailedAttempt, releaseLease, releaseWakeClaim, renewLease, requeueDeadMessages, transact]",
