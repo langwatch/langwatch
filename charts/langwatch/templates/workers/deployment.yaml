@@ -4,8 +4,6 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-workers
   labels:
-    app.kubernetes.io/name: {{ .Release.Name }}-workers
-    app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: workers
     {{- include "langwatch.labels" . | nindent 4 }}
     {{- if .Values.workers.deployment.labels }}

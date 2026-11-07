@@ -5,8 +5,6 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-langwatch-nlp
   labels:
-    app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
-    app.kubernetes.io/instance: {{ .Release.Name }}
     {{- include "langwatch.labels" . | nindent 4 }}
     {{- with .Values.langwatch_nlp.deployment.labels }}
     {{- toYaml . | nindent 4 }}
