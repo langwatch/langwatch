@@ -262,8 +262,13 @@ export function SubscriptionPage() {
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization },
   );
-  const { organizationWithMembers, pendingInvites, users, pendingInvitesWithMemberType } =
-    useSubscriptionMembers(organization?.id);
+  const {
+    organizationWithMembers,
+    pendingInvites,
+    users,
+    pendingInvitesWithMemberType,
+    heldSeats,
+  } = useSubscriptionMembers(organization?.id);
   // Seat limit state as enforcement counts it (custom roles, open invites)
   const usage = billingApi.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -525,6 +530,7 @@ export function SubscriptionPage() {
         isLoading={organizationWithMembers.isLoading}
         mode={drawerMode}
         inUse={seatUsageN}
+        held={heldSeats}
         price={seatPrice}
         onInvite={seatPurchase.invite}
         onUpgrade={handleUpgrade}

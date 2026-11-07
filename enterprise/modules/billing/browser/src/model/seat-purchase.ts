@@ -3,6 +3,8 @@
  * becomes the upgrade past it; on Growth it adds or lowers seats in place.
  * @see specs/licensing/seat-buying.feature
  */
+import { Temporal } from "@langwatch/time";
+
 import { type Currency, formatPrice } from "./billing-plans.ts";
 import { billingDay, type SeatQuote } from "./seat-change-summary.ts";
 
@@ -53,27 +55,28 @@ export function upgradeTotal({ seats, price }: { seats: number; price: SeatPrice
   };
 }
 
-/**
- * Full seats counted in use that no listed member or invite takes: seats held for people
- * removed within 30 days of taking them (specs/licensing/seat-rotation.feature).
- */
-export function heldSeatCount({
-  inUse,
-  fullMembers,
-  fullInvites,
-}: {
-  inUse: number;
-  fullMembers: number;
-  fullInvites: number;
-}): number {
-  return Math.max(0, inUse - fullMembers - fullInvites);
+/** Full seats still held for someone who left one, and the day the first of them frees. */
+export type HeldSeats = { count: number; firstFreesOn: string | undefined };
+
+export const noHeldSeats: HeldSeats = { count: 0, firstFreesOn: undefined };
+
+/** The server's holds (removed, disabled or demoted), as the drawer counts them. */
+export function heldSeatsOf(holds: readonly { seatFreesAt: string }[]): HeldSeats {
+  const first = Math.min(
+    ...holds.map((hold) => Temporal.Instant.from(hold.seatFreesAt).epochMilliseconds),
+  );
+  return { count: holds.length, firstFreesOn: holds.length ? billingDay(first) : undefined };
 }
 
-/** "2 in use." or "2 in use, 1 of them held for a removed member." */
-function inUseLine({ inUse, held }: { inUse: number; held: number }): string {
-  if (held === 0) return `${inUse} in use.`;
-  const whom = held === 1 ? "a removed member" : "removed members";
-  return `${inUse} in use, ${held} of them held for ${whom}.`;
+/** "until 7 Dec", or nothing when the day is unknown. */
+const untilDay = (held: HeldSeats) => (held.firstFreesOn ? ` until ${held.firstFreesOn}` : "");
+
+/** "2 in use." or "2 in use, 1 of them held until 7 Dec." */
+function inUseLine({ inUse, held }: { inUse: number; held: HeldSeats }): string {
+  if (held.count === 0) return `${inUse} in use.`;
+  if (held.count === 1) return `${inUse} in use, 1 of them held${untilDay(held)}.`;
+  const first = held.firstFreesOn ? `, the first${untilDay(held)}` : "";
+  return `${inUse} in use, ${held.count} of them held${first}.`;
 }
 
 export function upgradeMinimumHint(minimum: number): string | undefined {
@@ -84,8 +87,8 @@ export function upgradeMinimumHint(minimum: number): string | undefined {
 export type FreeSeatPlan = {
   includedSeats: number;
   inUse: number;
-  /** Of `inUse`, the seats held for removed members. */
-  held?: number;
+  /** Of `inUse`, the seats held for people who left a full seat. */
+  held?: HeldSeats;
   invites: number;
   price: SeatPrice;
 };
@@ -110,7 +113,13 @@ function freeSeatAction({
   };
 }
 
-export function freeSeatPlan({ includedSeats, inUse, held = 0, invites, price }: FreeSeatPlan) {
+export function freeSeatPlan({
+  includedSeats,
+  inUse,
+  held = noHeldSeats,
+  invites,
+  price,
+}: FreeSeatPlan) {
   const total = inUse + invites;
   const over = total > includedSeats;
   const action = freeSeatAction({ invites, total, over, price });
@@ -153,8 +162,8 @@ export type GrowthSeatPlan = {
   /** The seats the drawer asks for. */
   seats: number;
   inUse: number;
-  /** Of `inUse`, the seats held for removed members. */
-  held?: number;
+  /** Of `inUse`, the seats held for people who left a full seat. */
+  held?: HeldSeats;
   invites: number;
   price: SeatPrice;
   quote: SeatQuote | undefined;
@@ -170,7 +179,7 @@ export function growthMinimumSeats({ inUse, invites }: { inUse: number; invites:
 }
 
 export function growthSeatPlan(plan: GrowthSeatPlan) {
-  const { paid, seats, inUse, held = 0, invites, price, quote, developer } = plan;
+  const { paid, seats, inUse, held = noHeldSeats, invites, price, quote, developer } = plan;
   const delta = seats - paid;
   const devDelta = developer ? developer.target - developer.current : 0;
   const day = nextPeriodDay(plan);
@@ -189,11 +198,14 @@ export function growthSeatPlan(plan: GrowthSeatPlan) {
   };
 }
 
-function growthMinimumHint({ inUse, held }: { inUse: number; held: number }): string {
-  if (held === 0) return `${people(inUse)} use full seats. Remove someone in Users to go lower.`;
+function growthMinimumHint({ inUse, held }: { inUse: number; held: HeldSeats }): string {
+  if (held.count === 0)
+    return `${people(inUse)} use full seats. Remove someone in Users to go lower.`;
   const heldPart =
-    held === 1 ? "1 is held for a removed member" : `${held} are held for removed members`;
-  return `${people(inUse - held)} use full seats and ${heldPart}. Held seats free 30 days after the person joined.`;
+    held.count === 1
+      ? `1 more is held${untilDay(held)}`
+      : `${held.count} more are held${held.firstFreesOn ? `, the first${untilDay(held)}` : ""}`;
+  return `${people(inUse - held.count)} use full seats and ${heldPart}. Remove someone in Users to go lower.`;
 }
 
 function nextPeriodDay({

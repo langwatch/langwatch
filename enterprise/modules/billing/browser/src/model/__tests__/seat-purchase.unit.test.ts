@@ -10,7 +10,7 @@ import {
   freeSeatPlan,
   growthMinimumSeats,
   growthSeatPlan,
-  heldSeatCount,
+  heldSeatsOf,
   joinEmails,
   seatChangeToast,
   seatConfirm,
@@ -66,17 +66,15 @@ describe("freeSeatPlan()", () => {
     expect(plan.rowChip).toBe("Invited after payment");
   });
 
-  it("names the seat held for a removed member in the count", () => {
-    const held = heldSeatCount({ inUse: 2, fullMembers: 1, fullInvites: 0 });
+  it("names the held seat and the day it frees", () => {
+    const held = heldSeatsOf([{ seatFreesAt: "2026-12-07T10:00:00.000Z" }]);
     const plan = freeSeatPlan({ includedSeats: 2, inUse: 2, held, invites: 0, price: EUR });
-    expect(plan.heading).toBe(
-      "Free includes 2 seats. 2 in use, 1 of them held for a removed member.",
-    );
+    expect(plan.heading).toBe("Free includes 2 seats. 2 in use, 1 of them held until 7 Dec.");
   });
 
-  it("says only the count when no seat is held", () => {
-    const held = heldSeatCount({ inUse: 2, fullMembers: 1, fullInvites: 1 });
-    expect(held).toBe(0);
+  it("says only the count when the server lists no hold", () => {
+    const held = heldSeatsOf([]);
+    expect(held).toEqual({ count: 0, firstFreesOn: undefined });
     expect(freeSeatPlan({ includedSeats: 2, inUse: 2, held, invites: 0, price: EUR }).heading).toBe(
       "Free includes 2 seats. 2 in use.",
     );
@@ -102,18 +100,16 @@ describe("growthSeatPlan()", () => {
     expect(plan.action).toEqual({ kind: "change", label: "Confirm seat changes" });
   });
 
-  /** @scenario "Lowering seats names the seats held for removed members" */
-  it("names the held seats when the seats stop going lower", () => {
-    const plan = growthSeatPlan(growth({ paid: 5, seats: 3, inUse: 3, held: 1 }));
-    expect(plan.heading).toBe("You pay for 5. 3 in use, 1 of them held for a removed member.");
+  it("names several held seats by the first to free", () => {
+    const held = heldSeatsOf([
+      { seatFreesAt: "2026-12-20T10:00:00.000Z" },
+      { seatFreesAt: "2026-12-07T10:00:00.000Z" },
+    ]);
+    const plan = growthSeatPlan(growth({ paid: 5, seats: 4, inUse: 4, held }));
+    expect(plan.heading).toBe("You pay for 5. 4 in use, 2 of them held, the first until 7 Dec.");
     expect(plan.minimumHint).toBe(
-      "2 people use full seats and 1 is held for a removed member. Held seats free 30 days after the person joined.",
+      "2 people use full seats and 2 more are held, the first until 7 Dec. Remove someone in Users to go lower.",
     );
-  });
-
-  it("names several held seats", () => {
-    const plan = growthSeatPlan(growth({ paid: 5, seats: 4, inUse: 4, held: 2 }));
-    expect(plan.heading).toBe("You pay for 5. 4 in use, 2 of them held for removed members.");
   });
 
   it("invites into seats already paid for", () => {

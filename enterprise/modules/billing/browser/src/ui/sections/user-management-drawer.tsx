@@ -33,14 +33,13 @@ import {
   type GrowthSeatPlan,
   growthMinimumSeats,
   growthSeatPlan,
-  heldSeatCount,
+  type HeldSeats,
   type SeatAction,
   type SeatPrice,
   seatChangeToast,
   seatConfirm,
 } from "../../model/seat-purchase.ts";
 import {
-  countFullMembers,
   isValidEmail,
   type PendingInviteWithMemberType,
   type SubscriptionUser,
@@ -125,6 +124,7 @@ export function UserManagementDrawer({
   isLoading,
   mode,
   inUse,
+  held,
   price,
   onInvite,
   onUpgrade,
@@ -139,6 +139,8 @@ export function UserManagementDrawer({
   mode: SeatDrawerMode;
   /** Full seats held now, members and open invites as enforcement counts them. */
   inUse: number;
+  /** Of `inUse`, the seats held for people who left a full seat, as the server lists them. */
+  held: HeldSeats;
   price: SeatPrice;
   onInvite: (emails: string[]) => Promise<boolean>;
   onUpgrade: (input: { seats: number; emails: string[] }) => Promise<void>;
@@ -157,11 +159,6 @@ export function UserManagementDrawer({
   }, [open]);
 
   const emails = filledEmails(rows);
-  const held = heldSeatCount({
-    inUse,
-    fullMembers: countFullMembers(users),
-    fullInvites: countFullMembers(pendingInvitesWithMemberType),
-  });
   const growth = useGrowthSeats({
     open,
     mode: mode.kind === "growth" ? mode : undefined,
@@ -505,7 +502,7 @@ function useGrowthSeats({
   open: boolean;
   mode: Extract<SeatDrawerMode, { kind: "growth" }> | undefined;
   inUse: number;
-  held: number;
+  held: HeldSeats;
   invites: number;
   price: SeatPrice;
 }) {

@@ -158,10 +158,10 @@ Feature: Reconciling an organization down to its licensed seats
 
   @integration
   Scenario: A plan without Lite Member seats shows no Lite card on the member list
-    Given the organization is on the Free plan, which has no Lite Member seats
+    Given the license covers no Lite Member seats
     And nobody holds a Lite Member seat
     When an admin opens the member list
-    Then the full member seats are shown against what the plan covers
+    Then the full member seats are shown against what the license covers
     And no Lite Member card reads "0 / 0"
 
   @integration @regression

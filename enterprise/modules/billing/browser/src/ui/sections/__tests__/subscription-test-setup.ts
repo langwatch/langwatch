@@ -87,6 +87,13 @@ export const mockGetOrganizationWithMembers = vi.fn(() => ({
   refetch: vi.fn(),
 }));
 
+/** The server's held seats: none unless a test says otherwise. */
+export const mockListHeldSeats = vi.fn(
+  (): { data: { heldSeats: { seatFreesAt: string }[] } | undefined } => ({
+    data: { heldSeats: [] },
+  }),
+);
+
 export const mockUpdateUsers = vi.fn(() => ({
   mutate: vi.fn(),
   mutateAsync: vi.fn(),
@@ -248,6 +255,7 @@ export function resetMocks() {
     data: [],
     isLoading: false,
   });
+  mockListHeldSeats.mockReturnValue({ data: { heldSeats: [] } });
   mockGetUsage.mockReturnValue({
     data: undefined,
     isLoading: true,

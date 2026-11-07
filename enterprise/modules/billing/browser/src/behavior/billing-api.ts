@@ -90,6 +90,11 @@ type BorrowedProcedures = {
         output: { members: OrganizationMemberRead[] };
       };
     };
+
+    /** Full seats still held after their person was removed, disabled or demoted. */
+    listHeldSeats: {
+      query: { input: OrganizationScope; output: { heldSeats: { seatFreesAt: string }[] } };
+    };
   };
 
   invite: {

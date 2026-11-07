@@ -28,6 +28,7 @@ import {
   mockGetActivePlan,
   mockGetOrganizationWithMembers,
   mockGetUsage,
+  mockListHeldSeats,
   mockOrganization,
   mockPreviewDeveloperSeats,
   mockSetDeveloperSeats,
@@ -140,6 +141,7 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         getOrganizationWithMembersAndTheirTeams: {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
+        listHeldSeats: { useQuery: () => setup.mockListHeldSeats() },
       },
       invite: {
         upgradeWithInvites: { useMutation: () => setup.mockUpgradeWithInvites() },
@@ -191,6 +193,14 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
     },
   };
 });
+
+/** The full seats enforcement counts in use, members, invites and holds together. */
+const givenMembersCount = (membersCount: number) =>
+  mockGetUsage.mockReturnValue({
+    data: { seatLimitInfo: { status: "ok", message: "" }, membersCount },
+    isLoading: false,
+    refetch: vi.fn(),
+  } as ReturnType<typeof mockGetUsage>);
 
 /** `count` full members, as the page and the usage count both read them. */
 const givenMembers = (count: number) => {
@@ -517,19 +527,30 @@ describe("<SubscriptionPage/> buying seats", () => {
       expect(screen.queryByTestId("other-seat-types")).toBeNull();
     });
 
-    /** @scenario "Manage seats on Free names a seat held for a removed member" */
-    it("names the seat the server counts for a removed member", async () => {
+    /** @scenario "Manage seats on Free names a held seat and the day it frees" */
+    it("names the seat the server holds and the day it frees", async () => {
       givenFree(1);
-      mockGetUsage.mockReturnValue({
-        data: { seatLimitInfo: { status: "ok", message: "" }, membersCount: 2 },
-        isLoading: false,
-        refetch: vi.fn(),
-      } as ReturnType<typeof mockGetUsage>);
+      givenMembersCount(2);
+      mockListHeldSeats.mockReturnValue({
+        data: { heldSeats: [{ seatFreesAt: "2026-12-07T10:00:00.000Z" }] },
+      });
       renderPage();
       await openManageSeats();
 
       expect(screen.getByTestId("seat-drawer-heading")).toHaveTextContent(
-        "Free includes 2 seats. 2 in use, 1 of them held for a removed member.",
+        "Free includes 2 seats. 2 in use, 1 of them held until 7 Dec.",
+      );
+    });
+
+    /** @scenario "Manage seats on Free names a held seat and the day it frees" */
+    it("calls no seat held when the server lists no hold", async () => {
+      givenFree(1);
+      givenMembersCount(2);
+      renderPage();
+      await openManageSeats();
+
+      expect(screen.getByTestId("seat-drawer-heading")).toHaveTextContent(
+        "Free includes 2 seats. 2 in use.",
       );
     });
 
@@ -790,6 +811,27 @@ describe("<SubscriptionPage/> buying seats", () => {
       expect(screen.getByTestId("drawer-seats-stepper-minus")).toBeDisabled();
       expect(screen.getByTestId("seat-drawer-minimum")).toHaveTextContent(
         "3 people use full seats. Remove someone in Users to go lower.",
+      );
+    });
+
+    /** @scenario "Lowering seats names the seats held for people who left them" */
+    it("names the held seat in the heading and where lowering stops", async () => {
+      givenGrowth({ paid: 5, inUse: 3 });
+      mockListHeldSeats.mockReturnValue({
+        data: { heldSeats: [{ seatFreesAt: "2026-12-07T10:00:00.000Z" }] },
+      });
+      renderPage();
+      await openManageSeats();
+
+      fireEvent.click(screen.getByTestId("drawer-seats-stepper-minus"));
+      fireEvent.click(screen.getByTestId("drawer-seats-stepper-minus"));
+
+      expect(screen.getByTestId("seat-drawer-heading")).toHaveTextContent(
+        "You pay for 5. 3 in use, 1 of them held until 7 Dec.",
+      );
+      expect(screen.getByTestId("drawer-seats-stepper-minus")).toBeDisabled();
+      expect(screen.getByTestId("seat-drawer-minimum")).toHaveTextContent(
+        "2 people use full seats and 1 more is held until 7 Dec. Remove someone in Users to go lower.",
       );
     });
 
