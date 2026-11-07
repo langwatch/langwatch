@@ -9,7 +9,9 @@ import {
   LANGY_LONG_TURN_MS,
   LANGY_NOTIFY_TITLE_MAX,
   langyNotificationFor,
+  langyPushSetupProblem,
   langyTabNotifies,
+  type LangyPushSetupFailure,
   offerNotificationsCallId,
   readNotifyCall,
 } from "../langy-notifications.ts";
@@ -155,5 +157,41 @@ describe("langyTabNotifies", () => {
     expect(langyTabNotifies({ choice: "declined", pushDevice: "unavailable" })).toBe(false);
     expect(langyTabNotifies({ choice: null, pushDevice: "unavailable" })).toBe(false);
     expect(langyTabNotifies({ choice: "declined", pushDevice: "unsubscribed" })).toBe(false);
+  });
+});
+
+describe("langyPushSetupProblem", () => {
+  const failures: LangyPushSetupFailure[] = [
+    "unsupported",
+    "server_unreachable",
+    "browser_refused",
+    "save_failed",
+    "push_service_refused",
+  ];
+
+  it.each(failures)("gives %s its own plain line", (failure) => {
+    const { line } = langyPushSetupProblem(failure);
+
+    expect(line.length).toBeGreaterThan(0);
+    expect(line).not.toContain("—");
+    expect(failures.filter((other) => langyPushSetupProblem(other).line === line)).toEqual([
+      failure,
+    ]);
+  });
+
+  it("offers a retry only where trying again can help", () => {
+    expect(failures.filter((failure) => langyPushSetupProblem(failure).retryable)).toEqual([
+      "server_unreachable",
+      "browser_refused",
+      "save_failed",
+    ]);
+  });
+
+  it("says the tab is the fallback where the tab notifies, and only that pushes may not arrive elsewhere", () => {
+    expect(langyPushSetupProblem("browser_refused").line).toMatch(/while this tab stays open/);
+    // A subscription stored on an earlier visit can still be pushed to,
+    // so neither line says that none arrive.
+    expect(langyPushSetupProblem("server_unreachable").line).toMatch(/may not arrive/);
+    expect(langyPushSetupProblem("save_failed").line).toMatch(/may not arrive/);
   });
 });
