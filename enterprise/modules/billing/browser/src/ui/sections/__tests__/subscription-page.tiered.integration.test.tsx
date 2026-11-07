@@ -524,7 +524,9 @@ describe("<SubscriptionPage/>", () => {
       const features = await screen.findByTestId("current-plan-features-grid");
 
       expect(within(features).getByText(ENTERPRISE_PLAN_FEATURES[0]!)).toBeInTheDocument();
-      expect(within(features).queryByText("Up to 20 core users")).not.toBeInTheDocument();
+      expect(
+        within(features).queryByText("Volume discounts above 20 users"),
+      ).not.toBeInTheDocument();
       expect(within(features).queryByText("200,000 events included")).not.toBeInTheDocument();
     });
 
@@ -606,7 +608,9 @@ describe("<SubscriptionPage/>", () => {
 
       expect(within(features).getByText("Up to 10 core users")).toBeInTheDocument();
       expect(within(features).getByText("100,000 events included")).toBeInTheDocument();
-      expect(within(features).queryByText("Up to 20 core users")).not.toBeInTheDocument();
+      expect(
+        within(features).queryByText("Volume discounts above 20 users"),
+      ).not.toBeInTheDocument();
     });
   });
 });

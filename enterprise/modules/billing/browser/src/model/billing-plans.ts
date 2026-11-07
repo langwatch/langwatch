@@ -44,7 +44,7 @@ const growthRetentionPricingString = (currency: Currency): string =>
  * Accepts a currency so the events pricing line is accurate.
  */
 export const getGrowthFeatures = (currency: Currency): string[] => [
-  "Up to 20 core users",
+  "Volume discounts above 20 users",
   `${formatNumber(GROWTH_INCLUDED_EVENTS)} events included`,
   growthEventsPricingString(currency),
   "Unlimited lite users",
@@ -74,7 +74,7 @@ export const getGrowthPlanFeatures = (currency: Currency): string[] => [
   "200,000 events included",
   growthEventsPricingString(currency),
   growthRetentionPricingString(currency),
-  "Up to 20 core users (volume discount available)",
+  "Volume discounts above 20 users",
   "Unlimited lite users",
   "Unlimited evals, simulations and prompts",
   "Slack support",
