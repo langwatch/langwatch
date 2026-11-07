@@ -4,6 +4,7 @@ import { z } from "zod";
 /** Connected-agent presence and ownership displayed by the management UI (ADR-128). */
 import type { AgentWithFields } from "./agent.ts";
 import type { ConnectedAgentConfig } from "./config/connected.ts";
+import type { AgentHooks } from "./connected-agent.protocol.ts";
 import type { ConnectedAgentSelectability } from "./connected-agent.selectable.ts";
 
 /** The SDK that registered an agent, as the card prints it. */
@@ -60,7 +61,7 @@ export interface ConnectedAgentView extends ConnectedAgentSelectability {
   instances: ConnectedAgentInstance[];
   owner: ConnectedAgentOwner | null;
   parameters: ConnectedAgentConfig["parameters"];
-  config: { description?: string; sdk?: ConnectedAgentSdk };
+  config: { description?: string; sdk?: ConnectedAgentSdk; hooks?: AgentHooks };
 }
 
 /** One row of `agents.getAll`/`getById`, as `AgentModule` actually answers it. */

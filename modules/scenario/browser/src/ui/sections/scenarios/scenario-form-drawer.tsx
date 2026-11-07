@@ -57,6 +57,7 @@ import { CallerVoiceGroup } from "./caller-voice-group.tsx";
 import { SaveAndRunMenu } from "./save-and-run-menu.tsx";
 import { ScenarioEditorSidebar } from "./scenario-editor-sidebar.tsx";
 import { ScenarioRunModelDialog } from "./scenario-run-model-dialog.tsx";
+import { SelectedTargetHooksHint } from "./selected-target-hooks-hint.tsx";
 
 export type ScenarioFormDrawerProps = {
   open?: boolean;
@@ -352,6 +353,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           </GridItem>
           {/* Right: Help Sidebar */}
           <GridItem overflowY="auto" padding={4} bg="bg.muted">
+            <SelectedTargetHooksHint target={selectedTarget} />
             <ScenarioEditorSidebar form={formInstance} variant={props.variant} />
           </GridItem>
         </Grid>

@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({}),
+    agents: { getAll: { useQuery: () => ({ data: [] }) } },
   },
 }));
 
