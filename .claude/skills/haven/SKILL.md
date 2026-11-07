@@ -20,7 +20,7 @@ only the part you need.
 | Need                                                                                            | Skill                       |
 | ----------------------------------------------------------------------------------------------- | --------------------------- |
 | up, down, restart, reload, status, down --destroy, machine clean, self install, UI modes, lanes | `haven-lifecycle`           |
-| logs, errors, obs traces, obs metrics, obs profiles, raw TraceQL/LogQL/PromQL                   | `haven-logs`                |
+| logs, errors, obs traces/metrics/profiles, obs cpu/heap/compare (Node profiling), raw queries   | `haven-logs`                |
 | the resolved env, masking, precedence, machine limits                                           | `haven-env`                 |
 | reset, seed presets, connection strings, prune                                                  | `haven-db`                  |
 | seeded data, logins, auto-seed                                                                  | `haven-seed`                |
