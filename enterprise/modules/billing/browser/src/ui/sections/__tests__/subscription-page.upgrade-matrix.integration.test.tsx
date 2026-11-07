@@ -142,6 +142,21 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         manage: { useMutation: () => setup.mockManageSubscription() },
         listInvoices: { useQuery: () => setup.mockListInvoices() },
         getLastSubscription: { useQuery: () => setup.mockGetLastSubscription() },
+        developerSeats: {
+          useQuery: (_input: unknown, opts: { enabled: boolean }) => ({
+            ...(opts.enabled ? setup.mockDeveloperSeats() : { data: undefined }),
+            refetch: setup.mockDeveloperSeatsRefetch,
+          }),
+        },
+        previewDeveloperSeats: {
+          useQuery: (input: { quantity: number }, opts: { enabled: boolean }) =>
+            opts.enabled
+              ? setup.mockPreviewDeveloperSeats(input)
+              : { data: undefined, isLoading: false, isError: false },
+        },
+        setDeveloperSeats: {
+          useMutation: () => ({ mutateAsync: setup.mockSetDeveloperSeats, isPending: false }),
+        },
       },
       useUtils: vi.fn(() => ({
         organization: { getOrganizationWithMembersAndTheirTeams: { invalidate: vi.fn() } },
