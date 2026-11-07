@@ -26,3 +26,30 @@ Feature: goose never reruns a migration on a replicated ClickHouse
     When goose is given its connection
     Then its connection string is unchanged
     And no replica is synced and no write waits for a quorum
+
+  @unit
+  Scenario: A database holding tables with no version history at all is refused
+    Given a ClickHouse database holds any table besides goose's own version table
+    And its version table records no migration, after every replica has caught up
+    When the migration run bootstraps that database
+    Then it refuses before any migration runs, having read and written no table
+    And it names restoring the version history, never dropping the database
+
+  @unit
+  Scenario: A database with a version history or no tables bootstraps as usual
+    Given a ClickHouse database either records a migration or holds only goose's own table
+    When the migration run bootstraps that database
+    Then it does not refuse
+
+  @integration
+  Scenario: A real database restored without its version history refuses the run
+    Given a ClickHouse server holds a database with one table and no version rows
+    When the migration run is given that database
+    Then the run fails naming the version history to restore
+    And the table it holds is still there, at its original engine
+
+  @integration
+  Scenario: A real database carrying a version row runs its migrations
+    Given that same database is given back the version row its data was written at
+    When the migration run is given that database again
+    Then the run bootstraps and applies the migrations
