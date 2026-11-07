@@ -6,8 +6,10 @@ import { nowInstant } from "@langwatch/time";
 import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
 import type { TenancyRepository } from "../repositories/tenancy.repository.ts";
 import type { TraceCountRepository } from "../repositories/trace-count.repository.ts";
+import type { UsageCacheRepository } from "../repositories/usage-cache.repository.ts";
 import { buildLimitMessage, type UsageDeployment } from "../rules/usage-limit-message.rules.ts";
 import { resolveUsageMeter } from "../rules/usage-meter-policy.rules.ts";
+import { CountReadCoalescerService } from "./count-read-coalescer.service.ts";
 
 const logger = createLogger("langwatch:usage");
 
@@ -80,45 +82,13 @@ export interface UsageVolumeCounter {
   }): Promise<ProjectUsageCounts>;
 }
 
-/**
- * A short-lived per-key cache. Enforcement asks the same two questions on every ingested batch,
- * so the composition binds whatever it has — a Redis cache shared across pods, or a per-pod map
- * — and the absence of one only costs repeated reads.
- */
-interface UsageCache {
-  findValue<T>(key: string): Promise<T | undefined>;
-  set<T>(key: string, value: T): Promise<void>;
-}
-
-class NoUsageCache implements UsageCache {
+/** Absent a cache, every question is read afresh. */
+class NoUsageCache implements UsageCacheRepository {
   async findValue<T>(): Promise<T | undefined> {
     return undefined;
   }
 
   async set(): Promise<void> {}
-}
-
-export class InProcessUsageCache implements UsageCache {
-  private readonly entries = new Map<string, { value: unknown; expiresAt: number }>();
-
-  constructor(
-    private readonly ttlMs: number,
-    private readonly now: () => number = Date.now,
-  ) {}
-
-  async findValue<T>(key: string): Promise<T | undefined> {
-    const entry = this.entries.get(key);
-    if (!entry) return undefined;
-    if (entry.expiresAt <= this.now()) {
-      this.entries.delete(key);
-      return undefined;
-    }
-    return entry.value as T;
-  }
-
-  async set<T>(key: string, value: T): Promise<void> {
-    this.entries.set(key, { value, expiresAt: this.now() + this.ttlMs });
-  }
 }
 
 /** The peer the usage count prices through; traces are counted off entitlement's own meter. */
@@ -177,9 +147,6 @@ function meterTraceCounter({
   };
 }
 
-/** Main's 30-second count and meter-decision windows. */
-const USAGE_CACHE_TTL_MS = 30_000;
-
 /** A plan resolved for one organization. */
 type PlanResolver = (organizationId: string) => Promise<PlanInfo>;
 
@@ -202,8 +169,10 @@ interface UsageServiceDependencies {
   planResolver: PlanResolver;
   deployment: UsageDeployment;
   /** Both caches are 30-second windows in production; absent means uncached. */
-  countCache?: UsageCache;
-  decisionCache?: UsageCache;
+  countCache?: UsageCacheRepository;
+  decisionCache?: UsageCacheRepository;
+  /** The clock a failed count's retry window is measured on. */
+  now?: () => number;
 }
 
 /**
@@ -217,8 +186,9 @@ export class UsageService {
   private readonly eventUsageService: UsageVolumeCounter;
   private readonly planResolver: PlanResolver;
   private readonly deployment: UsageDeployment;
-  private readonly countCache: UsageCache;
-  private readonly decisionCache: UsageCache;
+  private readonly countCache: UsageCacheRepository;
+  private readonly decisionCache: UsageCacheRepository;
+  private readonly counts: CountReadCoalescerService<UsageCount>;
 
   static create(deps: UsageServiceDependencies): UsageService {
     return new UsageService(deps);
@@ -232,6 +202,7 @@ export class UsageService {
     tenancy: UsageTenancy;
     meter: Pick<BillableEventsMeterRepository, "countByProjects">;
     traceMeter: Pick<TraceCountRepository, "countByProjects">;
+    caches: Readonly<{ counts: UsageCacheRepository; decisions: UsageCacheRepository }>;
   }): UsageService {
     const { billing } = input.peers;
     const { tenancy } = input;
@@ -244,8 +215,8 @@ export class UsageService {
       eventCounter: meterEventCounter({ meter: input.meter }),
       planResolver: input.planResolver,
       deployment: { isSaas: input.isSaas },
-      countCache: new InProcessUsageCache(USAGE_CACHE_TTL_MS),
-      decisionCache: new InProcessUsageCache(USAGE_CACHE_TTL_MS),
+      countCache: input.caches.counts,
+      decisionCache: input.caches.decisions,
     });
   }
 
@@ -257,6 +228,7 @@ export class UsageService {
     this.deployment = deps.deployment;
     this.countCache = deps.countCache ?? new NoUsageCache();
     this.decisionCache = deps.decisionCache ?? new NoUsageCache();
+    this.counts = CountReadCoalescerService.create({ now: deps.now ?? Date.now });
   }
 
   async checkLimitForOrganization({
@@ -265,7 +237,7 @@ export class UsageService {
     organizationId: string;
   }): Promise<UsageLimitResult> {
     const plan = await this.planResolver(organizationId);
-    const count = await this.getCurrentMonthCount({ organizationId, plan });
+    const count = await this.getCurrentMonthCount({ organizationId, plan, reuseFailure: true });
 
     if (count === "unlimited") {
       return { exceeded: false };
@@ -316,12 +288,15 @@ export class UsageService {
     return decision.usageUnit;
   }
 
+  /** `reuseFailure`: answer a recent failed count without reading; only the ingest check does. */
   async getCurrentMonthCount({
     organizationId,
     plan,
+    reuseFailure = false,
   }: {
     organizationId: string;
     plan?: PlanInfo;
+    reuseFailure?: boolean;
   }): Promise<UsageCount | "unlimited"> {
     // Skip the heavy ClickHouse query for unlimited plans (e.g. seat-based pricing).
     // The count would never exceed the limit, so querying is wasted work for
@@ -333,7 +308,7 @@ export class UsageService {
       return "unlimited";
     }
 
-    return this.computeCurrentMonthCount({ organizationId, plan: activePlan });
+    return this.computeCurrentMonthCount({ organizationId, plan: activePlan, reuseFailure });
   }
 
   /**
@@ -345,15 +320,17 @@ export class UsageService {
   }: {
     organizationId: string;
   }): Promise<UsageCount> {
-    return this.computeCurrentMonthCount({ organizationId });
+    return this.computeCurrentMonthCount({ organizationId, reuseFailure: false });
   }
 
   private async computeCurrentMonthCount({
     organizationId,
     plan,
+    reuseFailure,
   }: {
     organizationId: string;
     plan?: PlanInfo;
+    reuseFailure: boolean;
   }): Promise<UsageCount> {
     const decision = await this.getCachedUsageMeterReading(organizationId, plan);
     const cacheKey = `${organizationId}:${decision.usageUnit}`;
@@ -363,6 +340,16 @@ export class UsageService {
       return cached;
     }
 
+    const read = () => this.readCurrentMonthCount({ organizationId, decision, cacheKey });
+    return this.counts.run({ key: cacheKey, reuseFailure, read });
+  }
+
+  private async readCurrentMonthCount(args: {
+    organizationId: string;
+    decision: UsageMeterReading;
+    cacheKey: string;
+  }): Promise<UsageCount> {
+    const { organizationId, decision, cacheKey } = args;
     const projectIds = await this.organizations.getProjectIds(organizationId);
     if (projectIds.length === 0) {
       // A real measurement: an organization with no projects has sent nothing.

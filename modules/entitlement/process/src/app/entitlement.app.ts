@@ -209,6 +209,7 @@ export class EntitlementModule implements EntitlementApiContract {
       tenancy: repositories.tenancy,
       meter: repositories.billableEvents,
       traceMeter: repositories.traces,
+      caches: { counts: repositories.usageCounts, decisions: repositories.usageDecisions },
     });
     const warnings = UsageWarningService.create({
       // The module is built below; the warning records only once its pipeline is connected.
