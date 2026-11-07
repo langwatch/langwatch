@@ -1,7 +1,7 @@
 /**
  * The port the inbox screen and everything insight lends read: scope, the release flag,
  * grants, the address, notices, the clipboard and Langy's ask. Mounted above the routed tree,
- * so the bell in the topbar and the action under a Langy answer find it too.
+ * so the bell in the topbar and a board's header find it too.
  */
 
 import type { LangyAskRequest } from "@langwatch/langy-contract";
@@ -19,11 +19,28 @@ export type InsightSuccessNotice = { title: string; description?: string };
 /** Raw errors travel so the host resolves the words from the error's code. */
 export type InsightFailureNotice = { error: unknown; fallbackTitle: string };
 
+/**
+ * Whether insight shows at all: `release_insights`, and `release_dashboards` too, because the
+ * Insights page lives in the Dashboards product and is closed while that flag is off. A bell
+ * that links to a closed page is worse than no bell. Undefined while either is not answered.
+ */
+export function insightsReleased({
+  insights,
+  dashboards,
+}: {
+  insights: boolean | undefined;
+  dashboards: boolean | undefined;
+}): boolean | undefined {
+  if (insights === false || dashboards === false) return false;
+  if (insights === void 0 || dashboards === void 0) return void 0;
+  return true;
+}
+
 export abstract class InsightHostApi {
   /** The project in scope, or undefined outside one or before it resolves. */
   abstract project(): InsightHostProject | undefined;
 
-  /** `release_insights`: undefined while not answered yet. */
+  /** `insightsReleased` over the two release flags: undefined while not answered yet. */
   abstract isEnabled(): boolean | undefined;
 
   abstract hasPermission(permission: string): boolean;

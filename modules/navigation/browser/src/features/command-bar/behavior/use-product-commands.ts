@@ -16,8 +16,8 @@ export function useProductCommands(): Command[] {
   const llmOpsProjectSlug = useLlmOpsProjectSlug();
   const { personalProjectSlug, features: personalFeatures } = usePersonalWorkspace();
   const codingAgentLinks = useCodingAgentLinks();
-  const gatewayItems = useVisibleSectionNavItems(gatewayNavItems);
-  const governanceItems = useVisibleSectionNavItems(governanceNavItems);
+  const { items: gatewayItems } = useVisibleSectionNavItems(gatewayNavItems);
+  const { items: governanceItems } = useVisibleSectionNavItems(governanceNavItems);
 
   return [
     ...switchProductCommands({ reachableProducts, projectSlug: llmOpsProjectSlug }),

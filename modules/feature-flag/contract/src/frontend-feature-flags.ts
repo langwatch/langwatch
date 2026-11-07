@@ -41,7 +41,7 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_agent_testing_v2_enabled",
   // The Dashboards area, its sidebar entry and its saved-dashboards list.
   "release_dashboards",
-  // The Insights inbox, its sidebar entry, the topbar bell and "Save as insight" on Langy answers.
+  // The Insights inbox, its entry in every product's side menu and the topbar bell.
   "release_insights",
   // LangWatchQL; with release_dashboards, the reports page's widget drawer.
   "release_lwql_workbench",

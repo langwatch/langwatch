@@ -13,7 +13,7 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { InsightEntry } from "@langwatch/insight-contract";
 import type { LangyAskRequest } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
-import { render, type RenderResult } from "@testing-library/react";
+import { act, render, type RenderResult } from "@testing-library/react";
 import type { ReactElement } from "react";
 
 import { insightApi } from "./behavior/insight-api.ts";
@@ -156,4 +156,15 @@ export function insightEntry(overrides: Partial<InsightEntry> = {}): InsightEntr
     keptAt: null,
     ...overrides,
   };
+}
+
+/**
+ * Lets a query that is going to fire do so: the effect starts it, the batch link sends it on a
+ * timer, then the transport answers across microtasks. Absence and its positive control share it;
+ * the positive control is what makes this round count safe: it proves the rounds suffice to read.
+ */
+export async function flushReads(): Promise<void> {
+  for (let round = 0; round < 5; round += 1) {
+    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+  }
 }
