@@ -220,7 +220,7 @@ export class IngestionPullWorkerService {
 
     const { adapterId, result } = await this.runAdapter({ source, cursor: input.cursor });
 
-    if (result.errorCount > 0) {
+    if (result.errorCount > 0 && !result.failure) {
       const cursorAdvanced = result.cursor !== null && result.cursor !== input.cursor;
       if (!cursorAdvanced) {
         throw new Error(`Ingestion pull adapter reported ${result.errorCount} error(s)`);
@@ -247,14 +247,15 @@ export class IngestionPullWorkerService {
       });
     }
 
-    const readThrough = pullReadThrough({ result, nowMs: this.now() });
+    const readThrough = result.failure ? null : pullReadThrough({ result, nowMs: this.now() });
     return {
       nextCursor: result.cursor,
       eventCount: result.events.length,
       errorCount: result.errorCount,
       completeness: result.completeness ?? "complete",
       ...(result.unreadPage === true ? { unreadPage: true as const } : {}),
-      readThroughAt: readThrough.outcome === "read-through" ? readThrough.at : null,
+      ...(result.failure ? { failure: result.failure } : {}),
+      readThroughAt: readThrough?.outcome === "read-through" ? readThrough.at : null,
     };
   }
 

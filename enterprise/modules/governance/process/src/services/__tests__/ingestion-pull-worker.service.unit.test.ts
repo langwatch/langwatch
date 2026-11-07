@@ -388,6 +388,58 @@ describe("IngestionPullWorkerService", () => {
     expect(sink.insertEvent).toHaveBeenCalledTimes(1);
   });
 
+  /** @scenario "A refused transcript sign-in keeps side reads but records a failed run" */
+  it("keeps side events and failure details without claiming transcript read-through", async () => {
+    const failure = { error: "Microsoft refused sign-in (HTTP 400)", errorCode: "pull_refused" };
+    const { service, sink } = worker({
+      runOnce: async () => ({
+        events: [pulledUsageEvent()],
+        cursor: "side-progress",
+        errorCount: 1,
+        unreadPage: true,
+        failure,
+      }),
+    });
+    await expect(service.run({ sourceId: "source-1", cursor: "before" })).resolves.toMatchObject({
+      nextCursor: "side-progress",
+      eventCount: 1,
+      errorCount: 1,
+      unreadPage: true,
+      failure,
+      readThroughAt: null,
+    });
+    expect(sink.insertEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps an explicit refusal visible when no cursor moved", async () => {
+    const failure = { error: "Microsoft refused sign-in (HTTP 400)", errorCode: "pull_refused" };
+    const { service } = worker({
+      runOnce: async () => ({ events: [], cursor: null, errorCount: 1, unreadPage: true, failure }),
+    });
+    await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toMatchObject({
+      nextCursor: null,
+      eventCount: 0,
+      failure,
+      readThroughAt: null,
+    });
+  });
+
+  it("does not return bankable progress when writing side events fails", async () => {
+    const failure = { error: "Microsoft refused sign-in (HTTP 400)", errorCode: "pull_refused" };
+    const { service, sink } = worker({
+      runOnce: async () => ({
+        events: [pulledUsageEvent()],
+        cursor: "side-progress",
+        errorCount: 1,
+        failure,
+      }),
+    });
+    sink.insertEvent.mockRejectedValueOnce(new Error("write failed"));
+    await expect(service.run({ sourceId: "source-1", cursor: "before" })).rejects.toThrow(
+      "write failed",
+    );
+  });
+
   it("fails without writing when an adapter reports errors and makes no progress", async () => {
     const { service, sink } = worker({
       runOnce: async () => ({

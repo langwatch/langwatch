@@ -92,7 +92,9 @@ function completedData(over: {
   };
 }
 
-function failed() {
+function failed(
+  progress: { nextCursor?: string | null; eventCount?: number; errorCount?: number } = {},
+) {
   return ingestionPullRunFailedEventSchema.parse({
     ...envelope,
     type: INGESTION_PULL_EVENT_TYPES.RUN_FAILED,
@@ -104,6 +106,7 @@ function failed() {
       error: "boom",
       errorCode: "transport",
       retryable: true,
+      ...progress,
     },
   });
 }
@@ -112,6 +115,43 @@ const health = (state: IngestionPullRunStatusData) =>
   deriveSourceHealth({ consecutiveFailures: state.ConsecutiveErrors });
 
 describe("the run-status fold as source health reads it", () => {
+  /** @scenario "A refused transcript sign-in keeps side reads but records a failed run" */
+  it("records failed progress without stamping a success or a completed read", () => {
+    const event = failed({ nextCursor: "side-progress", eventCount: 1, errorCount: 1 });
+    const next = projection.handleIngestionPullRunFailed(
+      event,
+      row({
+        Cursor: "before",
+        LastRunCompleteness: "complete",
+        LastReadThroughAt: 400,
+        ConsecutiveErrors: 2,
+      }),
+    );
+    expect(event.data).toMatchObject({ nextCursor: "side-progress", eventCount: 1, errorCount: 1 });
+    expect(next).toMatchObject({
+      Cursor: "side-progress",
+      LastRunOutcome: "failed",
+      LastRunEventCount: 1,
+      LastRunError: "boom",
+      ConsecutiveErrors: 3,
+      LastSuccessAt: 500,
+      LastReadThroughAt: 400,
+      LastRunCompleteness: null,
+    });
+    expect(health(next)).toBe("unhealthy");
+  });
+
+  it("keeps legacy failed-event cursor semantics and honours explicit null", () => {
+    expect(
+      projection.handleIngestionPullRunFailed(failed(), row({ Cursor: "before" })),
+    ).toMatchObject({ Cursor: "before", LastRunEventCount: 0 });
+    expect(
+      projection.handleIngestionPullRunFailed(
+        failed({ nextCursor: null }),
+        row({ Cursor: "before" }),
+      ).Cursor,
+    ).toBeNull();
+  });
   describe("given the source's last run succeeded", () => {
     /** @scenario A single failed run does not mark the source unhealthy */
     it("keeps the source healthy after one failed run", () => {

@@ -29,6 +29,8 @@ import {
   type GovernancePuller as PullerAdapter,
   type NormalizedPullEvent,
   type PullResult,
+  type PullFailure,
+  PULL_REFUSED_ERROR_CODE,
   type PullRunOptions,
   copilotStudioDataversePullConfigSchema,
   type CopilotStudioDataversePullConfig,
@@ -318,6 +320,7 @@ export class HttpCopilotStudioDataverseChannel
   ): Promise<PullResult> {
     const walk: TranscriptWalk = { events: [], errorCount: 0, last: null, isTruncated: false };
     const previous = HttpCopilotStudioDataverseChannel.parseCursor(options.cursor);
+    let failure: PullFailure | undefined;
 
     // Cost, seats and directory never throw and never count an error: an
     // error with an unmoved cursor makes the worker discard the conversations.
@@ -355,6 +358,9 @@ export class HttpCopilotStudioDataverseChannel
       });
     } catch (error) {
       walk.errorCount += 1;
+      if (error instanceof ProviderSignInError && [400, 401, 403].includes(error.status ?? 0)) {
+        failure = { error: error.message, errorCode: PULL_REFUSED_ERROR_CODE };
+      }
       logger.error(
         { error: error instanceof Error ? error.message : String(error) },
         "copilot studio dataverse pull failed",
@@ -368,6 +374,12 @@ export class HttpCopilotStudioDataverseChannel
       directory: directoryRead.directory,
     };
 
+    // A transcript read that never produced a row could not read the page it
+    // set out to read. The cost/seats/directory side reads may still have
+    // advanced their own cursor parts, so errorCount alone would let the worker
+    // treat the run as a successful advance and reset the failure streak.
+    const transcriptReadFailed = walk.errorCount > 0 && walk.last === null;
+
     return {
       events: walk.events,
       // An unmoved position hands back the incoming string verbatim, which the
@@ -376,6 +388,8 @@ export class HttpCopilotStudioDataverseChannel
         ? HttpCopilotStudioDataverseChannel.encodeCursor(next)
         : options.cursor,
       errorCount: walk.errorCount,
+      ...(transcriptReadFailed ? { unreadPage: true as const } : {}),
+      ...(failure ? { failure } : {}),
       ...(walk.isTruncated ? { completeness: "truncated" as const } : {}),
     };
   }
