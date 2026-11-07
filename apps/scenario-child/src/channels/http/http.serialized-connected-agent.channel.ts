@@ -12,6 +12,7 @@ import { AgentRole } from "@langwatch/scenario";
 import type { ConnectedAgentData, RunParameterValues } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
+import type { ScenarioCallRun } from "../../rules/scenario-call-run.rules.ts";
 import { type ServedInstance, SerializedAgentChannel } from "../serialized-agent.channel.ts";
 
 /** How long the adapter keeps retrying a busy agent before it gives up. */
@@ -46,13 +47,6 @@ export class ConnectedAgentCallError extends Error {
     this.code = code;
     this.httpStatus = httpStatus;
   }
-}
-
-/** The scenario run a call belongs to, sent with every call (ADR-180). */
-export interface ConnectedCallRun {
-  scenarioRunId?: string;
-  scenarioName?: string;
-  batchRunId?: string;
 }
 
 /** A scenario run's test data: what setup returned, or a turn's latest update. */
@@ -91,7 +85,7 @@ export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel 
   private readonly logger: Logger;
   private readonly fetchImpl: FetchLike;
   private readonly sleep: (ms: number) => Promise<void>;
-  private readonly run: ConnectedCallRun;
+  private readonly run: ScenarioCallRun;
   private served: ServedInstance | null = null;
   private state: ConnectedRunState | null = null;
 
@@ -102,7 +96,7 @@ export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel 
     logger: Logger;
     fetchImpl?: FetchLike;
     sleep?: (ms: number) => Promise<void>;
-    run?: ConnectedCallRun;
+    run?: ScenarioCallRun;
   }): HttpSerializedConnectedAgentChannel {
     return new HttpSerializedConnectedAgentChannel(options);
   }
@@ -126,7 +120,7 @@ export class HttpSerializedConnectedAgentChannel extends SerializedAgentChannel 
     /** The wait between busy retries, replaceable in tests. */
     sleep?: (ms: number) => Promise<void>;
     /** The scenario run the calls belong to; absent outside a scenario run. */
-    run?: ConnectedCallRun;
+    run?: ScenarioCallRun;
   }) {
     super();
     this.name = "SerializedConnectedAgentAdapter";

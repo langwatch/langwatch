@@ -1,9 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 /**
- * Stripe-style signing: `t=<unix seconds>,v1=<hex hmac-sha256>`, repeatable
- * during rotation (newest first, any match accepted). THE implementation,
- * synced via `specs/webhooks/signature-vectors.json` (also verified by the TS/Python SDKs).
+ * Stripe-style `t=<unix seconds>,v1=<hex hmac-sha256>`, one `v1` per valid secret, newest first:
+ * THE signer for webhook deliveries and scenario hooks, pinned by
+ * `specs/webhooks/signature-vectors.json` (which `@langwatch/webhook-verify` and the SDKs read).
  */
 export const WEBHOOK_SIGNATURE_HEADER = "X-LangWatch-Signature";
 

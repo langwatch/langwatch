@@ -9,7 +9,7 @@ import {
   verifyWebhookSignature,
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
-} from "../webhook-signature.rules.ts";
+} from "../webhook-signature.ts";
 
 /**
  * Spec: modules/webhook/specs/webhook-egress.feature
@@ -25,7 +25,7 @@ import {
 
 const VECTORS_PATH = join(
   dirname(fileURLToPath(import.meta.url)),
-  "../../../../../../specs/webhooks/signature-vectors.json",
+  "../../../../specs/webhooks/signature-vectors.json",
 );
 
 interface SigningVector {

@@ -4,7 +4,7 @@ import {
   signWebhookPayload,
   verifyWebhookSignature,
   WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
-} from "../webhook-signature.rules.ts";
+} from "../webhook-signature.ts";
 
 const SECRET = "whsec_test_secret_value";
 const OLD_SECRET = "whsec_previous_secret_value";

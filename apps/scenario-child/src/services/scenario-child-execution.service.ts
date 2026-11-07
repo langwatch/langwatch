@@ -15,11 +15,11 @@ import {
 } from "@langwatch/scenario-contract";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 
+import { HttpSerializedConnectedAgentChannel } from "../channels/http/http.serialized-connected-agent.channel.ts";
 import {
-  type ConnectedCallRun,
-  HttpSerializedConnectedAgentChannel,
-} from "../channels/http/http.serialized-connected-agent.channel.ts";
-import type { ScenarioHttp } from "../channels/http/http.serialized-http-agent.channel.ts";
+  HttpSerializedHttpAgentChannel,
+  type ScenarioHttp,
+} from "../channels/http/http.serialized-http-agent.channel.ts";
 import { litellmModelChannels } from "../channels/litellm-model-channels.registry.ts";
 import type { NlpFetchTimeouts } from "../channels/nlp-fetch.channel.ts";
 import {
@@ -34,10 +34,15 @@ import {
 } from "../rules/agent-first-script.rules.ts";
 import { buildCallerVoiceSimulatorConfig } from "../rules/caller-voice-simulator.rules.ts";
 import { buildRemoteTraceRunConfig } from "../rules/remote-trace-run.rules.ts";
+import { callRunOf } from "../rules/scenario-call-run.rules.ts";
 import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
 import { AgentTestScriptService } from "./agent-test-script.service.ts";
 import { RunStateRolesService } from "./run-state-roles.service.ts";
-import { ScenarioRunHooksError, ScenarioRunHooksService } from "./scenario-run-hooks.service.ts";
+import {
+  type ScenarioHookCaller,
+  ScenarioRunHooksError,
+  ScenarioRunHooksService,
+} from "./scenario-run-hooks.service.ts";
 
 /**
  * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate. This interface
@@ -203,8 +208,8 @@ function buildMaxTurnsRunConfig({
 }
 
 /**
- * The connected agent a scenario run calls hooks on, with the hooks it declared, or null when the
- * run calls none. An agent test calls none.
+ * The agent a scenario run calls hooks on (a connected agent, or an HTTP agent with a hooks URL),
+ * with the hooks it declared, or null when the run calls none. An agent test calls none.
  */
 function hookTargetOf({
   jobData,
@@ -212,22 +217,17 @@ function hookTargetOf({
 }: {
   jobData: ChildProcessJobData;
   adapter: ScenarioRunner.AgentAdapter;
-}): { caller: HttpSerializedConnectedAgentChannel; declared: AgentHooks } | null {
+}): { caller: ScenarioHookCaller; declared: AgentHooks } | null {
   const { adapterData } = jobData;
-  if (jobData.script || adapterData.type !== "connected") return null;
+  if (jobData.script) return null;
+  if (adapterData.type === "http" && !adapterData.hooksUrl) return null;
+  if (adapterData.type !== "connected" && adapterData.type !== "http") return null;
   const declared = adapterData.hooks;
   if (!declared?.setup && !declared?.teardown) return null;
-  if (!(adapter instanceof HttpSerializedConnectedAgentChannel)) return null;
-  return { caller: adapter, declared };
-}
-
-/** The scenario run every connected agent call names (ADR-180). */
-function callRunOf(jobData: ChildProcessJobData): ConnectedCallRun {
-  return {
-    ...(jobData.scenarioRunId ? { scenarioRunId: jobData.scenarioRunId } : {}),
-    scenarioName: jobData.scenario.name,
-    batchRunId: jobData.context.batchRunId,
-  };
+  const isHookCaller =
+    adapter instanceof HttpSerializedConnectedAgentChannel ||
+    adapter instanceof HttpSerializedHttpAgentChannel;
+  return isHookCaller ? { caller: adapter, declared } : null;
 }
 
 /** The run's turns through the scenario library, up to its verdict. */

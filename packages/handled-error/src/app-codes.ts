@@ -45,6 +45,7 @@ export const APP_ERROR_CODES = [
   "agent_dev_tunnel_unreachable",
   "agent_disconnected",
   "agent_environment_unresolved",
+  "agent_hooks_url_templated_origin",
   "agent_instance_lost",
   "agent_label_invalid",
   "agent_listing_unavailable",

@@ -1,4 +1,5 @@
 import { DispatchError } from "@langwatch/eventing";
+import { verifyWebhookSignature, WEBHOOK_SIGNATURE_HEADER } from "@langwatch/webhook-signing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { HttpWebhookSender } from "../../channels/webhook-destination.channel.ts";
@@ -6,10 +7,6 @@ import type {
   WebhookDispatchCapCount,
   WebhookDispatchCapRepository,
 } from "../../repositories/webhook-dispatch-cap.repository.ts";
-import {
-  verifyWebhookSignature,
-  WEBHOOK_SIGNATURE_HEADER,
-} from "../../rules/webhook-signature.rules.ts";
 import { describeTransportFailure } from "../../rules/webhook-transport-failure.rules.ts";
 import { WebhookDispatchCapService } from "../webhook-dispatch-cap.service.ts";
 import { WebhookEgressService } from "../webhook-egress.service.ts";

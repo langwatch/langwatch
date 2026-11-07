@@ -47,6 +47,7 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/webhook-contract": "workspace:*",
+    "@langwatch/webhook-signing": "workspace:*",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",

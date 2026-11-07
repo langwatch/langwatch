@@ -1,12 +1,13 @@
 import {
-  WEBHOOK_DELIVERY_ID_HEADER,
-  WEBHOOK_EVENT_ID_HEADER,
-} from "./webhook-delivery-classification.rules.ts";
-import {
   signWebhookPayload,
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
-} from "./webhook-signature.rules.ts";
+} from "@langwatch/webhook-signing";
+
+import {
+  WEBHOOK_DELIVERY_ID_HEADER,
+  WEBHOOK_EVENT_ID_HEADER,
+} from "./webhook-delivery-classification.rules.ts";
 
 /**
  * Emits cross-language signature test vectors from the sender's own
@@ -346,7 +347,7 @@ function buildVectors(): SignatureVectorFile {
     $schema_note:
       "Generated file. Do not hand-edit: run `pnpm --filter @langwatch/tasks task webhook-signature-vectors`.",
     generated_by: "modules/webhook/process/src/rules/webhook-signature-vectors.rules.ts",
-    generated_from: "modules/webhook/process/src/rules/webhook-signature.rules.ts",
+    generated_from: "packages/webhook-signing/src/webhook-signature.ts",
     headers: {
       signature: WEBHOOK_SIGNATURE_HEADER,
       delivery_id: WEBHOOK_DELIVERY_ID_HEADER,

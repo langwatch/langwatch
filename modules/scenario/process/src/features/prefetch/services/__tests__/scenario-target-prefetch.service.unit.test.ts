@@ -313,6 +313,71 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
     });
   });
 
+  describe("given an http agent with a hooks URL", () => {
+    const withHooks = (hooks: { setup: boolean; teardown: boolean }) =>
+      httpAgent({
+        url: "https://acme.test/chat",
+        method: "POST",
+        hooksUrl: "https://acme.test/hooks",
+        hooks,
+        hooksSigningSecret: "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET }}",
+      });
+
+    it("packs the hooks and the signing secret the child signs with", async () => {
+      const service = serviceAnswering({
+        agent: withHooks({ setup: true, teardown: false }),
+        projectSecrets: { HTTP_AGENT_1_HOOKS_SIGNING_SECRET: "whsec_test" },
+      });
+
+      await expect(fetchFor(service, "http")).resolves.toMatchObject({
+        hooksUrl: "https://acme.test/hooks",
+        hooks: { setup: true, teardown: false },
+        hooksSigningSecret: "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET }}",
+        secrets: { HTTP_AGENT_1_HOOKS_SIGNING_SECRET: "whsec_test" },
+      });
+    });
+
+    /** @scenario "Rotating the hooks signing secret keeps the old one valid for 24 hours" */
+    it("packs the previous signing secret of an open rotation and its value", async () => {
+      const previous = {
+        secret: "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET }}",
+        expiresAt: "2026-10-31T12:00:00.000Z",
+      };
+      const service = serviceAnswering({
+        agent: httpAgent({
+          url: "https://acme.test/chat",
+          method: "POST",
+          hooksUrl: "https://acme.test/hooks",
+          hooks: { setup: true, teardown: true },
+          hooksSigningSecret: "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET_2 }}",
+          hooksPreviousSigningSecret: previous,
+        }),
+        projectSecrets: {
+          HTTP_AGENT_1_HOOKS_SIGNING_SECRET: "whsec_test_previous_value",
+          HTTP_AGENT_1_HOOKS_SIGNING_SECRET_2: "whsec_test_current_value",
+        },
+      });
+
+      await expect(fetchFor(service, "http")).resolves.toMatchObject({
+        hooksSigningSecret: "{{ secrets.HTTP_AGENT_1_HOOKS_SIGNING_SECRET_2 }}",
+        hooksPreviousSigningSecret: previous,
+        secrets: {
+          HTTP_AGENT_1_HOOKS_SIGNING_SECRET: "whsec_test_previous_value",
+          HTTP_AGENT_1_HOOKS_SIGNING_SECRET_2: "whsec_test_current_value",
+        },
+      });
+    });
+
+    it("packs no hooks when both are unchecked", async () => {
+      const service = serviceAnswering({ agent: withHooks({ setup: false, teardown: false }) });
+
+      const adapter = await fetchFor(service, "http");
+
+      expect(adapter).not.toHaveProperty("hooksUrl");
+      expect(adapter).not.toHaveProperty("hooks");
+    });
+  });
+
   describe("given a connected agent", () => {
     it("packs the platform endpoint and caps the child adapter timeout", async () => {
       const service = serviceAnswering({ agent: connectedAgent(999_999) });

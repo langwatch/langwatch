@@ -610,3 +610,46 @@ describe("template file inclusion", () => {
     });
   });
 });
+
+describe("the run state in the template context", () => {
+  const state = { customer_id: "c 1", tier: 2 };
+
+  describe("given a run whose setup returned a state", () => {
+    /** @scenario "An HTTP turn template reads the state setup returned" */
+    it("renders the whole state as JSON and one key by name in the body", () => {
+      const context = buildTemplateContext({ input: inputWith("hi"), state });
+
+      const body = renderBodyTemplate({
+        template: '{"all": {{ state }}, "id": "{{ state.customer_id }}", "tier": {{ state.tier }}}',
+        context,
+      });
+
+      expect(JSON.parse(body)).toEqual({ all: state, id: "c 1", tier: 2 });
+    });
+
+    it("encodes the state in the url and renders it as text in a header", () => {
+      const context = buildTemplateContext({ input: inputWith("hi"), state });
+
+      expect(
+        renderUrlTemplate({ template: "https://x.test/c/{{ state.customer_id }}", context }),
+      ).toBe("https://x.test/c/c%201");
+      expect(
+        renderHeaderTemplate({ template: "{{ state.customer_id }}", context, headerKey: "X-C" }),
+      ).toBe("c 1");
+    });
+  });
+
+  describe("given an agent with hooks before setup answered", () => {
+    it("renders the state as an empty object", () => {
+      const context = buildTemplateContext({ input: inputWith("hi"), state: null });
+
+      expect(renderBodyTemplate({ template: "{{ state }}", context })).toBe("{}");
+    });
+  });
+
+  describe("given an agent without hooks", () => {
+    it("binds no state", () => {
+      expect(buildTemplateContext({ input: inputWith("hi") })).not.toHaveProperty("state");
+    });
+  });
+});

@@ -305,7 +305,7 @@ describe("<ScenarioRunDetailDrawer/> setup and teardown", () => {
   describe("given a finished run on an agent that declares no hooks", () => {
     /**
      * @scenario 'An agent with no hooks runs as today and is marked "No hooks"'
-     * @scenario "HTTP and code agents never call hooks"
+     * @scenario "An HTTP agent without a hooks URL and a code agent never call hooks"
      */
     it("marks the run No hooks and offers no keep-data rerun", async () => {
       const user = userEvent.setup();

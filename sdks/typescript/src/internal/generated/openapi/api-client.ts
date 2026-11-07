@@ -2120,6 +2120,16 @@ export interface operations {
                                 value: string;
                             };
                         };
+                        hooksUrl?: string;
+                        hooks?: {
+                            setup: boolean;
+                            teardown: boolean;
+                        };
+                        hooksSigningSecret?: string;
+                        hooksPreviousSigningSecret?: {
+                            secret: string;
+                            expiresAt: string;
+                        };
                         devTunnel?: {
                             previousUrl?: string;
                             connectedAt?: string;

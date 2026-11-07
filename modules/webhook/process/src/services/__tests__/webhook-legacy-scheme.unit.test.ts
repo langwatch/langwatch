@@ -4,6 +4,7 @@ import { createHmac } from "node:crypto";
 
 import { InMemoryProcessStore, type IntentContext } from "@langwatch/eventing";
 import { isValidEventSelector } from "@langwatch/webhook-contract";
+import { WEBHOOK_SIGNATURE_HEADER } from "@langwatch/webhook-signing";
 import { describe, expect, it } from "vitest";
 
 import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
@@ -15,7 +16,6 @@ import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
   type SendBatchPayload,
 } from "../../rules/webhook-delivery-contract.rules.ts";
-import { WEBHOOK_SIGNATURE_HEADER } from "../../rules/webhook-signature.rules.ts";
 import { WebhookDeliveryRequestService } from "../webhook-delivery-request.service.ts";
 import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
 import { WebhookDestinationDispatchService } from "../webhook-destination-dispatch.service.ts";
