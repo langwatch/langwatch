@@ -638,12 +638,14 @@ const describeNonArray = (value: unknown): string => {
   return ` (it is an object with keys: ${shown}${keys.length > MAX_NAMED_KEYS ? ", …" : ""})`;
 };
 
+// A key the subset cannot spell (a space, a dot) would make the hint an invalid path.
+const PATH_KEY_RE = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 // Names only keys whose value really is a list, so the hint never invents a path.
 const listPathHint = (value: unknown, at: string): string => {
   if (value === null || typeof value !== "object") return "";
   const base = at.replace(/\[(?:-?\d+)?\]$/, "");
   const paths = Object.entries(value)
-    .filter(([, child]) => Array.isArray(child))
+    .filter(([key, child]) => Array.isArray(child) && PATH_KEY_RE.test(key))
     .slice(0, MAX_LIST_HINTS)
     .map(([key]) => `${base}.${key}[]`);
   return paths.length > 0 ? `; try ${paths.join(", ")}` : "";

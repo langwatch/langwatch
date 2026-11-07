@@ -199,6 +199,15 @@ describe("applyJq", () => {
     expect(() => applyJq(".data[]", data)).toThrow(/try \.data\.items\[\]/);
   });
 
+  it("suggests the list path when an object is indexed, too", () => {
+    expect(() => applyJq(".data[0]", { data: { items: [1] } })).toThrow(/try \.data\.items\[\]/);
+  });
+
+  it("never suggests a key the subset cannot spell", () => {
+    expect(() => applyJq(".data[]", { data: { "my key": [1] } })).toThrow(/keys: my key/);
+    expect(() => applyJq(".data[]", { data: { "my key": [1] } })).not.toThrow(/try /);
+  });
+
   it("gives no path hint when no key of the object holds a list", () => {
     const data = { data: { a: 1, b: "two" } };
 
