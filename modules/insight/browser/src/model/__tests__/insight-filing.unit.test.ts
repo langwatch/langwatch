@@ -7,7 +7,14 @@
 import type { LangyInsightsCardFinding } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
-import { draftOfAnswer, draftOfFinding, filedFinding, filedSubject } from "../insight-filing.ts";
+import {
+  draftOfAnswer,
+  draftOfFinding,
+  fileableFindings,
+  type FileableFinding,
+  filedFinding,
+  filedSubject,
+} from "../insight-filing.ts";
 
 const WINDOW = { start: 1_783_209_600_000, end: 1_783_296_000_000, granularitySeconds: 3_600 };
 const BOARD = { id: "board-1", name: "Checkout health" };
@@ -19,10 +26,42 @@ const finding = (overrides: Partial<LangyInsightsCardFinding> = {}): LangyInsigh
   ...overrides,
 });
 
+/** A finding that names a next step, as `fileableFindings` hands it to the form. */
+const fileable = (overrides: Partial<FileableFinding> = {}): FileableFinding => ({
+  title: "Checkout errors doubled",
+  body: "Errors on checkout rose from 41 to 96.",
+  tone: "bad",
+  ...overrides,
+});
+
+describe("fileableFindings", () => {
+  describe("given a card with bad, watch and good findings", () => {
+    /** @scenario "A good finding of an insights card is never filed" */
+    it("keeps the bad and the watch findings in order, and drops the good one", () => {
+      const findings = [
+        finding({ title: "Errors doubled", tone: "bad" }),
+        finding({ title: "Cost per trace fell", tone: "good" }),
+        finding({ title: "Latency crept up", tone: "watch" }),
+      ];
+
+      expect(fileableFindings({ findings }).map(({ title, tone }) => ({ title, tone }))).toEqual([
+        { title: "Errors doubled", tone: "bad" },
+        { title: "Latency crept up", tone: "watch" },
+      ]);
+    });
+  });
+
+  describe("given no card", () => {
+    it("has nothing to file", () => {
+      expect(fileableFindings(undefined)).toEqual([]);
+    });
+  });
+});
+
 describe("draftOfFinding", () => {
   describe("given one finding of an answer's insights card", () => {
     it("starts the form with the finding's own words, verdict, topic and validity", () => {
-      expect(draftOfFinding(finding({ topic: "errors", validDays: 14 }))).toEqual({
+      expect(draftOfFinding(fileable({ topic: "errors", validDays: 14 }))).toEqual({
         title: "Checkout errors doubled",
         body: "Errors on checkout rose from 41 to 96.",
         tone: "bad",
@@ -32,7 +71,12 @@ describe("draftOfFinding", () => {
     });
 
     it("leaves the topic empty and the validity at a week when the finding names neither", () => {
-      expect(draftOfFinding(finding())).toMatchObject({ topic: "", validDays: 7 });
+      expect(draftOfFinding(fileable())).toMatchObject({ topic: "", validDays: 7 });
+    });
+
+    it("keeps a bad or a watch finding's own verdict", () => {
+      expect(draftOfFinding(fileable({ tone: "watch" })).tone).toBe("watch");
+      expect(draftOfFinding(fileable({ tone: "bad" })).tone).toBe("bad");
     });
   });
 });

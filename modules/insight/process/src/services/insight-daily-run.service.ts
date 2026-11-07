@@ -286,6 +286,10 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       widgets: ready.gate.widgets,
     });
     if (!answer.ok) return failed(answer.reason, conversationId);
+    if (answer.droppedGoodCount > 0) {
+      const dropped = { projectId, runId: input.runId, count: answer.droppedGoodCount };
+      logger.warn(dropped, "daily run dropped good findings the skill asks for none of");
+    }
     // Asked again: the turn took minutes, and a person who lost access since files nothing.
     const still = await this.members.gate.check({ projectId, userId, board: input.board });
     if (!still.ok) {

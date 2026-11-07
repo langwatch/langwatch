@@ -43,7 +43,7 @@ import { OTHER_PROJECT, PROJECT } from "./insight.fixture.ts";
 const { RUN_REQUESTED, RUN_STARTED, RUN_SETTLED } = INSIGHT_DAILY_RUN_EVENT_TYPES;
 const TWO_FINDINGS = answerWith([
   finding(),
-  finding({ title: "Errors fell by half", tone: "good" }),
+  finding({ title: "Errors rose on search", tone: "watch" }),
 ]);
 
 let installed: InstalledDailyRuns;
@@ -105,7 +105,7 @@ describe("given a member with analytics:view and a board with widgets", () => {
 
       expect(entries.map((entry) => entry.title).toSorted()).toEqual([
         "Checkout cost doubled",
-        "Errors fell by half",
+        "Errors rose on search",
       ]);
       for (const entry of entries) {
         expect(entry).toMatchObject({
@@ -598,6 +598,36 @@ describe("given Langy's answer, which is untrusted", () => {
     });
   });
 
+  /** @scenario "A good finding in a run's answer is dropped and not filed" */
+  it("files the bad and the watch findings, and no insight for the good one", async () => {
+    installed.world.langy.answer = answerWith([
+      finding(),
+      finding({ title: "Errors rose on search", tone: "watch" }),
+      finding({ title: "Cost per trace fell", tone: "good" }),
+    ]);
+
+    await run();
+
+    const filed = (await insightsOf()).map(({ title, tone }) => ({ title, tone }));
+    expect(filed.toSorted((a, b) => a.title.localeCompare(b.title))).toEqual([
+      { title: "Checkout cost doubled", tone: "bad" },
+      { title: "Errors rose on search", tone: "watch" },
+    ]);
+    expect(await lastRunOf()).toMatchObject({ outcome: "filed", filedCount: 2 });
+  });
+
+  /** @scenario "A run whose findings are all good files nothing" */
+  it("files nothing and records nothing when every finding is good news", async () => {
+    installed.world.langy.answer = answerWith([
+      finding({ title: "Cost per trace fell", tone: "good" }),
+    ]);
+
+    await run();
+
+    expect(await insightsOf()).toEqual([]);
+    expect(await lastRunOf()).toMatchObject({ outcome: "nothing", reason: null, filedCount: 0 });
+  });
+
   /** @scenario "An answer without the agreed block fails the run" */
   it("fails the run for prose with no findings block", async () => {
     installed.world.langy.answer = "Costs doubled on checkout. You should look at it.";
@@ -660,7 +690,7 @@ describe("given Langy's answer, which is untrusted", () => {
     expect(extractLangyTextFromParts(parts)).toBe("I read each widget over the window.\n");
     expect((await insightsOf()).map((entry) => entry.title).toSorted()).toEqual([
       "Checkout cost doubled",
-      "Errors fell by half",
+      "Errors rose on search",
     ]);
     expect(await lastRunOf()).toMatchObject({ outcome: "filed", filedCount: 2 });
   });
@@ -698,7 +728,7 @@ describe("given Langy's answer, which is untrusted", () => {
   });
 
   /** @scenario "A card that fails a run's checks is not rescued by a fenced block" */
-  it("fails the run when the card holds a finding over a run's limits, good block or not", async () => {
+  it("fails the run when the card holds a finding over a run's limits, valid block or not", async () => {
     installed.world.langy.answer = [
       answerWith([finding(), finding({ title: "x".repeat(121) })]),
       blockAnswerWith([finding({ title: "from the block" })]),
@@ -731,9 +761,13 @@ describe("given Langy's answer, which is untrusted", () => {
   it("fails the run for a card the relay repaired, whose last finding stops mid-sentence", async () => {
     const whole = answerWith([
       finding(),
-      { title: "Errors fell by half", tone: "good", body: "Errors fell from 96 to 41 overnight." },
+      {
+        title: "Errors rose on search",
+        tone: "watch",
+        body: "Errors rose from 41 to 96 overnight.",
+      },
     ]);
-    installed.world.langy.answer = whole.slice(0, whole.indexOf(" to 41 overnight"));
+    installed.world.langy.answer = whole.slice(0, whole.indexOf(" to 96 overnight"));
 
     await run();
 

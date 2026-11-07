@@ -1,18 +1,10 @@
 import { Box } from "@langwatch/design-system/primitives";
 
 /**
- * The unread count, like an email app: green when the unseen news skews good, red when it
- * skews bad. Draws nothing at zero.
+ * The unread count, like an email app, in one neutral colour: the count alone, never a
+ * verdict. Draws nothing at zero.
  */
-export function UnreadPill({
-  count,
-  tone,
-  size = "sm",
-}: {
-  count: number;
-  tone: "good" | "bad";
-  size?: "sm" | "xs";
-}) {
+export function UnreadPill({ count, size = "sm" }: { count: number; size?: "sm" | "xs" }) {
   if (count <= 0) return null;
   return (
     <Box
@@ -28,8 +20,8 @@ export function UnreadPill({
       textStyle="micro"
       fontWeight="bold"
       fontVariantNumeric="tabular-nums"
-      color="white"
-      background={tone === "good" ? "green.solid" : "red.solid"}
+      color="gray.contrast"
+      background="gray.solid"
     >
       {count}
     </Box>

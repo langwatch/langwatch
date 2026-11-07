@@ -31,7 +31,7 @@ beforeEach(async () => {
   installed = await installDailyRuns();
   installed.world.langy.answer = answerWith([
     finding(),
-    finding({ title: "Errors fell by half", tone: "good" }),
+    finding({ title: "Errors rose on search", tone: "watch" }),
   ]);
   schedule = scheduleDriver(installed);
   await schedule.turnOn();

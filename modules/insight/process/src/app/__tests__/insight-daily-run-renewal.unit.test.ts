@@ -84,7 +84,11 @@ async function lastRunOf({ userId = MEMBER, board = BOARD }: RunScope = {}) {
 }
 
 const COST = finding({ key: "checkout-cost-doubled" });
-const ERRORS = finding({ title: "Errors fell by half", tone: "good", key: "errors-fell" });
+const ERRORS = finding({
+  title: "Errors rose on search",
+  tone: "watch",
+  key: "search-errors-rose",
+});
 
 describe("given Langy answers a finding with a key that none of the person's insights holds", () => {
   /** @scenario "A new finding is filed with its key" */
@@ -184,7 +188,7 @@ describe("given an open insight that keeps a query and one that keeps none", () 
       board: { id: BOARD.id, widget: { id: "widget-cost", name: "Cost per day" } },
       renewedAt: DAY_2,
     });
-    expect(await insightTitled("Errors fell by half")).toMatchObject({
+    expect(await insightTitled("Errors rose on search")).toMatchObject({
       lwql: null,
       replay: null,
       board: { id: BOARD.id, widget: null },
@@ -212,7 +216,7 @@ describe("given an open insight the person has seen and kept, and one they have 
       keptAt: actedAt,
       archivedAt: null,
     });
-    const untouched = await insightTitled("Errors fell by half");
+    const untouched = await insightTitled("Errors rose on search");
     expect(untouched).toMatchObject({ renewedAt: DAY_2, seenAt: null, archivedAt: null });
     const inbox = deriveInsightInbox({ entries: await insightsOf(), now: DAY_2 });
     expect(inbox.unseen.map(({ id }) => id)).toEqual([untouched.id]);
@@ -224,7 +228,7 @@ describe("given the person marked an insight for the board done", () => {
   it("neither renews it nor files a twin, for a finding with its key or with its id", async () => {
     await runAt({ now: DAY_1, findings: [COST, ERRORS] });
     const before = await insightsOf();
-    const errors = await insightTitled("Errors fell by half");
+    const errors = await insightTitled("Errors rose on search");
     for (const { id } of before) {
       await installed.app.archiveInsight({ projectId: PROJECT, userId: MEMBER, insightId: id });
     }
@@ -279,7 +283,7 @@ describe("given a finding that names an insight that is not the person's own for
     await runAt({ now: DAY_1, userId: OTHER_MEMBER, findings: [COST] });
     await runAt({ now: DAY_1, board: ELSEWHERE, findings: [ERRORS] });
     const [theirs] = await insightsOf(OTHER_MEMBER);
-    const elsewhere = await insightTitled("Errors fell by half");
+    const elsewhere = await insightTitled("Errors rose on search");
 
     await runAt({
       now: DAY_2,
@@ -318,14 +322,14 @@ describe("given a run that renewed one insight and filed one", () => {
 
     expect(await insightsOf()).toEqual(first);
     expect(first.map(({ title, renewedAt }) => ({ title, renewedAt }))).toEqual([
-      { title: "Errors fell by half", renewedAt: null },
+      { title: "Errors rose on search", renewedAt: null },
       { title: "Checkout cost doubled", renewedAt: DAY_2 },
     ]);
     expect(await eventsOf((await insightTitled("Checkout cost doubled")).id)).toEqual([
       FILED,
       RENEWED,
     ]);
-    expect(await eventsOf((await insightTitled("Errors fell by half")).id)).toEqual([FILED]);
+    expect(await eventsOf((await insightTitled("Errors rose on search")).id)).toEqual([FILED]);
     const oneRun = [RUN_REQUESTED, RUN_STARTED, RUN_SETTLED];
     expect(await installed.runEventsOf()).toEqual([...oneRun, ...oneRun]);
     expect(firstRun).toMatchObject({ outcome: "filed", filedCount: 1, renewedCount: 1 });

@@ -7,7 +7,7 @@
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import type { LangyAnswerSubject, LangyDerivedInsightsCard } from "@langwatch/langy-contract";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -54,7 +54,7 @@ async function saveAnswer({ subject }: { subject?: LangyAnswerSubject }) {
   return { filed: filings[0]?.input, host };
 }
 
-/** An answer's insights card as Langy stamps it: one board, one window, two findings. */
+/** An answer's insights card as Langy stamps it: one board, one window, three findings. */
 const CARD: LangyDerivedInsightsCard = {
   kind: "insights",
   blockId: "daily-insights",
@@ -72,6 +72,7 @@ const CARD: LangyDerivedInsightsCard = {
       lwql: "SELECT countIf(HasError) FROM trace_metrics",
       key: "checkout-errors-doubled",
     },
+    { title: "Latency crept up", body: "p95 rose from 1.2 to 1.6 seconds.", tone: "watch" },
     { title: "Cost per trace fell", body: "From 0.12 to 0.08 dollars.", tone: "good" },
   ],
 };
@@ -146,22 +147,47 @@ describe("given a Langy answer that carries an insights card", () => {
       await openDialog();
       await userEvent.selectOptions(
         await screen.findByRole("combobox", { name: "Finding" }),
-        "Cost per trace fell",
+        "Latency crept up",
       );
-      expect(screen.getByRole("textbox", { name: "Headline" })).toHaveValue("Cost per trace fell");
+      expect(screen.getByRole("textbox", { name: "Headline" })).toHaveValue("Latency crept up");
       await saveDialog();
 
       await waitFor(() => expect(filings).toHaveLength(1));
       expect(filings[0]?.input).toMatchObject({
-        title: "Cost per trace fell",
-        body: "From 0.12 to 0.08 dollars.",
-        tone: "good",
+        title: "Latency crept up",
+        body: "p95 rose from 1.2 to 1.6 seconds.",
+        tone: "watch",
         validDays: 7,
         board: { id: "board-1", name: "Checkout health", widget: null },
       });
       expect(filings[0]?.input).not.toHaveProperty("lwql");
       expect(filings[0]?.input).not.toHaveProperty("replay");
       expect(filings[0]?.input).not.toHaveProperty("topic");
+    });
+
+    /** @scenario "A good finding of an insights card is never filed" */
+    it("offers only the bad and the watch findings, never the good one", async () => {
+      mountCardAnswer();
+
+      await openDialog();
+
+      const finding = await screen.findByRole("combobox", { name: "Finding" });
+      const options = within(finding).getAllByRole("option");
+      expect(options.map((option) => option.textContent)).toEqual([
+        "Checkout errors doubled",
+        "Latency crept up",
+      ]);
+    });
+
+    /** @scenario "The save form offers no Good news" */
+    it("offers no Good news as the verdict", async () => {
+      mountCardAnswer();
+
+      await openDialog();
+
+      const verdict = await screen.findByRole("combobox", { name: "Verdict" });
+      const options = within(verdict).getAllByRole("option");
+      expect(options.map((option) => option.textContent)).toEqual(["Warning", "Worth a look"]);
     });
 
     it("offers the findings not saved yet, and says saved once every one is", async () => {
@@ -172,7 +198,7 @@ describe("given a Langy answer that carries an insights card", () => {
       await waitFor(() => expect(filings).toHaveLength(1));
       await openDialog();
       expect(await screen.findByRole("textbox", { name: "Headline" })).toHaveValue(
-        "Cost per trace fell",
+        "Latency crept up",
       );
       expect(
         screen.getByRole("option", { name: "Checkout errors doubled (saved)" }),
@@ -198,6 +224,15 @@ describe("given a Langy answer that carries an insights card", () => {
       });
       expect(filings[0]?.input).not.toHaveProperty("board");
       expect(filings[0]?.input).not.toHaveProperty("replay");
+    });
+  });
+
+  describe("when the card holds good findings only", () => {
+    /** @scenario "A good finding of an insights card is never filed" */
+    it("draws no save action, so good news is never filed", () => {
+      mountCardAnswer({ card: { ...CARD, findings: CARD.findings.slice(2) } });
+
+      expect(screen.queryByRole("button", { name: "Save as insight" })).not.toBeInTheDocument();
     });
   });
 

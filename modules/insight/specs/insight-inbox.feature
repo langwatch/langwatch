@@ -40,6 +40,13 @@ Feature: The insights inbox
       When the request is validated
       Then it is refused with a field error on the title
 
+    @unit
+    Scenario: Filing a good insight directly is refused
+      Given a file request with the good tone
+      When the request is validated
+      Then it is refused with a field error on the tone
+      And an insight stored earlier with the good tone still reads
+
   Rule: An insight belongs to one person
     The owner is the person whose Langy made the insight: whoever saved the answer, or the
     person a run filed it for. Every read and every act is the owner's alone, and another
@@ -217,6 +224,29 @@ Feature: The insights inbox
       When a member saves it as an insight
       Then the form starts from the answer's own text
 
+  Rule: The verdict names the next step
+    A new insight is bad or watch, and names a next step. Good news is no longer filed, but
+    an insight stored with it still reads.
+
+    @unit
+    Scenario: An insight stored with the good tone still reads Good news
+      Given an insight stored earlier with the good tone
+      When its verdict is written out
+      Then it reads "Good news" on the color it had
+
+    @integration
+    Scenario: The save form offers no Good news
+      Given a Langy answer that carries an insights card
+      When a member opens the form to save it as an insight
+      Then the verdict offers no "Good news", only bad and watch
+
+    @unit @integration
+    Scenario: A good finding of an insights card is never filed
+      Given a Langy answer whose insights card holds bad, watch and good findings
+      When a member opens the form to save it as an insight
+      Then only the bad and the watch findings are offered, each with its own verdict
+      And a card of good findings alone offers no save
+
   Rule: Evidence on fixed dates
     An insight keeps what to run, never the result: its query, the fixed window the query
     read and the values in force when it was filed.
@@ -317,6 +347,12 @@ Feature: The insights inbox
       Given 3 unseen insights in the inbox and 1 unseen stale insight
       When the badge is derived
       Then the count is 3
+
+    @integration
+    Scenario: The unread pill is a plain count in one neutral colour
+      Given unseen insights in the inbox that are bad and watch, or good only
+      When the sidebar draws the unread pill
+      Then it shows only the count, drawn the same neutral way whatever the verdicts
 
   Rule: Seen is marked once
 

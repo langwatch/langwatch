@@ -127,18 +127,18 @@ Contract `../contract/src/insight.trpc.ts:28`, router `src/transport/insight.trp
 
 ```typescript
 // insights.getAll
-// Input: insightProjectScopeSchema, ../contract/src/insight.ts:122
+// Input: insightProjectScopeSchema, ../contract/src/insight.ts:134
 interface Input {
   projectId: string;
 }
 // Output: insightEntrySchema.array() (inline, ../contract/src/insight.trpc.ts:31)
 
 // insights.file
-type Input = z.infer<typeof fileInsightInputSchema>; // ../contract/src/insight.ts:142
-type Output = z.infer<typeof insightEntrySchema>; // ../contract/src/insight.ts:114
+type Input = z.infer<typeof fileInsightInputSchema>; // ../contract/src/insight.ts:155
+type Output = z.infer<typeof insightEntrySchema>; // ../contract/src/insight.ts:126
 
 // insights.markSeen
-// Input: markInsightsSeenInputSchema, ../contract/src/insight.ts:162
+// Input: markInsightsSeenInputSchema, ../contract/src/insight.ts:175
 interface Input {
   projectId: string;
   insightIds: string[];
@@ -147,7 +147,7 @@ interface Input {
 type Output = unknown;
 
 // insights.archive
-// Input: insightScopeSchema, ../contract/src/insight.ts:150
+// Input: insightScopeSchema, ../contract/src/insight.ts:163
 interface Input {
   projectId: string;
   insightId: string;
@@ -156,7 +156,7 @@ interface Input {
 type Output = unknown;
 
 // insights.keep
-type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:150
+type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:163
 // Output: inline, ../contract/src/insight.trpc.ts:47
 type Output = unknown;
 

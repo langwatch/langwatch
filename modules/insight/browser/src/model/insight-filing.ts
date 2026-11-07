@@ -5,10 +5,11 @@
  */
 
 import {
+  type ActionableInsightTone,
   DEFAULT_INSIGHT_VALID_DAYS,
   type FileInsightInput,
-  type InsightTone,
   insightReplaySchema,
+  isActionableTone,
 } from "@langwatch/insight-contract";
 import type {
   LangyAnswerSubject,
@@ -18,11 +19,11 @@ import type {
 
 import { titleFromAnswer } from "./insight-presentation.ts";
 
-/** The words the save form starts with. */
+/** The words the save form starts with; a new insight names a next step, so never `good`. */
 export type InsightDraft = {
   title: string;
   body: string;
-  tone: InsightTone;
+  tone: ActionableInsightTone;
   topic: string;
   validDays: number;
 };
@@ -41,8 +42,20 @@ export function draftOfAnswer(answerText: string): InsightDraft {
   };
 }
 
-/** One finding of an answer's insights card, word for word as Langy typed it. */
-export function draftOfFinding(finding: LangyInsightsCardFinding): InsightDraft {
+/** A finding of a card that names a next step, so it may be filed. */
+export type FileableFinding = LangyInsightsCardFinding & { tone: ActionableInsightTone };
+
+/** The findings of a card that may be filed: good news names no next step, so it never is. */
+export function fileableFindings(
+  card: Pick<LangyDerivedInsightsCard, "findings"> | undefined,
+): FileableFinding[] {
+  return (card?.findings ?? []).filter((finding): finding is FileableFinding =>
+    isActionableTone(finding.tone),
+  );
+}
+
+/** One fileable finding of an answer's insights card, word for word with its own verdict. */
+export function draftOfFinding(finding: FileableFinding): InsightDraft {
   return {
     title: finding.title,
     body: finding.body,

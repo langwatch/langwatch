@@ -1,6 +1,6 @@
 /**
  * The Insights inbox, one person's own. What they read is timeline-shaped, what they act on is
- * inbox-shaped: a few insights, judged good or bad, that drop to Stale once they stop being
+ * inbox-shaped: a few insights, each naming a next step, that drop to Stale once they stop being
  * true and to Archived once marked done. Nobody else reads them; Copy is how one is shared.
  * @see modules/insight/specs/insight-inbox.feature
  */
@@ -124,7 +124,7 @@ function InboxBody({
     return (
       <NoDataInfoBlock
         title="Langy writes your brief here"
-        description="Save a Langy answer as an insight and it lands here: judged good or bad news, kept until it stops being true. It is yours alone; copy one to share it."
+        description="Save a Langy answer as an insight and it lands here: something to act on or check, kept until it stops being true. It is yours alone; copy one to share it."
         icon={<Inbox size={24} />}
         testId="insights-day-zero"
       >
