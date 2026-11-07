@@ -21,12 +21,20 @@ export class LeaseBusyError extends Error {
   }
 }
 
+/** This holder's lease went to someone else while its work ran; the work must not write. */
+export class LeaseLostError extends Error {
+  constructor() {
+    super("the lease was taken over while the work ran; try again");
+    this.name = "LeaseLostError";
+  }
+}
+
 /** The lease row's three writes, each a short statement on its own connection. */
 export interface LeaseStore {
   /** Takes the lease when it is free or expired; false when someone else holds it. */
   acquire(input: { holder: string; ttlMs: number }): Promise<boolean>;
-  /** Pushes this holder's expiry out again; a lease taken over meanwhile is left alone. */
-  renew(input: { holder: string; ttlMs: number }): Promise<void>;
+  /** Pushes this holder's expiry out again; false when the lease is no longer this holder's. */
+  renew(input: { holder: string; ttlMs: number }): Promise<boolean>;
   /** Drops this holder's lease, and only its own. */
   release(input: { holder: string }): Promise<void>;
 }
@@ -72,6 +80,15 @@ export async function acquireLease({
   return holder;
 }
 
+/** What the work holds: `assertHeld` fences a guarded write against a lease lost meanwhile. */
+export interface HeldLease {
+  /**
+   * Renews the lease and throws when it is no longer this holder's, so the write that follows
+   * runs with a full LEASE_TTL_MS of the lease still ahead of it.
+   */
+  assertHeld(): Promise<void>;
+}
+
 /**
  * Runs `work` while this caller alone holds the lease. No connection is held while `work`
  * runs: the lease is a row with an expiry, renewed while the work lasts and deleted after,
@@ -81,25 +98,70 @@ export async function withLease<T>({
   store,
   work,
   onBusy,
+  onLost = () => new LeaseLostError(),
   waitMs,
   deps,
 }: {
   store: LeaseStore;
-  work: () => Promise<T>;
+  work: (lease: HeldLease) => Promise<T>;
   onBusy?: () => Error;
+  /** The error a write fenced off by a lost lease gets; the owner names it for its users. */
+  onLost?: () => Error;
   waitMs?: number;
   deps?: LeaseDeps;
 }): Promise<T> {
   const holder = await acquireLease({ store, onBusy, waitMs, deps });
+  return holdLease({
+    holder,
+    renew: () => store.renew({ holder, ttlMs: LEASE_TTL_MS }),
+    release: () => store.release({ holder }),
+    renewEveryMs: RENEW_EVERY_MS,
+    onLost,
+    work,
+  });
+}
+
+/**
+ * Runs `work` under a lease already taken: renews it every `renewEveryMs`, fences each
+ * `assertHeld` with a renewal, and releases it after.
+ */
+async function holdLease<T>({
+  holder,
+  renew,
+  release,
+  renewEveryMs,
+  onLost = () => new LeaseLostError(),
+  work,
+}: {
+  holder: string;
+  renew: () => Promise<boolean>;
+  release: () => Promise<void>;
+  renewEveryMs: number;
+  onLost?: () => Error;
+  work: (lease: HeldLease) => Promise<T>;
+}): Promise<T> {
+  let lost = false;
   const renewal = setInterval(() => {
-    store.renew({ holder, ttlMs: LEASE_TTL_MS }).catch((error: unknown) => {
-      logger.warn({ error, holder }, "lease renewal failed; the lease may expire mid-work");
-    });
-  }, RENEW_EVERY_MS);
+    renew()
+      .then((held) => {
+        if (!held) lost = true;
+      })
+      .catch((error: unknown) => {
+        logger.warn({ error, holder }, "lease renewal failed; the lease may expire mid-work");
+      });
+  }, renewEveryMs);
+  const lease: HeldLease = {
+    assertHeld: async () => {
+      if (lost || !(await renew())) {
+        lost = true;
+        throw onLost();
+      }
+    },
+  };
   try {
-    return await work();
+    return await work(lease);
   } finally {
     clearInterval(renewal);
-    await store.release({ holder });
+    await release();
   }
 }

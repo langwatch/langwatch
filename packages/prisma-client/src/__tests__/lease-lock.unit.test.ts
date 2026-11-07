@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LEASE_TTL_MS, type LeaseDeps, type LeaseStore, withLease } from "../lease-lock.ts";
+import {
+  LEASE_TTL_MS,
+  type LeaseDeps,
+  type LeaseStore,
+  RENEW_EVERY_MS,
+  withLease,
+} from "../lease-lock.ts";
 
 /** A lease store whose acquire answers from a list, recording every call. */
-function storeAnswering(answers: boolean[]) {
+function storeAnswering(answers: boolean[], { held = () => true }: { held?: () => boolean } = {}) {
   const calls: string[] = [];
   let tries = 0;
   const store: LeaseStore = {
@@ -13,6 +19,7 @@ function storeAnswering(answers: boolean[]) {
     },
     renew: async ({ holder }) => {
       calls.push(`renew:${holder}`);
+      return held();
     },
     release: async ({ holder }) => {
       calls.push(`release:${holder}`);
@@ -112,6 +119,82 @@ describe("withLease", () => {
       await expect(
         withLease({ store, work: async () => 1, waitMs: 500, deps: clock() }),
       ).rejects.toMatchObject({ name: "LeaseBusyError" });
+    });
+  });
+
+  describe("when the work fences a write while it still holds the lease", () => {
+    it("renews the lease and lets the write through", async () => {
+      const { store, calls } = storeAnswering([true]);
+      const writes: string[] = [];
+
+      await withLease({
+        store,
+        deps: clock(),
+        work: async (lease) => {
+          await lease.assertHeld();
+          writes.push("seat");
+        },
+      });
+
+      expect(writes).toEqual(["seat"]);
+      expect(calls).toEqual(["acquire:h1", "renew:h1", "release:h1"]);
+    });
+  });
+
+  describe("when the lease went to someone else before the write", () => {
+    it("refuses the write with the error the owner names", async () => {
+      const { store } = storeAnswering([true], { held: () => false });
+      const lost = Object.assign(new Error("lost"), { code: "seat_change_busy" });
+      const writes: string[] = [];
+
+      await expect(
+        withLease({
+          store,
+          deps: clock(),
+          onLost: () => lost,
+          work: async (lease) => {
+            await lease.assertHeld();
+            writes.push("seat");
+          },
+        }),
+      ).rejects.toBe(lost);
+      expect(writes).toEqual([]);
+    });
+
+    it("refuses with LeaseLostError when the owner names none", async () => {
+      const { store } = storeAnswering([true], { held: () => false });
+
+      await expect(
+        withLease({ store, deps: clock(), work: (lease) => lease.assertHeld() }),
+      ).rejects.toMatchObject({ name: "LeaseLostError" });
+    });
+  });
+
+  describe("when a background renewal finds the lease taken over", () => {
+    it("refuses every later write, even if a renewal would now succeed again", async () => {
+      vi.useFakeTimers();
+      let held = false;
+      const { store } = storeAnswering([true], { held: () => held });
+      let fence: () => Promise<void> = async () => {};
+      let finish: () => void = () => {};
+      const running = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+
+      const done = withLease({
+        store,
+        deps: clock(),
+        work: async (lease) => {
+          fence = () => lease.assertHeld();
+          await running;
+        },
+      });
+      await vi.advanceTimersByTimeAsync(RENEW_EVERY_MS + 1);
+      held = true;
+
+      await expect(fence()).rejects.toMatchObject({ name: "LeaseLostError" });
+      finish();
+      await done;
     });
   });
 });

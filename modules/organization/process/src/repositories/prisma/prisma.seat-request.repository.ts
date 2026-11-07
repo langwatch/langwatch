@@ -94,6 +94,7 @@ export class PrismaSeatRequestRepository
           openedAt: new Date(input.at),
           resolvedAt: null,
           resolvedByUserId: null,
+          seatPendingSince: null,
           salesNotifiedAt: null,
         },
       });
@@ -136,6 +137,7 @@ export class PrismaSeatRequestRepository
           status: input.status,
           resolvedAt: new Date(input.at),
           resolvedByUserId: input.resolvedByUserId,
+          seatPendingSince: input.status === "APPROVED" ? new Date(input.at) : null,
         },
       });
       return true;
@@ -151,8 +153,33 @@ export class PrismaSeatRequestRepository
         resolvedAt: new Date(input.at),
         resolvedByUserId: input.resolvedByUserId,
       },
-      data: { status: "OPEN", resolvedAt: null, resolvedByUserId: null },
+      data: { status: "OPEN", resolvedAt: null, resolvedByUserId: null, seatPendingSince: null },
     });
+  }
+
+  async settleSeat(input: Parameters<SeatRequestRepository["settleSeat"]>[0]): Promise<void> {
+    await this.prisma.seatRequest.updateMany({
+      where: {
+        id: input.id,
+        organizationId: input.organizationId,
+        status: "APPROVED",
+        resolvedAt: new Date(input.at),
+      },
+      data: { seatPendingSince: null },
+    });
+  }
+
+  async findSeatPending({
+    organizationId,
+    since,
+  }: {
+    organizationId: string;
+    since: number;
+  }): Promise<SeatRequestRow[]> {
+    const rows = await this.prisma.seatRequest.findMany({
+      where: { organizationId, status: "APPROVED", seatPendingSince: { lt: new Date(since) } },
+    });
+    return rows.map(rowOf);
   }
 
   async claimSalesNotice({ id, at }: { id: string; at: number }): Promise<boolean> {

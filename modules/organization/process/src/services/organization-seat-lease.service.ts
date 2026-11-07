@@ -16,7 +16,8 @@ export class OrganizationSeatLeaseService {
     return this.seats.acquireSeatLease(input);
   }
 
-  renew(input: { organizationId: string; holder: string }): Promise<void> {
+  /** False when the lease is no longer this holder's. */
+  renew(input: { organizationId: string; holder: string }): Promise<boolean> {
     return this.seats.renewSeatLease(input);
   }
 

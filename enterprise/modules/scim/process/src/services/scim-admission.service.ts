@@ -59,10 +59,11 @@ export class ScimAdmissionService {
     const plan = await this.options.plans.getActivePlan({ organizationId, user: { id: userId } });
     await this.options.seats.withSeatLock({
       organizationId,
-      work: async () => {
+      work: async (lease) => {
         const seats = await this.options.seats.countMemberSeats({ organizationId });
         const free = seatsFree({ plan, seats });
         const { role, pending } = admissionSeat({ requested: asserted, ...free });
+        await lease.assertHeld();
         try {
           await this.options.prisma.addMembership({ userId, organizationId, role, pending });
         } catch (error) {

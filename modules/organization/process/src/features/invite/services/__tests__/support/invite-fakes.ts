@@ -686,8 +686,12 @@ export class FakeSeatCensus implements OrganizationInviteSeatCensus {
     return true;
   }
 
-  withSeatLock<T>({ work }: { work: () => Promise<T> }): Promise<T> {
-    return work();
+  withSeatLock<T>({
+    work,
+  }: {
+    work: (lease: { assertHeld(): Promise<void> }) => Promise<T>;
+  }): Promise<T> {
+    return work({ assertHeld: async () => {} });
   }
 }
 

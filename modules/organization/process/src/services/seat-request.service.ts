@@ -64,6 +64,8 @@ export interface SeatRequestPeers {
   organizationName(input: { organizationId: string }): Promise<string>;
   /** Authz's Billing role holders on enabled memberships. */
   billingMembers(input: { organizationId: string }): Promise<readonly { userId: string }[]>;
+  /** Whether the address holds an unexpired invitation to the organization. */
+  hasOpenInvite(input: { organizationId: string; email: string }): Promise<boolean>;
   /** Invites an address as a full member, for a request with no membership to promote. */
   inviteMember(input: {
     organizationId: string;
@@ -205,7 +207,14 @@ export class SeatRequestService {
     return rows.some((row) => row.organizationId === organizationId && row.status === "OPEN");
   }
 
+  /** Approvals whose seat never landed are reopened first, so they are on the list again. */
   async listOpen({ organizationId }: { organizationId: string }): Promise<OpenSeatRequests> {
+    await this.approval.reopenStranded({ organizationId }).catch((error: unknown) => {
+      this.dependencies.logger.warn(
+        { error, organizationId },
+        "could not reopen stranded seat request approvals",
+      );
+    });
     const [rows, approval] = await Promise.all([
       this.dependencies.requests.findOpen({ organizationId }),
       this.approvalOf({ organizationId }),

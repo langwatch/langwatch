@@ -237,6 +237,67 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
     });
   });
 
+  describe("when approvals claim requests and only one of them gives its seat", () => {
+    /** @scenario "An approval whose seat never landed is reopened" */
+    it("finds only the old unsettled approval and reopens it", async () => {
+      const pendingOrganizationId = `${namespace}-pending`;
+      const approve = async (email: string, at: number) => {
+        const { request } = await requests.open({
+          id: `${namespace}-${email}`,
+          organizationId: pendingOrganizationId,
+          email,
+          userId: null,
+          name: null,
+          source: "pending",
+          idpRefused: false,
+          idpKind: null,
+          at: at - 100,
+        });
+        await requests.resolve({
+          organizationId: pendingOrganizationId,
+          id: request.id,
+          status: "APPROVED",
+          resolvedByUserId: "user-ada",
+          at,
+        });
+        return request.id;
+      };
+      try {
+        const stranded = await approve("stranded@acme.example", 10_000);
+        const settled = await approve("settled@acme.example", 11_000);
+        await approve("fresh@acme.example", 50_000);
+        await requests.settleSeat({
+          organizationId: pendingOrganizationId,
+          id: settled,
+          at: 11_000,
+        });
+
+        const pending = await requests.findSeatPending({
+          organizationId: pendingOrganizationId,
+          since: 40_000,
+        });
+        expect(pending.map((row) => row.id)).toEqual([stranded]);
+
+        await requests.release({
+          organizationId: pendingOrganizationId,
+          id: stranded,
+          resolvedByUserId: "user-ada",
+          at: 10_000,
+        });
+        const reopened = await requests.getOpen({
+          organizationId: pendingOrganizationId,
+          id: stranded,
+        });
+        expect(reopened.status).toBe("OPEN");
+        expect(
+          await requests.findSeatPending({ organizationId: pendingOrganizationId, since: 40_000 }),
+        ).toEqual([]);
+      } finally {
+        await prisma.seatRequest.deleteMany({ where: { organizationId: pendingOrganizationId } });
+      }
+    });
+  });
+
   describe("when the same notice is recorded twice in a day and claimed twice", () => {
     /** @scenario "A notice whose mail reached nobody is retried by the next arrival that day" */
     it("stores one row, hands it back while unmailed and claims it for mail once", async () => {
