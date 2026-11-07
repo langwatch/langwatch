@@ -7,8 +7,8 @@ refused against right now. The other value is recorded here and in
 `src/disputes.ts`, with the line that states it.
 
 **Nothing here is resolved.** Alex decides each one. Until then
-`planCatalogue.disputes()` lists all four, and
-`src/__tests__/catalogue.unit.test.ts` fails if a fifth appears.
+`planCatalogue.disputes()` lists all five, and
+`src/__tests__/catalogue.unit.test.ts` fails if another appears.
 
 ---
 
@@ -73,6 +73,22 @@ number the product does not honour.
 The buckets agree with the per-plan values on Free and Enterprise and flatten
 Launch and Accelerate to the paid bucket; the test pins numbers neither of the
 other two states.
+
+## 5. `growth-seat-member-ceiling`: the seat plans cap at 20, the copy sells past 20
+
+|                                     |                        Members |
+| ----------------------------------- | -----------------------------: |
+| **In the catalogue** (seat plans)   |                             20 |
+| Alternative (plan card and compare) | above 20, at a volume discount |
+
+- In force: `packages/plans/src/catalogue-data.ts:102` (`growthSeatPlan`), used
+  when a subscription states no seat count of its own
+- Alternative: `enterprise/modules/billing/browser/src/model/billing-plans.ts:47`
+  (and the plan comparison list at line 77)
+
+A seat checkout stores the bought seat count on the subscription, which
+overrides the catalogue value, so the 20 only answers for a seat subscription
+without one.
 
 ---
 
