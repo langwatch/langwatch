@@ -25,6 +25,31 @@ Feature: ClickHouse ownership records and named exceptions
     Then no finding names stored_objects as having no module owner
 
   @unit @architecture
+  Scenario: A table reserved for a module is not an ownerless table
+    Given a migration creates eval_results and no module writes it yet
+    And the policy records eval_results as reserved for instant-eval with a reason
+    When the policy runs
+    Then no finding names eval_results as having no module owner
+
+  @unit @architecture
+  Scenario: The reserved module's first write asks for the record to be deleted
+    Given the policy records eval_results as reserved for instant-eval
+    When instant-eval's repository inserts into eval_results
+    Then the policy reports the reservation as done and asks for the record to be deleted
+
+  @unit @architecture
+  Scenario: Another module writing a reserved table is reported
+    Given the policy records eval_results as reserved for instant-eval
+    When trace's repository inserts into eval_results
+    Then the policy reports trace writing a table reserved for instant-eval
+
+  @unit @architecture
+  Scenario: Another module reading a reserved table is reported
+    Given the policy records eval_results as reserved for instant-eval
+    When trace's repository reads eval_results
+    Then the policy reports trace reading a table owned by instant-eval
+
+  @unit @architecture
   Scenario: A module writing a recorded table is reported
     Given the policy records event_log as framework owned
     When a module's repository inserts into event_log
