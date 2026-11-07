@@ -1,7 +1,8 @@
 # Drift: where two sites state the same plan fact differently
 
 Recorded on `feat/strict-feature-layout-v0`, 2026-09-07, from the census in the
-plans proposal. The catalogue in `src/catalogue-data.ts` carries **the value
+plans proposal; `growth-seat-member-ceiling` was added on 2026-11-07, when the
+Growth copy moved to "Volume discounts above 20 users". The catalogue in `src/catalogue-data.ts` carries **the value
 billing enforces today**, because that is the number a customer is charged and
 refused against right now. The other value is recorded here and in
 `src/disputes.ts`, with the line that states it.

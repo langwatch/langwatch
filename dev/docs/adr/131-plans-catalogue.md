@@ -164,7 +164,7 @@ so the tree typechecks and lints on its own at every step.
 - `PlanCataloguePort`, `ApiPlanCatalogueAdapter`, `TIERED_LADDER`,
   `SEAT_EVENT_LADDER` and `PERSIST_CAP` all go, taking roughly 250 lines of
   wiring with them.
-- The four disputes become visible and decidable rather than latent.
+- The five disputes become visible and decidable rather than latent.
 
 ## Open items
 
@@ -176,7 +176,7 @@ so the tree typechecks and lints on its own at every step.
    it exists to fix. Alex has not ruled; if the split is wanted, the seam is
    `catalogue-data.ts`, and the cloud plans move while the schemas, the read
    API, `applyOverride` and the open-source baseline stay.
-2. **Each of the four disputes**, above.
+2. **Each of the five disputes**, above.
 3. **Whether Free belongs on the ladder.** Free carries no rung today, which is
    the mechanism behind `pro-volume-below-free`; it is recorded there rather
    than as a fifth dispute.

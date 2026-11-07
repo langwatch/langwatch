@@ -46,7 +46,8 @@ export const planDisputeSchema = z.object({
 export type PlanDispute = z.infer<typeof planDisputeSchema>;
 
 /**
- * Counted on feat/strict-feature-layout-v0, 2026-09-07. Alex decides each of
+ * Counted on feat/strict-feature-layout-v0, 2026-09-07; growth-seat-member-ceiling
+ * added 2026-11-07. Alex decides each of
  * these; the catalogue does not resolve one by picking a side quietly.
  */
 export const PLAN_DISPUTES: readonly PlanDispute[] = Object.freeze([
