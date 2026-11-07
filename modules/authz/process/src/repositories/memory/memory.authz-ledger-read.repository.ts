@@ -63,9 +63,9 @@ function directoryRow(row: AuthzMemoryGrantRow): LedgerDirectoryGrantRow {
   };
 }
 
-/** The ledger's reads over the memory Grant and Role heads, with the Prisma queries' filters. */
 const permissionsSchema = z.array(z.string());
 
+/** The ledger's reads over the memory Grant and Role heads, with the Prisma queries' filters. */
 export class MemoryAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
   static create(options: { memory: AuthzMemoryStore }): MemoryAuthzLedgerReadRepository {
     return new MemoryAuthzLedgerReadRepository(options.memory);
