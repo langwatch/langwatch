@@ -563,6 +563,25 @@ jobs:
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
 
+      # The LangWatchQL access-model fingerprint (tools/ecrtag/lwqlaccess.go):
+      # the image renders its access model offline from placeholder inputs and
+      # the per-arch tag gets lwql-access-<fingerprint>-<tag>, which the index
+      # takes below. Cloud re-runs its access render Job only when it changes.
+      # Best effort: an image without one re-renders on every release.
+      - name: Record the LangWatchQL access-model fingerprint
+        if: matrix.image == 'langwatch-app'
+        continue-on-error: true
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
+          CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
+        run: |
+          set -euo pipefail
+          docker pull --quiet "${REGISTRY}/langwatch-app:${TAG}"
+          FINGERPRINT=$(go run ./cmd/ecrtag lwql-access -repository langwatch-app -tag "${TAG}" \
+            -custom="${CUSTOM_TAG}" -image "${REGISTRY}/langwatch-app:${TAG}")
+          echo "LangWatchQL access-model fingerprint of \`langwatch-app:${TAG}\`: \`${FINGERPRINT}\`" >> "$GITHUB_STEP_SUMMARY"
+
       # ── Frontend assets for the CDN (langwatch-app only) ──────────────────
       # The cloud serves the app's hashed assets from a CDN at
       # LANGWATCH_ASSET_BASE=https://<cdn-host>/<image tag>/ (ADR-086), so each
@@ -878,6 +897,17 @@ jobs:
             echo "Copied CDN assets ${previous} -> ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
           }
 
+          # The app index takes the access-model fingerprint of the per-arch
+          # manifest this run built, or of the index a re-tag copied (see the
+          # build step). Best effort: a missing one only warns.
+          record_lwql_access() {
+            local image="$1" previous="$2"
+            [ "${image}" = "langwatch-app" ] || return 0
+            go run ./cmd/ecrtag lwql-access -repository "${image}" -tag "${IMAGE_TAG}" \
+              -custom="${CUSTOM_TAG}" -from "${IMAGE_TAG}-arm64 ${previous}" \
+              || echo "::warning::${image}:${IMAGE_TAG} has no LangWatchQL access-model fingerprint; Cloud re-renders its access model on every release of it"
+          }
+
           # Runs in a subshell per image (see the loop), so `set -e` stops only
           # that image.
           publish() {
@@ -898,6 +928,7 @@ jobs:
             if [ "${exists}" = "true" ]; then
               echo "${image}:${IMAGE_TAG} is already published; leaving it"
               echo "\`${image}:${IMAGE_TAG}\` was already published" >> "$GITHUB_STEP_SUMMARY"
+              record_lwql_access "${image}" ""
               return 0
             fi
 
@@ -941,6 +972,7 @@ jobs:
             # image's own label cannot say it.
             local annotation="index:org.opencontainers.image.revision=${GITHUB_SHA}"
             docker buildx imagetools create --annotation "${annotation}" -t "${repo}:${IMAGE_TAG}" "${sources[@]}"
+            record_lwql_access "${image}" "${previous}"
 
             echo "Published \`${image}\` to ECR with tags: ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
           }

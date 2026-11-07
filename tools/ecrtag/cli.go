@@ -85,6 +85,18 @@ func (c CLI) Tags(ctx context.Context, repository string) ([]string, error) {
 	return tags, err
 }
 
+// ImageTags implements ImageTags.
+func (c CLI) ImageTags(ctx context.Context, ref Ref) ([]string, error) {
+	var tags []string
+	err := c.aws(ctx, &tags, "describe-images", "--repository-name", ref.Repository, "--image-ids", "imageTag="+ref.Tag,
+		"--query", "imageDetails[0].imageTags")
+	if err != nil && strings.Contains(err.Error(), "ImageNotFoundException") {
+		return nil, ErrNotFound
+	}
+
+	return tags, err
+}
+
 // Manifest implements Registry.
 func (c CLI) Manifest(ctx context.Context, ref Ref) (Manifest, error) {
 	var fields []string
