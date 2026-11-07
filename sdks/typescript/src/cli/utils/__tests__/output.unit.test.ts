@@ -208,6 +208,19 @@ describe("applyJq", () => {
     expect(() => applyJq(".data[]", { data: { "my key": [1] } })).not.toThrow(/try /);
   });
 
+  it("names an empty object as empty", () => {
+    expect(() => applyJq(".a[]", { a: {} })).toThrow(/it is an empty object/);
+  });
+
+  it("suggests at most three list paths", () => {
+    const data = { data: { a: [1], b: [1], c: [1], d: [1] } };
+
+    expect(() => applyJq(".data[]", data)).toThrow(
+      /try \.data\.a\[\], \.data\.b\[\], \.data\.c\[\]\./,
+    );
+    expect(() => applyJq(".data[]", data)).not.toThrow(/\.data\.d\[\]/);
+  });
+
   it("gives no path hint when no key of the object holds a list", () => {
     const data = { data: { a: 1, b: "two" } };
 

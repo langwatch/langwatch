@@ -186,7 +186,10 @@ const descend = (value: unknown, key: string): unknown => {
 
 // A minus needs digits after it: `[-]` would otherwise parse as an index of
 // NaN and traverse to null instead of failing like an unsupported expression.
-const SUPPORTED_SEGMENT_RE = /^([A-Za-z_][A-Za-z0-9_-]*)?((?:\[(?:-?\d+)?\])*)$/;
+const PATH_KEY_SOURCE = "[A-Za-z_][A-Za-z0-9_-]*";
+const SUPPORTED_SEGMENT_RE = new RegExp(`^(${PATH_KEY_SOURCE})?((?:\\[(?:-?\\d+)?\\])*)$`);
+/** A whole key the subset can spell; the hint only suggests these. */
+const PATH_KEY_RE = new RegExp(`^${PATH_KEY_SOURCE}$`);
 
 /**
  * What to do instead, on every refusal. This subset stays small on purpose;
@@ -638,8 +641,6 @@ const describeNonArray = (value: unknown): string => {
   return ` (it is an object with keys: ${shown}${keys.length > MAX_NAMED_KEYS ? ", …" : ""})`;
 };
 
-// A key the subset cannot spell (a space, a dot) would make the hint an invalid path.
-const PATH_KEY_RE = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 // Names only keys whose value really is a list, so the hint never invents a path.
 const listPathHint = (value: unknown, at: string): string => {
   if (value === null || typeof value !== "object") return "";
