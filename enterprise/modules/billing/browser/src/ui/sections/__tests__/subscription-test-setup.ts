@@ -89,7 +89,11 @@ export const mockGetOrganizationWithMembers = vi.fn(() => ({
 
 /** The server's held seats: none unless a test says otherwise. */
 export const mockListHeldSeats = vi.fn(
-  (): { data: { heldSeats: { seatFreesAt: string }[] } | undefined } => ({
+  (): {
+    data:
+      | { heldSeats: { userId: string; email: string | null; seatFreesAt: string }[] }
+      | undefined;
+  } => ({
     data: { heldSeats: [] },
   }),
 );

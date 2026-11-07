@@ -6,7 +6,14 @@ import { heldSeatsOf, noHeldSeats } from "../../model/seat-purchase.ts";
 import type { SubscriptionUser } from "../../model/subscription-types.ts";
 
 /** The organization's members, pending invites and held seats, classified for seat counting. */
-export function useSubscriptionMembers(organizationId: string | undefined) {
+export function useSubscriptionMembers({
+  organizationId,
+  readsHeldSeats,
+}: {
+  organizationId: string | undefined;
+  /** Only `organization:manage` may list held seats; anyone else sees the bare count. */
+  readsHeldSeats: boolean;
+}) {
   const enabled = !!organizationId;
   const organizationWithMembers =
     billingApi.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
@@ -15,7 +22,7 @@ export function useSubscriptionMembers(organizationId: string | undefined) {
     );
   const heldSeatsQuery = billingApi.organization.listHeldSeats.useQuery(
     { organizationId: organizationId ?? "" },
-    { enabled },
+    { enabled: enabled && readsHeldSeats },
   );
   const pendingInvites = billingApi.invite.getOrganizationPendingInvites.useQuery(
     { organizationId: organizationId ?? "" },
@@ -50,10 +57,18 @@ export function useSubscriptionMembers(organizationId: string | undefined) {
     [pendingInvites.data],
   );
 
-  const heldSeats = useMemo(
-    () => (heldSeatsQuery.data ? heldSeatsOf(heldSeatsQuery.data.heldSeats) : noHeldSeats),
-    [heldSeatsQuery.data],
-  );
+  const heldSeats = useMemo(() => {
+    if (!readsHeldSeats || !heldSeatsQuery.data) return noHeldSeats;
+    const full = <T extends { memberType: string }>(list: T[]) =>
+      list.filter((entry) => entry.memberType === "FullMember");
+    return heldSeatsOf({
+      holds: heldSeatsQuery.data.heldSeats,
+      fullMemberIds: new Set(full(users).map((user) => user.userId)),
+      fullInviteEmails: new Set(
+        full(pendingInvitesWithMemberType).map((i) => i.email.toLowerCase()),
+      ),
+    });
+  }, [readsHeldSeats, heldSeatsQuery.data, users, pendingInvitesWithMemberType]);
 
   return {
     organizationWithMembers,

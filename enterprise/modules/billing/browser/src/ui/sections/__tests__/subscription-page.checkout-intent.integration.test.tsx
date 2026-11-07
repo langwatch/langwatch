@@ -55,6 +55,9 @@ class TestBillingHost extends BillingHostApi {
   canReadMonthBreakdown(): boolean {
     return true;
   }
+  canReadHeldSeats(): boolean {
+    return true;
+  }
 
   routeQuery(): Readonly<Record<string, string | undefined>> {
     return this.query;

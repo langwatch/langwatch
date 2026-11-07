@@ -56,27 +56,50 @@ export function upgradeTotal({ seats, price }: { seats: number; price: SeatPrice
 }
 
 /** Full seats still held for someone who left one, and the day the first of them frees. */
-export type HeldSeats = { count: number; firstFreesOn: string | undefined };
+export type HeldSeats = { count: 0 } | { count: number; firstFreesOn: string };
 
-export const noHeldSeats: HeldSeats = { count: 0, firstFreesOn: undefined };
+export const noHeldSeats: HeldSeats = { count: 0 };
 
-/** The server's holds (removed, disabled or demoted), as the drawer counts them. */
-export function heldSeatsOf(holds: readonly { seatFreesAt: string }[]): HeldSeats {
-  const first = Math.min(
-    ...holds.map((hold) => Temporal.Instant.from(hold.seatFreesAt).epochMilliseconds),
-  );
-  return { count: holds.length, firstFreesOn: holds.length ? billingDay(first) : undefined };
+/** One hold as the server lists it: removed, disabled or demoted. */
+export type SeatHold = { userId: string; email: string | null; seatFreesAt: string };
+
+/** "7 Dec": the day a held seat frees, in the reader's own calendar, as the Users list says it. */
+function holdFreesOn(epochMilliseconds: number): string {
+  return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds)
+    .toZonedDateTimeISO(Temporal.Now.timeZoneId())
+    .toLocaleString("en-GB", { day: "numeric", month: "short" });
 }
 
-/** "until 7 Dec", or nothing when the day is unknown. */
-const untilDay = (held: HeldSeats) => (held.firstFreesOn ? ` until ${held.firstFreesOn}` : "");
+/**
+ * The holds `inUse` counts: a hold whose person holds a full seat again, as a member or a
+ * pending invite, is counted once, as that seat (entitlement's `countMemberSeats`).
+ */
+export function heldSeatsOf({
+  holds,
+  fullMemberIds,
+  fullInviteEmails,
+}: {
+  holds: readonly SeatHold[];
+  fullMemberIds: ReadonlySet<string>;
+  fullInviteEmails: ReadonlySet<string>;
+}): HeldSeats {
+  const counted = holds.filter(
+    (hold) =>
+      !fullMemberIds.has(hold.userId) &&
+      !(hold.email && fullInviteEmails.has(hold.email.toLowerCase())),
+  );
+  if (counted.length === 0) return noHeldSeats;
+  const first = Math.min(
+    ...counted.map((hold) => Temporal.Instant.from(hold.seatFreesAt).epochMilliseconds),
+  );
+  return { count: counted.length, firstFreesOn: holdFreesOn(first) };
+}
 
 /** "2 in use." or "2 in use, 1 of them held until 7 Dec." */
 function inUseLine({ inUse, held }: { inUse: number; held: HeldSeats }): string {
-  if (held.count === 0) return `${inUse} in use.`;
-  if (held.count === 1) return `${inUse} in use, 1 of them held${untilDay(held)}.`;
-  const first = held.firstFreesOn ? `, the first${untilDay(held)}` : "";
-  return `${inUse} in use, ${held.count} of them held${first}.`;
+  if (!("firstFreesOn" in held)) return `${inUse} in use.`;
+  if (held.count === 1) return `${inUse} in use, 1 of them held until ${held.firstFreesOn}.`;
+  return `${inUse} in use, ${held.count} of them held, the first until ${held.firstFreesOn}.`;
 }
 
 export function upgradeMinimumHint(minimum: number): string | undefined {
@@ -199,13 +222,13 @@ export function growthSeatPlan(plan: GrowthSeatPlan) {
 }
 
 function growthMinimumHint({ inUse, held }: { inUse: number; held: HeldSeats }): string {
-  if (held.count === 0)
-    return `${people(inUse)} use full seats. Remove someone in Users to go lower.`;
+  const lower = "Remove someone in Users to go lower.";
+  if (!("firstFreesOn" in held)) return `${people(inUse)} use full seats. ${lower}`;
   const heldPart =
     held.count === 1
-      ? `1 more is held${untilDay(held)}`
-      : `${held.count} more are held${held.firstFreesOn ? `, the first${untilDay(held)}` : ""}`;
-  return `${people(inUse - held.count)} use full seats and ${heldPart}. Remove someone in Users to go lower.`;
+      ? `1 more is held until ${held.firstFreesOn}`
+      : `${held.count} more are held, the first until ${held.firstFreesOn}`;
+  return `${people(inUse - held.count)} use full seats and ${heldPart}. ${lower}`;
 }
 
 function nextPeriodDay({

@@ -22,6 +22,14 @@ const EUR = { seatCents: 2900, currency: Currency.EUR, periodSuffix: "/mo" };
 const DEC_1 = Date.UTC(2026, 11, 1);
 const NOV_6 = Date.UTC(2026, 10, 6);
 
+/** A hold the server lists for `userId`, freeing at `seatFreesAt`. */
+const hold = (userId: string, seatFreesAt: string) => ({
+  userId,
+  email: `${userId}@acme.example`,
+  seatFreesAt,
+});
+const noOneBack = { fullMemberIds: new Set<string>(), fullInviteEmails: new Set<string>() };
+
 const growth = (overrides: Partial<GrowthSeatPlan>): GrowthSeatPlan => ({
   paid: 3,
   seats: 3,
@@ -67,17 +75,32 @@ describe("freeSeatPlan()", () => {
   });
 
   it("names the held seat and the day it frees", () => {
-    const held = heldSeatsOf([{ seatFreesAt: "2026-12-07T10:00:00.000Z" }]);
+    const held = heldSeatsOf({
+      holds: [hold("removed", "2026-12-07T10:00:00.000Z")],
+      ...noOneBack,
+    });
     const plan = freeSeatPlan({ includedSeats: 2, inUse: 2, held, invites: 0, price: EUR });
     expect(plan.heading).toBe("Free includes 2 seats. 2 in use, 1 of them held until 7 Dec.");
   });
 
   it("says only the count when the server lists no hold", () => {
-    const held = heldSeatsOf([]);
-    expect(held).toEqual({ count: 0, firstFreesOn: undefined });
+    const held = heldSeatsOf({ holds: [], ...noOneBack });
+    expect(held).toEqual({ count: 0 });
     expect(freeSeatPlan({ includedSeats: 2, inUse: 2, held, invites: 0, price: EUR }).heading).toBe(
       "Free includes 2 seats. 2 in use.",
     );
+  });
+
+  it("leaves out a hold whose person holds a full seat again", () => {
+    const held = heldSeatsOf({
+      holds: [
+        hold("back", "2026-12-07T10:00:00.000Z"),
+        hold("invited", "2026-12-08T10:00:00.000Z"),
+      ],
+      fullMemberIds: new Set(["back"]),
+      fullInviteEmails: new Set(["invited@acme.example"]),
+    });
+    expect(held).toEqual({ count: 0 });
   });
 
   it("has nothing to do with no one planned", () => {
@@ -101,10 +124,10 @@ describe("growthSeatPlan()", () => {
   });
 
   it("names several held seats by the first to free", () => {
-    const held = heldSeatsOf([
-      { seatFreesAt: "2026-12-20T10:00:00.000Z" },
-      { seatFreesAt: "2026-12-07T10:00:00.000Z" },
-    ]);
+    const held = heldSeatsOf({
+      holds: [hold("a", "2026-12-20T10:00:00.000Z"), hold("b", "2026-12-07T10:00:00.000Z")],
+      ...noOneBack,
+    });
     const plan = growthSeatPlan(growth({ paid: 5, seats: 4, inUse: 4, held }));
     expect(plan.heading).toBe("You pay for 5. 4 in use, 2 of them held, the first until 7 Dec.");
     expect(plan.minimumHint).toBe(

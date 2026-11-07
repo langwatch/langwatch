@@ -268,7 +268,10 @@ export function SubscriptionPage() {
     users,
     pendingInvitesWithMemberType,
     heldSeats,
-  } = useSubscriptionMembers(organization?.id);
+  } = useSubscriptionMembers({
+    organizationId: organization?.id,
+    readsHeldSeats: host.canReadHeldSeats(),
+  });
   // Seat limit state as enforcement counts it (custom roles, open invites)
   const usage = billingApi.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },

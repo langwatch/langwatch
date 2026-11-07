@@ -35,6 +35,9 @@ class TestBillingHost extends BillingHostApi {
   canReadMonthBreakdown(): boolean {
     return true;
   }
+  canReadHeldSeats(): boolean {
+    return true;
+  }
 
   readonly successes: BillingSuccessNotice[] = [];
   readonly failures: BillingFailureNotice[] = [];

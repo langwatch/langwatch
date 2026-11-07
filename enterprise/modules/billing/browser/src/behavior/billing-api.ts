@@ -93,7 +93,10 @@ type BorrowedProcedures = {
 
     /** Full seats still held after their person was removed, disabled or demoted. */
     listHeldSeats: {
-      query: { input: OrganizationScope; output: { heldSeats: { seatFreesAt: string }[] } };
+      query: {
+        input: OrganizationScope;
+        output: { heldSeats: { userId: string; email: string | null; seatFreesAt: string }[] };
+      };
     };
   };
 

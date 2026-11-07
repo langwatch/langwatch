@@ -81,6 +81,10 @@ class CapabilityBillingHost extends BillingHostApi {
     return this.mayManageOrganization;
   }
 
+  canReadHeldSeats(): boolean {
+    return this.mayManageOrganization;
+  }
+
   routeQuery(): Readonly<Record<string, string | undefined>> {
     return this.query;
   }
