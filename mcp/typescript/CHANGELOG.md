@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.2.0](https://github.com/langwatch/langwatch/compare/mcp-server@v3.1.0...mcp-server@v3.2.0) (2026-11-07)
+
+
+### Features
+
+* agent and evaluator versioning with deploy labels, plus experiment and dependency fixes ([#9124](https://github.com/langwatch/langwatch/issues/9124)) ([ec774cb](https://github.com/langwatch/langwatch/commit/ec774cb12756a472d7260f6ed5e2292e324906cd))
+
+
+### Bug Fixes
+
+* **gateway:** record platform provider-key spend in the ledger and stop topic clustering re-embedding ([#9302](https://github.com/langwatch/langwatch/issues/9302)) ([5dacb3f](https://github.com/langwatch/langwatch/commit/5dacb3f3dc85bb2a433a81ad04bbdbfb43a85a19))
+* **mcp:** npx @langwatch/mcp-server installs again, and --http starts ([#9220](https://github.com/langwatch/langwatch/issues/9220)) ([8eeec0a](https://github.com/langwatch/langwatch/commit/8eeec0aa9001097d408167e9f0bfaef654235da0))
+
 ## [3.1.0](https://github.com/langwatch/langwatch/compare/mcp-server@v3.0.0...mcp-server@v3.1.0) (2026-11-02)
 
 
