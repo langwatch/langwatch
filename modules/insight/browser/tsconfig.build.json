@@ -48,6 +48,9 @@
       "path": "../../langy/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
       "path": "../../project/contract/tsconfig.build.json"
     },
     {

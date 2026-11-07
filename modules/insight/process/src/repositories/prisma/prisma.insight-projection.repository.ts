@@ -57,7 +57,7 @@ export class PrismaInsightProjectionRepository
   ): Promise<void> {
     const id = context.key ?? context.aggregateId;
     const projectId = String(context.tenantId);
-    const { source, board, replay, ...state } = projection.state;
+    const { source, board, replay, actions, ...state } = projection.state;
     const { replayContext, ...window } = replayColumns(replay);
     const data = {
       ...state,
@@ -67,6 +67,7 @@ export class PrismaInsightProjectionRepository
       ...window,
       // A JSON column takes SQL NULL only by name.
       replayContext: replayContext ?? Prisma.DbNull,
+      actions: actions.map(({ id, label, prompt }) => ({ id, label, prompt })),
       createdAt: projection.createdAt,
       updatedAt: projection.updatedAt,
       occurredAt: projection.occurredAt,

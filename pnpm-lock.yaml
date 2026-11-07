@@ -9898,6 +9898,9 @@ importers:
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../packages/observability
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract

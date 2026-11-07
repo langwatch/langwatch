@@ -65,6 +65,7 @@ function insight(overrides: Partial<InsightState> = {}): InsightState {
     ownerUserId: OWNER,
     filedByUserId: OWNER,
     findingKey: null,
+    actions: [],
     filedAt: FILED_AT,
     renewedAt: null,
     ...overrides,

@@ -57,8 +57,11 @@ export async function installInsight({
   isEnabled = true,
   peers = {},
 }: {
-  /** A function is asked on every check, so a test can turn the flag off between two acts. */
-  isEnabled?: boolean | (() => boolean);
+  /**
+   * A function is asked on every check, with the flag's key, so a test can turn a flag off
+   * between two acts, or one flag off and another on.
+   */
+  isEnabled?: boolean | ((flag: string) => boolean);
   peers?: InsightRunPeers;
 } = {}) {
   const eventStore = EventStoreMemory.createForTesting();
@@ -74,7 +77,7 @@ export async function installInsight({
     .withEventing(eventing)
     .provide({
       "feature-flag": createApiFixture<FeatureFlagApi>({
-        isEnabled: async () => (typeof isEnabled === "function" ? isEnabled() : isEnabled),
+        isEnabled: async (flag) => (typeof isEnabled === "function" ? isEnabled(flag) : isEnabled),
       }),
       project: createApiFixture<ProjectApi>({
         getOrganizationId: async (projectId) => {
@@ -125,6 +128,7 @@ export async function installInsight({
         ownerUserId,
         filedByUserId: null,
         findingKey: null,
+        actions: [],
       };
       await fileInsight.send({
         tenantId: projectId,

@@ -4,6 +4,7 @@
  * process, and the peers a run asks scripted by the test. The run's intent is carried out the
  * way the outbox carries it out, so a test can run it twice.
  * @see modules/insight/specs/insight-daily-run.feature
+ * @see modules/insight/specs/insight-actions.feature
  */
 
 import {
@@ -583,6 +584,19 @@ describe("given an Organization board another project owns", () => {
 });
 
 describe("given Langy's answer, which is untrusted", () => {
+  /** @scenario "A run files no actions, whatever its findings propose" */
+  it("files a finding with no actions, though the card proposes some", async () => {
+    installed.world.langy.answer = answerWith([
+      finding({ actions: [{ label: "Open the traces", prompt: "Find the costly traces." }] }),
+    ]);
+
+    await run();
+
+    expect(await insightsOf()).toEqual([
+      expect.objectContaining({ title: "Checkout cost doubled", filedVia: "run", actions: [] }),
+    ]);
+  });
+
   /** @scenario "An answer with no findings files nothing" */
   it("files nothing for an empty list of findings, and records nothing", async () => {
     installed.world.langy.answer = answerWith([]);

@@ -8,6 +8,7 @@ import type { StateProjectionDefinition, StateProjectionStore } from "@langwatch
 import {
   INSIGHT_EVENT_TYPES,
   INSIGHT_PROJECTION_VERSIONS,
+  type InsightAction,
   type InsightBoard,
   type InsightFiledVia,
   type InsightReplay,
@@ -37,6 +38,8 @@ export interface InsightState {
   readonly filedByUserId: string | null;
   /** The key a daily run matches a repeated finding by; null when no run filed it. */
   readonly findingKey: string | null;
+  /** What a click sends to Langy, ids minted at filing; none when a run filed or renewed it. */
+  readonly actions: InsightAction[];
   /** Epoch milliseconds. */
   readonly filedAt: number;
   readonly renewedAt: number | null;
@@ -56,6 +59,7 @@ const INITIAL_INSIGHT_STATE: InsightState = {
   ownerUserId: null,
   filedByUserId: null,
   findingKey: null,
+  actions: [],
   filedAt: 0,
   renewedAt: null,
 };
@@ -74,8 +78,14 @@ function applyFiled(state: InsightState, event: InsightFiledEvent): InsightState
 function applyRenewed(state: InsightState, event: InsightRenewedEvent): InsightState {
   // A renewal older than the one the row holds is a late repeat of an earlier run's.
   if (state.renewedAt !== null && event.occurredAt < state.renewedAt) return state;
-  const { insightId: _insightId, tone, ...renewed } = event.data;
-  return { ...state, ...renewed, tone: tone ?? state.tone, renewedAt: event.occurredAt };
+  const { insightId: _insightId, tone, actions, ...renewed } = event.data;
+  return {
+    ...state,
+    ...renewed,
+    tone: tone ?? state.tone,
+    actions: actions ?? state.actions,
+    renewedAt: event.occurredAt,
+  };
 }
 
 export function applyInsightEvent(

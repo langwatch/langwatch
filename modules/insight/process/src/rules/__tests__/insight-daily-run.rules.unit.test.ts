@@ -39,6 +39,7 @@ const entry = (overrides: Partial<InsightEntry> = {}): InsightEntry => ({
   ownerUserId: "user-1",
   filedByUserId: null,
   findingKey: null,
+  actions: [],
   filedAt: SLOT - DAY_MS,
   renewedAt: null,
   seenAt: null,

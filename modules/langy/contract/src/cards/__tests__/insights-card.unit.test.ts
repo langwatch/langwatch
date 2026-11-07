@@ -89,6 +89,18 @@ describe("the insights card", () => {
     });
   });
 
+  describe("given a finding that proposes actions", () => {
+    const action = (index: number) => ({ label: `Action ${index}`, prompt: `Do thing ${index}.` });
+    const withActions = (actions: unknown[]) => card({ findings: [finding({ actions })] });
+
+    /** @scenario "A finding may propose up to four actions for the insight saved from it" */
+    it("takes four, and refuses five or a label past 40 characters", () => {
+      expect(accepts(withActions([0, 1, 2, 3].map(action)))).toBe(true);
+      expect(accepts(withActions([0, 1, 2, 3, 4].map(action)))).toBe(false);
+      expect(accepts(withActions([{ label: "x".repeat(41), prompt: "Do it." }]))).toBe(false);
+    });
+  });
+
   describe("given a card with no findings", () => {
     /** @scenario "An insights card with no findings says nothing is worth reporting" */
     it("is accepted: an empty list is an answer", () => {

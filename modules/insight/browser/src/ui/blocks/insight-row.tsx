@@ -49,6 +49,7 @@ export function InsightRow({
   actions,
   boardTrail,
   evidence,
+  proposedActions,
 }: {
   entry: InsightEntry;
   folder: InsightFolder;
@@ -60,6 +61,8 @@ export function InsightRow({
   boardTrail?: ReactNode;
   /** The replayed chart under the body, shown with the body. */
   evidence?: ReactNode;
+  /** The actions Langy proposed, shown with the body, above the footer. */
+  proposedActions?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const expanded = density === "expanded" || open;
@@ -151,6 +154,7 @@ export function InsightRow({
             <>
               <InsightBody body={entry.body} />
               {evidence}
+              {proposedActions}
             </>
           ) : (
             <Text

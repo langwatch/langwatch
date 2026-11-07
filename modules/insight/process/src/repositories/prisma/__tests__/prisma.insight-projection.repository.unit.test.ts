@@ -66,6 +66,7 @@ const ROW_BEFORE_COLUMNS: InsightRow = {
   replayContext: null,
   ownerUserId: null,
   findingKey: null,
+  actions: null,
 };
 
 function folded(state: Partial<InsightState> = {}): StoredProjection<InsightState> {
@@ -84,6 +85,7 @@ function folded(state: Partial<InsightState> = {}): StoredProjection<InsightStat
       ownerUserId: "user-filer",
       filedByUserId: "user-filer",
       findingKey: null,
+      actions: [],
       filedAt: FILED_AT,
       renewedAt: null,
       ...state,
@@ -233,6 +235,29 @@ describe("given an insight row written before the pointer, window and owner colu
         filedVia: "chat",
         findingKey: null,
       });
+    });
+
+    /** @scenario "An insight stored before actions existed offers none" */
+    it("gives an insight with no actions", () => {
+      expect(
+        insightEntryFromRows({ insight: ROW_BEFORE_COLUMNS, reader: undefined }).actions,
+      ).toEqual([]);
+    });
+  });
+});
+
+describe("given an insight saved with actions", () => {
+  describe("when its row is written", () => {
+    /** @scenario "An insight's actions are stored with it and read back the same" */
+    it("holds the actions as one JSON list, and reads back the same", async () => {
+      const { repository, written } = repositoryOverOneRow();
+      const actions = [{ id: "a0", label: "Find the traces", prompt: "Find the failing traces." }];
+
+      await repository.store(folded({ actions }), CONTEXT);
+
+      expect(written.row?.actions).toEqual(actions);
+      const read = await repository.get("insight-1", CONTEXT);
+      expect(read.kind === "folded" && read.projection.state.actions).toEqual(actions);
     });
   });
 });

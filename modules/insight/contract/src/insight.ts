@@ -82,6 +82,119 @@ export interface InsightReplaySchema extends Named<typeof insightReplaySchemaDef
 export const insightReplaySchema: InsightReplaySchema = insightReplaySchemaDefinition;
 export type InsightReplay = z.infer<typeof insightReplaySchema>;
 
+/** At most this many actions ride on one insight. */
+export const MAX_INSIGHT_ACTIONS = 4;
+
+/** The hosts a link in an action may name; any other web address refuses the action. */
+export const INSIGHT_ACTION_LINK_HOSTS = ["langwatch.ai", "app.langwatch.ai"] as const;
+
+const ALLOWED_LINK_HOSTS: ReadonlySet<string> = new Set(INSIGHT_ACTION_LINK_HOSTS);
+const WEB_SCHEMES: ReadonlySet<string> = new Set(["http", "https"]);
+
+const REFUSED_SCHEME_NAMES = ["javascript", "data", "vbscript", "file", "mailto", "ftp"];
+/**
+ * Refused whatever follows, from a word's start: `metadata:x`, `trace.data:x`, `meta-data:x`,
+ * `span/data:x` and `user_data:x` stay words. A browser drops a tab, so one may split the scheme.
+ */
+const REFUSED_SCHEME = new RegExp(
+  `(?<![\\p{L}\\p{N}._/-])(?:${REFUSED_SCHEME_NAMES.map((name) => name.split("").join("\\t*")).join("|")})\\t*:\\t*\\S`,
+  "iu",
+);
+/**
+ * Any scheme before two slashes. No word start: a scheme past the bound still matches by its tail.
+ * One slash is words: `path:/api/v1`, `C:/Users/x`. `http(s):/x` is left to the address scan.
+ */
+const SCHEME_BEFORE_SLASH = /([a-z][a-z0-9+.-]{0,31}):[/\\]{2}/gi;
+/**
+ * `http(s):`, `www.`, `host/path` with a common ending, or `//` at a word's start or after `(<[:`
+ * or a quote (`:` catches `_https://x`, which `\b` misses), to the next whitespace or `http(s):`. A
+ * tab or line break a browser would drop goes to `continued`. `trace.cost/day`, `a//b` are words.
+ */
+const WEB_ADDRESS =
+  /(?:\bhttps?:(?=[\S\t])|(?<![^\s(<["'`:])[/\\]{2}\S|\bwww\.|(?:[\p{L}\p{N}-]{1,63}\.){1,8}(?:com|net|org|io|ai|co|dev|app|xyz|info)(?::\d{1,5})?[/\\])(?:(?!https?:)\S)*(?<continued>\t|\n[\t\n]*(?:[.@/\\:]|[\p{L}\p{N}-]{1,63}\.\p{L}))?/giu;
+const HTTP_AND_SLASHES = /^(?:https?:)?\/*/i;
+const SENTENCE_END = /[.,;:!?)\]}>"'`*]{1,32}$/;
+
+/** Read without tabs, which a browser drops: `evil<TAB>scheme://x` is `evilscheme://x`. */
+function namesRefusedScheme(words: string): boolean {
+  return (
+    REFUSED_SCHEME.test(words) ||
+    [...words.replaceAll("\t", "").matchAll(SCHEME_BEFORE_SLASH)].some(
+      ([, scheme = ""]) => !WEB_SCHEMES.has(scheme.toLowerCase()),
+    )
+  );
+}
+
+/** The host a browser would go to: after any `user@`, before any port, path, query or fragment. */
+function hostOf(address: string): string {
+  const authority = address.replace(HTTP_AND_SLASHES, "").split(/[/?#]/, 1)[0] ?? "";
+  const host = authority.slice(authority.lastIndexOf("@") + 1);
+  return host.replace(/:\d*$/, "").toLowerCase();
+}
+
+/** A browser reads a backslash as a slash or inside a name, by scheme, so none is allowed. */
+function isAllowedLink(address: string): boolean {
+  const link = address.replace(SENTENCE_END, "");
+  return !link.includes("\\") && ALLOWED_LINK_HOSTS.has(hostOf(link));
+}
+
+/** No refused scheme, and every web address the words name points at an allowed host. */
+function namesOnlyAllowedLinks(words: string): boolean {
+  if (namesRefusedScheme(words)) return false;
+  return [...words.matchAll(WEB_ADDRESS)].every(
+    ({ 0: address, groups }) => !groups?.continued && isAllowedLink(address),
+  );
+}
+
+const NOT_ALLOWED_LINK = "A link in an action may only point at langwatch.ai";
+/** `.max()` alone does not stop a later `.refine()`, which would scan the whole oversize field. */
+const STOP_AT_THE_CAP = { abort: true };
+
+const insightActionLabelSchema = z
+  .string()
+  .overwrite((label) => label.replaceAll(/[\p{Cc}\p{Cf}]/gu, ""))
+  .trim()
+  .min(1)
+  .max(40, STOP_AT_THE_CAP)
+  .refine(namesOnlyAllowedLinks, { error: NOT_ALLOWED_LINK });
+
+/**
+ * A prompt keeps its line breaks and tabs; every other control character is dropped, and every
+ * invisible format character, which could hide a link from this check and bidi-flip the card.
+ */
+const insightActionPromptSchema = z
+  .string()
+  .overwrite((prompt) => prompt.replaceAll(/[^\P{Cc}\n\t]|\p{Cf}/gu, ""))
+  .trim()
+  .min(1)
+  .max(1_000, STOP_AT_THE_CAP)
+  .refine(namesOnlyAllowedLinks, { error: NOT_ALLOWED_LINK });
+
+/**
+ * An action Langy proposes for an insight, as a filing hands it over: a button label and the
+ * prompt a click sends to Langy. The prompt is shown before the click and sent word for word.
+ */
+const insightActionInputSchemaDefinition = z.object({
+  label: insightActionLabelSchema,
+  prompt: insightActionPromptSchema,
+});
+export interface InsightActionInputSchema extends Named<
+  typeof insightActionInputSchemaDefinition
+> {}
+export const insightActionInputSchema: InsightActionInputSchema =
+  insightActionInputSchemaDefinition;
+export type InsightActionInput = z.infer<typeof insightActionInputSchema>;
+
+/** A stored action: its id is minted by the module at filing (`a0`..`a3`, by position). */
+const insightActionSchemaDefinition = z.object({
+  id: z.string().min(1).max(8),
+  label: z.string().min(1).max(40),
+  prompt: z.string().min(1).max(1_000),
+});
+export interface InsightActionSchema extends Named<typeof insightActionSchemaDefinition> {}
+export const insightActionSchema: InsightActionSchema = insightActionSchemaDefinition;
+export type InsightAction = z.infer<typeof insightActionSchema>;
+
 /** One insight as its owner sees it: the record plus their own seen, done and kept state. */
 const insightEntrySchemaDefinition = z.object({
   id: z.string(),
@@ -102,6 +215,8 @@ const insightEntrySchemaDefinition = z.object({
   filedByUserId: z.string().nullable(),
   /** The key a daily run matches a repeated finding by; null when it was saved from a chat. */
   findingKey: z.string().nullable(),
+  /** What a click sends to Langy; none on an insight a run filed. */
+  actions: z.array(insightActionSchema),
   /** Epoch milliseconds. */
   filedAt: z.number(),
   /** When a later run last found it still true; null until one did. */
@@ -133,6 +248,8 @@ const fileInsightInputSchemaDefinition = z
     replay: insightReplaySchema.optional(),
     source: insightSourceSchema.optional(),
     board: insightBoardSchema.optional(),
+    /** None when left out; dropped when the source conversation is a run's. */
+    actions: z.array(insightActionInputSchema).max(MAX_INSIGHT_ACTIONS).optional(),
   })
   .refine(({ lwql, replay }) => replay === undefined || lwql !== undefined, {
     path: ["replay"],
@@ -161,3 +278,34 @@ export interface MarkInsightsSeenInputSchema extends Named<
 export const markInsightsSeenInputSchema: MarkInsightsSeenInputSchema =
   markInsightsSeenInputSchemaDefinition;
 export type MarkInsightsSeenInput = z.infer<typeof markInsightsSeenInputSchema>;
+
+/**
+ * One click on an action. `clickId` is minted by the browser per click, so a repeated request of
+ * the same click sends Langy nothing new. The prompt is never sent: the module reads it.
+ */
+const runInsightActionInputSchemaDefinition = z.object({
+  ...insightScopeSchema.shape,
+  actionId: z.string().min(1).max(8),
+  clickId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
+});
+export interface RunInsightActionInputSchema extends Named<
+  typeof runInsightActionInputSchemaDefinition
+> {}
+export const runInsightActionInputSchema: RunInsightActionInputSchema =
+  runInsightActionInputSchemaDefinition;
+export type RunInsightActionInput = z.infer<typeof runInsightActionInputSchema>;
+
+/** The Langy turn a click started, and why it is in a new conversation when it is one. */
+const insightActionRunSchemaDefinition = z.object({
+  conversationId: z.string(),
+  turnId: z.string(),
+  /** The source conversation can no longer be read. */
+  sourceGone: z.boolean(),
+  /** The source still exists, but the clicker's copy of it did not get ready in time. */
+  forkNotReady: z.boolean(),
+  /** What that unused copy is called, as it may still appear in their list; null otherwise. */
+  forkTitle: z.string().nullable(),
+});
+export interface InsightActionRunSchema extends Named<typeof insightActionRunSchemaDefinition> {}
+export const insightActionRunSchema: InsightActionRunSchema = insightActionRunSchemaDefinition;
+export type InsightActionRun = z.infer<typeof insightActionRunSchema>;

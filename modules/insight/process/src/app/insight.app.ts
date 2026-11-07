@@ -1,6 +1,7 @@
 /**
  * The insight module: what its doors call. Every operation asks the `release_insights` gate
  * first, then hands the work to the service, which answers for the caller's own insights only.
+ * `runInsightAction` asks `release_insight_actions` too.
  */
 
 import { AnalyticsApi } from "@langwatch/analytics-contract";
@@ -17,9 +18,11 @@ import {
   type InsightDailyRun,
   type InsightDailyRunSetting,
   type InsightEntry,
+  type InsightActionRun,
   type InsightApi as InsightApiContract,
   type InsightOperatorDailySchedule,
   type RequestInsightDailyRunInput,
+  type RunInsightActionInput,
   type TurnOffInsightDailyRunInput,
 } from "@langwatch/insight-contract";
 import { LangyApi } from "@langwatch/langy-contract";
@@ -36,6 +39,7 @@ import {
   type InsightPipelineDefinition,
 } from "../eventing/insight.pipeline.ts";
 import type { InsightRepositories } from "../repositories/insight.repositories.ts";
+import { InsightActionService } from "../services/insight-action.service.ts";
 import { InsightCommandsService } from "../services/insight-commands.service.ts";
 import { InsightDailyRunAuditService } from "../services/insight-daily-run-audit.service.ts";
 import { InsightDailyRunCommandsService } from "../services/insight-daily-run-commands.service.ts";
@@ -64,7 +68,10 @@ export class InsightModule implements InsightApiContract {
     users: UserApi,
     authz: AuthzApi,
     dashboards: DashboardApi,
-    /** The turn a daily run reads the board with, as the person and read-only. */
+    /**
+     * The turn a daily run reads the board with, as the person and read-only; and the turn an
+     * action's click starts, as the clicker, in a conversation of theirs.
+     */
     langy: LangyApi,
     /** Admits the query a finding keeps, and says whether the project took any trace. */
     analytics: AnalyticsApi,
@@ -73,6 +80,7 @@ export class InsightModule implements InsightApiContract {
   };
 
   readonly #insights: InsightService;
+  readonly #actions: InsightActionService;
   readonly #commands: InsightCommandsService;
   readonly #rollout: InsightRolloutService;
   readonly #pipeline: InsightPipelineDefinition;
@@ -84,6 +92,7 @@ export class InsightModule implements InsightApiContract {
 
   private constructor(parts: {
     insights: InsightService;
+    actions: InsightActionService;
     commands: InsightCommandsService;
     rollout: InsightRolloutService;
     pipeline: InsightPipelineDefinition;
@@ -94,6 +103,7 @@ export class InsightModule implements InsightApiContract {
     dailyRunPipeline: InsightDailyRunPipelineDefinition;
   }) {
     this.#insights = parts.insights;
+    this.#actions = parts.actions;
     this.#commands = parts.commands;
     this.#rollout = parts.rollout;
     this.#pipeline = parts.pipeline;
@@ -133,7 +143,15 @@ export class InsightModule implements InsightApiContract {
       commands: dailyRunCommands,
     });
     return new InsightModule({
-      insights: InsightService.create({ insights: repositories.insights, commands }),
+      insights: InsightService.create({
+        insights: repositories.insights,
+        commands,
+        conversations: dependencies.langy,
+      }),
+      actions: InsightActionService.create({
+        insights: repositories.insights,
+        langy: dependencies.langy,
+      }),
       commands,
       rollout,
       pipeline: buildInsightPipeline({
@@ -221,6 +239,20 @@ export class InsightModule implements InsightApiContract {
   async keepInsight(input: ReaderScope): Promise<void> {
     await this.#rollout.assertEnabled(input);
     await this.#insights.keep(input);
+  }
+
+  async runInsightAction({
+    userId,
+    name,
+    email,
+    ...input
+  }: RunInsightActionInput & {
+    userId: string;
+    name: string | null;
+    email: string | null;
+  }): Promise<InsightActionRun> {
+    await this.#rollout.assertActionsEnabled(input);
+    return this.#actions.run({ ...input, caller: { userId, name, email } });
   }
 
   /** With the flag off no run is asked for; one already asked for is skipped when it starts. */

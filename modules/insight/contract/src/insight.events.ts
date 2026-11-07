@@ -7,17 +7,21 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  insightActionSchema,
   insightBoardSchema,
   insightFiledViaSchema,
   insightReplaySchema,
   insightSourceSchema,
   insightToneSchema,
+  MAX_INSIGHT_ACTIONS,
 } from "./insight.ts";
+
+const insightActionsSchema = z.array(insightActionSchema).max(MAX_INSIGHT_ACTIONS);
 
 /**
  * An insight filed for one person, by that person saving a Langy answer or by Langy on a run.
- * `replay`, `board`, `filedVia`, `ownerUserId` and `findingKey` came later, each with a default:
- * an old event reads as no window, no pointer, saved from a chat, its filer's, with no key.
+ * `replay`, `board`, `filedVia`, `ownerUserId`, `findingKey` and `actions` came later, with
+ * defaults: an old event reads as no window, no pointer, a chat's, its filer's, no key, no actions.
  */
 const insightFiledEventDataSchemaDefinition = z.object({
   insightId: z.string().min(1),
@@ -37,6 +41,8 @@ const insightFiledEventDataSchemaDefinition = z.object({
   filedByUserId: z.string().nullable(),
   /** The key a later run matches the same finding by; null when it was saved from a chat. */
   findingKey: z.string().min(1).nullable().default(null),
+  /** Checked and given their ids by the module; a run files none. */
+  actions: insightActionsSchema.default([]),
 });
 export interface InsightFiledEventDataSchema extends Named<
   typeof insightFiledEventDataSchemaDefinition
@@ -46,9 +52,9 @@ export const insightFiledEventDataSchema: InsightFiledEventDataSchema =
 export type InsightFiledEventData = z.infer<typeof insightFiledEventDataSchema>;
 
 /**
- * A later run found the insight still true. Its words, tone, validity, window and source become
- * the run's; its id, title and owner stay. It names no reader, so nobody's seen, done or kept
- * state moves. `tone` came later: an event stored before it reads as null and keeps the tone.
+ * A later run found the insight still true. Its words, tone, validity, window, source and actions
+ * become the run's (a run's carry none); its id, title, owner and every reader's state stay.
+ * `tone` and `actions` came later: an event stored before them reads null and keeps its own.
  */
 const insightRenewedEventDataSchemaDefinition = z.object({
   insightId: z.string().min(1),
@@ -58,6 +64,7 @@ const insightRenewedEventDataSchemaDefinition = z.object({
   /** The window the insight's query replays over from now on; null when it keeps no query. */
   replay: insightReplaySchema.nullable(),
   source: insightSourceSchema,
+  actions: insightActionsSchema.nullable().default(null),
 });
 export interface InsightRenewedEventDataSchema extends Named<
   typeof insightRenewedEventDataSchemaDefinition
