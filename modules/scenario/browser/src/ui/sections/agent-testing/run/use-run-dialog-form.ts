@@ -302,7 +302,7 @@ function useDeclaredParameters({
   targetAgentIds,
 }: {
   scenarioIds: string[];
-  allScenarios: readonly { id: string; parameters: unknown }[] | undefined;
+  allScenarios: readonly { id: string; parameters: unknown; situation?: string }[] | undefined;
   agents: readonly RunDialogAgent[];
   /** The ids of the agents the run goes against, sorted. */
   targetAgentIds: readonly string[];
@@ -480,7 +480,7 @@ function useRunDialogParameters({
   areChoicesLoaded,
 }: {
   subject: RunDialogSubject | null;
-  allScenarios: readonly { id: string; parameters: unknown }[] | undefined;
+  allScenarios: readonly { id: string; parameters: unknown; situation?: string }[] | undefined;
   agents: readonly RunDialogAgent[];
   /** The ids of the agents the run goes against, sorted. */
   targetAgentIds: readonly string[];

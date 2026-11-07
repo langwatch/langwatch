@@ -4,6 +4,7 @@
  * The Agent Testing scenario dialog: fields, footer, chip drawers, Save/Run.
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agents/voice-agents-v1.feature
+ * @see specs/scenarios/scenario-run-parameters.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal } from "@langwatch/time";
@@ -907,6 +908,135 @@ describe("the scenario dialog", () => {
         expect(screen.getByLabelText("golden_sql")).toBeInTheDocument();
         expect(screen.getByLabelText("attempts")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("given inline parameter declarations in the situation", () => {
+    const openStored = (parameters: unknown) => {
+      mockGetById.mockReturnValue({
+        data: storedCase({ parameters }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      openDrawerAs({ scenarioId: "case_1" });
+      renderWithDesignSystem(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+      );
+    };
+
+    /** Replaces the situation; braces are literal, which typing would read as keys. */
+    const writeSituation = async (user: ReturnType<typeof userEvent.setup>, text: string) => {
+      const situation = await screen.findByLabelText("Situation");
+      await user.clear(situation);
+      await user.click(situation);
+      await user.paste(text);
+    };
+
+    /** @scenario "The editor highlights the inline declarations in the situation" */
+    it("tints each declaration a run reads and leaves Liquid and JSON plain", async () => {
+      const user = userEvent.setup();
+      openNew();
+
+      await writeSituation(
+        user,
+        'A { plan: free } customer in { region: eu-central } says {{ tone: calm }} and {"id": 1}',
+      );
+
+      const highlights = screen.getByTestId("case-modal-situation-highlights");
+      expect(
+        within(highlights)
+          .getAllByTestId("situation-declaration")
+          .map((mark) => mark.textContent),
+      ).toEqual(["{ plan: free }", "{ region: eu-central }"]);
+      expect(highlights).toHaveTextContent('says {{ tone: calm }} and {"id": 1}');
+    });
+
+    /** @scenario "The editor lists the inline parameters live with their defaults" */
+    it("opens the parameters on its own and lists each inline one, read-only", async () => {
+      const user = userEvent.setup();
+      openNew();
+      await screen.findByTestId("case-modal");
+      expect(screen.queryByTestId("case-parameters-block")).not.toBeInTheDocument();
+
+      await writeSituation(user, "A { plan: free } customer in { region: eu-central }");
+
+      expect(screen.getByTestId("case-parameters-block")).toBeInTheDocument();
+      expect(screen.queryByTestId("customize-chip-case-parameters")).not.toBeInTheDocument();
+      const plan = screen.getByTestId("inline-parameter-declared-plan");
+      expect(plan).toHaveTextContent("plan");
+      expect(plan).toHaveTextContent("free");
+      expect(plan).toHaveTextContent("from situation");
+      expect(screen.getByTestId("inline-parameter-declared-region")).toHaveTextContent(
+        "eu-central",
+      );
+      expect(
+        within(screen.getByTestId("case-inline-parameters")).queryByRole("textbox"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("keeps the parameters open, with their line, after the declaration is deleted", async () => {
+      const user = userEvent.setup();
+      openNew();
+      await writeSituation(user, "A { plan: free } customer");
+      await user.type(screen.getByLabelText("Parameters"), "tone=calm");
+
+      await writeSituation(user, "A customer");
+
+      expect(screen.getByTestId("case-parameters-block")).toBeInTheDocument();
+      expect(screen.getByLabelText("Parameters")).toHaveValue("tone=calm");
+    });
+
+    /** @scenario "The editor shows a stored parameter winning over an inline one" */
+    it("keeps the stored line and lists the inline one as overridden", async () => {
+      const user = userEvent.setup();
+      openStored([{ name: "plan", defaultValue: "pro" }]);
+
+      await writeSituation(user, "A { plan: free } customer");
+
+      expect(screen.getByLabelText("Parameters")).toHaveValue("plan=pro");
+      expect(screen.getByTestId("inline-parameter-stored-plan")).toHaveTextContent(
+        "Stored parameter wins, default pro",
+      );
+      expect(screen.queryByTestId("inline-parameter-declared-plan")).not.toBeInTheDocument();
+      expect(screen.getByTestId("situation-declaration")).toHaveAttribute("data-status", "stored");
+    });
+
+    /** @scenario "The editor warns when a name is declared twice inline with another default" */
+    it("warns on the second default and names the first as used", async () => {
+      const user = userEvent.setup();
+      openNew();
+
+      await writeSituation(user, "{ plan: free } now, { plan: pro } later");
+
+      expect(screen.getByTestId("inline-parameter-duplicate-plan")).toHaveTextContent(
+        "plan is declared twice; the first default, free, is used",
+      );
+      expect(
+        screen.getAllByTestId("situation-declaration").map((mark) => mark.dataset.status),
+      ).toEqual(["declared", "duplicate"]);
+    });
+
+    /** @scenario "The editor refuses an inline declaration naming a stored secret" */
+    it("lists the secret as refused, shows no value and refuses the save", async () => {
+      const user = userEvent.setup();
+      openStored([{ name: "api_token", secret: true }]);
+
+      await writeSituation(user, "Use { api_token: abc123 } to sign in");
+
+      const row = screen.getByTestId("inline-parameter-secret-api_token");
+      expect(row).toHaveTextContent("A secret cannot be declared in the situation");
+      expect(screen.getByTestId("case-inline-parameters")).not.toHaveTextContent("abc123");
+
+      await user.click(screen.getByTestId("case-modal-save"));
+
+      expect(
+        await screen.findByText("A secret cannot be declared in the situation: api_token"),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Situation")).toHaveFocus();
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
 });
