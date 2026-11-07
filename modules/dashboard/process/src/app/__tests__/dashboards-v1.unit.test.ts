@@ -3,7 +3,7 @@
  * repositories: every board reachable to every member, the rollout gate and
  * source presence. Spec: dashboards-v1.feature.
  */
-import type { LangWatchQLExecuteInput } from "@langwatch/analytics-contract";
+import type { AnalyticsApi, LangWatchQLExecuteInput } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
@@ -21,6 +21,7 @@ function appWith(
     executeLangWatchQL?: (
       input: LangWatchQLExecuteInput,
     ) => Promise<{ rows: Record<string, unknown>[] }>;
+    reportBuiltInQueryFailure?: AnalyticsApi["reportBuiltInQueryFailure"];
   }> = {},
 ) {
   return createDashboardTestApp({
@@ -28,6 +29,9 @@ function appWith(
     dependencies: {
       analytics: createDashboardTestAnalytics({
         isDashboardsEnabled: async () => options.dashboardsEnabled ?? true,
+        ...(options.reportBuiltInQueryFailure === undefined
+          ? {}
+          : { reportBuiltInQueryFailure: options.reportBuiltInQueryFailure }),
         ...(options.executeLangWatchQL === undefined
           ? {}
           : {
@@ -273,7 +277,9 @@ describe("Dashboards v1 on the server", () => {
     /** @scenario "AC7 Connected state comes from real data" */
     it("answers present, absent or failed per source from the rows each query returns", async () => {
       const recorded = ["trace_metrics", "simulations"];
+      const reported: { projectId: string; error: unknown }[] = [];
       const app = appWith({
+        reportBuiltInQueryFailure: (failure) => void reported.push(failure),
         executeLangWatchQL: async ({ sql }) => {
           if (sql.includes("gateway_request_spend")) throw new Error("view unavailable");
           return { rows: recorded.some((table) => sql.includes(table)) ? [{ present: 1 }] : [] };
@@ -290,6 +296,8 @@ describe("Dashboards v1 on the server", () => {
           codingAgents: "absent",
         },
       );
+      expect(reported).toHaveLength(1);
+      expect(reported[0]).toMatchObject({ projectId: PROJECT });
     });
   });
 });

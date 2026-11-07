@@ -45,6 +45,7 @@ import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
+import { langWatchQLAccessRefusals } from "./langwatch-ql-access-refusal.service.ts";
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLExecutionService } from "./langwatch-ql-execution.service.ts";
@@ -270,7 +271,16 @@ export class LangWatchQLService {
         "LangWatchQL refused by policy",
       );
 
-      throw lwqlValidationErrors.forRejection(validation);
+      const error = lwqlValidationErrors.forRejection(validation);
+      langWatchQLAccessRefusals.markIfCallerAccess({
+        error,
+        rejection: validation,
+        database: this.deps.database,
+        protections,
+        views: this.views,
+        catalog: this.catalog,
+      });
+      throw error;
     }
 
     return validation;

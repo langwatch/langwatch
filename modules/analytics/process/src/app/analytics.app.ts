@@ -28,6 +28,8 @@ import {
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   LangWatchQLProjectNotFoundError,
+  LangWatchQLReservedParameterSuppliedError,
+  isLangWatchQLSurfaceParameter,
   type LangWatchQLRunCaller,
   type LangWatchQLAcceptedStatement,
   type LangWatchQLAppFunctionCall,
@@ -58,6 +60,7 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
+import { counter } from "@langwatch/observability/metrics";
 import type { FeatureSetup } from "@langwatch/process";
 import { OverloadedRefusal, StatementBoundTelemetry } from "@langwatch/process-stores";
 import { isAggregateProjectKind, ProjectApi } from "@langwatch/project-contract";
@@ -111,13 +114,17 @@ import {
   LangWatchQLConnectionService,
   LWQL_CONNECTION_DEFAULTS,
 } from "../services/langwatch-ql-connection.service.ts";
+import { LangWatchQLFailureReportService } from "../services/langwatch-ql-failure-report.service.ts";
 import { LwqlKeyMapService } from "../services/langwatch-ql-key-map.service.ts";
 import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,
 } from "../services/langwatch-ql-query-scope.service.ts";
 import { LangWatchQLReadableProjectsService } from "../services/langwatch-ql-readable-projects.service.ts";
-import { LangWatchQLRunScopeService } from "../services/langwatch-ql-run-scope.service.ts";
+import {
+  LangWatchQLRunScopeService,
+  type LangWatchQLRunScope,
+} from "../services/langwatch-ql-run-scope.service.ts";
 import { LangWatchQLValidationReportService } from "../services/langwatch-ql-validation-report.service.ts";
 import {
   DEFAULT_LWQL_DATABASE,
@@ -238,6 +245,8 @@ type LwqlProvisioningOperations = Readonly<{
 const NO_DRIFT: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], isKeyMapMissing: false };
 
 const lwqlLogger = createLogger("langwatch:analytics:lwql:provisioning");
+
+const LWQL_QUERY_FAILURE_METRIC_NAME = "lwql_query_failure_total";
 
 const LWQL_UNAVAILABLE: LwqlProvisioningOperations = {
   probeOwner: () => Promise.resolve("none"),
@@ -540,6 +549,7 @@ export class AnalyticsModule
   #runScope: LangWatchQLRunScopeService;
   #protections: WorkbenchProtectionsService;
   #validationReport: LangWatchQLValidationReportService;
+  #failureReport: LangWatchQLFailureReportService;
 
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
@@ -561,6 +571,14 @@ export class AnalyticsModule
     this.#validationReport = LangWatchQLValidationReportService.create({
       langWatchQL: dependencies.langWatchQL,
       protections: this.#protections,
+    });
+    this.#failureReport = LangWatchQLFailureReportService.create({
+      logger: createLogger("langwatch:analytics:lwql:query-failure"),
+      failures: counter({
+        name: LWQL_QUERY_FAILURE_METRIC_NAME,
+        description:
+          "Failed LangWatchQL queries by who wrote the statement (built_in or user_written)",
+      }),
     });
     this.#publicBaseUrl = publicBaseUrl;
     this.#widgetAccess = DashboardWidgetAccessService.create(dependencies);
@@ -851,9 +869,32 @@ export class AnalyticsModule
   async executeLangWatchQL(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
-    const { authorization, project, projects: asked, userId, ...run } = input;
+    return this.#runInScope({ input, scope: await this.#resolveRunScope(input) });
+  }
+
+  /** Which projects the run reads, refused here when the request names ones it may not. */
+  #resolveRunScope(
+    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
+  ): Promise<LangWatchQLRunScope> {
+    const { authorization, project, projects: asked, userId } = input;
     const selection = this.#runScope.select({ projects: asked });
-    const scope = await this.#runScope.resolve({ authorization, project, selection, userId });
+    return this.#runScope.resolve({ authorization, project, selection, userId });
+  }
+
+  async #runInScope({
+    input,
+    scope,
+  }: {
+    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>;
+    scope: LangWatchQLRunScope;
+  }): Promise<LangWatchQLQueryResult> {
+    const {
+      authorization: _authorization,
+      project,
+      projects: _asked,
+      userId: _user,
+      ...run
+    } = input;
 
     if (scope.kind === "aggregate") {
       // A judged column is charged to one project, so an aggregate's statement may call none.
@@ -881,6 +922,31 @@ export class AnalyticsModule
       (await this.#isInstantEvalsEnabled(input.project.id));
 
     return this.#dependencies.langWatchQL.execute({ project, ...run, isInstantEvalsEnabled });
+  }
+
+  async executeWorkbenchQuery(
+    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
+  ): Promise<LangWatchQLQueryResult> {
+    // The scope and the reserved names are the request's own input: refusing them is not the
+    // statement failing.
+    this.#assertNoReservedNameSupplied(input.parameters);
+    const scope = await this.#resolveRunScope(input);
+    return this.#failureReport.reportingFailures({
+      projectId: input.project.id,
+      sql: input.sql,
+      run: () => this.#runInScope({ input, scope }),
+    });
+  }
+
+  #assertNoReservedNameSupplied(parameters: Readonly<Record<string, unknown>> | undefined): void {
+    const supplied = Object.keys(parameters ?? {})
+      .filter(isLangWatchQLSurfaceParameter)
+      .toSorted();
+    if (supplied.length > 0) throw new LangWatchQLReservedParameterSuppliedError(supplied);
+  }
+
+  reportBuiltInQueryFailure(input: { projectId: string; source: string; error: unknown }): void {
+    this.#failureReport.reportBuiltInFailure(input);
   }
 
   async assertProjectsReadable(input: {

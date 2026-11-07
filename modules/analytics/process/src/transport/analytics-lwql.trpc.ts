@@ -65,6 +65,10 @@ export interface AnalyticsLwqlApi {
   executeLangWatchQL(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult>;
+  /** `executeLangWatchQL` for this door only: a failure is told by its text, then rethrown. */
+  executeWorkbenchQuery(
+    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
+  ): Promise<LangWatchQLQueryResult>;
 }
 
 export const AnalyticsLwqlApi = moduleApi<AnalyticsLwqlApi>()("analytics");
@@ -130,7 +134,7 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
       authorization,
     });
 
-    return app.executeLangWatchQL({
+    return app.executeWorkbenchQuery({
       project,
       protections,
       authorization,
