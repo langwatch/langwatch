@@ -179,7 +179,7 @@ so the tree typechecks and lints on its own at every step.
 2. **Each of the five disputes**, above.
 3. **Whether Free belongs on the ladder.** Free carries no rung today, which is
    the mechanism behind `pro-volume-below-free`; it is recorded there rather
-   than as a fifth dispute.
+   than as a dispute of its own.
 
 ## References
 
