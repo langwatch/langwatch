@@ -52,7 +52,7 @@
     "chalk": "catalog:",
     "commander": "catalog:",
     "concurrently": "catalog:",
-    "execa": "^9.6.0",
+    "execa": "^10.2.0",
     "listr2": "^9.0.4",
     "ora": "catalog:",
     "pg": "catalog:",
