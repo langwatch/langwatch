@@ -1,10 +1,10 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-/** An organization's membership milestones, which peers react to from their own side (§9). */
 /** The aggregate the organization records its lifecycle and member facts on. */
 export const ORGANIZATION_AGGREGATE_TYPE = "organization" as const;
 
+/** An organization's membership milestones, which peers react to from their own side (§9). */
 export const ORGANIZATION_SIGNED_UP_EVENT_TYPE = "lw.organization.signed_up" as const;
 export const ORGANIZATION_CREATED_EVENT_TYPE = "lw.organization.created" as const;
 export const ORGANIZATION_CREATED_EVENT_VERSION = "2026-10-09" as const;

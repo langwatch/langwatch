@@ -1703,6 +1703,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     userId: string;
     offboardedByUserId: string | null;
     occurredAt: number;
+    heldFullSeat?: boolean;
   }): Promise<void> {
     await this.getWithAdministrators({ organizationId: input.organizationId });
     await this.#infrastructure.lifecycle.memberRemoved({
@@ -1710,6 +1711,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       userId: input.userId,
       removedByUserId: input.offboardedByUserId,
       occurredAt: input.occurredAt,
+      heldFullSeat: input.heldFullSeat,
     });
   }
 
@@ -1718,6 +1720,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     organizationId: string;
     userId: string;
     occurredAt: number;
+    heldFullSeat?: boolean;
   }): Promise<void> {
     await this.getWithAdministrators({ organizationId: input.organizationId });
     await this.#infrastructure.lifecycle.memberRemoved({
@@ -1725,6 +1728,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       userId: input.userId,
       removedByUserId: null,
       occurredAt: input.occurredAt,
+      heldFullSeat: input.heldFullSeat,
     });
   }
 

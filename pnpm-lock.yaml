@@ -6382,6 +6382,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
@@ -16238,6 +16241,9 @@ importers:
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing

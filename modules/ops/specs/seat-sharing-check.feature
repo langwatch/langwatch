@@ -8,7 +8,8 @@ Feature: Ops seat sharing check
 
   "Held a seat in the window" means a full-seat member today, or a member removed or disabled
   in the last 30 days (read from the organization's member_removed and member_disabled facts;
-  a fact that says the person held no full seat is skipped, an older fact without it counts).
+  a fact that says the person held no full seat is skipped, an older fact without it counts;
+  authz offboarding and account erasure report the seat type the same way).
   "Active" means the person signed in (User.lastLoginAt) or used a browser session
   (Session.updatedAt, rolled once a day while used, or Session.lastSeenAt) in the window.
 
@@ -108,6 +109,25 @@ Feature: Ops seat sharing check
     When organization lists who held a seat in the window
     Then the person who held a full seat and the person whose fact says nothing are departed
     And the person who held no full seat is not
+
+  @integration
+  Scenario: Offboarding records whether the person held a full seat
+    Given an organization with a member and an external member with a view-only custom role
+    When authz offboards each of them
+    Then the member's offboarding reports a full seat and the external member's reports none
+
+  @integration
+  Scenario: Erasure records the organizations where the person held a full seat
+    Given a person who is a member of one organization and an external member of another
+    When their account is erased
+    Then the erased fact names both organizations and only the first as a full seat
+
+  @unit
+  Scenario: Offboarded and erased departures carry the seat type from the fact
+    Given an authz offboarding fact and a user erased fact for the same organization
+    When organization records the departures
+    Then each departure carries the seat type the fact reported
+    And a fact from before the seat type was recorded carries none, so it still counts
 
   @integration
   Scenario: A session used or a sign-in in the window marks a person active
