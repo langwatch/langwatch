@@ -744,6 +744,106 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the query is rejected rather than executed with weaker guarantees
 
   # ---------------------------------------------------------------------------
+  # Organizations with a private ClickHouse (issue #9248). Provisioning the
+  # LangWatchQL objects on a private ClickHouse lands in a later PR.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse as the LangWatchQL identity
+    Given an organization whose projects are routed to its own ClickHouse by a URL carrying the server's own user and password
+    When a LangWatchQL query reads that organization's projects
+    Then it runs on the route's server and database
+    And it connects as the LangWatchQL restricted identity, never with the user or password in the route URL
+    And a query for an organization without a private ClickHouse still runs on the shared ClickHouse
+
+  @unit
+  Scenario: A LangWatchQL query for an organization whose private route is missing is refused, never answered from the shared ClickHouse
+    Given an organization recorded as keeping its data on its own ClickHouse
+    And this deployment has no route to that ClickHouse
+    When a LangWatchQL query reads that organization's projects
+    Then the query layer refuses it with error code private_dataplane_unavailable, the router's own refusal, unchanged
+    And the REST API answers 503 private_dataplane_unavailable, saying the organization keeps its data on its own ClickHouse, which this deployment cannot reach
+    And the refusal names the variable that is missing or malformed, never its value; the label inside the variable is shown to that organization's caller
+    And no statement runs on the shared ClickHouse
+
+  @unit
+  Scenario: A LangWatchQL query spanning organizations is refused
+    Given projects that belong to two organizations
+    When one LangWatchQL query reads them together
+    Then the query layer refuses it with error code lwql_unavailable before any statement runs
+    And from REST with a project key the request gets 404 project_not_found earlier, so this refusal is not reached there
+
+  @unit
+  Scenario: A LangWatchQL query on a private ClickHouse without LangWatchQL set up is refused
+    Given an organization whose private ClickHouse does not know the LangWatchQL identity or has no LangWatchQL views
+    When a LangWatchQL query reads that organization's projects
+    Then the query layer refuses it with error code lwql_unavailable, saying LangWatchQL is not set up on this organization's ClickHouse yet
+    And the refusal names no URL, user or password
+
+  @unit
+  Scenario: A statement on a private route names the route's database, never the shared one
+    Given an organization routed to its own ClickHouse, whose route names the database acme_db
+    When a LangWatchQL query or pass reads that organization's projects
+    Then unqualified table names resolve to acme_db
+    And a statement naming acme_db runs, and it runs only on the route's server
+    And a statement naming the shared database is refused with error code lwql_not_permitted before any statement runs
+    And on an organization without a private ClickHouse a statement naming acme_db is refused the same way
+    And the generated member-window and completeness statements name acme_db too
+
+  @unit
+  Scenario: A pass on a private route validates against the route's database and asks the route once
+    Given an organization routed to its own ClickHouse
+    When a pass runs a statement over that organization's project
+    Then the statement is validated against the route's database
+    And the route is asked once for the pass
+
+  @unit
+  Scenario: A private route's statement may not use FINAL or SAMPLE on a PostgreSQL-resident view
+    Given an organization routed to its own ClickHouse
+    When a query or a pass names a PostgreSQL-resident view qualified with the route's database and uses FINAL
+    Then it is refused with error code lwql_table_modifier_unsupported before any statement runs
+
+  @unit
+  Scenario: A bad statement for an organization with no usable route gets the route refusal first
+    Given an organization whose route is missing or broken
+    When a LangWatchQL query reads that organization's projects with a statement the policy would refuse
+    Then the query layer refuses it with the route's refusal, lwql_unavailable or private_dataplane_unavailable
+    And no statement runs
+
+  @unit
+  Scenario: A deployment with no LangWatchQL identity judges the statement first
+    Given this deployment has no LangWatchQL restricted identity
+    When a LangWatchQL query is run with a statement the caller may not read
+    Then the query layer refuses it with the policy's refusal, lwql_not_permitted
+    And a statement the caller may read is refused with error code lwql_unavailable
+
+  @unit
+  Scenario: A save needs no route
+    Given a statement is saved without being run
+    When it is validated
+    Then no route is asked
+    And a statement naming the shared database saves, and is refused at run on a private organization
+    And a statement naming a private route's database is refused at save
+
+  @unit
+  Scenario: A run validates against its route's database before anything is judged
+    Given an organization routed to its own ClickHouse, whose route names the database acme_db
+    When a run is validated at its start
+    Then the route is asked once, and the statement is judged against acme_db
+    And a statement naming the shared database is refused with error code lwql_not_permitted
+    And a statement naming acme_db is accepted
+    And an organization whose route is missing gets the route's refusal, not a statement refusal
+    And an organization without a private ClickHouse is judged against the shared database as before
+
+  @unit
+  Scenario: A private route whose database is not a plain ClickHouse name is refused
+    Given an organization routed to a URL whose path is not a plain lower-case identifier, carries SQL once decoded, names a reserved database such as system, or cannot be parsed at all
+    When a LangWatchQL query reads that organization's projects
+    Then the query layer refuses it with error code lwql_unavailable before any statement runs
+    And the refusal names no part of the route URL
+    And the reasons kept for operators carry no part of the route URL
+
+  # ---------------------------------------------------------------------------
   # Resource safety (later PR of this issue — #6480)
   # ---------------------------------------------------------------------------
 

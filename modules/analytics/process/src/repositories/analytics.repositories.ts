@@ -5,6 +5,7 @@ import type { AnalyticsSessionsRepository } from "./analytics-sessions.repositor
 import type { AnalyticsRepository } from "./analytics.repository.ts";
 import type { FilterOptionsRepository } from "./filter-options.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "./langwatch-ql-app-function-store.repository.ts";
+import type { LangWatchQLTenantRouting } from "./langwatch-ql-executor.repository.ts";
 import type { LwqlProvisioningDatabase } from "./langwatch-ql-postgres.repository.ts";
 import type { ClickHouseAdminStatements } from "./langwatch-ql-provisioning.repository.ts";
 import type { LwqlUnconfirmedSinceRepository } from "./langwatch-ql-unconfirmed-since.repository.ts";
@@ -38,6 +39,8 @@ export type LangWatchQlSupply = Readonly<{
   database: () => LwqlProvisioningDatabase;
   /** The fleet's first failure to show the collection loaded, for the check's alert. */
   unconfirmedSince: LwqlUnconfirmedSinceRepository;
+  /** Which ClickHouse a statement's projects live on: shared, or their organization's own. */
+  routeTenantSet: LangWatchQLTenantRouting;
 }>;
 
 /** What the analytics module reads and counts, chosen once at boot. */

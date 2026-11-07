@@ -142,6 +142,14 @@ Admits a statement, or throws the refusal. The verdict is what a caller storing 
 validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement;
 ```
 
+#### `validateLangWatchQLForRun`
+
+Admits a statement for a run about to start: the project's route is asked first and the statement is judged against the route's database. A saved statement uses `validateLangWatchQL`, which needs no route.
+
+```typescript
+validateLangWatchQLForRun(input: LangWatchQLValidationInput): Promise<LangWatchQLAcceptedStatement>;
+```
+
 #### `describeLangWatchQLJudgements`
 
 The judged columns a hydration plan asks for, in the catalogue's own vocabulary. Derived here because the catalogue is LangWatchQL's: which option of an eval function is its threshold, range or list is its answer.
@@ -368,7 +376,7 @@ Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:96`, router `src/
 interface Input {
   projectId: string;
 }
-// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:500
+// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:502
 interface Output {
   available: boolean;
   reason?: "disabled" | "unprovisioned";
@@ -486,8 +494,8 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:57`.
 
 | Kind   | Leaf                              | Environment variable                      | Declared at                              |
 | ------ | --------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:411`           |
-| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:412`           |
+| secret | `lwqlClickHousePassword`          | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:412`           |
+| secret | `lwqlPostgresReaderPassword`      | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:413`           |
 | config | `langwatchQl.url`                 | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:11` |
 | config | `langwatchQl.username`            | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:12` |
 | config | `langwatchQl.database`            | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:13` |

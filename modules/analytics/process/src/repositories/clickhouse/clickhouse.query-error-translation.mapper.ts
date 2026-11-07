@@ -109,6 +109,8 @@ const BAD_QUERY_PARAMETER: ServerError = { code: "457", name: "BAD_QUERY_PARAMET
 const UNKNOWN_TABLE: ServerError = { code: "60", name: "UNKNOWN_TABLE" };
 const UNKNOWN_DATABASE: ServerError = { code: "81", name: "UNKNOWN_DATABASE" };
 const ACCESS_DENIED: ServerError = { code: "497", name: "ACCESS_DENIED" };
+const AUTHENTICATION_FAILED: ServerError = { code: "516", name: "AUTHENTICATION_FAILED" };
+const UNKNOWN_USER: ServerError = { code: "192", name: "UNKNOWN_USER" };
 
 /**
  * Whether `error` matches any of `variants`, by driver `code`/`type` properties or
@@ -257,6 +259,15 @@ export function extractBadQueryParameter(error: unknown): string | undefined {
 export function isClickHouseObjectAccessDeniedError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return raisedServerError({ error, variants: [ACCESS_DENIED] });
+}
+
+/**
+ * True when the server does not know the connecting identity or its password —
+ * AUTHENTICATION_FAILED (516) or UNKNOWN_USER (192).
+ */
+export function isClickHouseAuthenticationError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({ error, variants: [AUTHENTICATION_FAILED, UNKNOWN_USER] });
 }
 
 /**

@@ -48,6 +48,7 @@ describe("given the LangWatchQL settings profile's ceilings", () => {
       sql,
       parameters,
       tenantCapability: harness.tenantA.keyHash,
+      tenantIds: ["tenant-a"],
     });
 
   const codeOfFailure = async (attempt: () => Promise<unknown>): Promise<unknown> => {

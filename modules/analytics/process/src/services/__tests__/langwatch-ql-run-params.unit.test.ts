@@ -72,6 +72,7 @@ describe("given a statement that reads {dashboard_context_sources}", () => {
 
     expect(request?.parameters?.dashboard_context_sources).toEqual(["application"]);
     expect(result.params?.dashboard_context_sources).toEqual(["application"]);
+    expect(request?.tenantIds).toEqual(["project-1"]);
   });
 
   /** @scenario "QP04 A statement reading the sources parameter counts the origins it is bound to" */

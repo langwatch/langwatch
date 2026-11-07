@@ -193,6 +193,8 @@ describe("LangWatchQLService completeness", () => {
 
       const [statement, report] = executor.requests;
       expect(report?.tenantCapability).toBe(statement?.tenantCapability);
+      expect(statement?.tenantIds).toEqual(["project-1"]);
+      expect(report?.tenantIds).toEqual(["project-1"]);
       expect(report?.sql).toContain("FROM analytics.traces");
       expect(report?.sql).toContain("countIf(`UnpricedSpanCount` > 0)");
       expect(report?.parameters).toMatchObject({

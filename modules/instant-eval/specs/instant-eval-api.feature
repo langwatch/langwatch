@@ -38,6 +38,13 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     Then the response is 422 with code instant_eval_query_invalid
     And the refusal names the policy violations
 
+  @unit
+  Scenario: A run is judged against the organization's route, and a route refusal is not rewritten
+    Given an organization whose statement is judged at the start of a run
+    When the query layer refuses the route
+    Then the run is refused with the route's own refusal, not instant_eval_query_invalid
+    And a refusal of the statement itself is still instant_eval_query_invalid
+
   @integration
   Scenario: A statement with no trace id is refused before anything runs
     Given a statement projecting only a judged column

@@ -27,7 +27,7 @@ const executor = ClickHouseLangWatchQLExecutorRepository.create({
 });
 
 const refusalOf = (sql: string) =>
-  executor.execute({ sql, tenantCapability: "tenant-a" }).then(
+  executor.execute({ sql, tenantCapability: "tenant-a", tenantIds: ["tenant-a"] }).then(
     () => ({ code: "none", fault: "none", httpStatus: 0 }),
     (error: { code?: string; fault?: string; httpStatus?: number }) => ({
       code: error.code,
@@ -88,7 +88,7 @@ describe("given the LangWatchQL identity is running as many statements as it may
       );
 
       const refusal = await executor
-        .execute({ sql: "SELECT 1", tenantCapability: "tenant-a" })
+        .execute({ sql: "SELECT 1", tenantCapability: "tenant-a", tenantIds: ["tenant-a"] })
         .then(
           () => ({}),
           (error: { code?: string; fault?: string; httpStatus?: number; retryable?: boolean }) => ({
@@ -170,6 +170,7 @@ describe("given a bound parameter whose value does not fit its declared type", (
         .execute({
           sql: "SELECT count() FROM analytics.traces WHERE OccurredAt >= {start:DateTime64(3)}",
           tenantCapability: "tenant-a",
+          tenantIds: ["tenant-a"],
         })
         .then(
           () => null,
