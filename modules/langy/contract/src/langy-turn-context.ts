@@ -60,6 +60,8 @@ export const LANGY_TURN_SKILL_IDS = [
   "setup-lw",
   "test-cli-usability",
   "test-compliance",
+  "red-team",
+  "red-team-owasp",
   "observability.analytics",
   "observability.annotations",
   "evaluations.online-evaluation",

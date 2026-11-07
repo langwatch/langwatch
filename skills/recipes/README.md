@@ -15,6 +15,8 @@ Recipes are domain-specific, use-case-specific skills that solve particular prob
 | `evaluate-multimodal`   | Evaluate multimodal agents (images, audio, PDFs)                                |
 | `generate-rag-dataset`  | Generate synthetic evaluation dataset from your RAG knowledge base              |
 | `test-compliance`       | Test that your agent stays observational in regulated domains                   |
+| `red-team`              | Write and run one red-team test against your agent                              |
+| `red-team-owasp`        | Cover the OWASP Top 10 for LLM apps for your agent                              |
 
 ## Using a Recipe
 
