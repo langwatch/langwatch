@@ -119,7 +119,7 @@ Feature: Test agent with one scripted run
     Scenario: The REST route starts the run as the caller's person and the key they called with
       When "POST /api/v1/agents/:id/test" is called with a member's personal access token
       Then the run is started as that member, naming the token's key, so the run's key holds no more
-      And a key that acts as nobody starts the run with no person
+      And a key that acts as nobody starts the run with no person, naming that key
 
   Rule: A connected agent no process is holding cannot be tested
 

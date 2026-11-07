@@ -7,7 +7,7 @@
 
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import type { RunActor, ScenarioRunData } from "@langwatch/scenario-contract";
+import type { RecordedRunActor, ScenarioRunData } from "@langwatch/scenario-contract";
 import { format } from "@langwatch/time";
 import { useCallback, useMemo, useState } from "react";
 
@@ -62,7 +62,7 @@ const NO_RUNS: ScenarioRunData[] = [];
  * What the settings row calls whoever started a run.
  * @see specs/features/agent-testing/results-tabs.feature
  */
-function useRunStartedByLabel(actor: RunActor | null): string | null {
+function useRunStartedByLabel(actor: RecordedRunActor | null): string | null {
   const { organization } = useOrganizationTeamProject();
   // The reader's own id, which is what lets a run they started read as "You".
   // Read without requiring a session: the page is already behind the sign-in
