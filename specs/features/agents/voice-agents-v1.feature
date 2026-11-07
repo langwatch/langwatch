@@ -798,6 +798,13 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     When each finish creates the voice agent row
     Then the identity key folds them onto the same row rather than creating a second
 
+  # #8027: the per-pod single-flight saves a round trip; the identity key is the guarantee.
+  @unit @regression
+  Scenario: Concurrent finish retries create exactly one agent
+    Given two finishes of the same conversation racing with an agent-less token
+    When both reach the agent create at once
+    Then both settle on one agent id
+
   # #8020 decision 2
   @unit @regression
   Scenario: The legacy voice-calls set is excluded from run listings
