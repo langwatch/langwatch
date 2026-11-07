@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSplitProviderModel(t *testing.T) {
@@ -125,7 +127,7 @@ func TestApplyReasoningOverrides_PinsTemperatureAndFloorsMaxTokens(t *testing.T)
 		"temperature": 0.2,
 		"max_tokens":  1000,
 	}
-	mutated := ApplyReasoningOverrides("openai/gpt-5-mini", body)
+	mutated := ApplyReasoningOverrides("openai/gpt-5-mini", body, nil)
 	if !mutated {
 		t.Fatalf("expected mutation for reasoning model")
 	}
@@ -143,7 +145,7 @@ func TestApplyReasoningOverrides_PinsTemperatureAndFloorsMaxTokens(t *testing.T)
 
 func TestApplyReasoningOverrides_HighMaxTokensPreserved(t *testing.T) {
 	body := map[string]any{"max_tokens": 32000}
-	ApplyReasoningOverrides("openai/o3", body)
+	ApplyReasoningOverrides("openai/o3", body, nil)
 	if _, present := body["max_tokens"]; present {
 		t.Errorf("max_tokens must be removed for reasoning models, got %v", body["max_tokens"])
 	}
@@ -155,7 +157,7 @@ func TestApplyReasoningOverrides_HighMaxTokensPreserved(t *testing.T) {
 
 func TestApplyReasoningOverrides_NonReasoningUntouched(t *testing.T) {
 	body := map[string]any{"temperature": 0.2, "max_tokens": 100}
-	if ApplyReasoningOverrides("openai/gpt-4o", body) {
+	if ApplyReasoningOverrides("openai/gpt-4o", body, nil) {
 		t.Errorf("expected no mutation for non-reasoning model")
 	}
 	if body["temperature"] != 0.2 {
@@ -164,6 +166,73 @@ func TestApplyReasoningOverrides_NonReasoningUntouched(t *testing.T) {
 	if body["max_tokens"] != 100 {
 		t.Errorf("max_tokens must not change for gpt-4o")
 	}
+}
+
+// fakeCatalog answers for the models it lists and knows no other.
+type fakeCatalog map[string]string
+
+func (c fakeCatalog) OutputTokensParameter(modelID string) (string, bool) {
+	param, known := c[modelID]
+	return param, known
+}
+
+// @scenario "A workflow LLM call on a marked model sends max_completion_tokens"
+func TestApplyReasoningOverrides_CatalogMarkRenamesTheLimit(t *testing.T) {
+	// A model the name rule does not recognize: only the catalog can say.
+	catalog := fakeCatalog{"openai/acme-reasoner": "max_completion_tokens"}
+	body := map[string]any{"temperature": 0.2, "max_tokens": 900}
+
+	assert.True(t, NeedsReasoningOverrides("openai/acme-reasoner", catalog))
+	assert.True(t, ApplyReasoningOverrides("openai/acme-reasoner", body, catalog))
+
+	assert.NotContains(t, body, "max_tokens")
+	assert.Equal(t, 900, body["max_completion_tokens"])
+	assert.InDelta(t, 0.2, body["temperature"], 0, "only reasoning-class models pin temperature")
+}
+
+// @scenario "A workflow LLM call on a marked model sends max_completion_tokens"
+func TestApplyReasoningOverrides_CatalogMarkKeepsAnExplicitMaxCompletionTokens(t *testing.T) {
+	catalog := fakeCatalog{"openai/acme-reasoner": "max_completion_tokens"}
+	body := map[string]any{"max_tokens": 900, "max_completion_tokens": 300}
+
+	ApplyReasoningOverrides("openai/acme-reasoner", body, catalog)
+
+	assert.NotContains(t, body, "max_tokens")
+	assert.Equal(t, 300, body["max_completion_tokens"])
+}
+
+// @scenario "A workflow LLM call on a model that takes max_tokens keeps max_tokens"
+func TestApplyReasoningOverrides_CatalogDefaultKeepsMaxTokens(t *testing.T) {
+	catalog := fakeCatalog{"openai/gpt-4o": "max_tokens"}
+	body := map[string]any{"max_tokens": 100}
+
+	assert.False(t, NeedsReasoningOverrides("openai/gpt-4o", catalog))
+	assert.False(t, ApplyReasoningOverrides("openai/gpt-4o", body, catalog))
+	assert.Equal(t, 100, body["max_tokens"])
+}
+
+func TestApplyReasoningOverrides_CatalogDefaultLeavesTheNameRuleRename(t *testing.T) {
+	// An entry left at the default (the openai_codex/ ids) is not a claim
+	// that the model takes max_tokens, so the name rule's rename stands.
+	catalog := fakeCatalog{"openai_codex/gpt-5.6-sol": "max_tokens"}
+	body := map[string]any{"temperature": 0.2, "max_tokens": 1000}
+
+	ApplyReasoningOverrides("openai_codex/gpt-5.6-sol", body, catalog)
+
+	assert.NotContains(t, body, "max_tokens")
+	assert.Equal(t, reasoningMaxTokensFloor, body["max_completion_tokens"])
+	assert.InDelta(t, 1.0, body["temperature"], 0)
+}
+
+// @scenario "A model the catalog does not know keeps the request it gets today"
+func TestApplyReasoningOverrides_ModelOutsideTheCatalogKeepsTheNameRule(t *testing.T) {
+	catalog := fakeCatalog{}
+	body := map[string]any{"max_tokens": 32000}
+
+	ApplyReasoningOverrides("openai/o3", body, catalog)
+
+	assert.NotContains(t, body, "max_tokens")
+	assert.Equal(t, 32000, body["max_completion_tokens"])
 }
 
 func TestClampAnthropicTemperature(t *testing.T) {

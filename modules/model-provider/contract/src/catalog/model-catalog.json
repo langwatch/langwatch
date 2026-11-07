@@ -1066,7 +1066,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6.1-sol-pro:batch": {
       "id": "openai/gpt-6.1-sol-pro:batch",
@@ -1104,7 +1105,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6.1-sol": {
       "id": "openai/gpt-6.1-sol",
@@ -1139,7 +1141,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": false
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6.1-sol:batch": {
       "id": "openai/gpt-6.1-sol:batch",
@@ -1173,7 +1183,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": false
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "anthropic/claude-sonnet-5-5": {
       "id": "anthropic/claude-sonnet-5-5",
@@ -1613,7 +1631,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6-luna-pro:batch": {
       "id": "openai/gpt-6-luna-pro:batch",
@@ -1651,7 +1670,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6-luna": {
       "id": "openai/gpt-6-luna",
@@ -1690,7 +1710,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6-luna:batch": {
       "id": "openai/gpt-6-luna:batch",
@@ -1728,7 +1756,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6-sol-pro": {
       "id": "openai/gpt-6-sol-pro",
@@ -1767,7 +1803,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6-sol-pro:batch": {
       "id": "openai/gpt-6-sol-pro:batch",
@@ -1805,7 +1842,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6-sol": {
       "id": "openai/gpt-6-sol",
@@ -1844,7 +1882,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6-sol:batch": {
       "id": "openai/gpt-6-sol:batch",
@@ -1882,7 +1928,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "anthropic/claude-opus-5-5": {
       "id": "anthropic/claude-opus-5-5",
@@ -2890,7 +2944,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": false
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6-astra:batch": {
       "id": "openai/gpt-6-astra:batch",
@@ -2924,7 +2986,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": false
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6-astra-pro": {
       "id": "openai/gpt-6-astra-pro",
@@ -2959,7 +3029,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-6-astra-pro:batch": {
       "id": "openai/gpt-6-astra-pro:batch",
@@ -2993,7 +3064,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "qwen/qwen3.8-max-0902": {
       "id": "qwen/qwen3.8-max-0902",
@@ -5160,7 +5232,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.6-luna-pro:batch": {
       "id": "openai/gpt-5.6-luna-pro:batch",
@@ -5197,7 +5270,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.6-luna": {
       "id": "openai/gpt-5.6-luna",
@@ -5236,7 +5310,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.6-luna:batch": {
       "id": "openai/gpt-5.6-luna:batch",
@@ -5273,7 +5355,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.6-terra-pro": {
       "id": "openai/gpt-5.6-terra-pro",
@@ -5312,7 +5402,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.6-terra-pro:batch": {
       "id": "openai/gpt-5.6-terra-pro:batch",
@@ -5349,7 +5440,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.6-terra": {
       "id": "openai/gpt-5.6-terra",
@@ -5388,7 +5480,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.6-terra:batch": {
       "id": "openai/gpt-5.6-terra:batch",
@@ -5425,7 +5525,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.6-sol-pro": {
       "id": "openai/gpt-5.6-sol-pro",
@@ -5464,7 +5572,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.6-sol-pro:batch": {
       "id": "openai/gpt-5.6-sol-pro:batch",
@@ -5502,7 +5611,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.6-sol": {
       "id": "openai/gpt-5.6-sol",
@@ -5541,7 +5651,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.6-sol:batch": {
       "id": "openai/gpt-5.6-sol:batch",
@@ -5579,7 +5697,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh", "max"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "xai/grok-4.5": {
       "id": "xai/grok-4.5",
@@ -7524,7 +7650,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["medium", "high", "xhigh"],
+        "defaultValue": "high",
+        "canDisable": false
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.5-pro:batch": {
       "id": "openai/gpt-5.5-pro:batch",
@@ -7560,7 +7694,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["medium", "high", "xhigh"],
+        "defaultValue": "high",
+        "canDisable": false
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.5": {
       "id": "openai/gpt-5.5",
@@ -7598,7 +7740,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.5:batch": {
       "id": "openai/gpt-5.5:batch",
@@ -7635,7 +7785,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
+        "defaultValue": "medium",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "deepseek/deepseek-v4-pro": {
       "id": "deepseek/deepseek-v4-pro",
@@ -7876,7 +8034,8 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": true,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "outputTokensParameter": "max_completion_tokens"
     },
     "~anthropic/claude-opus-latest": {
       "id": "~anthropic/claude-opus-latest",
@@ -8546,7 +8705,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
+        "defaultValue": "none",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.4-nano:batch": {
       "id": "openai/gpt-5.4-nano:batch",
@@ -8583,7 +8750,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
+        "defaultValue": "none",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.4-mini": {
       "id": "openai/gpt-5.4-mini",
@@ -8621,7 +8796,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
+        "defaultValue": "none",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.4-mini:batch": {
       "id": "openai/gpt-5.4-mini:batch",
@@ -8658,7 +8841,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
+        "defaultValue": "none",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "mistralai/mistral-small-2603": {
       "id": "mistralai/mistral-small-2603",
@@ -8898,7 +9089,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["medium", "high", "xhigh"],
+        "defaultValue": "medium",
+        "canDisable": false
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.4-pro:batch": {
       "id": "openai/gpt-5.4-pro:batch",
@@ -8934,7 +9133,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["medium", "high", "xhigh"],
+        "defaultValue": "medium",
+        "canDisable": false
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.4": {
       "id": "openai/gpt-5.4",
@@ -8972,7 +9179,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
+        "defaultValue": "none",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.4:batch": {
       "id": "openai/gpt-5.4:batch",
@@ -9009,7 +9224,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["none", "low", "medium", "high", "xhigh"],
+        "defaultValue": "none",
+        "canDisable": true
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "inception/mercury-2": {
       "id": "inception/mercury-2",
@@ -9440,7 +9663,8 @@
         "allowedValues": ["none", "low", "medium", "high", "xhigh"],
         "defaultValue": "none",
         "canDisable": true
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "aion-labs/aion-2.0": {
       "id": "aion-labs/aion-2.0",
@@ -10334,7 +10558,8 @@
         "allowedValues": ["none", "low", "medium", "high", "xhigh"],
         "defaultValue": "none",
         "canDisable": true
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "bytedance-seed/seed-1.6-flash": {
       "id": "bytedance-seed/seed-1.6-flash",
@@ -10667,7 +10892,8 @@
         "allowedValues": ["none", "low", "medium", "high", "xhigh"],
         "defaultValue": "none",
         "canDisable": true
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.2-pro": {
       "id": "openai/gpt-5.2-pro",
@@ -10710,7 +10936,8 @@
         "allowedValues": ["high"],
         "defaultValue": "high",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.2-pro:batch": {
       "id": "openai/gpt-5.2-pro:batch",
@@ -10753,7 +10980,8 @@
         "allowedValues": ["high"],
         "defaultValue": "high",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.2": {
       "id": "openai/gpt-5.2",
@@ -10798,7 +11026,8 @@
         "allowedValues": ["none", "low", "medium", "high", "xhigh"],
         "defaultValue": "none",
         "canDisable": true
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.2:batch": {
       "id": "openai/gpt-5.2:batch",
@@ -10842,7 +11071,8 @@
         "allowedValues": ["none", "low", "medium", "high", "xhigh"],
         "defaultValue": "none",
         "canDisable": true
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "mistralai/devstral-2512": {
       "id": "mistralai/devstral-2512",
@@ -11020,7 +11250,8 @@
         "allowedValues": ["none", "low", "medium", "high", "xhigh"],
         "defaultValue": "none",
         "canDisable": true
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "amazon/nova-2-lite-v1": {
       "id": "amazon/nova-2-lite-v1",
@@ -11426,7 +11657,8 @@
         "allowedValues": ["none", "low", "medium", "high"],
         "defaultValue": "none",
         "canDisable": true
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.1:batch": {
       "id": "openai/gpt-5.1:batch",
@@ -11470,7 +11702,8 @@
         "allowedValues": ["none", "low", "medium", "high"],
         "defaultValue": "none",
         "canDisable": true
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.1-codex": {
       "id": "openai/gpt-5.1-codex",
@@ -11514,7 +11747,8 @@
         "allowedValues": ["none", "low", "medium", "high"],
         "defaultValue": "none",
         "canDisable": true
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5.1-codex-mini": {
       "id": "openai/gpt-5.1-codex-mini",
@@ -11558,7 +11792,8 @@
         "allowedValues": ["none", "low", "medium", "high"],
         "defaultValue": "none",
         "canDisable": true
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "moonshotai/kimi-k2-thinking": {
       "id": "moonshotai/kimi-k2-thinking",
@@ -11821,7 +12056,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "anthropic/claude-haiku-4-5": {
       "id": "anthropic/claude-haiku-4-5",
@@ -11990,7 +12226,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "gemini/gemini-2.5-flash-image": {
       "id": "gemini/gemini-2.5-flash-image",
@@ -12157,7 +12394,8 @@
         "allowedValues": ["high"],
         "defaultValue": "high",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5-pro:batch": {
       "id": "openai/gpt-5-pro:batch",
@@ -12200,7 +12438,8 @@
         "allowedValues": ["high"],
         "defaultValue": "high",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "z-ai/glm-4.6": {
       "id": "z-ai/glm-4.6",
@@ -12854,7 +13093,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5:batch": {
       "id": "openai/gpt-5:batch",
@@ -12898,7 +13138,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5-mini": {
       "id": "openai/gpt-5-mini",
@@ -12943,7 +13184,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5-mini:batch": {
       "id": "openai/gpt-5-mini:batch",
@@ -12987,7 +13229,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5-nano": {
       "id": "openai/gpt-5-nano",
@@ -13032,7 +13275,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-5-nano:batch": {
       "id": "openai/gpt-5-nano:batch",
@@ -13076,7 +13320,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-oss-120b": {
       "id": "openai/gpt-oss-120b",
@@ -14092,7 +14337,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "gemini/gemini-2.5-pro-preview": {
       "id": "gemini/gemini-2.5-pro-preview",
@@ -14415,7 +14661,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["low", "medium", "high"],
+        "defaultValue": "medium",
+        "canDisable": false
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/o3": {
       "id": "openai/o3",
@@ -14453,7 +14707,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/o3:batch": {
       "id": "openai/o3:batch",
@@ -14491,7 +14746,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/o4-mini": {
       "id": "openai/o4-mini",
@@ -14522,7 +14778,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["low", "medium", "high"],
+        "defaultValue": "medium",
+        "canDisable": false
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/o4-mini:batch": {
       "id": "openai/o4-mini:batch",
@@ -14553,7 +14817,15 @@
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
-      "supportsAudioOutput": false
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "reasoning_effort",
+        "allowedValues": ["low", "medium", "high"],
+        "defaultValue": "medium",
+        "canDisable": false
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/gpt-4.1": {
       "id": "openai/gpt-4.1",
@@ -14885,7 +15157,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "mistralai/mistral-small-3.1-24b-instruct": {
       "id": "mistralai/mistral-small-3.1-24b-instruct",
@@ -15314,7 +15587,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "aion-labs/aion-rp-llama-3.1-8b": {
       "id": "aion-labs/aion-rp-llama-3.1-8b",
@@ -15449,7 +15723,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "openai/o3-mini:batch": {
       "id": "openai/o3-mini:batch",
@@ -15491,7 +15766,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "mistralai/mistral-small-24b-instruct-2501": {
       "id": "mistralai/mistral-small-24b-instruct-2501",
@@ -15695,7 +15971,8 @@
         "allowedValues": ["low", "medium", "high"],
         "defaultValue": "medium",
         "canDisable": false
-      }
+      },
+      "outputTokensParameter": "max_completion_tokens"
     },
     "cohere/command-r7b-12-2024": {
       "id": "cohere/command-r7b-12-2024",

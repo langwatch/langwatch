@@ -68,121 +68,151 @@ type playgroundProxyStream interface {
 
 // playgroundProxyDispatch builds the http.HandlerFunc that runs an
 // inbound /go/proxy/v1/* request through the dispatcher.
-func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
+func playgroundProxyDispatch(proxy PlaygroundProxy, catalog litellm.OutputTokensLookup) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-
-		cred, err := gatewayproxy.ParseCredentialFromHeaders(r.Header)
+		req, isStream, err := buildPlaygroundProxyRequest(r, catalog)
 		if err != nil {
-			writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
-				"reason": "missing_provider",
-			}, err))
+			var refused herr.E
+			if !errors.As(err, &refused) {
+				refused = herr.New(ctx, nlpgodomain.ErrBadRequest, nil, err)
+			}
+			writeHandlerError(ctx, w, refused)
 			return
 		}
-
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
-				"reason": "read_body",
-			}, err))
-			return
-		}
-
-		// model + stream are pulled from the body so we don't force the
-		// caller to duplicate that information in headers.
-		model, isStream, err := peekBodyMetadata(body)
-		if err != nil {
-			writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
-				"reason": "invalid_json_body",
-			}, err))
-			return
-		}
-		bareModel := gatewayproxy.BareModel(model)
-
-		// Rewrite body.model to the BARE id before dispatch. The TS
-		// callsites (Vercel AI SDK in modelProviders/utils.ts, the
-		// playground tRPC route, model.factory.ts) ship the body with
-		// `"model": "openai/gpt-5.2"` because the langwatch-internal
-		// "<provider>/<model>" form is what those callers think in. Bifrost
-		// raw-forwards OpenAI-shape bodies to OpenAI to preserve the
-		// prompt-prefix auto-cache (bifrost_parser.go:50-58), and OpenAI
-		// 400s on a model field with the langwatch prefix
-		// (`{"error":"invalid model ID"}`). The bare id matches what the
-		// internal-only llmexecutor.translatedModelOrInferred path already
-		// puts on the wire for runSignature, which is why runSignature
-		// works and /go/proxy/v1 didn't until this edit.
-		if model != "" && bareModel != model {
-			body, err = rewriteBodyModel(body, bareModel)
-			if err != nil {
-				writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
-					"reason": "rewrite_body_model",
-				}, err))
-				return
-			}
-		}
-
-		// OpenAI's reasoning-class models (gpt-5*, o1/o3/o4) reject
-		// `max_tokens` ("Unsupported parameter: 'max_tokens' is not
-		// supported with this model. Use 'max_completion_tokens'
-		// instead.") and pin temperature to 1.0. The internal
-		// runSignature path already runs the same migration via
-		// litellm.ApplyReasoningOverrides; the playground proxy was
-		// raw-forwarding bodies authored by Vercel AI SDK / playground
-		// callers that emit `max_tokens`. Mirror the executor here so
-		// /go/proxy/v1/chat/completions doesn't 400 on Studio Monaco
-		// code-completion / playground / model.factory.ts traffic.
-		if litellm.IsReasoningModel(bareModel) {
-			body, err = applyReasoningOverridesToBody(body, bareModel)
-			if err != nil {
-				writeHandlerError(ctx, w, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
-					"reason": "apply_reasoning_overrides",
-				}, err))
-				return
-			}
-		}
-
-		reqType, httpPath := classifyPath(r.URL.Path)
-
-		req := playgroundProxyRequest{
-			Type:       reqType,
-			Model:      bareModel,
-			Body:       body,
-			Credential: cred,
-			HTTPPath:   httpPath,
-		}
-
-		// /v1beta/* (Gemini-native generateContent / streamGenerateContent
-		// and friends, called by gemini-cli + the Google GenAI SDK) flows
-		// through the dispatcher's passthrough mode rather than the typed
-		// RequestType branches. Capture the inbound HTTP shape (method,
-		// query, forwarded headers) so the dispatcher can reconstruct the
-		// upstream call. Auth headers (x-litellm-* — already parsed into
-		// Credential above; Authorization/X-Auth-Token — never expected
-		// from a /v1beta caller in our deployment shape) are stripped so
-		// they aren't double-applied or leaked to the upstream provider.
-		if reqType == domain.RequestTypePassthrough {
-			req.HTTPMethod = r.Method
-			req.HTTPRawQuery = r.URL.RawQuery
-			req.HTTPHeaders = filterPassthroughHeaders(r.Header)
-			// Gemini-native streaming endpoints encode the stream/sync
-			// distinction in the URL action suffix (e.g.
-			// `:streamGenerateContent` vs `:generateContent`), NOT in the
-			// OpenAI-style `"stream": true` body flag. peekBodyMetadata
-			// only saw the latter, so streamGenerateContent calls
-			// (gemini-cli + Google GenAI SDK) used to fall through to
-			// handleSync and discard the SSE deltas. Promote isStream
-			// when the path resolves to a stream-typed action.
-			if isPassthroughStreamPath(req.HTTPPath) {
-				isStream = true
-			}
-		}
-
 		if isStream {
 			handleStream(ctx, w, proxy, req)
 			return
 		}
 		handleSync(ctx, w, proxy, req)
 	}
+}
+
+// buildPlaygroundProxyRequest reads an inbound /go/proxy/v1/* request into
+// the dispatcher's shape, and whether it streams. Every error is a herr.E 400.
+func buildPlaygroundProxyRequest(r *http.Request, catalog litellm.OutputTokensLookup) (playgroundProxyRequest, bool, error) {
+	ctx := r.Context()
+
+	cred, err := gatewayproxy.ParseCredentialFromHeaders(r.Header)
+	if err != nil {
+		return playgroundProxyRequest{}, false, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+			"reason": "missing_provider",
+		}, err)
+	}
+
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		return playgroundProxyRequest{}, false, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+			"reason": "read_body",
+		}, err)
+	}
+
+	prepared, err := preparePlaygroundBody(ctx, raw, catalog)
+	if err != nil {
+		return playgroundProxyRequest{}, false, err
+	}
+
+	reqType, httpPath := classifyPath(r.URL.Path)
+
+	req := playgroundProxyRequest{
+		Type:       reqType,
+		Model:      prepared.bareModel,
+		Body:       prepared.body,
+		Credential: cred,
+		HTTPPath:   httpPath,
+	}
+	isStream := prepared.isStream
+
+	// /v1beta/* (Gemini-native generateContent / streamGenerateContent
+	// and friends, called by gemini-cli + the Google GenAI SDK) flows
+	// through the dispatcher's passthrough mode rather than the typed
+	// RequestType branches. Capture the inbound HTTP shape (method,
+	// query, forwarded headers) so the dispatcher can reconstruct the
+	// upstream call. Auth headers (x-litellm-* — already parsed into
+	// Credential above; Authorization/X-Auth-Token — never expected
+	// from a /v1beta caller in our deployment shape) are stripped so
+	// they aren't double-applied or leaked to the upstream provider.
+	if reqType == domain.RequestTypePassthrough {
+		req.HTTPMethod = r.Method
+		req.HTTPRawQuery = r.URL.RawQuery
+		req.HTTPHeaders = filterPassthroughHeaders(r.Header)
+		// Gemini-native streaming endpoints encode the stream/sync
+		// distinction in the URL action suffix (e.g.
+		// `:streamGenerateContent` vs `:generateContent`), NOT in the
+		// OpenAI-style `"stream": true` body flag. peekBodyMetadata
+		// only saw the latter, so streamGenerateContent calls
+		// (gemini-cli + Google GenAI SDK) used to fall through to
+		// handleSync and discard the SSE deltas. Promote isStream
+		// when the path resolves to a stream-typed action.
+		if isPassthroughStreamPath(req.HTTPPath) {
+			isStream = true
+		}
+	}
+	return req, isStream, nil
+}
+
+// playgroundBody is an inbound request body readied for dispatch.
+type playgroundBody struct {
+	body      []byte
+	bareModel string
+	isStream  bool
+}
+
+// preparePlaygroundBody reads the model and stream flag from the body (so
+// the caller doesn't duplicate them in headers), sends the bare model id and
+// applies the reasoning overrides. Every error is a herr.E 400.
+func preparePlaygroundBody(ctx context.Context, body []byte, catalog litellm.OutputTokensLookup) (playgroundBody, error) {
+	model, isStream, err := peekBodyMetadata(body)
+	if err != nil {
+		return playgroundBody{}, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+			"reason": "invalid_json_body",
+		}, err)
+	}
+	bareModel := gatewayproxy.BareModel(model)
+
+	// Rewrite body.model to the BARE id before dispatch. The TS
+	// callsites (Vercel AI SDK in modelProviders/utils.ts, the
+	// playground tRPC route, model.factory.ts) ship the body with
+	// `"model": "openai/gpt-5.2"` because the langwatch-internal
+	// "<provider>/<model>" form is what those callers think in. Bifrost
+	// raw-forwards OpenAI-shape bodies to OpenAI to preserve the
+	// prompt-prefix auto-cache (bifrost_parser.go:50-58), and OpenAI
+	// 400s on a model field with the langwatch prefix
+	// (`{"error":"invalid model ID"}`). The bare id matches what the
+	// internal-only llmexecutor.translatedModelOrInferred path already
+	// puts on the wire for runSignature, which is why runSignature
+	// works and /go/proxy/v1 didn't until this edit.
+	if model != "" && bareModel != model {
+		body, err = rewriteBodyModel(body, bareModel)
+		if err != nil {
+			return playgroundBody{}, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+				"reason": "rewrite_body_model",
+			}, err)
+		}
+	}
+
+	// OpenAI's reasoning-class models (gpt-5*, o1/o3/o4) reject
+	// `max_tokens` ("Unsupported parameter: 'max_tokens' is not
+	// supported with this model. Use 'max_completion_tokens'
+	// instead.") and pin temperature to 1.0. The internal
+	// runSignature path already runs the same migration via
+	// litellm.ApplyReasoningOverrides; the playground proxy was
+	// raw-forwarding bodies authored by Vercel AI SDK / playground
+	// callers that emit `max_tokens`. Mirror the executor here so
+	// /go/proxy/v1/chat/completions doesn't 400 on Studio Monaco
+	// code-completion / playground / model.factory.ts traffic. The
+	// model catalog decides the limit's name for every model it
+	// marks, so it is asked by the provider-prefixed id.
+	overrideID := reasoningOverridesModelID(model, bareModel, catalog)
+	if litellm.NeedsReasoningOverrides(overrideID, catalog) {
+		body, err = applyReasoningOverridesToBody(body, overrideID, catalog)
+		if err != nil {
+			return playgroundBody{}, herr.New(ctx, nlpgodomain.ErrBadRequest, herr.M{
+				"reason": "apply_reasoning_overrides",
+			}, err)
+		}
+	}
+	return playgroundBody{body: body, bareModel: bareModel, isStream: isStream}, nil
 }
 
 // isPassthroughStreamPath reports whether a /v1beta-family relative
@@ -228,12 +258,24 @@ func rewriteBodyModel(body []byte, newModel string) ([]byte, error) {
 	return json.Marshal(raw)
 }
 
+// reasoningOverridesModelID is the id the reasoning overrides are decided on:
+// the provider-prefixed id when the catalog carries it, else the bare id, whose
+// basename the name rule reads (`custom/openai/gpt-5` is `openai/gpt-5` bare).
+func reasoningOverridesModelID(model, bareModel string, catalog litellm.OutputTokensLookup) string {
+	if catalog != nil {
+		if _, known := catalog.OutputTokensParameter(model); known {
+			return model
+		}
+	}
+	return bareModel
+}
+
 // applyReasoningOverridesToBody migrates max_tokens → max_completion_tokens
 // and pins temperature to 1.0 for OpenAI reasoning-class models, mirroring
 // the in-process llmexecutor path. The actual rewrite logic lives in
 // litellm.ApplyReasoningOverrides (translator.go) — this is the
 // raw-bytes-in / raw-bytes-out wrapper for the playground proxy.
-func applyReasoningOverridesToBody(body []byte, modelID string) ([]byte, error) {
+func applyReasoningOverridesToBody(body []byte, modelID string, catalog litellm.OutputTokensLookup) ([]byte, error) {
 	if len(body) == 0 {
 		return body, nil
 	}
@@ -241,7 +283,7 @@ func applyReasoningOverridesToBody(body []byte, modelID string) ([]byte, error) 
 	if err := json.Unmarshal(body, &generic); err != nil {
 		return nil, err
 	}
-	litellm.ApplyReasoningOverrides(modelID, generic)
+	litellm.ApplyReasoningOverrides(modelID, generic, catalog)
 	return json.Marshal(generic)
 }
 

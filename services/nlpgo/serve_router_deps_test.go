@@ -240,3 +240,22 @@ func TestLoadConfig_SurroundingWhitespaceIsTrimmedFromTheSecret(t *testing.T) {
 		t.Errorf("InternalSecret = %q; want the trimmed value", cfg.InternalSecret)
 	}
 }
+
+// The playground reads the catalog from the router's dependencies, so the
+// one Serve was handed must reach them.
+func TestNewRouterDeps_CarriesThePlaygroundModelCatalog(t *testing.T) {
+	catalog := stubCatalog{}
+
+	got := newRouterDeps(routerDepsInput{
+		App: app.New(), Deps: newTestDeps(t), Cfg: defaultConfig(), Version: "test",
+		Playground: PlaygroundWiring{ModelCatalog: catalog},
+	})
+
+	if got.ModelCatalog != catalog {
+		t.Errorf("ModelCatalog = %v; want the catalog Serve was handed", got.ModelCatalog)
+	}
+}
+
+type stubCatalog struct{}
+
+func (stubCatalog) OutputTokensParameter(string) (string, bool) { return "", false }
