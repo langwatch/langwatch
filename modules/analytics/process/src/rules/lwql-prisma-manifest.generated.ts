@@ -326,6 +326,42 @@ export interface LwqlPrismaRows {
     readonly pendingSsoGrantId: "String?";
     readonly membershipStamp: "String";
   };
+  readonly SeatRequest: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly email: "String";
+    readonly userId: "String?";
+    readonly name: "String?";
+    readonly status: "String";
+    readonly source: "String";
+    readonly idpRefused: "Boolean";
+    readonly idpKind: "String?";
+    readonly salesNotifiedAt: "DateTime?";
+    readonly openedAt: "DateTime";
+    readonly resolvedAt: "DateTime?";
+    readonly resolvedByUserId: "String?";
+    readonly seatPendingSince: "DateTime?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly OrganizationSeatLease: {
+    readonly organizationId: "String";
+    readonly holder: "String";
+    readonly expiresAt: "DateTime";
+    readonly createdAt: "DateTime";
+  };
+  readonly OrganizationAccessNotice: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly kind: "String";
+    readonly email: "String";
+    readonly name: "String?";
+    readonly idp: "String?";
+    readonly dayKey: "String";
+    readonly idpRefused: "Boolean";
+    readonly createdAt: "DateTime";
+    readonly mailedAt: "DateTime?";
+  };
   readonly Team: {
     readonly id: "String";
     readonly name: "String";

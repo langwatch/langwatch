@@ -6,7 +6,7 @@ import {
 import { nowInstant, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import { OrganizationSeatRepository } from "../organization-seat.repository.ts";
+import { OrganizationSeatRepository, type SeatLease } from "../organization-seat.repository.ts";
 import type {
   MemoryOrganizationDatabase,
   MemoryOrganizationInviteRow,
@@ -59,6 +59,61 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
 
   private constructor(private readonly memory: MemoryOrganizationDatabase) {
     super();
+  }
+
+  /** The tail of each organization's queue; a hold starts once the one before it settled. */
+  readonly #seatQueues = new Map<string, Promise<unknown>>();
+
+  async withSeatLock<T>({
+    organizationId,
+    work,
+  }: {
+    organizationId: string;
+    work: (lease: SeatLease) => Promise<T>;
+  }): Promise<T> {
+    const previous = this.#seatQueues.get(organizationId) ?? Promise.resolve();
+    // The queue never hands a hold to another change, so the lease is always still held.
+    const held = previous.then(() => work({ assertHeld: async () => {} }));
+    const settled = held.catch(() => undefined);
+    this.#seatQueues.set(organizationId, settled);
+    try {
+      return await held;
+    } finally {
+      if (this.#seatQueues.get(organizationId) === settled) this.#seatQueues.delete(organizationId);
+    }
+  }
+
+  /** Each held lease's way to let the next hold on its organization start. */
+  readonly #leaseHolders = new Map<string, () => void>();
+
+  /** Joins the same queue `withSeatLock` holds, until the holder releases. */
+  async acquireSeatLease({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ holder: string; renewEveryMs: number }> {
+    const previous = this.#seatQueues.get(organizationId) ?? Promise.resolve();
+    let release: () => void = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.#seatQueues.set(
+      organizationId,
+      previous.then(() => released),
+    );
+    await previous;
+    const holder = `memory-lease-${this.#leaseHolders.size + 1}-${organizationId}`;
+    this.#leaseHolders.set(holder, release);
+    return { holder, renewEveryMs: 5_000 };
+  }
+
+  async renewSeatLease({ holder }: { organizationId: string; holder: string }): Promise<boolean> {
+    return this.#leaseHolders.has(holder);
+  }
+
+  async releaseSeatLease({ holder }: { organizationId: string; holder: string }): Promise<void> {
+    this.#leaseHolders.get(holder)?.();
+    this.#leaseHolders.delete(holder);
   }
 
   async getMemberCount(organizationId: string): Promise<number> {

@@ -306,30 +306,31 @@ export class InviteCreationService {
       organizationId,
     });
 
-    await this.checkLicenseLimits({
+    // Phase 1, under the seat lock: count, validate and write, no side effects.
+    const createdRecords = await this.deps.seats.withSeatLock({
       organizationId,
-      newInvites: invites.map((invite) => ({
-        role: invite.role,
-        teams: invite.teams,
-      })),
-      user,
-    });
-
-    const validInvites = await this.validatedInvites({ organizationId, invites, isStrict });
-
-    // Phase 1: DB operations in a transaction, no side effects.
-    const createdRecords = await this.invites.withTransaction(
-      (transaction) =>
-        this.persistInvites({
-          transaction,
-          invites: validInvites.map((invite) => ({ ...invite, requestedBy: requestedBy ?? null })),
-          organization,
-        }),
-      {
-        timeoutMs: INVITE_BATCH_TXN_TIMEOUT_MS,
-        maxWaitMs: INVITE_BATCH_TXN_MAX_WAIT_MS,
+      work: async (lease) => {
+        await this.checkLicenseLimits({
+          organizationId,
+          newInvites: invites.map((invite) => ({ role: invite.role, teams: invite.teams })),
+          user,
+        });
+        const validInvites = await this.validatedInvites({ organizationId, invites, isStrict });
+        await lease.assertHeld();
+        return this.invites.withTransaction(
+          (transaction) =>
+            this.persistInvites({
+              transaction,
+              invites: validInvites.map((invite) => ({
+                ...invite,
+                requestedBy: requestedBy ?? null,
+              })),
+              organization,
+            }),
+          { timeoutMs: INVITE_BATCH_TXN_TIMEOUT_MS, maxWaitMs: INVITE_BATCH_TXN_MAX_WAIT_MS },
+        );
       },
-    );
+    });
 
     // Phase 2: emails outside the transaction, so a provider failure can
     // never roll back a committed invite.

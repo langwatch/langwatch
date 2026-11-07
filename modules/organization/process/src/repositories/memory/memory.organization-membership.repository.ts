@@ -1,4 +1,4 @@
-import { GrantScopeTier } from "@langwatch/authz-contract";
+import { BindingMissingError, GrantScopeTier } from "@langwatch/authz-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import { readJoinerRole } from "@langwatch/identity-contract";
 import {
@@ -595,6 +595,24 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return { outcome: "created", seat, pending };
   }
 
+  async findMembershipStates({ userId }: { userId: string }): Promise<
+    {
+      organizationId: string;
+      organizationName: string;
+      role: OrganizationUserRole;
+      disabled: boolean;
+    }[]
+  > {
+    return this.memory.organizationUsers
+      .filter((row) => row.userId === userId)
+      .map((row) => ({
+        organizationId: row.organizationId,
+        organizationName: this.memory.organizations.get(row.organizationId)?.name ?? "",
+        role: row.role,
+        disabled: row.disabledAt !== null,
+      }));
+  }
+
   async countMembershipsForUser({ userId }: { userId: string }): Promise<number> {
     return this.memory.organizationUsers.filter((row) => row.userId === userId).length;
   }
@@ -698,10 +716,30 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     });
   }
 
+  private assertCustomRolesAssignable({
+    organizationId,
+    updates,
+  }: {
+    organizationId: string;
+    updates: UpdateMemberRoleInput["effectiveTeamRoleUpdates"];
+  }): void {
+    for (const update of updates) {
+      if (!isCustomRole(update.role) || !update.customRoleId) continue;
+      if (!this.isAssignable({ customRoleId: update.customRoleId, organizationId })) {
+        throw new NotFoundError("custom_role_not_found", {
+          resource: "CustomRole",
+          id: update.customRoleId,
+        });
+      }
+    }
+  }
+
   async updateMemberRole(input: UpdateMemberRoleInput): Promise<UpdateMemberRoleResult> {
     const { organizationId, userId, role, effectiveTeamRoleUpdates } = input;
     const row = this.membershipRow({ organizationId, userId });
     if (!row) throw new MemberNotFoundError(userId);
+    // As the ledger does: a role's grants land only on a live membership.
+    if (row.disabledAt) throw new BindingMissingError();
 
     if (isAdminDemotion({ currentRole: row.role, role })) {
       if (
@@ -712,15 +750,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
         throw new CannotDemoteLastAdminError();
       }
     }
-    for (const update of effectiveTeamRoleUpdates) {
-      if (!isCustomRole(update.role) || !update.customRoleId) continue;
-      if (!this.isAssignable({ customRoleId: update.customRoleId, organizationId })) {
-        throw new NotFoundError("custom_role_not_found", {
-          resource: "CustomRole",
-          id: update.customRoleId,
-        });
-      }
-    }
+    this.assertCustomRolesAssignable({ organizationId, updates: effectiveTeamRoleUpdates });
     row.role = role;
     row.updatedAt = nowInstant();
     this.applyDeveloperSeat({ organizationId, userId, role });

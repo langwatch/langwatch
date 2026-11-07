@@ -70,6 +70,7 @@ function screenLoader({
     if (screen.requires === void 0 && screen.flags === void 0) return loaded;
     const guard = withUiPageGuard({
       ...(screen.requires === void 0 ? {} : { permission: screen.requires }),
+      ...(screen.requiresAt === void 0 ? {} : { permissionAt: screen.requiresAt }),
       ...(screen.flags === void 0 ? {} : { flags: screen.flags }),
       fallbacks: UI_PAGE_FALLBACKS,
     });

@@ -3547,6 +3547,306 @@
       ]
     },
     {
+      "name": "SeatRequest",
+      "tableName": "SeatRequest",
+      "documentation": "A person asked for a full seat the organization had no room for (modules/organization/specs/\nseat-requests.feature). One row per organization and address; reopening reuses the row.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "email",
+          "columnName": "email",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Lowercased address of the person asking."
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Null when only the address is known (a sign-in the identity provider refused)."
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "status",
+          "columnName": "status",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "OPEN | APPROVED | DECLINED"
+        },
+        {
+          "name": "source",
+          "columnName": "source",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "pending | lite | idp_refused: how the person was left when the request opened."
+        },
+        {
+          "name": "idpRefused",
+          "columnName": "idpRefused",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The identity provider also refused this person's sign-in."
+        },
+        {
+          "name": "idpKind",
+          "columnName": "idpKind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "okta | entra | google | onelogin | jumpcloud | ping | auth0 | oidc | saml"
+        },
+        {
+          "name": "salesNotifiedAt",
+          "columnName": "salesNotifiedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When sales were told about this request; reset when it reopens."
+        },
+        {
+          "name": "openedAt",
+          "columnName": "openedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "resolvedAt",
+          "columnName": "resolvedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "resolvedByUserId",
+          "columnName": "resolvedByUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "seatPendingSince",
+          "columnName": "seatPendingSince",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Set when an approval claims the request, cleared once its seat is given; an approval\nstill pending long after is one whose seat never landed, and is reopened."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "OrganizationSeatLease",
+      "tableName": "OrganizationSeatLease",
+      "documentation": "Held by the one seat-taking write running on an organization (seat-requests.feature). A\nrow past expiresAt is free to take; a holder deletes its own row when its write is done.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "holder",
+          "columnName": "holder",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Random per hold, so a release deletes only its own lease."
+        },
+        {
+          "name": "expiresAt",
+          "columnName": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "OrganizationAccessNotice",
+      "tableName": "OrganizationAccessNotice",
+      "documentation": "The mail log for seat requests and refused sign-ins: at most one row per organization,\nkind, address and UTC day, each mailed at once.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "kind",
+          "columnName": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "seat_request | idp_refused"
+        },
+        {
+          "name": "email",
+          "columnName": "email",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "idp",
+          "columnName": "idp",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "dayKey",
+          "columnName": "dayKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "UTC day the notice was recorded on, YYYY-MM-DD."
+        },
+        {
+          "name": "idpRefused",
+          "columnName": "idpRefused",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Whether the seat request it announces was also refused by the identity provider."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "mailedAt",
+          "columnName": "mailedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Set once the notice was handed to the mailer; null if a send never started."
+        }
+      ]
+    },
+    {
       "name": "Team",
       "tableName": "Team",
       "documentation": "",

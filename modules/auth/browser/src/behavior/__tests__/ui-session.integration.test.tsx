@@ -263,13 +263,15 @@ describe("given a screen that asks what the reader may do", () => {
       expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(1);
     });
 
-    it("asks once, about the resolved project, as main did (scope knot Q2)", async () => {
+    /** @scenario "The project page's one grant read carries the organization's permissions too" */
+    it("sends exactly one grant read on a project page, about the resolved project, as main did", async () => {
       const { transport, callsTo } = recordingTransport();
 
       const view = renderSession({ transport, authClient: signedInAsJane });
 
       await waitFor(() => expect(view.getByTestId("user").textContent).toBe(JANE));
       await waitFor(() => expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE)).toHaveLength(1));
+      await new Promise((settle) => setTimeout(settle, 50));
       expect(callsTo(UI_EFFECTIVE_PERMISSIONS_PROCEDURE).map((call) => call.input)).toEqual([
         { projectId: "proj-app" },
       ]);

@@ -150,6 +150,12 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   OrganizationUser: {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && hasUserBound(clause),
   },
+  // "Which organizations hold this person waiting" is a READ bounded by the named user.
+  SeatRequest: {
+    extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && hasUserBound(clause),
+  },
+  OrganizationAccessNotice: {},
+  OrganizationSeatLease: {},
   Team: {},
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it

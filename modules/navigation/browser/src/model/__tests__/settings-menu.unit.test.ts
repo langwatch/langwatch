@@ -115,6 +115,17 @@ describe("given a lite member", () => {
       expect(hrefs).toContain("/settings/model-providers");
       expect(hrefs).not.toContain("/settings/authentication");
     });
+
+    /** @scenario "Billing is not a seat" */
+    it("offers the billing pages to a lite member who holds Billing", () => {
+      const hrefs = hrefsIn({
+        isLiteMember: true,
+        isSaaS: true,
+        hasPermission: (p) => p === "subscription:manage",
+      });
+      expect(hrefs).toContain("/settings/usage");
+      expect(hrefs).toContain("/settings/subscription");
+    });
   });
 });
 
@@ -126,7 +137,7 @@ describe("given an enterprise plan", () => {
       expect(hrefs).not.toContain("/settings/role-bindings");
     });
 
-    it("offers Directory on every plan, in place of Members, Teams, Groups and SCIM", () => {
+    it("offers Users on every plan, in place of Members, Teams, Groups and SCIM", () => {
       for (const enterprisePlan of ["pending", "locked", "included"] as const) {
         const hrefs = hrefsIn({ enterprisePlan });
         expect(hrefs).toContain("/settings/directory");
@@ -207,8 +218,11 @@ describe("given a plan that lacks Enterprise", () => {
       }
     });
 
-    it("hides them from a lite member", () => {
-      expect(lockedHrefsIn({ hasPermission: () => true, isLiteMember: true })).toEqual([]);
+    /** @scenario "A Lite Member lists members" */
+    it("keeps Roles & access for a lite member, read-only, and hides the audit log", () => {
+      expect(lockedHrefsIn({ hasPermission: () => true, isLiteMember: true })).toEqual([
+        "/settings/roles",
+      ]);
     });
   });
 });

@@ -12,6 +12,7 @@ export type InviteAssignableRoles = Pick<RoleApi, "filterAssignableRoles">;
 import type { OrganizationInviteMail } from "../channels/organization-invite-mail.channel.ts";
 import type { InviteSendThrottleService } from "../features/invite/services/invite-send-throttle.service.ts";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
+import type { SeatLease } from "../repositories/organization-seat.repository.ts";
 
 /**
  * What an organization's seats currently cost it, and what a lite seat is - two counts and one
@@ -28,6 +29,11 @@ export interface OrganizationInviteSeatCensus {
    * lite seat from being sold the permissions of a full one.
    */
   isViewOnlyCustomRole(permissions: string[]): boolean;
+  /** The organization's seat lock, held while a batch is counted and written. */
+  withSeatLock<T>(input: {
+    organizationId: string;
+    work: (lease: SeatLease) => Promise<T>;
+  }): Promise<T>;
 }
 
 /**

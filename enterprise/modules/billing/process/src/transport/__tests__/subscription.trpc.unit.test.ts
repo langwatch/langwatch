@@ -104,20 +104,26 @@ describe("given the mounted subscription router", () => {
   });
 });
 
-describe("given a caller who may read the organization but not upgrade it", () => {
-  describe("when a checkout is asked for", () => {
-    it("refuses the checkout and still answers the read", async () => {
+describe("given a caller who may read the organization but not manage it", () => {
+  describe("when a change to what the organization pays is asked for", () => {
+    /** @scenario "A Billing member approves seat requests but cannot invite" */
+    it("refuses the change and the invoices, and still answers the read", async () => {
       const viewer = routerFor((permission) => permission === "organization:view").createCaller({
         actor: { id: "user_ana" },
         email: "ana@acme.com",
       });
 
-      listInvoices.mockResolvedValue([]);
+      findLastNonCancelledSubscription.mockResolvedValue(null);
 
       await expect(
         viewer.create({ organizationId: ORGANIZATION, baseUrl: "https://app", plan: "PRO" }),
       ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
-      await expect(viewer.listInvoices({ organizationId: ORGANIZATION })).resolves.toEqual([]);
+      await expect(viewer.listInvoices({ organizationId: ORGANIZATION })).rejects.toMatchObject({
+        cause: { code: "permission_denied" },
+      });
+      await expect(
+        viewer.getLastSubscription({ organizationId: ORGANIZATION }),
+      ).resolves.toBeNull();
       expect(createOrUpdateSubscription).not.toHaveBeenCalled();
     });
   });
@@ -186,6 +192,7 @@ describe("when a first checkout is started", () => {
       organizationId: ORGANIZATION,
     });
     expect(createOrUpdateSubscription).toHaveBeenCalledWith({
+      startedByUserId: "user_ana",
       organizationId: ORGANIZATION,
       baseUrl: "https://app",
       plan: "PRO",

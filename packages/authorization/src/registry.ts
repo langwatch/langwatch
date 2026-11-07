@@ -195,11 +195,21 @@ export const AUTHZ_RESOURCES = {
     actions: ["deploy"],
     scopes: ["project", "team", "organization"],
   },
-  // Starting a paid subscription. Every organization role holds it, so whoever
-  // has the card can pay; changing or cancelling a live one stays
-  // `organization:manage` (specs/licensing/subscription-permissions.feature).
+  // Starting a paid subscription (`upgrade`), and changing a live one: seats, the billing
+  // portal, invoices (`manage`). The Billing role holds both without taking a seat.
   subscription: {
-    actions: ["upgrade"],
+    actions: ["upgrade", "manage"],
+    scopes: ["organization"],
+  },
+  // Requests to approve a seat for someone the seat limit held back or admitted as Lite.
+  seatRequests: {
+    actions: ["view", "manage"],
+    scopes: ["organization"],
+  },
+  // The member directory and the roles each member holds. Every organization role reads it;
+  // changing it stays `organization:manage`.
+  members: {
+    actions: ["view"],
     scopes: ["organization"],
   },
 } as const satisfies Record<

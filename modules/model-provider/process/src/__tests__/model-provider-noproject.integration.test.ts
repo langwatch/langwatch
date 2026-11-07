@@ -95,6 +95,8 @@ describe.skipIf(!DB_URL)(
           credentialPolicy: ModelProviderKeysService.create(),
           catalog,
           connectionRateLimiter: noopConnectionRateLimiter,
+          // The generation ping is its own suite's; this one asks who reaches the catalog.
+          connectionPing: { verify: async ({ credential }: { credential: unknown }) => credential },
           onboardingDefaults: noopOnboardingDefaults,
           ids: idService,
           defaults: {} as never,

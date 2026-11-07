@@ -26,6 +26,9 @@ export const prismaTableCatalogue = {
   "JoinRequest": "JoinRequest",
   "TeamUser": "TeamUser",
   "OrganizationUser": "OrganizationUser",
+  "SeatRequest": "SeatRequest",
+  "OrganizationSeatLease": "OrganizationSeatLease",
+  "OrganizationAccessNotice": "OrganizationAccessNotice",
   "Team": "Team",
   "Organization": "Organization",
   "IssuedLicense": "IssuedLicense",
@@ -573,6 +576,42 @@ export const prismaModelFieldCatalogue = {
     "disabledAt",
     "pendingSsoGrantId",
     "membershipStamp"
+  ],
+  "SeatRequest": [
+    "id",
+    "organizationId",
+    "email",
+    "userId",
+    "name",
+    "status",
+    "source",
+    "idpRefused",
+    "idpKind",
+    "salesNotifiedAt",
+    "openedAt",
+    "resolvedAt",
+    "resolvedByUserId",
+    "seatPendingSince",
+    "createdAt",
+    "updatedAt"
+  ],
+  "OrganizationSeatLease": [
+    "organizationId",
+    "holder",
+    "expiresAt",
+    "createdAt"
+  ],
+  "OrganizationAccessNotice": [
+    "id",
+    "organizationId",
+    "kind",
+    "email",
+    "name",
+    "idp",
+    "dayKey",
+    "idpRefused",
+    "createdAt",
+    "mailedAt"
   ],
   "Team": [
     "id",
@@ -3231,6 +3270,9 @@ export const prismaRelationCatalogue = {
     "user": "User",
     "organization": "Organization"
   },
+  "SeatRequest": {},
+  "OrganizationSeatLease": {},
+  "OrganizationAccessNotice": {},
   "Team": {
     "members": "TeamUser",
     "organization": "Organization",

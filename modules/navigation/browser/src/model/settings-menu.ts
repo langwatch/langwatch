@@ -160,6 +160,8 @@ function organizationGroup({
   enterprisePlan,
   isLiteMember,
 }: SettingsMenuGates): SettingsMenuGroup {
+  // Whoever pays sees what they pay for, Lite seat or not (the Billing role).
+  const seesBilling = !isLiteMember || hasPermission("subscription:manage");
   return {
     id: "settings-organization",
     label: "Organization",
@@ -187,7 +189,7 @@ function organizationGroup({
       ...(!isLiteMember && hasPermission("sso:view")
         ? [{ label: "Authentication", href: "/settings/authentication", icon: LogIn }]
         : []),
-      ...(!isLiteMember ? [{ label: "Usage", href: "/settings/usage", icon: Gauge }] : []),
+      ...(seesBilling ? [{ label: "Usage", href: "/settings/usage", icon: Gauge }] : []),
       // Every member may upgrade, Lite included: whoever holds the card pays.
       ...(isSaaS
         ? [
@@ -198,9 +200,11 @@ function organizationGroup({
             },
           ]
         : []),
+      ...(seesBilling && !isSaaS
+        ? [{ label: "License", href: "/settings/license", icon: BadgeCheck }]
+        : []),
       ...(!isLiteMember && !isSaaS
         ? [
-            { label: "License", href: "/settings/license", icon: BadgeCheck },
             { label: "Connect", href: "/settings/connect", icon: Cloud },
             { label: "Checkup", href: "/settings/checkup", icon: Stethoscope },
           ]
@@ -209,7 +213,7 @@ function organizationGroup({
   };
 }
 
-function accessGroup({ enterprisePlan, isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
+function accessGroup({ enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-access",
     label: "People & access",
@@ -217,7 +221,7 @@ function accessGroup({ enterprisePlan, isLiteMember }: SettingsMenuGates): Setti
       {
         // On every plan: members, teams and groups are tabs of this one page,
         // and each old address forwards onto its tab, as on main.
-        label: "Directory",
+        label: "Users",
         href: "/settings/directory",
         includePath: "/settings/directory",
         icon: BookUser,
@@ -229,18 +233,17 @@ function accessGroup({ enterprisePlan, isLiteMember }: SettingsMenuGates): Setti
           "/settings/access",
         ],
       },
-      ...(!isLiteMember
-        ? enterpriseEntry({
-            // Definitions and their assignments are two tabs of one page.
-            item: {
-              label: "Roles & access",
-              href: "/settings/roles",
-              icon: ShieldCheck,
-              alsoActiveAt: ["/settings/role-bindings"],
-            },
-            enterprisePlan,
-          })
-        : []),
+      // Every organization role reads it through `members:view`, Lite included; the page
+      // offers its edits to a manager only. Definitions and assignments are two tabs.
+      ...enterpriseEntry({
+        item: {
+          label: "Roles & access",
+          href: "/settings/roles",
+          icon: ShieldCheck,
+          alsoActiveAt: ["/settings/role-bindings"],
+        },
+        enterprisePlan,
+      }),
     ],
   };
 }

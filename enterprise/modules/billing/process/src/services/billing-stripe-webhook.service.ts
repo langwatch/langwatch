@@ -17,6 +17,7 @@ import type { BillingWebhookSubscriptionRepository } from "../repositories/billi
 import { BestEffortService } from "./best-effort.service.ts";
 import { BillingCheckoutCompletionService } from "./billing-checkout-completion.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
+import type { CheckoutBillingRoles } from "./billing-starter-role.service.ts";
 import {
   BillingSubscriptionLifecycleService,
   type LicenseClearer,
@@ -113,6 +114,7 @@ export class EEWebhookService implements WebhookService {
     host,
     connectedBilling,
     announcer,
+    billingRoles,
   }: {
     subscriptionRepository: BillingWebhookSubscriptionRepository;
     organizationRepository: BillingWebhookOrganizationRepository;
@@ -127,6 +129,8 @@ export class EEWebhookService implements WebhookService {
     connectedBilling?: ConnectedBillingInvoiceEvents;
     /** Records the checkout and subscription changes for peers; absent where none is composed. */
     announcer?: BillingLifecycleAnnouncerService;
+    /** Hands the Billing role to a checkout's starter; absent where no authz is composed. */
+    billingRoles?: CheckoutBillingRoles;
   }) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
@@ -145,6 +149,7 @@ export class EEWebhookService implements WebhookService {
       licenses,
       host,
       ...(announcer ? { announcer } : {}),
+      ...(billingRoles ? { billingRoles } : {}),
     });
     this.lifecycle = BillingSubscriptionLifecycleService.create({
       subscriptionRepository,
@@ -169,6 +174,7 @@ export class EEWebhookService implements WebhookService {
     host: BillingWebhookHost;
     connectedBilling?: ConnectedBillingInvoiceEvents;
     announcer?: BillingLifecycleAnnouncerService;
+    billingRoles?: CheckoutBillingRoles;
   }): EEWebhookService {
     return new EEWebhookService(options);
   }

@@ -21,6 +21,8 @@ export type UiPageGuardInstall = {
   flags?: readonly ReleaseFlagToken[];
   /** The grant the page needs once it exists. */
   permission?: string;
+  /** Asks the grant of the organization instead of the active project. */
+  permissionAt?: "organization";
   fallbacks: UiPageGuardFallbacks;
 };
 
@@ -62,7 +64,12 @@ export function resolveUiPageAccess({
 }
 
 /** Wraps a page in the flag and permission policy its route is behind. */
-export function withUiPageGuard({ flags, permission, fallbacks }: UiPageGuardInstall) {
+export function withUiPageGuard({
+  flags,
+  permission,
+  permissionAt,
+  fallbacks,
+}: UiPageGuardInstall) {
   return function guard<P extends object>(Page: ComponentType<P>): ComponentType<P> {
     const Guarded = (props: P) => {
       const { session } = useUiHostServices();
@@ -71,7 +78,10 @@ export function withUiPageGuard({ flags, permission, fallbacks }: UiPageGuardIns
         ...(flags ? { flags } : {}),
         ...(permission !== void 0 ? { permission } : {}),
         featureFlag: (flag) => uiFlags.flag(flag),
-        hasPermission: (needed) => session.hasPermission(needed),
+        hasPermission: (needed) =>
+          permissionAt === "organization"
+            ? session.hasOrganizationPermission(needed)
+            : session.hasPermission(needed),
         isSettled: () => session.isSettled(),
       });
 

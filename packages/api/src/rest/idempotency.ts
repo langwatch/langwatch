@@ -561,9 +561,9 @@ export function isClaimAbandoned({
 }
 
 /**
- * An update, not delete-and-insert, so the row keeps its identity. SQL, not
- * `updateMany`, whose subquery re-checks a parked write on its own old snapshot
- * and tells two racing takeovers yes; against the table only one wins.
+ * An update, not delete-and-insert, so the row keeps its identity. The store's
+ * fenced write re-checks the claim against the table, so of two racing
+ * takeovers only one wins.
  */
 export async function takeOverClaim({
   receipts,
