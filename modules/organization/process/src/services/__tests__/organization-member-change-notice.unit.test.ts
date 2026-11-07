@@ -13,7 +13,6 @@ import type {
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
 import type { OrganizationCreationNotice } from "../organization-provisioning.service.ts";
 import { OrganizationSeatLicenseService } from "../organization-seat-license.service.ts";
-import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
 import { withSeatHolds } from "./support/seat-holds.ts";
 
 const ORGANIZATION = "org_acme";
