@@ -550,3 +550,50 @@ describe("TraceSummaryFoldProjection context size", () => {
     });
   });
 });
+
+describe("TraceSummaryFoldProjection — Claude Code turn conversation", () => {
+  const SESSION = "8325f595-a06a-4ec0-8344-7b5682760622";
+  const SUBAGENT = "a976532ca15f3135f";
+
+  const subagentSpan = () =>
+    createTestSpan({
+      spanId: "bbbbbbbbbbbbbbb1",
+      parentSpanId: "aaaaaaaaaaaaaaa1",
+      name: "claude_code.llm_request",
+      startTimeUnixMs: 2_000,
+      spanAttributes: { "gen_ai.conversation.id": SUBAGENT, agent_id: SUBAGENT },
+    });
+
+  const promptRecord = () =>
+    makeLogEvent(
+      { "event.name": "user_prompt", "session.id": SESSION, prompt: "count the files" },
+      { body: "claude_code.user_prompt" },
+    );
+
+  describe("when a subagent span reaches the trace before the prompt record", () => {
+    /** @scenario "A Claude Code turn whose subagent span lands first stays in its session" */
+    it("files the trace under the session, not the subagent", () => {
+      const projection = makeProjection();
+      const runtime = createTestRuntime();
+      let state = applySpanToSummary({ state: createInitState(), runtime, span: subagentSpan() });
+      expect(state.attributes["gen_ai.conversation.id"]).toBe(SUBAGENT);
+
+      state = projection.handleTraceLogRecordReceived(promptRecord(), state);
+
+      expect(state.attributes["gen_ai.conversation.id"]).toBe(SESSION);
+    });
+  });
+
+  describe("when the prompt record reaches the trace first", () => {
+    /** @scenario "A Claude Code turn whose subagent span lands first stays in its session" */
+    it("keeps the session when a subagent span folds afterwards", () => {
+      const projection = makeProjection();
+      const runtime = createTestRuntime();
+      let state = projection.handleTraceLogRecordReceived(promptRecord(), createInitState());
+
+      state = applySpanToSummary({ state, runtime, span: subagentSpan() });
+
+      expect(state.attributes["gen_ai.conversation.id"]).toBe(SESSION);
+    });
+  });
+});

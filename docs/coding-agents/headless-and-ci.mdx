@@ -64,6 +64,22 @@ The session appears on the project's [sessions list](/coding-agents/sessions) li
 
 For CI jobs that use the LangWatch SDK or CLI itself rather than a coding agent, `langwatch login --api-key <sk-lw-...>` writes a project API key to `.env` non-interactively, and `langwatch login --token <token>` installs a pre-minted device token. Both fail fast on a machine without a terminal instead of hanging on a device-code prompt.
 
+## Agents started by a harness
+
+A harness that runs Claude Code for you, such as a sandbox supervisor, an agent platform or a session manager like rush, starts `claude -p` with an environment it builds itself. Put the variables from [Manual OpenTelemetry setup](/coding-agents/claude-code#manual-opentelemetry-setup) in that environment, with a project ingest key (`ik-lw-...`) in `OTEL_EXPORTER_OTLP_HEADERS`. Keep a project API key (`sk-lw-...`) out of it, since the agent can read every variable the harness gives it.
+
+Each Claude Code session the harness keeps becomes one session in LangWatch, each turn one trace, and a subagent's model calls and tool calls nest under the `Agent` tool call that started it.
+
+Three things to check in the harness:
+
+- `env` in a `settings.json` that Claude Code reads (the account's `~/.claude/settings.json`, or the file in `CLAUDE_CONFIG_DIR`) can override the same variables in the process environment. Keep the OTLP variables in one place.
+- Remove `TRACEPARENT` and `TRACESTATE` from the environment the harness passes on. Claude Code sets them for every command it runs, so a harness started from inside a Claude Code session inherits them, and every turn it runs then joins that outer session's trace.
+- A harness that stops idle sessions should close their input and give Claude Code a few seconds to exit, so the last spans and logs are exported.
+
+To send metadata only, set `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_ASSISTANT_RESPONSES` to `0`. Tokens, cost, model, timings and tool names still arrive.
+
+Prompts and responses then show as `<REDACTED>`, and tool arguments and outputs are not sent; a Bash call keeps only its program name and command class. To enforce the same on the server for everything a project receives, set the input, output and tool categories of a [data privacy policy](/coding-agents/privacy) to drop.
+
 ## Bake it into an image
 
 `langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`, `copilot_cli`. Add `--json` for machine-readable output. The command needs a signed-in device, unlike `--key`.

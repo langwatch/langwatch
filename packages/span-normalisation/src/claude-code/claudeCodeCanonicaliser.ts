@@ -178,6 +178,8 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
     }
 
     if (sessionId !== null) {
+      // A subagent's spans name the subagent as their conversation; the prompt names the session.
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, sessionId);
       ctx.setAttrIfAbsent("langwatch.thread.id", sessionId);
       fired = true;
     }
