@@ -35,6 +35,7 @@ import { isPlanToolPart } from "../../../../model/langy-plan.ts";
 import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer.ts";
 import { LangyInterruptedNote } from "../../../../ui/elements/langy-interrupted-note.tsx";
 import { isCodeAccessToolPart } from "../../../tools/model/langy-code-access-tool.ts";
+import { isMcpSetupToolPart } from "../../../tools/model/langy-mcp-setup-tool.ts";
 import {
   isQuestionToolPart,
   questionToolCardParts,
@@ -420,6 +421,8 @@ function isDrawnAsItsOwnCard(part: ToolPartLike): boolean {
   // The `secret_snippet` tool is the secret snippet card, rendered by message-content: an
   // activity row for it would only say a card was drawn.
   if (isSecretSnippetToolPart(part)) return true;
+  // The `mcp_setup` tool is the MCP setup card, for the same reason.
+  if (isMcpSetupToolPart(part)) return true;
   // The notification tools say nothing to the reader of the thread: the offer
   // is its own card, and a notification (or a refused one) belongs outside it.
   return isNotificationToolPart(part);

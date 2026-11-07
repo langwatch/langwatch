@@ -24,6 +24,12 @@
       "path": "../../langy/contract/tsconfig.build.json"
     },
     {
+      "path": "../../langy/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../github/contract/tsconfig.build.json"
     },
     {
