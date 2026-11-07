@@ -512,7 +512,10 @@ export type OpsDoorAnswer = Readonly<{
   body: Readonly<Record<string, unknown>>;
 }>;
 
-/** The Ops seat sharing check, Ops staff only (modules/ops/specs/seat-sharing-check.feature). */
+// ---------------------------------------------------------------------------
+// Seat sharing check, Ops staff only (modules/ops/specs/seat-sharing-check.feature)
+// ---------------------------------------------------------------------------
+
 /** The rolling window the check counts people over, in days. */
 export const SEAT_SHARING_WINDOW_DAYS = 30;
 
