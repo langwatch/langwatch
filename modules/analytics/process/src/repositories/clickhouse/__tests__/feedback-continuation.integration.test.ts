@@ -59,6 +59,22 @@ const SPANS: SeededSpan[] = [
       { name: "thumbs_up_down", at: T0 - 5000, vote: true },
     ],
   },
+  // No vote event at all: the span read skips both, and no feedback may come from them.
+  {
+    tenantId: TENANT_ID,
+    traceId: "trace-a",
+    spanId: "span-3",
+    events: [
+      { name: "exception", at: T0, vote: true },
+      { name: "log", at: T0 - 2000, vote: false },
+    ],
+  },
+  {
+    tenantId: TENANT_ID,
+    traceId: "trace-c",
+    spanId: "span-1",
+    events: [{ name: "exception", at: T0 + 100, vote: true }],
+  },
   {
     tenantId: OTHER_TENANT_ID,
     traceId: "trace-x",
@@ -212,6 +228,27 @@ describe("the paged feedback query on the shipped schema", () => {
       expect(unpaged.events.map((event) => event.event_id).toSorted()).toEqual(
         paged.map((position) => position.spanId).toSorted(),
       );
+    });
+  });
+
+  describe("when some spans carry events but no vote event", () => {
+    /** @scenario The feedbacks stored_spans source keeps only spans carrying the vote event */
+    it("returns the same feedback rows from the paged and unpaged reads, none from them", async () => {
+      const paged = (await pagesOf({ limit: 2 })).flat();
+      const unpaged = await repository.findFeedbackEvents({
+        authorization: analyticsProof({ projectId: TENANT_ID, permission: "cost:view" }),
+        projectId: TENANT_ID,
+        ...WINDOW,
+      });
+      const spanOf = (position: AnalyticsFeedbackPosition) =>
+        `${position.traceId}/${position.spanId}`;
+
+      expect(paged.map(spanOf)).not.toContain("trace-a/span-3");
+      expect(paged.map((position) => position.traceId)).not.toContain("trace-c");
+      expect(unpaged.events.map((event) => event.trace_id)).not.toContain("trace-c");
+      expect(
+        unpaged.events.map((event) => `${event.trace_id}/${event.event_id}`).toSorted(),
+      ).toEqual(paged.map(spanOf).toSorted());
     });
   });
 
