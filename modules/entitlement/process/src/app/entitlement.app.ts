@@ -129,7 +129,10 @@ type EntitlementDependencies = EntitlementSetup["dependencies"];
  */
 type EntitlementCallerLookup = Pick<EntitlementDependencies, "billing">;
 
-/** The repositories the app reads directly; the meters reach it only through its usage pipeline. */
+/**
+ * The repositories the app reads directly. Most meters reach it through its usage pipeline; the
+ * billable-events meter is read directly for the month breakdown.
+ */
 type EntitlementReadRepositories = Pick<
   EntitlementRepositories,
   "membership" | "seats" | "spend" | "tenancy" | "billableEvents"

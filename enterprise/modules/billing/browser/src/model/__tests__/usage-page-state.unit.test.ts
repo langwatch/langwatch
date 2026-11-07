@@ -7,6 +7,7 @@ import {
   fullSeats,
   liteRow,
   monthEvents,
+  planStrip,
   projectShares,
   shortDate,
   type UsagePagePlan,
@@ -21,6 +22,42 @@ const FREE: UsagePagePlan = {
   maxMessagesPerMonth: 50_000,
   planSource: "free",
 };
+
+describe("planStrip", () => {
+  it("offers the upgrade on Free with the price, events and seats it includes", () => {
+    expect(planStrip({ plan: FREE, currency: "EUR", seatPriceCents: 0 })).toEqual({
+      title: "Free plan",
+      summary: "€0 · 50,000 events and 2 full seats a month",
+      action: "upgrade",
+    });
+  });
+
+  it("prices a Growth plan from its seats and interval and manages it", () => {
+    expect(
+      planStrip({
+        plan: {
+          ...FREE,
+          type: "GROWTH_SEAT_USD_MONTHLY",
+          name: "Growth",
+          free: false,
+          maxMembers: 3,
+        },
+        currency: "USD",
+        seatPriceCents: 2900,
+      }),
+    ).toEqual({ title: "Growth plan", summary: "$87/mo · 3 full seats", action: "manage" });
+  });
+
+  it("names another paid plan after itself and lists its seats", () => {
+    const paid = { ...FREE, type: "CUSTOM_PLAN", free: false, maxMembers: 1 };
+    expect(
+      planStrip({ plan: { ...paid, name: "Enterprise" }, currency: "EUR", seatPriceCents: 0 }),
+    ).toEqual({ title: "Enterprise plan", summary: "1 full seat", action: "manage" });
+    expect(
+      planStrip({ plan: { ...paid, name: "Team Plan" }, currency: "EUR", seatPriceCents: 0 }).title,
+    ).toBe("Team Plan");
+  });
+});
 
 describe("shortDate", () => {
   it("writes a day as its number and short month", () => {

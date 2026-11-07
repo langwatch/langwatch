@@ -32,7 +32,7 @@ export const growthOverageCentsPer100k = (currency: Currency): number =>
 
 /** Returns the per-100K events pricing string for the given currency. */
 const growthEventsPricingString = (currency: Currency): string =>
-  `${currencySymbol[currency]}${growthOverageCentsPer100k(currency) / 100} per additional 100,000 events`;
+  `${formatPrice({ cents: growthOverageCentsPer100k(currency), currency })} per additional 100,000 events`;
 
 const growthRetentionPricingString = (currency: Currency): string =>
   currency === Currency.EUR

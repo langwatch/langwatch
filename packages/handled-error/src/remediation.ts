@@ -995,7 +995,7 @@ const registry = {
   instant_eval_free_budget_exhausted: {
     tips: [
       "Read `meta.spentUsd` against `meta.budgetUsd`; the organization has spent its free Instant Evals allowance across every project",
-      "Upgrade the organization to a paid plan under Settings, Subscription; judged queries and runs are then billed per input token",
+      "Upgrade the organization to a paid plan under Settings, Plan & billing; judged queries and runs are then billed per input token",
     ],
   },
   instant_eval_not_enabled: {

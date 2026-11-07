@@ -433,6 +433,21 @@ describe("the usage page", () => {
       expect(screen.queryByTestId("usage-breakdown-unavailable")).not.toBeInTheDocument();
     });
 
+    it("says no traces yet when the month is empty", () => {
+      given({
+        plan: TIERED_PLAN,
+        count: 0,
+        pricingModel: "TIERED",
+        usageUnit: "traces",
+        breakdown: { ...month({}), days: null },
+      });
+      renderPage();
+
+      expect(screen.getByTestId("usage-events-empty")).toHaveTextContent(
+        "No traces yet this month.",
+      );
+    });
+
     /** @scenario "A plan without Lite seats shows no Lite row" */
     it("shows no Lite members row", () => {
       renderPage();

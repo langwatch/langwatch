@@ -1,8 +1,9 @@
-import type { UsageUnit } from "@langwatch/entitlement-contract";
 /**
  * The usage page's month: every day of the UTC month and each project that used it.
  * @see ../../../../../../specs/licensing/usage-page.feature
  */
+
+import type { UsageUnit } from "@langwatch/entitlement-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

@@ -38,12 +38,15 @@ function Muted({ children }: { children: string }) {
   );
 }
 
-function EventsBody({ state }: { state: UsageEventsCardState }) {
-  if (state.kind === "loading") return <Muted>Loading this month's events.</Muted>;
+/** What the plan meters: events on seat plans, traces on the legacy tiered plans. */
+export type MeteredUnit = "events" | "traces";
+
+function EventsBody({ state, unit }: { state: UsageEventsCardState; unit: MeteredUnit }) {
+  if (state.kind === "loading") return <Muted>{`Loading this month's ${unit}.`}</Muted>;
   if (state.kind === "unavailable") {
     return (
       <Banner status="warning" data-testid="usage-events-unavailable">
-        This month's events could not be loaded. Refresh the page to try again.
+        {`This month's ${unit} could not be loaded. Refresh the page to try again.`}
       </Banner>
     );
   }
@@ -53,7 +56,7 @@ function EventsBody({ state }: { state: UsageEventsCardState }) {
         size="inline"
         testId="usage-events-empty"
         icon={<Activity size={20} aria-hidden />}
-        title="No events yet this month."
+        title={`No ${unit} yet this month.`}
         description="Send your first trace and it shows up here."
         next={[{ kind: "docs", label: "Set up tracing", href: SET_UP_TRACING_HREF }]}
       />
@@ -92,12 +95,11 @@ function EventsBody({ state }: { state: UsageEventsCardState }) {
 
 export function UsageEventsCard({
   state,
-  title,
+  unit,
   resetsOn,
 }: {
   state: UsageEventsCardState;
-  /** "Events this month", or "Traces this month" where the plan counts traces. */
-  title: string;
+  unit: MeteredUnit;
   /** "Resets on 1 Dec"; absent until the month is read. */
   resetsOn?: string;
 }) {
@@ -105,10 +107,10 @@ export function UsageEventsCard({
   return (
     <Card
       data-testid="usage-events-card"
-      title={title}
+      title={unit === "traces" ? "Traces this month" : "Events this month"}
       actions={aside ? <Muted>{aside}</Muted> : undefined}
     >
-      <EventsBody state={state} />
+      <EventsBody state={state} unit={unit} />
     </Card>
   );
 }

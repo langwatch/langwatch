@@ -28,7 +28,7 @@ class CapabilityBillingHost extends BillingHostApi {
   private readonly org: BillingHostOrganization | undefined;
   private readonly teamId: string | undefined;
   private readonly query: Readonly<Record<string, string | undefined>>;
-  private readonly mayInvite: boolean;
+  /** organization:manage: invites members and reads the month breakdown. */
   private readonly mayManageOrganization: boolean;
   private readonly deploymentIsSaaS: boolean;
   private readonly deploymentIsDevelopment: boolean;
@@ -39,7 +39,6 @@ class CapabilityBillingHost extends BillingHostApi {
     org,
     teamId,
     query,
-    mayInvite,
     mayManageOrganization,
     deploymentIsSaaS,
     deploymentIsDevelopment,
@@ -49,7 +48,6 @@ class CapabilityBillingHost extends BillingHostApi {
     org: BillingHostOrganization | undefined;
     teamId: string | undefined;
     query: Readonly<Record<string, string | undefined>>;
-    mayInvite: boolean;
     mayManageOrganization: boolean;
     deploymentIsSaaS: boolean;
     deploymentIsDevelopment: boolean;
@@ -60,7 +58,6 @@ class CapabilityBillingHost extends BillingHostApi {
     this.org = org;
     this.teamId = teamId;
     this.query = query;
-    this.mayInvite = mayInvite;
     this.mayManageOrganization = mayManageOrganization;
     this.deploymentIsSaaS = deploymentIsSaaS;
     this.deploymentIsDevelopment = deploymentIsDevelopment;
@@ -77,7 +74,7 @@ class CapabilityBillingHost extends BillingHostApi {
   }
 
   canInviteMembers(): boolean {
-    return this.mayInvite;
+    return this.mayManageOrganization;
   }
 
   canReadMonthBreakdown(): boolean {
@@ -156,7 +153,6 @@ export default function BillingHostMount({ children }: { children?: ReactNode })
   }, [organizations.data, projectId]);
 
   const query = route.reading().query;
-  const mayInvite = session.hasOrganizationPermission("organization:manage");
   const mayManageOrganization = session.hasOrganizationPermission("organization:manage");
 
   const host = useMemo(
@@ -165,7 +161,6 @@ export default function BillingHostMount({ children }: { children?: ReactNode })
         org,
         teamId,
         query,
-        mayInvite,
         mayManageOrganization,
         deploymentIsSaaS: deployment.isSaaS,
         deploymentIsDevelopment: deployment.isDevelopment,
@@ -176,7 +171,6 @@ export default function BillingHostMount({ children }: { children?: ReactNode })
       org,
       teamId,
       query,
-      mayInvite,
       mayManageOrganization,
       deployment.isSaaS,
       deployment.isDevelopment,

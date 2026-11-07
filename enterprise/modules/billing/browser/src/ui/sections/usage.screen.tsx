@@ -181,7 +181,6 @@ function HostedUsage({
         isProjectsUnavailable: breakdown.data?.projects === null,
       })
     : null;
-  const unitTitle = usage.data?.usageUnit === "traces" ? "Traces this month" : "Events this month";
 
   return (
     <>
@@ -192,7 +191,7 @@ function HostedUsage({
         />
       )}
       <UsageEventsCard
-        title={unitTitle}
+        unit={usage.data?.usageUnit === "traces" ? "traces" : "events"}
         state={eventsCardState({ usage, breakdown: breakdown.data, plan, pricingModel, currency })}
         resetsOn={breakdown.data ? `Resets on ${shortDate(breakdown.data.resetsOn)}` : undefined}
       />

@@ -1,11 +1,12 @@
-import { Card } from "@langwatch/design-system/card";
-import { MeterBar } from "@langwatch/design-system/meter-bar";
-import { Text } from "@langwatch/design-system/primitives";
-import { SettingList, SettingRow } from "@langwatch/design-system/settings-card";
 /**
  * Each project's events this month, the busiest first, with its share of the month.
  * @see specs/licensing/usage-page.feature
  */
+
+import { Card } from "@langwatch/design-system/card";
+import { MeterBar } from "@langwatch/design-system/meter-bar";
+import { Text } from "@langwatch/design-system/primitives";
+import { SettingList, SettingRow } from "@langwatch/design-system/settings-card";
 import type { ProjectUsageShare } from "@langwatch/entitlement-contract";
 import numeral from "numeral";
 
