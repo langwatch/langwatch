@@ -571,7 +571,7 @@ describe("<SubscriptionPage/> buying seats", () => {
       );
     });
 
-    /** @scenario "Manage seats on Free names a held seat and the day it frees" */
+    /** @scenario "A reader who may not manage the organization sees no held seats" */
     it("asks for no held seats when the reader may not manage the organization", async () => {
       hostReadsHeldSeats.current = false;
       givenFree(1);
@@ -848,7 +848,8 @@ describe("<SubscriptionPage/> buying seats", () => {
 
     /** @scenario "Lowering seats names the seats held for people who left them" */
     it("names the held seat in the heading and where lowering stops", async () => {
-      givenGrowth({ paid: 5, inUse: 3 });
+      givenGrowth({ paid: 5, inUse: 2 });
+      givenMembersCount(3);
       mockListHeldSeats.mockReturnValue({
         data: { heldSeats: [heldUntilDec7] },
       });

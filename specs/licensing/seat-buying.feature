@@ -98,6 +98,15 @@ Feature: Buying seats
       But when the held seats list none, it reads "Free includes 2 seats. 2 in use."
 
     @integration
+    Scenario: A reader who may not manage the organization sees no held seats
+      Given "ACME" is on the Free plan with 1 member and 2 full seats in use
+      And one of those seats is held until 7 Dec
+      And I do not hold organization:manage
+      When I open Manage seats
+      Then the held seats are not asked for
+      And it reads "Free includes 2 seats. 2 in use."
+
+    @integration
     Scenario: An invite that fits Free is sent at once
       Given "ACME" is on the Free plan with 1 member
       And Manage seats is open
@@ -198,7 +207,7 @@ Feature: Buying seats
 
     @integration
     Scenario: Lowering seats names the seats held for people who left them
-      Given "ACME" has a Growth subscription for 5 seats with 3 full seats in use
+      Given "ACME" has a Growth subscription for 5 seats with 2 members and 3 full seats in use
       And the organization's held seats list one seat that frees on 7 Dec
       And Manage seats is open
       When I lower the full seats to 3
