@@ -13,6 +13,8 @@ import type {
 } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 
+import type { SeatHold } from "../seat-hold.repository.ts";
+
 /** One organization row, the fields the organization repository owns. */
 export interface MemoryOrganizationRow {
   /** Absent reads as a customer's organization. */
@@ -96,6 +98,10 @@ export interface MemoryOrganizationUserRow {
   /** The grant intent an unfinished automatic admission is resumed from. */
   pendingSsoGrantId?: string | null;
   departmentId?: string | null;
+  /** When the current full seat was taken; absent or null reads as `createdAt`. */
+  fullSeatSince?: Instant | null;
+  /** Set when admission left the person waiting for a seat. */
+  seatPendingSince?: Instant | null;
 }
 
 /** One person, the fields the membership repository joins against. */
@@ -270,6 +276,8 @@ export class MemoryOrganizationDatabase {
   readonly customRoles = new Map<string, MemoryCustomRoleRow>();
   readonly auditLogs: MemoryAuditLogRow[] = [];
   readonly invites = new Map<string, MemoryOrganizationInviteRow>();
+  /** Full seats still counted after a removal, one per organization and person. */
+  readonly seatHolds: SeatHold[] = [];
 
   static create(): MemoryOrganizationDatabase {
     return new MemoryOrganizationDatabase();

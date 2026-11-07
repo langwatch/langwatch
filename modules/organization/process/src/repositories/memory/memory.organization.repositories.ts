@@ -15,6 +15,7 @@ import { MemoryOrganizationDatabase } from "./memory.organization.database.ts";
 import { MemoryOrganizationRepository } from "./memory.organization.repository.ts";
 import { MemoryPersonalTeamScopeRepository } from "./memory.personal-team-scope.repository.ts";
 import { MemoryScopeGraphRepository } from "./memory.scope-graph.repository.ts";
+import { MemorySeatHoldRepository } from "./memory.seat-hold.repository.ts";
 import { MemorySeatRequestRepository } from "./memory.seat-request.repository.ts";
 import { MemorySignUpPolicyRepository } from "./memory.sign-up-policy.repository.ts";
 import { MemoryTeamRepository } from "./memory.team.repository.ts";
@@ -51,6 +52,7 @@ export function memoryOrganizationRepositories({
     userDirectory: MemoryOrganizationUserDirectoryRepository.create({ memory }),
     privateClickHouseRoutes: new MemoryPrivateClickHouseRoutesRepository(),
     privateS3Accounts: new MemoryPrivateS3AccountsRepository(),
+    seatHolds: MemorySeatHoldRepository.create({ memory }),
     seatRequests: MemorySeatRequestRepository.create(),
     accessNotices: MemoryOrganizationAccessNoticeRepository.create(),
   };

@@ -69,6 +69,13 @@ const isDateComparison = (value: unknown, operator: "lte" | "gt"): boolean => {
   return Object.keys(bound).length === 1 && bound[operator] instanceof Date;
 };
 
+/** The seat hold check's sweep: holds whose end has passed, and nothing looser. */
+const isEndedSeatHoldSweep = (clause: unknown): boolean => {
+  if (!clause || typeof clause !== "object") return false;
+  const where = clause as Record<string, unknown>;
+  return Object.keys(where).length === 1 && isDateComparison(where.heldUntil, "lte");
+};
+
 const isNonEmptyStringList = (value: unknown): boolean => {
   const list = clauseField(value, "in");
   if (!Array.isArray(list)) return false;
@@ -149,6 +156,11 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // named user(s); a write keyed on userId alone still crosses tenants.
   OrganizationUser: {
     extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && hasUserBound(clause),
+  },
+  // The hourly seat hold check reads which holds have ended, fleet-wide: exactly
+  // `{ heldUntil: { lte: <Date> } }`. A hold names one person and its organization.
+  SeatHold: {
+    extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && isEndedSeatHoldSweep(clause),
   },
   // "Which organizations hold this person waiting" is a READ bounded by the named user.
   SeatRequest: {

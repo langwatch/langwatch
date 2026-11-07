@@ -13,6 +13,7 @@ import type { OrganizationUserDirectoryRepository } from "./organization-user-di
 import type { OrganizationRepository } from "./organization.repository.ts";
 import type { PrivateClickHouseRoutesRepository } from "./private-clickhouse-routes.repository.ts";
 import type { PrivateS3AccountsRepository } from "./private-s3-accounts.repository.ts";
+import type { SeatHoldRepository } from "./seat-hold.repository.ts";
 import type { SeatRequestRepository } from "./seat-request.repository.ts";
 import type { SignUpPolicyRepository } from "./sign-up-policy.repository.ts";
 import type { TeamRepository } from "./team.repository.ts";
@@ -45,6 +46,8 @@ export interface OrganizationRepositories {
   /** The private ClickHouse routes and S3 accounts this deployment names, by variable. */
   readonly privateClickHouseRoutes: PrivateClickHouseRoutesRepository;
   readonly privateS3Accounts: PrivateS3AccountsRepository;
+  /** Full seats still counted after a removal, until 30 days after they were taken. */
+  readonly seatHolds: SeatHoldRepository;
   /** Seat requests, one row per organization and address. */
   readonly seatRequests: SeatRequestRepository;
   /** The mail outbox for seat requests and refused sign-ins. */

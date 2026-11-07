@@ -29,6 +29,17 @@ export interface OrganizationInviteSeatCensus {
    * lite seat from being sold the permissions of a full one.
    */
   isViewOnlyCustomRole(permissions: string[]): boolean;
+  /**
+   * The addresses among these whose person still has a live seat hold (seat-rotation.feature):
+   * inviting them back takes that seat, not another. Absent where no holds are composed.
+   */
+  findHeldEmails?(input: { organizationId: string; emails: readonly string[] }): Promise<string[]>;
+  /** An accepted person back within their hold takes the held seat back. */
+  takeBackHeldSeat?(input: {
+    organizationId: string;
+    userId: string;
+    email?: string;
+  }): Promise<boolean>;
   /** The organization's seat lock, held while a batch is counted and written. */
   withSeatLock<T>(input: {
     organizationId: string;

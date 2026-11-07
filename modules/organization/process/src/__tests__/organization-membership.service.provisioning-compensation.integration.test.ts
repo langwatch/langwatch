@@ -18,6 +18,7 @@ import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
+import { withSeatHolds } from "../services/__tests__/support/seat-holds.ts";
 import type {
   OrganizationGrantCache,
   OrganizationSeatRevocationNotice,
@@ -110,7 +111,7 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
           memberRemoved: () => Promise.resolve(),
           memberDepartmentChanged: () => Promise.resolve(),
         },
-        repository: repo,
+        ...withSeatHolds({ repository: repo }),
         creations: buildFailingPrompts(attempted),
         seats,
         seatNotices,
@@ -140,7 +141,7 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
           memberRemoved: () => Promise.resolve(),
           memberDepartmentChanged: () => Promise.resolve(),
         },
-        repository: repo,
+        ...withSeatHolds({ repository: repo }),
         creations: buildWorkingPrompts(),
         seats,
         seatNotices,

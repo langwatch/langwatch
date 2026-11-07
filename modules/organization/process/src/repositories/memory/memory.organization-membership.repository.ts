@@ -41,16 +41,21 @@ import type {
   CreateForProvisioningInput,
   DeleteMemberInput,
   EnrichedAuditLog,
+  MemberSeatStanding,
   MemberTeamBinding,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationMembershipRepository,
   OrganizationProvisioningSummary,
+  AdmitWaitingMemberInput,
   SetMemberDisabledInput,
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,
   UpdateTeamMemberRoleInput,
+  UnfinishedSeatAdmission,
+  WaitingMember,
 } from "../organization-membership.repository.ts";
+import type { SeatHold, SeatTransition } from "../seat-hold.repository.ts";
 import { MemoryOrganizationSeatRepository } from "./memory.organization-seat.repository.ts";
 import {
   organizationOfRow,
@@ -569,8 +574,9 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     pending: boolean;
     /** Where a join request was made, for the Developer admission audit row. */
     origin?: "web" | "cli";
+    seatTakenAt?: Instant;
   }): Promise<OrganizationAdmission> {
-    const { organizationId, userId, pendingAdmissionId, seat, pending } = input;
+    const { organizationId, userId, pendingAdmissionId, seat, pending, seatTakenAt } = input;
     const existing = this.membershipRow({ organizationId, userId });
     if (existing) {
       if (existing.role === OrganizationUserRole.DEVELOPER) {
@@ -589,11 +595,114 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       organizationId,
       role: seat,
       disabledAt: pending ? now : null,
+      seatPendingSince: pending ? now : null,
+      fullSeatSince: seatTakenAt ?? null,
       createdAt: now,
       updatedAt: now,
       pendingSsoGrantId: seat === "DEVELOPER" || pending ? null : pendingAdmissionId,
     });
+    if (seatTakenAt) this.dropSeatHold({ organizationId, userId });
     return { outcome: "created", seat, pending };
+  }
+
+  async findSeatStandings(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MemberSeatStanding[]> {
+    const row = this.membershipRow(params);
+    if (!row) return [];
+    const user = this.memory.users.get(row.userId);
+    return [
+      {
+        role: row.role,
+        disabledAt: row.disabledAt ?? null,
+        createdAt: row.createdAt,
+        fullSeatSince: row.fullSeatSince ?? null,
+        seatPendingSince: row.seatPendingSince ?? null,
+        email: user?.email ?? null,
+        name: user?.name ?? null,
+      },
+    ];
+  }
+
+  async findWaitingMembers({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<WaitingMember[]> {
+    return this.memory.organizationUsers
+      .filter(
+        (row) =>
+          row.organizationId === organizationId &&
+          row.disabledAt !== null &&
+          (row.seatPendingSince ?? null) !== null,
+      )
+      .flatMap((row) =>
+        row.seatPendingSince
+          ? [
+              {
+                userId: row.userId,
+                name: this.memory.users.get(row.userId)?.name ?? null,
+                email: this.memory.users.get(row.userId)?.email ?? null,
+                waitingSince: row.seatPendingSince,
+              },
+            ]
+          : [],
+      )
+      .toSorted((a, b) => Temporal.Instant.compare(a.waitingSince, b.waitingSince));
+  }
+
+  async writeSeatHold({ hold }: { hold: SeatHold }): Promise<void> {
+    this.putSeatHold(hold);
+  }
+
+  async takeHeldSeat({
+    organizationId,
+    userId,
+    since,
+    holdUserIds,
+  }: {
+    organizationId: string;
+    userId: string;
+    since: Instant;
+    holdUserIds: readonly string[];
+  }): Promise<void> {
+    const row = this.membershipRow({ organizationId, userId });
+    if (row) row.fullSeatSince = since;
+    for (const holder of [userId, ...holdUserIds]) {
+      this.dropSeatHold({ organizationId, userId: holder });
+    }
+  }
+
+  /** Writes or replaces the person's seat hold, as the Postgres twin does in its transaction. */
+  private putSeatHold(hold: SeatHold): void {
+    this.dropSeatHold(hold);
+    this.memory.seatHolds.push(hold);
+  }
+
+  private dropSeatHold({ organizationId, userId }: { organizationId: string; userId: string }) {
+    const kept = this.memory.seatHolds.filter(
+      (hold) => !(hold.organizationId === organizationId && hold.userId === userId),
+    );
+    this.memory.seatHolds.splice(0, this.memory.seatHolds.length, ...kept);
+  }
+
+  /** Applies a seat transition to the membership row and the holds. */
+  private applySeatTransition({
+    row,
+    seat,
+  }: {
+    row: { organizationId: string; userId: string; fullSeatSince?: Instant | null };
+    seat: SeatTransition | undefined;
+  }): void {
+    if (!seat || seat.kind === "unchanged") return;
+    if (seat.kind === "taken") {
+      this.dropSeatHold(row);
+      row.fullSeatSince = seat.since;
+      return;
+    }
+    if (seat.hold) this.putSeatHold(seat.hold);
+    row.fullSeatSince = null;
   }
 
   async findMembershipStates({ userId }: { userId: string }): Promise<
@@ -624,6 +733,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     if (!row) throw new MemberNotFoundError(userId);
     await this.assertRemovalKeepsAnActiveAdmin({ organizationId, member: row });
     const heldFullSeat = await this.holdsFullSeat({ organizationId, userId });
+    if (input.seatHold) this.putSeatHold(input.seatHold);
 
     this.memory.organizationUsers.splice(
       0,
@@ -673,6 +783,40 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return (await seats.findFullSeatHolderIds(organizationId)).includes(userId);
   }
 
+  async findUnfinishedSeatAdmissions({
+    limit,
+  }: {
+    limit: number;
+  }): Promise<UnfinishedSeatAdmission[]> {
+    return this.memory.organizationUsers
+      .filter(
+        (row) =>
+          row.pendingSsoGrantId != null &&
+          row.disabledAt === null &&
+          row.fullSeatSince != null &&
+          row.role === OrganizationUserRole.MEMBER,
+      )
+      .toSorted((a, b) => a.updatedAt.epochMilliseconds - b.updatedAt.epochMilliseconds)
+      .slice(0, limit)
+      .map((row) => ({
+        organizationId: row.organizationId,
+        userId: row.userId,
+        grantId: row.pendingSsoGrantId ?? "",
+      }));
+  }
+
+  async admitWaitingMember(input: AdmitWaitingMemberInput): Promise<boolean> {
+    const row = this.membershipRow(input);
+    if (!row || row.disabledAt === null || row.seatPendingSince == null) return false;
+    row.role = OrganizationUserRole.MEMBER;
+    row.disabledAt = null;
+    row.seatPendingSince = null;
+    row.pendingSsoGrantId = input.pendingAdmissionId;
+    this.applySeatTransition({ row, seat: input.seat });
+    row.updatedAt = nowInstant();
+    return true;
+  }
+
   async setMemberDisabled(input: SetMemberDisabledInput): Promise<void> {
     const row = this.membershipRow(input);
     if (!row) throw new MemberNotFoundError(input.userId);
@@ -684,6 +828,8 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       ? await this.holdsFullSeat({ organizationId: input.organizationId, userId: input.userId })
       : false;
     row.disabledAt = input.disabled ? nowInstant() : null;
+    if (!input.disabled) row.seatPendingSince = null;
+    this.applySeatTransition({ row, seat: input.seat });
     row.updatedAt = nowInstant();
     if (row.disabledAt) {
       this.memory.memberDepartures.push({
@@ -784,6 +930,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     this.assertCustomRolesAssignable({ organizationId, updates: effectiveTeamRoleUpdates });
     row.role = role;
     row.updatedAt = nowInstant();
+    this.applySeatTransition({ row, seat: input.seat });
     this.applyDeveloperSeat({ organizationId, userId, role });
 
     const teamsLeftWithoutAdmin: { id: string; name: string }[] = [];
@@ -932,6 +1079,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     organizationId: string;
     role: OrganizationUserRole;
     disabledAt: Instant | null;
+    seatPendingSince?: Instant | null;
     createdAt: Instant;
     updatedAt: Instant;
   }): OrganizationMemberWithUser {
@@ -960,6 +1108,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       organizationId: row.organizationId,
       role: row.role,
       disabledAt: row.disabledAt,
+      seatPendingSince: row.seatPendingSince ?? null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       departmentId: null,

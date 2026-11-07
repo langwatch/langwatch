@@ -5,28 +5,13 @@ import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { SeatProrationPreviewProps } from "@langwatch/enterprise-billing-client";
 import { Crown } from "lucide-react";
 import { useState } from "react";
-import { z } from "zod";
 
 import { billingApi } from "../../../behavior/billing-api.ts";
-
-// The contract answers this one with the provider's own shape, deliberately
-// opaque, so the screen states what it reads and checks the answer against it.
-const prorationQuoteSchema = z.object({
-  amountDueCents: z.number(),
-  formattedAmountDue: z.string(),
-  formattedCreditApplied: z.string().nullable(),
-  formattedRecurringTotal: z.string(),
-  billingInterval: z.string(),
-  quotedAt: z.number(),
-});
-
-type ProrationQuote = z.infer<typeof prorationQuoteSchema>;
-
-function quoteOf(data: unknown): ProrationQuote | undefined {
-  const parsed = prorationQuoteSchema.safeParse(data);
-
-  return parsed.success ? parsed.data : void 0;
-}
+import {
+  billingDay,
+  type SeatQuote as ProrationQuote,
+  seatQuoteOf as quoteOf,
+} from "../../../model/seat-change-summary.ts";
 
 function PreviewBody({
   quote,
@@ -70,7 +55,7 @@ function PreviewBody({
               plan costs from the next invoice onwards. */}
           <HStack justify="space-between" paddingX={2}>
             <Text fontWeight="semibold" fontSize="md">
-              {quote.amountDueCents < 0 ? "Credit applied today" : "Due today"}
+              Due today
             </Text>
             <Text fontWeight="semibold" fontSize="md">
               {quote.formattedAmountDue}
@@ -93,7 +78,9 @@ function PreviewBody({
 
           <HStack justify="space-between" paddingX={2}>
             <Text fontWeight="normal" fontSize="md" color="fg.muted">
-              New billing amount
+              {quote.appliesAt != null
+                ? `New billing amount from ${billingDay(quote.appliesAt)}`
+                : "New billing amount"}
             </Text>
             <Text fontWeight="normal" fontSize="md" color="fg.muted">
               {quote.formattedRecurringTotal}

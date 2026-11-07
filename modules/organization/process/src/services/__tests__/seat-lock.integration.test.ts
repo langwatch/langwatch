@@ -27,14 +27,16 @@ import {
 import type { OrganizationSettingsCipher } from "../../repositories/organization.repository.ts";
 import { PrismaOrganizationMembershipRepository } from "../../repositories/prisma/prisma.organization-membership.repository.ts";
 import { PrismaOrganizationSeatRepository } from "../../repositories/prisma/prisma.organization-seat.repository.ts";
+import { PrismaSeatHoldRepository } from "../../repositories/prisma/prisma.seat-hold.repository.ts";
 import { PrismaSeatRequestRepository } from "../../repositories/prisma/prisma.seat-request.repository.ts";
 import type { OrganizationAccessNoticeService } from "../organization-access-notice.service.ts";
 import { OrganizationMemberAdmissionService } from "../organization-member-admission.service.ts";
-import { OrganizationMemberRoleService } from "../organization-member-role.service.ts";
+import { OrganizationMembershipService } from "../organization-membership.service.ts";
 import { OrganizationSeatLeaseService } from "../organization-seat-lease.service.ts";
 import { OrganizationSeatLicenseService } from "../organization-seat-license.service.ts";
 import { SeatLimitNoticeService } from "../seat-limit-notice.service.ts";
 import { SeatRequestService, type SeatRequestPeers } from "../seat-request.service.ts";
+import { withSeatHolds } from "./support/seat-holds.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -193,12 +195,22 @@ describe.skipIf(!DB_URL)("two seat-taking writes for the last free full seat", (
 
     /** @scenario "Two approvals for the last free full seat at once: exactly one wins" */
     it("enables exactly one, refuses the other with member_seat_limit_reached and keeps it open", async () => {
-      const roles = OrganizationMemberRoleService.create({
-        repository: members,
+      type Dependencies = Parameters<typeof OrganizationMembershipService.create>[0];
+      const roles = OrganizationMembershipService.create({
+        ...withSeatHolds({
+          repository: members,
+          holds: PrismaSeatHoldRepository.create(prisma),
+          seatRequests: requests,
+        }),
         seats,
         seatNotices: { memberDisabled: async () => {}, memberEnabled: async () => {} },
         grantCache: { invalidateOrganization: async () => {} },
         ceiling: { assertWithinCaller: async () => {} },
+        creations: createApiFixture<Dependencies["creations"]>({}),
+        testArrivals: createApiFixture<Dependencies["testArrivals"]>({}),
+        admissions: createApiFixture<Dependencies["admissions"]>({}),
+        workspaceNotices: createApiFixture<Dependencies["workspaceNotices"]>({}),
+        memberNotices: createApiFixture<Dependencies["memberNotices"]>({}),
       });
       const service = SeatRequestService.create({
         requests,
@@ -250,11 +262,11 @@ describe.skipIf(!DB_URL)("two seat-taking writes for the last free full seat", (
       type Dependencies = Parameters<typeof OrganizationMemberAdmissionService.create>[0];
       // An arrival with no admitting actor writes only its membership row.
       const admission = OrganizationMemberAdmissionService.create({
-        repository: members,
         admissions: createApiFixture<Dependencies["admissions"]>({}),
         seats,
         workspaceNotices: createApiFixture<Dependencies["workspaceNotices"]>({}),
         memberNotices: createApiFixture<Dependencies["memberNotices"]>({}),
+        ...withSeatHolds({ repository: members, holds: PrismaSeatHoldRepository.create(prisma) }),
       });
 
       const admitted = await Promise.all(

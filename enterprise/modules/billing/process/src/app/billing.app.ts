@@ -7,11 +7,14 @@ import {
   billingConfig,
   BillingPriceCatalogue,
   billingSecrets,
+  stripePricesFile,
   type BillingServerConfig,
   type BillingAuditRecordedEventData,
   type BillingStaff,
   type BillingDisplayInvoice,
   type ConnectedAddCommitRequest,
+  type DeveloperSeatQuote,
+  type DeveloperSeats,
   type Currency,
   type SubscribablePlan,
   type SubscriptionBillingInterval,
@@ -83,12 +86,17 @@ import {
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { CurrencyService } from "../services/currency.service.ts";
 import { CustomerService } from "../services/customer.service.ts";
+import { DeveloperSeatService } from "../services/developer-seat.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
 import { PlanLimitAlertService } from "../services/plan-limit-alert.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
+import {
+  type SeatLineRepairOutcome,
+  SeatLineRepairService,
+} from "../services/seat-line-repair.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
@@ -159,6 +167,8 @@ type SubscriptionComposition = Readonly<{
 type SubscriptionDoor = Readonly<{
   customers: CustomerService;
   subscriptions: BillingSubscriptionService;
+  seatLines: SeatLineRepairService;
+  developerSeats: DeveloperSeatService;
 }>;
 
 type ConnectedBilling = Readonly<{
@@ -544,6 +554,17 @@ export class BillingModule
         stripeErrors,
         seatsInUse,
       }),
+      seatLines: SeatLineRepairService.create({
+        stripeSubscriptions,
+        subscriptions: repositories.seatEventSubscriptions,
+        prices,
+      }),
+      developerSeats: DeveloperSeatService.create({
+        stripeSubscriptions,
+        subscriptions: repositories.seatEventSubscriptions,
+        prices,
+        unitAmountOf: (priceId) => stripePricesFile.prices[priceId]?.unitAmount ?? null,
+      }),
     };
   }
 
@@ -610,6 +631,25 @@ export class BillingModule
     newTotalSeats: number;
   }): Promise<unknown> {
     return this.#subscriptionDoor.subscriptions.previewProration(input);
+  }
+
+  async developerSeats(input: { organizationId: string }): Promise<DeveloperSeats> {
+    return this.#subscriptionDoor.developerSeats.developerSeats(input);
+  }
+
+  async previewDeveloperSeats(input: {
+    organizationId: string;
+    quantity: number;
+  }): Promise<DeveloperSeatQuote> {
+    return this.#subscriptionDoor.developerSeats.previewDeveloperSeats(input);
+  }
+
+  async setDeveloperSeats(input: {
+    organizationId: string;
+    quantity: number;
+    quotedAt?: number;
+  }): Promise<{ success: boolean }> {
+    return this.#subscriptionDoor.developerSeats.setDeveloperSeats(input);
   }
 
   async notifyProspective(input: {
@@ -1066,6 +1106,12 @@ export class BillingModule
       throw new Error("This billing app was composed without a lifecycle pipeline");
     }
     return this.#lifecycle;
+  }
+
+  /** Puts back seat lines Stripe refused to roll back; nothing where no subscription door is composed. */
+  async repairSeatLines(): Promise<SeatLineRepairOutcome> {
+    if (!this.#subscriptions) return { repaired: 0, pending: 0, failed: 0, flagged: 0 };
+    return this.#subscriptions.seatLines.repairSeatLines();
   }
 
   /** Every row it reads and every invoice it raises is Cloud's: an install runs nothing. */

@@ -325,6 +325,19 @@ export interface LwqlPrismaRows {
     readonly disabledAt: "DateTime?";
     readonly pendingSsoGrantId: "String?";
     readonly membershipStamp: "String";
+    readonly fullSeatSince: "DateTime?";
+    readonly seatPendingSince: "DateTime?";
+  };
+  readonly SeatHold: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly userId: "String";
+    readonly email: "String?";
+    readonly name: "String?";
+    readonly seatTakenAt: "DateTime";
+    readonly heldUntil: "DateTime";
+    readonly reason: "String";
+    readonly createdAt: "DateTime";
   };
   readonly SeatRequest: {
     readonly id: "String";
@@ -1754,6 +1767,22 @@ export interface LwqlPrismaRows {
     readonly maxDashboards: "Int?";
     readonly maxCustomGraphs: "Int?";
     readonly maxAutomations: "Int?";
+    readonly seatsKept: "Int?";
+    readonly seatsKeptUntil: "DateTime?";
+    readonly seatLineQuantity: "Int?";
+    readonly seatLineQuantityAt: "DateTime?";
+    readonly seatLineWriteQuantities: "Int[]";
+    readonly seatLineWriteSince: "DateTime?";
+    readonly seatLineWriteAt: "DateTime?";
+    readonly seatLineWriteAttempts: "Int?";
+    readonly seatLineWriteFlaggedAt: "DateTime?";
+    readonly seatRepairQuantity: "Int?";
+    readonly seatRepairLiftedQuantity: "Int?";
+    readonly seatRepairSince: "DateTime?";
+    readonly seatRepairAttempts: "Int?";
+    readonly seatRepairFlaggedAt: "DateTime?";
+    readonly seatLineLeaseToken: "String?";
+    readonly seatLineLeaseUntil: "DateTime?";
   };
   readonly Invoice: {
     readonly id: "String";

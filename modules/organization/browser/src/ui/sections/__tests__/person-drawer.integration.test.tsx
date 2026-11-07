@@ -27,6 +27,7 @@ vi.mock("../../../behavior/organization-api.ts", () => {
         organization: {
           getMemberById: invalidator,
           getOrganizationWithMembersAndTheirTeams: invalidator,
+          listHeldSeats: invalidator,
         },
         authz: { listBillingMembers: invalidator },
         limits: { getUsage: invalidator },
@@ -35,6 +36,9 @@ vi.mock("../../../behavior/organization-api.ts", () => {
       organization: {
         getMemberById: {
           useQuery: () => ({ data: state.member, isError: false, error: null }),
+        },
+        getSeatRemovalPreview: {
+          useQuery: () => ({ data: undefined, isSuccess: false, isError: false }),
         },
         deleteMember: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
         setMemberDisabled: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },

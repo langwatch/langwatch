@@ -9,9 +9,14 @@ import { Card } from "@langwatch/design-system/card";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
 import { Box, Button, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingList, SettingRow, StatusChip } from "@langwatch/design-system/settings-card";
-import { Check } from "lucide-react";
+import { Check, Info } from "lucide-react";
 
-import type { PlanEventUsage, PlanPrice } from "../../model/subscription-page-state.ts";
+import {
+  type FixedSeats,
+  fixedSeatsLine,
+  type PlanEventUsage,
+  type PlanPrice,
+} from "../../model/subscription-page-state.ts";
 
 const METER_FILL: Record<PlanEventUsage["status"], string> = {
   ok: "blue.solid",
@@ -105,6 +110,29 @@ function PlanActions({
   );
 }
 
+/** Seats fixed until renewal: what they cover and who changes them. */
+function FixedSeatsLine({
+  fixedSeats,
+  contactUrl,
+}: {
+  fixedSeats: FixedSeats;
+  contactUrl: string;
+}) {
+  return (
+    <HStack gap={2} align="start" color="fg.muted" data-testid="fixed-seats-line">
+      <Box flexShrink={0} paddingTop={1}>
+        <Info size={14} />
+      </Box>
+      <Text textStyle="bodySm">
+        {fixedSeatsLine(fixedSeats)}{" "}
+        <Link href={contactUrl} isExternal color="orange.fg">
+          Contact us
+        </Link>
+      </Text>
+    </HStack>
+  );
+}
+
 export function CurrentPlanBlock({
   planName,
   pricing,
@@ -121,6 +149,8 @@ export function CurrentPlanBlock({
   isManageLoading,
   deprecatedNotice,
   contactSalesUrl,
+  fixedSeats,
+  fixedSeatsContactUrl,
 }: {
   planName: string;
   pricing?: PlanPrice;
@@ -138,9 +168,14 @@ export function CurrentPlanBlock({
   isManageLoading?: boolean;
   deprecatedNotice?: boolean;
   contactSalesUrl?: string;
+  /** A contract or licence: the seats are shown with how to add more, never a seat control. */
+  fixedSeats?: FixedSeats;
+  fixedSeatsContactUrl?: string;
 }) {
+  // Fixed seats carry their own "Contact us" link, so the card has no second one.
+  const salesUrl = fixedSeats ? undefined : contactSalesUrl;
   const isOverSeats = maxSeats != null && userCount > maxSeats;
-  const hasActions = Boolean(onUpgrade || onManageSubscription || contactSalesUrl);
+  const hasActions = Boolean(onUpgrade || onManageSubscription || salesUrl);
   return (
     <Card
       data-testid="current-plan-block"
@@ -171,7 +206,7 @@ export function CurrentPlanBlock({
             isUpgradeLoading={isUpgradeLoading}
             onManageSubscription={onManageSubscription}
             isManageLoading={isManageLoading}
-            contactSalesUrl={contactSalesUrl}
+            contactSalesUrl={salesUrl}
           />
         ) : undefined
       }
@@ -202,7 +237,7 @@ export function CurrentPlanBlock({
             >
               {maxSeats != null ? `${userCount} / ${maxSeats}` : userCount}
             </Text>
-            {onUserCountClick && (
+            {onUserCountClick && !fixedSeats && (
               <Button
                 data-testid="user-count-link"
                 variant="outline"
@@ -214,6 +249,9 @@ export function CurrentPlanBlock({
             )}
           </SettingRow>
         </SettingList>
+        {fixedSeats && fixedSeatsContactUrl && (
+          <FixedSeatsLine fixedSeats={fixedSeats} contactUrl={fixedSeatsContactUrl} />
+        )}
         {features && (
           <SimpleGrid
             data-testid="current-plan-features-grid"
