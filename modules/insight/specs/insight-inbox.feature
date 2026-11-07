@@ -1,7 +1,8 @@
 Feature: The insights inbox
   Langy writes short findings about a project for one person. An insight has one owner,
   the person whose Langy made it. Only the owner reads it, marks it done or keeps it; to
-  everyone else it does not exist. Copying its text is how an owner shares it.
+  everyone else it does not exist. Until a share action exists, an owner shares it by selecting
+  and pasting its text.
 
   Background:
     Given the release_insights flag is on for the project
@@ -419,33 +420,11 @@ Feature: The insights inbox
       When the line under its title is written
       Then it reads "Kept as still relevant"
 
-  Rule: Copying an insight
-    Copy puts a plain-text version on the clipboard, to paste into Slack or an email. It is
-    the only way an insight leaves its owner.
-
-    @unit
-    Scenario: The copied text carries the title, the body, the fixed period and the board
-      Given an insight from a widget on a board, with a window from Jul 5 to Aug 3 2026, the period "Last 30 days" and a model parameter
-      When its plain text is written
-      Then it reads the title, then the body with its numbers as Langy wrote them and its headers as plain lines
-      And a line with the first and the last day, the year, the period and the parameter with its value
-      And a line with the board and the widget as they were filed
-
-    @unit
-    Scenario: The copied text of an insight with no board and no window is its title and body
-      Given an insight filed with no board and no window
-      When its plain text is written
-      Then it reads the title and the body, and names no period and no board
+  Rule: Sharing an insight
+    Until a share action exists, an owner shares an insight by selecting and pasting its text.
 
     @integration
-    Scenario: Copy puts the insight on the clipboard and says so
-      Given an insight in the inbox
-      When the reader chooses Copy
-      Then its plain text is written to the clipboard
-      And they read "Copied. Paste it anywhere."
-
-    @integration
-    Scenario: A clipboard that refuses says the copy failed
-      Given a browser that refuses the clipboard
-      When the reader chooses Copy
-      Then they are told the insight could not be copied
+    Scenario: An owner can share an insight by selecting and pasting its text
+      Given an insight in the owner's inbox
+      When the owner selects and pastes its text
+      Then the insight text is available to select and paste

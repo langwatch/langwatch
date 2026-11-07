@@ -9,7 +9,6 @@ import { type InsightEntry, type InsightFolder, insightSnippet } from "@langwatc
 import {
   Check,
   Clock3,
-  Copy,
   LayoutDashboard,
   type LucideIcon,
   MessageCircleMore,
@@ -34,7 +33,6 @@ export type InsightRowActions = {
   onKeep: () => void;
   onRestore: () => void;
   onChat: () => void;
-  onCopy: () => void;
   onNotUseful: () => void;
 };
 
@@ -226,7 +224,6 @@ export function InsightRow({
             <FooterButton icon={RotateCcw} label="Restore" onClick={actions.onRestore} />
           )}
           <FooterButton icon={MessageCircleMore} label="Chat about it" onClick={actions.onChat} />
-          <FooterButton icon={Copy} label="Copy" onClick={actions.onCopy} />
           {folder !== "archived" && (
             <Button
               marginLeft="auto"
