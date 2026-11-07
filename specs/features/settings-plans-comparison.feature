@@ -93,7 +93,7 @@ Feature: Settings Plans Comparison Page
       | extra event pricing           | <events> per additional 100,000 events         |
       | included data retention       | 30 days                                        |
       | custom retention              | <retention> per GB                             |
-      | core users                    | up to 20 with volume discount                  |
+      | core users                    | volume discounts above 20 users                |
       | lite users                    | unlimited                                      |
       | evals simulations and prompts | unlimited                                      |
 
