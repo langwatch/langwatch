@@ -15,6 +15,7 @@ import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.chan
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
+import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingOrganizationUsageService } from "../nurturing-organization-usage.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
 
@@ -37,7 +38,6 @@ const USAGE_TRAIT_KEYS = [
   "error_count",
   "total_cost",
   "last_failed_trace_at",
-  "usage_synced_at",
 ];
 
 const NO_TRACES: TraceUsageSummary = {
@@ -90,9 +90,11 @@ async function syncOver(
   {
     statuses = [],
     failingProjects = new Set<string>(),
+    claims = MemoryNurturingClaimRepository.create(),
   }: {
     statuses?: number[];
     failingProjects?: Set<string>;
+    claims?: NurturingClaimRepository;
   } = {},
 ) {
   const clock = { at: NOW - DAY_MS };
@@ -164,7 +166,7 @@ async function syncOver(
       placed: new Map(projects.map((project) => [project.id, project.organizationId])),
       archived: new Set(projects.filter(({ archived }) => archived).map(({ id }) => id)),
     }),
-    claims: MemoryNurturingClaimRepository.create(),
+    claims,
     customerIo: cio.service,
     prompts,
     evaluators,
@@ -214,7 +216,6 @@ describe("NurturingOrganizationUsageService", () => {
             error_count: 1,
             total_cost: 0.75,
             last_failed_trace_at: seconds(failedAt),
-            usage_synced_at: seconds(NOW),
           },
         },
       ]);
@@ -272,7 +273,6 @@ describe("NurturingOrganizationUsageService", () => {
             trace_count: 0,
             error_count: 0,
             total_cost: 0,
-            usage_synced_at: seconds(NOW),
           },
         },
       ]);
@@ -381,6 +381,36 @@ describe("NurturingOrganizationUsageService", () => {
       await expect(service.syncAll({ now: NOW })).rejects.toThrow("not synced");
       expect(cio.groups()).toEqual([]);
 
+      await service.syncAll({ now: NOW });
+
+      expect(cio.groups().map(({ groupId }) => groupId)).toEqual(["org-1", "org-2"]);
+    });
+  });
+
+  describe("given the claim for a page's second organization is rejected", () => {
+    /** @scenario A rejected claim gives the page's earlier claims back */
+    it("gives the first organization's claim back and fails with the rejection", async () => {
+      const memory = MemoryNurturingClaimRepository.create();
+      const released: string[] = [];
+      const redis = { down: true };
+      const claims: NurturingClaimRepository = {
+        claim: async (key, ttlSeconds) => {
+          if (redis.down && key.includes("org-2")) throw new Error("redis down");
+          return memory.claim(key, ttlSeconds);
+        },
+        release: async (key) => {
+          released.push(key);
+          await memory.release(key);
+        },
+      };
+      const { service, cio } = await syncOver([{ id: "org-1" }, { id: "org-2" }], { claims });
+
+      await expect(service.syncAll({ now: NOW })).rejects.toThrow("redis down");
+
+      expect(released).toEqual(["nurturing:organization_usage:org-1:2026-11-06"]);
+      expect(cio.groups()).toEqual([]);
+
+      redis.down = false;
       await service.syncAll({ now: NOW });
 
       expect(cio.groups().map(({ groupId }) => groupId)).toEqual(["org-1", "org-2"]);

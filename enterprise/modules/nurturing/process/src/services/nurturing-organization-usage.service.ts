@@ -65,7 +65,7 @@ export class NurturingOrganizationUsageService {
         limit: PAGE_SIZE,
         ...(afterId === undefined ? {} : { afterId }),
       });
-      unsynced += await this.#syncPage({ page, since, day, now });
+      unsynced += await this.#syncPage({ page, since, day });
       const last = page.at(-1);
       more = page.length === PAGE_SIZE && last !== undefined;
       afterId = last?.organizationId;
@@ -82,33 +82,36 @@ export class NurturingOrganizationUsageService {
     page,
     since,
     day,
-    now,
   }: Readonly<{
     page: readonly NurturingUsageOrganization[];
     since: number;
     day: string;
-    now: number;
   }>): Promise<number> {
     const { claims, customerIo } = this.dependencies;
     const release = NurturingClaimReleaseService.create(claims);
     const claimed: string[] = [];
     const calls: CioBatchCall[] = [];
     let failed = 0;
-    for (const { organizationId, adminUserId } of page) {
-      const claimKey = `nurturing:organization_usage:${organizationId}:${day}`;
-      if (!(await claims.claim(claimKey, SYNCED_WINDOW_SECONDS))) continue;
-      try {
-        const usage = await this.#usageOf({ organizationId, since });
-        calls.push(usageGroupCall({ organizationId, adminUserId, usage, syncedAt: now }));
-        claimed.push(claimKey);
-      } catch (error) {
-        failed++;
-        const released = await release.releasedAll([claimKey]);
-        nurturingLogger.error(
-          { error, released, organizationId },
-          "an organization's usage could not be read; its claim is given back",
-        );
+    try {
+      for (const { organizationId, adminUserId } of page) {
+        const claimKey = `nurturing:organization_usage:${organizationId}:${day}`;
+        if (!(await claims.claim(claimKey, SYNCED_WINDOW_SECONDS))) continue;
+        try {
+          const usage = await this.#usageOf({ organizationId, since });
+          calls.push(usageGroupCall({ organizationId, adminUserId, usage }));
+          claimed.push(claimKey);
+        } catch (error) {
+          failed++;
+          const released = await release.releasedAll([claimKey]);
+          nurturingLogger.error(
+            { error, released, organizationId },
+            "an organization's usage could not be read; its claim is given back",
+          );
+        }
       }
+    } catch (error) {
+      // A claim itself failed (Redis): the page's earlier claims were never sent, so retry them.
+      return release.rethrowAfterReleasing({ error, keys: claimed });
     }
     if (calls.length === 0) return failed;
     try {

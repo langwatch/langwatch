@@ -40,12 +40,10 @@ export function usageGroupCall({
   organizationId,
   adminUserId,
   usage,
-  syncedAt,
 }: {
   organizationId: string;
   adminUserId: string;
   usage: OrganizationUsage;
-  syncedAt: number;
 }): CioBatchCall {
   const traits: Partial<CioOrgTraits> = {
     prompt_count: usage.promptCount,
@@ -57,7 +55,6 @@ export function usageGroupCall({
     ...(usage.lastFailedTraceAt === null
       ? {}
       : { last_failed_trace_at: unixSecondsOf(usage.lastFailedTraceAt) }),
-    usage_synced_at: unixSecondsOf(syncedAt),
   };
   return { type: "group", userId: adminUserId, groupId: organizationId, traits };
 }

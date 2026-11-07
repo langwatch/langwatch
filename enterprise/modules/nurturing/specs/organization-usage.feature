@@ -25,7 +25,7 @@ Feature: An organization's usage reaches Customer.io once a day
   @unit
   Scenario: The group call carries only the usage traits
     When the daily sync sends an organization's group call
-    Then its trait keys are exactly the usage counts, the failed trace time and usage_synced_at
+    Then its trait keys are exactly the usage counts and the failed trace time
 
   @integration
   Scenario: A trace stored in two versions counts once with its newest cost
@@ -74,6 +74,13 @@ Feature: An organization's usage reaches Customer.io once a day
     Given Customer.io refuses a page's batch
     When the sync is retried
     Then the page's organizations are sent
+
+  @unit
+  Scenario: A rejected claim gives the page's earlier claims back
+    Given the claim for a page's second organization is rejected
+    When the daily sync runs
+    Then the first organization's claim is given back and the error is raised
+    And the retry sends both
 
   @unit
   Scenario: Only organizations active in the last 30 days and with an admin are read

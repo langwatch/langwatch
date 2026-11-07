@@ -147,7 +147,6 @@ export interface CioOrgTraits {
   total_cost: number;
   /** Absent when no trace in the window failed. */
   last_failed_trace_at?: number;
-  usage_synced_at: number;
 }
 
 // ---------------------------------------------------------------------------

@@ -21,7 +21,6 @@ const USAGE_TRAIT_KEYS = [
   "error_count",
   "total_cost",
   "last_failed_trace_at",
-  "usage_synced_at",
 ];
 
 const usage: OrganizationUsage = {
@@ -58,8 +57,6 @@ describe("isUsageSyncDue", () => {
 });
 
 describe("usageGroupCall", () => {
-  const syncedAt = at("2026-11-06T05:10:00.900Z");
-
   describe("given an organization's counts and a failed trace", () => {
     /** @scenario An active organization's usage reaches Customer.io as one group call */
     it("groups the admin into the organization with the counts and the failed time in seconds", () => {
@@ -67,7 +64,6 @@ describe("usageGroupCall", () => {
         organizationId: "org-1",
         adminUserId: "admin-1",
         usage,
-        syncedAt,
       });
 
       expect(call).toEqual({
@@ -82,7 +78,6 @@ describe("usageGroupCall", () => {
           error_count: 1,
           total_cost: 0.42,
           last_failed_trace_at: Math.floor(at("2026-11-05T10:00:00Z") / 1000),
-          usage_synced_at: Math.floor(at("2026-11-06T05:10:00Z") / 1000),
         },
       });
     });
@@ -93,7 +88,6 @@ describe("usageGroupCall", () => {
         organizationId: "org-1",
         adminUserId: "admin-1",
         usage,
-        syncedAt,
       });
 
       expect(call.type === "group" && Object.keys(call.traits ?? {}).toSorted()).toEqual(
@@ -117,7 +111,6 @@ describe("usageGroupCall", () => {
           totalCost: 0,
           lastFailedTraceAt: null,
         },
-        syncedAt,
       });
 
       expect(call).toMatchObject({

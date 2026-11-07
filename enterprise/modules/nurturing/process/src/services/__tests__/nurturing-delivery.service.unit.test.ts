@@ -337,18 +337,6 @@ describe("NurturingDeliveryService", () => {
       expect(cio.sent).toHaveLength(1);
     });
 
-    it("sends Customer.io nothing when the organization has no admin", async () => {
-      const { cio, delivery } = deliveryOverBothSinks();
-
-      await delivery.deliver({
-        key: "project_active_day:event-8",
-        signal: { ...activeDay, sourceEventId: "event-8", userId: "" },
-      });
-      await settle();
-
-      expect(cio.sent).toEqual([]);
-    });
-
     /** @scenario "an active-day signal without a signup age or a variant carries neither" */
     it("carries the source and the project only", async () => {
       const { posthog, delivery } = deliveryOverBothSinks();

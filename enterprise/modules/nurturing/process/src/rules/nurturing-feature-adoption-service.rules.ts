@@ -90,7 +90,6 @@ export function fireProjectActiveDay({
   daysSinceSignup,
   sourceEventId,
 }: NurturingSignalOf<"project_active_day">): CioBatchCall[] {
-  if (!userId) return [];
   return [
     {
       type: "track",
