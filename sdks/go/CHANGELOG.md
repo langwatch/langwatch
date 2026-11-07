@@ -1,5 +1,50 @@
 # Changelog
 
+## [2.0.0](https://github.com/langwatch/langwatch/compare/sdks/go/v1.0.0...sdks/go/v2.0.0) (2026-11-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk:** client.dashboards and langwatch.dashboards now address the new Dashboards API, not the old Reports; use client.analyticsReports / langwatch.analytics_reports for those. MCP Reports tools are renamed platform_*_analytics_report(s).
+
+### Features
+
+* agent and evaluator versioning with deploy labels, plus experiment and dependency fixes ([#9124](https://github.com/langwatch/langwatch/issues/9124)) ([ec774cb](https://github.com/langwatch/langwatch/commit/ec774cb12756a472d7260f6ed5e2292e324906cd))
+* **coding-agent:** capture Grok CLI sessions through its native OpenTelemetry ([#9224](https://github.com/langwatch/langwatch/issues/9224)) ([34c0f70](https://github.com/langwatch/langwatch/commit/34c0f700c4ff679717de20ad9bd15647631b8cec))
+* **coding-agent:** copilot CLI and VS Code sessions become rows ([#8884](https://github.com/langwatch/langwatch/issues/8884)) ([e5c5e8c](https://github.com/langwatch/langwatch/commit/e5c5e8c3eb372ac02eed8ad7e5bd1810fc3c3be1))
+* **coding-agent:** track pi as a natively instrumented coding agent ([#9203](https://github.com/langwatch/langwatch/issues/9203)) ([52eaa9e](https://github.com/langwatch/langwatch/commit/52eaa9e8f38533d84dfdde9896ac0edcd5cffb7a))
+* **dashboard:** add REST create and delete for Dashboards boards ([#8896](https://github.com/langwatch/langwatch/issues/8896)) ([fbc1469](https://github.com/langwatch/langwatch/commit/fbc1469027d6ef59c920243f63e2ebaf2264bcf8))
+* **dashboard:** move dashboards v2 onto its own tables ([#8707](https://github.com/langwatch/langwatch/issues/8707)) ([7f1f527](https://github.com/langwatch/langwatch/commit/7f1f527f85363fe97cdc93d300b7c469de4463eb))
+* **dashboards,insight:** dashboards and insights v1 ([#8545](https://github.com/langwatch/langwatch/issues/8545)) ([7b5e13d](https://github.com/langwatch/langwatch/commit/7b5e13dd84492d526f1442e3360005ff1ed08613))
+* **dashboards:** a per-dashboard Langy traces setting ([#9099](https://github.com/langwatch/langwatch/issues/9099)) ([821b467](https://github.com/langwatch/langwatch/commit/821b467e8a628e599951b42d3c871f0db454efd8))
+* **dashboards:** per-widget "Langy traces" setting in the query editor ([#9137](https://github.com/langwatch/langwatch/issues/9137)) ([5e82c1e](https://github.com/langwatch/langwatch/commit/5e82c1ebc1d2dbfda817cf175f3aba62e485a0d8))
+* **dashboards:** widget queries take sources and projects as params ([#9171](https://github.com/langwatch/langwatch/issues/9171)) ([af5a9c3](https://github.com/langwatch/langwatch/commit/af5a9c342951371a1cf547188cff78f9cd50bcc1))
+* **dataset:** dataset version history with autosave, compare, restore, retention and run pinning ([#9121](https://github.com/langwatch/langwatch/issues/9121)) ([f50c6f0](https://github.com/langwatch/langwatch/commit/f50c6f0c999e9e1cadf7173db0e87b9d3f1108de))
+* **docs:** add a lightweight static docs app ([#8563](https://github.com/langwatch/langwatch/issues/8563)) ([395ed9c](https://github.com/langwatch/langwatch/commit/395ed9c2ce9de4f25497a3b90092a1e647018ac6))
+* **experiment:** accept a per-run concurrency on the experiment run API ([#9023](https://github.com/langwatch/langwatch/issues/9023)) ([640d0f6](https://github.com/langwatch/langwatch/commit/640d0f6e21afd19e46eaed9312d4c04c121b9a4b))
+* **members:** developer seat, a member who owns a personal project and nothing shared ([#8373](https://github.com/langwatch/langwatch/issues/8373)) ([30ff7ea](https://github.com/langwatch/langwatch/commit/30ff7ea74a4caba95afb76d59ca9a6906b6f613e))
+* **model-provider:** instant evals decision model column with own-key decision models ([#8935](https://github.com/langwatch/langwatch/issues/8935)) ([9b022a5](https://github.com/langwatch/langwatch/commit/9b022a535f304bee38bca86530cc901b03731baa))
+* **monitor:** pause a monitor whose evaluations mostly fail ([#9040](https://github.com/langwatch/langwatch/issues/9040)) ([fcbd9ed](https://github.com/langwatch/langwatch/commit/fcbd9edabbfa2fd9b3a4c142c678298a846e184d))
+* **organization:** seat requests over the limit, IdP refusal screens and a Billing role ([#9391](https://github.com/langwatch/langwatch/issues/9391)) ([0805d4e](https://github.com/langwatch/langwatch/commit/0805d4ee7d7ca66f10740a417176c7261c9c3e38))
+* **scenarios:** setup and teardown hooks for connected agents ([#8765](https://github.com/langwatch/langwatch/issues/8765)) ([b0949cd](https://github.com/langwatch/langwatch/commit/b0949cdd929d35f030ddeb2fc1c16b1f33328c0f))
+* **sdk:** one product per dashboards path; dashboards means the new product everywhere ([#9089](https://github.com/langwatch/langwatch/issues/9089)) ([552534d](https://github.com/langwatch/langwatch/commit/552534d24487441ac5395d91c1af69ed072a0c00))
+* **sdks:** send traces as gzipped OTLP/protobuf by default in every SDK ([#8592](https://github.com/langwatch/langwatch/issues/8592)) ([206c830](https://github.com/langwatch/langwatch/commit/206c830dc5653660348004fb10a267cc9d13e7b2))
+* **server:** npx downloads a prebuilt app; evaluations retry while the evaluator is down ([#8845](https://github.com/langwatch/langwatch/issues/8845)) ([6e44487](https://github.com/langwatch/langwatch/commit/6e444878b00756e6d31e3d6cb36611b80920234c))
+
+
+### Bug Fixes
+
+* **agents,experiment:** agent edits refresh without reload, plus experiment workbench fixes ([#9290](https://github.com/langwatch/langwatch/issues/9290)) ([c4e344c](https://github.com/langwatch/langwatch/commit/c4e344ce7ffb073ee7e0933322340d60288e2025))
+* **annotations:** serialize annotation commands per trace and 404 on unknown delete ([#8400](https://github.com/langwatch/langwatch/issues/8400)) ([7606bf6](https://github.com/langwatch/langwatch/commit/7606bf6a6641e03912b2e16bbafbe0021f681bb8))
+* **billing:** let every organization member start a paid subscription ([#9370](https://github.com/langwatch/langwatch/issues/9370)) ([56f6a10](https://github.com/langwatch/langwatch/commit/56f6a106451981e4d36dbbe831a33d37af034c1a))
+* follow-ups that missed the [#7536](https://github.com/langwatch/langwatch/issues/7536) merge (eventing leases, group-queue dead workers, upgrade pacing, upgradelab) ([#8580](https://github.com/langwatch/langwatch/issues/8580)) ([7aca052](https://github.com/langwatch/langwatch/commit/7aca0524747e37193b219add62a00b45b1e55ae7))
+* **image:** install the scenario child's build dependencies before building it ([#8702](https://github.com/langwatch/langwatch/issues/8702)) ([5520bdf](https://github.com/langwatch/langwatch/commit/5520bdffb039d3adce901a019e4ca91bd2476de7))
+* **langevals:** judges reach a verdict on gpt-6 reasoning models ([#9102](https://github.com/langwatch/langwatch/issues/9102)) ([d7b6238](https://github.com/langwatch/langwatch/commit/d7b623874e55e0b6af4d81ce9671114d54dfb2cc))
+* **security:** close all 52 Go alerts (grpc 1.83.2 in 16 modules, OTel-Go 1.45.0 in the SDK) ([#7931](https://github.com/langwatch/langwatch/issues/7931)) ([691f480](https://github.com/langwatch/langwatch/commit/691f4807bb06db2213898e640b0e4075168062bc))
+* **trace:** a span's own attributes never break its read on a request-param name ([#9179](https://github.com/langwatch/langwatch/issues/9179)) ([d8adba2](https://github.com/langwatch/langwatch/commit/d8adba263b07692e61b5621527d5ade34d019894))
+* **triggers:** refuse a different customGraphId on PATCH instead of ignoring it ([#8433](https://github.com/langwatch/langwatch/issues/8433)) ([0ad8ad2](https://github.com/langwatch/langwatch/commit/0ad8ad2e1ae6981c130c4c2877bbd5e2722e8dd6))
+* workflow run answers keep the engine's trace, cost, timing and error; profiles use the reported service name ([#8677](https://github.com/langwatch/langwatch/issues/8677)) ([6c601fb](https://github.com/langwatch/langwatch/commit/6c601fb2d8c59abf20657b940276f7989e1040da))
+
 ## [1.0.0](https://github.com/langwatch/langwatch/compare/sdks/go/v0.3.0...sdks/go/v1.0.0) (2026-09-09)
 
 ### ⚠ BREAKING CHANGES
