@@ -25,6 +25,7 @@ import type {
   OrganizationMemberWithUser,
   OrganizationMembershipRepository,
 } from "../repositories/organization-membership.repository.ts";
+import type { SeatRequestRepository } from "../repositories/seat-request.repository.ts";
 import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import { enrichTeamWithGrants } from "../rules/team-grant-enrichment.rules.ts";
 import type { OrganizationGrantCeilingService } from "./organization-grant-ceiling.service.ts";
@@ -73,6 +74,8 @@ type OrganizationMembershipDependencies = {
   ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
   /** The 30-day seat hold (seat-rotation.feature). */
   seatHolds: SeatHoldService;
+  /** Seat requests, closed when a waiting person is admitted (seat-requests.feature). */
+  seatRequests: Pick<SeatRequestRepository, "findForUser" | "resolve">;
 };
 
 /**

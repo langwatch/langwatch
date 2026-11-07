@@ -3,10 +3,7 @@
  * seat service, the subscription webhook and the plan the seat limit reads, on memory twins.
  * @see specs/licensing/seat-rotation.feature
  */
-import {
-  SeatChangeInProgressError,
-  type StripePriceMap,
-} from "@langwatch/enterprise-billing-contract";
+import { SeatChangeBusyError, type StripePriceMap } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi, LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
@@ -380,7 +377,7 @@ describe("Growth seat changes", () => {
         .catch((error: unknown) => error);
       await vi.advanceTimersByTimeAsync(20_000);
 
-      expect(await change).toBeInstanceOf(SeatChangeInProgressError);
+      expect(await change).toBeInstanceOf(SeatChangeBusyError);
 
       expect(stripeSubscriptions.updates).toEqual([]);
     });

@@ -39,6 +39,8 @@ export function InvoicesBlock({
   const rows = !invoices.isLoading && !invoices.isError ? invoices.data : undefined;
   // Nothing until the list answers: a skeleton that then vanishes only shifts the page.
   if (hideWhenEmpty && (invoices.isLoading || rows?.length === 0)) return null;
+  // Invoices are for whoever pays (`subscription:manage`); anyone else sees no block at all.
+  if (invoices.error?.data?.httpStatus === 403) return null;
 
   return (
     <SettingsSection

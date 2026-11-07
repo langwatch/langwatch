@@ -30,6 +30,7 @@ export class SeatCheckoutSessionService {
     lineItems,
     isUpgradeFromTiered,
     subscriptionId,
+    startedByUserId,
   }: {
     customerId: string;
     baseUrl: string;
@@ -38,6 +39,7 @@ export class SeatCheckoutSessionService {
     lineItems: ReturnType<typeof createCheckoutLineItems>;
     isUpgradeFromTiered: boolean;
     subscriptionId: string;
+    startedByUserId?: string;
   }): Promise<{ url: string | null }> {
     const selectedOptionsMetadata = {
       selectedCurrency: checkoutCurrency,
@@ -60,7 +62,8 @@ export class SeatCheckoutSessionService {
       customerId,
       currency: checkoutCurrency.toLowerCase(),
       lineItems,
-      metadata: selectedOptionsMetadata,
+      // The starter rides on the session only: its completion grants them the Billing role.
+      metadata: { ...selectedOptionsMetadata, ...(startedByUserId ? { startedByUserId } : {}) },
       subscription: {
         metadata: selectedOptionsMetadata,
         billingCycleAnchor: Math.floor(billingCycleAnchor.epochMilliseconds / 1000),

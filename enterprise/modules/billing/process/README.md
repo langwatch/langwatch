@@ -92,6 +92,14 @@ Main's `usageLimits.notifyResourceLimitReached`: the ops Slack alert for a reach
 notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void>;
 ```
 
+#### `notifySalesOfSeatRequest`
+
+Tells sales that a person waits for a seat in an organization whose plan only sales can grow, on the subscriptions Slack channel. SaaS only; the caller sends it once per request. Never throws.
+
+```typescript
+notifySalesOfSeatRequest(input: { organizationId: string; organizationName: string; plan: string; seats: number; requestedSeats: number; }): Promise<void>;
+```
+
 #### `getPricingModel`
 
 The organization's pricing model column, which is empty for organizations never migrated.
@@ -225,20 +233,20 @@ interface Output {
 
 ### `subscription`
 
-Contract `../contract/src/subscription.trpc.ts:36`, router `src/transport/subscription.trpc.ts:101`.
+Contract `../contract/src/subscription.trpc.ts:36`, router `src/transport/subscription.trpc.ts:103`.
 
 | Procedure                            | Kind     | Gate                              | Input                     | Output                           |
 | ------------------------------------ | -------- | --------------------------------- | ------------------------- | -------------------------------- |
-| `subscription.addTeamMemberOrEvents` | mutation | Permission `organization:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
+| `subscription.addTeamMemberOrEvents` | mutation | Permission `subscription:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
 | `subscription.create`                | mutation | Permission `subscription:upgrade` | inline                    | `billingRedirectSchema`          |
-| `subscription.manage`                | mutation | Permission `organization:manage`  | inline                    | `billingPortalSessionSchema`     |
-| `subscription.previewProration`      | query    | Permission `organization:manage`  | inline                    | `providerOwnedSchema`            |
+| `subscription.manage`                | mutation | Permission `subscription:manage`  | inline                    | `billingPortalSessionSchema`     |
+| `subscription.previewProration`      | query    | Permission `subscription:manage`  | inline                    | `providerOwnedSchema`            |
 | `subscription.getLastSubscription`   | query    | Permission `organization:view`    | `organizationScopeSchema` | `providerOwnedSchema`            |
-| `subscription.prospective`           | mutation | Permission `organization:manage`  | inline                    | `providerOwnedSchema`            |
+| `subscription.prospective`           | mutation | Permission `subscription:manage`  | inline                    | `providerOwnedSchema`            |
 | `subscription.developerSeats`        | query    | Permission `organization:view`    | `organizationScopeSchema` | `developerSeatsSchema`           |
 | `subscription.previewDeveloperSeats` | query    | Permission `organization:manage`  | inline                    | `developerSeatQuoteSchema`       |
 | `subscription.setDeveloperSeats`     | mutation | Permission `organization:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
-| `subscription.listInvoices`          | query    | Permission `organization:view`    | `organizationScopeSchema` | inline                           |
+| `subscription.listInvoices`          | query    | Permission `subscription:manage`  | `organizationScopeSchema` | inline                           |
 
 ```typescript
 // subscription.addTeamMemberOrEvents
@@ -404,12 +412,12 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                | Environment variable                           | Declared at                            |
 | ------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
-| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:194`           |
-| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:195`           |
-| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:196`           |
-| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:197`           |
-| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:198`           |
-| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:199`           |
+| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:195`           |
+| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:196`           |
+| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:197`           |
+| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:198`           |
+| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:199`           |
+| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:200`           |
 | config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:13` |
 | config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:15` |
 | config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:23` |

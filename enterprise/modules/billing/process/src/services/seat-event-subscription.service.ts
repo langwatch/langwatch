@@ -7,7 +7,7 @@ import {
   isGrowthSeatPrice,
   NoActiveSubscriptionError,
   resolveGrowthSeatPlanType,
-  SeatChangeInProgressError,
+  SeatChangeBusyError,
   type StripePriceMap,
   SubscriptionItemNotFoundError,
   SubscriptionNotLinkedError,
@@ -183,6 +183,7 @@ export class SeatEventSubscriptionService {
     billingInterval,
     membersToAdd,
     isUpgradeFromTiered = false,
+    startedByUserId,
   }: {
     organizationId: string;
     customerId: string;
@@ -191,6 +192,7 @@ export class SeatEventSubscriptionService {
     billingInterval: BillingInterval;
     membersToAdd: number;
     isUpgradeFromTiered?: boolean;
+    startedByUserId?: string;
   }): Promise<{ url: string | null; subscriptionId: string }> => {
     // Resolve the currency before touching the database. A checkout we cannot
     // build in the customer's own currency will be rejected outright, and every
@@ -229,6 +231,7 @@ export class SeatEventSubscriptionService {
       lineItems,
       isUpgradeFromTiered,
       subscriptionId: subscription.id,
+      ...(startedByUserId ? { startedByUserId } : {}),
     });
     return { url, subscriptionId: subscription.id };
   };
@@ -289,7 +292,7 @@ export class SeatEventSubscriptionService {
       work: (guard) =>
         this.changeSeats({ organizationId, leased: found.id, totalMembers, prorationDate, guard }),
     });
-    if (!held.held) throw new SeatChangeInProgressError();
+    if (!held.held) throw new SeatChangeBusyError();
 
     return { success: true };
   }
@@ -311,7 +314,7 @@ export class SeatEventSubscriptionService {
   }): Promise<void> {
     // Read again under the lease: a change it waited behind may have moved the seats it keeps.
     const target = await this.loadSeatChangeTarget(organizationId);
-    if (target.subscription.id !== leased) throw new SeatChangeInProgressError();
+    if (target.subscription.id !== leased) throw new SeatChangeBusyError();
     const { subscription, stripeSubscription, seatItem } = target;
     const plan = this.planChange({ target, requested: totalMembers });
 

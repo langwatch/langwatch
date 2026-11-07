@@ -25,6 +25,7 @@ import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 const openSeats = {
   countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
   findLiveHoldUserIds: async () => [],
+  withSeatLock: <T>({ work }: { work: () => Promise<T> }): Promise<T> => work(),
 };
 
 const ACME = "org_acme";

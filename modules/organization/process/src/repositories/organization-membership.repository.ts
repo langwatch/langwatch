@@ -457,6 +457,16 @@ export abstract class OrganizationMembershipRepository {
   /** The people admission left waiting for a seat, longest waiting first. */
   abstract findWaitingMembers: (input: { organizationId: string }) => Promise<WaitingMember[]>;
 
+  /** Every membership the person holds, with its organization's name and whether it is off. */
+  abstract findMembershipStates: (input: { userId: string }) => Promise<
+    {
+      organizationId: string;
+      organizationName: string;
+      role: OrganizationUserRole;
+      disabled: boolean;
+    }[]
+  >;
+
   /** Every membership row the person holds, disabled ones included. */
   abstract countMembershipsForUser: (input: { userId: string }) => Promise<number>;
 

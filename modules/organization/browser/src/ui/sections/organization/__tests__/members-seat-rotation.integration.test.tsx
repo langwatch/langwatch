@@ -243,7 +243,7 @@ describe("given Qux is waiting for a full member seat", () => {
   });
 
   /** @scenario "A person waiting for a seat is listed as waiting, not disabled" */
-  it("lists Qux as waiting for a seat, not disabled, and counts them as waiting", () => {
+  it("lists Qux once, among the members, as waiting for a seat and not disabled", () => {
     renderUsers();
 
     const waitingRow = screen.getByText("Qux").closest("[data-testid='member-row']");
@@ -252,20 +252,9 @@ describe("given Qux is waiting for a full member seat", () => {
       within(waitingRow as HTMLElement).getByTestId("member-waiting-for-seat"),
     ).toHaveTextContent("Waiting for a seat");
     expect(within(waitingRow as HTMLElement).queryByTestId("member-disabled")).toBeNull();
-    expect(screen.getByRole("button", { name: /^Waiting to join, 1 person/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Members, 3 people/ })).toBeInTheDocument();
-  });
-
-  /** @scenario "The Waiting to join cut lists people waiting for a seat" */
-  it("shows Qux under the Waiting to join cut and not under Members", () => {
-    renderUsers({ people: "waiting" });
-    expect(screen.getByText("Qux")).toBeInTheDocument();
-    expect(screen.queryByText("Bar")).toBeNull();
-    cleanup();
-
-    renderUsers({ people: "members" });
-    expect(screen.queryByText("Qux")).toBeNull();
-    expect(screen.getByText("Baz")).toBeInTheDocument();
+    expect(screen.getAllByText("Qux")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: /^Members, 4 people/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Waiting to join, 0 people/ })).toBeInTheDocument();
   });
 
   /** @scenario "A person waiting for a seat can be given one from their row" */

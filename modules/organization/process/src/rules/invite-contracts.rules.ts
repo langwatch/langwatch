@@ -39,6 +39,8 @@ export interface OrganizationInviteSeatCensus {
     userId: string;
     email?: string;
   }): Promise<boolean>;
+  /** The organization's seat lock, held while a batch is counted and written. */
+  withSeatLock<T>(input: { organizationId: string; work: () => Promise<T> }): Promise<T>;
 }
 
 /**

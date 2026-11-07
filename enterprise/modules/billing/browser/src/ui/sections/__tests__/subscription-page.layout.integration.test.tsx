@@ -381,6 +381,28 @@ describe("<SubscriptionPage/> layout", () => {
     });
   });
 
+  describe("when the person viewing does not manage the subscription", () => {
+    beforeEach(() => {
+      givenOneMember();
+      givenUsage({ membersCount: 1, messageLimitInfo: eventLimit({}) });
+      mockListInvoices.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: { data: { httpStatus: 403 } },
+      });
+    });
+
+    /** @scenario "A member who does not pay sees no invoices block and no error" */
+    it("shows no invoices block and no error banner", async () => {
+      renderSubscriptionPage();
+
+      await screen.findByTestId("current-plan-block");
+      expect(screen.queryByTestId("invoices-block")).toBeNull();
+      expect(screen.queryByText(/failed to load invoices/i)).toBeNull();
+    });
+  });
+
   describe("when a Free organization has invoices from an earlier subscription", () => {
     beforeEach(() => {
       givenOneMember();

@@ -24,6 +24,11 @@ type JoinRequestNotifierMemberships = {
   getMemberCount(organizationId: string): Promise<number>;
 };
 
+/** Whether the joiner holds an open seat request, whose own mail already tells the admins. */
+type JoinRequestNotifierSeatRequests = {
+  isSeatRequested(input: { organizationId: string; userId: string }): Promise<boolean>;
+};
+
 /**
  * Who is told, and how. Every fan-out is `Promise.allSettled`, for the reason D11's re-request mail
  * gives: one bouncing admin address must not silence the rest. A mail that cannot be sent is logged
@@ -39,6 +44,7 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     /** Read for the seat census a domain-auto-join notice carries. Absent omits it. */
     plans?: JoinRequestNotifierPlans;
     memberships?: JoinRequestNotifierMemberships;
+    seatRequests?: JoinRequestNotifierSeatRequests;
   }): JoinRequestNotifierService {
     return new JoinRequestNotifierService({
       audience: options.audience,
@@ -47,6 +53,7 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
       baseHost: options.baseHost,
       plans: options.plans,
       memberships: options.memberships,
+      seatRequests: options.seatRequests,
     });
   }
 
@@ -56,6 +63,7 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
   private readonly baseHost: string;
   private readonly plans: JoinRequestNotifierPlans | undefined;
   private readonly memberships: JoinRequestNotifierMemberships | undefined;
+  private readonly seatRequests: JoinRequestNotifierSeatRequests | undefined;
 
   private constructor({
     audience,
@@ -64,6 +72,7 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     baseHost,
     plans,
     memberships,
+    seatRequests,
   }: {
     audience: JoinRequestAudienceRepository;
     context: JoinRequestNotificationContextRepository;
@@ -71,6 +80,7 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     baseHost: string;
     plans: JoinRequestNotifierPlans | undefined;
     memberships: JoinRequestNotifierMemberships | undefined;
+    seatRequests: JoinRequestNotifierSeatRequests | undefined;
   }) {
     this.audience = audience;
     this.context = context;
@@ -78,6 +88,7 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     this.baseHost = baseHost;
     this.plans = plans;
     this.memberships = memberships;
+    this.seatRequests = seatRequests;
   }
 
   async requestArrived({
@@ -268,6 +279,8 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     requesterUserId: string;
     domain: string;
   }): Promise<void> {
+    // A Lite joiner waiting for a full seat is told about once, by the seat request mail.
+    if (await this.isSeatRequested({ organizationId, userId: requesterUserId })) return;
     const [organizationName, memberName, admins, seats] = await Promise.all([
       this.organizationName({ organizationId }),
       this.displayName({ userId: requesterUserId }),
@@ -391,6 +404,20 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
   private async tryPersonalProjectUrl({ userId }: { userId: string }): Promise<string | undefined> {
     const [slug] = await this.context.findPersonalTeamSlugs(userId);
     return slug ? `${this.baseHost}/${slug}` : undefined;
+  }
+
+  /** A failed read sends the auto-join mail anyway: a second mail beats none. */
+  private async isSeatRequested(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<boolean> {
+    if (!this.seatRequests) return false;
+    try {
+      return await this.seatRequests.isSeatRequested(input);
+    } catch (error) {
+      logger.warn({ error, ...input }, "Could not read the joiner's seat request");
+      return false;
+    }
   }
 
   /**

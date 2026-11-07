@@ -17,4 +17,5 @@ export class MembersFake implements ScimMembers {
   readonly deleteMember = vi.fn(async (): Promise<void> => undefined);
   readonly holdSeatOfDepartingMember = vi.fn(async (): Promise<void> => undefined);
   readonly takeBackHeldSeat = vi.fn(async (): Promise<void> => undefined);
+  readonly openSeatRequestForAdmission = vi.fn(async (): Promise<void> => undefined);
 }

@@ -13,6 +13,7 @@ import {
 
 import type { OrganizationMembershipRepository } from "../repositories/organization-membership.repository.ts";
 import type { SeatTransition } from "../repositories/seat-hold.repository.ts";
+import type { SeatRequestRepository } from "../repositories/seat-request.repository.ts";
 import type {
   OrganizationAdmissions,
   OrganizationMemberAdmissionService,
@@ -39,6 +40,8 @@ type OrganizationMemberSeatDependencies = {
   seatHolds: SeatHoldService;
   admission: Pick<OrganizationMemberAdmissionService, "deleteMember">;
   admissions: OrganizationAdmissions;
+  /** The person's seat request, closed once they hold the seat (seat-requests.feature). */
+  seatRequests: Pick<SeatRequestRepository, "findForUser" | "resolve">;
 };
 
 const logger = createLogger("langwatch:organization:member-seats");
@@ -142,11 +145,15 @@ export class OrganizationMemberSeatService {
     await this.dependencies.admission.deleteMember({ organizationId, userId, actingUserId });
     if (!giveSeatToUserId) return { seatGivenToUserId: null, seatHandoverFailed: false };
     try {
-      const admitted = await this.admitWaitingMember({
+      const admitted = await this.dependencies.seats.withSeat({
         organizationId,
-        userId: giveSeatToUserId,
-        actingUserId,
-        caller,
+        work: () =>
+          this.admitWaitingMember({
+            organizationId,
+            userId: giveSeatToUserId,
+            actingUserId,
+            caller,
+          }),
       });
       return { seatGivenToUserId: admitted ? giveSeatToUserId : null, seatHandoverFailed: false };
     } catch (error) {
@@ -156,9 +163,9 @@ export class OrganizationMemberSeatService {
   }
 
   /**
-   * Gives a full seat to a person admission left waiting: their membership becomes MEMBER and is
-   * enabled. Answers false, changing nothing, when they no longer wait or no full seat fits. Once
-   * enabled the seat is theirs: a grant that fails after it is left for the seat hold check.
+   * Gives a full seat to a person admission left waiting, inside the caller's seat lease: their
+   * membership becomes an enabled MEMBER. Answers false, changing nothing, when they no longer
+   * wait or no full seat fits. A grant that fails after the enable is left for the hourly check.
    */
   async admitWaitingMember({
     organizationId,
@@ -200,13 +207,40 @@ export class OrganizationMemberSeatService {
     await Promise.all([
       seatNotices.memberEnabled({ organizationId, userId, enabledByUserId: actingUserId }),
       grantCache.invalidateOrganization({ organizationId }),
+      this.closeSeatRequest({ organizationId, userId, actingUserId }),
     ]).catch((error: unknown) => {
       logger.error(
         { error, organizationId },
-        "notice or cache drop after admitting a member failed",
+        "notice, cache drop or seat request close after admitting a member failed",
       );
     });
     return true;
+  }
+
+  /** Approves the person's open seat request in this organization, if they have one. */
+  private async closeSeatRequest({
+    organizationId,
+    userId,
+    actingUserId,
+  }: {
+    organizationId: string;
+    userId: string;
+    actingUserId: string | null;
+  }): Promise<void> {
+    const { seatRequests, seatHolds } = this.dependencies;
+    const open = (await seatRequests.findForUser({ userId })).filter(
+      (request) => request.organizationId === organizationId && request.status === "OPEN",
+    );
+    const at = seatHolds.now().epochMilliseconds;
+    for (const request of open) {
+      await seatRequests.resolve({
+        organizationId,
+        id: request.id,
+        status: "APPROVED",
+        resolvedByUserId: actingUserId,
+        at,
+      });
+    }
   }
 
   /** Lands the member grant an admission from waiting intends, then clears the intent. */
@@ -288,7 +322,10 @@ export class OrganizationMemberSeatService {
     const failures: SeatHoldCheckFailure[] = [];
     for (const organizationId of await seatHolds.findOrganizationsWithEnded({ now })) {
       try {
-        admitted += await this.admitWaitingMembers({ organizationId });
+        admitted += await this.dependencies.seats.withSeat({
+          organizationId,
+          work: () => this.admitWaitingMembers({ organizationId }),
+        });
         await seatHolds.deleteEnded({ organizationId, now });
       } catch (error) {
         failures.push({

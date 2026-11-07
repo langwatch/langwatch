@@ -14,8 +14,8 @@ import {
   OrganizationAdministrationFake,
 } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
-import type { ScimSeatRepository } from "../../repositories/scim-seat.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
+import type { ScimSeats } from "../scim-seat-lease.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
@@ -51,10 +51,11 @@ class OneSeatPlan implements Pick<EntitlementApi, "getActivePlan"> {
   }
 }
 
-function seatsWith({ heldBy }: { heldBy: string[] }): ScimSeatRepository {
+function seatsWith({ heldBy }: { heldBy: string[] }): ScimSeats {
   return {
     countMemberSeats: async () => ({ fullMembers: 1, liteMembers: 0, developers: 0 }),
     findLiveHoldUserIds: async () => heldBy,
+    withSeatLock: ({ work }) => work(),
   };
 }
 
@@ -62,7 +63,7 @@ function provision({
   seats,
   members = new MembersFake(),
 }: {
-  seats: ScimSeatRepository;
+  seats: ScimSeats;
   members?: MembersFake;
 }) {
   const repository = scimRepositoryFixture();
@@ -128,6 +129,28 @@ describe("a directory provisioning a person whose seat is held", () => {
         expect.objectContaining({ userId: "user-1", pending: true }),
       );
       expect(members.takeBackHeldSeat).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A person the directory pushes while every seat is taken opens a seat request" */
+    it("asks organization to open the seat request of the person left waiting", async () => {
+      const { members, push } = provision({ seats: seatsWith({ heldBy: [] }) });
+
+      await push();
+
+      expect(members.openSeatRequestForAdmission).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION_ID,
+        userId: "user-1",
+        admission: { outcome: "created", seat: "EXTERNAL", pending: true },
+      });
+    });
+
+    it("still admits the person when the seat request cannot be opened", async () => {
+      const members = new MembersFake();
+      members.openSeatRequestForAdmission.mockRejectedValueOnce(new Error("database unavailable"));
+      const { repository, push } = provision({ seats: seatsWith({ heldBy: [] }), members });
+
+      await expect(push()).resolves.toBeDefined();
+      expect(repository.addMembership).toHaveBeenCalled();
     });
   });
 

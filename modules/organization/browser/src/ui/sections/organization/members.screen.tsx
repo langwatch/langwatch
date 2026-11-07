@@ -143,7 +143,7 @@ function usePeopleListState({
   const { openDrawer } = useDrawer();
   const { cut, selectCut } = useCutFromAddress();
 
-  const invitesFlow = useInviteFlow({ organization, activePlan });
+  const invitesFlow = useInviteFlow({ organization, activePlan, canManage });
   const removal = useMemberRemoval(organization.id);
   const reads = usePeopleListReads({
     organization,
@@ -188,7 +188,7 @@ function PeopleList({
           onSelectCut={people.selectCut}
           memberCount={people.sortedMembers.length}
           openInviteCount={people.openInvites.length}
-          requestCount={people.joinRequests.requests.length + people.seatWaiters.length}
+          requestCount={people.joinRequests.requests.length}
           onInvite={people.openDrawer}
         />
 
@@ -210,7 +210,6 @@ function PeopleList({
           cut={people.cut}
           organizationId={organization.id}
           members={people.sortedMembers}
-          seatWaiters={people.seatWaiters}
           invites={people.invites}
           openInvites={people.openInvites}
           teams={teams}
@@ -390,7 +389,7 @@ function MemberStatusChip({ member }: { member: Member }) {
     return (
       <IdentityChip
         label="Waiting for a seat"
-        title="They joined while every full seat was taken. Enable them to give them a seat."
+        title="They joined while every full seat was taken. Their seat request is listed under Waiting for a seat."
         data-testid="member-waiting-for-seat"
       />
     );
@@ -462,6 +461,10 @@ function MemberListRow({
   onSetDisabled: ReturnType<typeof useMemberDisableAction>["setMemberDisabled"];
   onRequestRemoval: (target: RemovalTarget) => void;
 }) {
+  // One shared read for every row: the query cache answers all but the first.
+  const billingMembers = api.authz.listBillingMembers.useQuery({ organizationId });
+  const holdsBilling = !!billingMembers.data?.some((holder) => holder.userId === member.userId);
+
   return (
     <PersonIdentityRow
       name={member.user.name}
@@ -480,6 +483,11 @@ function MemberListRow({
           {member.role === "DEVELOPER" && (
             <Badge colorPalette="teal" size="sm">
               Developer
+            </Badge>
+          )}
+          {holdsBilling && (
+            <Badge colorPalette="purple" size="sm" data-testid="member-billing-badge">
+              Billing
             </Badge>
           )}
           <MemberStatusChip member={member} />
@@ -649,7 +657,6 @@ function PeopleRows({
   showDepartment,
   twoStep,
   joinRequests,
-  seatWaiters,
   heldSeats,
   heldSeatByMember,
   canDeleteMember,
@@ -674,7 +681,6 @@ function PeopleRows({
   showDepartment: boolean;
   twoStep: ReturnType<typeof useTwoStepRequirement>;
   joinRequests: ReturnType<typeof useJoinRequests>;
-  seatWaiters: Member[];
   heldSeats: HeldSeat[];
   heldSeatByMember: Map<string, HeldSeat>;
   canDeleteMember: (memberId: string) => boolean;
@@ -705,8 +711,6 @@ function PeopleRows({
     />
   );
   const memberRows = peopleCutShows({ cut, list: "members" }) ? members.map(memberRow) : [];
-  // People admitted while every full seat was taken wait with those asking to join.
-  const seatWaiterRows = peopleCutShows({ cut, list: "waiting" }) ? seatWaiters.map(memberRow) : [];
 
   // A held seat's person is greyed after the members until the seat frees (seat-rotation.feature).
   const heldSeatRows = peopleCutShows({ cut, list: "members" })
@@ -742,7 +746,7 @@ function PeopleRows({
 
   return (
     <IdentityRowList data-testid="people-list" empty={emptyPeopleCutText(cut)}>
-      {[...memberRows, ...heldSeatRows, ...inviteRows, ...seatWaiterRows, ...requestRows]}
+      {[...memberRows, ...heldSeatRows, ...inviteRows, ...requestRows]}
     </IdentityRowList>
   );
 }
@@ -751,9 +755,12 @@ function PeopleRows({
 function useInviteFlow({
   organization,
   activePlan,
+  canManage,
 }: {
   organization: OrganizationWithMembersAndTheirTeams;
   activePlan: PlanInfo;
+  /** Invitations are a manager's list; a reader is never asked for them. */
+  canManage: boolean;
 }) {
   const {
     open: isInviteLinkOpen,
@@ -763,7 +770,7 @@ function useInviteFlow({
 
   const pendingInvites = api.invite.getOrganizationPendingInvites.useQuery(
     { organizationId: organization.id },
-    { enabled: !!organization.id },
+    { enabled: !!organization.id && canManage },
   );
 
   const [selectedInvites, setSelectedInvites] = useState<{ inviteCode: string; email: string }[]>(
@@ -918,15 +925,13 @@ function usePeopleListReads({
     enabled: !!organization.id && canManage,
   });
 
-  const everyMember = useMemo(
+  const sortedMembers = useMemo(
     () =>
       [...organization.members].toSorted((a, b) =>
         (a.user.name ?? a.user.email ?? "").localeCompare(b.user.name ?? b.user.email ?? ""),
       ),
     [organization.members],
   );
-  const sortedMembers = everyMember.filter((member) => !waitsForSeat(member));
-  const seatWaiters = everyMember.filter((member) => waitsForSeat(member));
 
   const canDeleteMember = (memberId: string) =>
     canManage && organization.members.length > 1 && memberId !== userId;
@@ -962,7 +967,6 @@ function usePeopleListReads({
   return {
     provenance,
     sortedMembers,
-    seatWaiters,
     canDeleteMember,
     canDisableMember,
     invites,

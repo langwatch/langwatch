@@ -23,6 +23,7 @@ function acmeWithBarHeld(): InviteService {
     isViewOnlyCustomRole: () => false,
     findHeldEmails: async ({ emails }) => emails.filter((email) => email.toLowerCase() === BAR),
     takeBackHeldSeat: async () => false,
+    withSeatLock: ({ work }) => work(),
   };
   return InviteService.create({
     invites: PrismaOrganizationInviteRepository.create({ database: prisma }),

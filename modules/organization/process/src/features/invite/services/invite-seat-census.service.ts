@@ -44,4 +44,8 @@ export class InviteSeatCensusService implements OrganizationInviteSeatCensus {
   }): Promise<boolean> {
     return this.holds.takeBackHeldSeat(input);
   }
+
+  withSeatLock<T>(input: { organizationId: string; work: () => Promise<T> }): Promise<T> {
+    return this.memberships.withSeatLock(input);
+  }
 }

@@ -47,7 +47,7 @@ export class OrganizationMemberAdmissionService {
     repository: OrganizationMembershipRepository;
     admissions: OrganizationAdmissions;
     /** The licence's seats, asked before a full seat (seat-limit-at-provisioning.feature). */
-    seats: Pick<OrganizationSeatLicense, "checkLimit">;
+    seats: Pick<OrganizationSeatLicense, "checkLimit" | "withSeat">;
     workspaceNotices: PersonalWorkspaceArchiveNotice;
     memberNotices: OrganizationMemberChangeNotice;
     seatHolds: SeatHoldService;
@@ -60,7 +60,7 @@ export class OrganizationMemberAdmissionService {
       repository: OrganizationMembershipRepository;
       admissions: OrganizationAdmissions;
       /** The licence's seats, asked before a full seat (seat-limit-at-provisioning.feature). */
-      seats: Pick<OrganizationSeatLicense, "checkLimit">;
+      seats: Pick<OrganizationSeatLicense, "checkLimit" | "withSeat">;
       workspaceNotices: PersonalWorkspaceArchiveNotice;
       memberNotices: OrganizationMemberChangeNotice;
       /** The 30-day seat hold a removal leaves and a return takes back (seat-rotation.feature). */
@@ -131,23 +131,28 @@ export class OrganizationMemberAdmissionService {
   }): Promise<OrganizationAdmission> {
     const grantId = newAuthzGrantId();
     const requested = seat ?? (await this.repo.readJoinerSeat({ organizationId }));
-    // A person back within their hold takes the held seat, not a second one.
-    const [hold] =
-      requested === "MEMBER"
-        ? await this.dependencies.seatHolds.findLiveHolds({ organizationId, userId })
-        : [];
-    const decided = hold
-      ? admissionSeat({ requested, fullSeatFree: true, liteSeatFree: true })
-      : await this.decideSeat({ organizationId, userId, requested });
-    const admission = await this.repo.createMembership({
+    const admission = await this.dependencies.seats.withSeat({
       organizationId,
-      userId,
-      pendingAdmissionId: grantId,
-      via: admissionVia(admittedBy),
-      seat: decided.role,
-      pending: decided.pending,
-      ...(origin === undefined ? {} : { origin }),
-      ...(hold ? { seatTakenAt: hold.seatTakenAt } : {}),
+      work: async () => {
+        // A person back within their hold takes the held seat, not a second one.
+        const [hold] =
+          requested === "MEMBER"
+            ? await this.dependencies.seatHolds.findLiveHolds({ organizationId, userId })
+            : [];
+        const decided = hold
+          ? admissionSeat({ requested, fullSeatFree: true, liteSeatFree: true })
+          : await this.decideSeat({ organizationId, userId, requested });
+        return this.repo.createMembership({
+          organizationId,
+          userId,
+          pendingAdmissionId: grantId,
+          via: admissionVia(admittedBy),
+          seat: decided.role,
+          pending: decided.pending,
+          ...(origin === undefined ? {} : { origin }),
+          ...(hold ? { seatTakenAt: hold.seatTakenAt } : {}),
+        });
+      },
     });
     if (
       admission.outcome !== "created" ||

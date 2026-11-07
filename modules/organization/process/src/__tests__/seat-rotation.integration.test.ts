@@ -31,6 +31,7 @@ import { PrismaOrganizationInviteRepository } from "../repositories/prisma/prism
 import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
 import { PrismaOrganizationSeatRepository } from "../repositories/prisma/prisma.organization-seat.repository.ts";
 import { PrismaSeatHoldRepository } from "../repositories/prisma/prisma.seat-hold.repository.ts";
+import { PrismaSeatRequestRepository } from "../repositories/prisma/prisma.seat-request.repository.ts";
 import type { InviteAssignableRoles } from "../rules/invite-contracts.rules.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 import { OrganizationSeatLicenseService } from "../services/organization-seat-license.service.ts";
@@ -82,6 +83,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
     grants,
   });
   const seatCounts = PrismaOrganizationSeatRepository.create(prisma);
+  const seatRequests = PrismaSeatRequestRepository.create(prisma);
   const seatHolds = SeatHoldService.create({
     memberships: membershipRepository,
     holds: PrismaSeatHoldRepository.create(prisma),
@@ -89,6 +91,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
   const memberships = OrganizationMembershipService.create({
     repository: membershipRepository,
     seatHolds,
+    seatRequests,
     seats: OrganizationSeatLicenseService.create({
       plans,
       memberships: seatCounts,
@@ -135,6 +138,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
     if (organizationIds.length === 0) return;
     await cleanupTestRows(prisma, [
       ["seatHold", { organizationId: { in: organizationIds } }],
+      ["seatRequest", { organizationId: { in: organizationIds } }],
       ["organizationInvite", { organizationId: { in: organizationIds } }],
       ["organizationUser", { organizationId: { in: organizationIds } }],
       ["organization", { id: { in: organizationIds } }],
@@ -674,6 +678,40 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
         seatPendingSince: null,
       });
       expect(attachedBindings).toContainEqual({ organizationId, userId: qux, role: "MEMBER" });
+    });
+
+    /** @scenario "A person given a seat while waiting has their seat request closed" */
+    it("approves the open seat request of a waiting person once they are admitted", async () => {
+      const { organizationId, adminId, bar, waitingIds } = await acme({ waiting: ["Qux"] });
+      const qux = waitingIds[0]!;
+      const quxRow = await prisma.user.findUniqueOrThrow({ where: { id: qux } });
+      const opened = await seatRequests.open({
+        id: `seat-request-${nanoid(8)}`,
+        organizationId,
+        email: quxRow.email ?? "",
+        userId: qux,
+        name: "Qux",
+        source: "pending",
+        idpRefused: false,
+        idpKind: null,
+        at: Date.now(),
+      });
+      await remove(organizationId, adminId, bar);
+
+      await memberships.setMemberDisabled({
+        organizationId,
+        userId: qux,
+        disabled: false,
+        actingUser: { id: adminId },
+      });
+
+      expect((await membershipOf(organizationId, qux))?.disabledAt).toBeNull();
+      expect(await seatRequests.findOpen({ organizationId })).toEqual([]);
+      expect(
+        (await seatRequests.findForUser({ userId: qux })).find(
+          (request) => request.id === opened.request.id,
+        ),
+      ).toMatchObject({ status: "APPROVED", resolvedByUserId: adminId });
     });
 
     /** @scenario "Enabling a person waiting for a seat is refused while no full seat fits" */

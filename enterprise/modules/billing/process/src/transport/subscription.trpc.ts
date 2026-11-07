@@ -1,7 +1,7 @@
 /**
  * The server half of `subscription.*`. Reading takes `organization:view`, starting a
- * subscription `subscription:upgrade` (every member), changing a live one
- * `organization:manage`. Every refusal is a handled error the shared path maps.
+ * subscription `subscription:upgrade` (every member); changing a live one, its portal and its
+ * invoices take `subscription:manage`, which administrators and the Billing role hold.
  */
 import {
   defineMiddlewareContext,
@@ -51,6 +51,8 @@ export interface BillingSubscriptionApi {
     customerId: string;
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
+    /** Who opened the checkout; given the Billing role when it completes. */
+    startedByUserId?: string;
   }): Promise<{ url: string | null }>;
   createBillingPortalSession(input: {
     customerId: string;
@@ -100,7 +102,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   typeof subscriptionTrpc
 > = defineTrpcRouter(BillingSubscriptionApi, subscriptionTrpc)
   .procedure("addTeamMemberOrEvents")
-  .withPermission("organization:manage")
+  .withPermission("subscription:manage")
   // Raises the seat and volume lines on a live subscription, priced at the
   // instant the customer was quoted.
   .handle(({ app, input }) =>
@@ -119,13 +121,14 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   .withMiddlewareContext(billingCallerEmailContext)
   .withPermission("subscription:upgrade")
   // Starts a checkout; a live subscription is refused, the portal changes that one.
-  .handle(async ({ app, input }, email) => {
+  .handle(async ({ app, input, actor }, email) => {
     const customerId = await app.getOrCreateCustomerId({
       user: { email },
       organizationId: input.organizationId,
     });
 
     return app.createOrUpdateSubscription({
+      ...(actor.type === "user" ? { startedByUserId: actor.id } : {}),
       organizationId: input.organizationId,
       baseUrl: input.baseUrl,
       plan: input.plan,
@@ -139,7 +142,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("manage")
   .withMiddlewareContext(billingCallerEmailContext)
-  .withPermission("organization:manage")
+  .withPermission("subscription:manage")
   // A billing-portal session for card, address and cancellation.
   .handle(async ({ app, input }, email) => {
     const customerId = await app.getOrCreateCustomerId({
@@ -155,7 +158,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   })
 
   .procedure("previewProration")
-  .withPermission("organization:manage")
+  .withPermission("subscription:manage")
   // What a seat change costs, before it is confirmed.
   .handle(({ app, input }) =>
     app.previewProration({
@@ -173,7 +176,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("prospective")
   .withMiddlewareContext(billingCallerEmailContext)
-  .withPermission("organization:manage")
+  .withPermission("subscription:manage")
   // Tells sales an organization asked about a plan that is not self-serve.
   .handle(({ app, input }, email) =>
     app.notifyProspective({
@@ -210,7 +213,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("listInvoices")
-  .withPermission("organization:view")
+  .withPermission("subscription:manage")
   // The organization's invoices, for the billing page.
   .handle(({ app, input }) => app.listInvoices({ organizationId: input.organizationId }))
   .build();

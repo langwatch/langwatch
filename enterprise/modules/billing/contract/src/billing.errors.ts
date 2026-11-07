@@ -92,16 +92,19 @@ export class DeveloperSeatsUnavailableError extends HandledError {
   }
 }
 
-/** Another seat change or a seat line repair still holds the subscription's seat line. */
-export class SeatChangeInProgressError extends HandledError {
-  declare readonly code: "seat_change_in_progress";
+/**
+ * Another seat change or a seat line repair held the subscription's seat line for the whole wait:
+ * the same code and copy as organization's seat lease.
+ */
+export class SeatChangeBusyError extends HandledError {
+  declare readonly code: "seat_change_busy";
 
   constructor() {
-    super("seat_change_in_progress", "Another seat change is still in progress", {
+    super("seat_change_busy", "Another seat change is in progress. Try again in a moment.", {
       httpStatus: 409,
-      fault: "customer",
+      retryable: true,
     });
-    this.name = "SeatChangeInProgressError";
+    this.name = "SeatChangeBusyError";
   }
 }
 

@@ -178,14 +178,25 @@ Feature: Seat rotation
     Scenario: A person waiting for a seat is listed as waiting, not disabled
       Given "Qux" is waiting for a full member seat
       When an administrator opens Users
-      Then "Qux" carries the chip "Waiting for a seat"
-      And the Waiting to join cut counts "Qux" beside the join requests
+      Then "Qux" carries the chip "Waiting for a seat" among the members
+      And the Waiting to join cut does not count "Qux" a second time
 
+    # One model: the person waiting is their held membership row plus their open seat request
+    # (modules/organization/specs/seat-requests.feature), listed once in the seat requests card.
     @integration
-    Scenario: The Waiting to join cut lists people waiting for a seat
-      Given "Qux" is waiting for a full member seat
-      When an administrator selects the Waiting to join cut
-      Then "Qux" is listed there and not under Members
+    Scenario: A person given a seat while waiting has their seat request closed
+      Given "Qux" is waiting for a full member seat with an open seat request
+      And a full member seat is free
+      When "Qux" is given the seat, by an administrator or by the hourly seat hold check
+      Then "Qux" is a full member with access
+      And the seat request of "Qux" is approved and no longer listed
+
+    @unit
+    Scenario: A person the directory pushes while every seat is taken opens a seat request
+      Given 5 of 5 full member seats are in use and no Lite seat is free
+      When the identity provider pushes "Qux" into the organization
+      Then "Qux" is waiting for a full member seat
+      And "Qux" has an open seat request
 
     @integration
     Scenario: A person waiting for a seat can be given one from their row
@@ -467,7 +478,7 @@ Feature: Seat rotation
     Scenario: A seat change refused while another one keeps running
       Given a seat change is working on the subscription and does not finish
       When an administrator raises the seats
-      Then the change is refused with "seat_change_in_progress"
+      Then the change is refused with "seat_change_busy"
       And the payment provider is not asked to change anything
 
     @unit

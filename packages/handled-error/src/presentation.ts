@@ -2123,6 +2123,15 @@ const presentations = {
     title: "You can't remove yourself from the organization",
     describe: () => "Ask another organization admin to make this change.",
   },
+  seat_request_not_found: {
+    title: "This seat request is no longer open",
+    describe: () =>
+      "Someone may have approved or declined it already. Reload to see the open requests.",
+  },
+  seat_change_busy: {
+    title: "Another seat change is in progress",
+    describe: () => "Try again in a moment.",
+  },
   member_seat_limit_reached: {
     title: "All member seats are in use",
     describe: () => "Free a seat by disabling a membership, or upgrade the plan to add more.",
@@ -3128,12 +3137,6 @@ const presentations = {
     // charged, and saying so is the first thing anyone wants to know.
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
-  },
-  seat_change_in_progress: {
-    // fault: customer. Another seat change or a seat line repair is still working on this
-    // subscription, so this one did not start rather than race it at the payment provider.
-    title: "Another seat change is still in progress",
-    describe: () => "Nothing changed or was charged. Try again in a few minutes.",
   },
   seat_quantity_below_in_use: {
     // fault: customer. The seat count asked for is below the minimum (the full
