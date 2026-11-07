@@ -496,3 +496,50 @@ Feature: Subscription Page Plan Management
       And I continue to checkout from the seat dialog
       Then I see why the upgrade could not start
       And I stay on the subscription page
+
+  # ============================================================================
+  # Every organization that can pay has a way to pay
+  # ============================================================================
+
+  Rule: Every organization that can buy Growth reaches checkout from the subscription page
+
+    A missing condition once left a Free organization with one member no
+    Upgrade button at all. Nothing failed and nothing was logged, so it went
+    unnoticed for weeks. These scenarios walk every combination of plan,
+    organization size, who is looking and how far the page has loaded, so the
+    next such condition fails a test rather than a customer. The examples
+    name the corners; the test runs every combination of their columns.
+
+    @integration
+    Scenario Outline: An organization that can buy Growth is offered an upgrade that reaches checkout
+      Given my organization is on <plan>
+      And it has <size> members against the plan's seats
+      And I <invite> invite members
+      And my organization pays in <currency>
+      And the organization's usage has <usage>
+      When I view the subscription page
+      Then I am offered the Growth upgrade
+      And choosing any upgrade button starts a Growth checkout in <currency> for at least the seats in use
+
+      Examples:
+        | plan                                 | size                | invite  | currency | usage          |
+        | the Free plan                        | fewer               | may     | EUR      | been read      |
+        | the Free plan                        | exactly as many     | may not | USD      | not loaded yet |
+        | the Free plan                        | more                | may     | USD      | been read      |
+        | the Free plan on legacy pricing      | fewer               | may not | EUR      | been read      |
+        | a legacy tiered paid plan            | more                | may     | EUR      | not loaded yet |
+        | a license below Enterprise           | exactly as many     | may not | USD      | been read      |
+
+    @integration
+    Scenario: A Growth organization manages its subscription instead of buying it again
+      Given my organization is on the Growth plan
+      When I view the subscription page
+      Then I am not offered the Growth upgrade
+      And I can open the billing portal to manage the subscription
+
+    @integration
+    Scenario: An Enterprise organization is never sent to checkout
+      Given my organization is on the Enterprise plan
+      When I view the subscription page
+      Then I am not offered the Growth upgrade
+      And no checkout is started
