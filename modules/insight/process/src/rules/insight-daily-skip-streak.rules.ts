@@ -5,6 +5,7 @@
  */
 
 import {
+  INSIGHT_RUN_RETIRED_REASONS,
   INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF,
   type InsightRunOutcome,
   type InsightRunReason,
@@ -28,8 +29,8 @@ export const NO_SKIP_STREAK: SkipStreak = { count: 0, slot: null };
 
 /**
  * The streak after one run's outcome. A skipped scheduled run adds a day; filed, nothing or
- * failed starts over; an operator's run and a run on a From LangWatch board are no skipped
- * day. A run for a slot no newer than the last one counted is a repeat, and is ignored.
+ * failed starts over; an operator's run, and one recorded with a retired reason, are no
+ * skipped day. A run for a slot no newer than the last one counted is a repeat.
  */
 export function foldSkipStreak({
   streak,
@@ -41,7 +42,7 @@ export function foldSkipStreak({
   if (streak.slot !== null && run.slot <= streak.slot) return streak;
   if (run.outcome !== "skipped") return { count: 0, slot: run.slot };
   if (!run.runId.startsWith(SCHEDULED_RUN_PREFIX)) return streak;
-  if (run.reason === "template_board") return streak;
+  if (INSIGHT_RUN_RETIRED_REASONS.some((retired) => retired === run.reason)) return streak;
   return { count: streak.count + 1, slot: run.slot };
 }
 

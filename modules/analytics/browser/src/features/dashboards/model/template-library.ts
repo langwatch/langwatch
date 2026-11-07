@@ -5,31 +5,28 @@
  * @see modules/dashboard/specs/dashboards-finder.feature
  */
 
-import { CHART_GRID_COLUMNS } from "../../../model/chart-grid.ts";
 import {
   AGENT_KINDS,
   type AgentKind,
+  BOARD_TEMPLATES,
+  type BoardTemplate,
+  type BoardTemplateWidget,
   CATALOGUE_TEMPLATES,
   CATALOGUE_WIDGETS,
+  type CatalogueFilters,
+  type CatalogueItem,
+  catalogueSearchText,
+  type CatalogueSection,
+  catalogueSections,
   type CatalogueTemplate,
   implementedWidget,
   type QuestionType,
   stackWidgets,
-  TRUNKS,
   type Trunk,
-} from "../catalogue/index.ts";
-import {
-  BOARD_TEMPLATES,
-  type BoardTemplate,
-  type BoardTemplateWidget,
-} from "../templates/index.ts";
-import {
-  type CatalogueFilters,
-  type CatalogueItem,
-  type CatalogueSection,
-  catalogueSearchText,
-  catalogueSections,
-} from "./catalogue-filter.ts";
+  TRUNKS,
+} from "@langwatch/analytics-catalogue";
+
+import { CHART_GRID_COLUMNS } from "../../../model/chart-grid.ts";
 
 /**
  * Templates with a board image captured from preview sample data, served at `templatePreviewSrc`.

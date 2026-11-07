@@ -4,6 +4,12 @@
  * @see modules/dashboard/specs/dashboards-finder.feature
  */
 
+import {
+  AGENT_KIND_CHIP_LABELS,
+  CATALOGUE_TEMPLATES,
+  TRUNK_PITCHES,
+  TRUNK_QUESTIONS,
+} from "@langwatch/analytics-catalogue";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -14,12 +20,6 @@ import {
   renderWithAnalyticsHost,
   StubAnalyticsHost,
 } from "../../../testing.tsx";
-import {
-  AGENT_KIND_CHIP_LABELS,
-  CATALOGUE_TEMPLATES,
-  TRUNK_PITCHES,
-  TRUNK_QUESTIONS,
-} from "../catalogue/index.ts";
 import {
   finderPool,
   type PreviewWidget,

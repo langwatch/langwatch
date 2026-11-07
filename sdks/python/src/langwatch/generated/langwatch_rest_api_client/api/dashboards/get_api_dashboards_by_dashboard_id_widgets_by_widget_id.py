@@ -125,7 +125,9 @@ def sync_detailed(
 ]:
     """Get a widget on a dashboard
 
-     Returns one widget on this dashboard with its React source and named queries.
+     Returns one widget on this dashboard with its React source and named queries. A From LangWatch
+    board's read-only widgets (`template:<templateId>:<key>`) are answered under the board whose id is
+    their template id, and as not found under any other board.
 
     Args:
         dashboard_id (str):
@@ -167,7 +169,9 @@ def sync(
 ):
     """Get a widget on a dashboard
 
-     Returns one widget on this dashboard with its React source and named queries.
+     Returns one widget on this dashboard with its React source and named queries. A From LangWatch
+    board's read-only widgets (`template:<templateId>:<key>`) are answered under the board whose id is
+    their template id, and as not found under any other board.
 
     Args:
         dashboard_id (str):
@@ -203,7 +207,9 @@ async def asyncio_detailed(
 ]:
     """Get a widget on a dashboard
 
-     Returns one widget on this dashboard with its React source and named queries.
+     Returns one widget on this dashboard with its React source and named queries. A From LangWatch
+    board's read-only widgets (`template:<templateId>:<key>`) are answered under the board whose id is
+    their template id, and as not found under any other board.
 
     Args:
         dashboard_id (str):
@@ -243,7 +249,9 @@ async def asyncio(
 ):
     """Get a widget on a dashboard
 
-     Returns one widget on this dashboard with its React source and named queries.
+     Returns one widget on this dashboard with its React source and named queries. A From LangWatch
+    board's read-only widgets (`template:<templateId>:<key>`) are answered under the board whose id is
+    their template id, and as not found under any other board.
 
     Args:
         dashboard_id (str):

@@ -13,7 +13,7 @@ import { IMPLEMENTED_WIDGET_IDS, implementedWidget } from "../index.ts";
 
 const FIXTURE = fileURLToPath(
   new URL(
-    "../../../../../../process/src/langwatch-ql/__tests__/fixtures/stock-widget-queries.json",
+    "../../../../process/src/langwatch-ql/__tests__/fixtures/stock-widget-queries.json",
     import.meta.url,
   ),
 );

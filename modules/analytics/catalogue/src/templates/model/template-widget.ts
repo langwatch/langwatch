@@ -5,12 +5,12 @@
  */
 
 import type { TraceSource } from "@langwatch/analytics-contract";
+import { CHART_GRID_COLUMNS } from "@langwatch/analytics-contract/chart-grid";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   type DashboardWidgetDefinition,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
-import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
 import { PRESENCE_QUERY, readsSourcesParameter } from "../../model/sources-parameter.ts";
 import type { BoardTemplateWidget } from "./board-template.ts";
 import { PRESENCE_SQL } from "./source-presence-queries.ts";

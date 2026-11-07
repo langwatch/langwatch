@@ -24,7 +24,7 @@ import { onFirstDay, scheduleDriver } from "./insight-daily-schedule.fixture.ts"
 import { PROJECT } from "./insight.fixture.ts";
 
 const { CONFIGURED, TURNED_OFF } = INSIGHT_DAILY_RUN_EVENT_TYPES;
-const TEMPLATE: InsightRunBoard = { kind: "template", id: "llm-costs", name: "LLM costs" };
+const TEMPLATE: InsightRunBoard = { kind: "template", id: "release", name: "Release check" };
 const LEFT_AT = onFirstDay("08:00");
 
 let installed: InstalledDailyRuns;

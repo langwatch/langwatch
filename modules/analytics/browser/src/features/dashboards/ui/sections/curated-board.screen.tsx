@@ -4,6 +4,7 @@
  * (dashboards-v2.feature).
  */
 
+import { curatedBoardPointerId } from "@langwatch/analytics-catalogue";
 import { UiPageNotFound } from "@langwatch/browser/page-fallbacks";
 import { VStack } from "@langwatch/design-system/primitives";
 
@@ -20,7 +21,6 @@ import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import { boardSetupDraft, boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
-import { CURATED_SEGMENT } from "../../model/boards.ts";
 import { type CuratedBoard, curatedBoardById } from "../../model/curated-boards.ts";
 import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPage } from "../blocks/board-page.tsx";
@@ -39,9 +39,10 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
   const { grain, period, setRange, setGrain } = useBoardPeriod({
     refreshedAt: autoRefresh.refreshedAt,
   });
+  const boardPointerId = curatedBoardPointerId(board.templateId);
   const subject = boardSubject({
     board: {
-      id: `${CURATED_SEGMENT}/${board.templateId}`,
+      id: boardPointerId,
       name: board.name,
       templateId: board.templateId,
     },
@@ -63,6 +64,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
           pointer={{
             boardKind: "template",
             boardId: board.templateId,
+            boardPointerId,
             widgetCount: board.widgets.length,
           }}
           action={null}

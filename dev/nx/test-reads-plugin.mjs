@@ -117,6 +117,9 @@ export const reads = {
     "pnpm-workspace.yaml",
     "modules/analytics/process/src/langwatch-ql/__tests__/fixtures/stock-widget-queries.json",
   ],
+  "@langwatch/analytics-catalogue": [
+    "modules/analytics/process/src/langwatch-ql/__tests__/fixtures/stock-widget-queries.json",
+  ],
   "@langwatch/dashboard-process": ["docs/features/dashboards.mdx"],
   "@langwatch/webhook-verify": ["specs/webhooks/signature-vectors.json"],
   "@langwatch/oxlint-rules": [

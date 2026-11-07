@@ -8,19 +8,14 @@ import type { BoardHeaderActionProps } from "@langwatch/analytics-client";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, Button, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
-import type { InsightDailyRunSetting, InsightRunSettings } from "@langwatch/insight-contract";
+import { type InsightDailyRunSetting, type InsightRunSettings } from "@langwatch/insight-contract";
 import { nowInstant } from "@langwatch/time";
 import { ChevronDown, Inbox, Settings2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { useBoardDailyInsights } from "../../behavior/use-board-daily-insights.ts";
 import { useInsightInbox } from "../../behavior/use-insight-inbox.ts";
-import {
-  lastRunWords,
-  OFF_REASON_WORDS,
-  scheduleWords,
-  TEMPLATE_BOARD_NOTE,
-} from "../../model/daily-run.ts";
+import { lastRunWords, OFF_REASON_WORDS, scheduleWords } from "../../model/daily-run.ts";
 import { useInsightHost } from "../../model/insight-host.ts";
 import { DailyInsightsDialog } from "./daily-insights-dialog.tsx";
 
@@ -32,6 +27,7 @@ export function BoardDailyInsights(props: BoardHeaderActionProps) {
 function DailyInsightsControl({
   boardKind,
   boardId,
+  boardPointerId,
   boardName,
   widgetCount,
 }: BoardHeaderActionProps) {
@@ -39,7 +35,6 @@ function DailyInsightsControl({
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const { setting, settings } = daily;
-  const note = boardKind === "template" ? TEMPLATE_BOARD_NOTE : undefined;
   if (!daily.available || !setting) return null;
   const isOn = setting.state === "on";
   // Turning it on here would promise a run that has nothing to read.
@@ -51,7 +46,7 @@ function DailyInsightsControl({
     <>
       {isOn || turnedOff !== undefined ? (
         <DailyInsightsDropdown
-          boardId={boardId}
+          insightBoardId={boardPointerId}
           isEmpty={widgetCount === 0}
           settings={settings}
           lastRun={setting.lastRun}
@@ -77,7 +72,6 @@ function DailyInsightsControl({
           boardName={boardName}
           settings={settings}
           ownTimezone={daily.ownTimezone}
-          note={note}
           onSubmit={(next) => {
             setSettingsOpen(false);
             daily.save(next);
@@ -94,7 +88,7 @@ function DailyInsightsControl({
  * tag, and the rest inside.
  */
 function DailyInsightsDropdown({
-  boardId,
+  insightBoardId,
   isEmpty,
   settings,
   lastRun,
@@ -103,7 +97,8 @@ function DailyInsightsDropdown({
   onToggle,
   onOpenSettings,
 }: {
-  boardId: string;
+  /** The board id this board's insights keep. */
+  insightBoardId: string;
   /** The board lost its last widget: the run stays on and waits for one. */
   isEmpty: boolean;
   settings: InsightRunSettings;
@@ -121,7 +116,7 @@ function DailyInsightsDropdown({
   // Read when the dropdown opens, so "today" is the day the reader looks.
   const [now, setNow] = useState(() => nowInstant().epochMilliseconds);
   // The control counts this board's own insights; Insights, where it leads, shows every board's.
-  const unread = inbox?.unseen.filter((entry) => entry.board?.id === boardId).length ?? 0;
+  const unread = inbox?.unseen.filter((entry) => entry.board?.id === insightBoardId).length ?? 0;
   const isOn = turnedOff === undefined;
   const news = unread > 0 ? `${unread} new` : "nothing new";
   const status = isEmpty ? "waiting for a widget" : news;

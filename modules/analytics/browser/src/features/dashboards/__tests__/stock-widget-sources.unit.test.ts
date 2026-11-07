@@ -4,17 +4,19 @@
  * @see modules/dashboard/specs/dashboards-v2.feature AC202, AC202b, AC202c, AC202f
  */
 
-import { DEFAULT_WIDGET_SOURCES, TRACE_SOURCES } from "@langwatch/analytics-contract";
-import { describe, expect, it } from "vitest";
-
+import * as catalogue from "@langwatch/analytics-catalogue";
 import {
+  IMPLEMENTED_WIDGET_IDS,
+  implementedWidget,
   namedViews,
   PRESENCE_QUERY,
   readsSourcesParameter,
   VIEWS_WITH_ORIGIN,
-} from "../../model/sources-parameter.ts";
-import { SOURCES_DO_NOT_APPLY_LINE, widgetSourcesLine } from "../../model/widget-sources.ts";
-import { IMPLEMENTED_WIDGET_IDS, implementedWidget } from "../index.ts";
+} from "@langwatch/analytics-catalogue";
+import { DEFAULT_WIDGET_SOURCES, TRACE_SOURCES } from "@langwatch/analytics-contract";
+import { describe, expect, it } from "vitest";
+
+import { SOURCES_DO_NOT_APPLY_LINE, widgetSourcesLine } from "../model/widget-sources.ts";
 
 const widgets = IMPLEMENTED_WIDGET_IDS.flatMap((id) => implementedWidget(id) ?? []);
 const queries = widgets.flatMap(({ key, definition }) =>
@@ -106,9 +108,7 @@ describe("given the stock widgets of the catalogue", () => {
   });
 
   /** @scenario "AC202b Stock widgets: each stock widget declares its own list of sources" */
-  it("no longer exports the shared catalogue sources constant", async () => {
-    const module = await import("../../templates/model/template-widget.ts");
-
-    expect(module).not.toHaveProperty("CATALOGUE_QUERY_SOURCES");
+  it("no longer exports the shared catalogue sources constant", () => {
+    expect(catalogue).not.toHaveProperty("CATALOGUE_QUERY_SOURCES");
   });
 });

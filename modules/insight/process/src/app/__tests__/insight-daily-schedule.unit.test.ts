@@ -33,7 +33,7 @@ import { PROJECT } from "./insight.fixture.ts";
 
 const { CONFIGURED, TURNED_OFF, REARM_REQUESTED, RUN_STARTED, RUN_SETTLED } =
   INSIGHT_DAILY_RUN_EVENT_TYPES;
-const TEMPLATE: InsightRunBoard = { kind: "template", id: "llm-costs", name: "LLM costs" };
+const TEMPLATE: InsightRunBoard = { kind: "template", id: "release", name: "Release check" };
 const TWO_FINDINGS = answerWith([
   finding(),
   finding({ title: "Errors fell by half", tone: "good" }),
@@ -264,18 +264,18 @@ describe("given a member turned their daily run on for a board", () => {
 });
 
 describe("given a member turned their daily run on for a From LangWatch board", () => {
-  /** @scenario "A From LangWatch board that is on is skipped each day and stays on" */
-  it("records skipped with template_board, stays on and arms the next day", async () => {
+  /** @scenario "A From LangWatch board that is on runs each day and stays on" */
+  it("asks Langy to read it, files what it found, stays on and arms the next day", async () => {
     const scope = { board: TEMPLATE };
     await turnOn(scope);
 
     const [run] = await wakeAt(slotOn({ date: TODAY, ...scope }) + 2_000, scope);
     await installed.carryOut(run);
 
-    expect(installed.langy.starts).toEqual([]);
+    expect(installed.langy.starts).toHaveLength(1);
     expect(await settingOf(scope)).toMatchObject({
       state: "on",
-      lastRun: { outcome: "skipped", reason: "template_board" },
+      lastRun: { outcome: "filed", filedCount: 2 },
     });
     expect((await installed.instanceOf(scope))?.nextWakeAt).toBe(
       slotOn({ date: TOMORROW, ...scope }),

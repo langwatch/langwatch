@@ -4,8 +4,10 @@
  * `release_dashboards` is read per request.
  * @see modules/dashboard/specs/dashboards-v2.feature
  * @see specs/analytics/dashboard-rest-api.feature
+ * @see modules/dashboard/specs/dashboard-widget-mcp.feature
  * @vitest-environment node
  */
+import { CURATED_BOARD_DEFINITIONS, templateWidgetId } from "@langwatch/analytics-catalogue";
 import {
   bindMiddlewareContext,
   canonicalErrorResponse,
@@ -70,8 +72,9 @@ async function projectWithBothBoards({
   analytics?: ReturnType<typeof createDashboardTestAnalytics>;
 } = {}) {
   const caller = { actor, scope: { tier: "project" as const, id: PROJECT } };
-  // Each card the gate was asked for, with the names it read; it holds a click for every one.
-  const cards: { resource: string; names: (string | null | undefined)[] }[] = [];
+  // Each ask of the gate, with every name the route read: undefined is no such record, which
+  // the real gate shows no card for (RestConfirmation.name). It holds a click for every one.
+  const asked: { resource: string; names: (string | null | undefined)[] }[] = [];
   const admit = ({ request }: { request: Request }) => {
     if (langy) recordProjectCredential(request, LANGY_KEY);
     return caller;
@@ -98,7 +101,7 @@ async function projectWithBothBoards({
           servedDoors: true as const,
           confirmations: {
             confirm: async ({ resource, targets }) => {
-              cards.push({ resource, names: await Promise.all(targets.map((t) => t.name())) });
+              asked.push({ resource, names: await Promise.all(targets.map((t) => t.name())) });
             },
           },
         }
@@ -147,7 +150,7 @@ async function projectWithBothBoards({
     };
   };
 
-  return { app, reports, board, widget, send, cards };
+  return { app, reports, board, widget, send, asked };
 }
 
 const BOARDS = "/api/v1/dashboards";
@@ -482,6 +485,49 @@ describe("given two Dashboards boards, one holding a widget", () => {
     });
   });
 
+  describe("and a From LangWatch board's widget", () => {
+    const [curated, otherTemplate] = CURATED_BOARD_DEFINITIONS;
+    const [widget] = curated?.widgets ?? [];
+    if (!curated || !otherTemplate || !widget) {
+      throw new Error("Two From LangWatch boards, the first with a widget, are expected");
+    }
+    const id = templateWidgetId({ templateId: curated.templateId, key: widget.key });
+    const under = (dashboardId: string) =>
+      `${BOARDS}/${encodeURIComponent(dashboardId)}/widgets/${encodeURIComponent(id)}`;
+
+    /** @scenario "A From LangWatch widget is read under its own board's path only" */
+    it("answers it under its own template's board, as the daily insights skill reads it", async () => {
+      const { send } = await twoBoards();
+
+      const read = await send("dashboards", under(curated.templateId));
+
+      expect({ status: read.status, json: read.json }).toMatchObject({
+        status: 200,
+        json: {
+          id,
+          name: widget.name,
+          definition: { queries: widget.definition.queries },
+          dashboardId: null,
+        },
+      });
+    });
+
+    /** @scenario "A From LangWatch widget is read under its own board's path only" */
+    it("answers it as not found under a stored board or another template's board", async () => {
+      const { board, send } = await twoBoards();
+
+      const [onStored, onOtherTemplate] = await Promise.all([
+        send("dashboards", under(board.id)),
+        send("dashboards", under(otherTemplate.templateId)),
+      ]);
+
+      expect({ onStored: refusal(onStored), onOtherTemplate: refusal(onOtherTemplate) }).toEqual({
+        onStored: { status: 404, code: "dashboard_widget_not_found" },
+        onOtherTemplate: { status: 404, code: "dashboard_widget_not_found" },
+      });
+    });
+  });
+
   /** @scenario "AC199p Split: a board's widgets are a sub-resource of the board" */
   it("refuses a widget created under another project's board or a missing board", async () => {
     const { app, send } = await twoBoards();
@@ -543,7 +589,7 @@ describe("given a Langy session key deleting at /api/v1/dashboards", () => {
      * @scenario "A route the project cannot reach refuses a Langy key before any card"
      */
     it("answers 404 dashboards_not_released before any card, and reads no name", async () => {
-      const { board, widget, send, cards, app } = await projectWithBothBoards({
+      const { board, widget, send, asked, app } = await projectWithBothBoards({
         released: false,
         langy: true,
         actor: MEMBER,
@@ -558,7 +604,7 @@ describe("given a Langy session key deleting at /api/v1/dashboards", () => {
         { status: 404, code: "dashboards_not_released" },
         { status: 404, code: "dashboards_not_released" },
       ]);
-      expect(cards).toEqual([]);
+      expect(asked).toEqual([]);
       expect((await app.findBoards({ projectId: PROJECT })).map(({ id }) => id)).toContain(
         board.id,
       );
@@ -566,14 +612,84 @@ describe("given a Langy session key deleting at /api/v1/dashboards", () => {
   });
 
   describe("when Dashboards is switched on", () => {
+    /** @scenario "A From LangWatch widget cannot be changed under its own board's path" */
+    it("raises no card for a From LangWatch widget, and still names a stored one", async () => {
+      const [curated] = CURATED_BOARD_DEFINITIONS;
+      const [template] = curated?.widgets ?? [];
+      if (!curated || !template)
+        throw new Error("A From LangWatch board with a widget is expected");
+      const { board, widget, send, asked } = await projectWithBothBoards({
+        langy: true,
+        actor: MEMBER,
+      });
+      const templatePath = `${BOARDS}/${encodeURIComponent(curated.templateId)}/widgets/${encodeURIComponent(templateWidgetId({ templateId: curated.templateId, key: template.key }))}`;
+
+      const deletedTemplate = await send("dashboards", templatePath, { method: "DELETE" });
+      const patchedTemplate = await send("dashboards", templatePath, {
+        method: "PATCH",
+        body: { name: "Renamed" },
+      });
+      const templateAsks = [...asked];
+      const deletedStored = await send("dashboards", `${BOARDS}/${board.id}/widgets/${widget.id}`, {
+        method: "DELETE",
+      });
+      const readAfter = await send("dashboards", `${BOARDS}/${board.id}/widgets/${widget.id}`);
+
+      expect({
+        deletedTemplate: refusal(deletedTemplate),
+        patchedTemplate: refusal(patchedTemplate),
+        templateAsks,
+        deletedStored: deletedStored.status,
+        readAfter: refusal(readAfter),
+        asked,
+      }).toEqual({
+        deletedTemplate: { status: 404, code: "dashboard_widget_not_found" },
+        patchedTemplate: { status: 404, code: "dashboard_widget_not_found" },
+        // Read as no such record: the gate's own test pins that it then shows no card.
+        templateAsks: [{ resource: "dashboard widget", names: [undefined] }],
+        deletedStored: 204,
+        readAfter: { status: 404, code: "dashboard_widget_not_found" },
+        asked: [
+          { resource: "dashboard widget", names: [undefined] },
+          { resource: "dashboard widget", names: ["Traces"] },
+        ],
+      });
+    });
+
+    /** @scenario "A From LangWatch widget cannot be changed under its own board's path" */
+    it("answers a From LangWatch widget under a stored board's path as not found, with no card", async () => {
+      const [curated] = CURATED_BOARD_DEFINITIONS;
+      const [template] = curated?.widgets ?? [];
+      if (!curated || !template)
+        throw new Error("A From LangWatch board with a widget is expected");
+      const { board, send, asked } = await projectWithBothBoards({ langy: true, actor: MEMBER });
+      const widgetId = templateWidgetId({ templateId: curated.templateId, key: template.key });
+      const path = `${BOARDS}/${board.id}/widgets/${encodeURIComponent(widgetId)}`;
+
+      const deleted = await send("dashboards", path, { method: "DELETE" });
+      const patched = await send("dashboards", path, {
+        method: "PATCH",
+        body: { name: "Renamed" },
+      });
+
+      expect({ answers: [refusal(deleted), refusal(patched)], asked }).toEqual({
+        answers: [
+          { status: 404, code: "dashboard_widget_not_found" },
+          { status: 404, code: "dashboard_widget_not_found" },
+        ],
+        // Read as no such record: the gate then shows no card.
+        asked: [{ resource: "dashboard widget", names: [undefined] }],
+      });
+    });
+
     it("asks for the click on a card naming the board, then deletes it", async () => {
-      const { board, send, cards } = await projectWithBothBoards({ langy: true, actor: MEMBER });
+      const { board, send, asked } = await projectWithBothBoards({ langy: true, actor: MEMBER });
 
       const deleted = await send("dashboards", `${BOARDS}/${board.id}`, { method: "DELETE" });
 
-      expect({ status: deleted.status, cards }).toEqual({
+      expect({ status: deleted.status, asked }).toEqual({
         status: 200,
-        cards: [{ resource: "board", names: ["Usage"] }],
+        asked: [{ resource: "board", names: ["Usage"] }],
       });
     });
   });

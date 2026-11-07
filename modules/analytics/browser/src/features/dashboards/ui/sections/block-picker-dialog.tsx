@@ -4,6 +4,20 @@
  * and drafts its prompt in Langy (AC141); "I'll build it myself" goes to the widget editor instead.
  */
 
+import {
+  AGENT_KIND_CHIP_LABELS,
+  type CatalogueFilters,
+  filterCatalogue,
+  NO_CATALOGUE_FILTERS,
+  pickerPool,
+  type PickerQuestion,
+  type PickerSection,
+  pickerSections,
+  pickerWidgets,
+  trunkCounts,
+  type WidgetQuestion,
+  type WidgetQuestionIcon,
+} from "@langwatch/analytics-catalogue";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
@@ -20,14 +34,6 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 
-import {
-  AGENT_KIND_CHIP_LABELS,
-  pickerPool,
-  type PickerQuestion,
-  type PickerSection,
-  pickerSections,
-  pickerWidgets,
-} from "../../catalogue/index.ts";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
   type BoardSubject,
@@ -37,13 +43,6 @@ import {
 import { AskField } from "../../langy/ui/blocks/ask-field.tsx";
 import { LANGY_EDGE } from "../../langy/ui/elements/ask-bar-shell.tsx";
 import type { BoardPeriod } from "../../model/board-period.ts";
-import {
-  type CatalogueFilters,
-  filterCatalogue,
-  NO_CATALOGUE_FILTERS,
-  trunkCounts,
-} from "../../model/catalogue-filter.ts";
-import type { WidgetQuestion, WidgetQuestionIcon } from "../../model/widget-questions.ts";
 import {
   AgentKindChips,
   TRUNK_ICONS,

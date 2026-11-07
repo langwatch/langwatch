@@ -5,21 +5,19 @@
 
 import { existsSync } from "node:fs";
 
-import { describe, expect, it } from "vitest";
-
-import { CHART_GRID_COLUMNS } from "../../../model/chart-grid.ts";
 import {
   CATALOGUE_TEMPLATES,
   CATALOGUE_WIDGETS,
-  focusTemplateId,
-  TRUNKS,
-} from "../catalogue/index.ts";
-import {
   type CatalogueFilters,
   filterCatalogue,
+  focusTemplateId,
   NO_CATALOGUE_FILTERS,
   trunkCounts,
-} from "../model/catalogue-filter.ts";
+  TRUNKS,
+} from "@langwatch/analytics-catalogue";
+import { describe, expect, it } from "vitest";
+
+import { CHART_GRID_COLUMNS } from "../../../model/chart-grid.ts";
 import {
   finderPool,
   type LibraryTemplate,
