@@ -836,6 +836,9 @@
             "group": "Dashboards",
             "pages": [
               "ai-governance/governance-dashboard",
+              "ai-governance/costs",
+              "ai-governance/inventory",
+              "ai-governance/agents",
               "ai-governance/people"
             ]
           },
