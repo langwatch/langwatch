@@ -1,3 +1,4 @@
+import { parseScoreRange } from "@langwatch/analytics-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 
 /** The legacy filter fields only answerable once a trace's evaluations have run. */
@@ -161,9 +162,7 @@ function matchEvaluationValues(
       );
 
     case "evaluations.score":
-      return evaluations.some(
-        (e) => hasVerdict(e) && e.score !== null && values.includes(String(e.score)),
-      );
+      return matchScoreRange(evaluations, values);
 
     case "evaluations.state":
       return evaluations.some((e) => values.includes(e.status));
@@ -174,4 +173,14 @@ function matchEvaluationValues(
     default:
       return false;
   }
+}
+
+/** Range [min, max], parsed as the trace list's ClickHouse filter is; a bad range matches none. */
+function matchScoreRange(evaluations: EvaluationRunData[], values: unknown[]): boolean {
+  const range = parseScoreRange(values);
+  if (!range) return false;
+  const { min, max } = range;
+  return evaluations.some(
+    (e) => hasVerdict(e) && e.score !== null && e.score >= min && e.score <= max,
+  );
 }

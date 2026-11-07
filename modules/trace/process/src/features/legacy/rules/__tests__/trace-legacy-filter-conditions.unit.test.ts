@@ -235,6 +235,9 @@ describe("clickHouseFilterConditions", () => {
       ["evaluations.score", ["0"], "eval-1"],
       ["evaluations.score", ["invalid", "NaN"], "eval-1"],
       ["evaluations.score", ["0.9", "0.5"], "eval-1"],
+      ["evaluations.score", ["0.6x", "0.9"], "eval-1"],
+      ["evaluations.score", ["", "0.9"], "eval-1"],
+      ["evaluations.score", ["0x0", "0x1"], "eval-1"],
     ] as const)(
       "when evaluations.score is given %j with key=%s, it returns the no-match guard",
       (field, values, key) => {
