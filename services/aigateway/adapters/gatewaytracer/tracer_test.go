@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	otelapi "go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -72,5 +73,44 @@ func TestMiddlewareKeepsInternalRootAndLinksInboundTrace(t *testing.T) {
 	}
 	if got := attributes[clog.FieldObservedSpanID]; got != observedSpanID {
 		t.Fatalf("%s = %q, want %q", clog.FieldObservedSpanID, got, observedSpanID)
+	}
+}
+
+// @scenario "The gateway leaves a 4xx request span unset"
+func TestMiddlewareSpanStatusByResponseStatus(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		want   codes.Code
+	}{
+		{"success is ok", http.StatusNoContent, codes.Ok},
+		{"not found is unset", http.StatusNotFound, codes.Unset},
+		{"unauthorized is unset", http.StatusUnauthorized, codes.Unset},
+		{"server error is error", http.StatusBadGateway, codes.Error},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			exporter := tracetest.NewInMemoryExporter()
+			provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+			previous := otelapi.GetTracerProvider()
+			otelapi.SetTracerProvider(provider)
+			t.Cleanup(func() {
+				otelapi.SetTracerProvider(previous)
+				_ = provider.Shutdown(context.Background())
+			})
+
+			handler := Middleware(nil)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tc.status)
+			}))
+			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+
+			spans := exporter.GetSpans()
+			if len(spans) != 1 {
+				t.Fatalf("exported spans = %d, want 1", len(spans))
+			}
+			if got := spans[0].Status.Code; got != tc.want {
+				t.Fatalf("status for %d = %v, want %v", tc.status, got, tc.want)
+			}
+		})
 	}
 }
