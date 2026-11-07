@@ -1,3 +1,4 @@
+import { epochMsToOtlpNanos } from "@langwatch/otlp/trace-request";
 import type { OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
 import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import type {
@@ -33,10 +34,6 @@ function doubleAttr(key: string, value: number): OtlpKeyValue {
 
 function boolAttr(key: string, value: boolean): OtlpKeyValue {
   return { key, value: { boolValue: value } };
-}
-
-function msToNanoString(ms: number): string {
-  return String(ms * 1_000_000);
 }
 
 /** Every numeric usage metric a span carries, under its canonical attribute key. */
@@ -195,14 +192,14 @@ const convertSpanToOtlp = (span: Span): OtlpSpan => ({
   parentSpanId: span.parent_id ?? null,
   name: span.name ?? span.type,
   kind: spanTypeToESpanKind(span.type),
-  startTimeUnixNano: msToNanoString(span.timestamps.started_at),
-  endTimeUnixNano: msToNanoString(span.timestamps.finished_at),
+  startTimeUnixNano: epochMsToOtlpNanos(span.timestamps.started_at),
+  endTimeUnixNano: epochMsToOtlpNanos(span.timestamps.finished_at),
   attributes: buildSpanAttributes(span),
   events: span.timestamps.first_token_at
     ? [
         {
           name: "first_token",
-          timeUnixNano: msToNanoString(span.timestamps.first_token_at),
+          timeUnixNano: epochMsToOtlpNanos(span.timestamps.first_token_at),
           attributes: [],
         },
       ]

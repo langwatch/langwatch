@@ -1,6 +1,17 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+/**
+ * Epoch ms to the OTLP nanosecond string. `ms * 1_000_000` overflows
+ * `MAX_SAFE_INTEGER` at epoch magnitudes, so BigInt keeps whole ms exact
+ * and only the sub-ms remainder rounds — a 0.25ms span survives (#8038).
+ */
+export function epochMsToOtlpNanos(ms: number): string {
+  const wholeMs = Math.floor(ms);
+  const remainderNanos = Math.round((ms - wholeMs) * 1_000_000);
+  return (BigInt(wholeMs) * 1_000_000n + BigInt(remainderNanos)).toString();
+}
+
 const longBitsSchemaDefinition = z.object({
   low: z.number(),
   high: z.number(),

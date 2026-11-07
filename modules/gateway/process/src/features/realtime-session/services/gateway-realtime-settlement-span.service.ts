@@ -4,6 +4,7 @@
  */
 import type { GatewayRealtimeSessionRecord, SpendUsage } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
+import { epochMsToOtlpNanos } from "@langwatch/otlp/trace-request";
 import type { Instant } from "@langwatch/time";
 import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 
@@ -104,8 +105,8 @@ export class GatewayRealtimeSettlementSpanService {
           spanId: settlementSpanId(session.id),
           name: SPAN_NAME,
           kind: 3,
-          startTimeUnixNano: String(startMs * 1_000_000),
-          endTimeUnixNano: String(endMs * 1_000_000),
+          startTimeUnixNano: epochMsToOtlpNanos(startMs),
+          endTimeUnixNano: epochMsToOtlpNanos(endMs),
           attributes,
           events: [],
           links: [],
