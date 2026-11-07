@@ -157,6 +157,9 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         setDeveloperSeats: {
           useMutation: () => ({ mutateAsync: setup.mockSetDeveloperSeats, isPending: false }),
         },
+        previewProration: {
+          useQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+        },
       },
       useUtils: vi.fn(() => ({
         organization: { getOrganizationWithMembersAndTheirTeams: { invalidate: vi.fn() } },
@@ -305,6 +308,7 @@ const recordCheckouts = () => {
   return { create, withInvites };
 };
 
+const CONTINUE = "Continue to checkout";
 const UPGRADE_BUTTON = /^(Upgrade now|Upgrade to Growth)$/i;
 
 describe("<SubscriptionPage/> upgrade path for every organization that can pay", () => {
@@ -335,6 +339,14 @@ describe("<SubscriptionPage/> upgrade path for every organization that can pay",
       for (const [index, button] of buttons.entries()) {
         expect(button).toBeEnabled();
         fireEvent.click(button);
+        // An upgrade may open the seat dialog first; its default seat count goes to checkout.
+        await waitFor(() => {
+          const reached = host.departures.length > index;
+          expect(reached || screen.queryByRole("button", { name: CONTINUE }) !== null).toBe(true);
+        });
+        if (host.departures.length === index) {
+          fireEvent.click(screen.getByRole("button", { name: CONTINUE }));
+        }
         await waitFor(() => {
           expect(host.departures).toHaveLength(index + 1);
         });
