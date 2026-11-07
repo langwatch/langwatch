@@ -80,8 +80,8 @@ SELECT
   t.Attributes['user.id'] AS user,
   sum(j.Passed) AS annoyed,
   count() AS conversations
-FROM analytics.judgments AS j
-JOIN analytics.traces AS t ON t.TraceId = j.TraceId
+FROM langwatch.judgments AS j
+JOIN langwatch.traces AS t ON t.TraceId = j.TraceId
 WHERE j.RunId = {run:String}
   AND j.QuestionId = 'annoyed'
   AND j.CreatedAt >= subtractDays(now(), 7)

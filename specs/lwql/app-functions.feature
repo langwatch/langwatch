@@ -222,8 +222,7 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Given hydrated values whose total exceeds the hydrated-bytes ceiling
     When hydration runs
     Then the trailing rows are dropped
-    And the result is marked truncated
-    And it carries RESULT_TRUNCATED with meta.ceiling "hydratedBytes"
+    And it carries APP_FUNCTION_RESULT_TRUNCATED with meta.maxHydratedBytes and meta.rowsReturned
 
   @unit
   Scenario: The result ceiling counts encoded bytes, not characters

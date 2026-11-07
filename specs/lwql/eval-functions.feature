@@ -161,7 +161,7 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     Given a statement projecting eval_score(CapturedOutput, 'How polite', 1, 5) AS s
     When it orders by s, or by the eval's position in the SELECT list
     Then it is refused with APP_FUNCTION_POSITION
-    And the message says to run the eval first and sort over analytics.judgments
+    And the message says to run the eval first and sort over the judgments view
     And ordering the same statement by TraceId is accepted
 
   @unit
