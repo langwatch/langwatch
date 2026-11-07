@@ -33,12 +33,14 @@ import {
   type GrowthSeatPlan,
   growthMinimumSeats,
   growthSeatPlan,
+  heldSeatCount,
   type SeatAction,
   type SeatPrice,
   seatChangeToast,
   seatConfirm,
 } from "../../model/seat-purchase.ts";
 import {
+  countFullMembers,
   isValidEmail,
   type PendingInviteWithMemberType,
   type SubscriptionUser,
@@ -155,17 +157,29 @@ export function UserManagementDrawer({
   }, [open]);
 
   const emails = filledEmails(rows);
+  const held = heldSeatCount({
+    inUse,
+    fullMembers: countFullMembers(users),
+    fullInvites: countFullMembers(pendingInvitesWithMemberType),
+  });
   const growth = useGrowthSeats({
     open,
     mode: mode.kind === "growth" ? mode : undefined,
     inUse,
+    held,
     invites: emails.length,
     price,
   });
 
   const free =
     mode.kind === "free"
-      ? freeSeatPlan({ includedSeats: mode.includedSeats, inUse, invites: emails.length, price })
+      ? freeSeatPlan({
+          includedSeats: mode.includedSeats,
+          inUse,
+          held,
+          invites: emails.length,
+          price,
+        })
       : undefined;
   const view = growth?.view ?? free;
   const action: SeatAction = view?.action ?? { kind: "none", label: "No changes" };
@@ -484,12 +498,14 @@ function useGrowthSeats({
   open,
   mode,
   inUse,
+  held,
   invites,
   price,
 }: {
   open: boolean;
   mode: Extract<SeatDrawerMode, { kind: "growth" }> | undefined;
   inUse: number;
+  held: number;
   invites: number;
   price: SeatPrice;
 }) {
@@ -535,6 +551,7 @@ function useGrowthSeats({
     paid,
     seats,
     inUse,
+    held,
     invites,
     price,
     quote,

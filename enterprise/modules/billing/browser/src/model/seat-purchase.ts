@@ -53,6 +53,29 @@ export function upgradeTotal({ seats, price }: { seats: number; price: SeatPrice
   };
 }
 
+/**
+ * Full seats counted in use that no listed member or invite takes: seats held for people
+ * removed within 30 days of taking them (specs/licensing/seat-rotation.feature).
+ */
+export function heldSeatCount({
+  inUse,
+  fullMembers,
+  fullInvites,
+}: {
+  inUse: number;
+  fullMembers: number;
+  fullInvites: number;
+}): number {
+  return Math.max(0, inUse - fullMembers - fullInvites);
+}
+
+/** "2 in use." or "2 in use, 1 of them held for a removed member." */
+function inUseLine({ inUse, held }: { inUse: number; held: number }): string {
+  if (held === 0) return `${inUse} in use.`;
+  const whom = held === 1 ? "a removed member" : "removed members";
+  return `${inUse} in use, ${held} of them held for ${whom}.`;
+}
+
 export function upgradeMinimumHint(minimum: number): string | undefined {
   if (minimum <= 1) return undefined;
   return `${minimum} people are already in your organization, so you need at least ${minimum} full seats.`;
@@ -61,6 +84,8 @@ export function upgradeMinimumHint(minimum: number): string | undefined {
 export type FreeSeatPlan = {
   includedSeats: number;
   inUse: number;
+  /** Of `inUse`, the seats held for removed members. */
+  held?: number;
   invites: number;
   price: SeatPrice;
 };
@@ -85,7 +110,7 @@ function freeSeatAction({
   };
 }
 
-export function freeSeatPlan({ includedSeats, inUse, invites, price }: FreeSeatPlan) {
+export function freeSeatPlan({ includedSeats, inUse, held = 0, invites, price }: FreeSeatPlan) {
   const total = inUse + invites;
   const over = total > includedSeats;
   const action = freeSeatAction({ invites, total, over, price });
@@ -110,7 +135,7 @@ export function freeSeatPlan({ includedSeats, inUse, invites, price }: FreeSeatP
         { label: "Monthly price", value: money(price, 0), ruled: true, emphasis: true },
       ];
   return {
-    heading: `Free includes ${includedSeats} seats. ${inUse} in use.`,
+    heading: `Free includes ${includedSeats} seats. ${inUseLine({ inUse, held })}`,
     rowChip: over ? "Invited after payment" : "Invited now",
     note: over
       ? `${people(total)} is more than Free covers. Growth bills every full seat, ${total} × ${money(price, price.seatCents)}.`
@@ -128,6 +153,8 @@ export type GrowthSeatPlan = {
   /** The seats the drawer asks for. */
   seats: number;
   inUse: number;
+  /** Of `inUse`, the seats held for removed members. */
+  held?: number;
   invites: number;
   price: SeatPrice;
   quote: SeatQuote | undefined;
@@ -143,23 +170,30 @@ export function growthMinimumSeats({ inUse, invites }: { inUse: number; invites:
 }
 
 export function growthSeatPlan(plan: GrowthSeatPlan) {
-  const { paid, seats, inUse, invites, price, quote, developer } = plan;
+  const { paid, seats, inUse, held = 0, invites, price, quote, developer } = plan;
   const delta = seats - paid;
   const devDelta = developer ? developer.target - developer.current : 0;
   const day = nextPeriodDay(plan);
   const monthly =
     seats * price.seatCents + (developer ? developer.target * developer.unitCents : 0);
   return {
-    heading: `You pay for ${paid}. ${inUse} in use.`,
+    heading: `You pay for ${paid}. ${inUseLine({ inUse, held })}`,
     rowChip: "Invited when you confirm",
     minimumHint:
       seats <= growthMinimumSeats({ inUse, invites }) && seats < paid
-        ? `${people(inUse)} use full seats. Remove someone in Users to go lower.`
+        ? growthMinimumHint({ inUse, held })
         : undefined,
     note: growthNote({ delta, paid, seats, quote, day }),
     summary: growthSummary({ ...plan, delta, devDelta, day, monthly }),
     action: growthAction({ delta, devDelta, seats, invites, price, developer }),
   };
+}
+
+function growthMinimumHint({ inUse, held }: { inUse: number; held: number }): string {
+  if (held === 0) return `${people(inUse)} use full seats. Remove someone in Users to go lower.`;
+  const heldPart =
+    held === 1 ? "1 is held for a removed member" : `${held} are held for removed members`;
+  return `${people(inUse - held)} use full seats and ${heldPart}. Held seats free 30 days after the person joined.`;
 }
 
 function nextPeriodDay({

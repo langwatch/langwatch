@@ -517,6 +517,22 @@ describe("<SubscriptionPage/> buying seats", () => {
       expect(screen.queryByTestId("other-seat-types")).toBeNull();
     });
 
+    /** @scenario "Manage seats on Free names a seat held for a removed member" */
+    it("names the seat the server counts for a removed member", async () => {
+      givenFree(1);
+      mockGetUsage.mockReturnValue({
+        data: { seatLimitInfo: { status: "ok", message: "" }, membersCount: 2 },
+        isLoading: false,
+        refetch: vi.fn(),
+      } as ReturnType<typeof mockGetUsage>);
+      renderPage();
+      await openManageSeats();
+
+      expect(screen.getByTestId("seat-drawer-heading")).toHaveTextContent(
+        "Free includes 2 seats. 2 in use, 1 of them held for a removed member.",
+      );
+    });
+
     /** @scenario "An invite that fits Free is sent at once" */
     it("invites into Free at once", async () => {
       givenFree(1);
