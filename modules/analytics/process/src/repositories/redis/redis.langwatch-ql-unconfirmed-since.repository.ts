@@ -29,8 +29,13 @@ export class RedisLwqlUnconfirmedSinceRepository extends LwqlUnconfirmedSinceRep
   async mark(at: number): Promise<number> {
     await this.redis.set(KEY, String(at), "PX", RUN_TTL_MS, "NX");
     const since = Number(await this.redis.get(KEY));
+    if (!(Number.isFinite(since) && since > 0)) {
+      // NX left a value that is not a time; replace it so the next check sees `at`.
+      await this.redis.set(KEY, String(at), "PX", RUN_TTL_MS);
+      return at;
+    }
     await this.redis.pexpire(KEY, RUN_TTL_MS);
-    return Number.isFinite(since) && since > 0 ? since : at;
+    return since;
   }
 
   async clear(): Promise<void> {
