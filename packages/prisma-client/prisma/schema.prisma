@@ -1126,6 +1126,9 @@ model SeatRequest {
   openedAt         DateTime
   resolvedAt       DateTime?
   resolvedByUserId String?
+  /// Set when an approval claims the request, cleared once its seat is given; an approval
+  /// still pending long after is one whose seat never landed, and is reopened.
+  seatPendingSince DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @default(now()) @updatedAt
 

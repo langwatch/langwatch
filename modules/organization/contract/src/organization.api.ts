@@ -304,8 +304,11 @@ export interface OrganizationApi {
   acquireSeatLease(
     input: Readonly<{ organizationId: string }>,
   ): Promise<Readonly<{ holder: string; renewEveryMs: number }>>;
-  /** Pushes this holder's lease expiry out again; a lease taken over meanwhile is left alone. */
-  renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void>;
+  /**
+   * Pushes this holder's lease expiry out again; false when the lease is no longer this
+   * holder's, so a caller about to write a seat-holding row must not write it.
+   */
+  renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<boolean>;
   /** Drops this holder's seat lease, and only its own. */
   releaseSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void>;
   setMemberDisabled(

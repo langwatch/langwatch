@@ -35,7 +35,7 @@ function serviceWhere(options: {
       checkLimit: vi.fn(),
       assertRoleChangeAllowed,
       holdsFullSeat: vi.fn(async () => true),
-      withSeat: ({ work }) => work(),
+      withSeat: ({ work }) => work({ assertHeld: async () => {} }),
     },
     seatNotices: { memberDisabled: vi.fn(), memberEnabled: vi.fn() },
     grantCache: { invalidateOrganization: vi.fn() },

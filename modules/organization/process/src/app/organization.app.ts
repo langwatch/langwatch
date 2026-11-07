@@ -572,6 +572,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         pricing: (input) => organizations.getPricing(input),
         organizationName,
         billingMembers: (input) => dependencies.permissions.listBillingMembers(input),
+        hasOpenInvite: (input) => setup.repositories.invite.hasOpenInviteForEmail(input),
         inviteMember: async ({ organizationId, email, invitedBy }) => {
           await application.createInvitations(
             { organizationId, validation: "strict", invites: [{ email, role: "MEMBER" }] },
@@ -690,7 +691,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#infrastructure.seatLease.acquire(input);
   }
 
-  renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void> {
+  renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<boolean> {
     return this.#infrastructure.seatLease.renew(input);
   }
 
@@ -1835,10 +1836,11 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     // Custom roles too: the member's seat, read by the write, must not move under it.
     await this.#infrastructure.seats.withSeat({
       organizationId,
-      work: async () => {
+      work: async (lease) => {
         if (!isOrganizationApiCustomRole(input.role)) {
           await this.#assertBuiltInTeamRoleAllowed({ organizationId, input });
         }
+        await lease.assertHeld();
         await this.updateTeamMemberRole(input, by);
       },
     });

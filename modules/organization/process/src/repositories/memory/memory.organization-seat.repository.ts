@@ -6,7 +6,7 @@ import {
 import { nowInstant, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import { OrganizationSeatRepository } from "../organization-seat.repository.ts";
+import { OrganizationSeatRepository, type SeatLease } from "../organization-seat.repository.ts";
 import type {
   MemoryOrganizationDatabase,
   MemoryOrganizationInviteRow,
@@ -69,10 +69,11 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
     work,
   }: {
     organizationId: string;
-    work: () => Promise<T>;
+    work: (lease: SeatLease) => Promise<T>;
   }): Promise<T> {
     const previous = this.#seatQueues.get(organizationId) ?? Promise.resolve();
-    const held = previous.then(work);
+    // The queue never hands a hold to another change, so the lease is always still held.
+    const held = previous.then(() => work({ assertHeld: async () => {} }));
     const settled = held.catch(() => undefined);
     this.#seatQueues.set(organizationId, settled);
     try {
@@ -106,7 +107,9 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
     return { holder, renewEveryMs: 5_000 };
   }
 
-  async renewSeatLease(): Promise<void> {}
+  async renewSeatLease({ holder }: { organizationId: string; holder: string }): Promise<boolean> {
+    return this.#leaseHolders.has(holder);
+  }
 
   async releaseSeatLease({ holder }: { organizationId: string; holder: string }): Promise<void> {
     this.#leaseHolders.get(holder)?.();

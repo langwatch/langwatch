@@ -13,6 +13,8 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
   }
 
   readonly rows: SeatRequestRow[] = [];
+  /** Each approval still giving its seat, by request id: when it claimed the request. */
+  readonly seatPendingSince = new Map<string, number>();
 
   private constructor() {}
 
@@ -66,6 +68,7 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
       salesNotifiedAt: null,
     };
     this.rows[index] = request;
+    this.seatPendingSince.delete(request.id);
     return { request, outcome: "reopened" };
   }
 
@@ -105,6 +108,7 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
       resolvedAt: input.at,
       resolvedByUserId: input.resolvedByUserId,
     };
+    if (input.status === "APPROVED") this.seatPendingSince.set(row.id, input.at);
     return true;
   }
 
@@ -120,6 +124,36 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
     const row = this.rows[index];
     if (!row) return;
     this.rows[index] = { ...row, status: "OPEN", resolvedAt: null, resolvedByUserId: null };
+    this.seatPendingSince.delete(row.id);
+  }
+
+  async settleSeat(input: Parameters<SeatRequestRepository["settleSeat"]>[0]): Promise<void> {
+    const row = this.rows.find(
+      (candidate) =>
+        candidate.id === input.id &&
+        candidate.organizationId === input.organizationId &&
+        candidate.status === "APPROVED" &&
+        candidate.resolvedAt === input.at,
+    );
+    if (row) this.seatPendingSince.delete(row.id);
+  }
+
+  async findSeatPending({
+    organizationId,
+    since,
+  }: {
+    organizationId: string;
+    since: number;
+  }): Promise<SeatRequestRow[]> {
+    return this.rows.filter((row) => {
+      const pending = this.seatPendingSince.get(row.id);
+      return (
+        row.organizationId === organizationId &&
+        row.status === "APPROVED" &&
+        pending !== undefined &&
+        pending < since
+      );
+    });
   }
 
   async claimSalesNotice({ id, at }: { id: string; at: number }): Promise<boolean> {

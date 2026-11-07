@@ -20,7 +20,7 @@ import {
 import { prismaTables } from "@langwatch/prisma-client/ownership";
 import { z } from "zod";
 
-import { OrganizationSeatRepository } from "../organization-seat.repository.ts";
+import { OrganizationSeatRepository, type SeatLease } from "../organization-seat.repository.ts";
 
 /** Only what this repository needs, named so a caller never names Prisma's own types. */
 type PrismaOrganizationSeatDatabase = PrismaClient | Prisma.TransactionClient;
@@ -50,9 +50,10 @@ RETURNING "holder"`;
       return taken.length > 0;
     },
     renew: async ({ holder, ttlMs }) => {
-      await prisma.$executeRaw`
+      const renewed = await prisma.$executeRaw`
 UPDATE "OrganizationSeatLease" SET "expiresAt" = now() + make_interval(secs => ${ttlMs / 1000})
 WHERE "organizationId" = ${organizationId} AND "holder" = ${holder}`;
+      return renewed > 0;
     },
     release: async ({ holder }) => {
       await prisma.organizationSeatLease.deleteMany({ where: { organizationId, holder } });
@@ -130,12 +131,13 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
     work,
   }: {
     organizationId: string;
-    work: () => Promise<T>;
+    work: (lease: SeatLease) => Promise<T>;
   }): Promise<T> {
     return withLease({
       store: this.leaseStore(organizationId),
       work,
       onBusy: () => new SeatChangeBusyError(),
+      onLost: () => new SeatChangeBusyError(),
     });
   }
 
@@ -157,7 +159,7 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
   }: {
     organizationId: string;
     holder: string;
-  }): Promise<void> {
+  }): Promise<boolean> {
     return this.leaseStore(organizationId).renew({ holder, ttlMs: LEASE_TTL_MS });
   }
 

@@ -129,8 +129,9 @@ export class OrganizationMemberAdmissionService {
     const requested = seat ?? (await this.repo.readJoinerSeat({ organizationId }));
     const admission = await this.dependencies.seats.withSeat({
       organizationId,
-      work: async () => {
+      work: async (lease) => {
         const decided = await this.decideSeat({ organizationId, userId, requested });
+        await lease.assertHeld();
         return this.repo.createMembership({
           organizationId,
           userId,

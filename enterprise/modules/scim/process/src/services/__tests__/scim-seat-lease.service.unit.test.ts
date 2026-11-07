@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { type ScimSeatLeaseApi, ScimSeatLeaseService } from "../scim-seat-lease.service.ts";
 
 /** Organization's lease operations, recording every call in order. */
-function leaseApi() {
+function leaseApi({ held = true }: { held?: boolean } = {}) {
   const calls: string[] = [];
   const api: ScimSeatLeaseApi = {
     acquireSeatLease: async ({ organizationId }) => {
@@ -13,6 +13,7 @@ function leaseApi() {
     },
     renewSeatLease: async ({ holder }) => {
       calls.push(`renew:${holder}`);
+      return held;
     },
     releaseSeatLease: async ({ holder }) => {
       calls.push(`release:${holder}`);
@@ -76,6 +77,26 @@ describe("ScimSeatLeaseService", () => {
         }),
       ).rejects.toBe(busy);
       expect(runs).toBe(0);
+    });
+  });
+
+  describe("when the lease went to another seat change before the membership write", () => {
+    /** @scenario "A directory admission whose lease was taken over writes no membership" */
+    it("refuses the write seat_change_busy and still releases its own lease", async () => {
+      const { api, calls } = leaseApi({ held: false });
+      const writes: string[] = [];
+
+      await expect(
+        ScimSeatLeaseService.create(api).withSeatLock({
+          organizationId: "org-acme",
+          work: async (lease) => {
+            await lease.assertHeld();
+            writes.push("membership");
+          },
+        }),
+      ).rejects.toMatchObject({ code: "seat_change_busy" });
+      expect(writes).toEqual([]);
+      expect(calls).toEqual(["acquire:org-acme", "renew:h1", "release:h1"]);
     });
   });
 });
