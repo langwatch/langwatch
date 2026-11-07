@@ -292,6 +292,14 @@ The project's own live prompts with at least one version; the setup checklist's 
 countVersionedPrompts(input: { projectId: string }): Promise<number>;
 ```
 
+#### `countOrganizationVersionedPrompts`
+
+The organization's live prompts with at least one version, across every project.
+
+```typescript
+countOrganizationVersionedPrompts(input: { organizationId: string }): Promise<number>;
+```
+
 #### `getByAddress`
 
 The `/api/prompts` REST family's operations: its refusals keep the statuses they had.

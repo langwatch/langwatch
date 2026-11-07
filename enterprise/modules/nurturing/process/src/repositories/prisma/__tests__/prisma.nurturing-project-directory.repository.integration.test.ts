@@ -105,6 +105,13 @@ describe.skipIf(!databaseUrl)("given project's and organization's tables", () =>
     });
   });
 
+  describe("when an organization holding an archived project lists its projects", () => {
+    /** @scenario Archived projects are not counted */
+    it("answers its live projects, archived left out", async () => {
+      await expect(repository.findProjectIds({ organizationId })).resolves.toEqual([projectId]);
+    });
+  });
+
   describe("when an organization's creation is read", () => {
     /** @scenario "Nurturing reads an organization's creation through its share" */
     it("answers when its owners created it", async () => {

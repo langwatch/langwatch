@@ -18,6 +18,7 @@ import { selfHostedTraits, unixSecondsOf } from "../rules/nurturing-customer-io-
 import { pickCustomerIoDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
 import {
   fireExperimentRan,
+  fireProjectActiveDay,
   fireScenarioCreated,
   fireTeamMemberInvited,
   fireWorkflowCreated,
@@ -272,6 +273,8 @@ export class NurturingDeliveryService {
         return this.sendCustomerIoCalls(fireWorkflowCreated(signal));
       case "first_trace_integrated":
         return this.firstTraceToCustomerIo(signal);
+      case "project_active_day":
+        return this.sendCustomerIoCalls(fireProjectActiveDay(signal));
       case "simulation_run_finished":
         return this.simulationRunFinished(signal);
       case "evaluation_completed":

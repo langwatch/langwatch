@@ -186,6 +186,14 @@ How many scenarios the project holds.
 count(input: { projectId: string }): Promise<number>;
 ```
 
+#### `countActiveForProjects`
+
+How many active scenarios the projects hold; archived ones are not counted.
+
+```typescript
+countActiveForProjects(input: { projectIds: readonly string[] }): Promise<number>;
+```
+
 #### `getById`
 
 One live scenario. Throws `ScenarioNotFoundError` when the project holds none.

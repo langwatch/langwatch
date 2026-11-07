@@ -149,6 +149,7 @@ import {
   type TraceModelSpendWindow,
   type TraceSpendSummary,
   type TraceUsageCount,
+  type TraceUsageSummary,
   type EvaluationTraceEvent,
   type EvaluationTraceSpan,
   type TracesForProjectResult,
@@ -2232,6 +2233,13 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<TraceUsageCount> {
     return this.#dependencies.traces.existence.countUsage(input);
+  }
+
+  summarizeUsage(input: {
+    projectIds: readonly string[];
+    since: number;
+  }): Promise<TraceUsageSummary> {
+    return this.#dependencies.traces.existence.summarizeUsage(input);
   }
 
   classifyClaudeCall(input: ClassifyClaudeCallInput): ClassifyClaudeCallResult {

@@ -164,6 +164,19 @@ export interface TraceUsageCount {
   readonly spans: number;
 }
 
+/**
+ * An organization's traces for nurturing's daily usage sync, since `since` (epoch ms): each trace
+ * once, at its newest version. Counts, a cost and a time only; never trace content.
+ */
+export interface TraceUsageSummary {
+  readonly traces: number;
+  readonly errors: number;
+  /** The newest versions' summed cost in USD; 0 when none is known. */
+  readonly totalCost: number;
+  /** Epoch ms of the latest trace with an error; null when none had one. */
+  readonly lastFailedTraceAt: number | null;
+}
+
 /** Public Trace operations shared by process peers after boot composition. */
 export interface TraceApi extends TraceOtlpIngestApi {
   extractInlineMediaFromEvent(input: {
@@ -911,6 +924,11 @@ export interface TraceApi extends TraceOtlpIngestApi {
   platformUrl(input: { projectSlug: string; path: string }): string;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<TraceUsageCount>;
+  /** Nurturing's daily usage sync: the projects' traces, errors and cost since `since`. */
+  summarizeUsage(input: {
+    projectIds: readonly string[];
+    since: number;
+  }): Promise<TraceUsageSummary>;
   classifyClaudeCall(input: ClassifyClaudeCallInput): ClassifyClaudeCallResult;
   deriveClaudeResponseContent(
     input: DeriveClaudeResponseContentInput,

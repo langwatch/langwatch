@@ -84,6 +84,8 @@ export interface EvaluatorApi {
 
   /** Every evaluator in the project. */
   getAll(input: { projectId: string }): Promise<Evaluator[]>;
+  /** How many active evaluators the projects hold; archived ones are not counted. */
+  countActiveForProjects(input: { projectIds: readonly string[] }): Promise<number>;
   /** Every evaluator in the project, with its computed input and output fields. */
   getAllWithFields(input: { projectId: string }): Promise<EvaluatorWithFields[]>;
   /**

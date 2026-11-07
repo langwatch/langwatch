@@ -60,6 +60,15 @@ export class HttpCustomerIoChannel extends CustomerIoChannel {
   }
 
   batch(calls: CioBatchCall[]): Promise<void> {
+    return this.post("/batch", HttpCustomerIoChannel.batchBody(calls));
+  }
+
+  /** Rejects when Customer.io did not take the batch; batch only logs that. */
+  override batchOrThrow(calls: CioBatchCall[]): Promise<void> {
+    return this.postOrThrow("/batch", HttpCustomerIoChannel.batchBody(calls));
+  }
+
+  private static batchBody(calls: CioBatchCall[]): { batch: unknown[] } {
     const batchItems = calls.map((call) => {
       switch (call.type) {
         case "identify":
@@ -81,7 +90,7 @@ export class HttpCustomerIoChannel extends CustomerIoChannel {
           };
       }
     });
-    return this.post("/batch", { batch: batchItems });
+    return { batch: batchItems };
   }
 
   /** Rejects when Customer.io did not take the track; trackEvent only logs that. */

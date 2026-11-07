@@ -185,6 +185,10 @@ export class EvaluatorService {
     return this.options.repository.findAll(input);
   }
 
+  countActiveForProjects(input: { projectIds: readonly string[] }): Promise<number> {
+    return this.options.repository.countActiveByProjects({ projectIds: [...input.projectIds] });
+  }
+
   async getAllWithFields(input: { projectId: string }): Promise<EvaluatorWithFields[]> {
     const evaluators = await this.getAll(input);
 

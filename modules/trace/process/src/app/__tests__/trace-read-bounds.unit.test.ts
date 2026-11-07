@@ -59,6 +59,12 @@ function harness(tier: "free" | "paid" | "enterprise") {
       existence: {
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],
         countUsage: async () => ({ traces: 0, spans: 0 }),
+        summarizeUsage: async () => ({
+          traces: 0,
+          errors: 0,
+          totalCost: 0,
+          lastFailedTraceAt: null,
+        }),
         findTraceCosts: async () => [],
       },
       read: read as TraceLegacyRead,
