@@ -64,6 +64,37 @@ def test_valid_format_evaluator_python():
     assert "Invalid Python" in result.details  # type: ignore
 
 
+def test_valid_format_evaluator_python_whitespace_only():
+    entry = ValidFormatEntry(output="   \n\t\n  ")
+    evaluator = ValidFormatEvaluator(settings=ValidFormatSettings(format="python"))
+    result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert "Output is empty" in result.details  # type: ignore
+
+
+def test_valid_format_evaluator_python_comment_only():
+    # Comments are not AST nodes, so this parses to an empty module.
+    entry = ValidFormatEntry(output="# just a comment\n# another line")
+    evaluator = ValidFormatEvaluator(settings=ValidFormatSettings(format="python"))
+    result = evaluator.evaluate(entry)
+
+    assert result.status == "processed"
+    assert result.passed == False
+    assert result.score == 0
+    assert "Invalid Python" in result.details  # type: ignore
+
+
+def test_valid_format_evaluator_sql_whitespace_only():
+    # sqlglot.parse returns [None] for blank source instead of raising.
+    entry = ValidFormatEntry(output="   \n ")
+    evaluator = ValidFormatEvaluator(settings=ValidFormatSettings(format="sql"))
+    result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert "Output is empty" in result.details  # type: ignore
+
+
 def test_valid_format_evaluator_sql():
     # Test valid SQL
     entry = ValidFormatEntry(output="SELECT * FROM users WHERE age > 18;")
