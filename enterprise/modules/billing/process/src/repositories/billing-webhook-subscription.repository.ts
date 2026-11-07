@@ -55,6 +55,11 @@ export abstract class BillingWebhookSubscriptionRepository {
 
   abstract cancelTrialSubscriptions(organizationId: string): Promise<void>;
 
+  abstract findSupersededBySeatEvent(input: {
+    organizationId: string;
+    excludeSubscriptionId: string;
+  }): Promise<CancelledSubscription[]>;
+
   abstract migrateToSeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;

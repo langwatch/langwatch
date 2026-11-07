@@ -161,3 +161,53 @@ Feature: Stripe webhook handling grants and removes plans correctly
     Given the Stripe delivery channel over the provider and over its memory twin, each holding a signing secret
     When a delivery signed with that secret, one signed with another secret and one where no secret is held arrive
     Then each tier answers the first with its event and refuses the other two
+
+  Rule: An upgrade to Growth seats never leaves the old tiered subscription billing
+
+    Moving a legacy tiered organization to Growth seats activates the new
+    subscription and cancels the old one. The two happen in separate steps,
+    and Stripe reports activation through two different events in no fixed
+    order. If retiring the old subscription were tied to the first activation
+    only, a failed step or the events arriving the other way round would leave
+    the customer paying for both plans. So every confirmation that a Growth
+    seat subscription is active retires whatever tiered subscription is still
+    alive, and a redelivery finishes what an earlier attempt left undone.
+
+    @unit
+    Scenario: Retiring the old plan fails, and Stripe's redelivery retires it
+      Given an organization on a tiered plan has paid for Growth seats
+      And recording the move to seat pricing fails the first time
+      When the invoice-paid webhook is handled and then redelivered
+      Then the tiered subscription is cancelled in Stripe and in our records
+      And the organization is moved to seat pricing
+      And the subscription is announced as started once
+
+    @unit
+    Scenario: The subscription update arrives before the invoice is paid
+      Given an organization on a tiered plan has paid for Growth seats
+      When Stripe reports the subscription active before it reports the invoice paid
+      Then the tiered subscription is cancelled in Stripe and in our records
+      And it is cancelled once, not again when the invoice event arrives
+      And the subscription is announced as started once
+
+    @unit
+    Scenario: An organization already billed for both plans is healed by its next payment
+      Given an organization's Growth seat subscription is active
+      And its old tiered subscription is still active
+      When its next invoice is paid
+      Then the tiered subscription is cancelled in Stripe and in our records
+      And no subscription is announced as started
+
+    @unit
+    Scenario: A late activation for a cancelled Growth subscription retires nothing
+      Given an organization's Growth seat subscription is cancelled in our records
+      And its tiered subscription is active
+      When a delayed update reports the Growth subscription active
+      Then the tiered subscription stays active and nothing is cancelled in Stripe
+
+    @unit
+    Scenario: A renewal with nothing left to retire changes nothing
+      Given an organization's Growth seat subscription is active
+      And it holds no other live subscription
+      When its next invoice is paid
+      Then no subscription is cancelled and the pricing model is not announced again

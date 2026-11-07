@@ -154,11 +154,31 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
     // No-op, as the Prisma twin is: the `isTrial` column does not exist yet.
   }
 
+  async findSupersededBySeatEvent(input: {
+    organizationId: string;
+    excludeSubscriptionId: string;
+  }): Promise<{ stripeSubscriptionId: string | null }[]> {
+    return this.supersededBySeatEvent(input).map(({ stripeSubscriptionId }) => ({
+      stripeSubscriptionId,
+    }));
+  }
+
   async migrateToSeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
   }): Promise<{ stripeSubscriptionId: string | null }[]> {
-    const superseded = this.store.subscriptions.filter(
+    const superseded = this.supersededBySeatEvent(input);
+
+    for (const subscription of superseded) await this.cancel({ id: subscription.id });
+
+    return superseded.map(({ stripeSubscriptionId }) => ({ stripeSubscriptionId }));
+  }
+
+  private supersededBySeatEvent(input: {
+    organizationId: string;
+    excludeSubscriptionId: string;
+  }): BillingSubscriptionRecord[] {
+    return this.store.subscriptions.filter(
       (subscription) =>
         subscription.organizationId === input.organizationId &&
         subscription.id !== input.excludeSubscriptionId &&
@@ -166,10 +186,6 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
         subscription.stripeSubscriptionId !== null &&
         TIERED_PLANS.includes(subscription.plan),
     );
-
-    for (const subscription of superseded) await this.cancel({ id: subscription.id });
-
-    return superseded.map(({ stripeSubscriptionId }) => ({ stripeSubscriptionId }));
   }
 
   async updateQuantities(input: {

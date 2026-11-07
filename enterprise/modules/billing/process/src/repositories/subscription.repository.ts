@@ -50,6 +50,11 @@ export abstract class BillingSubscriptionRepository {
   abstract recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void>;
   abstract cancel(input: { id: string }): Promise<void>;
   abstract cancelTrialSubscriptions(organizationId: string): Promise<void>;
+  /** The live tiered subscriptions a Growth seat subscription supersedes; nothing changes. */
+  abstract findSupersededBySeatEvent(input: {
+    organizationId: string;
+    excludeSubscriptionId: string;
+  }): Promise<{ stripeSubscriptionId: string | null }[]>;
   abstract migrateToSeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
