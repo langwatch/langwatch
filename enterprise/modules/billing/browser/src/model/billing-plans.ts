@@ -23,11 +23,16 @@ export const currencySymbol: Record<Currency, string> = {
   [Currency.USD]: "$",
 };
 
+/** The events a Growth plan includes each month before overage. */
+export const GROWTH_INCLUDED_EVENTS = 200_000;
+
+/** What each further 100,000 events costs on Growth, in cents of the currency. */
+export const growthOverageCentsPer100k = (currency: Currency): number =>
+  currency === Currency.EUR ? 500 : 600;
+
 /** Returns the per-100K events pricing string for the given currency. */
 const growthEventsPricingString = (currency: Currency): string =>
-  currency === Currency.EUR
-    ? "\u20AC5 per additional 100,000 events"
-    : "$6 per additional 100,000 events";
+  `${formatPrice({ cents: growthOverageCentsPer100k(currency), currency })} per additional 100,000 events`;
 
 const growthRetentionPricingString = (currency: Currency): string =>
   currency === Currency.EUR
@@ -40,7 +45,7 @@ const growthRetentionPricingString = (currency: Currency): string =>
  */
 export const getGrowthFeatures = (currency: Currency): string[] => [
   "Up to 20 core users",
-  "200,000 events included",
+  `${formatNumber(GROWTH_INCLUDED_EVENTS)} events included`,
   growthEventsPricingString(currency),
   "Unlimited lite users",
   "30 days retention",

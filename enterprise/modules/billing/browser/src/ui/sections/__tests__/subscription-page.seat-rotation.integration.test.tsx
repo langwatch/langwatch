@@ -32,6 +32,10 @@ import {
 const { mockPreviewProration } = vi.hoisted(() => ({ mockPreviewProration: vi.fn() }));
 
 class TestBillingHost extends BillingHostApi {
+  canReadMonthBreakdown(): boolean {
+    return true;
+  }
+
   readonly successes: BillingSuccessNotice[] = [];
   readonly failures: BillingFailureNotice[] = [];
   readonly navigations: string[] = [];

@@ -48,6 +48,10 @@ class MemberHost extends BillingHostApi {
   canInviteMembers(): boolean {
     return this.mayInvite;
   }
+
+  canReadMonthBreakdown(): boolean {
+    return true;
+  }
   routeQuery(): Readonly<Record<string, string | undefined>> {
     return {};
   }

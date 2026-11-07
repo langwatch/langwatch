@@ -9,7 +9,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { UsageMembershipRepository } from "../../repositories/usage-membership.repository.ts";
-import type { UsageCounter, UsageCount } from "../usage-enforcement.service.ts";
+import type { ProjectUsageCounts, UsageCounter, UsageCount } from "../usage-enforcement.service.ts";
 import { UNCAPPED_MONTHLY_USAGE_LIMIT, UsageStatsService } from "../usage-stats.service.ts";
 
 const UNLIMITED_MESSAGES = 999_999_999;
@@ -47,6 +47,9 @@ class StubCounter implements UsageCounter {
   }
   async checkLimitForOrganization(): Promise<{ exceeded: false }> {
     return { exceeded: false };
+  }
+  async getCountByProjects(): Promise<ProjectUsageCounts> {
+    return [];
   }
 }
 

@@ -306,3 +306,18 @@ describe("given every Settings entry", () => {
     expect(new Set(icons).size).toBe(icons.length);
   });
 });
+
+describe("given a member on LangWatch Cloud", () => {
+  describe("when the menu is built", () => {
+    /** @scenario "The settings menu names the two billing pages Usage and Plan & billing" */
+    it("names the usage page Usage and the subscription page Plan & billing", () => {
+      const items = settingsMenu({ ...EVERYTHING_CLOSED, isSaaS: true, hosting: "cloud" }).flatMap(
+        (group) => group.items,
+      );
+      const labelOf = (href: string) => items.find((item) => item.href === href)?.label;
+
+      expect(labelOf("/settings/usage")).toBe("Usage");
+      expect(labelOf("/settings/subscription")).toBe("Plan & billing");
+    });
+  });
+});

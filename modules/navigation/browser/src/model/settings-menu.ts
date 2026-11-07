@@ -189,12 +189,12 @@ function organizationGroup({
       ...(!isLiteMember && hasPermission("sso:view")
         ? [{ label: "Authentication", href: "/settings/authentication", icon: LogIn }]
         : []),
-      ...(seesBilling ? [{ label: "Usage & billing", href: "/settings/usage", icon: Gauge }] : []),
+      ...(seesBilling ? [{ label: "Usage", href: "/settings/usage", icon: Gauge }] : []),
       // Every member may upgrade, Lite included: whoever holds the card pays.
       ...(isSaaS
         ? [
             {
-              label: "Subscription",
+              label: "Plan & billing",
               href: "/settings/subscription",
               icon: CreditCard,
             },

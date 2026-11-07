@@ -3702,7 +3702,7 @@ const presentations = {
     describe: (error) => {
       const budget = error.meta.budgetUsd;
       const allowance = typeof budget === "number" ? `$${budget.toFixed(2)}` : "the free";
-      return `Organizations without a paid plan can judge up to ${allowance} of text in total. Upgrade your plan under Settings, Subscription to keep running Instant Evals.`;
+      return `Organizations without a paid plan can judge up to ${allowance} of text in total. Upgrade your plan under Settings, Plan & billing to keep running Instant Evals.`;
     },
   },
   instant_eval_memory_judge_in_production: {

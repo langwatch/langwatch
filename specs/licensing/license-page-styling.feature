@@ -74,9 +74,9 @@ Feature: The License page says where a license stands
   Rule: usage against limits is read on the Usage page, not here
 
     @integration
-    Scenario: Usage against each limit is read on the Usage page
-      Given I open /settings/usage
-      Then each resource shows its current use against its limit
+    Scenario: Each resource's current use is read on the Usage page
+      Given I open /settings/usage on a self-hosted installation
+      Then each resource shows its current use
       And lite members are included when the plan has them
 
     @integration

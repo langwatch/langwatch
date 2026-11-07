@@ -7891,6 +7891,9 @@ importers:
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../packages/process
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract

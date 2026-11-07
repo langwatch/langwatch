@@ -42,6 +42,10 @@ const CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_seats";
 const DEC_1 = Date.UTC(2026, 11, 1);
 
 class TestBillingHost extends BillingHostApi {
+  canReadMonthBreakdown(): boolean {
+    return true;
+  }
+
   readonly successes: BillingSuccessNotice[] = [];
   readonly failures: BillingFailureNotice[] = [];
   readonly departures: string[] = [];

@@ -23,8 +23,9 @@ vi.mock("../../../behavior/billing-api.ts", () => {
   return {
     billingApi: {
       plan: { getActivePlan: loading },
-      limits: { getUsage: loading },
+      limits: { getUsage: loading, getMonthBreakdown: loading },
       license: { getStatus: loading },
+      currency: { detectCurrency: loading },
     },
   };
 });
