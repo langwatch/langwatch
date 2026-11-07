@@ -418,7 +418,7 @@ await it("styles a page, dark mode, search and navigation from inlined styles", 
         assert.match(html, /<style>@layer /);
         assert.doesNotMatch(
           html.replace(/<noscript>[\s\S]*?<\/noscript>/g, ""),
-          /<link(?![^>]*media="print")[^>]*rel="stylesheet"/,
+          /<link(?=[^>]*\srel="stylesheet")(?=[^>]*\shref=)[^>]*>/,
         );
         assert.equal(
           await page.locator(".docs-layout").evaluate((node) => getComputedStyle(node).display),

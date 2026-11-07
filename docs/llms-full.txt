@@ -37465,7 +37465,7 @@ For a golden answer, the test suite declares [fields](/agent-testing/test-suites
 **Edit suite** opens the suite editor. Under **Customize test suite**, **Add evaluator** lists the evaluators of the project, and picking one attaches it with its mappings inferred. When a required input is still unmapped, or the evaluator reads an expected value, the drawer opens on the attachment so you confirm each mapping.
 
 <Frame>
-<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The suite editor with two fields, golden_sql and table_schema, each with a drag handle, and two evaluator chips, SQL Query Equivalence with the required dot and a score judge" />
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" width="616" alt="The suite editor with two fields, golden_sql and table_schema, each with a drag handle, and two evaluator chips, SQL Query Equivalence with the required dot and a score judge" />
 </Frame>
 
 A chip with an amber alert has a required input with no mapping. **Run suite** does not start in that state: it opens the drawer on that evaluator instead.
@@ -40121,6 +40121,7 @@ The **Scenarios** tab lists the test suites of the project under **Test Suites**
   <img
     className="block"
     src="/images/agent-testing/test-suite-rail-menu.png"
+    width="356"
     alt="The test suite rail with the row menu of the Refunds test suite open"
   />
 </Frame>
@@ -40132,7 +40133,7 @@ The row menu of a test suite offers:
 | **New scenario**     | Opens the editor with this test suite preselected.                                            |
 | **Run suite**        | Opens the run dialog with every scenario of the test suite in scope.                          |
 | **Edit**             | Opens the suite editor: the name, the fields and the evaluators. Past runs keep the old name. |
-| **Open recent runs** | Lists the latest runs of this test suite.                                                     |
+| **Open recent runs** | Lists the latest runs of this test suite. It appears when a scenario in it has a result in the selected period. |
 | **Archive suite**    | Archives the test suite and the scenarios in it. Test runs are preserved.                     |
 
 Every project has a **Default** test suite. A scenario saved with **No test suite** goes there.
@@ -40146,7 +40147,7 @@ A test suite reads like a dataset. Beyond the situation and the criteria, it dec
 **Edit suite** opens the suite editor. Under **Customize test suite**, **Add fields** opens the field rows: an identifier and a type each, with **Add field** for the next one. Drag a row by the handle on its left to reorder the fields. The handle appears once the suite declares more than one field, and it takes the arrow keys when it has focus.
 
 <Frame>
-<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The Edit test suite drawer with the field rows golden_sql and table_schema, each with a drag handle, a type of Text and a remove button, and the evaluator chips under them" />
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" width="616" alt="The Edit test suite drawer with the field rows golden_sql and table_schema, each with a drag handle, a type of Text and a remove button, and the evaluator chips under them" />
 </Frame>
 
 The field rows of the `Case lookups` suite, with the drag handle on the left of each.
@@ -40174,6 +40175,7 @@ The evaluators attached to a suite run after every scenario run and report besid
   <img
     className="block"
     src="/images/agent-testing/move-to-test-suite.png"
+    width="448"
     alt="The Move to test suite dialog with the test suites of the project"
   />
 </Frame>

@@ -51,6 +51,12 @@ function prefetch({ event }: { event: Event }) {
   if (url) request.result = fetchPage({ url }).then(() => {});
 }
 
+/* The shared sheet of a page that has not finished loading names its address in `data-href`. */
+function sheetHref(link: HTMLLinkElement) {
+  const pending = link.dataset.href;
+  return pending ? new URL(pending, document.baseURI).href : link.href;
+}
+
 async function installStyles({ next }: { next: Document }) {
   next
     .querySelectorAll("style[data-docs-style]")
@@ -59,9 +65,14 @@ async function installStyles({ next }: { next: Document }) {
   const pending = [...next.querySelectorAll<HTMLLinkElement>("link[data-docs-style]")].map(
     (source) => {
       const present = [...document.querySelectorAll<HTMLLinkElement>("link[data-docs-style]")].find(
-        (link) => link.href === source.href,
+        (link) => sheetHref(link) === sheetHref(source),
       );
-      /* The shared sheet loads without blocking; wait if it is still on its way. */
+      /* The shared sheet loads after the page. A click before that asks for it now rather than
+         waiting for the rest of the page; either way, wait while it is on its way. */
+      if (present?.dataset.href !== undefined) {
+        present.href = sheetHref(present);
+        present.removeAttribute("data-href");
+      }
       if (present)
         return present.sheet
           ? Promise.resolve()
@@ -72,7 +83,7 @@ async function installStyles({ next }: { next: Document }) {
       return new Promise<void>((resolve, reject) => {
         const link = document.createElement("link");
         link.rel = "stylesheet";
-        link.href = source.href;
+        link.href = sheetHref(source);
         link.dataset.docsStyle = "";
         link.onload = () => resolve();
         link.onerror = () => {
@@ -95,10 +106,10 @@ function updateHead({ next }: { next: Document }) {
     .querySelectorAll(selector)
     .forEach((node) => document.head.append(node.cloneNode(true)));
   const hrefs = new Set(
-    [...next.querySelectorAll<HTMLLinkElement>("link[data-docs-style]")].map((link) => link.href),
+    [...next.querySelectorAll<HTMLLinkElement>("link[data-docs-style]")].map(sheetHref),
   );
   document.querySelectorAll<HTMLLinkElement>("link[data-docs-style]").forEach((link) => {
-    if (!hrefs.has(link.href)) link.remove();
+    if (!hrefs.has(sheetHref(link))) link.remove();
   });
 }
 
