@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.3.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v2.2.0...typescript-sdk@v2.3.0) (2026-11-07)
+
+
+### Features
+
+* **organization:** seat requests over the limit, IdP refusal screens and a Billing role ([#9391](https://github.com/langwatch/langwatch/issues/9391)) ([0805d4e](https://github.com/langwatch/langwatch/commit/0805d4ee7d7ca66f10740a417176c7261c9c3e38))
+
+
+### Bug Fixes
+
+* **agents,experiment:** agent edits refresh without reload, plus experiment workbench fixes ([#9290](https://github.com/langwatch/langwatch/issues/9290)) ([c4e344c](https://github.com/langwatch/langwatch/commit/c4e344ce7ffb073ee7e0933322340d60288e2025))
+* **billing:** let every organization member start a paid subscription ([#9370](https://github.com/langwatch/langwatch/issues/9370)) ([56f6a10](https://github.com/langwatch/langwatch/commit/56f6a106451981e4d36dbbe831a33d37af034c1a))
+
+
+### Documentation
+
+* **coding-agents:** add pi and Grok CLI setup pages ([#9305](https://github.com/langwatch/langwatch/issues/9305)) ([b0ae643](https://github.com/langwatch/langwatch/commit/b0ae643cc744ef7a955da6242e4b56c55e3d5f01))
+
 ## [2.2.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v2.1.0...typescript-sdk@v2.2.0) (2026-11-03)
 
 
