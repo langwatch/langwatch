@@ -27,6 +27,25 @@ function lastRunOf(state: InsightDailyScheduleState): InsightDailyRun["lastRun"]
   };
 }
 
+/** The last run as its person reads it, with its id; a requested run's id is its request's. */
+function ownLastRunOf(state: InsightDailyScheduleState): InsightDailyRunSetting["lastRun"] {
+  const lastRun = lastRunOf(state);
+  return lastRun === null || state.lastRunId === null
+    ? null
+    : { ...lastRun, runId: state.lastRunId };
+}
+
+/** The run that started and has not settled, as folded; the read drops one that is lost. */
+function runInFlightOf(state: InsightDailyScheduleState): InsightDailyRunSetting["runInFlight"] {
+  const {
+    runInFlightId: runId,
+    runInFlightConversationId: conversationId,
+    runInFlightStartedAt: startedAt,
+  } = state;
+  if (runId === null || conversationId === null || startedAt === null) return null;
+  return { runId, conversationId, startedAt };
+}
+
 /** One run row as its person reads it; `lastRun` is null until a run recorded an outcome. */
 export function dailyRunFromState({
   id,
@@ -48,6 +67,7 @@ export const UNDECIDED_DAILY_RUN_SETTING: InsightDailyRunSetting = {
   settings: null,
   lastRun: null,
   offReason: null,
+  runInFlight: null,
 };
 
 /** The row's setting as its person reads it; `settings` is null until they turned it on once. */
@@ -59,8 +79,9 @@ export function dailyRunSettingFromState(state: InsightDailyScheduleState): Insi
       hour === null || timezone === null || maxInsights === null
         ? null
         : { hour, timezone, maxInsights },
-    lastRun: lastRunOf(state),
+    lastRun: ownLastRunOf(state),
     offReason: state.offReason,
+    runInFlight: runInFlightOf(state),
   };
 }
 
@@ -109,10 +130,20 @@ export function decidedScheduleFromState({
 }): InsightDecidedSchedule[] {
   if (state.state === "undecided") return [];
   const board = { kind: state.boardKind, id: state.boardId, name: state.boardName };
-  const { userId, consecutiveSkips } = state;
-  const setting = dailyRunSettingFromState(state);
+  const { userId, consecutiveSkips, offReason } = state;
+  const { settings } = dailyRunSettingFromState(state);
   return [
-    { scheduleId, projectId, userId, board, ...setting, state: state.state, consecutiveSkips },
+    {
+      scheduleId,
+      projectId,
+      userId,
+      board,
+      settings,
+      lastRun: lastRunOf(state),
+      offReason,
+      state: state.state,
+      consecutiveSkips,
+    },
   ];
 }
 

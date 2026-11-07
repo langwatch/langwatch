@@ -136,6 +136,7 @@ describe("given a member with analytics:view and a board with widgets", () => {
           idempotencyKey: `insight-daily-run:${installed.scheduleIdOf()}:${runId}`,
           text: expect.stringContaining('Dashboard: "Costs" (id "dashboard-1")'),
           title: expect.stringMatching(/^Daily insights - Costs - \d{4}-\d{2}-\d{2}$/),
+          isExemptFromRateLimit: true,
         },
       ]);
       expect(installed.langy.waits).toEqual([
@@ -1070,7 +1071,7 @@ describe("given delivery at least once", () => {
     const runIds = (await installed.intentsOf()).map(
       ({ payload }) => (payload as { runId: string }).runId,
     );
-    expect(answer).toEqual({ requestId: expect.any(String) });
+    expect(answer).toEqual({ requestId: expect.any(String), requestedAt: expect.any(Number) });
     expect(runIds).toEqual([inFlight.runId]);
     expect(runIds).not.toContain(answer.requestId);
   });
@@ -1116,5 +1117,22 @@ describe("given the run's row", () => {
       "Costs",
       "Latency",
     ]);
+  });
+});
+
+describe("given a project whose unattended turns reached their window", () => {
+  describe("when an Insights run asks Langy for its turn", () => {
+    /** @scenario "An Insights run is not held to the unattended window" */
+    it("starts the turn, marked as not counted, and files what Langy found", async () => {
+      installed.world.langy.isWindowFull = true;
+      installed.world.langy.answer = TWO_FINDINGS;
+
+      await run();
+
+      expect(installed.langy.starts).toEqual([
+        expect.objectContaining({ isExemptFromRateLimit: true }),
+      ]);
+      expect(await lastRunOf()).toMatchObject({ outcome: "filed", filedCount: 2 });
+    });
   });
 });
