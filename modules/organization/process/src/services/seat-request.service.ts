@@ -64,6 +64,8 @@ export interface SeatRequestPeers {
   organizationName(input: { organizationId: string }): Promise<string>;
   /** Authz's Billing role holders on enabled memberships. */
   billingMembers(input: { organizationId: string }): Promise<readonly { userId: string }[]>;
+  /** Whether the address holds an unexpired invitation to the organization. */
+  hasOpenInvite(input: { organizationId: string; email: string }): Promise<boolean>;
   /** Invites an address as a full member, for a request with no membership to promote. */
   inviteMember(input: {
     organizationId: string;

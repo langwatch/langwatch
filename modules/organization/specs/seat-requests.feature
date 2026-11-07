@@ -191,6 +191,14 @@ Feature: Seat requests when an organization is over its seat limit
       Then the request stays approved and is marked as given
 
     @unit
+    Scenario: An approval whose invitation went out but was never marked is settled, not reopened
+      Given an administrator approved the seat request of a refused sign-in with no membership
+      And the approval invited the address as a full member
+      But the approval could not mark the seat as given
+      When an administrator lists the open seat requests an hour later
+      Then the request stays approved and is marked as given
+
+    @unit
     Scenario: A directory admission whose lease was taken over writes no membership
       Given a directory admission holds the organization's seat lease through the organization Api
       And the lease went to another seat change before the membership write

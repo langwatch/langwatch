@@ -449,4 +449,32 @@ describe("given an approved seat request whose seat never landed", () => {
       expect(membershipOf(userId)).toMatchObject({ disabledAt: null });
     });
   });
+
+  describe("when an approval invited the address but could not mark the seat as given", () => {
+    /** @scenario "An approval whose invitation went out but was never marked is settled, not reopened" */
+    it("keeps the request approved, since the invitation is its seat", async () => {
+      const { app, state, openRequests, seatRequests } = await application();
+      await app.recordRefusedSignIn({
+        organizationId: ORGANIZATION_ID,
+        email: "late@acme.example",
+        idp: "okta",
+      });
+      const [request] = await openRequests();
+      state.plan = planWith({ freeFull: 1 });
+      seatRequests.settleSeat = async () => {
+        throw new Error("seat request store unavailable");
+      };
+
+      const resolved = await app.approveSeatRequest(
+        { organizationId: ORGANIZATION_ID, seatRequestId: request!.id },
+        ADA,
+      );
+      seatRequests.seatPendingSince.set(request!.id, Date.now() - HOUR_MS);
+      seatRequests.settleSeat = MemorySeatRequestRepository.prototype.settleSeat.bind(seatRequests);
+
+      expect(resolved).toEqual({ outcome: "invited" });
+      expect(await openRequests()).toEqual([]);
+      expect(seatRequests.seatPendingSince.has(request!.id)).toBe(false);
+    });
+  });
 });

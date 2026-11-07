@@ -564,6 +564,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         pricing: (input) => organizations.getPricing(input),
         organizationName,
         billingMembers: (input) => dependencies.permissions.listBillingMembers(input),
+        hasOpenInvite: (input) => setup.repositories.invite.hasOpenInviteForEmail(input),
         inviteMember: async ({ organizationId, email, invitedBy }) => {
           await application.createInvitations(
             { organizationId, validation: "strict", invites: [{ email, role: "MEMBER" }] },

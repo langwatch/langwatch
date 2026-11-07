@@ -33,7 +33,7 @@ type Dependencies = Readonly<{
   members: OrganizationMembershipRepository;
   memberships: SeatRequestMemberships;
   seats: Pick<OrganizationSeatLicense, "checkLimit">;
-  peers: Pick<SeatRequestPeers, "inviteMember">;
+  peers: Pick<SeatRequestPeers, "inviteMember" | "hasOpenInvite">;
   now: () => number;
   logger: Pick<Logger, "warn">;
   wait?: (ms: number) => Promise<void>;
@@ -125,9 +125,9 @@ export class SeatRequestApprovalService {
   }
 
   /**
-   * Reopens the organization's approvals whose seat never landed (a crash between the claim and
-   * the seat write, or a claim that could not be handed back), so they are back on every list.
-   * One whose person holds an enabled full seat after all is only marked settled.
+   * Reopens approvals whose seat never landed (a crash between claim and seat write, or a claim
+   * not handed back). One whose person is seated, or whose address holds an open invitation,
+   * got its seat after all and is only marked settled.
    */
   async reopenStranded({ organizationId }: { organizationId: string }): Promise<void> {
     const { requests } = this.dependencies;
@@ -138,13 +138,7 @@ export class SeatRequestApprovalService {
     for (const request of stranded) {
       if (request.resolvedAt === null) continue;
       const at = request.resolvedAt;
-      const membership = await this.membershipOf({ organizationId, request });
-      const isSeated =
-        membership !== null &&
-        membership.disabledAt === null &&
-        (membership.role === OrganizationUserRole.MEMBER ||
-          membership.role === OrganizationUserRole.ADMIN);
-      if (isSeated) {
+      if (await this.gotSeat({ organizationId, request })) {
         await requests.settleSeat({ organizationId, id: request.id, at });
         continue;
       }
@@ -159,6 +153,26 @@ export class SeatRequestApprovalService {
         "reopened an approved seat request whose seat never landed",
       );
     }
+  }
+
+  /** An enabled full membership, or for an address alone the invitation its approval sent. */
+  private async gotSeat({
+    organizationId,
+    request,
+  }: {
+    organizationId: string;
+    request: SeatRequestRow;
+  }): Promise<boolean> {
+    const membership = await this.membershipOf({ organizationId, request });
+    if (
+      membership !== null &&
+      membership.disabledAt === null &&
+      (membership.role === OrganizationUserRole.MEMBER ||
+        membership.role === OrganizationUserRole.ADMIN)
+    ) {
+      return true;
+    }
+    return this.dependencies.peers.hasOpenInvite({ organizationId, email: request.email });
   }
 
   /**
