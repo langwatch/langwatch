@@ -125,6 +125,8 @@ const organizationMemberDisabledEventDataSchemaDefinition = z.object({
   ...envelope,
   /** Who disabled the seat; absent for an organization key with no member. */
   disabledByUserId: z.string().min(1).nullish(),
+  /** Whether the person held a full seat when it was disabled; absent on older facts. */
+  heldFullSeat: z.boolean().nullish(),
 });
 export interface OrganizationMemberDisabledEventDataSchema extends Named<
   typeof organizationMemberDisabledEventDataSchemaDefinition
@@ -161,6 +163,8 @@ const organizationMemberRemovedEventDataSchemaDefinition = z.object({
   ...envelope,
   /** Who removed the member; absent for a removal no member made. */
   removedByUserId: z.string().min(1).nullish(),
+  /** Whether the person held a full seat when removed; absent where it is not known. */
+  heldFullSeat: z.boolean().nullish(),
 });
 export interface OrganizationMemberRemovedEventDataSchema extends Named<
   typeof organizationMemberRemovedEventDataSchemaDefinition

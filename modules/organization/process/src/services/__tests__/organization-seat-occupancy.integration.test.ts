@@ -63,11 +63,13 @@ describe.skipIf(!DB_URL)("OrganizationSeatOccupancyService over Postgres", () =>
     type,
     userId,
     occurredAt,
+    heldFullSeat,
   }: {
     organizationId: string;
     type: string;
     userId: string;
     occurredAt: number;
+    heldFullSeat?: boolean;
   }) {
     const id = `event-${nanoid(10)}`;
     return {
@@ -79,7 +81,7 @@ describe.skipIf(!DB_URL)("OrganizationSeatOccupancyService over Postgres", () =>
       EventOccurredAt: occurredAt,
       EventType: type,
       EventVersion: "2026-10-08",
-      EventPayload: { tenantId: organizationId, organizationId, userId, occurredAt },
+      EventPayload: { tenantId: organizationId, organizationId, userId, occurredAt, heldFullSeat },
       ProcessingTraceparent: "",
       IdempotencyKey: id,
     };
@@ -141,5 +143,53 @@ describe.skipIf(!DB_URL)("OrganizationSeatOccupancyService over Postgres", () =>
 
     expect(occupants.fullSeatHolderIds.toSorted()).toEqual([admin, member].toSorted());
     expect(occupants.departedIds).toEqual([disabled]);
+  });
+
+  /** @scenario "Only departures that held a full seat count, older facts count as before" */
+  it("counts a departure that held a full seat or says nothing, never one that held none", async () => {
+    const now = Date.now();
+    const organization = await prisma.organization.create({
+      data: { name: "ACME", slug: `--test-${namespace}-departures` },
+    });
+    organizationIds.push(organization.id);
+    const organizationId = organization.id;
+    const [full, lite, older] = await Promise.all([
+      person("full-departed"),
+      person("lite-departed"),
+      person("older-fact"),
+    ]);
+    const events = EventRepositoryMemory.createForTesting();
+    await events.insertEventRecords([
+      departure({
+        organizationId,
+        type: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+        userId: full,
+        occurredAt: now - DAY_MS,
+        heldFullSeat: true,
+      }),
+      departure({
+        organizationId,
+        type: ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+        userId: lite,
+        occurredAt: now - DAY_MS,
+        heldFullSeat: false,
+      }),
+      departure({
+        organizationId,
+        type: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+        userId: older,
+        occurredAt: now - DAY_MS,
+      }),
+    ]);
+    const occupancy = OrganizationSeatOccupancyService.create({
+      seats: PrismaOrganizationSeatRepository.create(prisma),
+      departures: EventingOrganizationDeparturesRepository.create({
+        eventReadSeat: EventLogReadSeat.create({ repository: events }),
+      }),
+    });
+
+    const occupants = await occupancy.findSince({ organizationId, since: now - 30 * DAY_MS });
+
+    expect(occupants.departedIds.toSorted()).toEqual([full, older].toSorted());
   });
 });

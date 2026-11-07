@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Ops sees people on seats beside each organization. Corresponds to
+ * Cloud admin's seat use page. Corresponds to
  * modules/ops/specs/seat-sharing-check.feature.
  */
 import { screen, within } from "@testing-library/react";
@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeOpsHost, renderWithOpsHost } from "../../../testing.tsx";
-import OrganizationsView from "../ui/sections/organizations-view.tsx";
+import { CloudSeatUseScreen } from "../../../ui/sections/ops/admin-screens.tsx";
 
 const state = vi.hoisted(() => ({
   listCalls: [] as { filter: Record<string, unknown> }[],
@@ -74,7 +74,7 @@ const lastCheck = {
 };
 
 function openList({ cloudOps = true }: { cloudOps?: boolean } = {}) {
-  renderWithOpsHost(<OrganizationsView />, { host: fakeOpsHost({ isOpsAdmin: true, cloudOps }) });
+  renderWithOpsHost(<CloudSeatUseScreen />, { host: fakeOpsHost({ isOpsAdmin: true, cloudOps }) });
 }
 
 function rowOf(name: string): HTMLElement {
@@ -83,7 +83,7 @@ function rowOf(name: string): HTMLElement {
   return row;
 }
 
-describe("Feature: Ops seat sharing check on the organization list", () => {
+describe("Feature: Ops seat sharing check on the Cloud seat use page", () => {
   beforeEach(() => {
     state.listCalls = [];
     state.checksAsked = [];
@@ -140,14 +140,13 @@ describe("Feature: Ops seat sharing check on the organization list", () => {
   });
 
   describe("given ops's cloud-ops capability is off", () => {
-    /** @scenario "A self-hosted Ops list never shows the seat sharing check" */
-    it("has no seat use column, no filter, and never asks for the check", () => {
+    /** @scenario "A self-hosted Ops has no seat use page" */
+    it("answers as an unknown page and never asks for the check", () => {
       openList({ cloudOps: false });
 
-      expect(screen.getByText("ACME")).toBeInTheDocument();
-      expect(screen.queryByText("Seat use, 30 days")).toBeNull();
-      expect(screen.queryByText(/Over 2x seats/)).toBeNull();
-      expect(state.checksAsked.every(({ enabled }) => !enabled)).toBe(true);
+      expect(screen.getByText("Page not found")).toBeInTheDocument();
+      expect(screen.queryByText("ACME")).toBeNull();
+      expect(state.checksAsked).toEqual([]);
     });
   });
 });

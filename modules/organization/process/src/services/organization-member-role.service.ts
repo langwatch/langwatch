@@ -41,6 +41,7 @@ export interface OrganizationSeatRevocationNotice {
     organizationId: string;
     userId: string;
     disabledByUserId: string | null;
+    heldFullSeat?: boolean;
   }): Promise<void>;
   memberEnabled(input: {
     organizationId: string;
@@ -129,6 +130,9 @@ export class OrganizationMemberRoleService {
     }
 
     await this.repo.getMembership({ organizationId, userId });
+    const heldFullSeat = disabled
+      ? await this.dependencies.seats.holdsFullSeat({ organizationId, userId })
+      : undefined;
 
     if (!disabled) {
       const result = await this.dependencies.seats.checkLimit({
@@ -152,6 +156,7 @@ export class OrganizationMemberRoleService {
         organizationId,
         userId,
         disabledByUserId: actingUser?.id ?? null,
+        heldFullSeat,
       });
     } else {
       // M8487-MEMBER-ENABLED: governance puts the person's personal project back in aggregates.

@@ -32,6 +32,7 @@ export interface OrganizationMemberChangeNotice {
     organizationId: string;
     userId: string;
     removedByUserId: string | null;
+    heldFullSeat?: boolean;
   }): Promise<void>;
   memberDepartmentChanged(input: {
     organizationId: string;
@@ -46,7 +47,7 @@ export class OrganizationMemberAdmissionService {
     repository: OrganizationMembershipRepository;
     admissions: OrganizationAdmissions;
     /** The licence's seats, asked before a full seat (seat-limit-at-provisioning.feature). */
-    seats: Pick<OrganizationSeatLicense, "checkLimit">;
+    seats: Pick<OrganizationSeatLicense, "checkLimit" | "holdsFullSeat">;
     workspaceNotices: PersonalWorkspaceArchiveNotice;
     memberNotices: OrganizationMemberChangeNotice;
   }): OrganizationMemberAdmissionService {
@@ -58,7 +59,7 @@ export class OrganizationMemberAdmissionService {
       repository: OrganizationMembershipRepository;
       admissions: OrganizationAdmissions;
       /** The licence's seats, asked before a full seat (seat-limit-at-provisioning.feature). */
-      seats: Pick<OrganizationSeatLicense, "checkLimit">;
+      seats: Pick<OrganizationSeatLicense, "checkLimit" | "holdsFullSeat">;
       workspaceNotices: PersonalWorkspaceArchiveNotice;
       memberNotices: OrganizationMemberChangeNotice;
     },
@@ -84,6 +85,10 @@ export class OrganizationMemberAdmissionService {
       organizationId: params.organizationId,
       userId: params.userId,
     });
+    const heldFullSeat = await this.dependencies.seats.holdsFullSeat({
+      organizationId: params.organizationId,
+      userId: params.userId,
+    });
 
     const teamIds = await this.repo.deleteMember({
       organizationId: params.organizationId,
@@ -94,6 +99,7 @@ export class OrganizationMemberAdmissionService {
       organizationId: params.organizationId,
       userId: params.userId,
       removedByUserId: params.actingUserId ?? null,
+      heldFullSeat,
     });
     if (teamIds.length === 0) return;
     await this.dependencies.workspaceNotices.personalWorkspaceArchived({

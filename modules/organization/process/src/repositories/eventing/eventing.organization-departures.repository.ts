@@ -22,7 +22,7 @@ const DEPARTURE_EVENT_TYPES: ReadonlySet<string> = new Set([
 const departureSchema = z.object({
   type: z.string(),
   occurredAt: z.number(),
-  data: z.object({ userId: z.string().min(1) }),
+  data: z.object({ userId: z.string().min(1), heldFullSeat: z.boolean().nullish() }),
 });
 
 /** Departures read from the member facts the organization records on its own aggregate. */
@@ -53,6 +53,8 @@ export class EventingOrganizationDeparturesRepository extends OrganizationDepart
     for (const event of events) {
       const parsed = departureSchema.safeParse(event);
       if (!parsed.success || !DEPARTURE_EVENT_TYPES.has(parsed.data.type)) continue;
+      // A fact from before the seat type was recorded counts, as it may have held one.
+      if (parsed.data.data.heldFullSeat === false) continue;
       if (parsed.data.occurredAt >= since) departed.add(parsed.data.data.userId);
     }
     return [...departed];

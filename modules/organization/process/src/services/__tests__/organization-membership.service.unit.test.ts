@@ -22,6 +22,7 @@ import type { OrganizationSeatLicense } from "../organization-seat-license.servi
 const mockInvalidateOrganization = vi.fn();
 const mockCheckLimit = vi.fn();
 const mockAssertRoleChangeAllowed = vi.fn();
+const mockHoldsFullSeat = vi.fn(async () => true);
 const mockMemberDisabled = vi.fn();
 const mockMemberEnabled = vi.fn();
 const mockCreateAndAssign = vi.fn();
@@ -84,6 +85,7 @@ describe("OrganizationMembershipService", () => {
   const seats: OrganizationSeatLicense = {
     checkLimit: mockCheckLimit,
     assertRoleChangeAllowed: mockAssertRoleChangeAllowed,
+    holdsFullSeat: mockHoldsFullSeat,
   };
   const seatNotices: OrganizationSeatRevocationNotice = {
     memberDisabled: mockMemberDisabled,
@@ -779,6 +781,7 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           userId: "user-456",
           disabledByUserId: "admin-789",
+          heldFullSeat: true,
         });
       });
 

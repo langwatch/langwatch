@@ -26,6 +26,7 @@ function installed() {
   const seats: OrganizationSeatLicense = {
     checkLimit: refuse("a seat limit"),
     assertRoleChangeAllowed: refuse("a role change"),
+    holdsFullSeat: refuse("a seat type"),
   };
   const seatNotices: OrganizationSeatRevocationNotice = {
     memberDisabled: refuse("a seat revocation record"),

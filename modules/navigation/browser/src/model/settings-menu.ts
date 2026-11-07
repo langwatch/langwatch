@@ -34,6 +34,7 @@ import {
   Workflow,
   Vault,
   UserStar,
+  UsersRound,
   ShieldUser,
   FolderSync,
   Receipt,
@@ -394,6 +395,7 @@ export function cloudAdminGroup(): SettingsMenuGroup {
       { label: "Licenses", href: "/ops/cloud/licenses", icon: Ticket },
       { label: "Self-hosted installs", href: "/ops/cloud/self-hosted-instances", icon: Server },
       { label: "Bug reports", href: "/ops/cloud/bug-reports", icon: Bug },
+      { label: "Seat use", href: "/ops/cloud/seat-use", icon: UsersRound },
     ],
   };
 }

@@ -3,10 +3,12 @@ Feature: Ops seat sharing check
   paid seat among many people. Once a day Ops checks every organization on a paid plan: the
   distinct people active in the last 30 days (a rolling window, not a calendar month) beside
   its paid full seats, the plan's maxMembers. An organization is flagged when its active
-  people go over twice its seats. Only Cloud admin sees the check; customers never do.
+  people go over twice its seats. Only Cloud admin sees the check, on its seat use page under
+  /ops/cloud (ARCHITECTURE.md §3.5); customers never do.
 
   "Held a seat in the window" means a full-seat member today, or a member removed or disabled
-  in the last 30 days (read from the organization's member_removed and member_disabled facts).
+  in the last 30 days (read from the organization's member_removed and member_disabled facts;
+  a fact that says the person held no full seat is skipped, an older fact without it counts).
   "Active" means the person signed in (User.lastLoginAt) or used a browser session
   (Session.updatedAt, rolled once a day while used, or Session.lastSeenAt) in the window.
 
@@ -80,6 +82,20 @@ Feature: Ops seat sharing check
     Then the admin and the member are the full-seat members
     And the disabled member is listed as departed since it was disabled
 
+  @unit
+  Scenario: A departure records whether the person held a full seat
+    Given an organization with an admin and an external member
+    When the admin removes the external member
+    Then the member_removed fact records that the person held no full seat
+
+  @integration
+  Scenario: Only departures that held a full seat count, older facts count as before
+    Given three people left an organization in the last 30 days
+    And one fact says the person held a full seat, one says they held none, one says nothing
+    When organization lists who held a seat in the window
+    Then the person who held a full seat and the person whose fact says nothing are departed
+    And the person who held no full seat is not
+
   @integration
   Scenario: A session used or a sign-in in the window marks a person active
     Given one person whose browser session was used yesterday and one whose session was last used 40 days ago
@@ -90,7 +106,7 @@ Feature: Ops seat sharing check
   @integration
   Scenario: Ops sees people on seats beside each organization
     Given Cloud admin is on and the last check read ACME as 12 active people on 5 seats
-    When staff open the Ops organization list
+    When staff open the Cloud admin seat use page at /ops/cloud/seat-use
     Then ACME's row reads "12 people on 5 seats" with a "Seat sharing 2.4x" warning chip
     And an organization under twice its seats reads its people and seats with no chip
     And a free organization's row reads "Not checked"
@@ -111,20 +127,20 @@ Feature: Ops seat sharing check
   @integration
   Scenario: Before the first check the list says it has not run yet
     Given Cloud admin is on and no check has run yet
-    When staff open the Ops organization list
-    Then the list says the seat sharing check has not run yet
+    When staff open the Cloud admin seat use page
+    Then the page says the seat sharing check has not run yet
     And the "Over 2x seats" filter is disabled
 
   @integration
   Scenario: A failed read of the check shows an error and the list still loads
     Given reading the seat sharing check fails
-    When staff open the Ops organization list
-    Then the list says the seat sharing check could not be loaded
+    When staff open the Cloud admin seat use page
+    Then the page says the seat sharing check could not be loaded
     And the organizations are still listed
 
   @integration
-  Scenario: A self-hosted Ops list never shows the seat sharing check
+  Scenario: A self-hosted Ops has no seat use page
     Given ops's cloud-ops capability is off
-    When an operator opens the Ops organization list
-    Then there is no seat use column and no "Over 2x seats" filter
+    When an operator opens /ops/cloud/seat-use
+    Then it answers as an unknown page
     And the check is never asked for
