@@ -69,9 +69,25 @@ func TestMainRunsThePackageSuitesAsOneQueuedJob(t *testing.T) {
 			"timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}",
 			"timeout-minutes: 45",
 		},
+		"a shard list shorter than its total": {
+			"'[1, 2, 3, 4, 5, 6, 7, 8]'",
+			"'[1, 2, 3, 4, 5, 6, 7]'",
+		},
+		"a total that miscounts the shards": {
+			"'[1]' || '[8]'",
+			"'[1]' || '[9]'",
+		},
 		"a fixed shard total": {
-			"PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}",
-			"PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8",
+			"format('{0}/{1}', matrix.shard, matrix.total) || ''",
+			"format('{0}/8', matrix.shard) || ''",
+		},
+		"a shard total that counts the browser leg": {
+			"format('{0}/{1}', matrix.shard, matrix.total) || ''",
+			"format('{0}/{1}', matrix.shard, strategy.job-total) || ''",
+		},
+		"eight shards counted on main": {
+			"total: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[8]') }}",
+			"total: [8]",
 		},
 		"no shared cache fallback": {
 			"            ${{ runner.os }}-nx-suites-all-\n",
@@ -92,8 +108,8 @@ func TestMainSuitesReportsRatherThanFailsOnOtherLegalShapes(t *testing.T) {
 			"shard: [1, 2, 3, 4, 5, 6, 7, 8]",
 		},
 		"a matrix that is one expression": {
-			"matrix:\n        shard: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}",
-			"matrix: ${{ fromJSON(needs.changes.outputs.suites-matrix) }}",
+			"matrix:\n        shard: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}\n",
+			"matrix: ${{ fromJSON(needs.changes.outputs.suites-matrix) }}\n      x-old-matrix:\n",
 		},
 		"a numeric timeout": {
 			"timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}",
@@ -107,13 +123,31 @@ func TestMainSuitesReportsRatherThanFailsOnOtherLegalShapes(t *testing.T) {
 	}
 }
 
+// @scenario "Browser suites run on their own runner, never beside a suite that starts containers"
+func TestBrowserSuitesRunOnALegOfTheirOwn(t *testing.T) {
+	breakEach(t, realAppCI(t), map[string][2]string{
+		"no browser leg": {
+			"          - shard: browser\n            lanes: browser\n",
+			"          - shard: extra\n",
+		},
+		"numbered legs that run browser suites too": {
+			"        lanes: [no-browser]\n",
+			"",
+		},
+		"a leg that runs every lane": {
+			"          PACKAGE_SUITES_LANES: ${{ matrix.lanes }}\n",
+			"",
+		},
+	})
+}
+
 // @scenario "A red package-suites run on main posts to Slack"
 func TestARedOrTimedOutMainSuitesRunPostsToSlack(t *testing.T) {
 	good := realAppCI(t)
 
 	breakEach(t, good, map[string][2]string{
 		"no Slack job": {
-			`go run ./cmd/slacknotify -job "package-suites (1/1)"`,
+			`go run ./cmd/slacknotify -job-prefix`,
 			"echo skipped",
 		},
 		"a timeout that does not post": {
@@ -123,6 +157,24 @@ func TestARedOrTimedOutMainSuitesRunPostsToSlack(t *testing.T) {
 		"a Slack job that runs only on success": {
 			"if: always() && github.event_name == 'push'",
 			"if: github.event_name == 'push'",
+		},
+	})
+}
+
+// @scenario "A red main posts once per red package-suites leg"
+func TestARedMainPostsOncePerRedLeg(t *testing.T) {
+	breakEach(t, realAppCI(t), map[string][2]string{
+		"one fixed leg name": {
+			`go run ./cmd/slacknotify -job-prefix "package-suites ("`,
+			`go run ./cmd/slacknotify -job "package-suites (1/1)"`,
+		},
+		"a prefix no leg is named with": {
+			`-job-prefix "package-suites ("`,
+			`-job-prefix "package suites ("`,
+		},
+		"no fallback when the lookup fails or finds no leg": {
+			` -fallback-job "package-suites (1/1)"`,
+			"",
 		},
 	})
 }

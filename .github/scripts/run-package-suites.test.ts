@@ -11,17 +11,22 @@ import {
   exclusionNotices,
   failureAnnotations,
   heaviestFirst,
+  HEAVY_SECONDS,
   isHeavyPackage,
   jobsFor,
   laneOf,
   outcomeOf,
   parseConcurrency,
+  parseLanes,
   parseOnly,
   parseRegister,
   parseShard,
   parseWeights,
+  undefinedWeightScripts,
+  planShard,
   runJobs,
   workerEnvFor,
+  scriptSecondsFrom,
   scriptsFor,
   staleEntries,
   summarise,
@@ -680,7 +685,9 @@ void describe("given the job is split into shards", () => {
       // Each shard computes the split alone and takes its own group.
       const shares = [1, 2, 3].map(
         (index) =>
-          balanceByWallTime({ items, weightOf, concurrency: 2, total: 3 }).groups[index - 1]!,
+          balanceByWallTime({ items, scriptSeconds: weightOf, concurrency: 2, total: 3 }).groups[
+            index - 1
+          ]!,
       );
       assert.deepEqual(
         shares
@@ -705,9 +712,12 @@ void describe("given the job is split into shards", () => {
 
     /** @scenario "Shards are balanced by measured weight" */
     void it("places the heaviest first, each on the lightest shard", () => {
-      const groups = balanceByWallTime({ items, weightOf, concurrency: 2, total: 2 }).groups.map(
-        (g) => g.map((p) => p.name),
-      );
+      const groups = balanceByWallTime({
+        items,
+        scriptSeconds: weightOf,
+        concurrency: 2,
+        total: 2,
+      }).groups.map((g) => g.map((p) => p.name));
       assert.deepEqual(groups, [
         ["c", "slow"],
         ["a", "b", "mid"],
@@ -725,7 +735,12 @@ void describe("given the job is split into shards", () => {
       ]);
       const items = ["heavy", "l1", "l2", "l3", "l4"].map((name) => ({ name, scripts: ["test"] }));
       const weightOf = (p: { name: string }) => seconds.get(p.name) ?? 0;
-      const { groups, walls } = balanceByWallTime({ items, weightOf, concurrency: 2, total: 2 });
+      const { groups, walls } = balanceByWallTime({
+        items,
+        scriptSeconds: weightOf,
+        concurrency: 2,
+        total: 2,
+      });
       // By raw seconds l4 joined the heavy package: 200 + 90/2 against 270/2.
       assert.deepEqual(
         groups.map((g) => g.map((p) => p.name)),
@@ -747,7 +762,12 @@ void describe("given the job is split into shards", () => {
         ...["i1", "i2", "i3"].map((name) => ({ name, scripts: ["test:integration"] })),
       ];
       const weightOf = (p: { name: string }) => seconds.get(p.name) ?? 0;
-      const { groups, walls } = balanceByWallTime({ items, weightOf, concurrency: 2, total: 2 });
+      const { groups, walls } = balanceByWallTime({
+        items,
+        scriptSeconds: weightOf,
+        concurrency: 2,
+        total: 2,
+      });
       // Counted at half weight, all three joined one shard and ran 270s back to back.
       assert.deepEqual(
         groups.map((g) => g.map((p) => p.name)),
@@ -760,22 +780,28 @@ void describe("given the job is split into shards", () => {
     });
 
     /** @scenario "Shards are balanced by the wall time each package adds" */
-    void it("spreads a light package's weight over its scripts' lanes", () => {
+    void it("loads each lane with its own script's seconds", () => {
       const load = withPackage({
         load: { alone: 0, shared: 0, integration: 0, browser: 0 },
-        weight: 60,
-        scripts: ["test", "test:integration", "test:browser"],
+        seconds: new Map([
+          ["test", 40],
+          ["test:integration", 5],
+          ["test:browser", 15],
+        ]),
       });
-      assert.deepEqual(load, { alone: 0, shared: 60, integration: 20, browser: 20 });
+      assert.deepEqual(load, { alone: 0, shared: 60, integration: 5, browser: 15 });
       assert.equal(wallTimeOf({ load, concurrency: 2 }), 30);
     });
 
     /** @scenario "Every shard computes the same split" */
     void it("gives the same split whatever order the packages arrive in", () => {
       const split = (list: typeof items) =>
-        balanceByWallTime({ items: list, weightOf, concurrency: 2, total: 3 }).groups.map((g) =>
-          g.map((p) => p.name).toSorted(),
-        );
+        balanceByWallTime({
+          items: list,
+          scriptSeconds: weightOf,
+          concurrency: 2,
+          total: 3,
+        }).groups.map((g) => g.map((p) => p.name).toSorted());
       assert.deepEqual(split(items), split(items.toReversed()));
     });
   });
@@ -783,11 +809,14 @@ void describe("given the job is split into shards", () => {
   void describe("when a package is missing from the weights", () => {
     /** @scenario "A package with no recorded weight still lands on a shard" */
     void it("is weighed at the default and assigned like any other", () => {
-      const { weights } = parseWeights("known  100\n", "weights");
-      const weightOf = (p: { name: string }) => weights.get(p.name) ?? DEFAULT_WEIGHT_SECONDS;
+      const { weights, errors } = parseWeights("known  test  100\n", "weights");
+      assert.deepEqual(errors, []);
+      const seconds = scriptSecondsFrom({ weights, excluded: new Map() });
       const items = ["known", "new-a", "new-b"].map((name) => ({ name, scripts: ["test"] }));
-      assert.equal(weightOf(items[1]), DEFAULT_WEIGHT_SECONDS);
-      const placed = balanceByWallTime({ items, weightOf, concurrency: 2, total: 2 })
+      assert.equal(seconds(items[0]!, "test"), 100);
+      assert.equal(seconds(items[1]!, "test"), DEFAULT_WEIGHT_SECONDS);
+      assert.equal(seconds(items[0]!, "test:unlisted"), DEFAULT_WEIGHT_SECONDS);
+      const placed = balanceByWallTime({ items, scriptSeconds: seconds, concurrency: 2, total: 2 })
         .groups.flat()
         .map((p) => p.name)
         .toSorted();
@@ -800,7 +829,12 @@ void describe("given the job is split into shards", () => {
     void it("balances over just the packages given, not the whole workspace", () => {
       const reached = ["big", "small-a", "small-b"].map((name) => ({ name, scripts: ["test"] }));
       const weightOf = (p: { name: string }) => (p.name === "big" ? 300 : 100);
-      const { groups } = balanceByWallTime({ items: reached, weightOf, concurrency: 2, total: 2 });
+      const { groups } = balanceByWallTime({
+        items: reached,
+        scriptSeconds: weightOf,
+        concurrency: 2,
+        total: 2,
+      });
       assert.deepEqual(
         groups.map((g) => g.map((p) => p.name)),
         [["big"], ["small-a", "small-b"]],
@@ -810,26 +844,45 @@ void describe("given the job is split into shards", () => {
 
   void describe("given the weights file", () => {
     /** @scenario "A malformed weights file is refused" */
-    void it("reads a package and its seconds, skipping blanks and comments", () => {
+    void it("reads a package, a script and its seconds, skipping blanks and comments", () => {
       const { weights, errors } = parseWeights(
-        "# header\n\n@fix/a  120\n@fix/b 45.5  # note\n",
+        "# header\n\n@fix/a  test  120\n@fix/a  test:browser 15\n@fix/b test 45.5  # note\n",
         "weights",
       );
       assert.deepEqual(errors, []);
       assert.deepEqual(
-        [...weights],
+        [...weights].map(([name, scripts]) => [name, [...scripts]]),
         [
-          ["@fix/a", 120],
-          ["@fix/b", 45.5],
+          [
+            "@fix/a",
+            [
+              ["test", 120],
+              ["test:browser", 15],
+            ],
+          ],
+          ["@fix/b", [["test", 45.5]]],
         ],
       );
     });
 
     void it("refuses a missing, zero, non-numeric, infinite or repeated weight", () => {
-      const infinite = `@fix/a  ${"9".repeat(400)}`;
-      for (const bad of ["@fix/a", "@fix/a  0", "@fix/a  slow", infinite, "@fix/a 1\n@fix/a 2"]) {
-        assert.equal(parseWeights(bad, "weights").errors.length, 1, bad);
+      const infinite = `@fix/a  test  ${"9".repeat(400)}`;
+      const bad = ["@fix/a  120", "@fix/a test", "@fix/a test 0", "@fix/a test slow", infinite];
+      for (const line of [...bad, "@fix/a test 1\n@fix/a test 2"]) {
+        assert.equal(parseWeights(line, "weights").errors.length, 1, line);
       }
+    });
+  });
+
+  void describe("given a weights line for a script its package does not run", () => {
+    /** @scenario "A weights line naming a script its package does not run is refused" */
+    void it("names the line", () => {
+      const { weights } = parseWeights(
+        "@fix/a  test  9\n@fix/a  test:browser  9\n@fix/gone  test  9\n",
+        "weights",
+      );
+      const discovered = [{ name: "@fix/a", dir: "a", scripts: ["test"] }];
+      assert.deepEqual(undefinedWeightScripts(weights, discovered), ["@fix/a  test:browser"]);
     });
   });
 
@@ -892,5 +945,106 @@ void describe("given a suite script", () => {
     for (const script of ["test:integration", "test:browser"]) {
       assert.deepEqual(commandFor({ pkg, script }), ["--filter", "@fix/a", "run", script]);
     }
+  });
+});
+
+void describe("given the lanes a leg of the job runs", () => {
+  // A browser suite's Chromium aborts with ERR_NETWORK_CHANGED when a container starts beside it.
+  const workspace = [
+    pkg("@fix/web", ["test", "test:integration", "test:browser"]),
+    pkg("@fix/unit", ["test:unit"]),
+    pkg("@fix/canvas", ["test:browser"]),
+    pkg("@fix/store", ["test:integration"]),
+  ];
+  const scheduled = ({ lanes, index, total }: { lanes: string; index: number; total: number }) =>
+    planShard({
+      packages: workspace,
+      lanes: parseLanes(lanes),
+      shard: { index, total },
+      scriptSeconds: () => DEFAULT_WEIGHT_SECONDS,
+      concurrency: 2,
+      excluded: new Map(),
+    }).jobs.map((job) => `${job.pkg.name} ${job.script}`);
+
+  void describe("when the leg runs the browser lanes", () => {
+    /** @scenario "Browser suites run on their own runner, never beside a suite that starts containers" */
+    void it("schedules every browser suite and nothing else", () => {
+      assert.deepEqual(scheduled({ lanes: "browser", index: 1, total: 1 }).toSorted(), [
+        "@fix/canvas test:browser",
+        "@fix/web test:browser",
+      ]);
+    });
+  });
+
+  void describe("when the leg runs everything but the browser lanes", () => {
+    /** @scenario "Browser suites run on their own runner, never beside a suite that starts containers" */
+    void it("schedules no browser suite on any shard, and every other suite on one", () => {
+      const total = 3;
+      const shards = Array.from({ length: total }, (_, i) =>
+        scheduled({ lanes: "no-browser", index: i + 1, total }),
+      );
+      // Every shard's jobs together: no browser lane, and each other script exactly once.
+      assert.deepEqual(shards.flat().toSorted(), [
+        "@fix/store test:integration",
+        "@fix/unit test:unit",
+        "@fix/web test",
+        "@fix/web test:integration",
+      ]);
+    });
+  });
+
+  void describe("when a leg keeps only some of a package's suites", () => {
+    // analytics-browser-like: a 161s jsdom suite beside a 15s browser suite.
+    const analytics = pkg("@fix/analytics", ["test", "test:browser"]);
+    const seconds = (_: DiscoveredPackage, script: string) => (script === "test" ? 161 : 15);
+    const plan = (lanes: "browser" | "no-browser") =>
+      planShard({
+        packages: [analytics],
+        lanes,
+        shard: { index: 1, total: 1 },
+        scriptSeconds: seconds,
+        concurrency: 2,
+        excluded: new Map(),
+      });
+
+    /** @scenario "A leg weighs a package by the seconds of the suites it keeps" */
+    void it("weighs the package by the seconds of the suites the leg keeps", () => {
+      const [kept] = plan("no-browser").assigned;
+      assert.equal(plan("no-browser").weightOf(kept!), 161);
+      assert.equal(plan("browser").weightOf(plan("browser").assigned[0]!), 15);
+      assert.equal(isHeavyPackage({ weightOf: plan("no-browser").weightOf, pkg: kept! }), true);
+    });
+  });
+
+  void describe("when the runner asks how heavy a lane-filtered package is", () => {
+    /** @scenario "A heavy suite runs alone" */
+    void it("gets the same sum the split used, so the split and the runner agree", () => {
+      const plan = planShard({
+        packages: [pkg("@fix/web", ["test", "test:browser"])],
+        lanes: "browser",
+        shard: { index: 1, total: 1 },
+        scriptSeconds: (_, script) => (script === "test" ? 200 : HEAVY_SECONDS - 1),
+        concurrency: 2,
+        excluded: new Map(),
+      });
+      const [web] = plan.assigned;
+      assert.equal(plan.weightOf(web!), HEAVY_SECONDS - 1);
+      assert.equal(isHeavyPackage({ weightOf: plan.weightOf, pkg: web! }), false);
+    });
+  });
+
+  void describe("when no lane filter is set", () => {
+    /** @scenario "Without a lane filter every lane runs" */
+    void it("schedules every lane, as a local run always has", () => {
+      assert.equal(parseLanes(undefined), "all");
+      assert.equal(scheduled({ lanes: "", index: 1, total: 1 }).length, 6);
+    });
+  });
+
+  void describe("when the lane filter is malformed", () => {
+    /** @scenario "A lane filter other than browser or no-browser is refused" */
+    void it("refuses it rather than running every lane on every leg", () => {
+      assert.throws(() => parseLanes("chromium"));
+    });
   });
 });
