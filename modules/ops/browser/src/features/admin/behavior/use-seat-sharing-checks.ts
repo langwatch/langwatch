@@ -1,6 +1,6 @@
 import { api } from "../../../behavior/ops-api.ts";
 
-/** The last seat sharing check, empty before the first; asked only where Cloud admin is on. */
-export function useSeatSharingChecks({ enabled }: { enabled: boolean }) {
-  return api.ops.findSeatSharingChecks.useQuery(undefined, { enabled });
+/** The last seat sharing check, empty before the first; the Cloud admin screen gates it. */
+export function useSeatSharingChecks() {
+  return api.ops.findSeatSharingChecks.useQuery(undefined);
 }

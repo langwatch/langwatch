@@ -24,6 +24,7 @@ export class MemoryOrganizationDeparturesRepository extends OrganizationDepartur
       .filter(
         (departure) =>
           departure.organizationId === organizationId &&
+          departure.heldFullSeat &&
           departure.occurredAt.epochMilliseconds >= since,
       )
       .map((departure) => departure.userId);

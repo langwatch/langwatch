@@ -1,5 +1,5 @@
 /**
- * How the Ops organization list reads the seat sharing check.
+ * How the Cloud admin seat use page (/ops/cloud/seat-use) reads the seat sharing check.
  * Spec: modules/ops/specs/seat-sharing-check.feature
  */
 import type { SeatSharingCheck, SeatSharingReading } from "@langwatch/ops-contract";

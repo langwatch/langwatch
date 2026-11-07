@@ -13,7 +13,7 @@ import { CloudSeatUseScreen } from "../../../ui/sections/ops/admin-screens.tsx";
 
 const state = vi.hoisted(() => ({
   listCalls: [] as { filter: Record<string, unknown> }[],
-  checksAsked: [] as { enabled: boolean }[],
+  checksAsked: 0,
   checks: {
     data: undefined as unknown,
     isLoading: false,
@@ -38,8 +38,8 @@ vi.mock("../behavior/use-admin-resource.ts", () => ({
 }));
 
 vi.mock("../behavior/use-seat-sharing-checks.ts", () => ({
-  useSeatSharingChecks: (options: { enabled: boolean }) => {
-    state.checksAsked.push(options);
+  useSeatSharingChecks: () => {
+    state.checksAsked += 1;
     return state.checks;
   },
 }));
@@ -86,7 +86,7 @@ function rowOf(name: string): HTMLElement {
 describe("Feature: Ops seat sharing check on the Cloud seat use page", () => {
   beforeEach(() => {
     state.listCalls = [];
-    state.checksAsked = [];
+    state.checksAsked = 0;
     state.checks = { data: [lastCheck], isLoading: false, isError: false };
   });
 
@@ -147,7 +147,7 @@ describe("Feature: Ops seat sharing check on the Cloud seat use page", () => {
 
       expect(screen.getByText("Page not found")).toBeInTheDocument();
       expect(screen.queryByText("ACME")).toBeNull();
-      expect(state.checksAsked).toEqual([]);
+      expect(state.checksAsked).toBe(0);
     });
   });
 });

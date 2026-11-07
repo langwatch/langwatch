@@ -40,7 +40,7 @@ export default function SeatUseView() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search, 300);
-  const seatSharing = useSeatSharingChecks({ enabled: true });
+  const seatSharing = useSeatSharingChecks();
   const lastCheck = seatSharing.data?.[0];
   const [sharingFilter, setSharingFilter] = useState<SeatSharingFilter>("all");
   const overSeats = sharingFilter === "over";

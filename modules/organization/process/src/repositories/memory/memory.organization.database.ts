@@ -132,6 +132,8 @@ export interface MemoryMemberDepartureRow {
   organizationId: string;
   userId: string;
   occurredAt: Instant;
+  /** Whether the person held a full seat when they left, as the live fact records it. */
+  heldFullSeat: boolean;
 }
 
 /** One team-scoped membership row (the `TeamUser` join table). */

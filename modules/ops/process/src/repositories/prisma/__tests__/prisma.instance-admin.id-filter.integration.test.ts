@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * The Over 2x seats filter asks the Ops organization list for a list of ids.
+ * The Over 2x seats filter on the Cloud admin seat use page asks the admin organization
+ * resource for a list of ids.
  * @see modules/ops/specs/seat-sharing-check.feature
  */
 import { randomUUID } from "node:crypto";
