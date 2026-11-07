@@ -79,10 +79,9 @@ export async function catchUpConversationFold({
   targetCursor: LangyEventCursor | null | undefined;
 }): Promise<void> {
   const store = useLangyStore.getState();
-  // A durable cursor naming the conversation is proof it exists — confirms a
-  // freshly-minted conversation so the history read's not-found stops
-  // presenting as pending (see `unconfirmedConversations`).
-  store.confirmConversation(conversationId);
+  // Not a confirmation: a durable cursor proves event-log presence, not that the
+  // trailing Postgres projection is readable. Confirming here dropped the pending
+  // grace on every new chat. Only a history read confirms (`useLangyMessages`).
   const local = store.turnProjection.cursor;
   if (!targetCursor || !local) {
     // Pre-cursor server build, or the snapshot has not seeded the local fold

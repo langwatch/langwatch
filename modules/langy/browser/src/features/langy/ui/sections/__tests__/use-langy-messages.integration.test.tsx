@@ -6,9 +6,19 @@
  * @see specs/langy/langy-navigation-persistence.feature
  */
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useLangyMessages } from "../../../behavior/data/use-langy-messages.ts";
+
+type RefetchInterval = (query: { state: { data: unknown } }) => number | false;
+
+const seams = vi.hoisted(() => ({
+  refetchInterval: null as RefetchInterval | null,
+  store: {
+    confirmConversation: () => undefined,
+    unconfirmedConversations: {} as Record<string, true>,
+  },
+}));
 
 const previousConversation = {
   messages: [{ id: "msg_1", role: "assistant", parts: [] }],
@@ -32,23 +42,35 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
   api: {
     langy: {
       messages: {
-        useQuery: () => ({
-          data: previousConversation,
-          isLoading: false,
-          isFetching: true,
-          isError: true,
-          isSuccess: false,
-          error: new Error("conversation not found"),
-          refetch: vi.fn(),
-        }),
+        useQuery: (_input: unknown, options: { refetchInterval: RefetchInterval }) => {
+          seams.refetchInterval = options.refetchInterval;
+          return {
+            data: previousConversation,
+            isLoading: false,
+            isFetching: true,
+            isError: true,
+            isSuccess: false,
+            error: new Error("conversation not found"),
+            refetch: vi.fn(),
+          };
+        },
       },
     },
   },
 }));
 
-vi.mock("../../../../../behavior/langy.store.ts", () => ({
-  useLangyStore: { getState: () => ({ confirmConversation: vi.fn() }) },
-}));
+// The real store is callable with a selector AND carries getState; the hook uses both.
+vi.mock("../../../../../behavior/langy.store.ts", () => {
+  const useLangyStore = <T,>(selector: (state: typeof seams.store) => T): T =>
+    selector(seams.store);
+  useLangyStore.getState = () => seams.store;
+  return { useLangyStore };
+});
+
+beforeEach(() => {
+  seams.refetchInterval = null;
+  seams.store.unconfirmedConversations = {};
+});
 
 describe("useLangyMessages", () => {
   describe("when no conversation is open", () => {
@@ -74,6 +96,21 @@ describe("useLangyMessages", () => {
       expect(result.current.messages).toHaveLength(1);
       expect(result.current.isTurnInFlight).toBe(true);
       expect(result.current.isError).toBe(true);
+    });
+  });
+
+  describe("when the open conversation was just minted and its read 404'd (#7987)", () => {
+    it("re-reads about every second while it stays unconfirmed", () => {
+      seams.store.unconfirmedConversations = { langyconv_new: true };
+      renderHook(() => useLangyMessages("langyconv_new"));
+
+      expect(seams.refetchInterval?.({ state: { data: undefined } })).toBe(1_000);
+    });
+
+    it("does not poll a confirmed conversation", () => {
+      renderHook(() => useLangyMessages("langyconv_1"));
+
+      expect(seams.refetchInterval?.({ state: { data: undefined } })).toBe(false);
     });
   });
 });

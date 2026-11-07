@@ -1,3 +1,4 @@
+import { createTenantId } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import type {
   LangyConversationStartedEventData,
@@ -5,7 +6,11 @@ import type {
   LangyMessageRecordedEventData,
   LangyMessageRole,
 } from "@langwatch/langy-contract";
-import { langyJsonValueSchema, LangyTurnErrors } from "@langwatch/langy-contract";
+import {
+  LANGY_CONVERSATION_EVENT_TYPES,
+  langyJsonValueSchema,
+  LangyTurnErrors,
+} from "@langwatch/langy-contract";
 
 import type { LangyConversationCommands } from "../../../eventing/langy-conversation.commands.ts";
 import type { LangyConversationRepository } from "../../../repositories/langy-conversation-projection.repository.ts";
@@ -16,7 +21,17 @@ import {
 } from "../../../services/langy-final-parts.service.ts";
 import { LangyTurnAccountReaderService } from "../../turn/services/langy-turn-account-reader.service.ts";
 import type { LangyTurnOrderReader } from "../../turn/services/langy-turn-order.service.ts";
-import type { LangyConversationRuntime } from "./langy-conversation.service.ts";
+import type {
+  LangyConversationEventsReader,
+  LangyConversationRuntime,
+} from "./langy-conversation.service.ts";
+
+/**
+ * Bound on the turnExists event-log fallback. It only covers fold lag, so a day
+ * outlives any turn (the longest, an owed local connect, is 6h) without scanning
+ * a long conversation's whole history on every miss.
+ */
+const TURN_ACCEPTANCE_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 
 type LangyConversationTurnOptions = {
   repository: LangyConversationRepository;
@@ -24,6 +39,7 @@ type LangyConversationTurnOptions = {
   finalParts: LangyFinalPartsService;
   runtime: LangyConversationRuntime;
   turnOrder: LangyTurnOrderReader | null;
+  events: LangyConversationEventsReader | null;
 };
 
 /**
@@ -276,7 +292,23 @@ export class LangyConversationTurnService {
     conversationId: string;
     turnId: string;
   }): Promise<boolean> {
-    return this.deps.repository.turnExists({ projectId, conversationId, turnId });
+    // Projection first; on a miss, the acceptance event covers a short turn whose
+    // final outran the fold. A reader failure PROPAGATES: false becomes a terminal
+    // 404, and dropping a finished answer is what this check exists to prevent.
+    const projected = await this.deps.repository.turnExists({ projectId, conversationId, turnId });
+    if (projected) return true;
+    if (!this.deps.events) return false;
+    const events = await this.deps.events.getEventsOccurredSince({
+      aggregateId: conversationId,
+      context: { tenantId: createTenantId(projectId) },
+      aggregateType: "langy_conversation",
+      occurredAtFromMs: Math.max(0, this.deps.runtime.now() - TURN_ACCEPTANCE_LOOKBACK_MS),
+    });
+    return events.some(
+      (event) =>
+        event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED &&
+        event.data.turnId === turnId,
+    );
   }
 
   async ingestAgentTurnResult({
