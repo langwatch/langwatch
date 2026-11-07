@@ -52,7 +52,7 @@ exports[`the @langwatch/eventing public surface > given the . entry > exports ex
   "ProcessManagerPayloadStage: class [intent, keyBy, on, onSignal, onWake, outbox, schedule, transient]",
   "ProcessManagerScheduledHandledStage: class [intent]",
   "ProcessManagerScheduledStage: class [onWake]",
-  "ProcessManagerService: class [appendIntents, attemptSignalCommit, commitEvolution, duplicateSignalResult, handleEvent, handleSignal, handleWake, inEvolveSpan, isTransientEvolution, outboxMessagesFor, runEvolveSpanBody, runSignalRetryLoop]",
+  "ProcessManagerService: class [appendIntents, attemptEventCommit, attemptSignalCommit, commitEvolution, duplicateSignalResult, handleEvent, handleSignal, handleWake, inEvolveSpan, isTransientEvolution, outboxMessagesFor, runEventRetryLoop, runEvolveSpanBody, runSignalRetryLoop]",
   "ProcessManagerStage: class [intent, keyBy, on, onSignal, onWake, outbox, schedule, toPayload, transient]",
   "ProcessManagerStateStage: class [intent, keyBy, schedule]",
   "ProcessOutboxWorker: class [abandonStuckDrain, armPoll, armPollAfterDrain, armWatchdog, endIdleBackoff, notify, refuseToDrain, runDrain, settleBackoff, settleDrain, start, stop, triggerDrain]",
