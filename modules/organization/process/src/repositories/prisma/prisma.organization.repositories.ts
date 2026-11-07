@@ -11,6 +11,7 @@ import { PrismaOrganizationUserDirectoryRepository } from "./prisma.organization
 import { PrismaOrganizationRepository } from "./prisma.organization.repository.ts";
 import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository.ts";
 import { PrismaScopeGraphRepository } from "./prisma.scope-graph.repository.ts";
+import { PrismaSeatHoldRepository } from "./prisma.seat-hold.repository.ts";
 import { PrismaSeatRequestRepository } from "./prisma.seat-request.repository.ts";
 import { PrismaSignUpPolicyRepository } from "./prisma.sign-up-policy.repository.ts";
 import { PrismaTeamRepository } from "./prisma.team.repository.ts";
@@ -43,6 +44,7 @@ export const PostgresOrganizationRepositories = {
     invite: PrismaOrganizationInviteRepository.create({ database: prisma }),
     seats: PrismaOrganizationSeatRepository.create(prisma),
     userDirectory: PrismaOrganizationUserDirectoryRepository.create(prisma),
+    seatHolds: PrismaSeatHoldRepository.create(prisma),
     seatRequests: PrismaSeatRequestRepository.create(prisma),
     accessNotices: PrismaOrganizationAccessNoticeRepository.create(prisma),
   }),

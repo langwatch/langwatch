@@ -76,6 +76,8 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       maxMembersLite: null,
       maxMessagesPerMonth: null,
       lastPaymentFailedDate: null,
+      seatsKept: null,
+      seatsKeptUntil: null,
     };
     this.store.subscriptions.push(created);
     return created;

@@ -314,6 +314,7 @@ export class ScimModule implements ScimApiContract {
       organization: dependencies.authorization,
       seats: {
         countMemberSeats: (input) => repositories.seats.countMemberSeats(input),
+        findLiveHoldUserIds: (input) => repositories.seats.findLiveHoldUserIds(input),
         withSeatLock: (input) => seatLease.withSeatLock(input),
       },
       members: channels.members,
@@ -352,6 +353,7 @@ export class ScimModule implements ScimApiContract {
           grants: dependencies.authorization,
           lifecycle,
           organization: dependencies.authorization,
+          seats: channels.members,
         }),
       }),
       platformOperators: dependencies.authorization,

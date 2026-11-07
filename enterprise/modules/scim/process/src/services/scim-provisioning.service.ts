@@ -8,7 +8,6 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   EmailAlreadyRegisteredError,
   type UserProfile,
@@ -40,6 +39,7 @@ import { ScimUserPatchService } from "./scim-user-patch.service.ts";
  * sign in with.
  */
 export type ScimUserProvisioning = Pick<UserApi, "findById" | "findByEmail" | "create">;
+import type { ScimMembers } from "../channels/scim-channels.registry.ts";
 import { assertScimOrganizationId } from "../rules/scim-organization-scope.rules.ts";
 import { scimErrorDocument } from "../rules/scim-refusal.rules.ts";
 import {
@@ -92,7 +92,7 @@ export class ScimProvisioningService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
-    members: Pick<OrganizationApi, "deleteMember">;
+    members: ScimMembers;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;
@@ -121,6 +121,7 @@ export class ScimProvisioningService {
       plans,
       connections,
       membershipAccess: this.membershipAccess,
+      members,
     });
     this.costCenters = ScimCostCenterService.create(costCenterFacts);
     this.patches = ScimUserPatchService.create(this.costCenters);
@@ -133,7 +134,7 @@ export class ScimProvisioningService {
     users: ScimUserProvisioning;
     costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
-    members: Pick<OrganizationApi, "deleteMember">;
+    members: ScimMembers;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
     authority: Pick<ScimDirectoryIdentityService, "assertWritable">;

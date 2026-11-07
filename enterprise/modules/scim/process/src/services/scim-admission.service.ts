@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { admissionSeat, seatsFree } from "@langwatch/organization-contract";
+import { createLogger } from "@langwatch/observability";
+import {
+  admissionSeat,
+  seatsFree,
+  type OrganizationAdmission,
+} from "@langwatch/organization-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 
+import type { ScimMembers } from "../channels/scim-channels.registry.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import { isUniqueViolation } from "../rules/scim-user.rules.ts";
 import type { ScimHeldConnections } from "./scim-directory-identity.service.ts";
@@ -18,7 +24,11 @@ type ScimAdmissionDependencies = {
   plans: Pick<EntitlementApi, "getActivePlan">;
   connections: ScimHeldConnections;
   membershipAccess: ScimMembershipAccessService;
+  /** Organization takes a held seat back, and opens the seat request of one left waiting. */
+  members: Pick<ScimMembers, "takeBackHeldSeat" | "openSeatRequestForAdmission">;
 };
+
+const logger = createLogger("langwatch:scim:admission");
 
 /** Who a directory push may bring into an organization, and the seat and role they enter on. */
 export class ScimAdmissionService {
@@ -57,22 +67,44 @@ export class ScimAdmissionService {
   }): Promise<void> {
     const asserted = await this.directoryAssertedOrganizationRole({ userId, organizationId });
     const plan = await this.options.plans.getActivePlan({ organizationId, user: { id: userId } });
-    await this.options.seats.withSeatLock({
+    const { takesHeldSeat, admission } = await this.options.seats.withSeatLock({
       organizationId,
       work: async (lease) => {
-        const seats = await this.options.seats.countMemberSeats({ organizationId });
-        const free = seatsFree({ plan, seats });
-        const { role, pending } = admissionSeat({ requested: asserted, ...free });
+        const [seats, holds] = await Promise.all([
+          this.options.seats.countMemberSeats({ organizationId }),
+          this.options.seats.findLiveHoldUserIds({ organizationId, userId }),
+        ]);
+        // A person back within their seat hold takes that seat, already counted, not another
+        // (seat-rotation.feature).
+        const isHeld = holds.length > 0;
+        const counted = isHeld ? { ...seats, fullMembers: seats.fullMembers - 1 } : seats;
+        const { role, pending } = admissionSeat({
+          requested: asserted,
+          ...seatsFree({ plan, seats: counted }),
+        });
+        let outcome: OrganizationAdmission["outcome"] = "created";
         await lease.assertHeld();
         try {
           await this.options.prisma.addMembership({ userId, organizationId, role, pending });
         } catch (error) {
           if (!isUniqueViolation(error)) throw error;
+          outcome = "already-present";
         }
+        const seat: OrganizationAdmission["seat"] = role === "EXTERNAL" ? "EXTERNAL" : "MEMBER";
+        return { takesHeldSeat: isHeld && !pending, admission: { outcome, seat, pending } };
       },
     });
 
     await this.options.membershipAccess.reconcileOrganizationMembership({ userId, organizationId });
+    if (takesHeldSeat) {
+      await this.options.members.takeBackHeldSeat({ organizationId, userId });
+    }
+    // The admission stands whether or not its seat request could be opened.
+    await this.options.members
+      .openSeatRequestForAdmission({ organizationId, userId, admission })
+      .catch((error: unknown) => {
+        logger.error({ error, organizationId, userId }, "opening the seat request failed");
+      });
   }
 
   /**

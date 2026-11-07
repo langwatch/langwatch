@@ -28,6 +28,9 @@ const findLastNonCancelledSubscription =
 const previewProration = vi.fn<BillingSubscriptionApi["previewProration"]>();
 const notifyProspective = vi.fn<BillingSubscriptionApi["notifyProspective"]>();
 const listInvoices = vi.fn<BillingSubscriptionApi["listInvoices"]>();
+const developerSeats = vi.fn<BillingSubscriptionApi["developerSeats"]>();
+const previewDeveloperSeats = vi.fn<BillingSubscriptionApi["previewDeveloperSeats"]>();
+const setDeveloperSeats = vi.fn<BillingSubscriptionApi["setDeveloperSeats"]>();
 
 const billing: BillingSubscriptionApi = {
   getOrCreateCustomerId,
@@ -38,6 +41,9 @@ const billing: BillingSubscriptionApi = {
   previewProration,
   notifyProspective,
   listInvoices,
+  developerSeats,
+  previewDeveloperSeats,
+  setDeveloperSeats,
 };
 
 const trpc = initTRPC.context<BillingTrpcTestContext>().create();
@@ -75,11 +81,14 @@ describe("given the mounted subscription router", () => {
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "addTeamMemberOrEvents",
         "create",
+        "developerSeats",
         "getLastSubscription",
         "listInvoices",
         "manage",
+        "previewDeveloperSeats",
         "previewProration",
         "prospective",
+        "setDeveloperSeats",
       ]);
     });
 
@@ -94,11 +103,14 @@ describe("given the mounted subscription router", () => {
       expect(kinds).toEqual({
         addTeamMemberOrEvents: "mutation",
         create: "mutation",
+        developerSeats: "query",
         getLastSubscription: "query",
         listInvoices: "query",
         manage: "mutation",
+        previewDeveloperSeats: "query",
         previewProration: "query",
         prospective: "mutation",
+        setDeveloperSeats: "mutation",
       });
     });
   });
@@ -169,6 +181,13 @@ describe("given a member who may upgrade but not manage the organization", () =>
       }),
     ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
     expect(updateSubscriptionItems).not.toHaveBeenCalled();
+  });
+
+  it("is refused a Developer seat change", async () => {
+    await expect(
+      member.setDeveloperSeats({ organizationId: ORGANIZATION, quantity: 2 }),
+    ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+    expect(setDeveloperSeats).not.toHaveBeenCalled();
   });
 });
 

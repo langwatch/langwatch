@@ -16,6 +16,7 @@ import { billingApi } from "../../behavior/billing-api.ts";
 import { useBillingHost } from "../../model/billing-host.ts";
 import {
   getPlanActionLabel,
+  planActionHref,
   planManagementUrl,
   shouldShowPlanLimits,
 } from "../../model/plan-management-url.ts";
@@ -171,7 +172,13 @@ export default function UsageScreen() {
       </Link>
     </PageLayout.HeaderButton>
   );
-  const actionHref = isSelfHosted && !hasValidLicense ? "/settings/license" : planManagementHref;
+  const saasActionHref = planActionHref({
+    isSaaS: isSaaS === true,
+    isFree: saasPlan?.free ?? true,
+    isEnterprise: saasPlan?.type === PlanTypes.ENTERPRISE,
+  });
+  const selfHostedActionHref = hasValidLicense ? planManagementHref : "/settings/license";
+  const actionHref = isSelfHosted ? selfHostedActionHref : saasActionHref;
   const selfHostedActionLabel = hasValidLicense ? licensedActionLabel : unlicensedActionLabel;
   const actionLabel = isSelfHosted ? selfHostedActionLabel : saasActionLabel;
 
