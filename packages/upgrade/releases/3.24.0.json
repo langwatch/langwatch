@@ -1,0 +1,63 @@
+{
+  "release": "3.24.0",
+  "previous": "3.23.0",
+  "cutAt": "2026-11-07T01:41:36+01:00",
+  "steps": [
+    {
+      "id": "prisma:20261104120000_nurturing_organization_last_trace_at",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing organization last trace at"
+    },
+    {
+      "id": "prisma:20261104120100_nurturing_organization_coding_first_days",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing organization coding first days"
+    },
+    {
+      "id": "prisma:20261104120101_nurturing_organization_coding_terminal_and_repositories",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing organization coding terminal and repositories"
+    },
+    {
+      "id": "prisma:20261106120000_billing_license_renewal_claim",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: billing license renewal claim"
+    },
+    {
+      "id": "prisma:20261106120001_organization_seat_requests",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: organization seat requests"
+    },
+    {
+      "id": "prisma:20261106120002_organization_seat_lease",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: organization seat lease"
+    },
+    {
+      "id": "prisma:20261107120000_seat_request_seat_pending",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: seat request seat pending"
+    },
+    {
+      "id": "clickhouse:00124",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "gateway",
+      "description": "ClickHouse schema: gateway spend web search requests"
+    }
+  ]
+}
