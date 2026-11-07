@@ -4,7 +4,7 @@ import { VStack } from "@langwatch/design-system/primitives";
 import { OverviewDetail, SettingList } from "@langwatch/design-system/settings-card";
 import { RefreshCw } from "lucide-react";
 
-import { formatPeriodStart } from "../../model/hosted-services.ts";
+import { syncLineOf } from "../../model/connect-sync.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
 import type { ConnectEnabledStatus } from "./connect-status.ts";
 
@@ -16,12 +16,15 @@ import type { ConnectEnabledStatus } from "./connect-status.ts";
 export function ConnectSyncSection({ status }: { status: ConnectEnabledStatus }) {
   const host = useLicensingHost();
   const { sync } = status;
-  const failure = sync.lastError
-    ? host.describeFailure({
-        error: { error: { code: sync.lastError.code } },
-        fallbackTitle: "The last license sync did not complete",
-      })
-    : undefined;
+  // A failure the page already shows as its refusal is not said twice.
+  const isShownAsRefusal = sync.lastError?.code === status.refusal?.code;
+  const failure =
+    sync.lastError && !isShownAsRefusal
+      ? host.describeFailure({
+          error: { error: { code: sync.lastError.code } },
+          fallbackTitle: "The last license sync did not complete",
+        })
+      : undefined;
 
   return (
     <Card
@@ -33,8 +36,8 @@ export function ConnectSyncSection({ status }: { status: ConnectEnabledStatus })
     >
       <VStack align="stretch" gap={2}>
         <SettingList>
-          <OverviewDetail label="Last successful sync">
-            {formatPeriodStart({ value: sync.lastSyncAt, fallback: "It has not synced yet" })}
+          <OverviewDetail label="Sync">
+            <span data-testid="connect-sync-line">{syncLineOf(sync).text}</span>
           </OverviewDetail>
         </SettingList>
         {failure ? (

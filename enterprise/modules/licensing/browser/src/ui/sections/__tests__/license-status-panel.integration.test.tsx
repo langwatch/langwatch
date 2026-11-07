@@ -14,8 +14,9 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { LicensingHostApi, LicensingHostProvider } from "../../../model/licensing-host.ts";
 import { LicenseStatusPanel } from "../license-status-panel.tsx";
 
-const { statusResult, actions } = vi.hoisted(() => ({
+const { statusResult, connectResult, actions } = vi.hoisted(() => ({
   statusResult: { current: undefined as unknown },
+  connectResult: { current: undefined as unknown },
   actions: {
     upload: vi.fn(),
     activate: vi.fn(),
@@ -63,6 +64,16 @@ vi.mock("../../../behavior/licensing-api.ts", () => ({
           isError: false,
           refetch: vi.fn(),
         }),
+      },
+    },
+  },
+}));
+
+vi.mock("../../../behavior/connect-api.ts", () => ({
+  connectApi: {
+    connect: {
+      status: {
+        useQuery: () => ({ data: connectResult.current, refetch: vi.fn() }),
       },
     },
   },
@@ -141,6 +152,23 @@ beforeAll(() => {
 
 beforeEach(() => {
   for (const action of Object.values(actions)) action.mockClear();
+  connectResult.current = undefined;
+});
+
+const connectOn = (overrides: {
+  refusal?: { code: string } | null;
+  lastSyncAt?: string | null;
+  lastError?: { code: string } | null;
+}) => ({
+  deployment: "on",
+  gatewayHost: "gateway.langwatch.ai",
+  licensed: true,
+  enabledServices: ["instant_evals"],
+  entitledServices: null,
+  usage: null,
+  refusal: overrides.refusal ?? null,
+  isUsageUnavailable: false,
+  sync: { lastSyncAt: overrides.lastSyncAt ?? null, lastError: overrides.lastError ?? null },
 });
 
 describe("LicenseStatusPanel", () => {
@@ -196,6 +224,30 @@ describe("LicenseStatusPanel", () => {
     });
   });
 
+  describe("given a connected license read alongside Connect", () => {
+    /** @scenario The sync line uses the same words on the Connect and License pages */
+    it("reads the sync line from the Connect status", () => {
+      connectResult.current = connectOn({});
+      renderWith(validStatus({ connected: true }));
+
+      expect(screen.getByTestId("license-sync-line").textContent).toBe("Not synced yet");
+    });
+
+    /** @scenario A revoked license is not called valid */
+    it("says LangWatch revoked it when Connect refuses the license as revoked", () => {
+      connectResult.current = connectOn({
+        refusal: { code: "connect_license_revoked" },
+        lastError: { code: "connect_license_revoked" },
+      });
+      renderWith(validStatus({ connected: true }));
+
+      expect(screen.getByTestId("license-status-sentence").textContent).toBe(
+        "Revoked by LangWatch: hosted services are off",
+      );
+      expect(screen.queryByText("Valid")).toBeNull();
+    });
+  });
+
   describe("given a connected license whose term ended", () => {
     /** @scenario Refresh is offered on an expired connected licence */
     it("offers refresh so a renewal issued after expiry can be collected", async () => {
@@ -239,6 +291,21 @@ describe("LicenseStatusPanel", () => {
 
       await user.click(within(dialog).getByRole("button", { name: "Remove license" }));
       expect(actions.remove).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario The removal dialog warns that an activation code works once */
+    it("warns that an activation code works once before removing", async () => {
+      const user = userEvent.setup();
+      renderWith(validStatus({ connected: false }));
+
+      await user.click(screen.getByTestId("license-remove"));
+      const dialog = await screen.findByRole("alertdialog");
+
+      expect(
+        within(dialog).getByText(
+          /An activation code works once, so activating again later needs a new code from LangWatch/,
+        ),
+      ).toBeDefined();
     });
   });
 

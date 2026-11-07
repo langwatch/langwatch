@@ -106,25 +106,34 @@ describe("the Roles screen", () => {
       );
 
       expect(
-        screen.queryByText("Roles & access is included in Enterprise"),
+        screen.queryByText("Roles & access is part of LangWatch Enterprise"),
       ).not.toBeInTheDocument();
       expect(screen.queryByTestId("builtin-roles")).not.toBeInTheDocument();
     });
   });
 
   describe("given the organization is not on Enterprise", () => {
-    /** @scenario Custom roles are an Enterprise feature */
-    it("explains the feature is Enterprise and offers sales", async () => {
+    /**
+     * @scenario Custom roles are an Enterprise feature
+     * @scenario "Each Enterprise page names its feature in the shared lock"
+     */
+    it("explains the feature is Enterprise and leads a self-hosted admin to the License page", async () => {
       renderWithAuthzHost(
         <RolesScreen />,
         new FakeAuthzHost({ plan: { isEnterprise: false, isLoading: false } }),
       );
 
       expect(screen.getByRole("heading", { name: "Roles & access" })).toBeInTheDocument();
-      expect(screen.getByText("Roles & access is included in Enterprise")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "See plans" })).toHaveAttribute(
+      expect(
+        screen.getByText("Roles & access is part of LangWatch Enterprise"),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Activate a license" })).toHaveAttribute(
         "href",
-        "/settings/plans",
+        "/settings/license",
+      );
+      expect(screen.getByRole("link", { name: "Get a license" })).toHaveAttribute(
+        "href",
+        "/settings/license",
       );
       expect(screen.queryByText("Custom roles")).not.toBeInTheDocument();
     });

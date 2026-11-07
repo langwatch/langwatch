@@ -1,5 +1,4 @@
-import { Link } from "@langwatch/browser-host/link";
-import { UpgradeRequired } from "@langwatch/design-system/access-state";
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
 import { Banner } from "@langwatch/design-system/banner";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
@@ -74,14 +73,11 @@ export function ProvisioningTokens({
 
       {(list.isError || connections.isError) &&
         isEnterpriseGateError(list.error ?? connections.error) && (
-          <UpgradeRequired
+          <EnterpriseLock
             feature="Directory sync"
+            description="Sync people and groups from your identity provider, so joiners and leavers are handled for you."
+            canManage={mayManage}
             data-testid="scim-enterprise-gate"
-            actions={
-              <Button asChild colorPalette="orange" size="sm">
-                <Link href="/settings/plans">Compare plans</Link>
-              </Button>
-            }
           />
         )}
       {(list.isError || connections.isError) &&

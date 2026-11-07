@@ -5,13 +5,21 @@
  */
 
 import { VStack } from "@langwatch/design-system/primitives";
-import { detectLicenseInputForm } from "@langwatch/enterprise-licensing-contract";
+import {
+  type ConnectStatus,
+  detectLicenseInputForm,
+} from "@langwatch/enterprise-licensing-contract";
 import { useState } from "react";
 
+import { connectApi } from "../../behavior/connect-api.ts";
 import { licensingApi } from "../../behavior/licensing-api.ts";
-import { licenseMetersSeats } from "../../model/license-status.ts";
-import { useLicensingHost } from "../../model/licensing-host.ts";
-import { LicenseDetailsCard } from "../../ui/elements/license-details-card.tsx";
+import { isRevokedByLangWatch, syncLineOf } from "../../model/connect-sync.ts";
+import { isConnectedLicense, licenseMetersSeats } from "../../model/license-status.ts";
+import { type LicensingHostApi, useLicensingHost } from "../../model/licensing-host.ts";
+import {
+  type LicenseHostedState,
+  LicenseDetailsCard,
+} from "../../ui/elements/license-details-card.tsx";
 import { LicenseLoadError } from "../../ui/elements/license-load-error.tsx";
 import { LicenseLoadingSkeleton } from "../../ui/elements/license-loading-skeleton.tsx";
 import { OverSeatsCallout } from "../../ui/elements/over-seats-callout.tsx";
@@ -28,8 +36,9 @@ interface LicenseStatusPanelProps {
 export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) {
   const [licenseKey, setLicenseKey] = useState("");
   const [isReplacing, setIsReplacing] = useState(false);
+  const host = useLicensingHost();
   // The server refuses every change without organization:manage; this only hides what would fail.
-  const canManage = useLicensingHost().canManageOrganization();
+  const canManage = host.canManageOrganization();
 
   const {
     data: status,
@@ -45,6 +54,13 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
     },
   );
 
+  // The sync line and a revocation are read from Connect, the same reading its page shows.
+  const isConnected = !!status?.hasLicense && isConnectedLicense(status);
+  const connectStatus = connectApi.connect.status.useQuery(
+    { organizationId },
+    { enabled: isConnected, refetchOnWindowFocus: false },
+  );
+
   const [activationCode, setActivationCode] = useState("");
   const { upload, activate, remove, refresh, isUploading, isRemoving, isRefreshing } =
     useLicenseActions({
@@ -57,6 +73,9 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
       },
       onRemoveSuccess: () => {
         void refetch();
+      },
+      onRefreshSettled: () => {
+        if (isConnected) void connectStatus.refetch();
       },
     });
 
@@ -121,6 +140,7 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
         isRefreshing={isRefreshing}
         onReplace={() => setIsReplacing(true)}
         canManage={canManage}
+        hosted={hostedStateOf({ host, status: connectStatus.data })}
       />
       {isReplacing && canManage ? (
         <NoLicenseCard
@@ -139,4 +159,28 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
       ) : null}
     </VStack>
   );
+}
+
+/** The Connect reading in the card's words; absent until it is read or where Connect is off. */
+function hostedStateOf({
+  host,
+  status,
+}: {
+  host: LicensingHostApi;
+  status: ConnectStatus | undefined;
+}): LicenseHostedState | undefined {
+  if (status?.deployment !== "on") return void 0;
+  const line = syncLineOf(status.sync);
+  return {
+    syncText: line.text,
+    ...(status.sync.lastError
+      ? {
+          syncFailure: host.describeFailure({
+            error: { error: { code: status.sync.lastError.code } },
+            fallbackTitle: "The last license sync did not complete",
+          }),
+        }
+      : {}),
+    isRevoked: isRevokedByLangWatch(status),
+  };
 }

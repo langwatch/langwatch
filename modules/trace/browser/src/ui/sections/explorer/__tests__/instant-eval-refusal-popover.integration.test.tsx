@@ -226,6 +226,7 @@ describe("given a self-hosted install that judges through LangWatch", () => {
 describe("given an eval chip refused on a self-hosted install", () => {
   function renderRefusal(
     kind: "not_in_license" | "switched_off" | "not_connected" | "ask_operator",
+    { canActivateLicense = false }: { canActivateLicense?: boolean } = {},
   ) {
     render(
       <InstantEvalRefusalPopover
@@ -234,6 +235,7 @@ describe("given an eval chip refused on a self-hosted install", () => {
         onSkip={() => {}}
         onEnable={() => {}}
         isEnabling={false}
+        canActivateLicense={canActivateLicense}
       >
         <span>anchor</span>
       </InstantEvalRefusalPopover>,
@@ -241,20 +243,35 @@ describe("given an eval chip refused on a self-hosted install", () => {
     );
   }
 
-  describe("when its license does not include Instant Evals", () => {
+  describe("when its license does not include Instant Evals, or no license is installed", () => {
     /** @scenario "Each self-hosted refusal says what to do about it" */
-    it("says so, offers to contact us to add them, and links Read more", () => {
-      renderRefusal("not_in_license");
-      expect(screen.getByText("Your license doesn't include Instant Evals")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute(
+    it("shows the Enterprise lock to an admin, both buttons on the License page", () => {
+      renderRefusal("not_in_license", { canActivateLicense: true });
+      expect(screen.getByText("Instant Evals is part of LangWatch Enterprise")).toBeInTheDocument();
+      expect(screen.queryByText(/license doesn't include/)).toBeNull();
+      expect(screen.getByRole("link", { name: "Activate a license" })).toHaveAttribute(
         "href",
-        CONTACT_US_HREF,
+        "/settings/license",
+      );
+      expect(screen.getByRole("link", { name: "Get a license" })).toHaveAttribute(
+        "href",
+        "/settings/license",
       );
       expect(screen.getByRole("link", { name: "Read more" })).toHaveAttribute(
         "href",
         SELF_HOSTED_INSTANT_EVALS_HREF,
       );
-      expect(screen.queryByRole("button", { name: "Enable" })).toBeNull();
+      expect(screen.queryByText("Contact us")).toBeNull();
+    });
+
+    /** @scenario "Each self-hosted refusal says what to do about it" */
+    it("tells a member to ask an organization admin, with no license button", () => {
+      renderRefusal("not_in_license");
+      expect(
+        screen.getByText(/Ask an organization admin to activate a license\./),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Activate a license" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Not now" })).toBeInTheDocument();
     });
   });
 

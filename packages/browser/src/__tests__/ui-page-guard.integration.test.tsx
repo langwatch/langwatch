@@ -294,6 +294,13 @@ describe("given a module declaring a screen that requires a grant", () => {
       load: async () => ({ default: Page }),
       requires: "workflows:view",
     },
+    "pages/[project]/own-refusal": {
+      load: async () => ({
+        default: Page,
+        Forbidden: ({ permission }: { permission: string }) => <p>locked without {permission}</p>,
+      }),
+      requires: "workflows:view",
+    },
     "pages/[project]/open": { load: async () => ({ default: Page }) },
     "pages/[project]/flagged": {
       load: async () => ({ default: Page }),
@@ -335,6 +342,14 @@ describe("given a module declaring a screen that requires a grant", () => {
 
     expect(screen.getByText("Missing permission: workflows:view")).toBeDefined();
     expect(screen.queryByText("the page")).toBeNull();
+  });
+
+  /** @scenario "A declared screen answers its own refusal when its chunk exports Forbidden" */
+  it("shows the screen's own Forbidden export to a viewer without the grant", async () => {
+    await renderDeclared({ page: "pages/[project]/own-refusal", permissions: [] });
+
+    expect(screen.getByText("locked without workflows:view")).toBeDefined();
+    expect(screen.queryByText(/Missing permission/)).toBeNull();
   });
 
   /** @scenario "A declared screen that requires a grant opens for a viewer holding it" */

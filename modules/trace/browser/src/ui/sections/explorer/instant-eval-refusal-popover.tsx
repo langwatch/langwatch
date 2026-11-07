@@ -1,3 +1,4 @@
+import { EnterpriseLock, LICENSE_SETTINGS_HREF } from "@langwatch/browser-host/enterprise-lock";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 /**
  * The refusal an Instant Eval met, anchored under the search bar: what the eval would have found,
@@ -36,6 +37,10 @@ export const UPGRADE_HREF = "/settings/subscription";
 /** Where a model provider is connected, which is what a judge runs on. */
 export const MODEL_PROVIDERS_HREF = "/settings/model-providers";
 
+/** What an Instant Eval does, said once on the Enterprise lock. */
+const INSTANT_EVALS_DESCRIPTION =
+  "Ask your traces a question in plain language and keep only the results that answer it.";
+
 /** Where a project without Instant Evals asks for them to be switched on. */
 export const CONTACT_US_HREF =
   "mailto:support@langwatch.ai?subject=Please%20enable%20Instant%20Evals";
@@ -65,6 +70,8 @@ interface InstantEvalRefusalPopoverProps {
   isEnabling: boolean;
   /** The install judges through LangWatch: "can't run right now" then names the two addresses. */
   viaConnect?: boolean;
+  /** The reader may manage the organization, so the license lock offers the License page. */
+  canActivateLicense?: boolean;
   children: React.ReactElement;
 }
 
@@ -86,10 +93,11 @@ const READ_MORE_SELF_HOSTED = { label: "Read more", href: SELF_HOSTED_INSTANT_EV
  */
 const SELF_HOSTED_REFUSAL_COPY: Record<ExplorerSelfHostedInstantEvalOffer, InstantEvalRefusalCopy> =
   {
+    // Also the answer with no license at all, so it never says what a license holds.
     not_in_license: {
-      title: "Your license doesn't include Instant Evals",
-      body: "Instant Evals turn plain language questions into native filters. On a self-hosted install they come with a license that includes them. Contact us to add them.",
-      action: { label: "Contact us", href: CONTACT_US_HREF },
+      title: "Instant Evals is part of LangWatch Enterprise",
+      body: INSTANT_EVALS_DESCRIPTION,
+      action: { label: "Activate a license", href: LICENSE_SETTINGS_HREF },
       more: READ_MORE_SELF_HOSTED,
       dismiss: "Not now",
     },
@@ -190,6 +198,7 @@ export function InstantEvalRefusalPopover({
   onEnable,
   isEnabling,
   viaConnect,
+  canActivateLicense = false,
   children,
 }: InstantEvalRefusalPopoverProps) {
   const copy = refusal ? instantEvalRefusalCopy(refusal, { viaConnect }) : null;
@@ -197,6 +206,28 @@ export function InstantEvalRefusalPopover({
   const actionHref = action?.href;
   // Only a button that says Skip routes the words again; "Not now" just closes.
   const onDismiss = copy?.dismiss === "Skip" ? onSkip : onClose;
+  const licenseLock =
+    copy && refusal?.kind === "not_in_license" ? (
+      <EnterpriseLock
+        compact
+        feature="Instant Evals"
+        description={INSTANT_EVALS_DESCRIPTION}
+        canManage={canActivateLicense}
+        data-testid="instant-eval-enterprise-lock"
+        extraActions={
+          <>
+            <Button size="xs" variant="ghost" onClick={onDismiss}>
+              {copy.dismiss}
+            </Button>
+            {copy.more && (
+              <RoutedLink href={copy.more.href} target="_blank" rel="noopener noreferrer">
+                {copy.more.label}
+              </RoutedLink>
+            )}
+          </>
+        }
+      />
+    ) : null;
   return (
     <PopoverRoot
       open={refusal !== null}
@@ -212,91 +243,90 @@ export function InstantEvalRefusalPopover({
       <PopoverContent maxWidth="360px" data-testid="instant-eval-refusal">
         <PopoverArrow />
         <PopoverBody>
-          {copy &&
-          actionHref &&
-          (refusal?.kind === "budget" || refusal?.kind === "not_in_license") ? (
-            <AccessState
-              kind="upgrade"
-              compact
-              title={copy.title}
-              description={copy.body}
-              actions={
-                <>
-                  <Button asChild size="sm" colorPalette="orange">
-                    <RoutedLink href={actionHref}>{action?.label}</RoutedLink>
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={onDismiss}>
-                    {copy.dismiss}
-                  </Button>
-                  {copy.more && (
-                    <RoutedLink href={copy.more.href} target="_blank" rel="noopener noreferrer">
-                      {copy.more.label}
-                    </RoutedLink>
-                  )}
-                </>
-              }
-            />
-          ) : (
-            copy && (
-              <VStack align="stretch" gap={3}>
-                <HStack gap={2}>
-                  <Box
-                    width="28px"
-                    height="28px"
-                    borderRadius="full"
-                    bg="orange.subtle"
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    color="orange.fg"
-                  >
-                    <Sparkles size={14} />
-                  </Box>
-                  <Text textStyle="sm" fontWeight="semibold">
-                    {copy.title}
-                  </Text>
-                </HStack>
-                <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-                  {copy.body}
-                </Text>
-                <HStack gap={2}>
-                  {action && actionHref === undefined && (
-                    <Button
-                      size="xs"
-                      flex={1}
-                      colorPalette="orange"
-                      onClick={onEnable}
-                      loading={isEnabling}
-                    >
-                      {action.label}
+          {licenseLock ??
+            (copy && actionHref && refusal?.kind === "budget" ? (
+              <AccessState
+                kind="upgrade"
+                compact
+                title={copy.title}
+                description={copy.body}
+                actions={
+                  <>
+                    <Button asChild size="sm" colorPalette="orange">
+                      <RoutedLink href={actionHref}>{action?.label}</RoutedLink>
                     </Button>
-                  )}
-                  {action && actionHref !== undefined && (
-                    <RoutedLink
-                      href={actionHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ display: "block", flex: 1 }}
+                    <Button size="sm" variant="outline" onClick={onDismiss}>
+                      {copy.dismiss}
+                    </Button>
+                    {copy.more && (
+                      <RoutedLink href={copy.more.href} target="_blank" rel="noopener noreferrer">
+                        {copy.more.label}
+                      </RoutedLink>
+                    )}
+                  </>
+                }
+              />
+            ) : (
+              copy && (
+                <VStack align="stretch" gap={3}>
+                  <HStack gap={2}>
+                    <Box
+                      width="28px"
+                      height="28px"
+                      borderRadius="full"
+                      bg="orange.subtle"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      color="orange.fg"
                     >
-                      <Button size="xs" width="full" colorPalette="orange">
+                      <Sparkles size={14} />
+                    </Box>
+                    <Text textStyle="sm" fontWeight="semibold">
+                      {copy.title}
+                    </Text>
+                  </HStack>
+                  <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
+                    {copy.body}
+                  </Text>
+                  <HStack gap={2}>
+                    {action && actionHref === undefined && (
+                      <Button
+                        size="xs"
+                        flex={1}
+                        colorPalette="orange"
+                        onClick={onEnable}
+                        loading={isEnabling}
+                      >
                         {action.label}
                       </Button>
-                    </RoutedLink>
-                  )}
-                  {copy.more && (
-                    <RoutedLink href={copy.more.href} target="_blank" rel="noopener noreferrer">
-                      <Button size="xs" variant="outline">
-                        {copy.more.label}
-                      </Button>
-                    </RoutedLink>
-                  )}
-                  <Button size="xs" variant="ghost" onClick={onDismiss}>
-                    {copy.dismiss}
-                  </Button>
-                </HStack>
-              </VStack>
-            )
-          )}
+                    )}
+                    {action && actionHref !== undefined && (
+                      <RoutedLink
+                        href={actionHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ display: "block", flex: 1 }}
+                      >
+                        <Button size="xs" width="full" colorPalette="orange">
+                          {action.label}
+                        </Button>
+                      </RoutedLink>
+                    )}
+                    {copy.more && (
+                      <RoutedLink href={copy.more.href} target="_blank" rel="noopener noreferrer">
+                        <Button size="xs" variant="outline">
+                          {copy.more.label}
+                        </Button>
+                      </RoutedLink>
+                    )}
+                    <Button size="xs" variant="ghost" onClick={onDismiss}>
+                      {copy.dismiss}
+                    </Button>
+                  </HStack>
+                </VStack>
+              )
+            ))}
         </PopoverBody>
       </PopoverContent>
     </PopoverRoot>

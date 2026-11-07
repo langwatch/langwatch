@@ -85,6 +85,13 @@ Feature: Renewing and replacing a self-hosted licence
     And it says the organization returns to the open source plan, losing the licensed seats and enterprise capabilities such as single sign-on, SCIM and audit logs
     And nothing is removed until the admin confirms
 
+  @integration
+  Scenario: The removal dialog warns that an activation code works once
+    Given an organization with an installed licence
+    When an admin presses "Remove license"
+    Then the dialog says an activation code works once
+    And it says activating again later needs a new code from LangWatch
+
   # ============================================================================
   # A licence set in the environment
   # ============================================================================

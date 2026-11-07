@@ -40,15 +40,39 @@ Feature: The License page says where a license stands
   Rule: a missing license is an offer, not an error
 
     @integration
+    Scenario: Without a license the page offers two cards, one for a code and one for buying
+      Given no license is installed
+      Then the page says no license is installed
+      And one card is titled "I have an activation code" and holds the activation code field and the Activate button
+      And another card is titled "I need a license" and says "You get an activation code when you buy a license."
+      And the "I need a license" card offers "Talk to sales"
+      And nothing on the page says the code was sent with an order
+
+    @integration
     Scenario: Without a license the page offers three ways to activate one
       Given no license is installed
-      Then the page says no license is installed and that LangWatch is running open source
-      And I can choose an activation code, a license file or a license key
+      Then I can choose an activation code, a license file or a license key inside the "I have an activation code" card
 
     @integration
     Scenario: Activation waits until something is entered
       Given no license is installed
       Then I cannot activate until I have entered something to activate
+      And the page says "Enter an activation code to activate."
+
+    @integration
+    Scenario: The reason activation waits follows the chosen form
+      Given no license is installed
+      When I choose to enter a license key
+      Then the page says "Paste a license key to activate."
+      When I choose a license file
+      Then the page says "Choose a license file to activate."
+
+    @integration
+    Scenario: The reason disappears once something is entered
+      Given no license is installed
+      And I have entered an activation code
+      Then I can activate
+      And the page no longer says why activation waits
 
     @integration
     Scenario: Activating with a code hands the code on
@@ -62,6 +86,44 @@ Feature: The License page says where a license stands
       Given no license is installed
       When I choose to enter a license key
       Then I see the license key field
+
+    @integration
+    Scenario: A member who cannot manage the organization is told who can activate
+      Given I am a member without organization:manage
+      And no license is installed
+      Then the page says "An organization admin can activate a license."
+      And there is no activation code field and no Activate button
+
+  Rule: the License page and the Connect page tell the same sync story
+
+    @integration
+    Scenario: A connected license that has synced says when
+      Given a valid license that names a hosted service
+      And the last license sync succeeded 5 minutes ago
+      Then the Sync line reads "Last synced 5 minutes ago"
+
+    @integration
+    Scenario: A connected license that has never synced says so
+      Given a valid license that names a hosted service
+      And no license sync has run yet
+      Then the Sync line reads "Not synced yet"
+      And it never says "Connected to LangWatch"
+
+    @integration
+    Scenario: A failed sync is named on the License page and never reads as connected
+      Given a valid license that names a hosted service
+      And the last license sync was refused as unreachable
+      Then the Sync line says the last sync failed and why
+      And it still says when the last successful sync was, or "Not synced yet"
+
+  Rule: a license LangWatch revoked says so
+
+    @integration
+    Scenario: A revoked license is not called valid
+      Given a license whose signature checks out
+      And LangWatch refused the last sync because the license was revoked
+      Then the status reads "Revoked by LangWatch: hosted services are off"
+      And the license is not called valid
 
   Rule: a failure to read the license is not a missing license
 
