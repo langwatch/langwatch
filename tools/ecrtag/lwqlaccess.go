@@ -145,14 +145,7 @@ func (l LwqlAccessTag) Write(ctx context.Context) (string, error) {
 
 func (l LwqlAccessTag) fingerprint(ctx context.Context) (string, error) {
 	if l.Render != nil {
-		fingerprint, err := l.Render(ctx)
-		if err != nil {
-			return "", err
-		}
-		if !lwqlAccessTag.MatchString(LwqlAccessTagPrefix + fingerprint + "-") {
-			return "", fmt.Errorf("%q is not a 32-character hex fingerprint", fingerprint)
-		}
-		return fingerprint, nil
+		return l.rendered(ctx)
 	}
 	for _, source := range l.Sources {
 		tags, err := l.Registry.ImageTags(ctx, Ref{Repository: l.Ref.Repository, Tag: source})
@@ -168,4 +161,16 @@ func (l LwqlAccessTag) fingerprint(ctx context.Context) (string, error) {
 	}
 
 	return "", fmt.Errorf("%w: %s, from %v", ErrNoLwqlFingerprint, l.Ref, l.Sources)
+}
+
+func (l LwqlAccessTag) rendered(ctx context.Context) (string, error) {
+	fingerprint, err := l.Render(ctx)
+	if err != nil {
+		return "", err
+	}
+	if !lwqlAccessTag.MatchString(LwqlAccessTagPrefix + fingerprint + "-") {
+		return "", fmt.Errorf("%q is not a 32-character hex fingerprint", fingerprint)
+	}
+
+	return fingerprint, nil
 }
