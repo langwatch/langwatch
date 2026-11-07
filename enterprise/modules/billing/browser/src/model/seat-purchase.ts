@@ -3,6 +3,8 @@
  * becomes the upgrade past it; on Growth it adds or lowers seats in place.
  * @see specs/licensing/seat-buying.feature
  */
+import { Temporal } from "@langwatch/time";
+
 import { type Currency, formatPrice } from "./billing-plans.ts";
 import { billingDay, type SeatQuote } from "./seat-change-summary.ts";
 
@@ -53,6 +55,53 @@ export function upgradeTotal({ seats, price }: { seats: number; price: SeatPrice
   };
 }
 
+/** Full seats still held for someone who left one, and the day the first of them frees. */
+export type HeldSeats = { count: 0 } | { count: number; firstFreesOn: string };
+
+export const noHeldSeats: HeldSeats = { count: 0 };
+
+/** One hold as the server lists it: removed, disabled or demoted. */
+export type SeatHold = { userId: string; email: string | null; seatFreesAt: string };
+
+/** "7 Dec": the day a held seat frees, in the reader's own calendar, as the Users list says it. */
+function holdFreesOn(epochMilliseconds: number): string {
+  return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds)
+    .toZonedDateTimeISO(Temporal.Now.timeZoneId())
+    .toLocaleString("en-GB", { day: "numeric", month: "short" });
+}
+
+/**
+ * The holds `inUse` counts: a hold whose person holds a full seat again, as a member or a
+ * pending invite, is counted once, as that seat (entitlement's `countMemberSeats`).
+ */
+export function heldSeatsOf({
+  holds,
+  fullMemberIds,
+  fullInviteEmails,
+}: {
+  holds: readonly SeatHold[];
+  fullMemberIds: ReadonlySet<string>;
+  fullInviteEmails: ReadonlySet<string>;
+}): HeldSeats {
+  const counted = holds.filter(
+    (hold) =>
+      !fullMemberIds.has(hold.userId) &&
+      !(hold.email && fullInviteEmails.has(hold.email.toLowerCase())),
+  );
+  if (counted.length === 0) return noHeldSeats;
+  const first = Math.min(
+    ...counted.map((hold) => Temporal.Instant.from(hold.seatFreesAt).epochMilliseconds),
+  );
+  return { count: counted.length, firstFreesOn: holdFreesOn(first) };
+}
+
+/** "2 in use." or "2 in use, 1 of them held until 7 Dec." */
+function inUseLine({ inUse, held }: { inUse: number; held: HeldSeats }): string {
+  if (!("firstFreesOn" in held)) return `${inUse} in use.`;
+  if (held.count === 1) return `${inUse} in use, 1 of them held until ${held.firstFreesOn}.`;
+  return `${inUse} in use, ${held.count} of them held, the first until ${held.firstFreesOn}.`;
+}
+
 export function upgradeMinimumHint(minimum: number): string | undefined {
   if (minimum <= 1) return undefined;
   return `${minimum} people are already in your organization, so you need at least ${minimum} full seats.`;
@@ -61,6 +110,8 @@ export function upgradeMinimumHint(minimum: number): string | undefined {
 export type FreeSeatPlan = {
   includedSeats: number;
   inUse: number;
+  /** Of `inUse`, the seats held for people who left a full seat. */
+  held?: HeldSeats;
   invites: number;
   price: SeatPrice;
 };
@@ -85,7 +136,13 @@ function freeSeatAction({
   };
 }
 
-export function freeSeatPlan({ includedSeats, inUse, invites, price }: FreeSeatPlan) {
+export function freeSeatPlan({
+  includedSeats,
+  inUse,
+  held = noHeldSeats,
+  invites,
+  price,
+}: FreeSeatPlan) {
   const total = inUse + invites;
   const over = total > includedSeats;
   const action = freeSeatAction({ invites, total, over, price });
@@ -110,7 +167,7 @@ export function freeSeatPlan({ includedSeats, inUse, invites, price }: FreeSeatP
         { label: "Monthly price", value: money(price, 0), ruled: true, emphasis: true },
       ];
   return {
-    heading: `Free includes ${includedSeats} seats. ${inUse} in use.`,
+    heading: `Free includes ${includedSeats} seats. ${inUseLine({ inUse, held })}`,
     rowChip: over ? "Invited after payment" : "Invited now",
     note: over
       ? `${people(total)} is more than Free covers. Growth bills every full seat, ${total} × ${money(price, price.seatCents)}.`
@@ -128,6 +185,8 @@ export type GrowthSeatPlan = {
   /** The seats the drawer asks for. */
   seats: number;
   inUse: number;
+  /** Of `inUse`, the seats held for people who left a full seat. */
+  held?: HeldSeats;
   invites: number;
   price: SeatPrice;
   quote: SeatQuote | undefined;
@@ -143,23 +202,33 @@ export function growthMinimumSeats({ inUse, invites }: { inUse: number; invites:
 }
 
 export function growthSeatPlan(plan: GrowthSeatPlan) {
-  const { paid, seats, inUse, invites, price, quote, developer } = plan;
+  const { paid, seats, inUse, held = noHeldSeats, invites, price, quote, developer } = plan;
   const delta = seats - paid;
   const devDelta = developer ? developer.target - developer.current : 0;
   const day = nextPeriodDay(plan);
   const monthly =
     seats * price.seatCents + (developer ? developer.target * developer.unitCents : 0);
   return {
-    heading: `You pay for ${paid}. ${inUse} in use.`,
+    heading: `You pay for ${paid}. ${inUseLine({ inUse, held })}`,
     rowChip: "Invited when you confirm",
     minimumHint:
       seats <= growthMinimumSeats({ inUse, invites }) && seats < paid
-        ? `${people(inUse)} use full seats. Remove someone in Users to go lower.`
+        ? growthMinimumHint({ inUse, held })
         : undefined,
     note: growthNote({ delta, paid, seats, quote, day }),
     summary: growthSummary({ ...plan, delta, devDelta, day, monthly }),
     action: growthAction({ delta, devDelta, seats, invites, price, developer }),
   };
+}
+
+function growthMinimumHint({ inUse, held }: { inUse: number; held: HeldSeats }): string {
+  const lower = "Remove someone in Users to go lower.";
+  if (!("firstFreesOn" in held)) return `${people(inUse)} use full seats. ${lower}`;
+  const heldPart =
+    held.count === 1
+      ? `1 more is held until ${held.firstFreesOn}`
+      : `${held.count} more are held, the first until ${held.firstFreesOn}`;
+  return `${people(inUse - held.count)} use full seats and ${heldPart}. ${lower}`;
 }
 
 function nextPeriodDay({

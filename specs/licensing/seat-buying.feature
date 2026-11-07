@@ -90,6 +90,23 @@ Feature: Buying seats
       And there is no "Done" button and no "Other seat types"
 
     @integration
+    Scenario: Manage seats on Free names a held seat and the day it frees
+      Given "ACME" is on the Free plan with 1 member and 2 full seats in use
+      And the organization's held seats list one seat that frees on 7 Dec
+      When I open Manage seats
+      Then it reads "Free includes 2 seats. 2 in use, 1 of them held until 7 Dec."
+      But when the held seats list none, it reads "Free includes 2 seats. 2 in use."
+
+    @integration
+    Scenario: A reader who may not manage the organization sees no held seats
+      Given "ACME" is on the Free plan with 1 member and 2 full seats in use
+      And one of those seats is held until 7 Dec
+      And I do not hold organization:manage
+      When I open Manage seats
+      Then the held seats are not asked for
+      And it reads "Free includes 2 seats. 2 in use."
+
+    @integration
     Scenario: An invite that fits Free is sent at once
       Given "ACME" is on the Free plan with 1 member
       And Manage seats is open
@@ -187,6 +204,15 @@ Feature: Buying seats
       When I lower the full seats to 3
       Then they cannot be lowered further
       And it reads "3 people use full seats. Remove someone in Users to go lower."
+
+    @integration
+    Scenario: Lowering seats names the seats held for people who left them
+      Given "ACME" has a Growth subscription for 5 seats with 2 members and 3 full seats in use
+      And the organization's held seats list one seat that frees on 7 Dec
+      And Manage seats is open
+      When I lower the full seats to 3
+      Then it reads "You pay for 5. 3 in use, 1 of them held until 7 Dec."
+      And it reads "2 people use full seats and 1 more is held until 7 Dec. Remove someone in Users to go lower."
 
     @integration
     Scenario: Lowering seats asks to confirm from the next period

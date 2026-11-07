@@ -55,6 +55,9 @@ class TestBillingHost extends BillingHostApi {
   canReadMonthBreakdown(): boolean {
     return true;
   }
+  canReadHeldSeats(): boolean {
+    return true;
+  }
 
   routeQuery(): Readonly<Record<string, string | undefined>> {
     return this.query;
@@ -153,6 +156,7 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         getOrganizationWithMembersAndTheirTeams: {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
+        listHeldSeats: { useQuery: () => setup.mockListHeldSeats() },
       },
       invite: {
         upgradeWithInvites: {

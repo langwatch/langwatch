@@ -33,6 +33,7 @@ import {
   type GrowthSeatPlan,
   growthMinimumSeats,
   growthSeatPlan,
+  type HeldSeats,
   type SeatAction,
   type SeatPrice,
   seatChangeToast,
@@ -123,6 +124,7 @@ export function UserManagementDrawer({
   isLoading,
   mode,
   inUse,
+  held,
   price,
   onInvite,
   onUpgrade,
@@ -137,6 +139,8 @@ export function UserManagementDrawer({
   mode: SeatDrawerMode;
   /** Full seats held now, members and open invites as enforcement counts them. */
   inUse: number;
+  /** Of `inUse`, the seats held for people who left a full seat, as the server lists them. */
+  held: HeldSeats;
   price: SeatPrice;
   onInvite: (emails: string[]) => Promise<boolean>;
   onUpgrade: (input: { seats: number; emails: string[] }) => Promise<void>;
@@ -159,13 +163,20 @@ export function UserManagementDrawer({
     open,
     mode: mode.kind === "growth" ? mode : undefined,
     inUse,
+    held,
     invites: emails.length,
     price,
   });
 
   const free =
     mode.kind === "free"
-      ? freeSeatPlan({ includedSeats: mode.includedSeats, inUse, invites: emails.length, price })
+      ? freeSeatPlan({
+          includedSeats: mode.includedSeats,
+          inUse,
+          held,
+          invites: emails.length,
+          price,
+        })
       : undefined;
   const view = growth?.view ?? free;
   const action: SeatAction = view?.action ?? { kind: "none", label: "No changes" };
@@ -484,12 +495,14 @@ function useGrowthSeats({
   open,
   mode,
   inUse,
+  held,
   invites,
   price,
 }: {
   open: boolean;
   mode: Extract<SeatDrawerMode, { kind: "growth" }> | undefined;
   inUse: number;
+  held: HeldSeats;
   invites: number;
   price: SeatPrice;
 }) {
@@ -535,6 +548,7 @@ function useGrowthSeats({
     paid,
     seats,
     inUse,
+    held,
     invites,
     price,
     quote,
