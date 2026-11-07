@@ -38,13 +38,11 @@ export async function runFinish({
   props,
   refs,
   dispatch,
-  isCutAtLimit,
   nameOverride,
 }: {
   props: TalkToItPanelProps;
   refs: TalkRefs;
   dispatch: TalkDispatch;
-  isCutAtLimit: boolean;
   nameOverride?: string;
 }): Promise<void> {
   // Read off the ref: a provider disconnect arrives through handlers wired at start (#21).
@@ -58,8 +56,8 @@ export async function runFinish({
       conversationId: refs.conversationId.current,
       transcript: "transcript" in state ? state.transcript : [],
       startedAt: refs.startedAt.current || nowInstant().epochMilliseconds,
-      endedAt: nowInstant().epochMilliseconds,
-      isCutAtLimit,
+      // The server derives the cut-at-limit marker from this span (#8028).
+      endedAt: refs.endedAt.current || nowInstant().epochMilliseconds,
       ...(props.scenarioId ? { scenarioId: props.scenarioId } : {}),
     });
   } catch (error) {

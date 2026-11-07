@@ -37,6 +37,20 @@ export function voiceCallMaxSeconds(env: NodeJS.ProcessEnv): number {
   return Math.min(parsed, VOICE_CALL_MAX_SECONDS_CEILING);
 }
 
+/**
+ * Whether a call that ran for `durationMs` reached the call limit, by the browser countdown's
+ * whole-second rule: it ends a call once `floor(elapsed / 1000) >= maxCallSeconds`.
+ */
+export function callReachedLimit({
+  durationMs,
+  maxCallSeconds,
+}: {
+  durationMs: number;
+  maxCallSeconds: number;
+}): boolean {
+  return durationMs >= maxCallSeconds * 1000;
+}
+
 export function voiceRunsMaxConcurrent(env: NodeJS.ProcessEnv): number {
   return parsePositiveIntEnv({
     raw: env.VOICE_RUNS_MAX_CONCURRENT,

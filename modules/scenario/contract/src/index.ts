@@ -77,6 +77,7 @@ export * from "./voice/voice-transport.ts";
 export * from "./voice/voice-countdown.ts";
 export * from "./voice/call-limit-timer.ts";
 export {
+  callReachedLimit,
   VOICE_CALL_MAX_SECONDS_DEFAULT,
   VOICE_HTTP_TIMEOUT_MS,
   voiceCallMaxSeconds,

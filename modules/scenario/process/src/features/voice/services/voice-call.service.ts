@@ -11,6 +11,7 @@ import {
   type VoiceTransport,
   VoiceNameRequiredError,
   VoiceScenarioNotFoundError,
+  callReachedLimit,
 } from "@langwatch/scenario-contract";
 
 import {
@@ -49,7 +50,8 @@ export type VoiceCallFinishInput = {
   transcript: BrowserTranscriptTurn[];
   startedAt: number;
   endedAt: number;
-  isCutAtLimit: boolean;
+  /** The configured maximum call duration, the one the mint handed the browser. */
+  maxCallSeconds: number;
   conversationId?: string;
   /** Set for a "Call it myself" run: the scenario the call is scored under
    *  (AC23). Absent for a drawer call, which is not written as a run (#8020). */
@@ -260,7 +262,7 @@ async function ingestFinishedCall(
     transcript: BrowserTranscriptTurn[];
     startedAt: number;
     endedAt: number;
-    isCutAtLimit: boolean;
+    maxCallSeconds: number;
   },
   {
     transport,
@@ -303,6 +305,13 @@ async function ingestFinishedCall(
     existingAgentId,
   });
 
+  // The span is client-reported, so a modified client can still shift it; the marker at
+  // least agrees with the run's own timing rather than a separate flag (#8028).
+  const isCutAtLimit = callReachedLimit({
+    durationMs: Math.max(0, input.endedAt - input.startedAt),
+    maxCallSeconds: input.maxCallSeconds,
+  });
+
   const record = selectCallRecord({
     providerRecord,
     transcript: input.transcript,
@@ -310,7 +319,7 @@ async function ingestFinishedCall(
     transport,
     startedAt: input.startedAt,
     endedAt: input.endedAt,
-    isCutAtLimit: input.isCutAtLimit,
+    isCutAtLimit,
   });
 
   // Record one trace per exchange before any run is written, so every message
@@ -338,7 +347,7 @@ async function finishDrawerCall(
     transcript: BrowserTranscriptTurn[];
     startedAt: number;
     endedAt: number;
-    isCutAtLimit: boolean;
+    maxCallSeconds: number;
   },
   {
     transport,

@@ -61,7 +61,6 @@ function BrowserCallPanel(props: TalkToItPanelProps) {
       {state.kind === "saving" && <BusyLine label="Saving the call" />}
       {state.kind === "needsName" && (
         <NeedsNameView
-          state={state}
           pendingName={call.pendingName}
           setPendingName={call.setPendingName}
           onSave={call.saveWithName}
