@@ -189,3 +189,32 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
           allowed-skips: app, e2e, nlp, langevals, mcp, sdk-go, sdk-javascript, docs, codeql, clickhouse-serverless
+
+  # The LLM review, last so it spends tokens only on a change CI passed. The
+  # ruleset requires a check named `review`. !cancelled() replaces the implicit
+  # success(), which would skip this job whenever CI skipped a call, even though
+  # ci-complete passed.
+  review:
+    needs: ci-complete
+    # Dependabot PRs read a separate secret store, so the token check would fail.
+    if: |
+      !cancelled() &&
+      needs.ci-complete.result == 'success' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: langwatch/langwatch-pr-review-bot@05d6c298cb28b0f67e2e7fda075b916a0294af5b # main 2026-10-24
+        with:
+          slack_notify: "false"
+          claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          langwatch_ingest_key: ${{ secrets.LANGWATCH_INGEST_KEY }}

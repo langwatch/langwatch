@@ -13,34 +13,44 @@ import (
 	"github.com/langwatch/langwatch/tools/ciguard"
 )
 
-// prReviewBotPermissionsBlock is the workflow's `permissions:` block, kept as its own constant so it stays in sync with the tests that strip or replace it.
-const prReviewBotPermissionsBlock = `permissions:
-  contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
-  pull-requests: write
+// prReviewBotPermissionsBlock is the review job's `permissions:` block, kept as its own constant so it stays in sync with the tests that strip or replace it.
+const prReviewBotPermissionsBlock = `    permissions:
+      contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
+      pull-requests: write
 `
 
-// goodPRReviewBotWorkflow mirrors .github/workflows/pr-review-bot.yml as it
-// stands when every invariant holds. Individual tests mutate one clause of
+// prWorkflowPermissionsBlock is pr.yml's own block, which the review job's replaces.
+const prWorkflowPermissionsBlock = `permissions:
+  contents: read
+`
+
+// goodPRReviewBotWorkflow mirrors the review job of .github/workflows/pr.yml as
+// it stands when every invariant holds. Individual tests mutate one clause of
 // it at a time so each failure mode is isolated.
-const goodPRReviewBotWorkflow = `name: PR Review Bot
+const goodPRReviewBotWorkflow = `name: pr
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
 
-` + prReviewBotPermissionsBlock + `
+` + prWorkflowPermissionsBlock + `
 concurrency:
-  group: pr-review-bot-${{ github.event.pull_request.number }}
+  group: pr-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   review:
+    needs: ci-complete
     if: |
+      !cancelled() &&
+      needs.ci-complete.result == 'success' &&
+      github.event_name == 'pull_request' &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    steps:
+` + prReviewBotPermissionsBlock + `    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -107,6 +117,63 @@ func TestPRReviewBotGatesOnDraft(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, problems)
 	assert.Contains(t, strings.Join(problems, "\n"), "draft")
+}
+
+// @scenario "The review starts only after CI passed"
+func TestPRReviewBotGatesOnCIComplete(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "      needs.ci-complete.result == 'success' &&\n", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "ci-complete")
+}
+
+// @scenario "The review starts only after CI passed"
+func TestPRReviewBotWaitsForCIComplete(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "    needs: ci-complete\n", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "needs: ci-complete")
+}
+
+func TestPRReviewBotAcceptsCICompleteInANeedsList(t *testing.T) {
+	listed := strings.Replace(goodPRReviewBotWorkflow, "    needs: ci-complete\n", "    needs: [changes, ci-complete]\n", 1)
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, listed))
+
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+}
+
+// @scenario "The review still starts when CI skipped checks the change does not reach"
+func TestPRReviewBotStartsWhenCISkippedACall(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "      !cancelled() &&\n", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "skipped call")
+}
+
+// @scenario "The merge queue gets no review"
+func TestPRReviewBotStaysOutOfTheMergeQueue(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "      github.event_name == 'pull_request' &&\n", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "pull request")
 }
 
 func TestPRReviewBotReportsAMissingReviewJob(t *testing.T) {
@@ -190,7 +257,7 @@ func TestPRReviewBotCancelsInProgressRunsForTheSamePR(t *testing.T) {
 
 func TestPRReviewBotRequiresTheGroupToKeyOnThePR(t *testing.T) {
 	ungrouped := strings.Replace(goodPRReviewBotWorkflow,
-		"group: pr-review-bot-${{ github.event.pull_request.number }}", "group: pr-review-bot", 1)
+		"group: pr-${{ github.event.pull_request.number || github.ref }}", "group: pr", 1)
 	root := writePRReviewBotWorkflow(t, ungrouped)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -216,18 +283,19 @@ func TestPRReviewBotRequiresContentsWrite(t *testing.T) {
 
 func TestPRReviewBotReportsAMissingPermissionsBlock(t *testing.T) {
 	broken := strings.Replace(goodPRReviewBotWorkflow, prReviewBotPermissionsBlock, "", 1)
+	broken = strings.Replace(broken, prWorkflowPermissionsBlock, "", 1)
 	root := writePRReviewBotWorkflow(t, broken)
 
 	problems, err := ciguard.PRReviewBot(root)
 
 	require.NoError(t, err)
 	require.NotEmpty(t, problems)
-	assert.Contains(t, strings.Join(problems, "\n"), "declares no top-level permissions block")
+	assert.Contains(t, strings.Join(problems, "\n"), "declares no permissions block")
 }
 
 func TestPRReviewBotReportsAMissingRequiredPermissionKey(t *testing.T) {
 	withoutPullRequests := strings.Replace(goodPRReviewBotWorkflow,
-		"  pull-requests: write\n", "", 1)
+		"      pull-requests: write\n", "", 1)
 	root := writePRReviewBotWorkflow(t, withoutPullRequests)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -238,7 +306,7 @@ func TestPRReviewBotReportsAMissingRequiredPermissionKey(t *testing.T) {
 }
 
 func TestPRReviewBotRejectsShorthandPermissions(t *testing.T) {
-	shorthand := strings.Replace(goodPRReviewBotWorkflow, prReviewBotPermissionsBlock, "permissions: write-all\n", 1)
+	shorthand := strings.Replace(goodPRReviewBotWorkflow, prReviewBotPermissionsBlock, "    permissions: write-all\n", 1)
 	root := writePRReviewBotWorkflow(t, shorthand)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -250,8 +318,8 @@ func TestPRReviewBotRejectsShorthandPermissions(t *testing.T) {
 
 func TestPRReviewBotRejectsExtraPermissions(t *testing.T) {
 	withExtra := strings.Replace(goodPRReviewBotWorkflow,
-		"  pull-requests: write",
-		"  pull-requests: write\n  issues: write", 1)
+		"      pull-requests: write",
+		"      pull-requests: write\n      issues: write", 1)
 	root := writePRReviewBotWorkflow(t, withExtra)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -264,9 +332,9 @@ func TestPRReviewBotRejectsExtraPermissions(t *testing.T) {
 
 // @scenario "The review workflow grants exactly contents write and pull-requests write"
 func TestPRReviewBotUsesJobLevelPermissionsWhenPresent(t *testing.T) {
-	overridden := strings.Replace(goodPRReviewBotWorkflow,
-		"  review:\n    if:",
-		"  review:\n    permissions:\n      contents: read\n      pull-requests: write\n    if:", 1)
+	overridden := strings.Replace(goodPRReviewBotWorkflow, prWorkflowPermissionsBlock,
+		"permissions:\n  contents: write\n  pull-requests: write\n", 1)
+	overridden = strings.Replace(overridden, "      contents: write", "      contents: read", 1)
 	root := writePRReviewBotWorkflow(t, overridden)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -357,7 +425,7 @@ func TestPRReviewBotReportsAnExtraTriggerType(t *testing.T) {
 
 func TestPRReviewBotReportsAMissingConcurrencyGroup(t *testing.T) {
 	broken := strings.Replace(goodPRReviewBotWorkflow,
-		"\n  group: pr-review-bot-${{ github.event.pull_request.number }}", "", 1)
+		"\n  group: pr-${{ github.event.pull_request.number || github.ref }}", "", 1)
 	root := writePRReviewBotWorkflow(t, broken)
 
 	problems, err := ciguard.PRReviewBot(root)
