@@ -9,7 +9,6 @@ import {
   type TeamUserRole,
   CannotDisableSelfError,
   PersonalWorkspaceNotManagedHereError,
-  MemberSeatLimitReachedError,
 } from "@langwatch/organization-contract";
 
 import type {
@@ -137,7 +136,13 @@ export class OrganizationMemberRoleService {
     } else {
       const admitted = await this.dependencies.seats.withSeat({
         organizationId,
-        work: (lease) => this.enableUnderSeatLease({ organizationId, userId, actingUser, lease }),
+        work: (lease) =>
+          this.dependencies.memberSeats.enableUnderSeatLease({
+            organizationId,
+            userId,
+            actingUser,
+            lease,
+          }),
       });
       if (admitted) return;
     }
@@ -159,55 +164,9 @@ export class OrganizationMemberRoleService {
       });
     }
 
-    // Disabling is a plain column write, not a grant write, so nothing else
-    // retires the authorization snapshots cached for this organization. An
-    // admin who has just revoked someone's access must not have to wait for a
-    // cache to age out before it is true, and re-enabling must not leave the
-    // person locked out for the same window.
+    // A plain column write retires no cached authorization snapshot, so drop them here: a
+    // revoke takes effect now, and a re-enable does not lock the person out meanwhile.
     await this.dependencies.grantCache.invalidateOrganization({ organizationId });
-  }
-
-  /**
-   * Enables a member under the seat lease; answers true when they were waiting for a seat and
-   * were admitted, which is the whole enable. A waiting person needs a full seat, else they wait.
-   */
-  private async enableUnderSeatLease({
-    organizationId,
-    userId,
-    actingUser,
-    lease,
-  }: {
-    organizationId: string;
-    userId: string;
-    actingUser?: OrganizationPlanUser | null;
-    lease: SeatLease;
-  }): Promise<boolean> {
-    if (await this.dependencies.seatHolds.isWaiting({ organizationId, userId })) {
-      const admitted = await this.dependencies.memberSeats.admitWaitingMember({
-        organizationId,
-        userId,
-        actingUserId: actingUser?.id ?? null,
-        caller: { type: "system" },
-        lease,
-      });
-      if (admitted) return true;
-      const limit = await this.dependencies.seats.checkLimit({
-        organizationId,
-        resource: "members",
-        user: actingUser ?? undefined,
-      });
-      throw new MemberSeatLimitReachedError({
-        meta: { limitType: limit.limitType, current: limit.current, max: limit.max },
-      });
-    }
-    const seat = await this.dependencies.memberSeats.seatOnEnable({
-      organizationId,
-      userId,
-      actingUser: actingUser ?? undefined,
-    });
-    await lease.assertHeld();
-    await this.repo.setMemberDisabled({ organizationId, userId, disabled: false, seat });
-    return false;
   }
 
   /**
@@ -316,28 +275,43 @@ export class OrganizationMemberRoleService {
 
     return this.dependencies.seats.withSeat({
       organizationId,
-      work: async (lease) => {
-        const seat = await this.dependencies.memberSeats.seatOnRoleChange({
-          organizationId,
-          userId,
-          active: currentMember.disabledAt === null,
-          oldRole: currentMember.role,
+      work: (lease) =>
+        this.writeRoleChange({
+          change: { organizationId, userId, role, effectiveTeamRoleUpdates, currentUserId, caller },
+          currentMember,
           oldPermissions: userPermissions,
-          role,
           planUser: params.planUser,
-        });
-        await lease.assertHeld();
-        return this.repo.updateMemberRole({
-          organizationId,
-          userId,
-          role,
-          effectiveTeamRoleUpdates,
-          currentUserId,
-          caller,
-          seat,
-        });
-      },
+          lease,
+        }),
     });
+  }
+
+  /** The role change's seat and its write, under the seat lease the caller holds. */
+  private async writeRoleChange({
+    change,
+    currentMember,
+    oldPermissions,
+    planUser,
+    lease,
+  }: {
+    change: Parameters<OrganizationMembershipRepository["updateMemberRole"]>[0];
+    currentMember: { role: OrganizationUserRole; disabledAt: unknown };
+    oldPermissions: string[] | undefined;
+    planUser: OrganizationPlanUser | undefined;
+    lease: SeatLease;
+  }): Promise<UpdateMemberRoleResult> {
+    const { organizationId, userId, role } = change;
+    const seat = await this.dependencies.memberSeats.seatOnRoleChange({
+      organizationId,
+      userId,
+      active: currentMember.disabledAt === null,
+      oldRole: currentMember.role,
+      oldPermissions,
+      role,
+      planUser,
+    });
+    await lease.assertHeld();
+    return this.repo.updateMemberRole({ ...change, seat });
   }
 
   /**

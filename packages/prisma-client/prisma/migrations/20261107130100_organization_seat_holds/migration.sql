@@ -1,3 +1,5 @@
+-- IRREVERSIBLE: adds nullable columns to "OrganizationUser" and creates the "SeatHold" table.
+-- A rollback leaves them in place; dropping them is an operator step confirmed in Ops.
 -- Seat holds (specs/licensing/seat-rotation.feature): when a membership took its full seat,
 -- when admission left it waiting, and the seats still counted after a removal.
 ALTER TABLE "OrganizationUser" ADD COLUMN IF NOT EXISTS "fullSeatSince" TIMESTAMP(3),

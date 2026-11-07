@@ -62,6 +62,49 @@ export class OrganizationMemberSeatService {
   }
 
   /**
+   * Enables a member under the seat lease; answers true when they were waiting for a seat and
+   * were admitted, which is the whole enable. A waiting person needs a full seat, else they wait.
+   */
+  async enableUnderSeatLease({
+    organizationId,
+    userId,
+    actingUser,
+    lease,
+  }: {
+    organizationId: string;
+    userId: string;
+    actingUser?: OrganizationPlanUser | null;
+    lease: SeatLease;
+  }): Promise<boolean> {
+    if (await this.dependencies.seatHolds.isWaiting({ organizationId, userId })) {
+      const admitted = await this.admitWaitingMember({
+        organizationId,
+        userId,
+        actingUserId: actingUser?.id ?? null,
+        caller: { type: "system" },
+        lease,
+      });
+      if (admitted) return true;
+      const limit = await this.dependencies.seats.checkLimit({
+        organizationId,
+        resource: "members",
+        user: actingUser ?? undefined,
+      });
+      throw new MemberSeatLimitReachedError({
+        meta: { limitType: limit.limitType, current: limit.current, max: limit.max },
+      });
+    }
+    const seat = await this.seatOnEnable({
+      organizationId,
+      userId,
+      actingUser: actingUser ?? undefined,
+    });
+    await lease.assertHeld();
+    await this.repo.setMemberDisabled({ organizationId, userId, disabled: false, seat });
+    return false;
+  }
+
+  /**
    * The seat an enable takes, checked against the member's pool: a full member takes their hold
    * back or a free full seat, a Lite Member a free Lite seat, a Developer no capped seat.
    */
