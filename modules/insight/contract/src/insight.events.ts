@@ -46,9 +46,9 @@ export const insightFiledEventDataSchema: InsightFiledEventDataSchema =
 export type InsightFiledEventData = z.infer<typeof insightFiledEventDataSchema>;
 
 /**
- * A later run found the insight still true. Its words, tone, validity, window and source become
- * the run's; its id, title and owner stay. It names no reader, so nobody's seen, done or kept
- * state moves. `tone` came later: an event stored before it reads as null and keeps the tone.
+ * A later run found the insight still true: its words, tone, validity, window and source become
+ * the run's; id, title and owner stay; no reader's state moves. A null `tone` (stored before
+ * tones renewed) or `source` (a renewal with no conversation) keeps the insight's.
  */
 const insightRenewedEventDataSchemaDefinition = z.object({
   insightId: z.string().min(1),
@@ -57,7 +57,7 @@ const insightRenewedEventDataSchemaDefinition = z.object({
   validDays: z.number().int().positive(),
   /** The window the insight's query replays over from now on; null when it keeps no query. */
   replay: insightReplaySchema.nullable(),
-  source: insightSourceSchema,
+  source: insightSourceSchema.nullable(),
 });
 export interface InsightRenewedEventDataSchema extends Named<
   typeof insightRenewedEventDataSchemaDefinition

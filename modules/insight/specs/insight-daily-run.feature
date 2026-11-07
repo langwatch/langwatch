@@ -476,7 +476,7 @@ Feature: The daily insights run
     Scenario: A renewed insight keeps its id and reads as seen again
       Given a filed insight and a renewal of it by a later run
       When both events are folded
-      Then the row is the same insight with the renewal's body, tone, validity, window and source
+      Then the row is the same insight with the renewal's body, tone, validity, window and the source it names
       And it holds when it was renewed beside when it was filed
 
     @unit
@@ -484,6 +484,12 @@ Feature: The daily insights run
       Given a filed insight and a renewal of it stored without a tone
       When both events are folded
       Then the row keeps the tone it was filed with
+
+    @unit
+    Scenario: A renewal with no conversation keeps the insight's source
+      Given an insight that an earlier renewal gave a new source
+      When a renewal with no conversation is folded
+      Then the row keeps the source the earlier renewal gave it
 
     @unit
     Scenario: A late repeat of an older renewal changes nothing
