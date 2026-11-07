@@ -99,8 +99,6 @@ export function mapUsageToLimits(usage: UsageData, plan: PlanInfo): ResourceLimi
 
 export interface ResourceLimitsDisplayProps {
   limits: ResourceLimits;
-  /** When true, show "current / max" for member resources. Typically only for free plans. */
-  showLimits?: boolean;
   /** Override label for the messagesPerMonth resource (e.g. "Traces / month" for TIERED plans). */
   messagesLabel?: string;
   /** When true, show the Lite Members row. Only applies to SEAT_EVENT pricing model. */
@@ -115,7 +113,6 @@ export interface ResourceLimitsDisplayProps {
  */
 export function ResourceLimitsDisplay({
   limits,
-  showLimits = false,
   messagesLabel,
   showLiteMembers = false,
   leading,
@@ -128,17 +125,9 @@ export function ResourceLimitsDisplay({
     <StatTileGrid columns={visibleKeys.length + (leading ? 1 : 0)}>
       {leading}
       {visibleKeys.map((key) => {
-        const hideMax = !showLimits;
         const label =
           key === "messagesPerMonth" && messagesLabel ? messagesLabel : RESOURCE_LABELS[key];
-        return (
-          <ResourceLimitRow
-            key={key}
-            label={label}
-            current={limits[key].current}
-            max={hideMax ? undefined : limits[key].max}
-          />
-        );
+        return <ResourceLimitRow key={key} label={label} current={limits[key].current} />;
       })}
     </StatTileGrid>
   );
