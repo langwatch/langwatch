@@ -1,5 +1,5 @@
 import { StatTileGrid } from "@langwatch/design-system/stat-tile";
-import { LIMIT_TYPE_DISPLAY_LABELS, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
+import { LIMIT_TYPE_DISPLAY_LABELS } from "@langwatch/enterprise-licensing-contract";
 import type { UsageStats } from "@langwatch/entitlement-contract";
 import type { ReactNode } from "react";
 
@@ -39,20 +39,18 @@ const RESOURCE_ORDER: (keyof ResourceLimits)[] = [
   "messagesPerMonth",
 ] as const;
 
+/** Each resource's current use; the self-hosted page reads use, not limits. */
 export interface ResourceLimits {
-  members: { current: number; max: number };
-  membersLite: { current: number; max: number };
-  messagesPerMonth: { current: number; max: number };
+  members: { current: number };
+  membersLite: { current: number };
+  messagesPerMonth: { current: number };
 }
 
-/** Input type for license status data with plan and resource counts */
-interface LicenseStatusWithPlan {
+/** Input type for license status data with resource counts */
+interface LicenseStatusCounts {
   currentMembers: number;
-  maxMembers: number;
   currentMembersLite: number;
-  maxMembersLite: number;
   currentMessagesPerMonth: number;
-  maxMessagesPerMonth: number;
 }
 
 /** Input type for usage data from the limits.getUsage query */
@@ -61,39 +59,21 @@ type UsageData = Pick<
   "membersCount" | "membersLiteCount" | "currentMonthMessagesCount"
 >;
 
-/**
- * Maps license status data to ResourceLimits format.
- * Used when displaying limits for organizations with a valid license.
- */
-export function mapLicenseStatusToLimits(licenseData: LicenseStatusWithPlan): ResourceLimits {
+/** Maps a valid license's counts to ResourceLimits. */
+export function mapLicenseStatusToLimits(licenseData: LicenseStatusCounts): ResourceLimits {
   return {
-    members: {
-      current: licenseData.currentMembers,
-      max: licenseData.maxMembers,
-    },
-    membersLite: {
-      current: licenseData.currentMembersLite,
-      max: licenseData.maxMembersLite,
-    },
-    messagesPerMonth: {
-      current: licenseData.currentMessagesPerMonth,
-      max: licenseData.maxMessagesPerMonth,
-    },
+    members: { current: licenseData.currentMembers },
+    membersLite: { current: licenseData.currentMembersLite },
+    messagesPerMonth: { current: licenseData.currentMessagesPerMonth },
   };
 }
 
-/**
- * Maps usage data to ResourceLimits format using a plan's limits.
- * Used when displaying limits for organizations without a license (free tier).
- */
-export function mapUsageToLimits(usage: UsageData, plan: PlanInfo): ResourceLimits {
+/** Maps an unlicensed installation's usage counts to ResourceLimits. */
+export function mapUsageToLimits(usage: UsageData): ResourceLimits {
   return {
-    members: { current: usage.membersCount, max: plan.maxMembers },
-    membersLite: { current: usage.membersLiteCount, max: plan.maxMembersLite },
-    messagesPerMonth: {
-      current: usage.currentMonthMessagesCount ?? 0,
-      max: plan.maxMessagesPerMonth,
-    },
+    members: { current: usage.membersCount },
+    membersLite: { current: usage.membersLiteCount },
+    messagesPerMonth: { current: usage.currentMonthMessagesCount ?? 0 },
   };
 }
 

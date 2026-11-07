@@ -10,7 +10,6 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { StatTile, StatTileFigure, StatTileSkeleton } from "@langwatch/design-system/stat-tile";
-import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import type { UsageMonthBreakdown } from "@langwatch/entitlement-contract";
 import { ArrowRight } from "lucide-react";
 
@@ -331,7 +330,7 @@ export default function UsageScreen() {
           <ResourceLimitsTiles
             planLabel="Open source"
             chipLabel="Open source"
-            limits={mapUsageToLimits(usage.data, UNLIMITED_PLAN)}
+            limits={mapUsageToLimits(usage.data)}
             showLiteMembers={showLiteMembers}
             messagesLabel={messagesLabel}
           />

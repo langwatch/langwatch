@@ -24,9 +24,9 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 const limits = {
-  members: { current: 4, max: 100 },
-  membersLite: { current: 0, max: 50 },
-  messagesPerMonth: { current: 184, max: 10_000 },
+  members: { current: 4 },
+  membersLite: { current: 0 },
+  messagesPerMonth: { current: 184 },
 };
 
 afterEach(() => cleanup());
