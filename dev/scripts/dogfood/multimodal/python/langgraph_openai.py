@@ -8,23 +8,15 @@ model call becomes a span nested under the trace. The image goes in an
 `image_url` content block, the shape Chat Completions accepts.
 """
 
-import operator
-from typing import Annotated
-
 from _common import attachment, data_url, question, report, require
-from typing_extensions import TypedDict
 
 import langwatch
 from langchain.chat_models import init_chat_model
-from langchain.messages import AnyMessage, HumanMessage
+from langchain.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
-from langgraph.graph import END, START, StateGraph
+from langgraph.graph import END, START, MessagesState, StateGraph
 
 MODEL = "gpt-5-mini"
-
-
-class MessagesState(TypedDict):
-    messages: Annotated[list[AnyMessage], operator.add]
 
 
 model = init_chat_model(MODEL, temperature=0)
