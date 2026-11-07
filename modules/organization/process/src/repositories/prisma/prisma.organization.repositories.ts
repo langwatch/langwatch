@@ -27,7 +27,7 @@ export const PostgresOrganizationRepositories = {
     encryption: OrganizationSettingsCipher;
   }): Omit<
     OrganizationRepositories,
-    "inviteRateLimit" | "privateClickHouseRoutes" | "privateS3Accounts"
+    "inviteRateLimit" | "privateClickHouseRoutes" | "privateS3Accounts" | "departures"
   > => ({
     organization: PrismaOrganizationRepository.create({ database: prisma, cipher: encryption }),
     team: PrismaTeamRepository.create(prisma),

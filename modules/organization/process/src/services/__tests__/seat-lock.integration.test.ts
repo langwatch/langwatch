@@ -71,6 +71,10 @@ class DelayedCountSeatRepository extends OrganizationSeatRepository {
     return seats;
   }
 
+  findFullSeatHolderIds(organizationId: string): Promise<string[]> {
+    return this.inner.findFullSeatHolderIds(organizationId);
+  }
+
   withSeatLock<T>(input: {
     organizationId: string;
     work: (lease: SeatLease) => Promise<T>;

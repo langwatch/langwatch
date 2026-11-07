@@ -4,6 +4,7 @@ import type { PersonalTeamScopeReader } from "../features/personal-workspace/ser
 import type { OrganizationScopeGraphReader } from "../services/organization-scope-graph.service.ts";
 import type { GroupRepository } from "./group.repository.ts";
 import type { OrganizationAccessNoticeRepository } from "./organization-access-notice.repository.ts";
+import type { OrganizationDeparturesRepository } from "./organization-departures.repository.ts";
 import type { OrganizationInviteRateLimitRepository } from "./organization-invite-rate-limit.repository.ts";
 import type { OrganizationInviteRepository } from "./organization-invite.repository.ts";
 import type { OrganizationMembershipRepository } from "./organization-membership.repository.ts";
@@ -38,6 +39,8 @@ export interface OrganizationRepositories {
   readonly invite: OrganizationInviteRepository;
   /** The full, lite and Developer seats an organization holds, as licence and plan count them. */
   readonly seats: OrganizationSeatRepository;
+  /** The people removed or disabled, read from the organization's member facts. */
+  readonly departures: OrganizationDeparturesRepository;
   /** The organization's own reads of the people table. */
   readonly userDirectory: OrganizationUserDirectoryRepository;
   /** The private ClickHouse routes and S3 accounts this deployment names, by variable. */

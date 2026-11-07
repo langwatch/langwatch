@@ -10,6 +10,8 @@ export interface AdminTableProps {
   onSearchChange: (value: string) => void;
   searchPlaceholder?: string;
   pagination?: PaginationState;
+  /** What the pager counts, when the title is not a plural noun; the title by default. */
+  unitLabel?: string;
   isLoading?: boolean;
   isFetching?: boolean;
   error?: unknown;
@@ -29,6 +31,7 @@ export function AdminTable({
   onSearchChange,
   searchPlaceholder = "Search",
   pagination,
+  unitLabel,
   isLoading,
   isFetching,
   error,
@@ -65,7 +68,7 @@ export function AdminTable({
               pageSize: pagination.perPage,
               totalCount: pagination.total,
               onPageChange: pagination.onPageChange,
-              unitLabel: title.toLowerCase(),
+              unitLabel: unitLabel ?? title.toLowerCase(),
             }
           : void 0
       }

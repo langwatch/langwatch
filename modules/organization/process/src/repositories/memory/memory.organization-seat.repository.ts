@@ -159,6 +159,10 @@ export class MemoryOrganizationSeatRepository extends OrganizationSeatRepository
     };
   }
 
+  async findFullSeatHolderIds(organizationId: string): Promise<string[]> {
+    return this.#members(organizationId, isFullMember).map((member) => member.userId);
+  }
+
   #permissionsOf(organizationId: string): PermissionsOf {
     return (customRoleId) => {
       const role = customRoleId ? this.memory.customRoles.get(customRoleId) : undefined;

@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:256`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:262`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -956,6 +956,14 @@ The seats an organization holds: full and lite members, live invitations include
 
 ```typescript
 countMemberSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationMemberSeats>;
+```
+
+#### `findSeatOccupantsSince`
+
+The people who held a seat since `since`: today's full-seat members, and everyone removed or disabled since then. Read by the Ops seat sharing check.
+
+```typescript
+findSeatOccupantsSince(input: Readonly<{ organizationId: string; since: number }>): Promise<OrganizationSeatOccupants>;
 ```
 
 #### `checkLimit`
@@ -2449,26 +2457,26 @@ Declared at `src/eventing/organization-audit.pipeline.ts:46`. Events: `organizat
 
 ### Pipeline `organization_lifecycle` (aggregate `organization`)
 
-Declared at `src/eventing/organization-lifecycle.pipeline.ts:116`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `personalTeamCreatedEventSchema`, `personalWorkspaceArchivedEventSchema`, `personalWorkspaceRevivedEventSchema`, `personalWorkspaceFeaturesChangedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`, `organizationMemberDisabledEventSchema`, `organizationMemberEnabledEventSchema`, `organizationMemberRemovedEventSchema`, `organizationMemberDepartmentChangedEventSchema`, `organizationCreatedEventSchema`.
+Declared at `src/eventing/organization-lifecycle.pipeline.ts:118`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `personalTeamCreatedEventSchema`, `personalWorkspaceArchivedEventSchema`, `personalWorkspaceRevivedEventSchema`, `personalWorkspaceFeaturesChangedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`, `organizationMemberDisabledEventSchema`, `organizationMemberEnabledEventSchema`, `organizationMemberRemovedEventSchema`, `organizationMemberDepartmentChangedEventSchema`, `organizationCreatedEventSchema`.
 
 | Kind    | Name                                     | Handles | Declared at                                           |
 | ------- | ---------------------------------------- | ------- | ----------------------------------------------------- |
-| command | `recordSignedUp`                         | –       | `src/eventing/organization-lifecycle.pipeline.ts:138` |
-| command | `recordMembersInvited`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:139` |
-| command | `recordInviteAccepted`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:140` |
-| command | `recordIntegrationMethodChosen`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:141` |
-| command | `recordPersonalWorkspaceProvisioned`     | –       | `src/eventing/organization-lifecycle.pipeline.ts:142` |
-| command | `recordPersonalTeamCreated`              | –       | `src/eventing/organization-lifecycle.pipeline.ts:143` |
-| command | `recordPersonalWorkspaceArchived`        | –       | `src/eventing/organization-lifecycle.pipeline.ts:144` |
-| command | `recordPersonalWorkspaceRevived`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:145` |
-| command | `recordPersonalWorkspaceFeaturesChanged` | –       | `src/eventing/organization-lifecycle.pipeline.ts:146` |
-| command | `recordPresenceSettingChanged`           | –       | `src/eventing/organization-lifecycle.pipeline.ts:150` |
-| command | `recordTraceSharingDisabled`             | –       | `src/eventing/organization-lifecycle.pipeline.ts:151` |
-| command | `recordMemberDisabled`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:152` |
-| command | `recordMemberEnabled`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:153` |
-| command | `recordMemberRemoved`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:154` |
-| command | `recordMemberDepartmentChanged`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:155` |
-| command | `recordCreated`                          | –       | `src/eventing/organization-lifecycle.pipeline.ts:156` |
+| command | `recordSignedUp`                         | –       | `src/eventing/organization-lifecycle.pipeline.ts:140` |
+| command | `recordMembersInvited`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:141` |
+| command | `recordInviteAccepted`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:142` |
+| command | `recordIntegrationMethodChosen`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:143` |
+| command | `recordPersonalWorkspaceProvisioned`     | –       | `src/eventing/organization-lifecycle.pipeline.ts:144` |
+| command | `recordPersonalTeamCreated`              | –       | `src/eventing/organization-lifecycle.pipeline.ts:145` |
+| command | `recordPersonalWorkspaceArchived`        | –       | `src/eventing/organization-lifecycle.pipeline.ts:146` |
+| command | `recordPersonalWorkspaceRevived`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:147` |
+| command | `recordPersonalWorkspaceFeaturesChanged` | –       | `src/eventing/organization-lifecycle.pipeline.ts:148` |
+| command | `recordPresenceSettingChanged`           | –       | `src/eventing/organization-lifecycle.pipeline.ts:152` |
+| command | `recordTraceSharingDisabled`             | –       | `src/eventing/organization-lifecycle.pipeline.ts:153` |
+| command | `recordMemberDisabled`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:154` |
+| command | `recordMemberEnabled`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:155` |
+| command | `recordMemberRemoved`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:156` |
+| command | `recordMemberDepartmentChanged`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:157` |
+| command | `recordCreated`                          | –       | `src/eventing/organization-lifecycle.pipeline.ts:158` |
 
 ### Pipeline `organization_private_dataplane_recorder` (aggregate `global`)
 
@@ -2498,7 +2506,7 @@ Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedE
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:320`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:324`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:18` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:19` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:20` |

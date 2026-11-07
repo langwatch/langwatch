@@ -1,4 +1,4 @@
-import { countMemberSeats } from "@langwatch/entitlement-contract";
+import { countMemberSeats, isFullMember } from "@langwatch/entitlement-contract";
 import {
   type OrganizationMemberSeats,
   SeatChangeBusyError,
@@ -204,6 +204,13 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
       ],
       holds,
     );
+  }
+
+  async findFullSeatHolderIds(organizationId: string): Promise<string[]> {
+    const context = await this.getMemberClassificationContext(organizationId);
+    return context.users
+      .filter((user) => isFullMember(user.role, context.userPermissionsMap.get(user.userId)))
+      .map((user) => user.userId);
   }
 
   /**

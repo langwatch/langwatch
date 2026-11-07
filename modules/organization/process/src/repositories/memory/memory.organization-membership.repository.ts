@@ -56,6 +56,7 @@ import type {
   WaitingMember,
 } from "../organization-membership.repository.ts";
 import type { SeatHold, SeatTransition } from "../seat-hold.repository.ts";
+import { MemoryOrganizationSeatRepository } from "./memory.organization-seat.repository.ts";
 import {
   organizationOfRow,
   type MemoryAuditLogRow,
@@ -731,6 +732,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     const row = this.membershipRow({ organizationId, userId });
     if (!row) throw new MemberNotFoundError(userId);
     await this.assertRemovalKeepsAnActiveAdmin({ organizationId, member: row });
+    const heldFullSeat = await this.holdsFullSeat({ organizationId, userId });
     if (input.seatHold) this.putSeatHold(input.seatHold);
 
     this.memory.organizationUsers.splice(
@@ -754,6 +756,12 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     }
 
     const archivedAt = nowInstant();
+    this.memory.memberDepartures.push({
+      organizationId,
+      userId,
+      occurredAt: archivedAt,
+      heldFullSeat,
+    });
     const archivedTeamIds: string[] = [];
     for (const team of this.teamsOf(organizationId)) {
       if (team.ownerUserId !== userId || !team.isPersonal || team.archivedAt) continue;
@@ -761,6 +769,18 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       archivedTeamIds.push(team.id);
     }
     return archivedTeamIds;
+  }
+
+  /** Classified as the seat twin classifies it, read before the removal or disable. */
+  private async holdsFullSeat({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const seats = MemoryOrganizationSeatRepository.create({ memory: this.memory });
+    return (await seats.findFullSeatHolderIds(organizationId)).includes(userId);
   }
 
   async findUnfinishedSeatAdmissions({
@@ -804,10 +824,21 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       const activeAdmins = this.activeAdminCount(input.organizationId);
       if (isLastAdmin({ adminCount: activeAdmins })) throw new CannotDisableLastAdminError();
     }
+    const heldFullSeat = input.disabled
+      ? await this.holdsFullSeat({ organizationId: input.organizationId, userId: input.userId })
+      : false;
     row.disabledAt = input.disabled ? nowInstant() : null;
     if (!input.disabled) row.seatPendingSince = null;
     this.applySeatTransition({ row, seat: input.seat });
     row.updatedAt = nowInstant();
+    if (row.disabledAt) {
+      this.memory.memberDepartures.push({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        occurredAt: row.disabledAt,
+        heldFullSeat,
+      });
+    }
   }
 
   async findPersonalTeamsInScopes(params: {

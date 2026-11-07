@@ -474,6 +474,14 @@ The same figure for one organization, counted over the members the caller names.
 countUsageForMembers(input: { memberUserIds: readonly string[]; at: number; }): Promise<AuthUsageCount>;
 ```
 
+#### `findSessionUsersSince`
+
+Which of these people used a browser session at or after `since` (epoch ms).
+
+```typescript
+findSessionUsersSince(input: { userIds: readonly string[]; since: number; }): Promise<readonly string[]>;
+```
+
 ## REST transport
 
 ### `authCliDeviceFlowRest`

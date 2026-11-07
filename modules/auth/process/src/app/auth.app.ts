@@ -1024,6 +1024,13 @@ export class AuthModule implements AuthApiContract {
     };
   }
 
+  findSessionUsersSince(input: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<readonly string[]> {
+    return this.#sessions.findSessionUsersSince(input);
+  }
+
   listBrowserSessions(input: {
     userId: string;
     currentSessionId?: string | undefined;

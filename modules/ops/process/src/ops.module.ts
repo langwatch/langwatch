@@ -15,6 +15,7 @@ import { anomalyDetectionEventing } from "#eventing/ops-anomaly-detection.pipeli
 import { groupQueueReaperEventing } from "#eventing/ops-group-queue-reaper.pipeline";
 import { platformOperatorSeedEventing } from "#eventing/ops-platform-operator-seed.pipeline";
 import { projectionReplayEventing } from "#eventing/ops-projection-replay.pipeline";
+import { seatSharingEventing } from "#eventing/ops-seat-sharing.pipeline";
 import { storageStatsEventing } from "#eventing/ops-storage-stats.pipeline";
 import { systemMigrationsEventing } from "#eventing/ops-system-migrations.pipeline";
 import { usageReportEventing } from "#eventing/ops-usage-report.pipeline";
@@ -72,6 +73,7 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
     .withEventing(usageReportEventing)
     .withEventing(anomalyDetectionEventing)
     .withEventing(storageStatsEventing)
+    .withEventing(seatSharingEventing)
     .withEventing(groupQueueReaperEventing)
     .withEventing(upgradeAlertsEventing)
     .withEventing(projectionReplayEventing)

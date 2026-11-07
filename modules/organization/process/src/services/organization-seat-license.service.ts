@@ -53,6 +53,9 @@ export interface OrganizationSeatLicense {
     user?: OrganizationPlanUser | undefined;
   }): Promise<OrganizationSeatDecision>;
 
+  /** Whether the member holds a full seat now; asked before a removal or a disable. */
+  holdsFullSeat(input: { organizationId: string; userId: string }): Promise<boolean>;
+
   /**
    * Refuses a role change the organization's seats do not carry. Throws, never a soft answer.
    * The custom-role plan is declared on the door.
@@ -105,6 +108,17 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
 
     const { current, free } = await this.seatsFor({ plan, ...input });
     return { allowed: free, limitType: input.resource, current, max };
+  }
+
+  async holdsFullSeat({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const holders = await this.options.memberships.findFullSeatHolderIds(organizationId);
+    return holders.includes(userId);
   }
 
   async assertRoleChangeAllowed(input: {

@@ -23,6 +23,7 @@ import { withSeatHolds } from "./support/seat-holds.ts";
 const mockInvalidateOrganization = vi.fn();
 const mockCheckLimit = vi.fn();
 const mockAssertRoleChangeAllowed = vi.fn();
+const mockHoldsFullSeat = vi.fn(async () => true);
 const mockMemberDisabled = vi.fn();
 const mockMemberEnabled = vi.fn();
 const mockCreateAndAssign = vi.fn();
@@ -92,6 +93,7 @@ describe("OrganizationMembershipService", () => {
   const seats: OrganizationSeatLicense = {
     checkLimit: mockCheckLimit,
     assertRoleChangeAllowed: mockAssertRoleChangeAllowed,
+    holdsFullSeat: mockHoldsFullSeat,
     withSeat: ({ work }) => work({ assertHeld: async () => {} }),
   };
   const seatNotices: OrganizationSeatRevocationNotice = {
@@ -791,6 +793,7 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           userId: "user-456",
           disabledByUserId: "admin-789",
+          heldFullSeat: true,
         });
       });
 

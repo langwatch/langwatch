@@ -50,6 +50,7 @@ const recordingGrantsWriter = createApiFixture<AuthzGrantsService>({
 const seats: OrganizationSeatLicense = {
   checkLimit: vi.fn(),
   assertRoleChangeAllowed: vi.fn(),
+  holdsFullSeat: vi.fn(async () => true),
   withSeat: ({ work }) => work({ assertHeld: async () => {} }),
 };
 const seatNotices: OrganizationSeatRevocationNotice = {

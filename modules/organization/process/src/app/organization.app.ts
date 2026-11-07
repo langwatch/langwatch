@@ -106,6 +106,7 @@ import {
   type OrganizationInvitedMemberIds,
   type OrganizationFounding,
   type OrganizationMemberSeats,
+  type OrganizationSeatOccupants,
   type OrganizationApiRemoveMemberInput,
   type OrganizationHeldSeats,
   type OrganizationMemberRemoved,
@@ -197,6 +198,7 @@ import type {
   OrganizationSeatLicense,
   OrganizationPlanUser,
 } from "../services/organization-seat-license.service.ts";
+import { OrganizationSeatOccupancyService } from "../services/organization-seat-occupancy.service.ts";
 import { OrganizationSignInPolicyService } from "../services/organization-sign-in-policy.service.ts";
 import { OrganizationSignalsService } from "../services/organization-signals.service.ts";
 import type { OrganizationSignals } from "../services/organization-signals.service.ts";
@@ -256,6 +258,8 @@ type OrganizationInfrastructure = Readonly<{
   seats: OrganizationSeatLicense;
   /** The full and lite seats an organization holds, as a licence and a plan count them. */
   seatCounts: OrganizationSeatRepository;
+  /** Who held a seat in a window, for the Ops seat sharing check. */
+  seatOccupancy: OrganizationSeatOccupancyService;
   /** The 30-day seat holds (seat-rotation.feature), shared by admission, invites and removal. */
   seatHolds: SeatHoldService;
   seatLease: OrganizationSeatLeaseService;
@@ -485,6 +489,10 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         notices: seatLimits,
       }),
       seatCounts,
+      seatOccupancy: OrganizationSeatOccupancyService.create({
+        seats: seatCounts,
+        departures: setup.repositories.departures,
+      }),
       seatHolds,
       seatLease: OrganizationSeatLeaseService.create(seatCounts),
       invitations: OrganizationInvitationsService.create({
@@ -1741,6 +1749,12 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#invitationDoor.cancelPaymentPending(input);
   }
 
+  findSeatOccupantsSince(
+    input: Readonly<{ organizationId: string; since: number }>,
+  ): Promise<OrganizationSeatOccupants> {
+    return this.#infrastructure.seatOccupancy.findSince(input);
+  }
+
   async countMemberSeats(
     input: Readonly<{ organizationId: string }>,
   ): Promise<OrganizationMemberSeats> {
@@ -1770,6 +1784,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     userId: string;
     offboardedByUserId: string | null;
     occurredAt: number;
+    heldFullSeat?: boolean;
   }): Promise<void> {
     await this.getWithAdministrators({ organizationId: input.organizationId });
     await this.#infrastructure.lifecycle.memberRemoved({
@@ -1777,6 +1792,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       userId: input.userId,
       removedByUserId: input.offboardedByUserId,
       occurredAt: input.occurredAt,
+      heldFullSeat: input.heldFullSeat,
     });
   }
 
@@ -1785,6 +1801,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     organizationId: string;
     userId: string;
     occurredAt: number;
+    heldFullSeat?: boolean;
   }): Promise<void> {
     await this.getWithAdministrators({ organizationId: input.organizationId });
     await this.#infrastructure.lifecycle.memberRemoved({
@@ -1792,6 +1809,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       userId: input.userId,
       removedByUserId: null,
       occurredAt: input.occurredAt,
+      heldFullSeat: input.heldFullSeat,
     });
   }
 

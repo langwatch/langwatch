@@ -33,6 +33,7 @@ export interface OrganizationMemberChangeNotice {
     organizationId: string;
     userId: string;
     removedByUserId: string | null;
+    heldFullSeat?: boolean;
   }): Promise<void>;
   memberDepartmentChanged(input: {
     organizationId: string;
@@ -47,7 +48,7 @@ export class OrganizationMemberAdmissionService {
     repository: OrganizationMembershipRepository;
     admissions: OrganizationAdmissions;
     /** The licence's seats, asked before a full seat (seat-limit-at-provisioning.feature). */
-    seats: Pick<OrganizationSeatLicense, "checkLimit" | "withSeat">;
+    seats: Pick<OrganizationSeatLicense, "checkLimit" | "holdsFullSeat" | "withSeat">;
     workspaceNotices: PersonalWorkspaceArchiveNotice;
     memberNotices: OrganizationMemberChangeNotice;
     seatHolds: SeatHoldService;
@@ -60,7 +61,7 @@ export class OrganizationMemberAdmissionService {
       repository: OrganizationMembershipRepository;
       admissions: OrganizationAdmissions;
       /** The licence's seats, asked before a full seat (seat-limit-at-provisioning.feature). */
-      seats: Pick<OrganizationSeatLicense, "checkLimit" | "withSeat">;
+      seats: Pick<OrganizationSeatLicense, "checkLimit" | "holdsFullSeat" | "withSeat">;
       workspaceNotices: PersonalWorkspaceArchiveNotice;
       memberNotices: OrganizationMemberChangeNotice;
       /** The 30-day seat hold a removal leaves and a return takes back (seat-rotation.feature). */
@@ -88,6 +89,10 @@ export class OrganizationMemberAdmissionService {
       organizationId: params.organizationId,
       userId: params.userId,
     });
+    const heldFullSeat = await this.dependencies.seats.holdsFullSeat({
+      organizationId: params.organizationId,
+      userId: params.userId,
+    });
 
     const release = await this.dependencies.seatHolds.releaseOf({
       organizationId: params.organizationId,
@@ -104,6 +109,7 @@ export class OrganizationMemberAdmissionService {
       organizationId: params.organizationId,
       userId: params.userId,
       removedByUserId: params.actingUserId ?? null,
+      heldFullSeat,
     });
     if (teamIds.length === 0) return;
     await this.dependencies.workspaceNotices.personalWorkspaceArchived({
