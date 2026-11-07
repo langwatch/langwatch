@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.1](https://github.com/langwatch/langwatch/compare/clickhouse-serverless@v0.4.0...clickhouse-serverless@v0.4.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **helm:** bump chart images for CVE fixes (postgres, redis, curl, prometheus, alpine/k8s) ([#9208](https://github.com/langwatch/langwatch/issues/9208)) ([ad7c623](https://github.com/langwatch/langwatch/commit/ad7c623567ba6fa783fa317e353da28941dc6f5d))
+* **self-hosting:** autogen-off and Argo CD installs, gateway ingress, PDBs, activation codes in the license variable, SSO without restart ([#8399](https://github.com/langwatch/langwatch/issues/8399)) ([0a300c1](https://github.com/langwatch/langwatch/commit/0a300c1dab1cbd2f3c1ba909542a136751ec1e3c))
+
+
+### Code Refactoring
+
+* **architecture:** introduce domain driven separation across the entire monorepo ([#7536](https://github.com/langwatch/langwatch/issues/7536)) ([47d3882](https://github.com/langwatch/langwatch/commit/47d388239a9827aa4f01dd366260ff1263f793c5))
+
 ## [0.4.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless@v0.3.0...clickhouse-serverless@v0.4.0) (2026-09-12)
 
 
