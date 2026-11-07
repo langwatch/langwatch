@@ -106,6 +106,10 @@ import {
   type OrganizationInvitedMemberIds,
   type OrganizationFounding,
   type OrganizationMemberSeats,
+  type OrganizationApiRemoveMemberInput,
+  type OrganizationHeldSeats,
+  type OrganizationMemberRemoved,
+  type OrganizationSeatRemovalPreview,
   type LimitCheckResult,
   type LimitType,
   type ScopeGraphOrganization,
@@ -133,7 +137,7 @@ import type { FeatureSetup } from "@langwatch/process";
 import { projectKindsHiddenFrom } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
-import { nowInstant, type Instant } from "@langwatch/time";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import type { OrganizationChannels } from "../channels/organization.channels.ts";
 import type { RecordAuditCommandData } from "../eventing/organization-audit.commands.ts";
@@ -200,6 +204,7 @@ import { OrganizationVisibilityService } from "../services/organization-visibili
 import type { OrganizationDemoProject } from "../services/organization-visibility.service.ts";
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
 import { PrivateDataplaneRecordService } from "../services/private-dataplane-record.service.ts";
+import { type SeatHoldCheckOutcome, SeatHoldService } from "../services/seat-hold.service.ts";
 import { SeatLimitNoticeService } from "../services/seat-limit-notice.service.ts";
 import { SeatRequestService } from "../services/seat-request.service.ts";
 import { SignUpPolicyService } from "../services/sign-up-policy.service.ts";
@@ -251,6 +256,8 @@ type OrganizationInfrastructure = Readonly<{
   seats: OrganizationSeatLicense;
   /** The full and lite seats an organization holds, as a licence and a plan count them. */
   seatCounts: OrganizationSeatRepository;
+  /** The 30-day seat holds (seat-rotation.feature), shared by admission, invites and removal. */
+  seatHolds: SeatHoldService;
   seatLease: OrganizationSeatLeaseService;
   /** The invitations this deployment administers. */
   invitations: OrganizationInvitations;
@@ -339,6 +346,8 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     const membershipRepository = setup.repositories.membership(setup.dependencies.permissions);
     const membership = OrganizationMembershipService.create({
       repository: membershipRepository,
+      seatHolds: infrastructure.seatHolds,
+      seatRequests: setup.repositories.seatRequests,
       creations: infrastructure.lifecycle,
       workspaceNotices: infrastructure.lifecycle,
       memberNotices: infrastructure.lifecycle,
@@ -449,10 +458,14 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     const signals = OrganizationSignalsService.create({ logger, signupAnnouncements });
     const seatLimits = SeatLimitNoticeService.create({ signals });
     const invites = setup.repositories.invite;
+    const seatHolds = SeatHoldService.create({
+      memberships: setup.repositories.membership(dependencies.permissions),
+      holds: setup.repositories.seatHolds,
+    });
     const throttle = InviteSendThrottleService.create(setup.repositories.inviteRateLimit);
     const inviteService = InviteService.create({
       invites,
-      seats: InviteSeatCensusService.create(seatCounts),
+      seats: InviteSeatCensusService.create(seatCounts, seatHolds),
       plans: dependencies.entitlement,
       grants: dependencies.permissions,
       roles: dependencies.roles,
@@ -472,6 +485,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         notices: seatLimits,
       }),
       seatCounts,
+      seatHolds,
       seatLease: OrganizationSeatLeaseService.create(seatCounts),
       invitations: OrganizationInvitationsService.create({
         invites: inviteService,
@@ -564,6 +578,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         pricing: (input) => organizations.getPricing(input),
         organizationName,
         billingMembers: (input) => dependencies.permissions.listBillingMembers(input),
+        hasOpenInvite: (input) => setup.repositories.invite.hasOpenInviteForEmail(input),
         inviteMember: async ({ organizationId, email, invitedBy }) => {
           await application.createInvitations(
             { organizationId, validation: "strict", invites: [{ email, role: "MEMBER" }] },
@@ -676,13 +691,85 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.membership.deleteMember({ ...input, actingUserId: by?.id ?? null });
   }
 
+  async removeMember(
+    input: OrganizationApiRemoveMemberInput,
+    by: OrganizationCaller,
+  ): Promise<OrganizationMemberRemoved> {
+    const { seatGivenToUserId, seatHandoverFailed } =
+      await this.#dependencies.membership.removeMember({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        actingUserId: by.id,
+        giveSeatToUserId: input.giveSeatToUserId ?? null,
+        caller: this.#grantCaller(by),
+      });
+    return { success: true, seatGivenToUserId, seatHandoverFailed };
+  }
+
+  async getSeatRemovalPreview(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<OrganizationSeatRemovalPreview> {
+    const preview = await this.#infrastructure.seatHolds.removalPreview(input);
+    return {
+      holdsFullSeat: preview.holdsFullSeat,
+      seatFreesAt: preview.seatFreesAt ? toDate(preview.seatFreesAt) : null,
+      waiting: preview.waiting
+        ? {
+            userId: preview.waiting.userId,
+            name: preview.waiting.name,
+            email: preview.waiting.email,
+          }
+        : null,
+    };
+  }
+
+  async listHeldSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationHeldSeats> {
+    const holds = await this.#infrastructure.seatHolds.findHeld(input);
+    return {
+      heldSeats: holds.map((hold) => ({
+        userId: hold.userId,
+        name: hold.name,
+        email: hold.email,
+        seatTakenAt: toDate(hold.seatTakenAt),
+        seatFreesAt: toDate(hold.heldUntil),
+        reason: hold.reason,
+      })),
+    };
+  }
+
+  holdSeatOfDepartingMember(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<void> {
+    return this.#infrastructure.seatHolds.holdSeatOfDepartingMember(input);
+  }
+
+  async takeBackHeldSeat(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<void> {
+    await this.#infrastructure.seatHolds.takeBackHeldSeat(input);
+  }
+
+  openSeatRequestForAdmission(
+    input: Readonly<{ organizationId: string; userId: string; admission: OrganizationAdmission }>,
+  ): Promise<void> {
+    return this.#seatRequests.openForAdmission({ ...input, requestedSeat: "MEMBER" });
+  }
+
+  /**
+   * The hourly seat hold check (seat-rotation.feature): ended holds go, and the people waiting
+   * longest take the seats that freed. Answers who it admitted and which organizations failed.
+   */
+  runSeatHoldCheck(): Promise<SeatHoldCheckOutcome> {
+    return this.#dependencies.membership.runSeatHoldCheck();
+  }
+
   acquireSeatLease(
     input: Readonly<{ organizationId: string }>,
   ): Promise<Readonly<{ holder: string; renewEveryMs: number }>> {
     return this.#infrastructure.seatLease.acquire(input);
   }
 
-  renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void> {
+  renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<boolean> {
     return this.#infrastructure.seatLease.renew(input);
   }
 
@@ -1657,12 +1744,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   async countMemberSeats(
     input: Readonly<{ organizationId: string }>,
   ): Promise<OrganizationMemberSeats> {
-    const [fullMembers, liteMembers, developers] = await Promise.all([
-      this.#infrastructure.seatCounts.getMemberCount(input.organizationId),
-      this.#infrastructure.seatCounts.getMembersLiteCount(input.organizationId),
-      this.#infrastructure.seatCounts.getMembersDeveloperCount(input.organizationId),
-    ]);
-    return { fullMembers, liteMembers, developers };
+    return this.#infrastructure.seatCounts.countMemberSeats(input.organizationId);
   }
 
   /** organization_seat_limit: organization records the fact, billing subscribes (§9). */
@@ -1821,10 +1903,11 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     // Custom roles too: the member's seat, read by the write, must not move under it.
     await this.#infrastructure.seats.withSeat({
       organizationId,
-      work: async () => {
+      work: async (lease) => {
         if (!isOrganizationApiCustomRole(input.role)) {
           await this.#assertBuiltInTeamRoleAllowed({ organizationId, input });
         }
+        await lease.assertHeld();
         await this.updateTeamMemberRole(input, by);
       },
     });

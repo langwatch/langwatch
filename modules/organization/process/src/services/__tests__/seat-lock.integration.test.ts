@@ -20,18 +20,23 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { OrganizationSeatRepository } from "../../repositories/organization-seat.repository.ts";
+import {
+  OrganizationSeatRepository,
+  type SeatLease,
+} from "../../repositories/organization-seat.repository.ts";
 import type { OrganizationSettingsCipher } from "../../repositories/organization.repository.ts";
 import { PrismaOrganizationMembershipRepository } from "../../repositories/prisma/prisma.organization-membership.repository.ts";
 import { PrismaOrganizationSeatRepository } from "../../repositories/prisma/prisma.organization-seat.repository.ts";
+import { PrismaSeatHoldRepository } from "../../repositories/prisma/prisma.seat-hold.repository.ts";
 import { PrismaSeatRequestRepository } from "../../repositories/prisma/prisma.seat-request.repository.ts";
 import type { OrganizationAccessNoticeService } from "../organization-access-notice.service.ts";
 import { OrganizationMemberAdmissionService } from "../organization-member-admission.service.ts";
-import { OrganizationMemberRoleService } from "../organization-member-role.service.ts";
+import { OrganizationMembershipService } from "../organization-membership.service.ts";
 import { OrganizationSeatLeaseService } from "../organization-seat-lease.service.ts";
 import { OrganizationSeatLicenseService } from "../organization-seat-license.service.ts";
 import { SeatLimitNoticeService } from "../seat-limit-notice.service.ts";
 import { SeatRequestService, type SeatRequestPeers } from "../seat-request.service.ts";
+import { withSeatHolds } from "./support/seat-holds.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -66,7 +71,10 @@ class DelayedCountSeatRepository extends OrganizationSeatRepository {
     return seats;
   }
 
-  withSeatLock<T>(input: { organizationId: string; work: () => Promise<T> }): Promise<T> {
+  withSeatLock<T>(input: {
+    organizationId: string;
+    work: (lease: SeatLease) => Promise<T>;
+  }): Promise<T> {
     return this.inner.withSeatLock(input);
   }
 
@@ -74,7 +82,7 @@ class DelayedCountSeatRepository extends OrganizationSeatRepository {
     return this.inner.acquireSeatLease(input);
   }
 
-  renewSeatLease(input: { organizationId: string; holder: string }): Promise<void> {
+  renewSeatLease(input: { organizationId: string; holder: string }): Promise<boolean> {
     return this.inner.renewSeatLease(input);
   }
 
@@ -183,12 +191,22 @@ describe.skipIf(!DB_URL)("two seat-taking writes for the last free full seat", (
 
     /** @scenario "Two approvals for the last free full seat at once: exactly one wins" */
     it("enables exactly one, refuses the other with member_seat_limit_reached and keeps it open", async () => {
-      const roles = OrganizationMemberRoleService.create({
-        repository: members,
+      type Dependencies = Parameters<typeof OrganizationMembershipService.create>[0];
+      const roles = OrganizationMembershipService.create({
+        ...withSeatHolds({
+          repository: members,
+          holds: PrismaSeatHoldRepository.create(prisma),
+          seatRequests: requests,
+        }),
         seats,
         seatNotices: { memberDisabled: async () => {}, memberEnabled: async () => {} },
         grantCache: { invalidateOrganization: async () => {} },
         ceiling: { assertWithinCaller: async () => {} },
+        creations: createApiFixture<Dependencies["creations"]>({}),
+        testArrivals: createApiFixture<Dependencies["testArrivals"]>({}),
+        admissions: createApiFixture<Dependencies["admissions"]>({}),
+        workspaceNotices: createApiFixture<Dependencies["workspaceNotices"]>({}),
+        memberNotices: createApiFixture<Dependencies["memberNotices"]>({}),
       });
       const service = SeatRequestService.create({
         requests,
@@ -240,11 +258,11 @@ describe.skipIf(!DB_URL)("two seat-taking writes for the last free full seat", (
       type Dependencies = Parameters<typeof OrganizationMemberAdmissionService.create>[0];
       // An arrival with no admitting actor writes only its membership row.
       const admission = OrganizationMemberAdmissionService.create({
-        repository: members,
         admissions: createApiFixture<Dependencies["admissions"]>({}),
         seats,
         workspaceNotices: createApiFixture<Dependencies["workspaceNotices"]>({}),
         memberNotices: createApiFixture<Dependencies["memberNotices"]>({}),
+        ...withSeatHolds({ repository: members, holds: PrismaSeatHoldRepository.create(prisma) }),
       });
 
       const admitted = await Promise.all(
@@ -305,14 +323,46 @@ describe.skipIf(!DB_URL)("two seat-taking writes for the last free full seat", (
         });
         const shortened = await expiry();
 
-        await lease.renew({ organizationId, holder: "someone-else" });
+        expect(await lease.renew({ organizationId, holder: "someone-else" })).toBe(false);
         expect(await expiry()).toEqual(shortened);
 
-        await lease.renew({ organizationId, holder });
+        expect(await lease.renew({ organizationId, holder })).toBe(true);
         expect((await expiry()).getTime()).toBeGreaterThan(shortened.getTime() + 10_000);
       } finally {
         await lease.release({ organizationId, holder });
       }
+    });
+  });
+
+  describe("when the seat lease expires mid-change and another change takes it", () => {
+    /** @scenario "A seat change whose lease was taken over writes nothing" */
+    it("refuses the first change's write seat_change_busy and lets the new holder write", async () => {
+      const seatRepository = PrismaOrganizationSeatRepository.create(prisma);
+      const organizationId = `${namespace}-fence`;
+      const writes: string[] = [];
+
+      const first = seatRepository.withSeatLock({
+        organizationId,
+        work: async (lease) => {
+          // The holder stalls past its expiry, and a second change takes the lease meanwhile.
+          await prisma.organizationSeatLease.update({
+            where: { organizationId },
+            data: { expiresAt: new Date(Date.now() - 1_000) },
+          });
+          await seatRepository.withSeatLock({
+            organizationId,
+            work: async (taken) => {
+              await taken.assertHeld();
+              writes.push("second");
+            },
+          });
+          await lease.assertHeld();
+          writes.push("first");
+        },
+      });
+
+      await expect(first).rejects.toMatchObject({ code: "seat_change_busy" });
+      expect(writes).toEqual(["second"]);
     });
   });
 

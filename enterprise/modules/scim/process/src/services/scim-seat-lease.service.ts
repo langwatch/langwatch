@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { type OrganizationApi, SeatChangeBusyError } from "@langwatch/organization-contract";
 
 import type { ScimSeatRepository } from "../repositories/scim-seat.repository.ts";
 
@@ -12,17 +12,26 @@ export type ScimSeatLeaseApi = Pick<
   "acquireSeatLease" | "renewSeatLease" | "releaseSeatLease"
 >;
 
+/** What the work holds: `assertHeld` right before the membership write fences it. */
+export interface ScimHeldLease {
+  assertHeld(): Promise<void>;
+}
+
 /** Runs `work` holding organization's seat lease, the one its own seat writes hold. */
 export interface ScimSeatLock {
-  withSeatLock<T>(input: Readonly<{ organizationId: string; work: () => Promise<T> }>): Promise<T>;
+  withSeatLock<T>(
+    input: Readonly<{ organizationId: string; work: (lease: ScimHeldLease) => Promise<T> }>,
+  ): Promise<T>;
 }
 
 /** What an admission is held to: the seat counts, read and written under the seat lease. */
-export type ScimSeats = Pick<ScimSeatRepository, "countMemberSeats"> & ScimSeatLock;
+export type ScimSeats = Pick<ScimSeatRepository, "countMemberSeats" | "findLiveHoldUserIds"> &
+  ScimSeatLock;
 
 /**
  * Organization's seat lease, taken through its Api: acquired (or refused seat_change_busy after
- * the wait), renewed at the interval organization names while `work` runs, released after.
+ * the wait), renewed at the interval organization names while `work` runs, released after. A
+ * write fenced by `assertHeld` after the lease went to another change is refused seat_change_busy.
  */
 export class ScimSeatLeaseService implements ScimSeatLock {
   static create(lease: ScimSeatLeaseApi): ScimSeatLeaseService {
@@ -34,18 +43,32 @@ export class ScimSeatLeaseService implements ScimSeatLock {
   async withSeatLock<T>({
     organizationId,
     work,
-  }: Readonly<{ organizationId: string; work: () => Promise<T> }>): Promise<T> {
+  }: Readonly<{ organizationId: string; work: (lease: ScimHeldLease) => Promise<T> }>): Promise<T> {
     const { holder, renewEveryMs } = await this.lease.acquireSeatLease({ organizationId });
+    const renew = () => this.lease.renewSeatLease({ organizationId, holder });
+    let lost = false;
     const renewal = setInterval(() => {
-      this.lease.renewSeatLease({ organizationId, holder }).catch((error: unknown) => {
-        logger.warn(
-          { error, organizationId, holder },
-          "seat lease renewal failed; the lease may expire mid-admission",
-        );
-      });
+      renew()
+        .then((held) => {
+          if (!held) lost = true;
+        })
+        .catch((error: unknown) => {
+          logger.warn(
+            { error, organizationId, holder },
+            "seat lease renewal failed; the lease may expire mid-admission",
+          );
+        });
     }, renewEveryMs);
+    const held: ScimHeldLease = {
+      assertHeld: async () => {
+        if (lost || !(await renew())) {
+          lost = true;
+          throw new SeatChangeBusyError();
+        }
+      },
+    };
     try {
-      return await work();
+      return await work(held);
     } finally {
       clearInterval(renewal);
       await this.lease.releaseSeatLease({ organizationId, holder });

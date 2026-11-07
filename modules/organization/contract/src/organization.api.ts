@@ -72,6 +72,10 @@ import type {
   OrganizationListedInvite,
   OrganizationInvitedMemberIds,
   OrganizationPendingInviteApplied,
+  OrganizationApiRemoveMemberInput,
+  OrganizationHeldSeats,
+  OrganizationMemberRemoved,
+  OrganizationSeatRemovalPreview,
 } from "./organization.responses.ts";
 import type {
   Organization,
@@ -183,7 +187,10 @@ export type OrganizationWithMembersAndTheirTeams = Organization & {
  */
 export type OrganizationInviteValidation = "strict" | "lenient";
 
-/** An organization's seats: full, lite and Developer (ADR-171), live invitations included. */
+/**
+ * An organization's seats: full, lite and Developer (ADR-171), live invitations included.
+ * `fullMembers` includes the seats held after a removal (seat-rotation.feature).
+ */
 export type OrganizationMemberSeats = Readonly<{
   fullMembers: number;
   liteMembers: number;
@@ -291,6 +298,41 @@ export interface OrganizationApi {
     by: OrganizationCaller | null,
   ): Promise<void>;
   /**
+   * Removes a member; when their seat frees at once and a full seat fits, gives it to the person
+   * waiting the caller named (seat-rotation.feature).
+   */
+  removeMember(
+    input: OrganizationApiRemoveMemberInput,
+    by: OrganizationCaller,
+  ): Promise<OrganizationMemberRemoved>;
+  /** What removing this member does to their seat, and who waits for it: the remove dialog. */
+  getSeatRemovalPreview(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<OrganizationSeatRemovalPreview>;
+  /** The seats removed, disabled or demoted people still hold: the Users list's greyed rows. */
+  listHeldSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationHeldSeats>;
+  /**
+   * Keeps the full seat of a member about to leave by a path that deletes the membership row
+   * itself (directory offboarding), so leaving and coming back costs the same seat. Asked
+   * before that path runs; nothing when the seat frees at once (seat-rotation.feature).
+   */
+  holdSeatOfDepartingMember(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<void>;
+  /**
+   * A person admitted back within their seat hold, by a path that writes the membership row
+   * itself (directory provisioning), takes the held seat: its date stays and the hold goes.
+   */
+  takeBackHeldSeat(input: Readonly<{ organizationId: string; userId: string }>): Promise<void>;
+  /**
+   * Opens the seat request of an admission a caller wrote itself (directory provisioning) when a
+   * full seat was asked for and Lite or held was given (seat-requests.feature). A repeat only
+   * fills a missing request.
+   */
+  openSeatRequestForAdmission(
+    input: Readonly<{ organizationId: string; userId: string; admission: OrganizationAdmission }>,
+  ): Promise<void>;
+  /**
    * Takes the organization's seat lease for a caller that writes a seat-holding row itself (a
    * directory admission): waits while another seat change holds it, then refuses
    * seat_change_busy. The holder renews it every `renewEveryMs` and releases it in a finally.
@@ -298,8 +340,11 @@ export interface OrganizationApi {
   acquireSeatLease(
     input: Readonly<{ organizationId: string }>,
   ): Promise<Readonly<{ holder: string; renewEveryMs: number }>>;
-  /** Pushes this holder's lease expiry out again; a lease taken over meanwhile is left alone. */
-  renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void>;
+  /**
+   * Pushes this holder's lease expiry out again; false when the lease is no longer this
+   * holder's, so a caller about to write a seat-holding row must not write it.
+   */
+  renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<boolean>;
   /** Drops this holder's seat lease, and only its own. */
   releaseSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void>;
   setMemberDisabled(

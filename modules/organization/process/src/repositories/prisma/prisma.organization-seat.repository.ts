@@ -20,7 +20,7 @@ import {
 import { prismaTables } from "@langwatch/prisma-client/ownership";
 import { z } from "zod";
 
-import { OrganizationSeatRepository } from "../organization-seat.repository.ts";
+import { OrganizationSeatRepository, type SeatLease } from "../organization-seat.repository.ts";
 
 /** Only what this repository needs, named so a caller never names Prisma's own types. */
 type PrismaOrganizationSeatDatabase = PrismaClient | Prisma.TransactionClient;
@@ -50,9 +50,10 @@ RETURNING "holder"`;
       return taken.length > 0;
     },
     renew: async ({ holder, ttlMs }) => {
-      await prisma.$executeRaw`
+      const renewed = await prisma.$executeRaw`
 UPDATE "OrganizationSeatLease" SET "expiresAt" = now() + make_interval(secs => ${ttlMs / 1000})
 WHERE "organizationId" = ${organizationId} AND "holder" = ${holder}`;
+      return renewed > 0;
     },
     release: async ({ holder }) => {
       await prisma.organizationSeatLease.deleteMany({ where: { organizationId, holder } });
@@ -82,6 +83,7 @@ interface MemberClassificationContext {
   userPermissionsMap: Map<string, string[]>;
   pendingInvites: {
     role: OrganizationUserRole;
+    email: string;
     teamAssignments: TeamAssignment[] | null;
   }[];
 }
@@ -130,12 +132,13 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
     work,
   }: {
     organizationId: string;
-    work: () => Promise<T>;
+    work: (lease: SeatLease) => Promise<T>;
   }): Promise<T> {
     return withLease({
       store: this.leaseStore(organizationId),
       work,
       onBusy: () => new SeatChangeBusyError(),
+      onLost: () => new SeatChangeBusyError(),
     });
   }
 
@@ -157,7 +160,7 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
   }: {
     organizationId: string;
     holder: string;
-  }): Promise<void> {
+  }): Promise<boolean> {
     return this.leaseStore(organizationId).renew({ holder, ttlMs: LEASE_TTL_MS });
   }
 
@@ -181,16 +184,26 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
   /** Every seat in one read: full, lite and Developer, live invitations included. */
   async countMemberSeats(organizationId: string): Promise<OrganizationMemberSeats> {
     const context = await this.getMemberClassificationContext(organizationId);
-    return countMemberSeats([
-      ...context.users.map((user) => ({
-        role: user.role,
-        permissions: context.userPermissionsMap.get(user.userId),
-      })),
-      ...context.pendingInvites.map((invite) => ({
-        role: invite.role,
-        permissions: this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
-      })),
-    ]);
+    // A full seat stays counted until its hold ends (seat-rotation.feature).
+    const holds = await this.prisma.seatHold.findMany({
+      where: { organizationId, heldUntil: { gt: new Date() } },
+      select: { userId: true, email: true },
+    });
+    return countMemberSeats(
+      [
+        ...context.users.map((user) => ({
+          role: user.role,
+          permissions: context.userPermissionsMap.get(user.userId),
+          userId: user.userId,
+        })),
+        ...context.pendingInvites.map((invite) => ({
+          role: invite.role,
+          email: invite.email,
+          permissions: this.getInvitePermissions(invite.teamAssignments, context.customRoleMap),
+        })),
+      ],
+      holds,
+    );
   }
 
   /**
@@ -221,7 +234,7 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
         status: INVITE_STATUS.PENDING,
         OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
       },
-      select: { role: true, teamAssignments: true },
+      select: { role: true, teamAssignments: true, email: true },
     });
 
     return {
@@ -230,6 +243,7 @@ export class PrismaOrganizationSeatRepository extends OrganizationSeatRepository
       userPermissionsMap,
       pendingInvites: pendingInvites.map((i) => ({
         role: i.role,
+        email: i.email,
         teamAssignments: teamAssignmentsSchema.safeParse(i.teamAssignments).data ?? null,
       })),
     };

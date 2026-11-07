@@ -79,6 +79,35 @@ export class SeatBillingUnavailableError extends HandledError {
   }
 }
 
+/** No Developer seat price is configured for this subscription's currency and interval. */
+export class DeveloperSeatsUnavailableError extends HandledError {
+  declare readonly code: "developer_seats_unavailable";
+
+  constructor() {
+    super("developer_seats_unavailable", "Developer seats are not sold on this plan yet", {
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "DeveloperSeatsUnavailableError";
+  }
+}
+
+/**
+ * Another seat change or a seat line repair held the subscription's seat line for the whole wait:
+ * the same code and copy as organization's seat lease.
+ */
+export class SeatChangeBusyError extends HandledError {
+  declare readonly code: "seat_change_busy";
+
+  constructor() {
+    super("seat_change_busy", "Another seat change is in progress. Try again in a moment.", {
+      httpStatus: 409,
+      retryable: true,
+    });
+    this.name = "SeatChangeBusyError";
+  }
+}
+
 /** No active subscription when one was expected; drift with the provider. */
 export class NoActiveSubscriptionError extends HandledError {
   declare readonly code: "subscription_sync_failed";

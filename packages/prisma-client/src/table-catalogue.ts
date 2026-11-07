@@ -26,6 +26,7 @@ export const prismaTableCatalogue = {
   "JoinRequest": "JoinRequest",
   "TeamUser": "TeamUser",
   "OrganizationUser": "OrganizationUser",
+  "SeatHold": "SeatHold",
   "SeatRequest": "SeatRequest",
   "OrganizationSeatLease": "OrganizationSeatLease",
   "OrganizationAccessNotice": "OrganizationAccessNotice",
@@ -575,7 +576,20 @@ export const prismaModelFieldCatalogue = {
     "departmentId",
     "disabledAt",
     "pendingSsoGrantId",
-    "membershipStamp"
+    "membershipStamp",
+    "fullSeatSince",
+    "seatPendingSince"
+  ],
+  "SeatHold": [
+    "id",
+    "organizationId",
+    "userId",
+    "email",
+    "name",
+    "seatTakenAt",
+    "heldUntil",
+    "reason",
+    "createdAt"
   ],
   "SeatRequest": [
     "id",
@@ -591,6 +605,7 @@ export const prismaModelFieldCatalogue = {
     "openedAt",
     "resolvedAt",
     "resolvedByUserId",
+    "seatPendingSince",
     "createdAt",
     "updatedAt"
   ],
@@ -2210,6 +2225,22 @@ export const prismaModelFieldCatalogue = {
     "maxDashboards",
     "maxCustomGraphs",
     "maxAutomations",
+    "seatsKept",
+    "seatsKeptUntil",
+    "seatLineQuantity",
+    "seatLineQuantityAt",
+    "seatLineWriteQuantities",
+    "seatLineWriteSince",
+    "seatLineWriteAt",
+    "seatLineWriteAttempts",
+    "seatLineWriteFlaggedAt",
+    "seatRepairQuantity",
+    "seatRepairLiftedQuantity",
+    "seatRepairSince",
+    "seatRepairAttempts",
+    "seatRepairFlaggedAt",
+    "seatLineLeaseToken",
+    "seatLineLeaseUntil",
     "organization",
     "invoices"
   ],
@@ -3269,6 +3300,7 @@ export const prismaRelationCatalogue = {
     "user": "User",
     "organization": "Organization"
   },
+  "SeatHold": {},
   "SeatRequest": {},
   "OrganizationSeatLease": {},
   "OrganizationAccessNotice": {},

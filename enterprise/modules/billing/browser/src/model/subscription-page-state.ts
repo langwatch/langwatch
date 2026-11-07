@@ -198,3 +198,31 @@ export function planPrice({
   ].filter((part): part is string => Boolean(part));
   return { total, breakdown: parts.length > 0 ? parts.join(" · ") : undefined };
 }
+
+/** Seats a contract or licence fixes until renewal: only LangWatch changes them. */
+export type FixedSeats = { kind: "contract" | "licence"; seats: number };
+
+/**
+ * A contract, AWS Marketplace or licensed plan has no seat drawer; a Stripe plan returns undefined.
+ * A self-hosted install holds a licence, a cloud organization a contract.
+ */
+export function fixedSeatsOf({
+  flags,
+  isSaaS,
+  maxMembers,
+}: {
+  flags: SubscriptionPlanFlags;
+  isSaaS: boolean;
+  maxMembers: number | undefined;
+}): FixedSeats | undefined {
+  if (maxMembers == null) return undefined;
+  if (flags.isLicenseOverride && !isSaaS) return { kind: "licence", seats: maxMembers };
+  if (flags.isLicenseOverride || flags.isEnterprisePlan) {
+    return { kind: "contract", seats: maxMembers };
+  }
+  return undefined;
+}
+
+export function fixedSeatsLine({ kind, seats }: FixedSeats): string {
+  return `Your ${kind} covers ${seats} seats. Contact LangWatch to add more.`;
+}

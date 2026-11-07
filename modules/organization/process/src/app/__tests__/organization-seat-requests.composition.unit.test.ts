@@ -5,6 +5,7 @@
 import { OrganizationUserRole } from "@langwatch/organization-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { MemorySeatRequestRepository } from "../../repositories/memory/memory.seat-request.repository.ts";
 import {
   ADA,
   application,
@@ -383,6 +384,97 @@ describe("given an open seat request", () => {
       expect(await openRequests()).toEqual([]);
       expect(membershipOf(userId)).toMatchObject({ role: OrganizationUserRole.EXTERNAL });
       expect(membershipOf(userId)?.disabledAt).not.toBeNull();
+    });
+  });
+});
+
+describe("given an approved seat request whose seat never landed", () => {
+  const HOUR_MS = 60 * 60 * 1000;
+
+  /** An approval claimed `ageMs` ago whose process stopped before the seat was given. */
+  async function strandedApproval(ageMs: number) {
+    const given = await application();
+    const { userId } = await given.arrive({ email: "late@acme.example" });
+    const [request] = await given.openRequests();
+    await given.seatRequests.resolve({
+      organizationId: ORGANIZATION_ID,
+      id: request!.id,
+      status: "APPROVED",
+      resolvedByUserId: ADA.id,
+      at: Date.now() - ageMs,
+    });
+    return { ...given, userId, requestId: request!.id };
+  }
+
+  describe("when an administrator lists open seat requests long after the approval", () => {
+    /** @scenario "An approval whose seat never landed is reopened" */
+    it("reopens the request, so it is on the list again", async () => {
+      const { openRequests, membershipOf, userId, requestId } = await strandedApproval(HOUR_MS);
+
+      expect((await openRequests()).map((open) => open.id)).toEqual([requestId]);
+      expect(membershipOf(userId)).toMatchObject({ disabledAt: expect.anything() });
+    });
+  });
+
+  describe("when the approval is still within its grace period", () => {
+    /** @scenario "An approval still giving its seat is left alone" */
+    it("leaves the request approved", async () => {
+      const { openRequests } = await strandedApproval(60 * 1000);
+
+      expect(await openRequests()).toEqual([]);
+    });
+  });
+
+  describe("when the seat was given but could not be marked as given", () => {
+    /** @scenario "An approval whose seat landed but was never marked is settled, not reopened" */
+    it("keeps the request approved and marks the seat given", async () => {
+      const { app, state, arrive, openRequests, seatRequests, membershipOf } = await application();
+      const { userId } = await arrive({ email: "late@acme.example" });
+      const [request] = await openRequests();
+      state.plan = planWith({ freeFull: 1 });
+      seatRequests.settleSeat = async () => {
+        throw new Error("seat request store unavailable");
+      };
+
+      const resolved = await app.approveSeatRequest(
+        { organizationId: ORGANIZATION_ID, seatRequestId: request!.id },
+        ADA,
+      );
+      seatRequests.seatPendingSince.set(request!.id, Date.now() - HOUR_MS);
+      seatRequests.settleSeat = MemorySeatRequestRepository.prototype.settleSeat.bind(seatRequests);
+
+      expect(resolved).toEqual({ outcome: "enabled" });
+      expect(await openRequests()).toEqual([]);
+      expect(seatRequests.seatPendingSince.has(request!.id)).toBe(false);
+      expect(membershipOf(userId)).toMatchObject({ disabledAt: null });
+    });
+  });
+
+  describe("when an approval invited the address but could not mark the seat as given", () => {
+    /** @scenario "An approval whose invitation went out but was never marked is settled, not reopened" */
+    it("keeps the request approved, since the invitation is its seat", async () => {
+      const { app, state, openRequests, seatRequests } = await application();
+      await app.recordRefusedSignIn({
+        organizationId: ORGANIZATION_ID,
+        email: "late@acme.example",
+        idp: "okta",
+      });
+      const [request] = await openRequests();
+      state.plan = planWith({ freeFull: 1 });
+      seatRequests.settleSeat = async () => {
+        throw new Error("seat request store unavailable");
+      };
+
+      const resolved = await app.approveSeatRequest(
+        { organizationId: ORGANIZATION_ID, seatRequestId: request!.id },
+        ADA,
+      );
+      seatRequests.seatPendingSince.set(request!.id, Date.now() - HOUR_MS);
+      seatRequests.settleSeat = MemorySeatRequestRepository.prototype.settleSeat.bind(seatRequests);
+
+      expect(resolved).toEqual({ outcome: "invited" });
+      expect(await openRequests()).toEqual([]);
+      expect(seatRequests.seatPendingSince.has(request!.id)).toBe(false);
     });
   });
 });

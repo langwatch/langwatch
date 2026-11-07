@@ -170,9 +170,13 @@ export class BillingSubscriptionService {
         tracesToAdd: effectiveTraces,
         membersToAdd: effectiveMembers,
       });
+      // Added seats are invoiced now, prorated, as on the seat plans.
+      const addsSeats = effectiveMembers > (lastSubscription.maxMembers ?? 0);
       await this.stripeSubscriptions.updateSubscription({
         subscriptionId: lastSubscription.stripeSubscriptionId,
-        change: { items: itemsToUpdate },
+        change: addsSeats
+          ? { items: itemsToUpdate, prorationBehavior: "always_invoice" }
+          : { items: itemsToUpdate },
       });
 
       return { success: true };
