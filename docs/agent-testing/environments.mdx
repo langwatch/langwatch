@@ -94,11 +94,13 @@ The row stays after the process stops. It keeps the agent identity, the declared
 Two targets in one run is a comparison. The results page shows one column per target, each with its own pass rate, duration and cost.
 
 ```bash
-langwatch run-plan run --test-suite "Checkout" \
+langwatch run-plan run --label canary \
   --target connected:support-agent@production \
   --target connected:support-agent@development \
-  --name "Checkout: production vs local" --wait
+  --name "Canary: production vs local" --wait
 ```
+
+A run against `production` runs on real data. Give the `canary` label only to scenarios that only read data: a label selects scenarios, and LangWatch does not check what they do. Setup and teardown hooks and per-conversation seeding run for every scenario, so leave them out of that process.
 
 The same shape compares two deployed environments, `staging` against `production`, or one environment against another model:
 
