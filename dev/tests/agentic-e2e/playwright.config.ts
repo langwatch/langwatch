@@ -133,6 +133,15 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], actionTimeout: 30000, navigationTimeout: 120000 },
     },
 
+    /* Cloud billing journeys against paymentsim: each signs up its own administrator and refuses a
+     * stack that is not saas */
+    {
+      name: "billing",
+      testDir: "./tests/billing",
+      timeout: 300000,
+      use: { ...devices["Desktop Chrome"], actionTimeout: 30000, navigationTimeout: 120000 },
+    },
+
     /* Licence journeys: each spec refuses a stack in the wrong deployment mode */
     {
       name: "licence",
@@ -144,7 +153,13 @@ export default defineConfig({
     /* Main test project - uses authenticated state */
     {
       name: "chromium",
-      testIgnore: ["**/journey/**", "**/sso/**", "**/licence/**", "**/*.unit.test.ts"],
+      testIgnore: [
+        "**/journey/**",
+        "**/sso/**",
+        "**/licence/**",
+        "**/billing/**",
+        "**/*.unit.test.ts",
+      ],
       use: {
         ...devices["Desktop Chrome"],
         storageState: AUTH_FILE,
