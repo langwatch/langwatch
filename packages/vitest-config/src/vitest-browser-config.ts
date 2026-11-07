@@ -32,7 +32,27 @@ export function defineBrowserVitestConfig(
   const { include, exclude, setupFiles, testTimeout, test } = options;
   return defineConfig({
     // The same React Compiler output apps/ui ships, as the jsdom builder compiles.
-    plugins: [react({ compiler: true })],
+    plugins: [
+      react({ compiler: true }),
+      {
+        name: "diag-http",
+        configureServer(server) {
+          if (!process.env.DIAG_BROWSER_HTTP) return;
+          server.middlewares.use((req, res, next) => {
+            const t = Date.now();
+            res.on("finish", () => {
+              if (res.statusCode >= 300 || process.env.DIAG_BROWSER_HTTP === "all")
+                console.error(`[diag-http] ${res.statusCode} ${res.statusMessage ?? ""} ${req.url} ${Date.now() - t}ms`);
+            });
+            res.on("close", () => {
+              if (!res.writableFinished) console.error(`[diag-http] UNFINISHED ${req.url} ${Date.now() - t}ms`);
+            });
+            next();
+          });
+        },
+      },
+    ],
+    ...(process.env.DIAG_BROWSER_HTTP ? { logLevel: "info" as const } : {}),
     test: {
       include: include ?? [BROWSER_TEST_GLOB],
       exclude: exclude ?? DEFAULT_EXCLUDE,
