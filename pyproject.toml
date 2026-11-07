@@ -50,3 +50,45 @@ constraint-dependencies = [
   "pillow>=13.0.0", # security: Pillow advisories covering <13.0.0, three CRITICAL (#2955-#2963, #3038-#3075)
   "mcp>=1.30.0,!=2.0.*,!=2.1.*", # security: MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 and 2.2.0 (#2829)
 ]
+
+# langwatch-scenario, in the SDK's dev group for the connected-agent tests,
+# caps langwatch below 2 in every release so far, so the SDK's own 2.x
+# version cannot resolve here. This restates scenario 1.6.0's published
+# dependencies with that one cap raised to <3, so the tests run against the
+# real scenario package. It only changes this repo's lock, never the
+# published SDK. Remove it once a langwatch-scenario release allows
+# langwatch 2 (https://github.com/langwatch/scenario/pull/1040).
+[[tool.uv.dependency-metadata]]
+name = "langwatch-scenario"
+version = "1.6.0"
+requires-python = ">=3.10"
+requires-dist = [
+  "pytest>=9.0.3",
+  "pytest-rerunfailures>=14.0",
+  "litellm>=1.83.14",
+  "openai>=1.88.0",
+  "python-dotenv>=1.0.1",
+  "termcolor>=2.4.0",
+  "pydantic>=2.7.0",
+  "joblib>=1.4.2",
+  "wrapt<2,>=1.17.2",
+  "pytest-asyncio>=0.26.0",
+  "rich<16.0.0,>=13.3.3",
+  "pksuid>=1.1.2",
+  "httpx>=0.27.0",
+  "rx>=3.2.0",
+  "python-dateutil>=2.9.0.post0",
+  "pydantic-settings>=2.14.2",
+  "langwatch>=1.0.0,<3",
+  "opentelemetry-sdk>=1.20.0",
+  "imageio-ffmpeg>=0.5.0",
+  "numpy>=1.26",
+  "webrtcvad-wheels>=2.0",
+  "websockets>=12",
+  "twilio>=9.0",
+  "fastapi>=0.110",
+  "uvicorn>=0.27",
+  "audioop-lts>=0.2.1; python_version >= \"3.13\"",
+  "google-genai>=1.0",
+  "elevenlabs>=1.0",
+]

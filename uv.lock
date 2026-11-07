@@ -58,6 +58,12 @@ constraints = [
     { name = "vcrpy", specifier = ">=8.2.1" },
 ]
 
+[[manifest.dependency-metadata]]
+name = "langwatch-scenario"
+version = "1.6.0"
+requires-dist = ["pytest>=9.0.3", "pytest-rerunfailures>=14.0", "litellm>=1.83.14", "openai>=1.88.0", "python-dotenv>=1.0.1", "termcolor>=2.4.0", "pydantic>=2.7.0", "joblib>=1.4.2", "wrapt>=1.17.2,<2", "pytest-asyncio>=0.26.0", "rich>=13.3.3,<16.0.0", "pksuid>=1.1.2", "httpx>=0.27.0", "rx>=3.2.0", "python-dateutil>=2.9.0.post0", "pydantic-settings>=2.14.2", "langwatch>=1.0.0,<3", "opentelemetry-sdk>=1.20.0", "imageio-ffmpeg>=0.5.0", "numpy>=1.26", "webrtcvad-wheels>=2.0", "websockets>=12", "twilio>=9.0", "fastapi>=0.110", "uvicorn>=0.27", "audioop-lts>=0.2.1 ; python_full_version >= '3.13'", "google-genai>=1.0", "elevenlabs>=1.0"]
+requires-python = ">=3.10"
+
 [[package]]
 name = "aiofiles"
 version = "25.1.0"
@@ -3391,7 +3397,7 @@ dev = [
 
 [[package]]
 name = "langwatch-scenario"
-version = "1.4.0"
+version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "audioop-lts", marker = "python_full_version >= '3.13'" },
@@ -3425,9 +3431,9 @@ dependencies = [
     { name = "websockets" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3c/63/4e8d0b854148521ff7e2a0c1e6c0a56c83fd3abf64f5629e9ab2112609da/langwatch_scenario-1.4.0.tar.gz", hash = "sha256:006f167fdf55a79fb5c1e0218521bf74d13848430a5210d321a2aae8dab67e4e", size = 1201340, upload-time = "2026-09-02T02:56:09.956Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/de/915c8afecc198a1491576128f325df71f2f661a7bca3d029a01cadda1995/langwatch_scenario-1.6.0.tar.gz", hash = "sha256:757809c817e70db9a4ad8ffd06a12157a7b05e9a570203f355bb208b31a54357", size = 1257785, upload-time = "2026-10-07T12:56:56.165Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/7c/2f0e9b74ac8e219c7e7b9c38bc45334ff682b1b56505129db8cccf182777/langwatch_scenario-1.4.0-py3-none-any.whl", hash = "sha256:2239e7e4f4f59a358f7340e19466ede77ac5c0cf6a1cd7a84f126dc9927f95f1", size = 1248030, upload-time = "2026-09-02T02:56:08.28Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/87/d5c155715df1a16444e9318f28dd6dc6e7570a684ae880cfcdfad91fbc43/langwatch_scenario-1.6.0-py3-none-any.whl", hash = "sha256:403ec16fefdc54f7cf97ba5983a8b970d43c9cfbb4396f28e213f83f370c6159", size = 1291568, upload-time = "2026-10-07T12:56:54.596Z" },
 ]
 
 [[package]]
