@@ -615,6 +615,7 @@
 /coding-agents/github-copilot-cli
 /coding-agents/grok-cli
 /coding-agents/headless-and-ci
+/coding-agents/measure-pull-requests
 /coding-agents/openai-codex
 /coding-agents/opencode
 /coding-agents/overview
