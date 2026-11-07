@@ -1,5 +1,67 @@
 # Changelog
 
+## [3.24.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.23.0...langwatch@v3.24.0) (2026-11-07)
+
+
+### Features
+
+* **api-key:** reopen a key's details and rotate its secret ([#9359](https://github.com/langwatch/langwatch/issues/9359)) ([e36c81d](https://github.com/langwatch/langwatch/commit/e36c81d15788c321d09b32a9f711af2cbd7eb35f))
+* **billing:** lead the subscription page with the plan, its usage and the next step ([#9368](https://github.com/langwatch/langwatch/issues/9368)) ([11b45d1](https://github.com/langwatch/langwatch/commit/11b45d1f195a71bff101efe6c69b2515b6fc2231))
+* **coding-agent:** show the official pi logo ([#9321](https://github.com/langwatch/langwatch/issues/9321)) ([4ea3ab8](https://github.com/langwatch/langwatch/commit/4ea3ab8202c9dab3a0d35e8eecb076ed014f1210))
+* **dashboards:** drop the 'Looking for the old Analytics?' notice ([#9241](https://github.com/langwatch/langwatch/issues/9241)) ([17cbc89](https://github.com/langwatch/langwatch/commit/17cbc893f8c3a6f85dba23c713ab78803d460a4c))
+* **docs-site:** consent notice, theme menu, live stars and a calmer shell ([#9261](https://github.com/langwatch/langwatch/issues/9261)) ([8fd9f8b](https://github.com/langwatch/langwatch/commit/8fd9f8b897458e040b34762f089669d1fe8f37b9))
+* **instant-evals:** route LLM-judge evaluations through the judge router behind its flag ([#9335](https://github.com/langwatch/langwatch/issues/9335)) ([862546e](https://github.com/langwatch/langwatch/commit/862546e80c607a6e04b6b486e7234c42ea5415e7))
+* **instant-evals:** turn own decision models on by default ([#9322](https://github.com/langwatch/langwatch/issues/9322)) ([f3a0ba4](https://github.com/langwatch/langwatch/commit/f3a0ba43e5131d2ef451bd13e3a45f35e5cf0c62))
+* **model-provider:** add a Judge column to default models for scenario judging ([#9358](https://github.com/langwatch/langwatch/issues/9358)) ([2f89491](https://github.com/langwatch/langwatch/commit/2f8949167b94f86cc226e63ca80ff44a2fa16f91))
+* **model-provider:** list decision models as one flat, titled list in the model pickers ([#9366](https://github.com/langwatch/langwatch/issues/9366)) ([1a5fcf5](https://github.com/langwatch/langwatch/commit/1a5fcf542980ac0b673cf5bc92d201ae0569d74d))
+* **nurturing:** per-person coding session traits for Customer.io ([#9327](https://github.com/langwatch/langwatch/issues/9327)) ([1d9052b](https://github.com/langwatch/langwatch/commit/1d9052bb29ac784ac4408e7a4372d499378c9bc0))
+* **nurturing:** send coding terminal types, repo count and early session days to Customer.io ([#9314](https://github.com/langwatch/langwatch/issues/9314)) ([29094ab](https://github.com/langwatch/langwatch/commit/29094abaeea7b37eadfe0645d832cec353419cba))
+* **nurturing:** send joined_organization for invite and SSO joins, once per person and org ([#9363](https://github.com/langwatch/langwatch/issues/9363)) ([11c2bb5](https://github.com/langwatch/langwatch/commit/11c2bb566f0078fc2d2caa2b2d1a932aacecda11))
+* **nurturing:** send trace and coding session facts to every org member ([#9313](https://github.com/langwatch/langwatch/issues/9313)) ([8773e97](https://github.com/langwatch/langwatch/commit/8773e97d40741d44e737db0df682a61e010f5ec1))
+* **nurturing:** tell Customer.io when someone opens their usage, cost or plan page ([#9317](https://github.com/langwatch/langwatch/issues/9317)) ([6009758](https://github.com/langwatch/langwatch/commit/6009758961cb6052f702d7e519157a7665d7aead))
+* **organization:** seat requests over the limit, IdP refusal screens and a Billing role ([#9391](https://github.com/langwatch/langwatch/issues/9391)) ([0805d4e](https://github.com/langwatch/langwatch/commit/0805d4ee7d7ca66f10740a417176c7261c9c3e38))
+
+
+### Bug Fixes
+
+* **agents,experiment:** agent edits refresh without reload, plus experiment workbench fixes ([#9290](https://github.com/langwatch/langwatch/issues/9290)) ([c4e344c](https://github.com/langwatch/langwatch/commit/c4e344ce7ffb073ee7e0933322340d60288e2025))
+* **api-key:** a CLI login key never carries organization:delete ([#9337](https://github.com/langwatch/langwatch/issues/9337)) ([4217699](https://github.com/langwatch/langwatch/commit/4217699b76f3a5949dd3ae2853da780932a93baf))
+* **api-key:** default new keys to no expiration, tuck the rest under Advanced ([#9360](https://github.com/langwatch/langwatch/issues/9360)) ([f378694](https://github.com/langwatch/langwatch/commit/f37869462de2192ad088665babc279363987f715))
+* **api-key:** restricted-key drawer offers rows the mint would accept ([#9333](https://github.com/langwatch/langwatch/issues/9333)) ([e5e4a17](https://github.com/langwatch/langwatch/commit/e5e4a1741ba26492ebf8865b24b05e0ef39b750e))
+* **auth:** get invited new accounts to their invitation without errors ([#9311](https://github.com/langwatch/langwatch/issues/9311)) ([d0c1f1e](https://github.com/langwatch/langwatch/commit/d0c1f1eccfaf989bebcc907d4b1dcf73baf6c9be))
+* **auth:** send a member who already accepted an invitation on into LangWatch ([#9312](https://github.com/langwatch/langwatch/issues/9312)) ([ee7454e](https://github.com/langwatch/langwatch/commit/ee7454edacc673ada17cefab96554ce436eadbce))
+* **billing:** let every organization member start a paid subscription ([#9370](https://github.com/langwatch/langwatch/issues/9370)) ([56f6a10](https://github.com/langwatch/langwatch/commit/56f6a106451981e4d36dbbe831a33d37af034c1a))
+* **billing:** offer the Growth upgrade to a Free organization with one member ([#9355](https://github.com/langwatch/langwatch/issues/9355)) ([b3279eb](https://github.com/langwatch/langwatch/commit/b3279ebf7a40743bb6c450425848ef5c734e77fa))
+* **billing:** only tell an organization its plan doesn't cover its seats when it doesn't ([#9357](https://github.com/langwatch/langwatch/issues/9357)) ([f3fab9b](https://github.com/langwatch/langwatch/commit/f3fab9b35e42f443ca895a8f09658c8c46bd6d42))
+* **billing:** plan card matches the approved mockup; enterprise card named Enterprise ([#9386](https://github.com/langwatch/langwatch/issues/9386)) ([6e95a79](https://github.com/langwatch/langwatch/commit/6e95a79bad40858ca9de2d5a0e48af61da2f731e))
+* **billing:** plans page Upgrade now opens Stripe Checkout instead of bouncing back ([#9367](https://github.com/langwatch/langwatch/issues/9367)) ([e72816a](https://github.com/langwatch/langwatch/commit/e72816adcadef16f0e799a151449242f1a370bba))
+* **billing:** refuse a seat count below the full seats in use ([#9401](https://github.com/langwatch/langwatch/issues/9401)) ([add9e24](https://github.com/langwatch/langwatch/commit/add9e24ffbaba1f2669e6f4aab9549c370bbad91))
+* **dashboards:** say honestly when a widget fails, and never show old rows under a new period ([#9362](https://github.com/langwatch/langwatch/issues/9362)) ([105757d](https://github.com/langwatch/langwatch/commit/105757d6c523861b16847bbee5da4ddf09e95019))
+* **dataset:** ship @langwatch/handled-error in the runtime image ([#9352](https://github.com/langwatch/langwatch/issues/9352)) ([c72f8fd](https://github.com/langwatch/langwatch/commit/c72f8fde9b8406b80d75165b6196e27379fafd00))
+* **design-system:** an outline button with a hue colorPalette tints its ([6e95a79](https://github.com/langwatch/langwatch/commit/6e95a79bad40858ca9de2d5a0e48af61da2f731e))
+* **feature-flag:** turn the judge router off by default on self-hosted installs ([#9353](https://github.com/langwatch/langwatch/issues/9353)) ([32c4e00](https://github.com/langwatch/langwatch/commit/32c4e0006754d1aa51b6dbc0722bdf59440eb112))
+* **gateway:** record platform provider-key spend in the ledger and stop topic clustering re-embedding ([#9302](https://github.com/langwatch/langwatch/issues/9302)) ([5dacb3f](https://github.com/langwatch/langwatch/commit/5dacb3f3dc85bb2a433a81ad04bbdbfb43a85a19))
+* **identity:** send SSO issuer discovery and the domain proof file through the outbound proxy ([#8942](https://github.com/langwatch/langwatch/issues/8942)) ([8daf2f9](https://github.com/langwatch/langwatch/commit/8daf2f9d0791733d5111ffe769a27e1fc7e26251))
+* **identity:** stop SSO sign-in hanging behind a proxy that refuses the identity provider ([#9369](https://github.com/langwatch/langwatch/issues/9369)) ([856f023](https://github.com/langwatch/langwatch/commit/856f023c9c5c043b15e82f6a7cb9469a2ab3f2e4))
+* **licensing:** self-hosted licence renewal, replace, env licence and offline fixes ([#9402](https://github.com/langwatch/langwatch/issues/9402)) ([9eafecd](https://github.com/langwatch/langwatch/commit/9eafecd832c6d39e8fc0b315d86293295d3e5ecf))
+* **model-provider:** drop the model id from the OpenAI and Azure Decisions names ([#9398](https://github.com/langwatch/langwatch/issues/9398)) ([ad140b8](https://github.com/langwatch/langwatch/commit/ad140b8db70579545110b7030604bc044ab18e49))
+* **onboarding:** greet a user with no name without the "there" placeholder ([#9356](https://github.com/langwatch/langwatch/issues/9356)) ([95daf9d](https://github.com/langwatch/langwatch/commit/95daf9d34f7bbb3a0496dae87bb557cca1b59b39))
+* **organization:** fence seat writes on the seat lease and reopen approvals whose seat never landed ([#9408](https://github.com/langwatch/langwatch/issues/9408)) ([a87478e](https://github.com/langwatch/langwatch/commit/a87478e081db5bb26961f7d8b06322497e6813d1))
+* **organization:** never report an invite as sent when none was created ([#9403](https://github.com/langwatch/langwatch/issues/9403)) ([b6f18c4](https://github.com/langwatch/langwatch/commit/b6f18c47f97c0326194ee5ee1d4fb3d7a28be3ed))
+* **trace:** log a refused collector payload at warn, not error ([#9388](https://github.com/langwatch/langwatch/issues/9388)) ([b36b8bc](https://github.com/langwatch/langwatch/commit/b36b8bcb3fd4d85e2253637d280334be64b81d88))
+
+
+### Miscellaneous
+
+* **prisma-client:** regenerate the table catalogue for SeatRequest.seatPendingSince ([#9409](https://github.com/langwatch/langwatch/issues/9409)) ([22e80cd](https://github.com/langwatch/langwatch/commit/22e80cd97ef6fe34a7adca2fc19325a0596cd626))
+
+
+### Documentation
+
+* **coding-agents:** add pi and Grok CLI setup pages ([#9305](https://github.com/langwatch/langwatch/issues/9305)) ([b0ae643](https://github.com/langwatch/langwatch/commit/b0ae643cc744ef7a955da6242e4b56c55e3d5f01))
+* **instant-evals:** document running Instant Evals on your own decision model ([#9303](https://github.com/langwatch/langwatch/issues/9303)) ([8306e87](https://github.com/langwatch/langwatch/commit/8306e87b6ffca4ed1bde427edc57d69d475a7511))
+* regenerate llms-full.txt for 3.23.0 ([#9306](https://github.com/langwatch/langwatch/issues/9306)) ([bd5d233](https://github.com/langwatch/langwatch/commit/bd5d233d8f20ffa08ddca255c13e460c169c6936))
+
 ## [3.23.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.22.0...langwatch@v3.23.0) (2026-11-03)
 
 
