@@ -95,6 +95,14 @@ jobs:
               - '.github/pr-filters.yml'
               - 'cmd/prfilters/**'
               - 'tools/ciguard/**'
+              - 'tools/releaselock/**'
+              # The release-lock guard reads all of these; a PR touching any must reach it.
+              - 'uv.lock'
+              - 'pyproject.toml'
+              - 'sdks/python/pyproject.toml'
+              - 'packages/ksuid-python/pyproject.toml'
+              - '.github/release-please-config.json'
+              - '.github/.release-please-manifest.json'
               - 'pkg/ciscan/**'
               # The static-cloud-keys guard walks composite actions too.
               - '.github/actions/**'
@@ -151,6 +159,7 @@ jobs:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
       - run: go test ./tools/ciguard/...
+      - run: go test ./tools/releaselock/...
       - run: go run ./cmd/ciguard
 
   test:
