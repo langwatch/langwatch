@@ -215,14 +215,11 @@ func lwqlAccessOptions(o options) error {
 }
 
 func lwqlAccess(ctx context.Context, o options) error {
-	reg := o.registry()
-	l := ecrtag.LwqlAccessTag{Registry: reg, Tags: reg, Ref: o.ref(), Sources: o.from}
+	l := ecrtag.LwqlAccessTag{Registry: o.registry(), Ref: o.ref(), Sources: o.from}
 	if o.image != "" {
-		fingerprint, err := ecrtag.LwqlAccessFingerprint(ctx, ecrtag.Run, o.image)
-		if err != nil {
-			return err
+		l.Render = func(ctx context.Context) (string, error) {
+			return ecrtag.LwqlAccessFingerprint(ctx, ecrtag.Run, o.image)
 		}
-		l.Fingerprint = fingerprint
 	}
 	fingerprint, err := l.Write(ctx)
 	if err != nil {

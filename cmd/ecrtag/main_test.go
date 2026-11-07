@@ -53,7 +53,8 @@ func (oneTag) Tags(context.Context, string) ([]string, error) { return []string{
 func (oneTag) Manifest(context.Context, ecrtag.Ref) (ecrtag.Manifest, error) {
 	return ecrtag.Manifest{}, nil
 }
-func (oneTag) Put(context.Context, ecrtag.Ref, ecrtag.Manifest) error { return nil }
+func (oneTag) Put(context.Context, ecrtag.Ref, ecrtag.Manifest) error  { return nil }
+func (oneTag) ImageTags(context.Context, ecrtag.Ref) ([]string, error) { return nil, nil }
 func (oneTag) Label(context.Context, ecrtag.Ref, string) (string, error) {
 	return "", nil
 }

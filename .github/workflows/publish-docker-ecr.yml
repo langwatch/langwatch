@@ -928,7 +928,15 @@ jobs:
             if [ "${exists}" = "true" ]; then
               echo "${image}:${IMAGE_TAG} is already published; leaving it"
               echo "\`${image}:${IMAGE_TAG}\` was already published" >> "$GITHUB_STEP_SUMMARY"
-              record_lwql_access "${image}" ""
+              if [ "${image}" = "langwatch-app" ] && [ "${built}" != "true" ]; then
+                # A re-tag an earlier run published but did not fingerprint:
+                # the ancestor it copied still carries the fingerprint.
+                previous=$(aws ecr describe-images --repository-name "${image}" \
+                  --query 'imageDetails[].imageTags[]' --output text \
+                  | tr '\t' '\n' | grep -vxF "${IMAGE_TAG}" \
+                  | HEAD_COMMIT="${GITHUB_SHA}" .github/scripts/nearest-ancestor-tag.sh) || previous=""
+              fi
+              record_lwql_access "${image}" "${previous}"
               return 0
             fi
 

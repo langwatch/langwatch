@@ -187,7 +187,8 @@ Feature: Publish every deployable image to the artifacts registry
 
   # How Cloud's LangWatchQL access render Job knows whether an app image
   # changes the rendered access model (langwatch-saas infrastructure/lwql.tf).
-  # Bound by tools/ecrtag/lwqlaccess_test.go.
+  # Bound by tools/ecrtag/lwqlaccess_test.go, and that the workflow makes both
+  # calls by tools/ciguard/ecrskip_test.go.
   @unit
   Scenario: An app image records the fingerprint of the access model it renders
     Given publish-docker-ecr built the langwatch-app image for a commit

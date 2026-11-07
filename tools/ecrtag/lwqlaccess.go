@@ -106,29 +106,24 @@ func LwqlAccessFingerprintOf(tags []string) (fingerprint string, ok bool) {
 	return found[0], true
 }
 
-// ImageTags lists every tag on the image one tag names.
-type ImageTags interface {
-	ImageTags(ctx context.Context, ref Ref) ([]string, error)
-}
-
 // ErrNoLwqlFingerprint is a tag with no fingerprint to copy from any source.
 var ErrNoLwqlFingerprint = errors.New("no access-model fingerprint to record")
 
-// LwqlAccessTag gives Ref its lwql-access-<fingerprint>-<tag> tag, with
-// Fingerprint, or else the one a Sources tag's image carries (a per-arch
-// manifest this run built, or the image a re-tag copied).
+// LwqlAccessTag gives Ref its lwql-access-<fingerprint>-<tag> tag, from
+// Render, or else the one a Sources tag's image carries (a per-arch manifest
+// this run built, or the image a re-tag copied). Render runs only when Ref
+// has no fingerprint yet.
 type LwqlAccessTag struct {
-	Registry    Registry
-	Tags        ImageTags
-	Ref         Ref
-	Fingerprint string
-	Sources     []string
+	Registry Registry
+	Ref      Ref
+	Render   func(ctx context.Context) (string, error)
+	Sources  []string
 }
 
 // Write returns the fingerprint it recorded. A Ref that already carries one
 // is left alone.
 func (l LwqlAccessTag) Write(ctx context.Context) (string, error) {
-	own, err := l.Tags.ImageTags(ctx, l.Ref)
+	own, err := l.Registry.ImageTags(ctx, l.Ref)
 	if err != nil {
 		return "", err
 	}
@@ -149,14 +144,18 @@ func (l LwqlAccessTag) Write(ctx context.Context) (string, error) {
 }
 
 func (l LwqlAccessTag) fingerprint(ctx context.Context) (string, error) {
-	if l.Fingerprint != "" {
-		if lwqlAccessTag.MatchString(LwqlAccessTagPrefix + l.Fingerprint + "-") {
-			return l.Fingerprint, nil
+	if l.Render != nil {
+		fingerprint, err := l.Render(ctx)
+		if err != nil {
+			return "", err
 		}
-		return "", fmt.Errorf("%q is not a 32-character hex fingerprint", l.Fingerprint)
+		if !lwqlAccessTag.MatchString(LwqlAccessTagPrefix + fingerprint + "-") {
+			return "", fmt.Errorf("%q is not a 32-character hex fingerprint", fingerprint)
+		}
+		return fingerprint, nil
 	}
 	for _, source := range l.Sources {
-		tags, err := l.Tags.ImageTags(ctx, Ref{Repository: l.Ref.Repository, Tag: source})
+		tags, err := l.Registry.ImageTags(ctx, Ref{Repository: l.Ref.Repository, Tag: source})
 		if errors.Is(err, ErrNotFound) {
 			continue
 		}

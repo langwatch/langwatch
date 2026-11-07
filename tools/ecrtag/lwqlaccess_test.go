@@ -117,6 +117,9 @@ func TestLwqlAccessFingerprintOf(t *testing.T) {
 func TestLwqlAccessTag(t *testing.T) {
 	ctx := context.Background()
 	app := func(tag string) ecrtag.Ref { return ecrtag.Ref{Repository: "langwatch-app", Tag: tag} }
+	render := func(fingerprint string) func(context.Context) (string, error) {
+		return func(context.Context) (string, error) { return fingerprint, nil }
+	}
 
 	t.Run("a built index takes the fingerprint its per-arch manifest carries", func(t *testing.T) {
 		reg := newRegistry().
@@ -124,7 +127,7 @@ func TestLwqlAccessTag(t *testing.T) {
 			push("git-2-arm64", entry{digest: "sha256:arm2"}).
 			push("lwql-access-"+fpA+"-git-2-arm64", entry{digest: "sha256:arm2"})
 
-		fingerprint, err := ecrtag.LwqlAccessTag{Registry: reg, Tags: reg, Ref: app("git-2"), Sources: []string{"git-2-arm64"}}.Write(ctx)
+		fingerprint, err := ecrtag.LwqlAccessTag{Registry: reg, Ref: app("git-2"), Sources: []string{"git-2-arm64"}}.Write(ctx)
 
 		require.NoError(t, err)
 		assert.Equal(t, fpA, fingerprint)
@@ -138,7 +141,7 @@ func TestLwqlAccessTag(t *testing.T) {
 			push("lwql-access-"+fpA+"-git-1", entry{digest: "sha256:index1", mediaType: index}).
 			push("git-3", entry{digest: "sha256:index3", mediaType: index, body: "index-3"})
 
-		fingerprint, err := ecrtag.LwqlAccessTag{Registry: reg, Tags: reg, Ref: app("git-3"), Sources: []string{"git-3-arm64", "git-1"}}.Write(ctx)
+		fingerprint, err := ecrtag.LwqlAccessTag{Registry: reg, Ref: app("git-3"), Sources: []string{"git-3-arm64", "git-1"}}.Write(ctx)
 
 		require.NoError(t, err)
 		assert.Equal(t, fpA, fingerprint)
@@ -148,28 +151,31 @@ func TestLwqlAccessTag(t *testing.T) {
 	t.Run("a given fingerprint tags the image directly", func(t *testing.T) {
 		reg := newRegistry().push("git-2-arm64", entry{body: "arm-2"})
 
-		_, err := ecrtag.LwqlAccessTag{Registry: reg, Tags: reg, Ref: app("git-2-arm64"), Fingerprint: fpB}.Write(ctx)
+		_, err := ecrtag.LwqlAccessTag{Registry: reg, Ref: app("git-2-arm64"), Render: render(fpB)}.Write(ctx)
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"lwql-access-" + fpB + "-git-2-arm64"}, reg.puts)
 	})
 
-	t.Run("an image that already carries one is left alone", func(t *testing.T) {
+	t.Run("an image that already carries one is left alone and never rendered", func(t *testing.T) {
 		reg := newRegistry().
 			push("git-2", entry{digest: "sha256:index2", mediaType: index}).
 			push("lwql-access-"+fpA+"-git-2", entry{digest: "sha256:index2", mediaType: index})
+		rendered := false
+		renderOnce := func(context.Context) (string, error) { rendered = true; return fpB, nil }
 
-		fingerprint, err := ecrtag.LwqlAccessTag{Registry: reg, Tags: reg, Ref: app("git-2"), Fingerprint: fpB}.Write(ctx)
+		fingerprint, err := ecrtag.LwqlAccessTag{Registry: reg, Ref: app("git-2"), Render: renderOnce}.Write(ctx)
 
 		require.NoError(t, err)
 		assert.Equal(t, fpA, fingerprint)
 		assert.Empty(t, reg.puts)
+		assert.False(t, rendered, "rendered an image that already had a fingerprint")
 	})
 
 	t.Run("no fingerprint anywhere writes nothing and says so", func(t *testing.T) {
 		reg := newRegistry().push("git-3", entry{mediaType: index}).push("git-1", entry{mediaType: index})
 
-		_, err := ecrtag.LwqlAccessTag{Registry: reg, Tags: reg, Ref: app("git-3"), Sources: []string{"git-3-arm64", "git-1"}}.Write(ctx)
+		_, err := ecrtag.LwqlAccessTag{Registry: reg, Ref: app("git-3"), Sources: []string{"git-3-arm64", "git-1"}}.Write(ctx)
 
 		require.ErrorIs(t, err, ecrtag.ErrNoLwqlFingerprint)
 		assert.Empty(t, reg.puts)
@@ -178,7 +184,7 @@ func TestLwqlAccessTag(t *testing.T) {
 	t.Run("a malformed given fingerprint is refused", func(t *testing.T) {
 		reg := newRegistry().push("git-2", entry{})
 
-		_, err := ecrtag.LwqlAccessTag{Registry: reg, Tags: reg, Ref: app("git-2"), Fingerprint: "nothex"}.Write(ctx)
+		_, err := ecrtag.LwqlAccessTag{Registry: reg, Ref: app("git-2"), Render: render("nothex")}.Write(ctx)
 
 		require.Error(t, err)
 		assert.Empty(t, reg.puts)
