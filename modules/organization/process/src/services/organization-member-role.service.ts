@@ -126,17 +126,23 @@ export class OrganizationMemberRoleService {
     }
 
     await this.repo.getMembership({ organizationId, userId });
-    const heldFullSeat = disabled
-      ? await this.dependencies.seats.holdsFullSeat({ organizationId, userId })
-      : undefined;
 
     if (disabled) {
+      const heldFullSeat = await this.dependencies.seats.holdsFullSeat({ organizationId, userId });
       const seat = await this.dependencies.seatHolds.releaseOf({
         organizationId,
         userId,
         reason: "DISABLED",
       });
       await this.repo.setMemberDisabled({ organizationId, userId, disabled, seat });
+      // The seat is gone and the authz snapshot retired below, so the next request is refused
+      // now; user ends the live browser sessions from this fact (§9, R7).
+      await this.dependencies.seatNotices.memberDisabled({
+        organizationId,
+        userId,
+        disabledByUserId: actingUser?.id ?? null,
+        heldFullSeat,
+      });
     } else {
       const admitted = await this.dependencies.seats.withSeat({
         organizationId,
@@ -149,18 +155,6 @@ export class OrganizationMemberRoleService {
           }),
       });
       if (admitted) return;
-    }
-
-    if (disabled) {
-      // The seat is gone and the authz snapshot retired below, so the next request is refused
-      // now; user ends the live browser sessions from this fact (§9, R7).
-      await this.dependencies.seatNotices.memberDisabled({
-        organizationId,
-        userId,
-        disabledByUserId: actingUser?.id ?? null,
-        heldFullSeat,
-      });
-    } else {
       // M8487-MEMBER-ENABLED: governance puts the person's personal project back in aggregates.
       await this.dependencies.seatNotices.memberEnabled({
         organizationId,
