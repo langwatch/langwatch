@@ -58,6 +58,33 @@ Feature: Join before create - the choice happens before an organization is minte
     Then the organization with the most members is offered first
     And organizations of the same size are offered oldest first
 
+  # A domain can carry dozens of organizations, most of them one-person test
+  # workspaces. One primary button per organization buried the real team and
+  # the way out under a wall of equal calls to action.
+  @integration
+  Scenario: Many organizations stay one clear choice and a short list
+    Given twelve organizations open to requests from "acme.com"
+    When "sam" completes verification
+    Then joining the organization with the most members is the only primary action
+    And the next three are listed as quiet rows with their rounded counts
+    And the rest are listed, with a name filter, only once "sam" asks to show all
+    And creating a new organization stays visible as the explicit secondary choice
+
+  @integration
+  Scenario: A few organizations list as rows with nothing to unfold
+    Given four organizations open to requests from "acme.com"
+    When "sam" completes verification
+    Then joining the organization with the most members is the only primary action
+    And the other three are listed as quiet rows, with no "Show all" toggle and no name filter
+
+  @integration
+  Scenario: A name filter that matches nothing says so and folds back cleanly
+    Given twelve organizations open to requests from "acme.com"
+    And "sam" has asked to show all of them
+    When "sam" filters by a name no organization has
+    Then the list says no organization matches and offers to clear the search
+    And asking to show fewer returns to three rows with the filter cleared
+
   @integration
   Scenario: With nothing to offer, sign-up continues exactly as before
     Given no organization is open to "acme.com"
