@@ -232,3 +232,47 @@ Feature: Langy conversations are an event-sourced projection
     When I rename it or toggle sharing
     Then a "conversation_metadata_updated" event is recorded
     And the operational projection reflects the new title or sharing state
+
+  # ============================================================================
+  # Turn admission under concurrent sends
+  # The two refusals state the server error. The REST body still masks that code:
+  # https://github.com/langwatch/langwatch/issues/8860
+  # ============================================================================
+
+  @regression @unit
+  Scenario: A send that loses a write conflict is admitted on its next attempt
+    Given another send's write conflicts with mine
+    And no other turn holds my conversation when my send tries again
+    When my send loses the write conflict
+    Then my turn is admitted on the next attempt
+
+  @unit
+  Scenario: A send that loses a write conflict to another turn on my conversation is answered busy
+    Given another turn's write conflicts with mine
+    And that turn holds my conversation when my send tries again
+    When my send loses the write conflict
+    Then the turn start is answered busy
+
+  @unit
+  Scenario: A send that clashes with an already committed copy replays it
+    Given a copy of my send raced mine and has already been committed
+    When my send is submitted
+    Then I get that committed turn back instead of an error
+
+  @unit
+  Scenario: A send that clashes with a copy still being prepared is refused as Langy unavailable
+    Given a copy of my send raced mine and is still being prepared
+    When my send is submitted
+    Then the turn start fails with the "langy_agent_unavailable" error
+
+  @unit
+  Scenario: A send that cannot get through a burst of sends fails as Langy unavailable
+    Given many sends race mine and none lets it through
+    When my send keeps losing
+    Then the turn start fails with the "langy_agent_unavailable" error
+
+  @unit
+  Scenario: A turn send that fails for another reason is surfaced without retry
+    Given my send fails for a reason unrelated to a race
+    When my send is submitted
+    Then I see that failure straight away and the send is not attempted again
