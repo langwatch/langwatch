@@ -18,6 +18,9 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../ksuid/tsconfig.build.json"
     }
   ]
 }

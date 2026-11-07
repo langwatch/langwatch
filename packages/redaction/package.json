@@ -32,6 +32,7 @@
     "libphonenumber-js": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/ksuid": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
