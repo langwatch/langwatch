@@ -10,6 +10,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { StatTile, StatTileFigure, StatTileSkeleton } from "@langwatch/design-system/stat-tile";
+import { PlanTypes } from "@langwatch/enterprise-billing-contract";
 import type { UsageMonthBreakdown } from "@langwatch/entitlement-contract";
 import { ArrowRight } from "lucide-react";
 
@@ -17,8 +18,12 @@ import { billingApi, type UsageRead } from "../../behavior/billing-api.ts";
 import { useBillingPricingService } from "../../behavior/use-billing-pricing-service.ts";
 import { useBillingHost } from "../../model/billing-host.ts";
 import { parseGrowthSeatPlanType, type Currency } from "../../model/billing-plans.ts";
-import { SUBSCRIPTION_PATH, UPGRADE_DIALOG_HREF } from "../../model/checkout-intent.ts";
-import { getPlanActionLabel, planManagementUrl } from "../../model/plan-management-url.ts";
+import { SUBSCRIPTION_PATH } from "../../model/checkout-intent.ts";
+import {
+  getPlanActionLabel,
+  planActionHref,
+  planManagementUrl,
+} from "../../model/plan-management-url.ts";
 import { PricingModel } from "../../model/prisma-types.ts";
 import {
   breakdownGapMessage,
@@ -186,7 +191,11 @@ function HostedUsage({
       {plan && (
         <UsagePlanStrip
           strip={planStrip({ plan, currency, seatPriceCents })}
-          actionHref={plan.free ? UPGRADE_DIALOG_HREF : SUBSCRIPTION_PATH}
+          actionHref={planActionHref({
+            isSaaS: true,
+            isFree: plan.free,
+            isEnterprise: plan.type === PlanTypes.ENTERPRISE,
+          })}
         />
       )}
       <UsageEventsCard

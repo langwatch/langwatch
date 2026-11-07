@@ -22,7 +22,7 @@ Feature: Usage page
     When I open the Usage page
     Then the plan strip reads "Free plan" with a "Current" chip
     And it reads "€0 · 50,000 events and 2 full seats a month"
-    And "Upgrade to Growth" opens Plan & billing
+    And "Upgrade to Growth" opens the Growth seat dialog on Plan & billing
 
   @integration
   Scenario: A Growth organization sees its price and manages its subscription
