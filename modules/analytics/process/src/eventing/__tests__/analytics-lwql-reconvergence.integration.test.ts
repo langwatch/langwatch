@@ -14,6 +14,7 @@ import {
 } from "@langwatch/prisma-client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
 import { LWQL_POSTGRES_READER_ROLE } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   type LwqlAppOwnedDrift,
@@ -46,6 +47,8 @@ class AllowTestQueries extends PrismaQueryGuard {
 }
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+
+const collectionBinding = LangWatchQLCollectionBindingService.create();
 const ENGINE_TABLES = LangWatchQLCatalogShapesService.create()
   .postgresViews(LWQL_VIEW_CATALOG)
   .map((view) => view.sourceTable);
@@ -160,7 +163,7 @@ describe("given a rendered install whose config store has not mounted the named 
     );
     // Production provisions into the application's own database, which holds the fact tables.
     names = { ...harness.names, database: harness.factDatabase };
-    collection = selfProvisioning.namedCollection({ names });
+    collection = collectionBinding.namedCollection({ names, mode: "rendered" });
     // A reused container keeps the facts database, so the app-owned objects go first.
     await harness.applyAsAdmin([
       `DROP NAMED COLLECTION IF EXISTS ${collection}`,
