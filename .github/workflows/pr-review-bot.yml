@@ -1,9 +1,8 @@
 name: PR Review Bot
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-
+  # pr.yml calls this once a pull request's branch has gone quiet.
+  workflow_call:
 permissions:
   contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
   pull-requests: write

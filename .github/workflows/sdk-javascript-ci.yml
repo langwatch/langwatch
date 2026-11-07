@@ -4,11 +4,8 @@
 name: sdk-javascript-ci
 
 on:
-  # Pull requests and the merge queue reach this through pr.yml.
+  # Pull requests reach this through pr.yml; main through the nightly suite.
   workflow_call:
-  push:
-    branches:
-      - main
   pull_request_target:
     types: [labeled]
   workflow_dispatch:
