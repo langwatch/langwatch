@@ -229,8 +229,8 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       python: {
-        pip: "pip install langwatch openai",
-        uv: "uv add langwatch openai",
+        pip: 'pip install "langwatch>=1.3.0" openai',
+        uv: 'uv add "langwatch>=1.3.0" openai',
       },
     },
     snippet: pyRef(openaiPySource),
@@ -254,8 +254,8 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       python: {
-        pip: "pip install langwatch openai-agents openinference-instrumentation-openai-agents",
-        uv: "uv add langwatch openai-agents openinference-instrumentation-openai-agents",
+        pip: 'pip install "langwatch>=1.3.0" openai-agents openinference-instrumentation-openai-agents',
+        uv: 'uv add "langwatch>=1.3.0" openai-agents openinference-instrumentation-openai-agents',
       },
     },
     snippet: pyRef(openaiAgentsPySource),
@@ -276,8 +276,8 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       python: {
-        pip: "pip install langwatch langchain langchain-openai",
-        uv: "uv add langwatch langchain langchain-openai",
+        pip: 'pip install "langwatch>=1.3.0" langchain langchain-openai',
+        uv: 'uv add "langwatch>=1.3.0" langchain langchain-openai',
       },
     },
     snippet: pyRef(langchainPySource),
@@ -298,8 +298,8 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       python: {
-        pip: "pip install langwatch langgraph langchain-openai",
-        uv: "uv add langwatch langgraph langchain-openai",
+        pip: 'pip install "langwatch>=1.3.0" langgraph langchain-openai',
+        uv: 'uv add "langwatch>=1.3.0" langgraph langchain-openai',
       },
     },
     snippet: pyRef(langgraphPySource),
@@ -316,8 +316,8 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/litellm.avif", "LiteLLM"),
     install: {
       python: {
-        pip: "pip install langwatch litellm",
-        uv: "uv add langwatch litellm",
+        pip: 'pip install "langwatch>=1.3.0" litellm',
+        uv: 'uv add "langwatch>=1.3.0" litellm',
       },
     },
     snippet: pyRef(litellmPySource),
@@ -334,8 +334,8 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/dspy.webp", "DSPy"),
     install: {
       python: {
-        pip: "pip install langwatch dspy",
-        uv: "uv add langwatch dspy",
+        pip: 'pip install "langwatch>=1.3.0" dspy',
+        uv: 'uv add "langwatch>=1.3.0" dspy',
       },
     },
     snippet: pyRef(dspyPySource),
@@ -352,8 +352,8 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/strands.svg", "Strands Agents"),
     install: {
       python: {
-        pip: "pip install langwatch strands-agents strands-agents-tools",
-        uv: "uv add langwatch strands-agents strands-agents-tools",
+        pip: 'pip install "langwatch>=1.3.0" strands-agents strands-agents-tools',
+        uv: 'uv add "langwatch>=1.3.0" strands-agents strands-agents-tools',
       },
     },
     snippet: pyRef(strandsPySource),
@@ -370,8 +370,8 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/agno.png", "Agno"),
     install: {
       python: {
-        pip: "pip install langwatch agno openai openinference-instrumentation-agno",
-        uv: "uv add langwatch agno openai openinference-instrumentation-agno",
+        pip: 'pip install "langwatch>=1.3.0" agno openai openinference-instrumentation-agno',
+        uv: 'uv add "langwatch>=1.3.0" agno openai openinference-instrumentation-agno',
       },
     },
     snippet: pyRef(agnoPySource),
@@ -392,8 +392,8 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       python: {
-        pip: "pip install langwatch anthropic openinference-instrumentation-anthropic",
-        uv: "uv add langwatch anthropic openinference-instrumentation-anthropic",
+        pip: 'pip install "langwatch>=1.3.0" anthropic openinference-instrumentation-anthropic',
+        uv: 'uv add "langwatch>=1.3.0" anthropic openinference-instrumentation-anthropic',
       },
     },
     snippet: pyRef(anthropicPySource),
@@ -410,8 +410,8 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/pydanticai.svg", "Pydantic AI"),
     install: {
       python: {
-        pip: "pip install langwatch pydantic-ai",
-        uv: "uv add langwatch pydantic-ai",
+        pip: 'pip install "langwatch>=1.3.0" pydantic-ai',
+        uv: 'uv add "langwatch>=1.3.0" pydantic-ai',
       },
     },
     snippet: pyRef(pydanticPySource),
@@ -428,8 +428,8 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/haystack.png", "Haystack"),
     install: {
       python: {
-        pip: "pip install langwatch openinference-instrumentation-haystack haystack-ai",
-        uv: "uv add langwatch openinference-instrumentation-haystack haystack-ai",
+        pip: 'pip install "langwatch>=1.3.0" openinference-instrumentation-haystack haystack-ai',
+        uv: 'uv add "langwatch>=1.3.0" openinference-instrumentation-haystack haystack-ai',
       },
     },
     snippet: pyRef(haystackPySource),
