@@ -16,6 +16,7 @@ describe("the Python install lines", () => {
       spec.install?.python ? [spec.install.python.pip, spec.install.python.uv] : [],
     );
 
+    /** @scenario "Every Python framework snippet installs langwatch 1.3.0 or newer" */
     it("asks every pip and uv install for 1.3.0 or newer", () => {
       expect(installs.length).toBeGreaterThan(10);
       expect(installs.filter((install) => !install.includes(FLOORED))).toEqual([]);
@@ -23,6 +24,7 @@ describe("the Python install lines", () => {
   });
 
   describe("when the tracing prompt is read", () => {
+    /** @scenario "The tracing setup prompt installs langwatch 1.3.0 or newer" */
     it("asks for 1.3.0 or newer and never for a bare langwatch", () => {
       expect(PROMPT_TRACING).toContain(`pip install ${FLOORED}`);
       expect(PROMPT_TRACING).toContain(`uv add ${FLOORED}`);

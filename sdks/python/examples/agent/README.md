@@ -9,7 +9,7 @@ These examples connect a Python function to LangWatch Agent Testing with `langwa
 
 ## Setup
 
-1. Install the SDK and the example dependencies: `uv add langwatch openai fastapi uvicorn python-dotenv`.
+1. Install the SDK and the example dependencies: `uv add "langwatch>=1.3.0" openai fastapi uvicorn python-dotenv`.
 2. Set `LANGWATCH_API_KEY` to the API key of your project.
 3. Set `OPENAI_API_KEY`.
 4. Start one of the examples. The agent shows as Online on the Agents page of your project.
