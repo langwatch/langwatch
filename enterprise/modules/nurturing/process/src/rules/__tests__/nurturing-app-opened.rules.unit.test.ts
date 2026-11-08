@@ -11,15 +11,6 @@ import { appOpenedSignals } from "../nurturing-app-opened.rules.ts";
 const open = (page: AppPageOpenedEventData["page"]) =>
   ({ tenantId: "user-1", userId: "user-1", page, occurredAt: 1_000 }) as AppPageOpenedEventData;
 
-const pages = [
-  "me_sessions",
-  "me_overview",
-  "settings_usage",
-  "settings_plans",
-  "settings_subscription",
-  "governance_costs",
-] as const;
-
 describe("appOpenedSignals", () => {
   /** @scenario "An app open identifies app_last_opened_at and tracks sessions_page_viewed on the opening user" */
   it("raises sessions_page_viewed for the sessions page", () => {
@@ -30,6 +21,7 @@ describe("appOpenedSignals", () => {
   });
 
   /** @scenario "A usage, cost or plan page open identifies usage_page_viewed_at on the opening user" */
+  /** @scenario "Any tracked page open identifies app_last_opened_at" */
   it.each([
     "me_overview",
     "settings_usage",
@@ -42,11 +34,6 @@ describe("appOpenedSignals", () => {
       "usage_page_opened",
       "usage_page_viewed",
     ]);
-  });
-
-  /** @scenario "Any tracked page open identifies app_last_opened_at" */
-  it.each(pages)("raises app_opened for %s", (page) => {
-    expect(appOpenedSignals({ data: open(page) }).map(({ kind }) => kind)).toContain("app_opened");
   });
 
   /** @scenario "Other pages do not set usage_page_viewed_at" */

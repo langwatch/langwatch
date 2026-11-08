@@ -476,6 +476,7 @@ describe("NurturingDeliveryService coding-agent signals", () => {
 describe("NurturingDeliveryService app-open signals", () => {
   describe("when an app open is delivered", () => {
     /** @scenario "An app open identifies app_last_opened_at and tracks sessions_page_viewed on the opening user" */
+    /** @scenario "Any tracked page open identifies app_last_opened_at" */
     it("identifies the opening user with the open time", async () => {
       const { delivery, cio } = deliveryOver(new ClockedClaims());
 
