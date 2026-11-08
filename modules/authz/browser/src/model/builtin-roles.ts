@@ -2,6 +2,7 @@
 
 import { type AuthzPermission } from "@langwatch/authorization";
 import {
+  BILLING_ROLE_KEY,
   builtinRolePermissions,
   roleKeyForTeamRole,
   type TeamUserRole,
@@ -9,12 +10,18 @@ import {
 
 import type { ManagedGrant } from "./managed-grant.ts";
 
+/** The dot a built-in role's row and drawer lead with, as a design-system colour palette. */
+export type RoleDotPalette = "orange" | "green" | "gray" | "blue";
+
 /** One built-in role, as the page presents it. */
 export type BuiltinRoleCard = {
+  /** The address the role's drawer carries: `?drawer.role=<key>`. */
+  key: "admin" | "member" | "viewer";
   /** The legacy team role, which is what the permission lookup is keyed on. */
   teamRole: Extract<TeamUserRole, "ADMIN" | "MEMBER" | "VIEWER">;
   name: string;
   description: string;
+  dot: RoleDotPalette;
   /** The tier this one builds on, which the card names instead of repeating its grants. */
   inheritsFrom: string | null;
   /** The few permissions the card shows as chips; the dialog lists the rest. */
@@ -28,29 +35,47 @@ export type BuiltinRoleCard = {
  */
 export const BUILTIN_ROLE_CARDS: readonly BuiltinRoleCard[] = [
   {
+    key: "admin",
     teamRole: "ADMIN",
     name: "Admin",
-    description:
-      "Everything Member can do, and the team as well: who is on it, the projects it owns, and how the gateway routes and spends.",
+    description: "Everything Member can do, plus teams, projects and model providers.",
+    dot: "orange",
     inheritsFrom: "Member",
     headline: ["team:manage", "project:delete", "gatewayProviders:manage"],
   },
   {
+    key: "member",
     teamRole: "MEMBER",
     name: "Member",
-    description:
-      "Create and change the work itself: traces, datasets, prompts, evaluations, experiments and the keys that call models.",
+    description: "Creates and changes traces, datasets, prompts, evaluations and keys.",
+    dot: "green",
     inheritsFrom: "Viewer",
     headline: ["datasets:manage", "prompts:manage", "virtualKeys:create"],
   },
   {
+    key: "viewer",
     teamRole: "VIEWER",
     name: "Viewer",
-    description: "Read everything the team has, and change none of it.",
+    description: "Reads everything the team has and changes none of it.",
+    dot: "gray",
     inheritsFrom: null,
     headline: ["traces:view", "analytics:view", "datasets:view"],
   },
 ];
+
+/** The Billing role: the last row of the list, read like the others. */
+export const BILLING_ROLE_CARD = {
+  key: "billing",
+  name: "Billing",
+  description: "Pays: plan, seats, invoices and seat requests.",
+  dot: "blue",
+  headline: ["subscription:manage", "seatRequests:manage", "members:view"],
+} as const;
+
+/** Every permission the Billing role holds. */
+export function billingRoleGrantedPermissions(): AuthzPermission[] {
+  return [...builtinRolePermissions(BILLING_ROLE_KEY)] as AuthzPermission[];
+}
 
 /** Every permission a built-in role holds, as the viewer reads membership. */
 export function builtinRoleGrantedPermissions(

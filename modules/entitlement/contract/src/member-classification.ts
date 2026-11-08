@@ -70,14 +70,44 @@ export function getRoleChangeType({
   return willBe === "FullMember" ? "lite-to-full" : "full-to-lite";
 }
 
-/** An organization's seats over the people holding one: members and live invitations alike. */
+/**
+ * An organization's seats over the people holding one: members and live invitations alike. A
+ * live seat hold (seat-rotation.feature) counts as a full seat unless its person holds one again,
+ * as a member (by user id) or through a live full invitation (by address).
+ */
 export function countMemberSeats(
-  holders: readonly Readonly<{ role: OrganizationUserRole; permissions: string[] | undefined }>[],
-): Readonly<{ fullMembers: number; liteMembers: number; developers: number }> {
+  holders: readonly Readonly<{
+    role: OrganizationUserRole;
+    permissions: string[] | undefined;
+    userId?: string;
+    email?: string | null;
+  }>[],
+  holds: readonly Readonly<{ userId: string; email?: string | null }>[] = [],
+): Readonly<{
+  fullMembers: number;
+  liteMembers: number;
+  developers: number;
+}> {
   const count = (type: MemberType) =>
     holders.filter((holder) => classifyMemberType(holder.role, holder.permissions) === type).length;
+  const fullHolders = holders.filter(
+    (holder) => classifyMemberType(holder.role, holder.permissions) === "FullMember",
+  );
+  const fullUserIds = new Set(fullHolders.map((holder) => holder.userId));
+  const fullEmails = new Set(
+    fullHolders.flatMap((holder) => (holder.email ? [holder.email.toLowerCase()] : [])),
+  );
+  const heldFullMembers = new Set(
+    holds
+      .filter(
+        (hold) =>
+          !fullUserIds.has(hold.userId) &&
+          !(hold.email && fullEmails.has(hold.email.toLowerCase())),
+      )
+      .map((hold) => hold.userId),
+  ).size;
   return {
-    fullMembers: count("FullMember"),
+    fullMembers: count("FullMember") + heldFullMembers,
     liteMembers: count("LiteMember"),
     developers: count("Developer"),
   };

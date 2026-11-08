@@ -28,6 +28,8 @@ class CapabilityBillingHost extends BillingHostApi {
   private readonly org: BillingHostOrganization | undefined;
   private readonly teamId: string | undefined;
   private readonly query: Readonly<Record<string, string | undefined>>;
+  /** organization:manage: invites members and reads the month breakdown. */
+  private readonly mayManageOrganization: boolean;
   private readonly deploymentIsSaaS: boolean;
   private readonly deploymentIsDevelopment: boolean;
   private readonly navigation: UiNavigation;
@@ -37,6 +39,7 @@ class CapabilityBillingHost extends BillingHostApi {
     org,
     teamId,
     query,
+    mayManageOrganization,
     deploymentIsSaaS,
     deploymentIsDevelopment,
     navigation,
@@ -45,6 +48,7 @@ class CapabilityBillingHost extends BillingHostApi {
     org: BillingHostOrganization | undefined;
     teamId: string | undefined;
     query: Readonly<Record<string, string | undefined>>;
+    mayManageOrganization: boolean;
     deploymentIsSaaS: boolean;
     deploymentIsDevelopment: boolean;
     navigation: UiNavigation;
@@ -54,6 +58,7 @@ class CapabilityBillingHost extends BillingHostApi {
     this.org = org;
     this.teamId = teamId;
     this.query = query;
+    this.mayManageOrganization = mayManageOrganization;
     this.deploymentIsSaaS = deploymentIsSaaS;
     this.deploymentIsDevelopment = deploymentIsDevelopment;
     this.navigation = navigation;
@@ -66,6 +71,18 @@ class CapabilityBillingHost extends BillingHostApi {
 
   activeTeamId(): string | undefined {
     return this.teamId;
+  }
+
+  canInviteMembers(): boolean {
+    return this.mayManageOrganization;
+  }
+
+  canReadMonthBreakdown(): boolean {
+    return this.mayManageOrganization;
+  }
+
+  canReadHeldSeats(): boolean {
+    return this.mayManageOrganization;
   }
 
   routeQuery(): Readonly<Record<string, string | undefined>> {
@@ -87,6 +104,10 @@ class CapabilityBillingHost extends BillingHostApi {
 
   navigate(to: string): void {
     this.navigation.navigate(to);
+  }
+
+  replace(to: string): void {
+    this.navigation.replace(to);
   }
 
   leaveTo(url: string): void {
@@ -136,6 +157,7 @@ export default function BillingHostMount({ children }: { children?: ReactNode })
   }, [organizations.data, projectId]);
 
   const query = route.reading().query;
+  const mayManageOrganization = session.hasOrganizationPermission("organization:manage");
 
   const host = useMemo(
     () =>
@@ -143,12 +165,22 @@ export default function BillingHostMount({ children }: { children?: ReactNode })
         org,
         teamId,
         query,
+        mayManageOrganization,
         deploymentIsSaaS: deployment.isSaaS,
         deploymentIsDevelopment: deployment.isDevelopment,
         navigation,
         feedback,
       }),
-    [org, teamId, query, deployment.isSaaS, deployment.isDevelopment, navigation, feedback],
+    [
+      org,
+      teamId,
+      query,
+      mayManageOrganization,
+      deployment.isSaaS,
+      deployment.isDevelopment,
+      navigation,
+      feedback,
+    ],
   );
 
   return <BillingHostProvider value={host}>{children}</BillingHostProvider>;

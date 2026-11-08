@@ -807,7 +807,7 @@ type Output = z.infer<typeof modelDefaultSnapshotSchema>; // ../contract/src/mod
 interface Input {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
-  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS" | "INSTANT_EVALS";
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS" | "INSTANT_EVALS" | "JUDGE";
   model: string | null;
 }
 // Output: modelProviderOkAckSchema, ../contract/src/model-provider.trpc-schemas.ts:389
@@ -900,8 +900,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                         | Environment variable                           | Declared at                                   |
 | ------ | -------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:256`           |
-| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:257`           |
+| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:262`           |
+| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:263`           |
 | config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:31` |
 | config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:32` |
 | config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:33` |

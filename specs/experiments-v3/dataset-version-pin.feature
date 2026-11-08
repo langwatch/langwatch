@@ -64,9 +64,26 @@ Feature: An experiment can pin the saved dataset version its runs read
     Then it is refused with code "experiment_evaluation_input_invalid"
 
   @unit
+  Scenario: The run API refuses a dataset version with no saved dataset to read
+    Given a saved experiment whose active dataset is inline
+    When the run API is called with "dataset_version" 1 and no "dataset_id"
+    Then it is refused with a 400 and code "experiment_evaluation_input_invalid"
+    And no run starts
+    And the same call naming a saved dataset in "dataset_id" reads that dataset's version 1
+
+  @unit
   Scenario: The workflow evaluate API refuses a dataset version sent with inline data
     When the workflow evaluate API is called with inline data and "dataset_version" 1
     Then the body fails validation on "dataset_version"
+
+  @integration @unit
+  Scenario: An open workbench shows a saved dataset's new rows after it changes elsewhere
+    Given a workbench open on saved dataset "qa" showing "a" and "b4"
+    When an older version of "qa" with "a-EDITED", "b" and "c" is restored on the dataset page
+    Then the workbench shows "a-EDITED", "b" and "c" without a reload
+    And a cell edited in the workbench and not yet synced keeps its value
+    And a row deleted in the workbench and not yet synced stays deleted
+    And a read keyed by other columns than the workbench's leaves its rows as they are
 
   @unit
   Scenario: Saving an experiment pinned to a dataset version keeps that version

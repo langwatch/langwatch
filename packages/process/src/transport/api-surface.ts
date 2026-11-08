@@ -55,6 +55,7 @@ import { z } from "zod";
 import type { ExposedSurface } from "../process-supply.ts";
 import type { ApiUiBundle } from "./bundle-config.ts";
 import { docsCrossOrigin } from "./docs-cross-origin.ts";
+import { idempotencyReceiptsOn } from "./idempotency-receipts.ts";
 
 export type ApiSurfaceComposition = Readonly<{
   members: ProcessMemberSource;
@@ -97,7 +98,7 @@ class ApiSurface {
     const sessions = SessionReader.create({ verify: door.sessions });
     const idempotency = stores.database
       ? IdempotencyLedger.create({
-          receipts: members.read("prisma"),
+          receipts: idempotencyReceiptsOn(members.read("prisma")),
           cipher: members.read("encryption"),
         }).run
       : void 0;

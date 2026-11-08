@@ -23,6 +23,7 @@
   "dependencies": {
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/instant-eval-judge-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",

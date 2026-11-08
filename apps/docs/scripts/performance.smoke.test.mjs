@@ -425,7 +425,8 @@ await it("styles a page, dark mode, search and navigation from inlined styles", 
           "grid",
         );
         const light = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-        await page.getByRole("button", { name: "Switch color theme" }).first().click();
+        await page.getByRole("button", { name: "Color theme" }).first().click();
+        await page.getByRole("menuitemradio", { name: "Dark", exact: true }).click();
         await page.waitForFunction(
           (before) =>
             document.documentElement.classList.contains("dark") &&

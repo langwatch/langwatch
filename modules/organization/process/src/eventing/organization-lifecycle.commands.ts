@@ -1,6 +1,7 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import {
+  ORGANIZATION_AGGREGATE_TYPE,
   INTEGRATION_METHOD_CHOSEN_EVENT_TYPE,
   INVITE_ACCEPTED_EVENT_TYPE,
   MEMBERS_INVITED_EVENT_TYPE,
@@ -30,7 +31,6 @@ import {
   type IntegrationMethodChosenEvent,
   type InviteAcceptedEvent,
   type MembersInvitedEvent,
-  ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_LIFECYCLE_EVENT_VERSION,
   type OrganizationCreatedEvent,
   type OrganizationMemberDisabledEvent,

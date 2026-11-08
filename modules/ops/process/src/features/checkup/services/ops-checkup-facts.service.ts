@@ -311,7 +311,7 @@ function connectView({
   return {
     deployment: "on",
     licensed: status.licensed,
-    entitledServices: status.entitledServices ?? [...status.enabledServices],
+    entitledServices: status.entitledServices,
     ...(status.sync.lastSyncAt ? { lastSyncAt: status.sync.lastSyncAt } : {}),
     ...(status.sync.lastError ? { lastSyncError: status.sync.lastError.code } : {}),
     ...hosts,

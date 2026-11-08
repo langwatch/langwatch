@@ -97,6 +97,8 @@ describe("given an organization whose joiner seat is Developer", () => {
           organizationId: "org_acme",
           role: OrganizationUserRole.DEVELOPER,
           disabledAt: null,
+          seatPendingSince: null,
+          fullSeatSince: null,
           pendingSsoGrantId: null,
         },
       });

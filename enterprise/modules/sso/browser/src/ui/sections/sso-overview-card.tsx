@@ -1,5 +1,5 @@
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
 import { Link } from "@langwatch/browser-host/link";
-import { UpgradeRequired } from "@langwatch/design-system/access-state";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * How everyone signs in, on the Authentication overview: the live connection
@@ -50,12 +50,13 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
   const connection = view?.connection ?? null;
   const refusal = view && !view.availability.available ? view.availability.refusal : null;
   // A refusal is said above the cards, and nothing is offered that it would refuse.
-  const enterpriseRequired = view?.enterpriseRequired === true;
+  // A missing license is the Enterprise lock on the card, said once rather than twice.
+  const enterpriseRequired = view?.enterpriseRequired === true || refusal === "license_required";
   const canOffer = canManage && refusal === null && !enterpriseRequired;
 
   return (
     <VStack align="stretch" gap={3} width="full" height="full">
-      {refusal && <AvailabilityRefusalNotice refusal={refusal} />}
+      {refusal && refusal !== "license_required" && <AvailabilityRefusalNotice refusal={refusal} />}
       {canManage && view && view.legacyDomainsToMove.length > 0 && (
         <LegacyDomainToMoveNotice domains={view.legacyDomainsToMove} settingsHref={PROVIDER_PAGE} />
       )}
@@ -65,6 +66,7 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
         <SingleSignOnPreviewCard
           state={connection?.state ?? null}
           canManage={canOffer}
+          canActivate={host.canManageOrganization()}
           enterpriseRequired={enterpriseRequired}
           updatePhase={view?.migration?.phase ?? null}
           goLiveBlockedBecause={
@@ -281,6 +283,7 @@ function UpdateNotice({
 export function SingleSignOnPreviewCard({
   state = null,
   canManage = false,
+  canActivate = false,
   enterpriseRequired = false,
   goLiveBlockedBecause = null,
   updatePhase = null,
@@ -288,6 +291,8 @@ export function SingleSignOnPreviewCard({
 }: {
   state?: SetupConnection["state"] | null;
   canManage?: boolean;
+  /** The reader may activate a license or change the plan, so the lock offers the way there. */
+  canActivate?: boolean;
   /** The plan refuses single sign-on: said on the card, no control offered. */
   enterpriseRequired?: boolean;
   goLiveBlockedBecause?: string | null;
@@ -317,15 +322,12 @@ export function SingleSignOnPreviewCard({
       }
     >
       {enterpriseRequired && (
-        <UpgradeRequired
+        <EnterpriseLock
           feature="Single sign-on"
+          description="Your people sign in with your company's identity provider, and you decide there who still has access."
+          canManage={canActivate}
           compact
           data-testid="sso-card-enterprise-gate"
-          actions={
-            <Button asChild size="sm" colorPalette="orange">
-              <Link href="/settings/plans">Compare plans</Link>
-            </Button>
-          }
         />
       )}
 

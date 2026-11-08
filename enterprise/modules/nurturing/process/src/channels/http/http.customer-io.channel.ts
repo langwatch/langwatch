@@ -10,6 +10,7 @@ import { CustomerIoChannel, type CustomerIoChannelOptions } from "../customer-io
 
 const logger = createLogger("ee:customer-io-channel");
 const EXTERNAL_SERVICE_TIMEOUT_MS = 10_000;
+type CustomerIoPath = "/identify" | "/track" | "/group" | "/batch";
 const REGIONAL_ENDPOINTS: Readonly<{ us: string; eu: string }> = {
   us: "https://cdp.customer.io/v1",
   eu: "https://cdp-eu.customer.io/v1",
@@ -45,6 +46,7 @@ export class HttpCustomerIoChannel extends CustomerIoChannel {
     userId: string;
     event: CioEventName;
     properties?: Record<string, unknown>;
+    messageId?: string;
   }): Promise<void> {
     return this.post("/track", input);
   }
@@ -68,6 +70,7 @@ export class HttpCustomerIoChannel extends CustomerIoChannel {
             userId: call.userId,
             event: call.event,
             properties: call.properties,
+            ...(call.messageId ? { messageId: call.messageId } : {}),
           };
         case "group":
           return {
@@ -81,11 +84,23 @@ export class HttpCustomerIoChannel extends CustomerIoChannel {
     return this.post("/batch", { batch: batchItems });
   }
 
-  private async post(path: "/identify" | "/track" | "/group" | "/batch", body: unknown) {
+  /** Rejects when Customer.io did not take the track; trackEvent only logs that. */
+  override trackEventOrThrow(input: Parameters<CustomerIoChannel["trackEvent"]>[0]): Promise<void> {
+    return this.postOrThrow("/track", input);
+  }
+
+  /** A failure is logged and reported, never thrown: most calls are fire-and-forget. */
+  private async post(path: CustomerIoPath, body: unknown): Promise<void> {
+    await this.postOrThrow(path, body).catch(() => undefined);
+  }
+
+  /** Logs and reports a failure, then rejects with it. */
+  private async postOrThrow(path: CustomerIoPath, body: unknown): Promise<void> {
     if (!this.apiKey) return;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_SERVICE_TIMEOUT_MS);
+    let failure: Error | undefined;
     try {
       const response = await this.fetchFn(`${this.baseUrl}${path}`, {
         method: "POST",
@@ -101,19 +116,20 @@ export class HttpCustomerIoChannel extends CustomerIoChannel {
           typeof response.text === "function"
             ? await response.text().catch(() => "<unreadable>")
             : "<unreadable>";
-        const error = new Error(`Customer.io ${path} failed: HTTP ${response.status}`);
+        failure = new Error(`Customer.io ${path} failed: HTTP ${response.status}`);
         logger.error(
           { path, status: response.status, responseBody: responseBody.slice(0, 500) },
           `[CIO] <<< ${path} FAILED: HTTP ${response.status}`,
         );
-        this.errorReporter?.capture(error, { path, status: response.status });
+        this.errorReporter?.capture(failure, { path, status: response.status });
       }
     } catch (error) {
-      const normalizedError = error instanceof Error ? error : new Error(String(error));
+      failure = error instanceof Error ? error : new Error(String(error));
       logger.error({ error, path }, `[CIO] <<< ${path} EXCEPTION`);
-      this.errorReporter?.capture(normalizedError);
+      this.errorReporter?.capture(failure);
     } finally {
       clearTimeout(timeoutId);
     }
+    if (failure) throw failure;
   }
 }

@@ -361,6 +361,58 @@ describe("given a self-hosted install that judges through LangWatch, with the re
   });
 });
 
+describe("given a self-hosted install with no license, no classifier and the release flag off", () => {
+  const unlicensed = ({ runsOnOwnModel }: { runsOnOwnModel: boolean }) =>
+    InstantEvalAccessService.create({
+      flags: { isEnabled: async () => false },
+      projects: { findOrganizationId: async () => "organization-1" },
+      judgesThroughConnect: true,
+      optIns: NEVER_OPTED_IN,
+      isJudgeConfigured: () => false,
+      hostedPlans: null,
+      judge: { isAvailableForOrganization: async () => false },
+      ownModels: { runsOnOwnModel: async () => runsOnOwnModel },
+    });
+
+  describe("when the project's Instant Evals column is its own decision model, ready to run", () => {
+    /** @scenario "An own decision model releases Instant Evals without the flag or a license" */
+    it("may judge, while LangWatch's own model stays unreleased", async () => {
+      const access = InstantEvalAccessService.create({
+        flags: LOUD_FLAGS,
+        projects: { findOrganizationId: async () => "organization-1" },
+        judgesThroughConnect: true,
+        optIns: NEVER_OPTED_IN,
+        isJudgeConfigured: () => {
+          throw new Error("the gate read the classifier");
+        },
+        hostedPlans: null,
+        judge: {
+          isAvailableForOrganization: () => {
+            throw new Error("the gate read the license");
+          },
+        },
+        ownModels: { runsOnOwnModel: async () => true },
+      });
+
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(true);
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(true);
+      await expect(
+        unlicensed({ runsOnOwnModel: true }).isHostedReleased({ projectId: "project-1" }),
+      ).resolves.toBe(false);
+    });
+  });
+
+  describe("when its own decision model has no usable key", () => {
+    /** @scenario "An own decision model that cannot run releases nothing" */
+    it("may not judge", async () => {
+      const access = unlicensed({ runsOnOwnModel: false });
+
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(false);
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(false);
+    });
+  });
+});
+
 /** A development checkout with no classifier: it judges, but not through LangWatch. */
 function devCheckout({ flagOn }: { flagOn: boolean }) {
   return InstantEvalAccessService.create({

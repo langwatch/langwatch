@@ -4,6 +4,7 @@ import {
   ActivationCodeExpiredError,
   ActivationCodeNotFoundError,
   ConnectInstanceRequiredError,
+  ConnectLicenseExpiredError,
   ConnectLicenseRevokedError,
   ConnectLicenseTokenMalformedError,
   LicenseSyncRateLimitedError,
@@ -24,7 +25,10 @@ import { upgradeDiagnosticsSubmission } from "../../__tests__/support/upgrade-di
 import { HttpConnectLicenseChannel } from "../../channels/http/http.connect-license.channel.ts";
 import { connectHostDoor, connectHostRest } from "../connect-host.rest.ts";
 
-type ConnectBearerVerifiers = Pick<LicensingApi, "verifyLicenceToken" | "verifyActivationCode">;
+type ConnectBearerVerifiers = Pick<
+  LicensingApi,
+  "verifyLicenceToken" | "verifyLicenceTokenForSync" | "verifyActivationCode"
+>;
 
 const TOKEN = `lwl_${"a".repeat(64)}`;
 const credential = { token: TOKEN, instanceId: "install-1" };
@@ -42,12 +46,14 @@ const activationCaller = {
 };
 
 /** The door's checks as the services answer them: a refusal is thrown by its own code. */
+const verifyLicence = async ({ bearer, instanceId }: ConnectPresentedCredential) => {
+  if (bearer !== TOKEN) throw new ConnectLicenseTokenMalformedError();
+  if (!instanceId) throw new ConnectInstanceRequiredError();
+  return licenceCaller;
+};
 const accepting: ConnectBearerVerifiers = {
-  verifyLicenceToken: async ({ bearer, instanceId }: ConnectPresentedCredential) => {
-    if (bearer !== TOKEN) throw new ConnectLicenseTokenMalformedError();
-    if (!instanceId) throw new ConnectInstanceRequiredError();
-    return licenceCaller;
-  },
+  verifyLicenceToken: verifyLicence,
+  verifyLicenceTokenForSync: verifyLicence,
   verifyActivationCode: async ({ bearer }: ConnectPresentedCredential) => {
     if (bearer === "LW-REVOKED") throw new ActivationCodeNotFoundError();
     if (bearer === "LW-EXPIRED") throw new ActivationCodeExpiredError();
@@ -324,6 +330,37 @@ describe("the connect host's upgrade diagnostics route", () => {
       );
 
       expect(response.status).toBe(413);
+      expect(recordUpgradeDiagnostics).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an expired licence with a renewal waiting presents itself", () => {
+    const renewalCaller = { ...licenceCaller, virtualKeyId: null, renewalOnly: true as const };
+    const expiredButRenewing: ConnectBearerVerifiers = {
+      ...accepting,
+      verifyLicenceToken: () => Promise.reject(new ConnectLicenseExpiredError()),
+      verifyLicenceTokenForSync: async () => renewalCaller,
+    };
+
+    /** @scenario An expired licence reaches no other connect route */
+    it("admits it on the sync path only and refuses upgrade diagnostics as expired", async () => {
+      const recordLicenseSync = vi.fn().mockResolvedValue({ services: [] });
+      const recordUpgradeDiagnostics = vi.fn();
+      const { channel } = mount(
+        { recordLicenseSync, recordUpgradeDiagnostics },
+        expiredButRenewing,
+      );
+
+      await expect(channel.syncLicense({ credential, version: "1.2.3", seats })).resolves.toEqual({
+        services: [],
+      });
+      expect(recordLicenseSync).toHaveBeenCalledWith({
+        caller: renewalCaller,
+        body: { version: "1.2.3", seats },
+      });
+      await expect(
+        channel.sendUpgradeDiagnostics({ credential, submission: upgradeDiagnosticsSubmission() }),
+      ).rejects.toMatchObject({ code: "connect_license_expired" });
       expect(recordUpgradeDiagnostics).not.toHaveBeenCalled();
     });
   });
