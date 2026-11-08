@@ -481,6 +481,16 @@ describe("presentLangyToolError", () => {
       expect(presentation.detail).toMatch(/^ImportError: cannot import name 'connect_agent'/);
     });
 
+    it("leaves a sandbox shell failure, which the sandbox writes its own way, on its old card", () => {
+      const sandbox = presentLangyToolError({
+        title: "Running a command",
+        errorText: "ImportError: cannot import name 'x'\n\nCommand exited with code 1",
+        toolName: "bash",
+      });
+      expect(sandbox.message).toBe("This step couldn't be completed.");
+      expect(sandbox.detail).toBeUndefined();
+    });
+
     it("drops a string sequence's payload, terminated or cut off", () => {
       const raw =
         presentCommand(
