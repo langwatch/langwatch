@@ -49,7 +49,7 @@ const LONG_RUN_TIMEOUT_MS = 2_700_000;
  * llmops-python-too-new).
  */
 const PYTHON_QUESTION =
-  /^Your Python (\S+) is newer than the LangWatch SDK supports, so pip installed an old release without the tracing API\. Want me to set up a supported Python for this folder\?$/;
+  /^Your Python (\S+) is newer than the LangWatch SDK supports, so pip can't install a release with the tracing API\. Want me to set up a supported Python for this folder\?$/;
 const INSTALL_PYTHON_OPTION = "Install Python 3.13 with uv for me";
 const OWN_INTERPRETER_OPTION = "I'll pick the interpreter myself";
 
@@ -138,17 +138,17 @@ describe("Langy asks for a supported Python before writing against an SDK that l
           config: {
             name: "guided onboarding: the llmops path on a python the SDK does not ship for",
             description:
-              "A developer of the ACME notes application (one OpenAI call behind a FastAPI endpoint, a requirements.txt manifest, no tracing and no tests) just signed up and picked Evals & LLM Ops. The folder is shared through the command line. The only interpreter on the terminal's PATH is Python 3.14, which every current LangWatch release excludes, so `pip install langwatch` silently resolves to 0.1.32: a release with no `setup()` and no `connect_agent()`. Langy must notice before it writes any code, and offer to set up an interpreter that works.",
+              "A developer of the ACME notes application (one OpenAI call behind a FastAPI endpoint, a requirements.txt manifest, no tracing and no tests) just signed up and picked Evals & LLM Ops. The folder is shared through the command line. The only interpreter on the terminal's PATH is Python 3.14, which every current LangWatch release excludes, so a bare `pip install langwatch` would silently resolve to 0.1.32: a release with no `setup()` and no `connect_agent()`. Langy asks for `langwatch>=1.3.0`, pip refuses it on this interpreter, and Langy must offer to set up an interpreter that works before it writes any code.",
             agents: [
               langy,
               scenario.userSimulatorAgent({ model }),
               scenario.judgeAgent({
                 model,
                 criteria: [
-                  `After installing the package, before editing any file, Langy checks through the interpreter that the installed release carries the tracing API (an import of langwatch naming setup and connect_agent, or the installed version).`,
-                  `When that check fails, Langy asks with a question card reading, word for word, with the interpreter's own version in place of <version>: "Your Python <version> is newer than the LangWatch SDK supports, so pip installed an old release without the tracing API. Want me to set up a supported Python for this folder?"`,
+                  `Langy's install asks for langwatch 1.3.0 or newer ("langwatch>=1.3.0"), so pip refuses it on this interpreter instead of installing an old release; Langy reads that refusal, or a failed import of langwatch naming setup and connect_agent, before editing any file.`,
+                  `When pip refuses the install or that check fails, Langy asks with a question card reading, word for word, with the interpreter's own version in place of <version>: "Your Python <version> is newer than the LangWatch SDK supports, so pip can't install a release with the tracing API. Want me to set up a supported Python for this folder?"`,
                   `The card carries exactly two options, in this order: "${INSTALL_PYTHON_OPTION}" and "${OWN_INTERPRETER_OPTION}".`,
-                  "Langy never runs `pip install langwatch --upgrade` against this interpreter. The newest release it can reach is already installed, so an upgrade cannot change the outcome.",
+                  "Langy never runs `pip install --upgrade` against this interpreter. It has no release with the tracing API, so an upgrade cannot change the outcome.",
                   'Langy never edits the project\'s code while the interpreter in use lacks the API, and never reports the missing API as a failure it stopped on: it offers the interpreter instead. What completes the switch is a check through the NEW interpreter that exits clean (`.venv/bin/python -c "import langwatch; langwatch.setup; langwatch.connect_agent"` or the equivalent). Edits that come after that check are the path doing its job, not a violation: judge the order against the check, not against the card.',
                   "Langy does not tell the developer to install a Python themselves, and does not call the folder broken or unsupported. Only the interpreter is too new.",
                   ...LANGY_GUIDED_PATH_CRITERIA,
@@ -224,15 +224,19 @@ describe("Langy asks for a supported Python before writing against an SDK that l
         console.log("[layer2] main.py unchanged at the card:", mainAtQuestion === pristineMain);
         expect(mainAtQuestion).toBe(pristineMain);
 
-        // The install happened, and the interpreter really did get a release
-        // without the API: the card is answering the machine, not a guess.
+        // The install asked for a release with the API, and the floor kept the
+        // old one out: the card is answering pip's refusal, not a guess.
+        const floored = commands.filter((command) =>
+          command.includes(`langwatch>=${FIRST_SUPPORTED_SDK}`),
+        );
+        console.log("[layer2] floored installs:", floored.join(" | "));
+        expect(floored.length).toBeGreaterThan(0);
         const installed = installedVersion({
           python: python.python,
           name: "langwatch",
         });
         console.log("[layer2] installed langwatch:", installed ?? "none");
-        expect(installed).not.toBeNull();
-        expect(belowVersion(installed!, FIRST_SUPPORTED_SDK)).toBe(true);
+        expect(installed).toBeNull();
 
         // An upgrade cannot reach past the interpreter's ceiling, so the rule
         // is that it is never tried.

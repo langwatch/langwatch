@@ -394,17 +394,20 @@ Each file's header links here rather than repeating its narrative.
   (0.2.11 through 1.4.0) declares `requires-python >=3.10,<3.14`. On a
   machine whose `python3` is 3.14 (Homebrew's default today), pip walks past
   all of them and silently installs 0.1.32, the last release with no upper
-  bound and from before `setup()`/`connect_agent()` existed — the install
-  reports success and the tracing code written against it cannot import.
+  bound and from before `setup()`/`connect_agent()` existed, when the install
+  names a bare `langwatch`. The skills ask for `"langwatch>=1.3.0"`, so pip
+  refuses the install instead, and nothing old lands in the interpreter.
   This repo's own published range already reaches 3.14, but the scenario is
   about what a developer can install, so it stands until a release ships.
   The venv here is built from the machine's own `python3` on purpose (the
-  interpreter IS the subject); the skill's answer is an import check between
-  install and first edit, and an unlock question on failure — never a blind
+  interpreter IS the subject); the skill's answer is the floor on the install,
+  an import check between install and first edit, and an unlock question on a
+  refusal or a failed check — never a blind
   `--upgrade`, which cannot help, and never an edit against an API that
   isn't there. Layer 2 comes before the judge: the card's own wording and
   options, that `app/main.py` was still untouched when the card was
-  answered, and that no `--upgrade` was attempted. The `PYTHON_QUESTION`
+  answered, that an install carried the floor and left no `langwatch` in the
+  interpreter, and that no `--upgrade` was attempted. The `PYTHON_QUESTION`
   constant puts the interpreter's own reported version in place of 3.14, so
   the wording is pinned and the number is read from this machine rather than
   hard-coded to a version that only holds until Homebrew moves.

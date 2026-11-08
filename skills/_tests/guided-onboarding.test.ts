@@ -601,7 +601,7 @@ describe("the guided-onboarding skill", () => {
       expect(install).toBeGreaterThan(branch);
       expect(tracingItem).toBeGreaterThan(install);
       const how = rendered.indexOf(
-        "1. Install the package, as step 2 of the `tracing` skill says for the language, from the project root, through the project's own package manager. For Python the install is a ladder, not one command, and the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, when the folder has a `uv.lock`, or when `.venv/pyvenv.cfg` carries a `uv =` line (a virtual environment uv made has no pip in it); otherwise the folder's own interpreter, `.venv/bin/python -m pip install langwatch` when `.venv` exists; and only after those the interpreter's pip, `pip install langwatch`, `pip3 install langwatch`, `python3 -m pip install langwatch`, `python -m pip install langwatch`, stopping at the first that works. The interpreter's pip never runs before the named manager or the folder's own interpreter.",
+        '1. Install the package, as step 2 of the `tracing` skill says for the language, from the project root, through the project\'s own package manager. For Python the install is a ladder, not one command, and the manager the workspace facts name is its first rung: `uv add "langwatch>=1.3.0"` when the facts name uv, when the folder has a `uv.lock`, or when `.venv/pyvenv.cfg` carries a `uv =` line (a virtual environment uv made has no pip in it); otherwise the folder\'s own interpreter, `.venv/bin/python -m pip install "langwatch>=1.3.0"` when `.venv` exists; and only after those the interpreter\'s pip, `pip install "langwatch>=1.3.0"`, `pip3 install "langwatch>=1.3.0"`, `python3 -m pip install "langwatch>=1.3.0"`, `python -m pip install "langwatch>=1.3.0"`, stopping at the first that works. The interpreter\'s pip never runs before the named manager or the folder\'s own interpreter.',
       );
       const tracingStep = rendered.indexOf("2. `tracing` for the detected framework.");
       expect(how).toBeGreaterThan(-1);
@@ -1047,14 +1047,31 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "The manager the facts name is the first rung of the install ladder" */
     it("installs through the manager the facts name before any pip spelling", () => {
       expect(rendered).toContain(
-        "the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, when the folder has a `uv.lock`, or when `.venv/pyvenv.cfg` carries a `uv =` line (a virtual environment uv made has no pip in it)",
+        'the manager the workspace facts name is its first rung: `uv add "langwatch>=1.3.0"` when the facts name uv, when the folder has a `uv.lock`, or when `.venv/pyvenv.cfg` carries a `uv =` line (a virtual environment uv made has no pip in it)',
       );
       expect(rendered).toContain(
         "The interpreter's pip never runs before the named manager or the folder's own interpreter.",
       );
       const tracing = renderSkill(listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!);
       expect(tracing).toContain(
-        "the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, the folder has a `uv.lock` or `.venv/pyvenv.cfg` carries a `uv =` line",
+        'the manager the workspace facts name is its first rung: `uv add "langwatch>=1.3.0"` when the facts name uv, the folder has a `uv.lock` or `.venv/pyvenv.cfg` carries a `uv =` line',
+      );
+    });
+
+    /** @scenario "Every Python install asks for a release that carries the API" */
+    it("asks every Python install for 1.3.0 or newer, quoted, in every skill", () => {
+      const install =
+        /(?:uv add|uv pip install|pip3? install|-m pip install)(?: --?[\w-]+(?: \d[\d.]*)?)* (\S+)/g;
+      const asked = listNativeSkills(skillsRoot).flatMap((skill) =>
+        [...renderSkill(skill).matchAll(install)]
+          .map((match) => match[1]!)
+          .filter((target) => /^["']?langwatch(?![-\w])/.test(target))
+          .map((target) => `${skill.slug}: ${target.replace(/[`,.;)]+$/, "")}`),
+      );
+      expect(asked.length).toBeGreaterThan(10);
+      expect(asked.filter((line) => !line.endsWith(': "langwatch>=1.3.0"'))).toEqual([]);
+      expect(rendered).toContain(
+        "With the floor, an interpreter newer than the SDK supports gets a refusal instead",
       );
     });
 
@@ -1075,7 +1092,7 @@ describe("the guided-onboarding skill", () => {
         'Options, in this order: "Install uv for me" and "I\'ll set up Python myself".',
       );
       expect(section).toContain(
-        'On "Install uv for me": run the official installer, `curl -LsSf https://astral.sh/uv/install.sh | sh`, then `uv init` when the folder has no `pyproject.toml`, then `uv add langwatch`, and item 1 goes on.',
+        'On "Install uv for me": run the official installer, `curl -LsSf https://astral.sh/uv/install.sh | sh`, then `uv init` when the folder has no `pyproject.toml`, then `uv add "langwatch>=1.3.0"`, and item 1 goes on.',
       );
       expect(section).toContain(
         'On "I\'ll set up Python myself": end the turn saying what to install, Python 3 with pip or uv, and to send a message when it is done.',
@@ -1094,22 +1111,25 @@ describe("the guided-onboarding skill", () => {
         "through the runner item 1 settled on, so `.venv/bin/python -c` or `python -c` in place of `uv run python -c` outside a uv project.",
       );
       expect(rendered).toContain(
-        "A Python release below 1.3.0 has neither `setup` nor `connect_agent`, and pip installs one without a word when the interpreter is newer than the SDK supports: every release with the API declares an upper Python bound, so pip walks back to the last release with none and reports success.",
+        "A Python release below 1.3.0 has neither `setup` nor `connect_agent`, and every release with the API declares an upper Python bound: on an interpreter newer than the SDK supports, a bare `langwatch` makes pip walk back to the last release with no bound and report success.",
       );
       expect(rendered).toContain(
-        "`pip install langwatch --upgrade` never runs there: that interpreter has no newer release to get.",
+        "`pip install --upgrade` never runs there: that interpreter has no newer release to get.",
       );
       const tracing = renderSkill(listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!);
       expect(tracing).toContain(
         'Before any code is written against it, check the install carries the API through the interpreter that installed it: `python -c "import langwatch; langwatch.setup; langwatch.connect_agent"` for Python, `node -e "require(\'langwatch\')"` for TypeScript.',
       );
-      expect(tracing).toContain("`pip install langwatch --upgrade` cannot help there.");
+      expect(tracing).toContain("`pip install --upgrade` cannot help there.");
     });
 
-    /** @scenario "An installed SDK without the tracing API is an interpreter question, not a stop" */
-    it("asks about the interpreter when the installed SDK has no tracing API", () => {
+    /** @scenario "An interpreter the SDK does not support is an interpreter question, not a stop" */
+    it("asks about the interpreter when pip refuses the install or the installed SDK has no tracing API", () => {
       expect(rendered).toContain(
-        'When the check fails, or the version the show command reads (`python -m pip show langwatch`, `uv pip show langwatch`) is below 1.3.0, the cause is the interpreter, and that is the third unlock question of "When a step fails", asked before any edit.',
+        'When pip refuses that way, when the check fails, or when the version the show command reads (`python -m pip show langwatch`, `uv pip show langwatch`) is below 1.3.0, the cause is the interpreter, and that is the third unlock question of "When a step fails", asked before any edit.',
+      );
+      expect(rendered).toContain(
+        "That refusal ends the ladder, since every rung on the same interpreter gets the same answer.",
       );
       const failed = rendered.indexOf("### When a step fails");
       const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
@@ -1117,16 +1137,16 @@ describe("the guided-onboarding skill", () => {
         "Four dead ends have a known unlock, and an unlock is asked, never stopped on:",
       );
       expect(section).toContain(
-        "The third: the check of item 1 fails, or the installed version is below 1.3.0, after an install that reported success.",
+        "The third: pip refuses the install of item 1 for the interpreter's version, the check of item 1 fails, or the installed version is below 1.3.0.",
       );
       expect(section).toContain(
-        "Your Python 3.14 is newer than the LangWatch SDK supports, so pip installed an old release without the tracing API. Want me to set up a supported Python for this folder?",
+        "Your Python 3.14 is newer than the LangWatch SDK supports, so pip can't install a release with the tracing API. Want me to set up a supported Python for this folder?",
       );
       expect(section).toContain(
         'Options, in this order: "Install Python 3.13 with uv for me" and "I\'ll pick the interpreter myself".',
       );
       expect(section).toContain(
-        'On "Install Python 3.13 with uv for me": `uv python install 3.13` (when `uv` is a command not found, the installer of the second question runs first), then the ladder\'s uv rung against that interpreter: `uv add --python 3.13 langwatch` when the folder has a `pyproject.toml`; `uv venv --python 3.13` then `uv pip install langwatch` when it has none, and the manifest line of item 1 goes into the requirements file as for any pip project.',
+        'On "Install Python 3.13 with uv for me": `uv python install 3.13` (when `uv` is a command not found, the installer of the second question runs first), then the ladder\'s uv rung against that interpreter: `uv add --python 3.13 "langwatch>=1.3.0"` when the folder has a `pyproject.toml`; `uv venv --python 3.13` then `uv pip install "langwatch>=1.3.0"` when it has none, and the manifest line of item 1 goes into the requirements file as for any pip project.',
       );
       expect(section).toContain(
         "Then the check of item 1 runs again through `.venv/bin/python`, and item 1 goes on; the agent of item 6 starts through that interpreter, `uv run` or `.venv/bin/python`, never the machine's `python3`.",
