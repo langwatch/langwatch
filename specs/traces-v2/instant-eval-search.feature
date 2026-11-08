@@ -338,6 +338,12 @@ Feature: Instant Evals inside the Trace Explorer
       And it offers Retry
       And neither the bar nor the empty table says the run is still judging
 
+    @integration
+    Scenario: A failed chip keeps its bar when a later chip has settled
+      Given two eval chips, where the earlier run failed and the later run settled
+      When the table shows its results
+      Then the failure and Retry for the earlier chip are shown
+
     @unit
     Scenario Outline: A failed run says why, as far as the server knows
       Given a run that failed with "<code>" and charged <charged>

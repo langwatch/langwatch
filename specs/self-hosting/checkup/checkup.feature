@@ -113,6 +113,14 @@ Feature: The checkup page of a self-hosted install
     And the row does not ask for an activation code
 
   @unit
+  Scenario: A license whose hosted services could not be read is not called empty
+    Given the organization holds an active license
+    And reading which hosted services it names failed
+    When the checkup runs
+    Then the connect row does not say the license includes no hosted services
+    And a recorded sync failure is still shown
+
+  @unit
   Scenario Outline: A refused license sync reads as a plain sentence, never as its code
     Given the last license sync was refused with "<code>"
     When the checkup runs

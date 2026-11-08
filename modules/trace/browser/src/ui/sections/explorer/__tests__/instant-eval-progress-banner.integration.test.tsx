@@ -73,6 +73,42 @@ describe("given a run behind the query's eval chip that LangWatch could not reac
     expect(screen.queryByTestId("instant-eval-progress")).toBeNull();
   });
 
+  describe("when a later chip's run has settled", () => {
+    /** @scenario "A failed chip keeps its bar when a later chip has settled" */
+    it("still shows the earlier chip's failure with Retry", () => {
+      const query = `${QUERY} AND eval:"the user is happy"`;
+      const laterKey = instantEvalRunKey({
+        question: "the user is happy",
+        target: "traces",
+        otherQuery: "service:api",
+        window: { from: 1_000, to: 2_000 },
+      });
+      useExplorerStore.setState({
+        queryText: query,
+        debouncedQueryText: query,
+        evalRuns: { [key]: "run-1", [laterKey]: "run-2" },
+      });
+      useInstantEvalRunStore.getState().setRun({
+        id: "run-2",
+        status: "finished",
+        total: 8,
+        progress: 8,
+        matched: 3,
+        failed: 0,
+        skipped: 0,
+        error: null,
+        priceUsd: 0.01,
+        finishedAtMs: Date.now(),
+      });
+      useInstantEvalRunStore.setState({ settled: { "run-2": true } });
+
+      render(<InstantEvalProgressBanner />, { wrapper });
+
+      expect(screen.getByTestId("instant-eval-failure")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+    });
+  });
+
   describe("when Retry is pressed", () => {
     /** @scenario "Retry starts the same eval again" */
     it("forgets the failed run and submits the query again", () => {

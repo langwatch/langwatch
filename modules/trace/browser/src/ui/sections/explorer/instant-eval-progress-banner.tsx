@@ -26,11 +26,12 @@ export function InstantEvalProgressBanner() {
   const markStopped = useInstantEvalRunStore((s) => s.markStopped);
   const cancel = useCancelInstantEval();
 
-  // The last chip typed is the one being judged; an earlier chip's run has
-  // already settled, and a settled run has no bar.
+  // The last chip whose run still has something to show: a settled run has no bar,
+  // and a failed run never settles, so it stays reachable behind a later settled one.
   const chip = [...chips].reverse().find((entry) => {
     if (!entry.runId) return false;
-    return selectInstantEvalRunPhase({ runs, stoppedByUser, settled }, entry.runId) !== null;
+    const entryPhase = selectInstantEvalRunPhase({ runs, stoppedByUser, settled }, entry.runId);
+    return entryPhase !== null && entryPhase !== "settled";
   });
   const runId = chip?.runId ?? null;
   const phase = runId ? selectInstantEvalRunPhase({ runs, stoppedByUser, settled }, runId) : null;

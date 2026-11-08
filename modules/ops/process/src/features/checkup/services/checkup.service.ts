@@ -318,7 +318,7 @@ export class CheckupService {
         docsPath: CHECKUP_DOCS.connect,
       };
     }
-    if (view.licensed && view.entitledServices.length === 0) {
+    if (view.licensed && view.entitledServices?.length === 0) {
       return {
         outcome: "unchecked",
         detail:
@@ -362,7 +362,7 @@ export class CheckupService {
     }
     return {
       outcome: "verified",
-      detail: `Last sync ${view.lastSyncAt} with ${view.licenseHost}. Services: ${view.entitledServices.join(", ")}.`,
+      detail: `Last sync ${view.lastSyncAt} with ${view.licenseHost}.${servicesSentence(view.entitledServices)}`,
     };
   }
 
@@ -463,4 +463,9 @@ function licenseDay(iso: string | undefined, whenAbsent: string): string {
   } catch {
     return iso;
   }
+}
+
+/** The services the license names, or nothing when the entitlement read failed. */
+function servicesSentence(entitledServices: string[] | null): string {
+  return entitledServices === null ? "" : ` Services: ${entitledServices.join(", ")}.`;
 }

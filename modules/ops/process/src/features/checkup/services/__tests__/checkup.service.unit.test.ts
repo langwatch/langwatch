@@ -610,6 +610,32 @@ describe("CheckupService", () => {
     });
   });
 
+  describe("when the hosted services the license names could not be read", () => {
+    /** @scenario "A license whose hosted services could not be read is not called empty" */
+    it("shows the recorded sync failure instead of saying the license has none", async () => {
+      const deps = healthyDeps({
+        connect: async () => ({
+          ...CONNECTED,
+          entitledServices: null,
+          lastSyncError: "connect_license_revoked",
+        }),
+      });
+      const verdict = rowOf((await CheckupService.create(deps).cheap()).rows, "connect");
+
+      expect(verdict.outcome).toBe("refused");
+      expect(verdict.detail).not.toContain("includes no hosted services");
+    });
+
+    /** @scenario "A license whose hosted services could not be read is not called empty" */
+    it("reports a good sync without naming services it could not read", async () => {
+      const deps = healthyDeps({ connect: async () => ({ ...CONNECTED, entitledServices: null }) });
+      const verdict = rowOf((await CheckupService.create(deps).cheap()).rows, "connect");
+
+      expect(verdict.outcome).toBe("verified");
+      expect(verdict.detail).not.toContain("Services:");
+    });
+  });
+
   describe("when the last license sync was refused", () => {
     const refusedWith = async (code: string) =>
       rowOf(
