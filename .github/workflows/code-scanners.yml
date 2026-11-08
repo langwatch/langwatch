@@ -255,12 +255,28 @@ jobs:
       # the Go 1.27 standard library.
       # One run per workspace module: there is no root go.mod, and
       # govulncheck refuses a directory that is not inside a module.
+      # IGNORED lists advisories with no fixed version whose vulnerable code we
+      # never run. GO-2026-6911: mcp-go's StreamableHTTP client follows
+      # redirects with credentials; only bifrost's MCP client manager calls
+      # it, and the gateway passes no MCPConfig to bifrost.Init, so no
+      # manager is built. Drop an entry once a fixed version ships.
       - name: govulncheck
+        env:
+          IGNORED: GO-2026-6911
         run: |
           rc=0
           for m in cmd pkg services tools; do
             echo "==> govulncheck $m"
-            (cd "$m" && go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...) || rc=1
+            (cd "$m" && go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -format json ./...) > "/tmp/vuln-$m.json" || { rc=1; continue; }
+            called=$(jq -r 'select(.finding) | .finding | select(.trace[0].function != null) | .osv' "/tmp/vuln-$m.json" | sort -u)
+            for id in $called; do
+              if [[ " $IGNORED " == *" $id "* ]]; then
+                echo "ignored $id (see IGNORED above)"
+              else
+                echo "::error::$m calls code affected by $id: https://pkg.go.dev/vuln/$id (run govulncheck ./... in $m for traces)"
+                rc=1
+              fi
+            done
           done
           exit "$rc"
 

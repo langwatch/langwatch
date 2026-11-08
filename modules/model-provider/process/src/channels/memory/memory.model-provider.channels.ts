@@ -4,6 +4,7 @@ import { TraceApi } from "@langwatch/trace-contract";
 import type { ModelProviderChannels } from "../model-provider.channels.ts";
 import { MemoryModelProviderCodexGatewayPingChannel } from "./memory.model-provider-codex-gateway-ping.channel.ts";
 import { MemoryModelProviderConnectionPingChannel } from "./memory.model-provider-connection-ping.channel.ts";
+import { MemoryModelProviderSpendChannel } from "./memory.model-provider-spend.channel.ts";
 
 /** Every ping is recorded and answers "generated"; spans read through the bound trace module. */
 export class MemoryModelProviderChannels {
@@ -19,6 +20,7 @@ export class MemoryModelProviderChannels {
       connectionPing: MemoryModelProviderConnectionPingChannel.create(),
       codexGatewayPing: MemoryModelProviderCodexGatewayPingChannel.create(),
       spans: bound.traces,
+      spend: MemoryModelProviderSpendChannel.create(),
     };
   }
 }

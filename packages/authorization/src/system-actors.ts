@@ -25,6 +25,8 @@ export const SYSTEM_ACTORS = {
   /** A run nobody started (a monitor, an online evaluation, a scheduled suite) calling back
    *  with its ownerless run key. Never the creator of the thing that started it. */
   unattendedRun: "system:unattended-run",
+  /** A completed checkout handing the Billing role to the person who started it. */
+  billingCheckout: "system:billing-checkout",
 } as const satisfies Record<string, `system:${string}`>;
 
 export type SystemActorName = keyof typeof SYSTEM_ACTORS;

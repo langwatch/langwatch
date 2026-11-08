@@ -104,6 +104,7 @@ import { ScimDirectoryMoveService } from "../services/scim-directory-move.servic
 import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
 import { ScimOversightService } from "../services/scim-oversight.service.ts";
 import { ScimReconciliationService } from "../services/scim-reconciliation.service.ts";
+import { ScimSeatLeaseService } from "../services/scim-seat-lease.service.ts";
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { ScimSyncLifecycleService } from "../services/scim-sync-lifecycle.service.ts";
 import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
@@ -304,13 +305,18 @@ export class ScimModule implements ScimApiContract {
     });
     const connections = ScimConnectionsService.create(repositories.scimSsoConnections);
     const costCenterFacts = ScimCostCenterFactsService.create();
+    const seatLease = ScimSeatLeaseService.create(channels.members);
     const scim = PostgresScimService.create({
       repository: repositories.scim,
       writer: dependencies.authorization,
       users: dependencies.users,
       costCenterFacts,
       organization: dependencies.authorization,
-      seats: repositories.seats,
+      seats: {
+        countMemberSeats: (input) => repositories.seats.countMemberSeats(input),
+        findLiveHoldUserIds: (input) => repositories.seats.findLiveHoldUserIds(input),
+        withSeatLock: (input) => seatLease.withSeatLock(input),
+      },
       members: channels.members,
       entitlements: dependencies.entitlements,
       lifecycle,
@@ -347,6 +353,7 @@ export class ScimModule implements ScimApiContract {
           grants: dependencies.authorization,
           lifecycle,
           organization: dependencies.authorization,
+          seats: channels.members,
         }),
       }),
       platformOperators: dependencies.authorization,

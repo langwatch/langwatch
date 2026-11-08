@@ -36,4 +36,10 @@ class MemoryScimSeatRepository implements ScimSeatRepository {
   ): Promise<OrganizationMemberSeats> {
     return { fullMembers: 0, liteMembers: 0, developers: 0 };
   }
+
+  async findLiveHoldUserIds(
+    _input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<string[]> {
+    return [];
+  }
 }

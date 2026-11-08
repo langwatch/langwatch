@@ -54,6 +54,7 @@ export class TestApiKeyService implements ApiKeyApi {
   revokeCliSessionKey = unsupported<ApiKeyApi["revokeCliSessionKey"]>();
   revokeCliLoginKeysForDevice = unsupported<ApiKeyApi["revokeCliLoginKeysForDevice"]>();
   revokeKey = unsupported<ApiKeyApi["revokeKey"]>();
+  rotateKey = unsupported<ApiKeyApi["rotateKey"]>();
   update = unsupported<ApiKeyApi["update"]>();
   updateAsCaller = unsupported<ApiKeyApi["updateAsCaller"]>();
   updateKey = unsupported<ApiKeyApi["updateKey"]>();

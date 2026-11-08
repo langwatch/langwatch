@@ -1,3 +1,4 @@
+import { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderServerConfig } from "@langwatch/model-provider-contract";
 import type { BoundApis } from "@langwatch/process";
 import { nlpInternalSecret, type ScopedSecrets } from "@langwatch/secrets";
@@ -11,7 +12,7 @@ import { HttpModelProviderConnectionPingChannel } from "./http.model-provider-co
 /** Test Connection generates once through the engine's proxy, or through the AI gateway. */
 export class HttpModelProviderChannels {
   static readonly requires = [] as const;
-  static readonly binds = { traces: TraceApi } as const;
+  static readonly binds = { traces: TraceApi, spend: GatewayApi } as const;
 
   static async create({
     config,
@@ -36,6 +37,7 @@ export class HttpModelProviderChannels {
           config.gatewayInternalUrl ?? config.gatewayPublicUrl ?? config.gatewayLegacyUrl,
       }),
       spans: bound.traces,
+      spend: bound.spend,
     };
   }
 }

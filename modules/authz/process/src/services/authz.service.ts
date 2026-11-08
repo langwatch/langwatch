@@ -277,6 +277,14 @@ export class AuthzService {
     return this.decisionCore.effectivePermissions(args);
   }
 
+  /** The set at a scope and at its organization, from one snapshot; see AuthzDecisionService. */
+  effectivePermissionsWithOrganization(args: {
+    principal: AuthzPrincipalRef;
+    scope: AuthzScopeRef;
+  }): Promise<{ permissions: AuthzPermission[]; organizationPermissions: AuthzPermission[] }> {
+    return this.decisionCore.effectivePermissionsWithOrganization(args);
+  }
+
   /**
    * What of these permissions the caller does not hold at the scope (inherited from above
    * included). A scope outside the organization holds nothing, so all of them come back.

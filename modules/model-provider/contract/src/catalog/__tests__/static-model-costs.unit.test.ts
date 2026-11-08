@@ -39,3 +39,13 @@ describe("static model cost ordering", () => {
     expect(rates.find((rate) => new RegExp(rate.regex).test("abc-def"))?.model).toBe("x/abc-def");
   });
 });
+
+describe("static model cost web search rate", () => {
+  /** @scenario "the catalog carries the per-query web search rate to the cost rule" */
+  it("carries the catalog's per-query web search rate onto the cost rule", async () => {
+    vi.resetModules();
+    const { getStaticModelCostRates } = await import("../static-model-costs.ts");
+    const rule = getStaticModelCostRates().find((rate) => rate.model === "openai/gpt-5-mini");
+    expect(rule?.webSearchCostPerQuery).toBe(0.01);
+  });
+});

@@ -52,6 +52,7 @@ function run() {
       },
     },
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
+    judgeRouting: { isRouted: async () => false },
     installEnvironment: {},
   };
 

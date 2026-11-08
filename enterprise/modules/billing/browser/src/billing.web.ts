@@ -35,7 +35,7 @@ export const billingWeb = defineBrowserModule("billing")
     "pages/settings/subscription": {
       path: "/settings/subscription",
       within: "settings",
-      label: "Subscription",
+      label: "Plan & billing",
       load: () => import("./ui/sections/subscription.screen.tsx"),
     },
     "pages/settings/usage": {

@@ -22,6 +22,18 @@ vi.mock("../../../behavior/use-join-requests.ts", () => ({
   }),
 }));
 
+vi.mock("../../../behavior/use-seat-requests.ts", () => ({
+  useSeatRequests: () => ({
+    requests: [],
+    seatFree: false,
+    approvalPath: undefined,
+    canManage: false,
+    answeringId: null,
+    approve: vi.fn(),
+    decline: vi.fn(),
+  }),
+}));
+
 afterEach(cleanup);
 
 const request = (id: string): PendingJoinRequest => ({

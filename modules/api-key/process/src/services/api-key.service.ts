@@ -20,6 +20,7 @@ import {
   type OrganizationApiKeyResolution,
   type ResolvedApiKeyCredential,
   type RevokeApiKeyInput,
+  type RotateApiKeyInput,
   type UpdateApiKeyInput,
   type CliSessionKeyRevocation,
   type CliSessionRevocationCause,
@@ -37,6 +38,7 @@ import { ApiKeyEnrichmentService } from "./api-key-enrichment.service.ts";
 import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { ApiKeyLastUsedService } from "./api-key-last-used.service.ts";
 import { ApiKeyLifecycleService, type DisabledApiKey } from "./api-key-lifecycle.service.ts";
+import { ApiKeyRotationService } from "./api-key-rotation.service.ts";
 import { ApiKeyTokenResolutionService } from "./api-key-token-resolution.service.ts";
 import type { ApiKeyTokenService } from "./api-key-token.service.ts";
 import { ApiKeyVisibilityService } from "./api-key-visibility.service.ts";
@@ -62,6 +64,7 @@ export class ApiKeyService {
   private readonly policy: ApiKeyGrantPolicyService;
   private readonly catalog: ApiKeyCatalogService;
   private readonly lifecycle: ApiKeyLifecycleService;
+  private readonly rotation: ApiKeyRotationService;
   private readonly tokens: ApiKeyTokenResolutionService;
   private readonly visibility: ApiKeyVisibilityService;
   private readonly cli: ApiKeyCliService;
@@ -86,6 +89,12 @@ export class ApiKeyService {
     this.catalog = ApiKeyCatalogService.create(dependencies);
     this.tokens = ApiKeyTokenResolutionService.create(dependencies);
     this.lifecycle = ApiKeyLifecycleService.create(dependencies, this.policy, this.tokens);
+    this.rotation = ApiKeyRotationService.create({
+      repository,
+      authz: options.authz,
+      tokens: options.tokens,
+      answers: this.tokens,
+    });
     this.visibility = ApiKeyVisibilityService.create(dependencies);
     this.cli = ApiKeyCliService.create(dependencies, this.policy, this.lifecycle);
     this.enrichment = ApiKeyEnrichmentService.create(dependencies, this.catalog);
@@ -173,6 +182,10 @@ export class ApiKeyService {
 
   async revoke(input: RevokeApiKeyInput): Promise<ApiKey> {
     return this.lifecycle.revoke(input);
+  }
+
+  async rotate(input: RotateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
+    return this.rotation.rotate(input);
   }
 
   async ensureCallerIsOrgMember(input: { userId: string; organizationId: string }): Promise<void> {

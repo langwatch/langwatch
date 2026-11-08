@@ -78,6 +78,17 @@ export interface BillingApi {
    * SaaS only, at most once a day per organization and limit. Never throws.
    */
   notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void>;
+  /**
+   * Tells sales that a person waits for a seat in an organization whose plan only sales can grow,
+   * on the subscriptions Slack channel. SaaS only; the caller sends it once per request. Never throws.
+   */
+  notifySalesOfSeatRequest(input: {
+    organizationId: string;
+    organizationName: string;
+    plan: string;
+    seats: number;
+    requestedSeats: number;
+  }): Promise<void>;
   /** The organization's pricing model column, which is empty for organizations never migrated. */
   getPricingModel(input: {
     organizationId: string;

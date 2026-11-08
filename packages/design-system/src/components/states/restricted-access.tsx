@@ -29,6 +29,24 @@ export function describePermission(permission: string): string {
   return action ? `${action} ${readableSubject}` : readableSubject;
 }
 
+/**
+ * Whether a permission belongs to the platform rather than an organization: an organization
+ * admin cannot grant it, so the page must not send the reader to one.
+ */
+export function isPlatformOperatorPermission(permission: string | undefined): boolean {
+  return permission?.startsWith("ops:") ?? false;
+}
+
+/** Who can give the reader this access, in one sentence. */
+export function restrictedAccessDescription(permission: string | undefined): string {
+  if (isPlatformOperatorPermission(permission)) {
+    return "This page needs platform operator access. It is for the people who run this LangWatch install.";
+  }
+  return permission
+    ? `Your role doesn't let you ${describePermission(permission)}. Ask an organization admin to give you access.`
+    : "Your role doesn't include this action. Ask an organization admin to give you access.";
+}
+
 /** The words an admin needs to grant the access: who, what, and where. */
 export function accessRequestText({
   permission,
@@ -83,12 +101,7 @@ export function RestrictedAccess({
       <AccessState
         kind="permission"
         title={`You don't have access to ${area}`}
-        description={
-          description ??
-          (permission
-            ? `Your role doesn't let you ${describePermission(permission)}. Ask an organization admin to give you access.`
-            : "Your role doesn't include this action. Ask an organization admin to give you access.")
-        }
+        description={description ?? restrictedAccessDescription(permission)}
         compact={compact}
         data-testid={testId}
         actions={
@@ -118,12 +131,20 @@ export function RestrictedAccess({
         {copyFailed && (
           <Text role="alert" fontSize="sm" color="fg.muted">
             Couldn't copy the request. Send this page's address
-            {permission ? ` and the permission ${permission}` : ""} to an organization admin.
+            {permission ? ` and the permission ${permission}` : ""} to{" "}
+            {isPlatformOperatorPermission(permission)
+              ? "whoever runs this install"
+              : "an organization admin"}
+            .
           </Text>
         )}
         {copied && (
           <Text as="output" fontSize="sm" color="fg.muted">
-            Send the copied request to an organization admin.
+            Send the copied request to{" "}
+            {isPlatformOperatorPermission(permission)
+              ? "whoever runs this install"
+              : "an organization admin"}
+            .
           </Text>
         )}
       </AccessState>

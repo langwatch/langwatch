@@ -256,7 +256,47 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then its routed cost reads as zero and its spend is priced from its input tokens
 
   @unit
-  Scenario: The router flag is off by default
+  Scenario: The router flag is on by default on LangWatch Cloud
     Given the feature flag registry
-    When the router flag is read with no targeting rule
-    Then it is off, so no caller sends a route
+    When the router flag is read with no targeting rule on LangWatch Cloud
+    Then it is on, so the LLM-judge caller sends a route
+
+  @unit
+  Scenario: The router flag is off by default on a self-hosted install
+    Given a self-hosted install, where IS_SAAS is unset
+    When the router flag is read with no operator row and no override
+    Then it is off, so the LLM-judge caller sends no route
+    And the Instant Evals column of Default models does not offer routing
+    And an operator can still switch it on for the install
+
+  # --- The LLM-judge caller (ADR-190 open question 2: one caller behind the flag) ---
+
+  @unit
+  Scenario: An LLM judge on LangWatch Evals Preview is routed when the flag is on
+    Given the router flag is on for the project's organization
+    And the project's Instant Evals column is LangWatch Evals Preview
+    When an LLM judge evaluation runs on Instant Evals
+    Then the judge call carries the route for the "llm_judge" job
+    And the flag is read for the project within its organization, so an organization rule applies
+
+  @unit
+  Scenario: With the router flag off an LLM judge keeps today's single classifier call
+    Given the router flag is off for the project's organization
+    When an LLM judge evaluation runs on Instant Evals
+    Then the judge call carries no route
+
+  @unit
+  Scenario: An own decision model is never routed
+    Given the router flag is on for the project's organization
+    And the project runs Instant Evals on its own decision model
+    When an LLM judge evaluation runs on Instant Evals
+    Then the judge call carries the own decision model and no route
+    And the router flag is not read
+
+  @unit
+  Scenario: A routed result says who answered it
+    Given a routed judgement that the decision model answered and the LLM leg escalated
+    When the evaluation result is built
+    Then its details name the LangWatch Judge and the backends that answered
+    And they say how many questions were escalated
+    And an unrouted result's details read exactly as before

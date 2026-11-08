@@ -4,6 +4,7 @@ import type {
   InstantEvalLlmJudgeChannel,
 } from "../instant-eval-llm-judge.channel.ts";
 import { MemoryInstantEvalDecisionModelChannel } from "./memory.instant-eval-decision-model.channel.ts";
+import { MemoryInstantEvalProviderSpendChannel } from "./memory.instant-eval-provider-spend.channel.ts";
 
 /** No classifier: memory-tier processes judge nothing, as before the registry. */
 export class MemoryInstantEvalJudgeChannels {
@@ -15,6 +16,7 @@ export class MemoryInstantEvalJudgeChannels {
       decisionModels: MemoryInstantEvalDecisionModelChannel.create(),
       hostedDecisions: undefined,
       llmJudge: unavailableLlmJudge,
+      spend: MemoryInstantEvalProviderSpendChannel.create(),
     };
   }
 }

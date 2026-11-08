@@ -18,6 +18,7 @@ import type { AuthzRepositories } from "../authz.repositories.ts";
 import { AuthzMemoryStore } from "../memory/authz-memory.store.ts";
 import { MemoryAuthzAdmissionRepository } from "../memory/memory.authz-admission.repository.ts";
 import { MemoryAuthzAuditTrailRepository } from "../memory/memory.authz-audit-trail.repository.ts";
+import { MemoryAuthzBillingGrantRepository } from "../memory/memory.authz-billing-grant.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../memory/memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzLedgerReadRepository } from "../memory/memory.authz-ledger-read.repository.ts";
 import { MemoryAuthzLineageEpochRepository } from "../memory/memory.authz-lineage-epoch.repository.ts";
@@ -61,6 +62,7 @@ const backends: readonly Backend[] = [
         sessionVersions: MemoryAuthzSessionVersionRepository.create({ memory }),
         auditTrail: MemoryAuthzAuditTrailRepository.create({ memory }),
         platformGrants: MemoryAuthzPlatformGrantRepository.create({ memory }),
+        billingGrants: MemoryAuthzBillingGrantRepository.create({ memory }),
         membershipStamps: MemoryAuthzMembershipStampRepository.create({ memory }),
         grantProjection: MemoryAuthzGrantProjectionRepository.create({ memory }),
         revocation: MemoryAuthzRevocationRepository.create({ memory }),

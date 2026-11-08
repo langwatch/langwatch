@@ -123,6 +123,8 @@ import {
   type GatewayBudgetListWithHealth,
   type GatewayBudgetPageWithHealth,
   type GatewayPricedSpend,
+  type GatewayProviderUsage,
+  type GatewayProviderUsageResult,
   type GatewayPricedSpendResult,
   type GatewaySpendDay,
   type GatewayInternalSpendCommandRecord,
@@ -1270,6 +1272,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       config,
       budgetSpend: controlPlane.budgetSpend,
       modelProviders: setup.dependencies.modelProviders,
+      providerRows: setup.dependencies.modelProviders,
       guardrails,
       spend,
       realtimeSessions,
@@ -1572,6 +1575,10 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
 
   recordPricedSpend(input: GatewayPricedSpend): Promise<GatewayPricedSpendResult> {
     return this.#internalProtocol.recordPricedSpend(input);
+  }
+
+  recordProviderUsage(input: GatewayProviderUsage): Promise<GatewayProviderUsageResult> {
+    return this.#internalProtocol.recordProviderUsage(input);
   }
 
   reserveRealtimeSession(

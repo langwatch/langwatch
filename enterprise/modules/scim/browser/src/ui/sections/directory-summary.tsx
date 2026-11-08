@@ -1,5 +1,5 @@
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
 import { Link } from "@langwatch/browser-host/link";
-import { UpgradeRequired } from "@langwatch/design-system/access-state";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The Directory page's status band: which sources are connected, when the last
@@ -8,15 +8,7 @@ import { UpgradeRequired } from "@langwatch/design-system/access-state";
  * Spec: specs/identity/directory-administration.feature
  */
 import { Card } from "@langwatch/design-system/card";
-import {
-  Box,
-  Button,
-  Grid,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Grid, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatusChip, type StatusChipTone } from "@langwatch/design-system/settings-card";
 import { StatTileFigure } from "@langwatch/design-system/stat-tile";
 import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-client";
@@ -28,6 +20,7 @@ import type { ReactNode } from "react";
 import { useDirectoryFacts } from "../../behavior/use-directory-facts.ts";
 import { relativeTime } from "../../model/display-formatters.ts";
 import { isEnterpriseGateError } from "../../model/enterprise-gate.ts";
+import { useScimHost } from "../../model/scim-host.ts";
 
 const AUTHENTICATION_PAGE = "/settings/authentication";
 
@@ -41,7 +34,9 @@ export default function DirectorySummary({
   const { reconciliation } = facts;
 
   if (reconciliation.isError) {
-    if (isEnterpriseGateError(reconciliation.error)) return <EnterpriseGate />;
+    if (isEnterpriseGateError(reconciliation.error)) {
+      return <EnterpriseGate />;
+    }
     return (
       <HandledErrorAlert
         error={reconciliation.error}
@@ -108,17 +103,16 @@ export default function DirectorySummary({
   );
 }
 
-/** A plan state, not a failure: said as an upsell, as the directory band does on main. */
+/** A plan state, not a failure: one quiet line, so the page never reads as Enterprise-only. */
 function EnterpriseGate() {
+  const canManage = useScimHost().hasPermission("organization:manage");
   return (
-    <UpgradeRequired
+    <EnterpriseLock
+      variant="line"
       feature="Directory sync"
+      description="Sync people and groups from your identity provider, so joiners and leavers are handled for you."
+      canManage={canManage}
       data-testid="directory-enterprise-gate"
-      actions={
-        <Button asChild colorPalette="orange" size="sm">
-          <Link href="/settings/plans">Compare plans</Link>
-        </Button>
-      }
     />
   );
 }

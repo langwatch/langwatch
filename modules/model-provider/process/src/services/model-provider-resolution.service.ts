@@ -14,6 +14,7 @@ import {
   type ModelDefaultScope,
   type ModelProviderAlternateResolution,
   type ModelProviderResolution,
+  UNSET_ROLE_FALLBACK,
 } from "@langwatch/model-provider-contract";
 
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
@@ -49,7 +50,15 @@ export class ModelProviderResolutionService {
     const configs = await this.configs(parsed.projectId, context.organizationId);
     const chain = this.chain(parsed.projectId, context.teamId, context.organizationId);
     const restrictedModels = new Set<string>();
-    const resolution = this.findResolution({ configs, chain, feature, restrictedModels });
+    const resolution =
+      this.findResolution({ configs, chain, feature, keys: ownKeys(feature), restrictedModels }) ??
+      this.findResolution({
+        configs,
+        chain,
+        feature,
+        keys: fallbackKeys(feature),
+        restrictedModels,
+      });
 
     if (resolution) {
       return modelProviderResolutionSchema.parse({ ...resolution, feature });
@@ -101,18 +110,20 @@ export class ModelProviderResolutionService {
       );
     }
 
-    for (const tier of TIERS.slice(skipIndex + 1)) {
-      const tierConfigs = this.tierConfigs(configs, chain, tier);
+    for (const keys of [ownKeys(feature), fallbackKeys(feature)]) {
+      for (const tier of TIERS.slice(skipIndex + 1)) {
+        const tierConfigs = this.tierConfigs(configs, chain, tier);
 
-      const [first] = findConfiguredModels({ tierConfigs, feature });
+        const [first] = findConfiguredModels({ tierConfigs, keys });
 
-      if (first) {
-        return modelProviderResolutionSchema.parse({
-          model: first.model,
-          source: first.key === feature.key ? "feature_override" : "role_default",
-          scope: tier.label,
-          feature,
-        });
+        if (first) {
+          return modelProviderResolutionSchema.parse({
+            model: first.model,
+            source: first.key === feature.key ? "feature_override" : "role_default",
+            scope: tier.label,
+            feature,
+          });
+        }
       }
     }
 
@@ -165,17 +176,19 @@ export class ModelProviderResolutionService {
     configs,
     chain,
     feature,
+    keys,
     restrictedModels,
   }: {
     configs: ModelDefaultConfig[];
     chain: ModelDefaultScope[];
     feature: ModelDefaultFeature;
+    keys: readonly string[];
     restrictedModels: Set<string>;
   }): Omit<ModelProviderResolution, "feature"> | null {
     for (const tier of TIERS) {
       const tierConfigs = this.tierConfigs(configs, chain, tier);
 
-      for (const { key, model } of findConfiguredModels({ tierConfigs, feature })) {
+      for (const { key, model } of findConfiguredModels({ tierConfigs, keys })) {
         if (!isModelAllowedForFeature({ modelId: model, featureKey: feature.key })) {
           restrictedModels.add(model);
 
@@ -213,16 +226,27 @@ export class ModelProviderResolutionService {
   }
 }
 
+/** The feature's own keys, read tier by tier: its override, then its role. */
+function ownKeys(feature: ModelDefaultFeature): readonly string[] {
+  return [feature.key, feature.role];
+}
+
+/** The role an unset role reads once its own chain is empty (JUDGE reads DEFAULT). */
+function fallbackKeys(feature: ModelDefaultFeature): readonly string[] {
+  const fallback = UNSET_ROLE_FALLBACK[feature.role];
+  return fallback ? [fallback] : [];
+}
+
 function findConfiguredModels({
   tierConfigs,
-  feature,
+  keys,
 }: {
   tierConfigs: ModelDefaultConfig[];
-  feature: ModelDefaultFeature;
+  keys: readonly string[];
 }): { key: string; model: string }[] {
   const models: { key: string; model: string }[] = [];
 
-  for (const key of [feature.key, feature.role]) {
+  for (const key of keys) {
     for (const config of tierConfigs) {
       const value = pickConfiguredModel(config.config[key]);
 

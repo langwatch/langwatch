@@ -20,7 +20,7 @@ bindings.
 ## How it works
 
 1. Your identity provider pushes groups to the SCIM `/Groups` endpoint
-2. The groups appear at **Settings > Directory > Groups**
+2. The groups appear at **Settings > Users > Groups**
 3. You bind roles to each group, for example Member on the Engineering team
 4. A user added to the group in the identity provider holds every binding of the group
 5. A user removed from the group, or deprovisioned, loses them
@@ -35,7 +35,7 @@ bindings.
 </Frame>
 
 
-**Settings > Directory > Groups** lists every group. Each row shows:
+**Settings > Users > Groups** lists every group. Each row shows:
 
 | Column      | Description                                                          |
 | ----------- | -------------------------------------------------------------------- |
@@ -71,7 +71,7 @@ A group can hold several bindings, for example Member on the organization plus A
 
 ## How bindings add up
 
-A user in several groups holds every binding of every group, plus the bindings set on the user directly at **Settings > Directory > People**. Permissions add up: a request is allowed when any binding on the project, its team or the organization grants it, and no binding removes what another one grants.
+A user in several groups holds every binding of every group, plus the bindings set on the user directly at **Settings > Users > People**. Permissions add up: a request is allowed when any binding on the project, its team or the organization grants it, and no binding removes what another one grants.
 
 For example, a user in Group A (Member on the Engineering team) and Group B (Admin on the Engineering team) holds both, and can do everything an Admin can on that team.
 
@@ -103,7 +103,7 @@ Both `DELETE` and `PATCH active: false` remove the person's organization members
 
 You can also create groups manually without an identity provider:
 
-1. At **Settings > Directory > Groups**, click **Add a group** below the list
+1. At **Settings > Users > Groups**, click **Add a group** below the list
 2. Enter a group name
 3. Add role bindings and members in the dialog if you want
 4. Click **Create group**
@@ -152,13 +152,13 @@ GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
 
 **Users in a group have no access**
 
-- Open the group at **Settings > Directory > Groups**. The **Access granted** section needs at least one binding
+- Open the group at **Settings > Users > Groups**. The **Access granted** section needs at least one binding
 - The user is in the group's **Members** list. A user who was not in the organization when the identity provider pushed the group was skipped; push the group again after the user is provisioned
 
 **A user has more access than expected**
 
 - The user is in several groups. Bindings add up across groups
-- Bindings set on the user at **Settings > Directory > People** add up with the group bindings
+- Bindings set on the user at **Settings > Users > People** add up with the group bindings
 
 **Removing a user from a group in the identity provider has no effect**
 

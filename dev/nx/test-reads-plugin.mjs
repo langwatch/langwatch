@@ -112,6 +112,10 @@ export const reads = {
     "apps/ui/src/shell/route-patterns.generated.json",
   ],
   "@langwatch/onboarding-browser": ["apps/ui/src/shell/route-patterns.generated.json"],
+  "@langwatch/ui": [
+    "modules/auth/browser/src/ui/elements/auth-front-door.css",
+    "packages/design-system/src/components/brand/langy-theme.css",
+  ],
   "@langwatch/analytics-browser": [
     "apps/ui/public/images/dashboards/templates/**/*",
     "pnpm-workspace.yaml",

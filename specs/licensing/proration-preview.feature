@@ -13,7 +13,9 @@ Feature: Proration Preview Before Seat Update
 
   Seat upgrades are charged immediately (not deferred to the next invoice).
   The proration preview shows the exact amount that will be invoiced at the
-  moment the update is confirmed.
+  moment the update is confirmed. Seat reductions apply from the next billing
+  cycle with no credit, so their preview charges nothing today
+  (specs/licensing/seat-rotation.feature).
 
   Background:
     Given I am logged in as an organization administrator on LangWatch Cloud
@@ -46,9 +48,11 @@ Feature: Proration Preview Before Seat Update
     Then the amount due includes that pending proration
 
   @unit
-  Scenario: Reducing seats previews a credit rather than an amount owed
+  Scenario: Reducing seats previews nothing due today and when the lower count applies
     When I preview a seat decrease
-    Then the amount due is negative
+    Then the amount due today is zero
+    And the preview names the date the lower count starts billing
+    And the seats kept until then with their price
 
   # An account can be holding credit from an earlier change. The invoice total
   # and the amount the card is charged then differ by that credit, and only one
@@ -209,10 +213,11 @@ Feature: Proration Preview Before Seat Update
     And the recurring total is labeled with its billing period
 
   @integration
-  Scenario: Seats mode modal presents a seat reduction as a credit
+  Scenario: Seats mode modal presents a seat reduction as applying from the next cycle
     Given I have triggered a seat update that lowers the seat count
     When the proration preview modal opens
-    Then the amount is presented as a credit rather than as an amount owed
+    Then nothing is due today
+    And the new billing amount is labelled with the date it applies
 
   # A per-line breakdown (the unused-time credit and the remaining-time charge
   # as separate rows) is still not rendered — the modal shows the net amount.

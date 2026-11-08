@@ -173,6 +173,7 @@
   "/ops/cloud/licenses",
   "/ops/cloud/self-hosted-instances",
   "/ops/cloud/bug-reports",
+  "/ops/cloud/seat-use",
   "/ops/backoffice",
   "/ops/backoffice/*",
   "/@project/*",

@@ -3157,6 +3157,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       TokensInputImage: "inherit",
       TokensOutputImage: "inherit",
       ImageCount: "inherit",
+      WebSearchRequests: "inherit",
     },
   }),
   governance_cost_restatements: defineTableCatalogue({

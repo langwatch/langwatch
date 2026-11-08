@@ -24,6 +24,7 @@ export class MemoryCustomerIoChannel extends CustomerIoChannel {
     userId: string;
     event: CioEventName;
     properties?: Record<string, unknown>;
+    messageId?: string;
   }): Promise<void> {}
 
   async groupUser(_input: {
