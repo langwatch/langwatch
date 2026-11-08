@@ -86,6 +86,7 @@ function storedCard(widget: BoardWidget) {
         dashboardId="board-1"
         boardName="Weekly review"
         period={PERIOD}
+        periodKey="30d:auto"
         isWriting={false}
       />
     ),
@@ -187,6 +188,7 @@ describe("given a From LangWatch board's widget card", () => {
           rowSpan={4}
           timeWindow={{ start: PERIOD.periodStart, end: PERIOD.periodEnd }}
           granularitySeconds={PERIOD.granularitySeconds}
+          periodKey="30d:auto"
         />
       ),
       host: new StubAnalyticsHost(),

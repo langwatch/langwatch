@@ -88,6 +88,7 @@ describe("given a limit failure on a From LangWatch widget", () => {
             layout: { gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 4 },
           }}
           frameId="release-volume"
+          templateId="release"
           boardName="Release check"
           projectId="proj-1"
           projectSlug="test-project"
