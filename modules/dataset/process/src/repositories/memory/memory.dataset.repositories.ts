@@ -8,7 +8,6 @@ import { MemoryBatchEvaluationRepository } from "./memory.batch-evaluation.repos
 import { MemoryDatasetContentRepository } from "./memory.dataset-content.repository.ts";
 import { MemoryDatasetCountRepository } from "./memory.dataset-count.repository.ts";
 import { MemoryDatasetMigrationRepository } from "./memory.dataset-migration.repository.ts";
-import { MemoryDatasetRecordContentRepository } from "./memory.dataset-record-content.repository.ts";
 import { MemoryDatasetRecordRepository } from "./memory.dataset-record.repository.ts";
 import { MemoryDatasetVersionRepository } from "./memory.dataset-version.repository.ts";
 import { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
@@ -26,7 +25,6 @@ export class MemoryDatasetRepositories {
       datasets: MemoryDatasetRepository.create({ database }),
       records: MemoryDatasetRecordRepository.create({ database }),
       content: MemoryDatasetContentRepository.create({ database }),
-      recordContent: MemoryDatasetRecordContentRepository.create({ database }),
       batchEvaluations: MemoryBatchEvaluationRepository.create({ database }),
       count: MemoryDatasetCountRepository.create({ database }),
       migration: MemoryDatasetMigrationRepository.create(),

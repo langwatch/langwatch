@@ -7,7 +7,13 @@ describe("MemoryDatasetRepository", () => {
   describe("when two instances share one database", () => {
     it("hands out distinct ids", async () => {
       const database = MemoryDatasetDatabase.create();
-      const input = { projectId: "project_1", name: "a", slug: "a", columnTypes: [] };
+      const input = {
+        projectId: "project_1",
+        name: "a",
+        slug: "a",
+        columnTypes: [],
+        contentLayout: "s3_jsonl" as const,
+      };
 
       const first = await MemoryDatasetRepository.create({ database }).create(input);
       const second = await MemoryDatasetRepository.create({ database }).create({

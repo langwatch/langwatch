@@ -28,6 +28,7 @@ describe("Postgres datasets", () => {
         name: "Reviews",
         slug: "reviews",
         columnTypes: [{ name: "input", type: "string" }],
+        contentLayout: "s3_jsonl",
       });
 
       expect(parse(String(create.mock.calls[0]![0].data.id)).resource).toBe("dataset");
@@ -47,6 +48,7 @@ describe("Postgres datasets", () => {
         name: "Reviews",
         slug: "reviews",
         columnTypes: [{ name: "input", type: "string" }],
+        contentLayout: "s3_jsonl",
       });
 
       expect(parse(String(create.mock.calls[0]![0].data.id)).resource).toBe("dataset");
