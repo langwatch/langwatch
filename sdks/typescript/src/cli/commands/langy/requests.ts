@@ -328,6 +328,9 @@ export type PersonCredentials = {
   projectId?: string;
 };
 
+/** The command's credentials and which login they came from: the device login or an env key. */
+export type SignedIn = PersonCredentials & { source: "device" | "env" };
+
 /** The project a key from the environment answers on, once LangWatch took it as a person. */
 export type PersonalKeyProject = { projectId: string; projectName: string };
 
@@ -399,7 +402,7 @@ export async function ensureSignedIn({
   isAccepted?: (credentials: PersonCredentials) => Promise<boolean>;
   /** Whether LangWatch takes a key from the environment as a person, and on which project. */
   isPersonalKey?: (candidate: PersonCredentials) => Promise<PersonalKeyProject | undefined>;
-}): Promise<PersonCredentials> {
+}): Promise<SignedIn> {
   const elsewhere = loginMadeElsewhere();
   if (elsewhere) throw new ShareControlError(loginElsewhereMessage(elsewhere));
 
@@ -422,6 +425,7 @@ export async function ensureSignedIn({
     apiKey: credentials.apiKey,
     endpoint: credentials.endpoint,
     ...(credentials.projectId === undefined ? {} : { projectId: credentials.projectId }),
+    source: "device",
   };
 }
 
@@ -432,7 +436,7 @@ async function personalEnvKey({
 }: {
   isPersonalKey: (candidate: PersonCredentials) => Promise<PersonalKeyProject | undefined>;
   hadLogin: boolean;
-}): Promise<PersonCredentials | undefined> {
+}): Promise<SignedIn | undefined> {
   const found = findEnvKey();
   if (!found) return undefined;
   if (found.kind === "project") {
@@ -449,7 +453,12 @@ async function personalEnvKey({
     return undefined;
   }
   console.log(chalk.gray(envKeyLine({ projectName: project.projectName, hadLogin })));
-  return { apiKey: found.apiKey, endpoint: found.endpoint, projectId: project.projectId };
+  return {
+    apiKey: found.apiKey,
+    endpoint: found.endpoint,
+    projectId: project.projectId,
+    source: "env",
+  };
 }
 
 async function signInAgain({

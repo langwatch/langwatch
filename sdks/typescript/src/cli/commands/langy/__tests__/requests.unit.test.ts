@@ -253,6 +253,7 @@ describe("given the share-control command", () => {
         expect(login).not.toHaveBeenCalled();
         expect(credentials.apiKey).toBe("sk-lw-login-key");
         expect(credentials.projectId).toBe("project_personal");
+        expect(credentials.source).toBe("device");
         expect(printed).toContain("Using your login as Riley at ACME.");
         const wrong = printed.filter(
           (line) =>
@@ -355,6 +356,7 @@ describe("given the share-control command", () => {
           apiKey: PERSONAL_KEY,
           endpoint: ENDPOINT,
           projectId: "project_shop",
+          source: "env",
         });
         expect(printed).toContain(
           "Using the personal key in LANGWATCH_API_KEY on project ACME Shop, since this machine has no device login.",
