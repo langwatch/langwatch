@@ -77,6 +77,11 @@
       "cells": ["C1", "C3"],
       "note": "heavy creates the dataset by REST with no rows yet; rows in Postgres need a row door (REST rows route)"
     },
+    "dataset:convert-single-file-datasets": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs a useS3 dataset on the postgres layout with its JSON array in object storage, as releases before ADR-032 wrote it; no current door creates one, so it needs SQL plus an object put"
+    },
     "dataset:fill-empty-slugs": {
       "status": "pending",
       "seed": "unplanned",

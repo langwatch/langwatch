@@ -17,6 +17,7 @@ export type CodeStepId =
   | "coding-agent:fill-id-indexes"
   | "data-retention:keep-control-plane-events-forever"
   | "dataset:move-content-to-object-storage"
+  | "dataset:convert-single-file-datasets"
   | "dataset:fill-empty-slugs"
   | "dataset:create-first-versions"
   | "evaluation:fill-id-indexes"
