@@ -165,7 +165,6 @@ export const findEnvKey = (): EnvKey | undefined => {
   if (!apiKey) return undefined;
   if (!isUserScopedApiKey(apiKey)) return { kind: "project" };
   const endpoint = getEndpoint();
-  process.env.LANGWATCH_ENDPOINT ??= endpoint;
   const projectId = process.env.LANGWATCH_PROJECT_ID?.trim();
   return { kind: "user-scoped", apiKey, endpoint, ...(projectId ? { projectId } : {}) };
 };
