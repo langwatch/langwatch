@@ -37,6 +37,8 @@ import {
 } from "../../../rules/langy-local-user-wait-record.rules.ts";
 import { UserWaitCardsService } from "./langy-local-user-wait-cards.service.ts";
 
+type CancelStep = { step: string; run: () => Promise<void> };
+
 const logger = createLogger("langwatch:langy:local-control:waits");
 
 interface UserWaitServiceOptions {
@@ -287,13 +289,7 @@ export class UserWaitService {
    * waiting command still gets its expired answer.
    */
   private async cancelOne({ wait }: { wait: StoredUserWait }): Promise<boolean> {
-    const attempt = async ({
-      step,
-      run,
-    }: {
-      step: string;
-      run: () => Promise<void>;
-    }): Promise<boolean> => {
+    const attempt = async ({ step, run }: CancelStep): Promise<boolean> => {
       try {
         await run();
         return true;
