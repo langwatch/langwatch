@@ -6,6 +6,7 @@
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, renderHook, screen, within } from "@testing-library/react";
+import type { LangyCardPart } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -73,6 +74,27 @@ function waitingQuestion({ messageId, toolCallId }: { messageId: string; toolCal
   } satisfies UIMessage;
 }
 
+/** A platform confirmation card: a stamped choices card, tied to no tool call. */
+function confirmationCard({ messageId }: { messageId: string }) {
+  const part: LangyCardPart = {
+    type: "langy-card",
+    blockId: "confirm-1",
+    kind: "choices",
+    provenance: "derived",
+    card: {
+      kind: "choices",
+      blockId: "confirm-1",
+      question: "Delete this dashboard?",
+      options: [
+        { id: "confirm", label: "Confirm" },
+        { id: "keep", label: "Keep it" },
+      ],
+    },
+  };
+  // The ai UIMessage part union does not list the stamped card part.
+  return { id: messageId, role: "assistant", parts: [part as never] } satisfies UIMessage;
+}
+
 /** The live wait the stream put up for a question, as the transport records it. */
 function recordLiveQuestion({ turnId, toolCallId }: { turnId: string; toolCallId: string }) {
   useLangyLocalControlStore.getState().recordWait({
@@ -116,9 +138,9 @@ function renderLive(messages: UIMessage[]) {
   );
 }
 
-function isLocked(messageId: string): boolean {
-  const red = within(screen.getByTestId(messageId)).getByRole("button", { name: /Red/ });
-  return (red as HTMLButtonElement).disabled || red.getAttribute("aria-disabled") === "true";
+function isLocked(messageId: string, option: RegExp = /Red/): boolean {
+  const button = within(screen.getByTestId(messageId)).getByRole("button", { name: option });
+  return (button as HTMLButtonElement).disabled || button.getAttribute("aria-disabled") === "true";
 }
 
 async function answerStop(): Promise<void> {
@@ -193,6 +215,10 @@ describe("a live question card when Stop is answered", () => {
         conversationId: "conv-1",
         wait: { waitId: "wait-confirm", kind: "question", status: "pending", turnId: "turn-1" },
       });
+      renderLive([
+        waitingQuestion({ messageId: "m-1", toolCallId: "call-q1" }),
+        confirmationCard({ messageId: "m-2" }),
+      ]);
       const { result } = renderHook(() =>
         useLangyPanelStop({ projectId: "proj-1", foldInFlightTurnId: null, stop: async () => {} }),
       );
@@ -200,9 +226,10 @@ describe("a live question card when Stop is answered", () => {
       act(() => result.current());
       await answerStop();
 
-      const { waits } = useLangyLocalControlStore.getState();
-      expect(waits["wait-call-q1"]?.status).toBe("cancelled");
-      expect(waits["wait-confirm"]?.status).toBe("pending");
+      expect(isLocked("m-1")).toBe(true);
+      expect(isLocked("m-2", /Confirm/)).toBe(false);
+      // The card stays answerable because its wait is not the stopped question's.
+      expect(useLangyLocalControlStore.getState().waits["wait-confirm"]?.status).toBe("pending");
     });
   });
 });
