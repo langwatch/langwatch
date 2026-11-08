@@ -64,6 +64,10 @@ export interface ResolvedCredentials {
  */
 export const SESSION_REVALIDATE_WINDOW_MS = 5 * 60 * 1000;
 
+/** How long a login with no personal project yet waits for a new account's workspace to finish. */
+export const PERSONAL_PROJECT_PENDING_WAIT_MS = 4_000;
+const PERSONAL_PROJECT_RETRY_INTERVAL_MS = 1_000;
+
 /**
  * Resolves credentials in priority order: --api-key flag, env, then the
  * device session. Publishes into the request-scoped store, not
@@ -435,7 +439,7 @@ async function resolveSessionCredential(
   }
 
   try {
-    const project = await fetchPersonalProject(cfg);
+    const project = await fetchPersonalProjectOnceReady(cfg);
     if (!project) {
       // Endpoint missing (legacy server). Nothing to revalidate against;
       // trust the cached key and quiet the clock so we don't re-probe every
@@ -482,6 +486,26 @@ async function resolveSessionCredential(
           isLoginKey: cached === loginKey,
         }
       : undefined;
+  }
+}
+
+/**
+ * The personal project, asked again for a few seconds while a new account's workspace is still being
+ * set up (the server answers 5xx until it is). A login that already knows its project asks once.
+ */
+async function fetchPersonalProjectOnceReady(
+  cfg: GovernanceConfig,
+): Promise<Awaited<ReturnType<typeof fetchPersonalProject>>> {
+  const deadline = Date.now() + PERSONAL_PROJECT_PENDING_WAIT_MS;
+  for (;;) {
+    try {
+      return await fetchPersonalProject(cfg);
+    } catch (err) {
+      const isPending = err instanceof SessionApiError && err.status >= 500;
+      const hasRoom = Date.now() + PERSONAL_PROJECT_RETRY_INTERVAL_MS <= deadline;
+      if (!isPending || cfg.personal_project?.id || !hasRoom) throw err;
+      await new Promise((resolve) => setTimeout(resolve, PERSONAL_PROJECT_RETRY_INTERVAL_MS));
+    }
   }
 }
 

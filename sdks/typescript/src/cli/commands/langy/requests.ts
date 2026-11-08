@@ -199,11 +199,26 @@ export interface ControlApi {
 
 const REQUESTS_PATH = "/api/v1/langy/control/requests";
 
-/** The control routes, over the credentials the command resolved. */
+/** What the command says when the login reaches no project yet, so the routes cannot be called. */
+export const NO_PROJECT_YET_MESSAGE =
+  "Your LangWatch login does not reach a project yet, so this folder is not shared. A new account's workspace takes a few seconds to set up: wait a moment, then run `langwatch langy --share-control` again.";
+
+/** The first project a `project_required` refusal lists as reachable by the key. */
+function firstReachableProject(body: unknown): string | undefined {
+  const { meta } = (body ?? {}) as { meta?: { projects?: unknown } };
+  if (!Array.isArray(meta?.projects)) return undefined;
+  const [first] = meta.projects as { id?: unknown }[];
+  return typeof first?.id === "string" && first.id !== "" ? first.id : undefined;
+}
+
+/**
+ * The control routes, over the credentials the command resolved. A login that names no project
+ * (a new account's workspace still being set up) goes on with a project its key reaches.
+ */
 export function createControlApi({
   endpoint,
   apiKey,
-  projectId,
+  projectId: resolvedProjectId,
   fetchImpl = langwatchFetch,
 }: {
   endpoint: string;
@@ -211,14 +226,12 @@ export function createControlApi({
   projectId?: string;
   fetchImpl?: typeof fetch;
 }): ControlApi {
-  const headers = {
-    ...buildAuthHeaders({
-      apiKey,
-      ...(projectId === undefined ? {} : { projectId }),
-    }),
+  let projectId = resolvedProjectId;
+  const headersFor = (project: string | undefined) => ({
+    ...buildAuthHeaders({ apiKey, ...(project === undefined ? {} : { projectId: project }) }),
     "Content-Type": "application/json",
     "User-Agent": `langwatch-cli/${LANGWATCH_SDK_VERSION}`,
-  };
+  });
 
   const call = async (
     urlPath: string,
@@ -226,7 +239,7 @@ export function createControlApi({
   ): Promise<unknown> => {
     const response = await fetchImpl(`${endpoint}${urlPath}`, {
       method: init.method,
-      headers,
+      headers: headersFor(projectId),
       ...(init.body === undefined ? {} : { body: init.body }),
     });
     const text = await response.text();
@@ -235,6 +248,16 @@ export function createControlApi({
       body = text === "" ? null : JSON.parse(text);
     } catch {
       body = null;
+    }
+    const isProjectRequired =
+      response.status === 400 && (body as { code?: unknown } | null)?.code === "project_required";
+    if (isProjectRequired) {
+      const reachable = projectId === undefined ? firstReachableProject(body) : undefined;
+      if (reachable === undefined) {
+        throw new ShareControlError(NO_PROJECT_YET_MESSAGE, { status: response.status });
+      }
+      projectId = reachable;
+      return call(urlPath, init);
     }
     if (!response.ok) {
       throw new ShareControlError(
