@@ -2,12 +2,13 @@
  * Which name the keepalive's activity line gives the machine a call runs on.
  * @see specs/langy/langy-local-control.feature
  */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ConnectedWorkspace } from "../../../../repositories/langy-local-presence.repository.ts";
 import type { StoredLocalCall } from "../../../../rules/langy-local-call-record.rules.ts";
 import { LANGY_LIVENESS } from "../../../../rules/langy-streaming-constants.rules.ts";
-import type { LangyActorUserReader } from "../../../../services/langy-actor-session.service.ts";
 import { LocalCallKeepaliveService } from "../langy-local-call-keepalive.service.ts";
 
 const createdAt = 1_752_600_100_000;
@@ -37,29 +38,44 @@ const workspace: ConnectedWorkspace = {
   workspace: { root: "/Users/ada/acme-app", name: "acme-app", os: "darwin" },
 };
 
-async function activityLine({ people }: { people?: LangyActorUserReader }): Promise<string> {
+async function activityLine({ users }: { users?: UserApi }): Promise<string> {
   const appendStatus = vi.fn().mockResolvedValue(undefined);
   const keepalive = LocalCallKeepaliveService.create({
     calls: { claimKeepaliveWindow: async () => true },
     presence: { getByConversationId: async () => workspace },
     buffer: { appendStatus, heartbeat: async () => undefined },
-    ...(people ? { people } : {}),
+    ...(users ? { users } : {}),
     now: () => now,
+    nameLookupMs: 20,
   });
   await keepalive.beater()(call);
   return appendStatus.mock.calls[0]![0].status;
 }
 
-const person = (name: string | null) =>
-  ({
-    findById: async ({ id }: { id: string }) => (id === "user_ada" ? { id, name } : null),
-  }) as unknown as LangyActorUserReader;
+const profile = (id: string, name: string | null) => ({
+  id,
+  name,
+  email: "ada@example.com",
+  emailVerified: true,
+  image: null,
+  pendingSsoSetup: false,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  lastLoginAt: null,
+  deactivatedAt: null,
+});
+
+/** The user module, answering only for the person who shared the folder. */
+const usersNaming = (name: string | null) =>
+  createApiFixture<UserApi>({
+    findById: async ({ id }) => (id === workspace.userId ? profile(id, name) : null),
+  });
 
 describe("LocalCallKeepaliveService", () => {
   describe("given the person who shared the folder has a name on record", () => {
     /** @scenario "The activity line says whose machine, never the command" */
     it("says the command runs on that person's machine", async () => {
-      expect(await activityLine({ people: person("Ada Lovelace") })).toBe(
+      expect(await activityLine({ users: usersNaming("Ada Lovelace") })).toBe(
         "Running on Ada's machine",
       );
     });
@@ -68,14 +84,19 @@ describe("LocalCallKeepaliveService", () => {
   describe("given no name on record", () => {
     /** @scenario "The activity line says whose machine, never the command" */
     it("names the machine", async () => {
-      expect(await activityLine({ people: person(null) })).toBe("Running on ada-mbp");
+      expect(await activityLine({ users: usersNaming(null) })).toBe("Running on ada-mbp");
     });
 
     it("names the machine when the name cannot be read", async () => {
-      const people = {
+      const users = createApiFixture<UserApi>({
         findById: async () => Promise.reject(new Error("db down")),
-      } as unknown as LangyActorUserReader;
-      expect(await activityLine({ people })).toBe("Running on ada-mbp");
+      });
+      expect(await activityLine({ users })).toBe("Running on ada-mbp");
+    });
+
+    it("names the machine when the name does not come in time", async () => {
+      const users = createApiFixture<UserApi>({ findById: () => new Promise(() => undefined) });
+      expect(await activityLine({ users })).toBe("Running on ada-mbp");
     });
 
     it("names the machine when no reader was composed", async () => {

@@ -46,7 +46,7 @@ export type LocalControlRepositories = {
 type Timing = { offlineWaitMs?: number; pollIntervalMs?: number; now?: () => number };
 
 /** Names the person whose machine a call runs on, for the panel's activity line. */
-type ActivityNames = { people?: LangyActorUserReader };
+type ActivityNames = { users?: LangyActorUserReader };
 
 /** Told every answered card, so a confirmation card's click is recorded where it is spent. */
 type AnswerListener = { onAnswered?: (wait: StoredUserWait) => Promise<void> };
@@ -89,7 +89,7 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
     events,
     buffer,
     onAnswered,
-    people,
+    users,
     ...timing
   }: LocalControlRepositories & {
     workspace: LangyLocalWorkspaceChannel;
@@ -110,7 +110,7 @@ export class LangyLocalControlRuntimeService implements LocalControlRuntime {
       workspace,
       presence,
       buffer,
-      ...(people ? { people } : {}),
+      ...(users ? { users } : {}),
       ...clock,
       ...(offlineWaitMs !== undefined ? { offlineWaitMs } : {}),
       ...polling,

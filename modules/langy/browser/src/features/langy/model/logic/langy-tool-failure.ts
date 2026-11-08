@@ -346,20 +346,18 @@ function buildNoDomainPresentation(
 }
 
 /**
- * A shell command on the developer's own machine that exited non-zero. The reader
- * wrote that code, so its last error line, even an exception line, is theirs to read.
+ * A shell command on the developer's own machine that exited non-zero. Keyed on the text,
+ * which only the worker's local shell path writes: a folder-bound `bash` arrives named
+ * `bash`. The reader wrote that code, so its last error line, an exception too, is theirs.
  */
 function buildShellPresentation({
   title,
   raw,
-  toolName,
 }: {
   title: string;
   raw: string | undefined;
-  toolName: string | undefined;
 }): LangyToolErrorPresentation | null {
-  if (!raw || !toolName?.startsWith(LOCAL_TOOL_PREFIX)) return null;
-  const failure = readShellFailure(raw);
+  const failure = raw ? readShellFailure(raw) : null;
   if (!failure) return null;
   return {
     title: `${title} failed`,
@@ -442,7 +440,7 @@ export function presentLangyToolError({
 
   const notInstalled = githubAppNotInstalled({ toolName, raw });
   if (notInstalled) return notInstalled;
-  const shell = domain ? null : buildShellPresentation({ title, raw, toolName });
+  const shell = domain ? null : buildShellPresentation({ title, raw });
   if (shell) return shell;
 
   return domain

@@ -51,7 +51,7 @@ interface LocalCallDispatcherOptions {
   presence: LangyLocalPresenceRepository;
   buffer?: LocalCallBuffer;
   /** Names whose machine the activity line says a call runs on. */
-  people?: LangyActorUserReader;
+  users?: LangyActorUserReader;
   now?: () => number;
   /** Test knob: how long a first call waits for the folder to appear. */
   offlineWaitMs?: number;
@@ -84,7 +84,7 @@ export class LocalCallDispatcherService {
       calls: this.calls,
       presence: this.presence,
       buffer: this.buffer,
-      ...(options.people ? { people: options.people } : {}),
+      ...(options.users ? { users: options.users } : {}),
       now: this.now,
     });
   }

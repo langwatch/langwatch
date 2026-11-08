@@ -14,6 +14,8 @@ import {
 import { memorySessionState } from "@langwatch/process-stores";
 import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { testRedisUrl } from "../../../../__tests__/support/test-redis-url.ts";
@@ -166,7 +168,9 @@ describe("given a command running on the developer's machine", () => {
         workspace: MemoryLangyLocalWorkspaceChannel.create(),
         presence,
         buffer,
-        people: { findById: async ({ id }) => ({ ...someone, id }) },
+        users: createApiFixture<UserApi>({
+          findById: async ({ id }) => (id === someone.id ? someone : null),
+        }),
         now: () => now,
         offlineWaitMs: 0,
         pollIntervalMs: 1,

@@ -1,13 +1,16 @@
 /**
- * What a terminal printed, read into text a card can show: escapes gone, redrawn
- * progress lines dropped, and a failed shell command's exit code and last error line.
- * @see specs/langy/langy-local-control.feature "A failed command says its exit code and its last error line"
+ * Terminal output read into card text: escapes gone, redrawn progress dropped, exit code read.
+ * @see specs/langy/langy-local-control.feature
+ *      "A failed command says its exit code and its last error line"
  */
 
-/** CSI (colours, cursor moves, line erases), OSC (titles, hyperlinks), and any other two-byte escape. */
+/**
+ * CSI (colours, cursor moves, line erases); the string sequences OSC, DCS, SOS, PM and APC
+ * through BEL, ST or the end of a cut output; and any other two-byte escape.
+ */
 const ESCAPE_OR_BREAK =
   // eslint-disable-next-line no-control-regex -- matching terminal control bytes is the whole point
-  /(\u001b\[|\u009b)([0-?]*)[ -/]*([@-~])|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)|\u001b[@-Z\\-_]|\r|\n/g;
+  /(\u001b\[|\u009b)([0-?]*)[ -/]*([@-~])|\u001b[\]PX^_][^\u0007\u001b]*(?:\u0007|\u001b\\|$)|\u001b[@-Z\\-_]|\r|\n/g;
 // eslint-disable-next-line no-control-regex -- the control bytes left once every escape is replayed
 const STRAY_CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 

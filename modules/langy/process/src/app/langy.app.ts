@@ -351,7 +351,7 @@ export class LangyModule implements LangyApiContract {
       events: commands,
       buffer,
       onAnswered: (wait) => confirmationAnswers.recordAnswer(wait),
-      people: setup.dependencies.users,
+      users: setup.dependencies.users,
     });
     const deleteConfirmations = LangyDeleteConfirmationService.create({
       confirmations: setup.repositories.deleteConfirmations,

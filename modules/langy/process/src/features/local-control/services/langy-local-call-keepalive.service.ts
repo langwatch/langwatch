@@ -1,3 +1,5 @@
+import { setTimeout as sleep } from "node:timers/promises";
+
 import { HandledError } from "@langwatch/handled-error";
 import { LIVE_STREAM_KEEPALIVE_MS } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
@@ -14,14 +16,19 @@ import type { LangyActorUserReader } from "../../../services/langy-actor-session
 
 const logger = createLogger("langwatch:langy:local-control:keepalive");
 
+/** How long the line waits for the person's name before it names the machine instead. */
+const NAME_LOOKUP_MS = 1_000;
+
 interface LocalCallKeepaliveOptions {
   calls: Pick<LangyLocalCallRepository, "claimKeepaliveWindow">;
   presence: Pick<LangyLocalPresenceRepository, "getByConversationId">;
   /** Absent where no turn buffer was composed: polling then keeps nothing alive. */
   buffer: LocalCallBuffer | null;
   /** Names the person whose machine it is; absent, the line names the machine instead. */
-  people?: LangyActorUserReader;
+  users?: LangyActorUserReader;
   now: () => number;
+  /** Test knob: how long the name lookup may hold the poll. */
+  nameLookupMs?: number;
 }
 
 /** Keeps a polled call's turn alive and its activity line on the panel (ADR-129 "Transport"). */
@@ -99,16 +106,24 @@ export class LocalCallKeepaliveService {
     });
   }
 
-  /** A name that cannot be read only costs the line its name, never the keepalive. */
+  /**
+   * A name that fails, or is slow to come, costs the line its name, never the poll:
+   * the lookup is raced against a short deadline.
+   */
   private async personName(userId: string): Promise<string | null> {
-    const people = this.options.people;
-    if (!people) {
+    const users = this.options.users;
+    if (!users) {
       return null;
     }
-    const user = await people.findById({ id: userId }).catch((error: unknown) => {
+    const lookup = users.findById({ id: userId }).catch((error: unknown) => {
       logger.warn({ error, userId }, "could not read the name for the activity line");
       return null;
     });
+    const deadline = new AbortController();
+    const timeout = sleep(this.options.nameLookupMs ?? NAME_LOOKUP_MS, null, {
+      signal: deadline.signal,
+    }).catch(() => null);
+    const user = await Promise.race([lookup, timeout]).finally(() => deadline.abort());
     return user?.name ?? null;
   }
 }

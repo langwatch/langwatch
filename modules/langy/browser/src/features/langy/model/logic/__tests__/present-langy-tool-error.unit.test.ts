@@ -461,11 +461,39 @@ describe("presentLangyToolError", () => {
     /** @scenario "A failed command says its exit code and its last error line" */
     it("keeps the details free of every terminal escape and overwritten progress line", () => {
       const raw = presentCommand(uvPythonImportFailure).raw ?? "";
-      expect(raw).not.toMatch(/\u001b|\r/);
+      expect(raw).not.toContain(ESC);
+      expect(raw).not.toContain("\r");
       expect(raw).not.toContain("Preparing packages");
       expect(raw).toContain("Resolved 42 packages in 1.21s");
       expect(raw).toContain("Traceback (most recent call last):");
-      expect(presentCommand(uvResolutionFailure).raw).not.toMatch(/\u001b|8;;/);
+      expect(presentCommand(uvResolutionFailure).raw).not.toContain(ESC);
+      expect(presentCommand(uvResolutionFailure).raw).not.toContain("8;;");
+    });
+
+    /** @scenario "A failed command says its exit code and its last error line" */
+    it("reads the same way for a folder-bound shell call that arrives named bash", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        errorText: uvPythonImportFailure,
+        toolName: "bash",
+      });
+      expect(presentation.message).toBe("The command stopped with exit code 1.");
+      expect(presentation.detail).toMatch(/^ImportError: cannot import name 'connect_agent'/);
+    });
+
+    it("drops a string sequence's payload, terminated or cut off", () => {
+      const raw =
+        presentCommand(
+          shellResult({
+            exitCode: "1",
+            stdout: "(empty)",
+            stderr: `${ESC}P1$r0m${ESC}\\error: Failed to spawn: \`python3.14\`\n${ESC}]0;uv run main.py`,
+          }),
+        ).raw ?? "";
+      expect(raw).toContain("error: Failed to spawn: `python3.14`");
+      expect(raw).not.toContain(ESC);
+      expect(raw).not.toContain("1$r0m");
+      expect(raw).not.toContain("uv run main.py");
     });
 
     it("says the exit code alone when the command printed nothing", () => {
