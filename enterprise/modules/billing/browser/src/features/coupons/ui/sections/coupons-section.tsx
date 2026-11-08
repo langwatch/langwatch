@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { describeError } from "@langwatch/browser-host/errors";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { ListPage } from "@langwatch/design-system/list-page";
+import {
+  ListPage,
+  type ListPageEmptyConfig,
+  type ListPageErrorConfig,
+} from "@langwatch/design-system/list-page";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import type { CouponsSectionProps } from "@langwatch/enterprise-billing-client";
 import type { PromotionCodeView } from "@langwatch/enterprise-billing-contract";
@@ -12,6 +16,12 @@ import { billingCouponsApi } from "../../behavior/billing-coupons-api.ts";
 import { useCouponCommands } from "../../behavior/use-coupon-commands.ts";
 import { CouponsTable } from "../blocks/coupons-table.tsx";
 import { CreateCouponDrawer } from "./create-coupon-drawer.tsx";
+
+/** Each state with the config ListPage requires for it. */
+type CouponsPageState =
+  | { state: "loading" | "ready" }
+  | { state: "error"; error: ListPageErrorConfig }
+  | { state: "empty"; empty: ListPageEmptyConfig };
 
 const STRIPE_COUPON_DOCS = {
   kind: "docs",
@@ -39,24 +49,29 @@ export default function CouponsSection(_props: CouponsSectionProps) {
   const description =
     "Promotion codes customers type at the Growth checkout, and whether that checkout accepts each one. No code discounts the first charge up to the 1st of next month; the discount months count from the day of checkout.";
 
-  const state = list.error
-    ? "error"
-    : list.isLoading
-      ? "loading"
-      : coupons.length === 0
-        ? "empty"
-        : "ready";
-  // ListPage draws any error it is given over loaded rows, so only a failed read passes one.
-  const loadError = list.error
-    ? {
+  const pageState = (): CouponsPageState => {
+    if (list.error)
+      return {
+        state: "error",
         error: {
           title: "Couldn't load coupons",
           description: describeError({ error: list.error, fallbackTitle: "Couldn't load coupons" }),
           onRetry: () => void list.refetch(),
           next: [STRIPE_COUPON_DOCS],
         },
-      }
-    : {};
+      };
+    if (list.isLoading) return { state: "loading" };
+    if (coupons.length > 0) return { state: "ready" };
+    return {
+      state: "empty",
+      empty: {
+        icon: <TicketPercent />,
+        title: "No coupons yet",
+        description: "Create a coupon to give a customer a promotion code for the Growth checkout.",
+        next: [STRIPE_COUPON_DOCS],
+      },
+    };
+  };
 
   return (
     <>
@@ -64,16 +79,8 @@ export default function CouponsSection(_props: CouponsSectionProps) {
         title="Coupons"
         description={description}
         actions={actions}
-        state={state}
         refreshing={list.isFetching}
-        {...loadError}
-        empty={{
-          icon: <TicketPercent />,
-          title: "No coupons yet",
-          description:
-            "Create a coupon to give a customer a promotion code for the Growth checkout.",
-          next: [STRIPE_COUPON_DOCS],
-        }}
+        {...pageState()}
       >
         <CouponsTable coupons={coupons} onDeactivate={setDeactivating} />
       </ListPage>
