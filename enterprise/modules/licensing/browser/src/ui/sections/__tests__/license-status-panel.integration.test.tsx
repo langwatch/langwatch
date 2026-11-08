@@ -7,16 +7,18 @@
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { LicenseStatus as LicenseStatusPayload } from "@langwatch/enterprise-licensing-contract";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LicensingHostApi, LicensingHostProvider } from "../../../model/licensing-host.ts";
 import { LicenseStatusPanel } from "../license-status-panel.tsx";
 
-const { statusResult, connectResult, actions } = vi.hoisted(() => ({
+const { statusResult, connectResult, connectQuery, actionOptions, actions } = vi.hoisted(() => ({
   statusResult: { current: undefined as unknown },
   connectResult: { current: undefined as unknown },
+  connectQuery: { options: undefined as { refetchInterval?: number | false } | undefined },
+  actionOptions: { current: undefined as { onRefreshSettled?: () => void } | undefined },
   actions: {
     upload: vi.fn(),
     activate: vi.fn(),
@@ -73,19 +75,25 @@ vi.mock("../../../behavior/connect-api.ts", () => ({
   connectApi: {
     connect: {
       status: {
-        useQuery: () => ({ data: connectResult.current, refetch: vi.fn() }),
+        useQuery: (_input: unknown, options: { refetchInterval?: number | false }) => {
+          connectQuery.options = options;
+          return { data: connectResult.current, refetch: vi.fn() };
+        },
       },
     },
   },
 }));
 
 vi.mock("../use-license-actions.ts", () => ({
-  useLicenseActions: () => ({
-    ...actions,
-    isUploading: false,
-    isRemoving: false,
-    isRefreshing: false,
-  }),
+  useLicenseActions: (options: { onRefreshSettled?: () => void }) => {
+    actionOptions.current = options;
+    return {
+      ...actions,
+      isUploading: false,
+      isRemoving: false,
+      isRefreshing: false,
+    };
+  },
 }));
 
 const resourceCounts = {
@@ -231,6 +239,25 @@ describe("LicenseStatusPanel", () => {
       renderWith(validStatus({ connected: true }));
 
       expect(screen.getByTestId("license-sync-line").textContent).toBe("Not synced yet");
+    });
+
+    /** @scenario The sync line follows a refresh once its outcome is recorded */
+    it("re-reads Connect after a refresh until the recorded sync changes", () => {
+      connectResult.current = connectOn({});
+      const view = renderWith(validStatus({ connected: true }));
+      expect(connectQuery.options?.refetchInterval).toBe(false);
+
+      act(() => actionOptions.current?.onRefreshSettled?.());
+      expect(connectQuery.options?.refetchInterval).toBe(1_000);
+
+      connectResult.current = connectOn({ lastSyncAt: new Date().toISOString() });
+      view.rerender(
+        <LicensingHostProvider value={new TestHost(true)}>
+          <LicenseStatusPanel organizationId="org-123" />
+        </LicensingHostProvider>,
+      );
+      expect(connectQuery.options?.refetchInterval).toBe(false);
+      expect(screen.getByTestId("license-sync-line").textContent).toMatch(/^Last synced/);
     });
 
     /** @scenario A revoked license is not called valid */

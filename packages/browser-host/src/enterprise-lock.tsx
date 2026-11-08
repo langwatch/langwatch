@@ -4,7 +4,7 @@
  * Spec: specs/licensing/enterprise-lock.feature
  */
 import { AccessState } from "@langwatch/design-system/access-state";
-import { Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -90,7 +90,7 @@ export function EnterpriseLock({
         {extraActions}
       </>
     ) : undefined;
-  return (
+  const lock = (
     <AccessState
       kind="upgrade"
       compact={compact}
@@ -100,6 +100,7 @@ export function EnterpriseLock({
       data-testid={testId}
     />
   );
+  return compact ? lock : <Box paddingTop={4}>{lock}</Box>;
 }
 
 function lockActions({

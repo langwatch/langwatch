@@ -199,6 +199,13 @@ Feature: License sync
     And the License page shows the same line from the same reading
 
   @integration
+  Scenario: The sync line follows a refresh once its outcome is recorded
+    Given a license that names a hosted service
+    When an admin refreshes the license on the License page
+    Then the page re-reads the sync line until the refresh's outcome is recorded
+    And it stops re-reading once the line changed
+
+  @integration
   Scenario: A failure that is already the page's refusal is not shown twice
     Given the last sync was refused for the same reason the hosted services refuse the license
     When an admin opens Settings, Connect

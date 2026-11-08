@@ -56,10 +56,17 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
 
   // The sync line and a revocation are read from Connect, the same reading its page shows.
   const isConnected = !!status?.hasLicense && isConnectedLicense(status);
+  const [awaitedSync, setAwaitedSync] = useState<string | null>(null);
   const connectStatus = connectApi.connect.status.useQuery(
     { organizationId },
-    { enabled: isConnected, refetchOnWindowFocus: false },
+    {
+      enabled: isConnected,
+      refetchOnWindowFocus: false,
+      refetchInterval: awaitedSync === null ? false : SYNC_RECORD_POLL_MS,
+    },
   );
+  const recordedSync = syncKeyOf(connectStatus.data);
+  if (awaitedSync !== null && recordedSync !== awaitedSync) setAwaitedSync(null);
 
   const [activationCode, setActivationCode] = useState("");
   const { upload, activate, remove, refresh, isUploading, isRemoving, isRefreshing } =
@@ -75,7 +82,10 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
         void refetch();
       },
       onRefreshSettled: () => {
-        if (isConnected) void connectStatus.refetch();
+        if (!isConnected) return;
+        // The sync outcome is recorded by a subscriber, so it lands a moment after the refresh.
+        setAwaitedSync(recordedSync);
+        setTimeout(() => setAwaitedSync(null), SYNC_RECORD_WAIT_MS);
       },
     });
 
@@ -183,4 +193,14 @@ function hostedStateOf({
       : {}),
     isRevoked: isRevokedByLangWatch(status),
   };
+}
+
+/** How often, and for how long, the panel re-reads Connect for the sync a refresh recorded. */
+const SYNC_RECORD_POLL_MS = 1_000;
+const SYNC_RECORD_WAIT_MS = 10_000;
+
+/** What the last sync recorded, to tell when a newer outcome arrived. */
+function syncKeyOf(status: ConnectStatus | undefined): string {
+  if (!status || status.deployment !== "on") return "";
+  return `${status.sync.lastSyncAt ?? ""}|${status.sync.lastError?.code ?? ""}`;
 }
