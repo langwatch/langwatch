@@ -24,7 +24,10 @@ import {
   type SnippetLanguage,
 } from "../../model/connect-snippets.ts";
 
-/** The install line of each language, above its snippet. 1.3.0 is the first Python release with connect_agent. */
+/**
+ * The install line of each language, above its snippet.
+ * 1.3.0 is the first Python release with connect_agent.
+ */
 const INSTALL_COMMANDS: Record<SnippetLanguage, string> = {
   python: 'pip install "langwatch>=1.3.0"',
   typescript: "npm install langwatch zod",

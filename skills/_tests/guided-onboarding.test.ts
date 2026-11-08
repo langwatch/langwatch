@@ -615,7 +615,11 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "A pip project's manifest gets the package line" */
     it("writes the langwatch line into the requirements file itself, since a pip install writes no manifest", () => {
       expect(rendered).toContain(
-        "`uv add`, `npm install` and the other managers write it themselves; a pip install writes nothing, so for a pip project the manifest is `requirements.txt` (or the file the folder uses, such as `requirements/base.txt`) and you write the line into it yourself: read the version with `python -m pip show langwatch` through the interpreter the install worked with, then add `langwatch==<installed version>`, pinned the way the file pins its other packages, and unpinned when the file pins none of them.",
+        "`uv add`, `npm install` and the other managers write it themselves; a pip install writes nothing, so for a pip project the manifest is `requirements.txt` (or the file the folder uses, such as `requirements/base.txt`) and you write the line into it yourself: read the version with `python -m pip show langwatch` through the interpreter the install worked with, then add `langwatch==<installed version>`, pinned the way the file pins its other packages, and `langwatch>=1.3.0` when the file pins none of them: a bare line lets a later `pip install -r` walk back to a release without the API.",
+      );
+      const tracing = renderSkill(listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!);
+      expect(tracing).toContain(
+        "the line is `langwatch==<installed version>`, pinned the way the file pins its other packages, and `langwatch>=1.3.0` when it pins none of them.",
       );
       // The commit stages that manifest, whatever the file is called.
       expect(rendered).toContain(
@@ -1060,11 +1064,11 @@ describe("the guided-onboarding skill", () => {
 
     /** @scenario "Every Python install asks for a release that carries the API" */
     it("asks every Python install for 1.3.0 or newer, quoted, in every skill", () => {
-      const install =
-        /(?:uv add|uv pip install|pip3? install|-m pip install)(?: --?[\w-]+(?: \d[\d.]*)?)* (\S+)/g;
+      // Every argument to the end of the command, so a langwatch after other packages is seen.
+      const install = /(?:uv add|uv pip install|pip3? install|-m pip install)((?: [^\s`]+)+)/g;
       const asked = listNativeSkills(skillsRoot).flatMap((skill) =>
         [...renderSkill(skill).matchAll(install)]
-          .map((match) => match[1]!)
+          .flatMap((match) => match[1]!.trim().split(" "))
           .filter((target) => /^["']?langwatch(?![-\w])/.test(target))
           .map((target) => `${skill.slug}: ${target.replace(/[`,.;)]+$/, "")}`),
       );
@@ -1072,6 +1076,23 @@ describe("the guided-onboarding skill", () => {
       expect(asked.filter((line) => !line.endsWith(': "langwatch>=1.3.0"'))).toEqual([]);
       expect(rendered).toContain(
         "With the floor, an interpreter newer than the SDK supports gets a refusal instead",
+      );
+    });
+
+    /** @scenario "A uv project whose Python range starts below the SDK's is asked about" */
+    it("asks before raising a uv project's requires-python when uv refuses the floor over it", () => {
+      expect(rendered).toContain(
+        "`uv add` refuses too when the project's `requires-python` starts below 3.10, whatever interpreter is active, with a hint naming `requires-python`: uv resolves for the whole range, so another interpreter cannot help, and the range is never changed unasked.",
+      );
+      expect(rendered).toContain(
+        'Ask with the `question` tool, verbatim: "Your project\'s requires-python allows Python versions the LangWatch SDK doesn\'t support. Want me to raise its lower bound to 3.10?" Options, in this order: "Raise it to 3.10 for me" and "I\'ll change it myself".',
+      );
+      expect(rendered).toContain(
+        'On "Raise it to 3.10 for me": set the lower bound of `requires-python` in `pyproject.toml` to 3.10, keeping any upper bound, and run the uv rung again.',
+      );
+      const tracing = renderSkill(listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!);
+      expect(tracing).toContain(
+        '`uv add` refuses too when the project\'s `requires-python` starts below 3.10 (the hint names `requires-python`): another interpreter cannot help, so ask before raising that lower bound: "Raise it to 3.10 for me" or "I\'ll change it myself".',
       );
     });
 
@@ -1118,7 +1139,7 @@ describe("the guided-onboarding skill", () => {
       );
       const tracing = renderSkill(listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!);
       expect(tracing).toContain(
-        'Before any code is written against it, check the install carries the API through the interpreter that installed it: `python -c "import langwatch; langwatch.setup; langwatch.connect_agent"` for Python, `node -e "require(\'langwatch\')"` for TypeScript.',
+        'Before any code is written against it, check the install carries the API through the interpreter that installed it: `python -c "import langwatch; langwatch.setup; langwatch.connect_agent"` for Python (`.venv/bin/python -c` after the `.venv` rung, `uv run python -c` in a uv project), `node -e "require(\'langwatch\')"` for TypeScript.',
       );
       expect(tracing).toContain("`pip install --upgrade` cannot help there.");
     });

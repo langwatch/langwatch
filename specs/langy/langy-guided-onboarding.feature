@@ -583,7 +583,7 @@ Feature: Langy guides the first setup after sign-up
       Then the manifest of a pip project is requirements.txt, or the requirements file the folder uses
       And a pip install writes no manifest, so Langy writes the langwatch line into that file itself
       And the version comes from python -m pip show langwatch, run with the interpreter the install worked with
-      And the line is pinned the way the file pins its other packages, and unpinned when the file pins none of them
+      And the line is pinned the way the file pins its other packages, and langwatch>=1.3.0 when the file pins none of them
       And the commit stages that manifest
 
     # The fixture folder was a repository with no remote, so
@@ -743,7 +743,7 @@ Feature: Langy guides the first setup after sign-up
     Scenario: Every Python install asks for a release that carries the API
       When the compiled skills are read
       Then every Python install command asks for "langwatch>=1.3.0", quoted so the shell never reads the > as a redirect
-      And no Python install command asks for a bare langwatch
+      And no Python install command asks for a bare langwatch, the starter agent's install of several packages included
       And on an interpreter newer than the SDK supports pip refuses the install instead of walking back to a release without the API
 
     @unit
@@ -763,6 +763,17 @@ Feature: Langy guides the first setup after sign-up
       And the question names the Python version and offers "Install Python 3.13 with uv for me" and "I'll pick the interpreter myself", plain answers with no ref
       And the first option installs Python 3.13 with uv, runs the ladder's uv rung against it and checks the install again
       And the second ends the turn naming the Python the SDK supports
+
+    # A uv project declaring requires-python >=3.9 locked langwatch 0.2.10 on
+    # Python 3.13 with a bare spec: uv resolves for the whole declared range. The
+    # floor turns that into a refusal, and another interpreter cannot fix a range.
+    @unit
+    Scenario: A uv project whose Python range starts below the SDK's is asked about
+      When the compiled guided-onboarding skill is read
+      Then uv refusing the install over the project's requires-python is a question about raising its lower bound to 3.10
+      And the options are "Raise it to 3.10 for me" and "I'll change it myself", plain answers with no ref
+      And the project's Python range is never changed unasked
+      And the tracing skill says the same
 
     # The wait is one CLI call, not a loop the model writes: a hand-written
     # poll once misread the list and gave up on an agent that was online.

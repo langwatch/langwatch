@@ -31,6 +31,7 @@ import {
   startShareControl,
   teardown,
   terminalSection,
+  toolOutputText,
   waitForConnectedWorkspace,
   waitForPendingRequest,
   watchLangyConversation,
@@ -224,13 +225,11 @@ describe("Langy asks for a supported Python before writing against an SDK that l
         console.log("[layer2] main.py unchanged at the card:", mainAtQuestion === pristineMain);
         expect(mainAtQuestion).toBe(pristineMain);
 
-        // The install asked for a release with the API, and the floor kept the
-        // old one out: the card is answering pip's refusal, not a guess.
-        const floored = commands.filter((command) =>
-          command.includes(`langwatch>=${FIRST_SUPPORTED_SDK}`),
-        );
-        console.log("[layer2] floored installs:", floored.join(" | "));
-        expect(floored.length).toBeGreaterThan(0);
+        // A pip install asked for a release with the API and pip refused it: the
+        // card answers that refusal, not a guess or a manifest line alone.
+        const refused = storedRefusedInstalls({ messages: stored, floor: FIRST_SUPPORTED_SDK });
+        console.log("[layer2] refused floored installs:", refused.join(" | "));
+        expect(refused.length).toBeGreaterThan(0);
         const installed = installedVersion({
           python: python.python,
           name: "langwatch",
@@ -255,6 +254,25 @@ describe("Langy asks for a supported Python before writing against an SDK that l
     );
   });
 });
+
+/** The pip installs of langwatch at or above the floor that pip refused for the interpreter. */
+function storedRefusedInstalls({
+  messages,
+  floor,
+}: {
+  messages: { parts: Record<string, unknown>[] }[];
+  floor: string;
+}): string[] {
+  return messages.flatMap((message) =>
+    message.parts.flatMap((part) => {
+      const command = (part.input as { command?: unknown } | undefined)?.command;
+      if (typeof part.type !== "string" || !part.type.startsWith("tool-")) return [];
+      if (typeof command !== "string" || !/pip3?\s+install\b/.test(command)) return [];
+      if (!command.includes(`langwatch>=${floor}`)) return [];
+      return toolOutputText(part).includes("No matching distribution found") ? [command] : [];
+    }),
+  );
+}
 
 /** Every command the stored conversation shows Langy ran, in order. */
 function storedCommands(messages: { parts: Record<string, unknown>[] }[]): string[] {
