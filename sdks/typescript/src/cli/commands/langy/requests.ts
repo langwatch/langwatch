@@ -213,7 +213,8 @@ function firstReachableProject(body: unknown): string | undefined {
 
 /**
  * The control routes, over the credentials the command resolved. A login that names no project
- * (a new account's workspace still being set up) goes on with a project its key reaches.
+ * (a new account's workspace still being set up) lists on a project its key reaches, and answers
+ * a request on that request's own project.
  */
 export function createControlApi({
   endpoint,
@@ -227,8 +228,11 @@ export function createControlApi({
   fetchImpl?: typeof fetch;
 }): ControlApi {
   let projectId = resolvedProjectId;
-  const headers = () => ({
-    ...buildAuthHeaders({ apiKey, ...(projectId === undefined ? {} : { projectId }) }),
+  const listedProjects = new Map<string, string>();
+  const projectOfRequest = (requestId: string): string | undefined =>
+    resolvedProjectId ?? listedProjects.get(requestId) ?? projectId;
+  const headers = (project: string | undefined) => ({
+    ...buildAuthHeaders({ apiKey, ...(project === undefined ? {} : { projectId: project }) }),
     "Content-Type": "application/json",
     "User-Agent": `langwatch-cli/${LANGWATCH_SDK_VERSION}`,
   });
@@ -236,10 +240,11 @@ export function createControlApi({
   const call = async (
     urlPath: string,
     init: { method: string; body?: string },
+    project: string | undefined = projectId,
   ): Promise<unknown> => {
     const response = await fetchImpl(`${endpoint}${urlPath}`, {
       method: init.method,
-      headers: headers(),
+      headers: headers(project),
       ...(init.body === undefined ? {} : { body: init.body }),
     });
     const text = await response.text();
@@ -252,12 +257,12 @@ export function createControlApi({
     const isProjectRequired =
       response.status === 400 && (body as { code?: unknown } | null)?.code === "project_required";
     if (isProjectRequired) {
-      const reachable = projectId === undefined ? firstReachableProject(body) : undefined;
+      const reachable = project === undefined ? firstReachableProject(body) : undefined;
       if (reachable === undefined) {
         throw new ShareControlError(NO_PROJECT_YET_MESSAGE, { status: response.status });
       }
       projectId = reachable;
-      return call(urlPath, init);
+      return call(urlPath, init, reachable);
     }
     if (!response.ok) {
       throw new ShareControlError(
@@ -273,17 +278,24 @@ export function createControlApi({
       const body = (await call(REQUESTS_PATH, { method: "GET" })) as {
         requests?: ControlRequest[];
       } | null;
-      return Array.isArray(body?.requests) ? body.requests : [];
+      const requests = Array.isArray(body?.requests) ? body.requests : [];
+      for (const request of requests) {
+        if (request.projectId) listedProjects.set(request.id, request.projectId);
+      }
+      return requests;
     },
     approve: async ({ requestId, workspace }) =>
-      (await call(`${REQUESTS_PATH}/${encodeURIComponent(requestId)}/approve`, {
-        method: "POST",
-        body: JSON.stringify({ workspace }),
-      })) as ApprovedControl,
+      (await call(
+        `${REQUESTS_PATH}/${encodeURIComponent(requestId)}/approve`,
+        { method: "POST", body: JSON.stringify({ workspace }) },
+        projectOfRequest(requestId),
+      )) as ApprovedControl,
     cancel: async ({ requestId }) => {
-      await call(`${REQUESTS_PATH}/${encodeURIComponent(requestId)}/cancel`, {
-        method: "POST",
-      });
+      await call(
+        `${REQUESTS_PATH}/${encodeURIComponent(requestId)}/cancel`,
+        { method: "POST" },
+        projectOfRequest(requestId),
+      );
     },
   };
 }
