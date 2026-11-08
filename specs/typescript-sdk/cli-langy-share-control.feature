@@ -15,6 +15,7 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
     @unit
     Scenario: The command signs in when there is no session
       Given no device session on this machine
+      And no personal key in LANGWATCH_API_KEY
       When I run "langwatch langy --share-control"
       Then the CLI prints "No login on this machine yet. Signing in first."
       And the CLI runs the device login right away
@@ -30,9 +31,8 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       And the CLI prints who I am logged in as
       And the CLI prints no login header, no AI tools, no model providers, no budgets and no dashboard line
 
-    # Langy writes the project's key into the folder's .env during the setup.
-    # That key carries no person, so it can never list or approve a request
-    # addressed to me; the login on this machine is who I am.
+    # The login on this machine is who I am, so it answers first, whatever
+    # key the folder's .env carries.
     @unit
     Scenario: The login answers before a project key found in the folder
       Given a device session on this machine
@@ -41,18 +41,31 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       Then the request list is read with my login's key
       And no login flow runs
 
-    # The same rule for a key exported in the shell. Nothing in a key tells
-    # the command line whether a person stands behind it: a project key and a
-    # key a person created look alike from here. So the command never takes
-    # LANGWATCH_API_KEY, from the folder's .env or from the shell, and the
-    # device login is its one credential.
+    # `langwatch login --project` writes a personal key into the folder's .env,
+    # and a personal key belongs to me. With no usable login, that key answers,
+    # so a request waiting for me just works without a second sign-in.
     @unit
-    Scenario: A key in the environment never stands in for the login
-      Given no device session on this machine
-      And LANGWATCH_API_KEY is set, in the shell or in the folder's .env
+    Scenario: A personal key in the environment answers when there is no login
+      Given no device session on this machine, or one that cannot be used
+      And LANGWATCH_API_KEY holds my personal key for "ACME Shop", in the shell or in the folder's .env
       When I run "langwatch langy --share-control"
-      Then the CLI runs the device login right away
-      And the request list is never read with that key
+      Then the CLI prints "Using the personal key in LANGWATCH_API_KEY on project ACME Shop, since this machine has no device login."
+      And the request list is read with that key, naming its project
+      And no login flow runs
+      And no line prints the key's value
+
+    # A project key acts as the project, not as a person, so it cannot find or
+    # approve a request Langy made to me. The format tells an old project key;
+    # for a new key only LangWatch knows, so its request list is the check.
+    @unit
+    Scenario: A project key in the environment never stands in for the login
+      Given no device session on this machine
+      And LANGWATCH_API_KEY holds a project key, in the shell or in the folder's .env
+      When I run "langwatch langy --share-control"
+      Then the CLI prints one line saying why LANGWATCH_API_KEY cannot answer Langy's request
+      And the CLI runs the device login right away
+      And continues to the request list with the new login's key
+      And no line prints the key's value
 
     # A login the server refuses, one that holds no login key, or one whose
     # key the platform answers with a 401 cannot act as me.

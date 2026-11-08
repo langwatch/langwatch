@@ -138,9 +138,8 @@ export const resolveCredentials = async (
 };
 
 /**
- * A person-acting command's credentials: the device session's login key only, never
- * `LANGWATCH_API_KEY`. Nothing when there is no login, it is refused or keyless, or was made
- * elsewhere (`loginMadeElsewhere`).
+ * A person-acting command's device-login credentials: the session's login key only. Nothing when
+ * there is no login, it is refused or keyless, or was made elsewhere. `findEnvKey` is the fallback.
  * @see specs/typescript-sdk/cli-langy-share-control.feature
  */
 export const resolvePersonCredentials = async (): Promise<ResolvedCredentials | undefined> => {
@@ -149,6 +148,26 @@ export const resolvePersonCredentials = async (): Promise<ResolvedCredentials | 
   const endpoint = getEndpoint();
   process.env.LANGWATCH_ENDPOINT ??= endpoint;
   return resolveFromSession({ endpoint, isLoginKeyRequired: true });
+};
+
+/**
+ * `LANGWATCH_API_KEY`, from the shell or the folder's .env, as a person-acting command may weigh it.
+ * `project` is an old project key, told by its format; `user-scoped` may be personal or a service
+ * key, which only the server can tell. No network here, and the value is never printed.
+ */
+export type EnvKey =
+  | { kind: "project" }
+  | { kind: "user-scoped"; apiKey: string; endpoint: string; projectId?: string };
+
+export const findEnvKey = (): EnvKey | undefined => {
+  loadEnvFileScoped();
+  const apiKey = process.env.LANGWATCH_API_KEY?.trim();
+  if (!apiKey) return undefined;
+  if (!isUserScopedApiKey(apiKey)) return { kind: "project" };
+  const endpoint = getEndpoint();
+  process.env.LANGWATCH_ENDPOINT ??= endpoint;
+  const projectId = process.env.LANGWATCH_PROJECT_ID?.trim();
+  return { kind: "user-scoped", apiKey, endpoint, ...(projectId ? { projectId } : {}) };
 };
 
 /**
