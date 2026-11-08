@@ -29,12 +29,17 @@ void describe("question-opener", () => {
   /** @scenario "A statement H1 does not hide a question in the first paragraph" */
   void it("reads the first paragraph when the H1 is a statement", () => {
     const found = opener("# Support bots\n\nWhy did retrieval return nothing? A timeout.\n");
-    assert.deepEqual(found, { question: "Why did retrieval return nothing?", answeredInLine: true });
+    assert.deepEqual(found, {
+      question: "Why did retrieval return nothing?",
+      answeredInLine: true,
+    });
   });
 
   /** @scenario "A question that wraps onto a second line is judged by the line holding its mark" */
   void it("checks the text after the mark on the mark's own line", () => {
-    const found = opener("Why does the support bot answer\nwhen retrieval is empty?\nIt guesses.\n");
+    const found = opener(
+      "Why does the support bot answer\nwhen retrieval is empty?\nIt guesses.\n",
+    );
     assert.equal(found.answeredInLine, false);
   });
 
@@ -46,7 +51,8 @@ void describe("question-opener", () => {
 
   /** @scenario "A statement opener and a question later on are not flagged" */
   void it("reports nothing when the opener is a statement", () => {
-    const body = "The agent forgets because it compacts its context. So why keep it all? The bill.\n";
+    const body =
+      "The agent forgets because it compacts its context. So why keep it all? The bill.\n";
     assert.equal(opener(body), null);
   });
 });

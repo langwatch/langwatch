@@ -509,7 +509,7 @@ const hasText = (unit) => /\w/.test(unit.replace(/<[^>]*>/g, ""));
 const QUESTION_END = /\?["')\]]*\s*$/;
 
 /** The H1 (even in a heading-only section) and the first sentence with text. */
-export function openerCandidates(sections, firstContentIndex) {
+function openerCandidates(sections, firstContentIndex) {
   const out = [];
   const h1 = sections.slice(0, firstContentIndex + 1).find((s) => s.level === 1);
   if (h1) out.push({ sentence: h1.heading, raw: h1.heading });
