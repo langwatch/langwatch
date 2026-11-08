@@ -178,6 +178,58 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       Then the terminal reads that it is waiting for a Langy conversation to ask for this folder
       And a request recorded later appears without restarting the command
 
+    # The terminal lists only its login's own requests, so a login that is not
+    # the person who asked Langy waits for ever. The card's command names who
+    # asked with --as, and the terminal compares that with its login.
+    @unit
+    Scenario: A login that is not the asker's offers to sign in as the asker
+      Given a device session on this machine as riley@acme.test
+      When I run "langwatch langy --share-control --as sam@acme.test"
+      Then the CLI prints "Signed in as riley@acme.test, the request came from sam@acme.test."
+      And asks "Sign in as sam@acme.test?"
+      When I answer yes
+      Then the CLI runs the device login right away
+      And the request list is read with the new login's key
+
+    @unit
+    Scenario: A sign-in that lands on the same login says so and keeps waiting
+      Given a device session on this machine as riley@acme.test
+      When I run "langwatch langy --share-control --as sam@acme.test" and answer yes
+      And the browser approves the login as riley@acme.test again
+      Then the CLI says it is still signed in as riley@acme.test
+      And keeps waiting with that login
+
+    @unit
+    Scenario: Keeping the other login keeps waiting
+      Given a device session on this machine as riley@acme.test
+      When I run "langwatch langy --share-control --as sam@acme.test" and answer no
+      Then the CLI says requests made by sam@acme.test do not reach this terminal
+      And keeps waiting with the login as riley@acme.test
+
+    @unit
+    Scenario: The asker's own login asks nothing
+      Given a device session on this machine as riley@acme.test
+      When I run "langwatch langy --share-control --as Riley@ACME.test"
+      Then the CLI asks no question about the login
+
+    @unit
+    Scenario: Output that is not a terminal says how to switch instead of asking
+      Given a device session on this machine as riley@acme.test
+      And the command's input is not a terminal
+      When I run "langwatch langy --share-control --as sam@acme.test"
+      Then the CLI prints the mismatch and what to run to sign in as sam@acme.test
+      And asks nothing and keeps waiting
+
+    # The fallback for a command run without --as, or a request that never comes.
+    @unit
+    Scenario: Nothing arriving for thirty seconds names the login and how to switch
+      Given a device session on this machine as riley@acme.test at ACME
+      And no conversation recorded a control request for me
+      When I run "langwatch langy --share-control" and thirty seconds pass
+      Then the CLI prints "No Langy request has reached riley@acme.test at ACME yet."
+      And says how to sign in as the account that asked Langy
+      And keeps waiting, and says this only once
+
     @unit
     Scenario: The folder is the current directory, reported as its real path
       Given I run the command from a directory reached through a symlink

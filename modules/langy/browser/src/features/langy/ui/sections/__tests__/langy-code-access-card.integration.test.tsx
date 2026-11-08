@@ -18,6 +18,24 @@ let githubInstallations: {
   installationId: string;
   accountLogin: string;
 }[] = [];
+let sessionUser: { id: string; email: string } | null = null;
+let namesAskerFlag = false;
+const copiedValues: string[] = [];
+
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: (token: { name: string }) => ({
+    enabled: token.name === "release_ui_langy_share_command_names_asker" && namesAskerFlag,
+    isLoading: false,
+  }),
+}));
+
+vi.mock("../../../../../behavior/auth-session.ts", () => ({
+  useSession: () => ({ data: sessionUser ? { user: sessionUser } : null }),
+}));
+
+vi.mock("@langwatch/design-system/use-copy-to-clipboard", () => ({
+  useCopyToClipboard: () => ({ copied: false, copy: (value: string) => copiedValues.push(value) }),
+}));
 
 vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -82,6 +100,9 @@ beforeEach(() => {
   refetchWorkspace.mockClear();
   renewRequest.mockClear();
   workspaceError = null;
+  sessionUser = null;
+  namesAskerFlag = false;
+  copiedValues.length = 0;
   githubInstallations = [{ installationId: "i1", accountLogin: "acme" }];
   // The local-folder pick persists per browser, so one test's click would
   // otherwise open the next test's card already waiting.
@@ -206,6 +227,38 @@ describe("given no folder and nothing remembered", () => {
     expect(screen.getByText("Run this in the folder you want me to work in:")).toBeDefined();
     expect(screen.getByText("npx langwatch@latest langy --share-control")).toBeDefined();
     expect(screen.getByText(/Waiting for you to approve in the terminal/)).toBeDefined();
+  });
+
+  /** @scenario "The waiting card's command names who asked" */
+  it("names the signed-in person in the command it shows and copies", () => {
+    workspaceData = {
+      ...ASKING,
+      requestState: "open",
+      pendingRequest: { id: "req_1", expiresAt: new Date(10_000 + 5 * 60_000).toISOString() },
+    };
+    sessionUser = { id: "user_1", email: "riley@acme.test" };
+    namesAskerFlag = true;
+    renderCard({ now: () => 10_000 });
+    fireEvent.click(screen.getByText("Share local folder"));
+
+    const command = "npx langwatch@latest langy --share-control --as riley@acme.test";
+    expect(screen.getByText(command)).toBeDefined();
+    fireEvent.click(screen.getByLabelText("Copy the command"));
+    expect(copiedValues).toEqual([command]);
+  });
+
+  // Until the CLI release that accepts --as is on npm, an older CLI refuses the option.
+  it("shows the bare command while the release flag is off", () => {
+    workspaceData = {
+      ...ASKING,
+      requestState: "open",
+      pendingRequest: { id: "req_1", expiresAt: new Date(10_000 + 5 * 60_000).toISOString() },
+    };
+    sessionUser = { id: "user_1", email: "riley@acme.test" };
+    renderCard({ now: () => 10_000 });
+    fireEvent.click(screen.getByText("Share local folder"));
+
+    expect(screen.getByText("npx langwatch@latest langy --share-control")).toBeDefined();
   });
 
   /** @scenario "Choosing GitHub continues on the existing pull request path" */

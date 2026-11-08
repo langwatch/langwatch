@@ -66,6 +66,15 @@ Feature: Langy asks how to reach the customer's code, once
       And the card says it is waiting for my approval in the terminal
       And the card shows when the request expires
 
+    # The terminal lists only its login's own requests, so the command names who
+    # asked. A terminal signed in as someone else then says so instead of waiting.
+    # Behind release_ui_langy_share_command_names_asker until the CLI with --as is on npm.
+    @integration
+    Scenario: The waiting card's command names who asked
+      Given I am signed in as riley@acme.test
+      When I choose to share my local folder
+      Then the card's command and its copy button read "npx langwatch@latest langy --share-control --as riley@acme.test"
+
     @integration
     Scenario: A fresh card asks even though the request to share a folder exists
       Given Langy recorded a request to share a folder when it asked
