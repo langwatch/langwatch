@@ -5,8 +5,8 @@
  * @see specs/langy/langy-stop-and-resume.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { act, cleanup, render, renderHook, screen, within } from "@testing-library/react";
 import type { LangyCardPart } from "@langwatch/langy-contract";
+import { act, cleanup, render, renderHook, screen, within } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
