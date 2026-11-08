@@ -13,6 +13,7 @@ import { PrismaDatasetContentRepository } from "./prisma.dataset-content.reposit
 import { PrismaDatasetCountRepository } from "./prisma.dataset-count.repository.ts";
 import { PrismaDatasetMigrationRepository } from "./prisma.dataset-migration.repository.ts";
 import { PrismaDatasetRecordRepository } from "./prisma.dataset-record.repository.ts";
+import { PrismaDatasetStorageAuditRepository } from "./prisma.dataset-storage-audit.repository.ts";
 import { PrismaDatasetVersionRepository } from "./prisma.dataset-version.repository.ts";
 import { PrismaDatasetRepository } from "./prisma.dataset.repository.ts";
 
@@ -44,6 +45,7 @@ export class PostgresDatasetRepositories {
       chunks,
       migration: PrismaDatasetMigrationRepository.create({ database: prisma }),
       migrationChunks: chunks,
+      storageAudit: PrismaDatasetStorageAuditRepository.create({ database: prisma }),
       singleFiles: singleFilesOf({ objectStorage, storage: config.singleFileStorage }),
       versionContent: ObjectStorageDatasetVersionContentRepository.create({ objectStorage }),
     };
