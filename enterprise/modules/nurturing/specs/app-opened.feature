@@ -18,7 +18,7 @@ Feature: App opens reach Customer.io on the opening user
 
   @unit
   Scenario: Repeated opens inside an hour send once per user
-    When the same user opens the page twice inside an hour
+    When the same user opens the sessions page twice inside an hour
     Then one identify and one track are sent
     And after the hour both are sent again
 
