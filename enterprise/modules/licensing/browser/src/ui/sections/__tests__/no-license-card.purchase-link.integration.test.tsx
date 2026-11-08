@@ -1,12 +1,12 @@
 /**
  * @vitest-environment jsdom
  *
- * specs/licensing/self-serving-license-purchase.feature: the "Purchase license"
+ * specs/licensing/self-serving-license-purchase.feature: the "Buy online"
  * button follows STRIPE_LICENSE_PAYMENT_LINK_URL and is absent without it.
  */
 
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { LicensingHostApi, LicensingHostProvider } from "../../../model/licensing-host.ts";
@@ -84,11 +84,12 @@ describe("NoLicenseCard purchase link", () => {
   describe("when the payment link URL is configured", () => {
     /** @scenario "Purchase button uses configured payment link URL" */
     it(
-      "links the Purchase license button to it",
+      "offers Buy online in the I need a license card, linking to it",
       () => {
         renderCard({ purchaseUrl: "https://buy.stripe.com/test123" });
 
-        expect(screen.getByRole("link", { name: /Purchase license/ })).toHaveAttribute(
+        const card = within(screen.getByTestId("license-need-license"));
+        expect(card.getByRole("link", { name: /Buy online/ })).toHaveAttribute(
           "href",
           "https://buy.stripe.com/test123",
         );
@@ -100,12 +101,17 @@ describe("NoLicenseCard purchase link", () => {
   describe("when the payment link URL is not configured", () => {
     /** @scenario "Purchase button hidden when payment link URL is not configured" */
     it(
-      "shows no Purchase license button",
+      "offers Talk to sales and no Buy online button",
       () => {
         renderCard({ purchaseUrl: undefined });
 
         expect(screen.getByTestId("license-activate")).toBeInTheDocument();
-        expect(screen.queryByText(/Purchase license/)).toBeNull();
+        expect(screen.queryByText(/Buy online/)).toBeNull();
+        expect(
+          within(screen.getByTestId("license-need-license")).getByRole("link", {
+            name: /Talk to sales/,
+          }),
+        ).toBeInTheDocument();
       },
       RENDER_TIMEOUT_MS,
     );

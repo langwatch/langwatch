@@ -6530,8 +6530,13 @@ const presentations = {
   },
   connect_unreachable: {
     title: "Hosted services were not reached",
-    describe: () =>
-      "LangWatch-hosted services could not be reached. Allow outbound access to the host and port named on this message.",
+    describe: (error) => {
+      const host = str(error, "host", "");
+      const port = typeof error.meta.port === "number" ? String(error.meta.port) : "";
+      return host
+        ? `LangWatch-hosted services could not be reached. Allow outbound access to ${host}${port ? ` on port ${port}` : ""}.`
+        : "LangWatch-hosted services could not be reached. Allow outbound access from this install to LangWatch.";
+    },
   },
   connected_billing_commit_mismatch: {
     title: "That commit is not what the license says",
@@ -6550,7 +6555,16 @@ const presentations = {
   },
   activation_code_already_redeemed: {
     title: "Activation code already used",
-    describe: () => "This activation code has already been used on another installation.",
+    describe: (error) => {
+      const sameInstall = error.meta.sameInstall;
+      if (sameInstall === true) {
+        return "This code was already used on this install. Ask LangWatch for a new one.";
+      }
+      if (sameInstall === false) {
+        return "This code was already used on another install. Ask LangWatch for a new one.";
+      }
+      return "This code was already used. Ask LangWatch for a new one.";
+    },
   },
   activation_code_expired: {
     title: "Activation code expired",

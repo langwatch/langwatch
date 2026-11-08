@@ -86,7 +86,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     Scenario: A self-hosted install is told why from its judge and its license, and the plan is not read
       Given a self-hosted install
       When the popover asks what to offer
-      Then an install whose license does not include Instant Evals, or that holds no license, is told its license does not include them
+      Then an install whose license does not include Instant Evals, or that holds no license, is told Instant Evals are part of LangWatch Enterprise
       And an install whose admin switched hosted judging off is told where to switch it back on
       And an install with Connect switched off, or that holds no credential to present, is told it is not connected to LangWatch
       And an install that has judging turned off is told to ask whoever runs it
@@ -95,7 +95,10 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     Scenario: Each self-hosted refusal says what to do about it
       Given an eval chip refused on a self-hosted install
       When the popover opens
-      Then a license without Instant Evals offers to contact us to add them
+      Then an install without Instant Evals in its license, or with no license, says "Instant Evals is part of LangWatch Enterprise"
+      And an organization admin is offered "Activate a license" and "Get a license", both leading to Settings > License
+      And a member is told "Ask an organization admin to activate a license." with no button
+      And it never says the license doesn't include them when no license is installed
       And a switched-off organization names Settings, Connect, and offers no "Contact us"
       And an install that is not connected to LangWatch names connect.langwatch.ai and gateway.langwatch.ai and links "Read more"
       And an install that has judging turned off offers no "Contact us"

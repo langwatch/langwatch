@@ -7,15 +7,18 @@
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { LicenseStatus as LicenseStatusPayload } from "@langwatch/enterprise-licensing-contract";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type * as ReactModule from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LicensingHostApi, LicensingHostProvider } from "../../../model/licensing-host.ts";
 import { LicenseStatusPanel } from "../license-status-panel.tsx";
 
-const { statusResult, actions } = vi.hoisted(() => ({
+const { statusResult, connectResult, actionOptions, actions } = vi.hoisted(() => ({
   statusResult: { current: undefined as unknown },
+  connectResult: { current: undefined as unknown },
+  actionOptions: { current: undefined as { onRefreshSettled?: () => void } | undefined },
   actions: {
     upload: vi.fn(),
     activate: vi.fn(),
@@ -68,13 +71,39 @@ vi.mock("../../../behavior/licensing-api.ts", () => ({
   },
 }));
 
+/** Answers what the server holds now, re-reading it on the interval the panel asks for. */
+vi.mock("../../../behavior/connect-api.ts", async () => {
+  const { useEffect, useState } = await vi.importActual<typeof ReactModule>("react");
+  return {
+    connectApi: {
+      connect: {
+        status: {
+          useQuery: (_input: unknown, options: { refetchInterval?: () => number | false }) => {
+            const [data, setData] = useState(() => connectResult.current);
+            const interval = options.refetchInterval?.() ?? false;
+            useEffect(() => {
+              if (interval === false) return;
+              const id = setInterval(() => setData(connectResult.current), interval);
+              return () => clearInterval(id);
+            }, [interval]);
+            return { data, refetch: vi.fn() };
+          },
+        },
+      },
+    },
+  };
+});
+
 vi.mock("../use-license-actions.ts", () => ({
-  useLicenseActions: () => ({
-    ...actions,
-    isUploading: false,
-    isRemoving: false,
-    isRefreshing: false,
-  }),
+  useLicenseActions: (options: { onRefreshSettled?: () => void }) => {
+    actionOptions.current = options;
+    return {
+      ...actions,
+      isUploading: false,
+      isRemoving: false,
+      isRefreshing: false,
+    };
+  },
 }));
 
 const resourceCounts = {
@@ -141,6 +170,23 @@ beforeAll(() => {
 
 beforeEach(() => {
   for (const action of Object.values(actions)) action.mockClear();
+  connectResult.current = undefined;
+});
+
+const connectOn = (overrides: {
+  refusal?: { code: string } | null;
+  lastSyncAt?: string | null;
+  lastError?: { code: string } | null;
+}) => ({
+  deployment: "on",
+  gatewayHost: "gateway.langwatch.ai",
+  licensed: true,
+  enabledServices: ["instant_evals"],
+  entitledServices: null,
+  usage: null,
+  refusal: overrides.refusal ?? null,
+  isUsageUnavailable: false,
+  sync: { lastSyncAt: overrides.lastSyncAt ?? null, lastError: overrides.lastError ?? null },
 });
 
 describe("LicenseStatusPanel", () => {
@@ -196,6 +242,62 @@ describe("LicenseStatusPanel", () => {
     });
   });
 
+  describe("given a connected license read alongside Connect", () => {
+    /** @scenario The sync line uses the same words on the Connect and License pages */
+    it("reads the sync line from the Connect status", () => {
+      connectResult.current = connectOn({});
+      renderWith(validStatus({ connected: true }));
+
+      expect(screen.getByTestId("license-sync-line").textContent).toBe("Not synced yet");
+    });
+
+    /** @scenario The sync line follows a refresh once its outcome is recorded */
+    it("shows the recorded sync once a refresh's outcome lands", async () => {
+      connectResult.current = connectOn({});
+      renderWith(validStatus({ connected: true }));
+
+      act(() => actionOptions.current?.onRefreshSettled?.());
+      connectResult.current = connectOn({ lastSyncAt: new Date().toISOString() });
+
+      await waitFor(
+        () => expect(screen.getByTestId("license-sync-line").textContent).toMatch(/^Last synced/),
+        { timeout: 3_000 },
+      );
+    });
+
+    /** @scenario The sync line follows a refresh once its outcome is recorded */
+    it("does not re-read Connect when no refresh is waiting", () => {
+      vi.useFakeTimers();
+      try {
+        connectResult.current = connectOn({});
+        renderWith(validStatus({ connected: true }));
+
+        connectResult.current = connectOn({ lastSyncAt: new Date().toISOString() });
+        act(() => {
+          vi.advanceTimersByTime(15_000);
+        });
+
+        expect(screen.getByTestId("license-sync-line").textContent).toBe("Not synced yet");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    /** @scenario A revoked license is not called valid */
+    it("says LangWatch revoked it when Connect refuses the license as revoked", () => {
+      connectResult.current = connectOn({
+        refusal: { code: "connect_license_revoked" },
+        lastError: { code: "connect_license_revoked" },
+      });
+      renderWith(validStatus({ connected: true }));
+
+      expect(screen.getByTestId("license-status-sentence").textContent).toBe(
+        "Revoked by LangWatch: hosted services are off",
+      );
+      expect(screen.queryByText("Valid")).toBeNull();
+    });
+  });
+
   describe("given a connected license whose term ended", () => {
     /** @scenario Refresh is offered on an expired connected licence */
     it("offers refresh so a renewal issued after expiry can be collected", async () => {
@@ -239,6 +341,21 @@ describe("LicenseStatusPanel", () => {
 
       await user.click(within(dialog).getByRole("button", { name: "Remove license" }));
       expect(actions.remove).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario The removal dialog warns that an activation code works once */
+    it("warns that an activation code works once before removing", async () => {
+      const user = userEvent.setup();
+      renderWith(validStatus({ connected: false }));
+
+      await user.click(screen.getByTestId("license-remove"));
+      const dialog = await screen.findByRole("alertdialog");
+
+      expect(
+        within(dialog).getByText(
+          /An activation code works once, so activating again later needs a new code from LangWatch/,
+        ),
+      ).toBeDefined();
     });
   });
 

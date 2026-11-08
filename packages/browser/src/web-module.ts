@@ -50,7 +50,10 @@ export type WebScreen = Readonly<{
   label?: string;
   icon?: unknown;
   load?: () => Promise<unknown>;
-  /** The grant the shell's router checks before this screen renders (§10). */
+  /**
+   * The grant the shell's router checks before this screen renders (§10); a `Forbidden`
+   * export of the chunk answers its refusal.
+   */
   requires?: string;
   /** Where `requires` is asked: the active project by default, or the organization itself. */
   requiresAt?: "organization";

@@ -127,10 +127,11 @@ Feature: Self-Serving License Purchase
   Scenario: Purchase button uses configured payment link URL
     Given the STRIPE_LICENSE_PAYMENT_LINK_URL is set to "https://buy.stripe.com/test123"
     When the license page renders for a user without a license
-    Then the "Purchase license" button links to "https://buy.stripe.com/test123"
+    Then the "I need a license" card offers "Buy online", linking to "https://buy.stripe.com/test123"
 
   @integration
   Scenario: Purchase button hidden when payment link URL is not configured
     Given the STRIPE_LICENSE_PAYMENT_LINK_URL is NOT set
     When the license page renders for a user without a license
-    Then the "Purchase license" button is not displayed
+    Then the "I need a license" card offers no "Buy online" button
+    And it still offers "Talk to sales"

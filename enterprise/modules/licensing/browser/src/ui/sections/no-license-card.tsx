@@ -6,6 +6,7 @@ import {
   Field,
   HStack,
   Input,
+  SimpleGrid,
   Text,
   Textarea,
   VStack,
@@ -14,8 +15,8 @@ import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { StatusChip } from "@langwatch/design-system/settings-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
-import { ArrowUpRight, KeyRound, Upload, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowUpRight, KeyRound, ShoppingCart, Upload, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { formatFileSize, licenseTextOfFile } from "../../model/license-status.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
@@ -62,11 +63,7 @@ export function NoLicenseCard({
 
   const [activationMethod, setActivationMethod] = useState<ActivationMethod>("code");
   const [uploadedFile, setUploadedFile] = useState<ChosenLicenseFile | null>(null);
-  const handleMethodChange = (method: ActivationMethod) => {
-    setActivationMethod(method);
-  };
-
-  const handleActivate = useCallback(() => {
+  const handleActivate = () => {
     const activations: Record<ActivationMethod, () => void> = {
       code: onCodeActivate,
       key: onActivate,
@@ -75,7 +72,7 @@ export function NoLicenseCard({
       },
     };
     activations[activationMethod]();
-  }, [activationMethod, uploadedFile, onFileActivate, onActivate, onCodeActivate]);
+  };
 
   const hasInput: Record<ActivationMethod, boolean> = {
     code: activationCode.trim().length > 0,
@@ -83,6 +80,8 @@ export function NoLicenseCard({
     key: licenseKey.trim().length > 0,
   };
   const isActivateDisabled = isActivating || !hasInput[activationMethod];
+  const waitingFor =
+    isActivating || hasInput[activationMethod] ? void 0 : WAITING_FOR[activationMethod];
   const isReplacing = mode === "replace";
 
   if (!canManage) {
@@ -101,88 +100,190 @@ export function NoLicenseCard({
     );
   }
 
+  const form = (
+    <ActivationForm
+      activationMethod={activationMethod}
+      onMethodChange={setActivationMethod}
+      isActivating={isActivating}
+      activationCode={activationCode}
+      onActivationCodeChange={onActivationCodeChange}
+      licenseKey={licenseKey}
+      onLicenseKeyChange={onLicenseKeyChange}
+      uploadedFile={uploadedFile}
+      onFileChosen={setUploadedFile}
+    />
+  );
+  const footer = (
+    <ActivationFooter
+      isReplacing={isReplacing}
+      onActivate={handleActivate}
+      onCancel={onCancel}
+      isActivating={isActivating}
+      isActivateDisabled={isActivateDisabled}
+      waitingFor={waitingFor}
+    />
+  );
+
+  if (isReplacing) {
+    return (
+      <Card
+        title="Replace license"
+        description="Enter the renewed or reissued license. It takes the place of the current one in one step, so the organization keeps its license throughout."
+        status="neutral"
+        icon={<KeyRound size={16} />}
+        footer={footer}
+      >
+        {form}
+      </Card>
+    );
+  }
+
   return (
-    <Card
-      title={isReplacing ? "Replace license" : "No license installed"}
-      description={
-        isReplacing
-          ? "Enter the renewed or reissued license. It takes the place of the current one in one step, so the organization keeps its license throughout."
-          : "Running without a license. Some features may be limited."
-      }
-      status="neutral"
-      icon={<KeyRound size={16} />}
-      badge={isReplacing ? void 0 : <StatusChip label="Open source" tone="neutral" />}
-      footer={
-        <ActivationFooter
-          isReplacing={isReplacing}
-          onActivate={handleActivate}
-          onCancel={onCancel}
+    <VStack align="stretch" gap={4} width="full">
+      <HStack gap={2}>
+        <Text fontSize="sm" fontWeight="medium">
+          No license installed
+        </Text>
+        <StatusChip label="Open source" tone="neutral" />
+      </HStack>
+      <SimpleGrid columns={{ base: 1, lg: 2 }} gap={4} width="full">
+        <Card
+          title="I have an activation code"
+          description="Enter the code to activate your license."
+          status="neutral"
+          icon={<KeyRound size={16} />}
+          footer={footer}
+          data-testid="license-have-code"
+        >
+          {form}
+        </Card>
+        <Card
+          title="I need a license"
+          description="You get an activation code when you buy a license."
+          status="neutral"
+          icon={<ShoppingCart size={16} />}
+          footer={<GetLicenseActions purchaseLinkUrl={purchaseLinkUrl} />}
+          data-testid="license-need-license"
+        >
+          <Text fontSize="sm" color="fg.muted">
+            A license adds seats and enterprise capabilities, such as single sign-on, SCIM
+            provisioning and audit logs.
+          </Text>
+        </Card>
+      </SimpleGrid>
+    </VStack>
+  );
+}
+
+/** Why Activate waits, in the words of the chosen form. */
+const WAITING_FOR: Record<ActivationMethod, string> = {
+  code: "Enter an activation code to activate.",
+  file: "Choose a license file to activate.",
+  key: "Paste a license key to activate.",
+};
+
+function ActivationForm({
+  activationMethod,
+  onMethodChange,
+  isActivating,
+  activationCode,
+  onActivationCodeChange,
+  licenseKey,
+  onLicenseKeyChange,
+  uploadedFile,
+  onFileChosen,
+}: {
+  activationMethod: ActivationMethod;
+  onMethodChange: (method: ActivationMethod) => void;
+  isActivating: boolean;
+  activationCode: string;
+  onActivationCodeChange: (value: string) => void;
+  licenseKey: string;
+  onLicenseKeyChange: (value: string) => void;
+  uploadedFile: ChosenLicenseFile | null;
+  onFileChosen: (chosen: ChosenLicenseFile | null) => void;
+}) {
+  return (
+    <VStack align="start" gap={3} width="full">
+      <SegmentedControl
+        size="sm"
+        value={activationMethod}
+        onValueChange={(e) => onMethodChange(e.value as ActivationMethod)}
+        disabled={isActivating}
+        items={[
+          { value: "code", label: "Activation code" },
+          { value: "file", label: "License file" },
+          { value: "key", label: "License key" },
+        ]}
+      />
+
+      {activationMethod === "file" && (
+        <LicenseFileField
+          uploadedFile={uploadedFile}
+          onChosen={onFileChosen}
           isActivating={isActivating}
-          isActivateDisabled={isActivateDisabled}
-          purchaseLinkUrl={purchaseLinkUrl}
         />
-      }
-    >
-      <VStack align="stretch" gap={2}>
-        <VStack align="start" gap={3} width="full">
-          <SegmentedControl
-            size="sm"
-            value={activationMethod}
-            onValueChange={(e) => handleMethodChange(e.value as ActivationMethod)}
+      )}
+
+      {activationMethod === "code" && (
+        <Field.Root width="full">
+          <Field.Label srOnly>Activation code</Field.Label>
+          <Input
+            value={activationCode}
+            onChange={(e) => onActivationCodeChange(e.target.value)}
+            placeholder="LW-XXXX-XXXX-XXXX-XXXX"
+            data-testid="license-activation-code"
+            fontFamily="mono"
+            maxWidth="360px"
             disabled={isActivating}
-            items={[
-              { value: "code", label: "Activation code" },
-              { value: "file", label: "License file" },
-              { value: "key", label: "License key" },
-            ]}
           />
+          <Field.HelperText>
+            This install asks LangWatch for the license the code covers, so it needs internet
+            access. Without it, use a license file instead.
+          </Field.HelperText>
+        </Field.Root>
+      )}
 
-          {activationMethod === "file" && (
-            <LicenseFileField
-              uploadedFile={uploadedFile}
-              onChosen={setUploadedFile}
-              isActivating={isActivating}
-            />
-          )}
+      {activationMethod === "key" && (
+        <Field.Root width="full">
+          <Field.Label srOnly>License key</Field.Label>
+          <Textarea
+            value={licenseKey}
+            onChange={(e) => onLicenseKeyChange(e.target.value)}
+            placeholder="Paste your license key"
+            data-testid="license-key-input"
+            rows={4}
+            fontFamily="mono"
+            fontSize="xs"
+            disabled={isActivating}
+          />
+        </Field.Root>
+      )}
+    </VStack>
+  );
+}
 
-          {activationMethod === "code" && (
-            <Field.Root width="full">
-              <Field.Label srOnly>Activation code</Field.Label>
-              <Input
-                value={activationCode}
-                onChange={(e) => onActivationCodeChange(e.target.value)}
-                placeholder="LW-XXXX-XXXX-XXXX-XXXX"
-                data-testid="license-activation-code"
-                fontFamily="mono"
-                maxWidth="360px"
-                disabled={isActivating}
-              />
-              <Field.HelperText>
-                Your code was sent with your order. This install asks LangWatch for the license it
-                covers, so it needs to reach the internet. If it cannot, upload the license file
-                instead.
-              </Field.HelperText>
-            </Field.Root>
-          )}
-
-          {activationMethod === "key" && (
-            <Field.Root width="full">
-              <Field.Label srOnly>License key</Field.Label>
-              <Textarea
-                value={licenseKey}
-                onChange={(e) => onLicenseKeyChange(e.target.value)}
-                placeholder="Paste your license key"
-                data-testid="license-key-input"
-                rows={4}
-                fontFamily="mono"
-                fontSize="xs"
-                disabled={isActivating}
-              />
-            </Field.Root>
-          )}
-        </VStack>
-      </VStack>
-    </Card>
+/** How someone without a code gets one: sales always, the payment link where it is set. */
+function GetLicenseActions({ purchaseLinkUrl }: { purchaseLinkUrl: string | undefined }) {
+  return (
+    <>
+      <Button asChild variant="outline" colorPalette="orange" size="sm">
+        <Link href={CONTACT_SALES_URL} isExternal>
+          Talk to sales
+          <ArrowUpRight size={14} />
+        </Link>
+      </Button>
+      {purchaseLinkUrl ? (
+        <Tooltip content="After purchase, your license will be generated and delivered to your email.">
+          <Button asChild variant="outline" size="sm">
+            <Link href={purchaseLinkUrl} isExternal>
+              Buy online
+              <ArrowUpRight size={14} />
+            </Link>
+          </Button>
+        </Tooltip>
+      ) : null}
+    </>
   );
 }
 
@@ -194,14 +295,15 @@ function ActivationFooter({
   onCancel,
   isActivating,
   isActivateDisabled,
-  purchaseLinkUrl,
+  waitingFor,
 }: {
   isReplacing: boolean;
   onActivate: () => void;
   onCancel?: () => void;
   isActivating: boolean;
   isActivateDisabled: boolean;
-  purchaseLinkUrl: string | undefined;
+  /** Why Activate is disabled, shown beside it; absent once there is something to activate. */
+  waitingFor: string | undefined;
 }) {
   return (
     <>
@@ -221,27 +323,11 @@ function ActivationFooter({
           Cancel
         </Button>
       ) : null}
-      {!isReplacing && purchaseLinkUrl && (
-        <Tooltip content="After purchase, your license will be generated and delivered to your email.">
-          <Button asChild variant="outline" size="sm">
-            <Link href={purchaseLinkUrl} isExternal>
-              Purchase license
-              <ArrowUpRight size={14} />
-            </Link>
-          </Button>
-        </Tooltip>
-      )}
-      {!isReplacing && (
-        <Link
-          href={CONTACT_SALES_URL}
-          isExternal
-          color="orange.fg"
-          fontSize="sm"
-          _hover={{ textDecoration: "underline" }}
-        >
-          Contact sales →
-        </Link>
-      )}
+      {waitingFor ? (
+        <Text fontSize="sm" color="fg.muted" data-testid="license-activate-waiting">
+          {waitingFor}
+        </Text>
+      ) : null}
     </>
   );
 }

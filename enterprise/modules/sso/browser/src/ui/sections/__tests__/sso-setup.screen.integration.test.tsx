@@ -339,7 +339,8 @@ describe("the single sign-on setup page", () => {
   });
 
   describe("given an organization that cannot set it up yet", () => {
-    it("says why and offers no journey it would refuse", () => {
+    /** @scenario "Each Enterprise page names its feature in the shared lock" */
+    it("shows the Enterprise lock once and offers no journey it would refuse", () => {
       state.view = setupView({
         availability: { available: false, refusal: "license_required" },
         connection: null,
@@ -348,7 +349,15 @@ describe("the single sign-on setup page", () => {
 
       renderWithSsoHost(<SsoSetupScreen />);
 
-      expect(screen.getByTestId("sso-availability-refusal")).toHaveTextContent(/active license/);
+      expect(screen.getByTestId("sso-enterprise-required")).toHaveTextContent(
+        /Single sign-on is part of LangWatch Enterprise/,
+      );
+      expect(screen.getAllByText(/Single sign-on is part of LangWatch Enterprise/)).toHaveLength(1);
+      expect(screen.getByRole("link", { name: "Get a license" })).toHaveAttribute(
+        "href",
+        "/settings/license",
+      );
+      expect(screen.queryByTestId("sso-availability-refusal")).toBeNull();
       expect(screen.queryByTestId("sso-setup")).toBeNull();
     });
   });
@@ -360,7 +369,7 @@ describe("the single sign-on setup page", () => {
 
       renderWithSsoHost(<SsoSetupScreen />);
 
-      expect(screen.getByTestId("sso-enterprise-required")).toHaveTextContent(/Enterprise plan/);
+      expect(screen.getByTestId("sso-enterprise-required")).toHaveTextContent(/Enterprise/);
       expect(screen.queryByTestId("sso-setup")).toBeNull();
       expect(screen.queryByRole("button")).toBeNull();
     });

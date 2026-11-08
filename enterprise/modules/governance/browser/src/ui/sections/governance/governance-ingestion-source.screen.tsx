@@ -375,8 +375,8 @@ function SourceDetailShell({ pageTitle, children }: { pageTitle: string; childre
   return (
     <GovernanceLayout pageTitle={pageTitle}>
       <EnterpriseLockedSurface
-        featureName="Ingestion Source detail"
-        description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
+        featureName="Ingestion source detail"
+        description="See health metrics and drill into the events of each ingestion source."
       >
         {children}
       </EnterpriseLockedSurface>

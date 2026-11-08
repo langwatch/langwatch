@@ -33,7 +33,21 @@ interface LicenseDetailsCardProps {
   onReplace?: () => void;
   /** Whether the viewer may manage the organization; without it no action is offered. */
   canManage: boolean;
+  /** Where hosted services stand for a connected license, from Connect; absent while unread. */
+  hosted?: LicenseHostedState;
 }
+
+/** What the Connect status says about a connected license, in the card's words. */
+export interface LicenseHostedState {
+  /** "Last synced 5 minutes ago", "Not synced yet", or led by the last failure. */
+  syncText: string;
+  /** Why the last sync failed, when it did. */
+  syncFailure?: string;
+  /** LangWatch revoked the license, so hosted services are off. */
+  isRevoked: boolean;
+}
+
+const REVOKED_SENTENCE = "Revoked by LangWatch: hosted services are off";
 
 /**
  * Where the license stands, in one word. A lapsed license is a warning rather
@@ -43,16 +57,28 @@ interface LicenseDetailsCardProps {
 function licenseChipOf({
   isValid,
   isExpired,
+  isRevoked,
 }: {
   isValid: boolean;
   isExpired: boolean;
+  isRevoked: boolean;
 }): OverviewChip {
+  if (isRevoked) return { label: "Revoked", tone: "bad", title: REVOKED_SENTENCE };
   if (isValid) return { label: "Valid", tone: "good", title: "The signature checks out" };
   if (isExpired) return { label: "Expired", tone: "warning", title: "The term has ended" };
   return { label: "Invalid", tone: "bad", title: "The signature does not check out" };
 }
 
-function statusSentenceOf({ isValid, isExpired }: { isValid: boolean; isExpired: boolean }) {
+function statusSentenceOf({
+  isValid,
+  isExpired,
+  isRevoked,
+}: {
+  isValid: boolean;
+  isExpired: boolean;
+  isRevoked: boolean;
+}) {
+  if (isRevoked) return REVOKED_SENTENCE;
   if (isValid) return "Valid, the signature checks out";
   if (isExpired) return "Term ended, the signature checks out";
   return "The signature does not check out";
@@ -118,7 +144,7 @@ function RemoveLicenseButton({
         open={isConfirming}
         onClose={() => setIsConfirming(false)}
         title="Remove the license?"
-        description="The organization returns to the open source plan at once. It loses the seats this license covers and its enterprise capabilities, such as single sign-on, SCIM provisioning and audit logs. To renew, replace the license instead."
+        description="The organization returns to the open source plan at once. It loses the seats this license covers and its enterprise capabilities, such as single sign-on, SCIM provisioning and audit logs. An activation code works once, so activating again later needs a new code from LangWatch. To renew, replace the license instead."
         confirmLabel="Remove license"
         tone="danger"
         loading={isRemoving}
@@ -147,8 +173,10 @@ export function LicenseDetailsCard({
   isRefreshing = false,
   onReplace,
   canManage,
+  hosted,
 }: LicenseDetailsCardProps) {
   const isValid = status.valid;
+  const isRevoked = hosted?.isRevoked ?? false;
   const isExpired = isLicenseExpired(status);
   const isConnected = isConnectedLicense(status);
   const isFromEnvironment = isEnvironmentLicense(status);
@@ -221,7 +249,7 @@ export function LicenseDetailsCard({
       </StatTileGrid>
       <OverviewCard
         title="License"
-        chip={licenseChipOf({ isValid, isExpired })}
+        chip={licenseChipOf({ isValid, isExpired, isRevoked })}
         actions={
           <HStack gap={2} flexWrap="wrap">
             {canRefresh ? (
@@ -241,20 +269,47 @@ export function LicenseDetailsCard({
           </HStack>
         }
       >
-        <OverviewDetail label="Status">{statusSentenceOf({ isValid, isExpired })}</OverviewDetail>
+        <OverviewDetail label="Status">
+          <span data-testid="license-status-sentence">
+            {statusSentenceOf({ isValid, isExpired, isRevoked })}
+          </span>
+        </OverviewDetail>
         {isFromEnvironment ? (
           <OverviewDetail label="Source">
             Installed from the environment (LANGWATCH_LICENSE_KEY)
           </OverviewDetail>
         ) : null}
-        {isConnected ? (
-          <OverviewDetail label="Sync">
-            {isValid
-              ? "Connected to LangWatch"
-              : "Connected to LangWatch. Refresh to collect a renewal."}
-          </OverviewDetail>
+        {isConnected && hosted ? (
+          <SyncDetail hosted={hosted} isAwaitingRenewal={!isValid && !isRevoked} />
         ) : null}
       </OverviewCard>
     </>
+  );
+}
+
+/** When the license last synced, why the last sync failed, and whether a renewal waits. */
+function SyncDetail({
+  hosted,
+  isAwaitingRenewal,
+}: {
+  hosted: LicenseHostedState;
+  isAwaitingRenewal: boolean;
+}) {
+  return (
+    <OverviewDetail label="Sync">
+      <Text as="span" data-testid="license-sync-line">
+        {hosted.syncText}
+      </Text>
+      {isAwaitingRenewal ? (
+        <Text fontSize="sm" color="fg.muted">
+          Refresh to collect a renewal.
+        </Text>
+      ) : null}
+      {hosted.syncFailure ? (
+        <Text fontSize="sm" color="fg.muted" data-testid="license-sync-failure">
+          {hosted.syncFailure}
+        </Text>
+      ) : null}
+    </OverviewDetail>
   );
 }

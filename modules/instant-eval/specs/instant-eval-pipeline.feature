@@ -272,6 +272,26 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     Then it throws rather than recording a mostly empty page
 
   @unit
+  Scenario: A page the judge could not answer at all fails with the judge's own reason
+    Given a page where every row failed with the same handled reason, such as "connect_unreachable"
+    When the page is judged
+    Then it throws that reason, so the run that fails carries it as its error code
+    And nothing is written
+
+  @unit
+  Scenario: A step failing with a refusal the outbox will not retry fails the run on that attempt
+    Given a page step that throws a handled refusal the outbox will not retry, such as "connect_unreachable"
+    When it fails on its first attempt
+    Then the run is recorded as failed with that refusal's code
+    And the step does not throw, so the run never waits on a delivery that will not come
+
+  @unit
+  Scenario: A page the judge could not answer for mixed reasons fails as the judge being unavailable
+    Given a page where every row failed, for different reasons or none a caller can act on
+    When the page is judged
+    Then it throws "instant_eval_classifier_unavailable"
+
+  @unit
   Scenario: A page that partly failed is recorded with its failures counted
     Given a page where a tenth of the rows could not be judged
     When the page is judged

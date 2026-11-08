@@ -1,3 +1,4 @@
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
 import { Link } from "@langwatch/browser-host/link";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -13,12 +14,13 @@ import { StatTileFigure } from "@langwatch/design-system/stat-tile";
 import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-client";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { nowInstant, readableDate } from "@langwatch/time";
-import { Boxes, Clock, Lock, Plug, Users, UserX } from "lucide-react";
+import { Boxes, Clock, Plug, Users, UserX } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useDirectoryFacts } from "../../behavior/use-directory-facts.ts";
 import { relativeTime } from "../../model/display-formatters.ts";
 import { isEnterpriseGateError } from "../../model/enterprise-gate.ts";
+import { useScimHost } from "../../model/scim-host.ts";
 
 const AUTHENTICATION_PAGE = "/settings/authentication";
 
@@ -32,7 +34,9 @@ export default function DirectorySummary({
   const { reconciliation } = facts;
 
   if (reconciliation.isError) {
-    if (isEnterpriseGateError(reconciliation.error)) return <EnterpriseGate />;
+    if (isEnterpriseGateError(reconciliation.error)) {
+      return <EnterpriseGate />;
+    }
     return (
       <HandledErrorAlert
         error={reconciliation.error}
@@ -101,16 +105,15 @@ export default function DirectorySummary({
 
 /** A plan state, not a failure: one quiet line, so the page never reads as Enterprise-only. */
 function EnterpriseGate() {
+  const canManage = useScimHost().hasPermission("organization:manage");
   return (
-    <HStack gap={2} color="fg.muted" fontSize="sm" data-testid="directory-enterprise-gate">
-      <Lock size={14} aria-hidden />
-      <Text>Sync people from your identity provider on Enterprise.</Text>
-      <Text asChild color="orange.fg">
-        <Link unstyled href="/settings/plans">
-          Compare plans
-        </Link>
-      </Text>
-    </HStack>
+    <EnterpriseLock
+      variant="line"
+      feature="Directory sync"
+      description="Sync people and groups from your identity provider, so joiners and leavers are handled for you."
+      canManage={canManage}
+      data-testid="directory-enterprise-gate"
+    />
   );
 }
 

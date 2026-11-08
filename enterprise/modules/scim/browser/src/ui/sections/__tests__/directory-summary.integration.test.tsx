@@ -49,7 +49,7 @@ vi.mock("../../../behavior/scim-api.ts", () => {
 
 // The pool shares a module graph across files: the band and its host load fresh over this mock.
 vi.resetModules();
-const { renderWithScimHost } = await import("../../../testing.tsx");
+const { FakeScimHost, renderWithScimHost } = await import("../../../testing.tsx");
 const { default: DirectorySummary } = await import("../directory-summary.tsx");
 
 afterEach(cleanup);
@@ -180,17 +180,30 @@ describe("the directory's status band", () => {
 });
 
 describe("given a plan that does not carry directory sync", () => {
-  it("says in one line that sync is on Enterprise, with no upsell card", () => {
+  /** @scenario "Each Enterprise page names its feature in the shared lock" */
+  it("says in one line that sync is part of LangWatch Enterprise, with no upsell card", () => {
     state.readError = { data: { error: { code: "enterprise_plan_required" } } };
     renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
 
-    expect(
-      screen.getByText("Sync people from your identity provider on Enterprise."),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Compare plans" })).toHaveAttribute(
+    expect(screen.getByText("Directory sync is part of LangWatch Enterprise.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Activate a license" })).toHaveAttribute(
       "href",
-      "/settings/plans",
+      "/settings/license",
     );
+  });
+
+  /** @scenario "A member on a self-hosted install is told to ask an admin" */
+  it("tells a reader who may not manage the organization to ask an admin", () => {
+    state.readError = { data: { error: { code: "enterprise_plan_required" } } };
+    renderWithScimHost(
+      <DirectorySummary organizationId="org-1" canReadMembership />,
+      new FakeScimHost({ withheld: ["organization:manage"] }),
+    );
+
+    expect(
+      screen.getByText("Ask an organization admin to activate a license."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("link")).toBeNull();
     expect(screen.queryByText("Directory sync on Enterprise")).not.toBeInTheDocument();
     expect(screen.queryByTestId("directory-summary")).not.toBeInTheDocument();
   });
