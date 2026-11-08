@@ -693,6 +693,26 @@ describe("given the share-control command", () => {
     });
 
     /** @scenario "A key LangWatch could not be asked about gives way to the login" */
+    it("cannot tell when the project lookup is rate limited", async () => {
+      const { impl } = fakeFetch({
+        [ME_PROJECT]: { status: 429, body: {} },
+        [LIST]: { body: { requests: [] } },
+      });
+
+      expect(await checkPersonalKey(candidate, { fetchImpl: impl })).toEqual({ kind: "unchecked" });
+    });
+
+    /** @scenario "A key LangWatch could not be asked about gives way to the login" */
+    it("cannot tell when the request list times out on the server", async () => {
+      const { impl } = fakeFetch({
+        [ME_PROJECT]: { body: shop },
+        [LIST]: { status: 408, body: {} },
+      });
+
+      expect(await checkPersonalKey(candidate, { fetchImpl: impl })).toEqual({ kind: "unchecked" });
+    });
+
+    /** @scenario "A key LangWatch could not be asked about gives way to the login" */
     it("gives every request of the check a deadline", async () => {
       const { impl, calls } = fakeFetch({
         [ME_PROJECT]: { body: shop },

@@ -333,7 +333,7 @@ export type SignedIn = PersonCredentials & { source: "device" | "env" };
 
 /**
  * What LangWatch said of a key from the environment: personal, on a project; refused, by a 4xx;
- * or unchecked, when a timeout, a dropped connection or a 5xx left nothing said about the key.
+ * or unchecked, when a timeout, a dropped connection, a 408, a 429 or a 5xx said nothing of the key.
  */
 export type KeyCheck =
   | { kind: "personal"; projectId: string; projectName: string }
@@ -368,8 +368,9 @@ const envKeyLine = ({
 const ME_PROJECT_PATH = "/api/v1/me/project";
 const KEY_CHECK_TIMEOUT_MS = 10_000;
 
+/** A 4xx about the key. A 408 or a 429 says the server was busy, not that it refused the key. */
 const isRefusal = (status: number | undefined): boolean =>
-  status !== undefined && status >= 400 && status < 500;
+  status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429;
 
 /**
  * Whether LangWatch takes a key from the environment as a person, and on which project. The key

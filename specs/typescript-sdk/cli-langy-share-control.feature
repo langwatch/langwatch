@@ -67,13 +67,13 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       And continues to the request list with the new login's key
       And no line prints the key's value
 
-    # A timeout, a dropped connection or a 5xx says nothing about the key, so
-    # it is not reported as LangWatch refusing it. The check gives up in time.
+    # A timeout, a dropped connection, a 408, a 429 or a 5xx says nothing about
+    # the key, so it is not reported as LangWatch refusing it. The check gives up in time.
     @unit
     Scenario: A key LangWatch could not be asked about gives way to the login
       Given no device session on this machine
       And LANGWATCH_API_KEY holds a personal key, in the shell or in the folder's .env
-      And LangWatch does not answer the check, or answers it with a server error
+      And LangWatch does not answer the check, or answers it with a timeout, a rate limit or a server error
       When I run "langwatch langy --share-control"
       Then the CLI prints one line saying LangWatch could not be reached to check LANGWATCH_API_KEY
       And the CLI runs the device login right away
