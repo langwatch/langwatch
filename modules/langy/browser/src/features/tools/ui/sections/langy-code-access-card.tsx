@@ -658,8 +658,8 @@ function WaitingState({
           fontFamily="mono"
           color="fg"
           flex={1}
-          overflowX="auto"
-          whiteSpace="nowrap"
+          paddingY={1}
+          overflowWrap="anywhere"
         >
           {command}
         </Text>
