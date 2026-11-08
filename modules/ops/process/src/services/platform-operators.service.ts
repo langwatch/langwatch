@@ -1,6 +1,9 @@
 import type { LedgerActor } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { NotificationService as NotificationApi } from "@langwatch/notification-contract";
+import {
+  isEmailUnconfigured,
+  type NotificationService as NotificationApi,
+} from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   OpsImpersonatedOperatorRefusedError,
@@ -12,7 +15,6 @@ import {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 
-import { isEmailUnconfigured } from "../rules/platform-operator-seed.rules.ts";
 import { grantsAreStaffOnly, isStaffAccount } from "../rules/platform-operator-staff.rules.ts";
 
 const logger = createLogger("langwatch:ops:platform-operators");

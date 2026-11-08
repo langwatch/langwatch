@@ -85,6 +85,19 @@ export const mailDeliveryViewSchema: MailDeliveryViewSchema = mailDeliveryViewSc
 
 export type MailDeliveryView = z.infer<typeof mailDeliveryViewSchema>;
 
+/**
+ * No email at all: no gateway named and none half-configured. Only then can no account have
+ * verified its address, so sign-up skips verification and the platform-operator seed may take
+ * an unverified named user. A misconfigured gateway is not the same as none.
+ */
+export function isEmailUnconfigured({
+  mail,
+}: {
+  mail: Pick<MailDeliveryView, "provider" | "misconfigured">;
+}): boolean {
+  return mail.provider === undefined && !mail.misconfigured;
+}
+
 /** A file carried with a message, such as a licence key. */
 const emailAttachmentSchemaDefinition = z
   .object({ filename: z.string().min(1), content: z.string(), contentType: z.string().min(1) })
