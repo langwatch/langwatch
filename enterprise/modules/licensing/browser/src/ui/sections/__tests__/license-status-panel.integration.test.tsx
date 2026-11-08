@@ -15,17 +15,20 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { LicensingHostApi, LicensingHostProvider } from "../../../model/licensing-host.ts";
 import { LicenseStatusPanel } from "../license-status-panel.tsx";
 
-const { statusResult, connectResult, actionOptions, actions } = vi.hoisted(() => ({
-  statusResult: { current: undefined as unknown },
-  connectResult: { current: undefined as unknown },
-  actionOptions: { current: undefined as { onRefreshSettled?: () => void } | undefined },
-  actions: {
-    upload: vi.fn(),
-    activate: vi.fn(),
-    remove: vi.fn(),
-    refresh: vi.fn(),
-  },
-}));
+const { statusResult, connectResult, connectPollInterval, actionOptions, actions } = vi.hoisted(
+  () => ({
+    statusResult: { current: undefined as unknown },
+    connectResult: { current: undefined as unknown },
+    connectPollInterval: { current: false as number | false },
+    actionOptions: { current: undefined as { onRefreshSettled?: () => void } | undefined },
+    actions: {
+      upload: vi.fn(),
+      activate: vi.fn(),
+      remove: vi.fn(),
+      refresh: vi.fn(),
+    },
+  }),
+);
 
 class TestHost extends LicensingHostApi {
   constructor(private readonly canManage: boolean) {
@@ -81,6 +84,7 @@ vi.mock("../../../behavior/connect-api.ts", async () => {
           useQuery: (_input: unknown, options: { refetchInterval?: () => number | false }) => {
             const [data, setData] = useState(() => connectResult.current);
             const interval = options.refetchInterval?.() ?? false;
+            connectPollInterval.current = interval;
             useEffect(() => {
               if (interval === false) return;
               const id = setInterval(() => setData(connectResult.current), interval);
@@ -169,6 +173,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  connectPollInterval.current = false;
   for (const action of Object.values(actions)) action.mockClear();
   connectResult.current = undefined;
 });
@@ -266,13 +271,11 @@ describe("LicenseStatusPanel", () => {
     });
 
     /** @scenario The sync line follows a refresh once its outcome is recorded */
-    it("does not re-read Connect when no refresh is waiting", async () => {
+    it("does not re-read Connect when no refresh is waiting", () => {
       connectResult.current = connectOn({});
       renderWith(validStatus({ connected: true }));
 
-      connectResult.current = connectOn({ lastSyncAt: new Date().toISOString() });
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
-
+      expect(connectPollInterval.current).toBe(false);
       expect(screen.getByTestId("license-sync-line").textContent).toBe("Not synced yet");
     });
 
