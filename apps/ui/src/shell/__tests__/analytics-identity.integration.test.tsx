@@ -420,4 +420,36 @@ describe("the project every later event carries", () => {
 
     expect(analytics.superProperties).toEqual(["unregister projectId"]);
   });
+
+  /** @scenario "Telemetry: every later event carries the project in scope" */
+  it("keeps the project registered when the signed-in person switches in the same project", () => {
+    /** Mirrors PostHog: a reset clears every registered super property. */
+    class ResettingAnalytics extends RecordingAnalytics {
+      readonly registered: Record<string, unknown> = {};
+      override register(properties: Readonly<Record<string, unknown>>): void {
+        Object.assign(this.registered, properties);
+      }
+      override unregister(property: string): void {
+        delete this.registered[property];
+      }
+      override reset(): void {
+        super.reset();
+        for (const key of Object.keys(this.registered)) delete this.registered[key];
+      }
+    }
+    const analytics = new ResettingAnalytics();
+    const asPerson = (user: UiActor) => (
+      <UiHostServicesContextProvider
+        value={hostServices(user, "org_1", analytics, CAMPAIGN, "project_checkout")}
+      >
+        <Probe />
+      </UiHostServicesContextProvider>
+    );
+
+    const { rerender } = render(asPerson(ADA));
+    rerender(asPerson(BOB));
+
+    expect(analytics.calls).toContain("reset");
+    expect(analytics.registered).toEqual({ projectId: "project_checkout" });
+  });
 });

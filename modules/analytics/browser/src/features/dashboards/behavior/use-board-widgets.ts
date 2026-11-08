@@ -201,7 +201,7 @@ export function useBoardWidgets({
   const duplicateWidget = (widget: BoardWidget) =>
     undoable({
       title: "Widget duplicated",
-      events: [widgetAdded({ addedFrom: "duplicate" })],
+      events: [widgetAdded({ addedFrom: "duplicate", addedCount: 1 })],
       change: () =>
         write({
           fallbackTitle: "Couldn't duplicate the widget",
@@ -240,7 +240,7 @@ export function useBoardWidgets({
     try {
       return await undoable({
         title: "Widget added",
-        events: [widgetAdded({ addedFrom: "catalogue", widgetCount: picked.length })],
+        events: [widgetAdded({ addedFrom: "catalogue", addedCount: picked.length })],
         change: () =>
           write({
             fallbackTitle: "Couldn't add the widget",
@@ -269,7 +269,7 @@ export function useBoardWidgets({
   const addWidget = (draft: DashboardWidgetDraft) =>
     undoable({
       title: "Widget added",
-      events: [widgetAdded({ addedFrom: "editor" })],
+      events: [widgetAdded({ addedFrom: "editor", addedCount: 1 })],
       change: () =>
         write({
           fallbackTitle: "Couldn't add the widget",

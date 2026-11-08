@@ -59,12 +59,12 @@ describe("the Dashboards product events", () => {
 
   /** @scenario "Telemetry: adding, saving and deleting a widget each send their own event" */
   it("names a widget added, edited and deleted", () => {
-    expect(composed(widgetAdded({ addedFrom: "catalogue", widgetCount: 2 }))).toBe(
+    expect(composed(widgetAdded({ addedFrom: "catalogue", addedCount: 2 }))).toBe(
       "dashboards.added.widget",
     );
-    expect(widgetAdded({ addedFrom: "editor" }).attributes).toEqual({
+    expect(widgetAdded({ addedFrom: "editor", addedCount: 1 }).attributes).toEqual({
       addedFrom: "editor",
-      widgetCount: 1,
+      addedCount: 1,
     });
     expect(composed(widgetEdited())).toBe("dashboards.edited.widget");
     expect(composed(widgetDeleted())).toBe("dashboards.deleted.widget");

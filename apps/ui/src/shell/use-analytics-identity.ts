@@ -73,9 +73,14 @@ export function useAnalyticsIdentity(): void {
 
   const userId = session.user?.id ?? null;
   const email = session.user?.email ?? null;
-  useEffect(() => {
+  // A layout effect declared before the project register below: reset clears super properties,
+  // so it must land first or a switched person's events lose the project.
+  useLayoutEffect(() => {
     if (previousUserId.current && previousUserId.current !== userId) analytics.reset();
     previousUserId.current = userId;
+  }, [analytics, userId]);
+
+  useEffect(() => {
     if (!userId) return;
 
     analytics.identify({ id: userId, email });

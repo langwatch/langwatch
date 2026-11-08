@@ -37,7 +37,7 @@ change. Each event also carries `projectId`.
 | ---------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `dashboards.viewed.dashboard`                        | a board opens (`dashboardKind`, `widgetCount`, `dashboardKey`)                   | are boards opened, and which kinds             |
 | `dashboards.created.dashboard` / `deleted.dashboard` | the server accepts it (on create: `createdFrom`, `templateId` when from one)     | do people make their own boards, and keep them |
-| `dashboards.added.widget`                            | the server accepts it (`addedFrom`, `widgetCount`)                               | do people build widgets, and from what         |
+| `dashboards.added.widget`                            | the server accepts it (`addedFrom`, `addedCount`)                                | do people build widgets, and from what         |
 | `dashboards.edited.widget` / `deleted.widget`        | the server accepts it                                                            | do people keep their widgets up to date        |
 | `dashboards.viewed.widget`                           | half a card first shows on screen, once per card per board view (`widgetSource`) | which widgets are looked at, not only loaded   |
 | `dashboards.changed.period`                          | the period changes (`range`, `grain`)                                            | which periods people need                      |

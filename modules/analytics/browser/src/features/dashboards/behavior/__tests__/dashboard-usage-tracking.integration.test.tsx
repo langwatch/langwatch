@@ -217,8 +217,8 @@ describe("given a member changing a board's widgets", () => {
     );
 
     expect(tracked.events.map(({ attributes }) => attributes)).toEqual([
-      { addedFrom: "duplicate", widgetCount: 1 },
-      { addedFrom: "editor", widgetCount: 1 },
+      { addedFrom: "duplicate", addedCount: 1 },
+      { addedFrom: "editor", addedCount: 1 },
     ]);
     expect(names()).toEqual(["dashboards.added.widget", "dashboards.added.widget"]);
   });

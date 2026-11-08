@@ -139,12 +139,12 @@ export function dashboardFavourited({ starred }: { starred: boolean }): UiAnalyt
 /** Widgets that landed on a board, and from where: "dashboards.added.widget". */
 export function widgetAdded({
   addedFrom,
-  widgetCount = 1,
+  addedCount,
 }: {
   addedFrom: WidgetAddedFrom;
-  widgetCount?: number;
+  addedCount: number;
 }): UiAnalyticsEvent {
-  return dashboardsEvent("widget", "added", { addedFrom, widgetCount });
+  return dashboardsEvent("widget", "added", { addedFrom, addedCount });
 }
 
 /** A widget's edit saved: "dashboards.edited.widget". */
