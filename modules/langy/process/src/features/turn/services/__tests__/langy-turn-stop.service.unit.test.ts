@@ -283,6 +283,34 @@ describe("LangyTurnStopService.stopTurn", () => {
     });
   });
 
+  describe("when ending the local work never settles", () => {
+    it("answers the stop once the cap passes, with the terminal already recorded", async () => {
+      vi.useFakeTimers();
+      try {
+        const { deps, mocks } = makeStopDeps({
+          localWork: { cancelTurn: () => new Promise<void>(() => undefined) },
+        });
+        let answered = false;
+        const stopping = LangyTurnStopService.create(deps)
+          .stopTurn(stopArgs)
+          .then(() => {
+            answered = true;
+          });
+
+        await vi.advanceTimersByTimeAsync(2_999);
+        expect(answered).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        await stopping;
+
+        expect(answered).toBe(true);
+        expect(mocks.finalizeTurn).toHaveBeenCalledTimes(1);
+        expect(mocks.cancel).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("when the live buffer holds no partial answer", () => {
     it("still records a stopped terminal, with an empty answer", async () => {
       const { deps, mocks } = makeStopDeps({ emptyBuffer: true });

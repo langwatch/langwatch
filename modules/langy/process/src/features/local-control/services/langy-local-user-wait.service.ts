@@ -275,7 +275,7 @@ export class UserWaitService {
     for (const wait of await this.listPending({ conversationId, turnId })) {
       if (wait.confirm) continue;
       const next: StoredUserWait = { ...wait, state: "cancelled" };
-      if (await this.cancelOne(next)) cancelled.push(next);
+      if (await this.cancelOne({ wait: next })) cancelled.push(next);
     }
 
     return cancelled;
@@ -286,8 +286,14 @@ export class UserWaitService {
    * still end; only a failed save keeps it waiting. Once saved it reads cancelled, and a
    * waiting command still gets its expired answer.
    */
-  private async cancelOne(wait: StoredUserWait): Promise<boolean> {
-    const attempt = async (step: string, run: () => Promise<void>): Promise<boolean> => {
+  private async cancelOne({ wait }: { wait: StoredUserWait }): Promise<boolean> {
+    const attempt = async ({
+      step,
+      run,
+    }: {
+      step: string;
+      run: () => Promise<void>;
+    }): Promise<boolean> => {
       try {
         await run();
         return true;
@@ -305,18 +311,20 @@ export class UserWaitService {
         return false;
       }
     };
-    if (!(await attempt("persist", () => this.persist(wait)))) return false;
+    if (!(await attempt({ step: "persist", run: () => this.persist(wait) }))) return false;
 
-    await attempt("end", () => this.end(wait, "cancelled"));
+    await attempt({ step: "end", run: () => this.end(wait, "cancelled") });
     if (wait.kind === "permission" && wait.callId) {
       const { callId } = wait;
-      await attempt("sendPermission", () =>
-        this.sendPermission({
-          conversationId: wait.conversationId,
-          callId,
-          decision: "expired",
-        }),
-      );
+      await attempt({
+        step: "sendPermission",
+        run: () =>
+          this.sendPermission({
+            conversationId: wait.conversationId,
+            callId,
+            decision: "expired",
+          }),
+      });
     }
 
     return true;

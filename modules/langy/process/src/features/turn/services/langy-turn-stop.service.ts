@@ -9,6 +9,9 @@ import { LangyTurnSharedService } from "./langy-turn-shared.service.ts";
 
 const logger = createLogger("langwatch:langy:turn-stop-service");
 
+/** Matches the worker cancel's cap, so a stalled Redis cannot hold Stop's answer. */
+const LOCAL_WORK_CANCEL_TIMEOUT_MS = 3_000;
+
 /** The shared turn helpers. Stateless: one instance for the module. */
 const LANGY_TURN_SHARED = LangyTurnSharedService.create();
 
@@ -81,7 +84,10 @@ export class LangyTurnStopService {
     const settled = await Promise.allSettled([
       tokenBuffer.markEnd({ conversationId, turnId }),
       worker?.cancel({ conversationId, turnId, projectId }) ?? Promise.resolve(),
-      localWork.cancelTurn({ conversationId, turnId }),
+      this.capLocalWorkCancel({
+        cancel: localWork.cancelTurn({ conversationId, turnId }),
+        context: { projectId, conversationId, turnId },
+      }),
     ]);
     for (const outcome of settled) {
       if (outcome.status !== "rejected") continue;
@@ -89,6 +95,30 @@ export class LangyTurnStopService {
         { error: outcome.reason, projectId, conversationId, turnId },
         "part of the langy stop failed after the stopped terminal was recorded",
       );
+    }
+  }
+
+  /** Lets Stop answer when the local-work cancel stalls; the cancel itself keeps running. */
+  private async capLocalWorkCancel({
+    cancel,
+    context,
+  }: {
+    cancel: Promise<unknown>;
+    context: { projectId: string; conversationId: string; turnId: string };
+  }): Promise<void> {
+    let timer: NodeJS.Timeout | undefined;
+    const capped = new Promise<"timed-out">((resolve) => {
+      timer = setTimeout(() => resolve("timed-out"), LOCAL_WORK_CANCEL_TIMEOUT_MS);
+    });
+    try {
+      if ((await Promise.race([cancel, capped])) === "timed-out") {
+        logger.warn(
+          { ...context, timeoutMs: LOCAL_WORK_CANCEL_TIMEOUT_MS },
+          "ending the turn's local work timed out; answering the stop anyway",
+        );
+      }
+    } finally {
+      clearTimeout(timer);
     }
   }
 }
