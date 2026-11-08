@@ -26,6 +26,10 @@ Nine came from instructions that were too loose, and the fix was wording:
 
 Two things about Jev's sensitivity to phrasing showed up. A criterion that quotes a concrete fragment ("like 'Overhead was high. Handoffs failed silently.'") moves a rule from 0.59 to 0.9 on the same text. And the judge matches quoted examples very literally: three of my first instructions quoted sentences from the docs pages under test, which made the pages fail on those rules by construction. They were replaced with the guides' own examples and the reports were re-run; the findings survived with the same located sentences, at slightly lower probabilities (0.94 to 0.89, 0.86 to 0.78).
 
+## 2026-11-08: opening questions warn
+
+The writing guide now allows an opening question rarely, when the answer lands in the same line and the question is the reader's own words ("Laptop shut? It still works"). `writing/question-opener` is a local check with `severity: "warning"`: it prints with `w` and never fails the run. `open-flat` no longer counts a rhetorical question as a windup, and `punchline-section-opener` no longer treats a question as a punchline: on the first run it scored the new `bad-question-opener.md` fixture at 0.88, which would have turned the warning back into a failure. Two fixtures were added, `bad-question-opener.md` (no answer in the line) and `ok-question-same-line.md`; both expect only the warning. Two runs over the 17 fixtures cost USD 0.0063 each; `question-opener` was 2 of 2 on both. The remaining misses are on rules this change did not touch, and several of them differ between the two runs.
+
 ## Per-rule table
 
 Threshold 0.7. 15 fixtures, 30 requests, 138,513 input tokens, USD 0.0058.

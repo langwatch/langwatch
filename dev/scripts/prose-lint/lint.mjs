@@ -502,12 +502,30 @@ function titleHowToFindings({ rule, section, doc }) {
   return [{ rule, probability: 1, sentence: `title: ${title}` }];
 }
 
+// An opening question warns instead of failing: writing-rules allows one, rarely,
+// when the answer lands in the same line in the reader's own words.
+function questionOpenerFindings({ rule, section, doc }) {
+  if (section.index !== doc.firstContentIndex) return [];
+  const p = section.paragraphs.find((x) => ["prose", "heading", "list"].includes(x.kind) && !x.exempt);
+  const title = section.level === 1 ? section.heading : "";
+  const first = title || p?.units[0];
+  const question = first?.split(/(?<=\?)\s/)[0];
+  if (!question || !/\?["')\]]*\s*$/.test(question)) return [];
+  const line = title || (p.text.split("\n").find((l) => l.includes(first.slice(0, 20))) ?? "");
+  const rest = line.slice(line.indexOf("?") + 1).replace(/[#*_`\s]/g, "");
+  const note = rest
+    ? "answer in the same line: keep only if the question is the reader's own words"
+    : "no answer in the same line";
+  return [{ rule, probability: 1, sentence: `${question} (${note})` }];
+}
+
 /** The local checks by name; each returns the findings it raises for one section. */
 const LOCAL_CHECKS = {
   "paragraph-words": paragraphWordsFindings,
   "one-sentence-paragraph-run": oneSentenceRunFindings,
   "title-repeated-as-heading": titleRepeatedFindings,
   "title-how-to": titleHowToFindings,
+  "question-opener": questionOpenerFindings,
 };
 
 function runLocalRules(rules, section, doc) {
@@ -834,12 +852,13 @@ async function lintFile(file, rules, opts, key) {
           match: f.match ?? null,
           count: f.count ?? null,
           founder: f.rule.kind === "judge" && (f.founder ?? isFounder(f.sentence)),
+          warning: f.rule.severity === "warning",
         })),
     })),
     usage: { ...usage, usd: round((usage.inputTokens / 1e6) * PRICE_PER_MTOK, 6) },
   };
   out.failed = out.sections.some((s) =>
-    s.findings.some((f) => f.probability >= opts.threshold && !f.founder),
+    s.findings.some((f) => f.probability >= opts.threshold && !f.founder && !f.warning),
   );
   return out;
 }
@@ -848,6 +867,7 @@ const round = (x, d = 3) => Math.round(x * 10 ** d) / 10 ** d;
 
 function findingFlag(f, threshold) {
   if (f.founder) return "f";
+  if (f.warning) return "w";
   return f.probability >= threshold ? "!" : " ";
 }
 
