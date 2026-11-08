@@ -252,7 +252,11 @@ async function resolveFromSession({
   // Every key the session holds goes through here, so this is the one place
   // that keeps it with the address that issued it.
   if (loginElsewhere({ cfg, endpoint })) return undefined;
-  const session = await resolveSessionCredential(cfg);
+  // Only the person-acting command waits out a new account's workspace; others fall back at once.
+  const session = await resolveSessionCredential({
+    cfg,
+    waitsForPendingWorkspace: isLoginKeyRequired,
+  });
   if (!session) return undefined;
   if (isLoginKeyRequired && !session.isLoginKey) return undefined;
 
@@ -420,9 +424,13 @@ interface SessionCredential {
  * the personal-project key when present; using either past
  * `SESSION_REVALIDATE_WINDOW_MS` unconditionally would be a revocation bypass.
  */
-async function resolveSessionCredential(
-  cfg: GovernanceConfig,
-): Promise<SessionCredential | undefined> {
+async function resolveSessionCredential({
+  cfg,
+  waitsForPendingWorkspace,
+}: {
+  cfg: GovernanceConfig;
+  waitsForPendingWorkspace: boolean;
+}): Promise<SessionCredential | undefined> {
   const loginKey = trimmedOrUndefined(cfg.cli_api_key);
   const personalKey = trimmedOrUndefined(cfg.personal_project?.api_key);
   // One clock for both: the probe below confirms the SESSION, and the session
@@ -439,7 +447,9 @@ async function resolveSessionCredential(
   }
 
   try {
-    const project = await fetchPersonalProjectOnceReady(cfg);
+    const project = waitsForPendingWorkspace
+      ? await fetchPersonalProjectOnceReady(cfg)
+      : await fetchPersonalProject(cfg);
     if (!project) {
       // Endpoint missing (legacy server). Nothing to revalidate against;
       // trust the cached key and quiet the clock so we don't re-probe every

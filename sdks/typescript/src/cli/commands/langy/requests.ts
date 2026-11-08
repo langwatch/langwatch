@@ -199,9 +199,9 @@ export interface ControlApi {
 
 const REQUESTS_PATH = "/api/v1/langy/control/requests";
 
-/** What the command says when the login reaches no project yet, so the routes cannot be called. */
+/** What the command says when the login reaches no project it can use Langy in. */
 export const NO_PROJECT_YET_MESSAGE =
-  "Your LangWatch login does not reach a project yet, so this folder is not shared. A new account's workspace takes a few seconds to set up: wait a moment, then run `langwatch langy --share-control` again.";
+  "Your LangWatch login does not reach a project where you can use Langy, so this folder is not shared. If you just created your account, its workspace may still be setting up: wait a moment, then run `langwatch langy --share-control` again. Otherwise, ask an admin of your organization for access to a project.";
 
 /** The first project a `project_required` refusal lists as reachable by the key. */
 function firstReachableProject(body: unknown): string | undefined {
@@ -227,8 +227,8 @@ export function createControlApi({
   fetchImpl?: typeof fetch;
 }): ControlApi {
   let projectId = resolvedProjectId;
-  const headersFor = (project: string | undefined) => ({
-    ...buildAuthHeaders({ apiKey, ...(project === undefined ? {} : { projectId: project }) }),
+  const headers = () => ({
+    ...buildAuthHeaders({ apiKey, ...(projectId === undefined ? {} : { projectId }) }),
     "Content-Type": "application/json",
     "User-Agent": `langwatch-cli/${LANGWATCH_SDK_VERSION}`,
   });
@@ -239,7 +239,7 @@ export function createControlApi({
   ): Promise<unknown> => {
     const response = await fetchImpl(`${endpoint}${urlPath}`, {
       method: init.method,
-      headers: headersFor(projectId),
+      headers: headers(),
       ...(init.body === undefined ? {} : { body: init.body }),
     });
     const text = await response.text();
