@@ -1082,12 +1082,17 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "A uv project whose Python range starts below the SDK's is asked about" */
     it("asks before raising a uv project's requires-python when uv refuses the floor over it", () => {
       expect(rendered).toContain(
-        "`uv add` refuses too when the project's `requires-python` starts below 3.10, whatever interpreter is active, with a hint naming `requires-python`: uv resolves for the whole range, so another interpreter cannot help, and the range is never changed unasked.",
+        '`uv add` refuses too when the project\'s `requires-python` starts below 3.10, whatever interpreter is active, with a hint naming `requires-python`: that is the fifth unlock question of "When a step fails", asked before any edit.',
       );
-      expect(rendered).toContain(
-        'Ask with the `question` tool, verbatim: "Your project\'s requires-python allows Python versions the LangWatch SDK doesn\'t support. Want me to raise its lower bound to 3.10?" Options, in this order: "Raise it to 3.10 for me" and "I\'ll change it myself".',
+      const failed = rendered.indexOf("### When a step fails");
+      const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
+      expect(section).toContain(
+        "The fifth: the uv rung of item 1 refuses because the project's `requires-python` starts below 3.10. uv resolves for the whole range, so another interpreter cannot help, and the range is never changed unasked.",
       );
-      expect(rendered).toContain(
+      expect(section).toContain(
+        'The question is this, verbatim: "Your project\'s requires-python allows Python versions the LangWatch SDK doesn\'t support. Want me to raise its lower bound to 3.10?" Options, in this order: "Raise it to 3.10 for me" and "I\'ll change it myself".',
+      );
+      expect(section).toContain(
         'On "Raise it to 3.10 for me": set the lower bound of `requires-python` in `pyproject.toml` to 3.10, keeping any upper bound, and run the uv rung again.',
       );
       const tracing = renderSkill(listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!);
@@ -1155,7 +1160,7 @@ describe("the guided-onboarding skill", () => {
       const failed = rendered.indexOf("### When a step fails");
       const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
       expect(section).toContain(
-        "Four dead ends have a known unlock, and an unlock is asked, never stopped on:",
+        "Five dead ends have a known unlock, and an unlock is asked, never stopped on:",
       );
       expect(section).toContain(
         "The third: pip refuses the install of item 1 for the interpreter's version, the check of item 1 fails, or the installed version is below 1.3.0.",

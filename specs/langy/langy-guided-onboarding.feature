@@ -770,7 +770,7 @@ Feature: Langy guides the first setup after sign-up
     @unit
     Scenario: A uv project whose Python range starts below the SDK's is asked about
       When the compiled guided-onboarding skill is read
-      Then uv refusing the install over the project's requires-python is a question about raising its lower bound to 3.10
+      Then uv refusing the install over the project's requires-python is the fifth unlock question of "When a step fails", about raising its lower bound to 3.10
       And the options are "Raise it to 3.10 for me" and "I'll change it myself", plain answers with no ref
       And the project's Python range is never changed unasked
       And the tracing skill says the same
