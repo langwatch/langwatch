@@ -39,61 +39,44 @@ export default function CouponsSection(_props: CouponsSectionProps) {
   const description =
     "Promotion codes customers type at the Growth checkout, and whether that checkout accepts each one. No code discounts the first charge up to the 1st of next month; the discount months count from the day of checkout.";
 
-  const renderPage = () => {
-    if (list.error)
-      return (
-        <ListPage
-          title="Coupons"
-          description={description}
-          actions={actions}
-          state="error"
-          error={{
-            title: "Couldn't load coupons",
-            description: describeError({
-              error: list.error,
-              fallbackTitle: "Couldn't load coupons",
-            }),
-            onRetry: () => void list.refetch(),
-            next: [STRIPE_COUPON_DOCS],
-          }}
-        >
-          {null}
-        </ListPage>
-      );
-    if (!list.isLoading && coupons.length === 0)
-      return (
-        <ListPage
-          title="Coupons"
-          description={description}
-          actions={actions}
-          state="empty"
-          empty={{
-            icon: <TicketPercent />,
-            title: "No coupons yet",
-            description:
-              "Create a coupon to give a customer a promotion code for the Growth checkout.",
-            next: [STRIPE_COUPON_DOCS],
-          }}
-        >
-          {null}
-        </ListPage>
-      );
-    return (
+  const state = list.error
+    ? "error"
+    : list.isLoading
+      ? "loading"
+      : coupons.length === 0
+        ? "empty"
+        : "ready";
+  // ListPage draws any error it is given over loaded rows, so only a failed read passes one.
+  const loadError = list.error
+    ? {
+        error: {
+          title: "Couldn't load coupons",
+          description: describeError({ error: list.error, fallbackTitle: "Couldn't load coupons" }),
+          onRetry: () => void list.refetch(),
+          next: [STRIPE_COUPON_DOCS],
+        },
+      }
+    : {};
+
+  return (
+    <>
       <ListPage
         title="Coupons"
         description={description}
         actions={actions}
-        state={list.isLoading ? "loading" : "ready"}
+        state={state}
         refreshing={list.isFetching}
+        {...loadError}
+        empty={{
+          icon: <TicketPercent />,
+          title: "No coupons yet",
+          description:
+            "Create a coupon to give a customer a promotion code for the Growth checkout.",
+          next: [STRIPE_COUPON_DOCS],
+        }}
       >
         <CouponsTable coupons={coupons} onDeactivate={setDeactivating} />
       </ListPage>
-    );
-  };
-
-  return (
-    <>
-      {renderPage()}
       <CreateCouponDrawer open={creating} onClose={() => setCreating(false)} />
       <ConfirmDialog
         open={deactivating !== null}

@@ -78,6 +78,13 @@ const list: { data?: { coupons: CouponView[] }; error: unknown; isLoading: boole
 const refetch = vi.fn();
 const created: unknown[] = [];
 const deactivated: unknown[] = [];
+const createFailure: { error: unknown } = { error: null };
+const showErrorToast = vi.fn();
+
+vi.mock("@langwatch/browser-host/errors", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  showErrorToast: (options: unknown) => showErrorToast(options),
+}));
 
 vi.mock("../behavior/billing-coupons-api.ts", () => ({
   billingCouponsApi: {
@@ -86,9 +93,13 @@ vi.mock("../behavior/billing-coupons-api.ts", () => ({
       list: { useQuery: () => ({ ...list, isFetching: false, refetch }) },
       create: {
         useMutation: () => ({
-          mutate: (input: unknown, options?: { onSuccess?: () => void }) => {
+          mutate: (
+            input: unknown,
+            options?: { onSuccess?: () => void; onError?: (error: unknown) => void },
+          ) => {
             created.push(input);
-            options?.onSuccess?.();
+            if (createFailure.error) options?.onError?.(createFailure.error);
+            else options?.onSuccess?.();
           },
           isPending: false,
         }),
@@ -116,6 +127,19 @@ async function fill(label: string, value: string) {
   fireEvent.change(await screen.findByLabelText(label), { target: { value } });
 }
 
+/** A tRPC refusal as the client receives it. */
+const refusal = (error: { code: string; httpStatus: number; meta: object }) => ({
+  data: { error },
+});
+
+async function submitCoupon() {
+  renderPage();
+  fireEvent.click(screen.getAllByRole("button", { name: /new coupon/i })[0]!);
+  await fill("Percent off", "50");
+  await fill("Code", "welcome50");
+  fireEvent.click(await screen.findByRole("button", { name: "Create coupon" }));
+}
+
 describe("CouponsSection", () => {
   beforeEach(() => {
     list.data = { coupons: [] };
@@ -123,6 +147,8 @@ describe("CouponsSection", () => {
     list.isLoading = false;
     created.length = 0;
     deactivated.length = 0;
+    createFailure.error = null;
+    showErrorToast.mockReset();
     refetch.mockReset();
   });
   afterEach(cleanup);
@@ -217,6 +243,42 @@ describe("CouponsSection", () => {
         screen.getByText("Codes use letters, digits, dashes and underscores"),
       ).toBeInTheDocument();
       expect(created).toEqual([]);
+    });
+
+    /** @scenario "An invalid coupon is refused before it reaches Stripe" */
+    it("puts the server's refusal under the field it names and keeps the drawer open", async () => {
+      createFailure.error = refusal({
+        code: "billing_coupon_invalid",
+        httpStatus: 422,
+        meta: { fieldErrors: { code: ["Codes use letters, digits, dashes and underscores"] } },
+      });
+      await submitCoupon();
+
+      expect(
+        await screen.findByText("Codes use letters, digits, dashes and underscores"),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Create coupon" })).toBeInTheDocument();
+      expect(showErrorToast).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A code already taken by an active promotion code is refused by name" */
+    it("raises a toast naming the taken code when no field is named", async () => {
+      createFailure.error = refusal({
+        code: "billing_coupon_code_taken",
+        httpStatus: 409,
+        meta: { code: "WELCOME50" },
+      });
+      await submitCoupon();
+
+      await waitFor(() =>
+        expect(showErrorToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            error: createFailure.error,
+            fallbackTitle: "The coupon was not created",
+          }),
+        ),
+      );
+      expect(screen.getByRole("button", { name: "Create coupon" })).toBeInTheDocument();
     });
   });
 

@@ -2,14 +2,11 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { discountLabel, durationLabel, productsLabel, redemptionsLabel } from "../coupon-copy.ts";
 import {
   couponProblemsOf,
   couponRequestFrom,
-  discountLabel,
-  durationLabel,
   emptyCouponDraft,
-  productsLabel,
-  redemptionsLabel,
   type CouponDraft,
 } from "../coupon-form.ts";
 

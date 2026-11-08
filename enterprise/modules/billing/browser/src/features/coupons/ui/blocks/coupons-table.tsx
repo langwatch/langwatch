@@ -9,7 +9,7 @@ import {
   durationLabel,
   productsLabel,
   redemptionsLabel,
-} from "../../model/coupon-form.ts";
+} from "../../model/coupon-copy.ts";
 
 const COLUMN_COUNT = 8;
 
