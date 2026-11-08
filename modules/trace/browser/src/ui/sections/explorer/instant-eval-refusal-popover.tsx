@@ -1,4 +1,4 @@
-import { EnterpriseLock, LICENSE_SETTINGS_HREF } from "@langwatch/browser-host/enterprise-lock";
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 /**
  * The refusal an Instant Eval met, anchored under the search bar: what the eval would have found,
@@ -84,6 +84,13 @@ interface InstantEvalRefusalCopy {
   dismiss: string;
 }
 
+/** The license gap: the Enterprise lock owns its words; the entry holds what sits beside it. */
+interface InstantEvalLicenseLockCopy {
+  lock: "license";
+  more: { label: string; href: string };
+  dismiss: string;
+}
+
 const READ_MORE_SELF_HOSTED = { label: "Read more", href: SELF_HOSTED_INSTANT_EVALS_HREF };
 
 /**
@@ -91,36 +98,32 @@ const READ_MORE_SELF_HOSTED = { label: "Read more", href: SELF_HOSTED_INSTANT_EV
  * than falling through to the enterprise copy. Only a license gap offers a word with us: the other
  * three are fixed on the install, by an admin, its network or its operator.
  */
-const SELF_HOSTED_REFUSAL_COPY: Record<ExplorerSelfHostedInstantEvalOffer, InstantEvalRefusalCopy> =
-  {
-    // Also the answer with no license at all, so it never says what a license holds.
-    not_in_license: {
-      title: "Instant Evals is part of LangWatch Enterprise",
-      body: INSTANT_EVALS_DESCRIPTION,
-      action: { label: "Activate a license", href: LICENSE_SETTINGS_HREF },
-      more: READ_MORE_SELF_HOSTED,
-      dismiss: "Not now",
-    },
-    switched_off: {
-      title: "Instant Evals are switched off for your organization",
-      body: "Your license includes Instant Evals, and an organization admin switched them off. An admin can switch them back on in Settings, Connect.",
-      action: { label: "Open Connect settings", href: CONNECT_SETTINGS_HREF },
-      dismiss: "Not now",
-    },
-    not_connected: {
-      // Not "can't reach": an operator who switched Connect off on purpose gets this one too.
-      title: "This install isn't connected to LangWatch",
-      body: `Instant Evals on a self-hosted install judge through LangWatch. The install needs Connect switched on and ${CONNECT_HOSTS} reachable.`,
-      more: READ_MORE_SELF_HOSTED,
-      dismiss: "Not now",
-    },
-    ask_operator: {
-      title: "Instant Evals are off on this install",
-      body: "This install doesn't judge through LangWatch, so whoever runs it decides when Instant Evals are on. Ask them to switch Instant Evals on.",
-      more: READ_MORE_SELF_HOSTED,
-      dismiss: "Not now",
-    },
-  };
+const SELF_HOSTED_REFUSAL_COPY: { not_in_license: InstantEvalLicenseLockCopy } & Record<
+  Exclude<ExplorerSelfHostedInstantEvalOffer, "not_in_license">,
+  InstantEvalRefusalCopy
+> = {
+  // Also the answer with no license at all, so it never says what a license holds.
+  not_in_license: { lock: "license", more: READ_MORE_SELF_HOSTED, dismiss: "Not now" },
+  switched_off: {
+    title: "Instant Evals are switched off for your organization",
+    body: "Your license includes Instant Evals, and an organization admin switched them off. An admin can switch them back on in Settings, Connect.",
+    action: { label: "Open Connect settings", href: CONNECT_SETTINGS_HREF },
+    dismiss: "Not now",
+  },
+  not_connected: {
+    // Not "can't reach": an operator who switched Connect off on purpose gets this one too.
+    title: "This install isn't connected to LangWatch",
+    body: `Instant Evals on a self-hosted install judge through LangWatch. The install needs Connect switched on and ${CONNECT_HOSTS} reachable.`,
+    more: READ_MORE_SELF_HOSTED,
+    dismiss: "Not now",
+  },
+  ask_operator: {
+    title: "Instant Evals are off on this install",
+    body: "This install doesn't judge through LangWatch, so whoever runs it decides when Instant Evals are on. Ask them to switch Instant Evals on.",
+    more: READ_MORE_SELF_HOSTED,
+    dismiss: "Not now",
+  },
+};
 
 /** Whether a refusal kind, or the server's offer, is a self-hosted one; the record is the list. */
 export function isSelfHostedRefusal(
@@ -136,7 +139,7 @@ export function isSelfHostedRefusal(
 export function instantEvalRefusalCopy(
   refusal: InstantEvalRefusal,
   { viaConnect = false }: { viaConnect?: boolean } = {},
-): InstantEvalRefusalCopy {
+): InstantEvalRefusalCopy | InstantEvalLicenseLockCopy {
   const what =
     "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do.";
   const skip = "Skip searches your words without the eval.";
@@ -201,33 +204,32 @@ export function InstantEvalRefusalPopover({
   canActivateLicense = false,
   children,
 }: InstantEvalRefusalPopoverProps) {
-  const copy = refusal ? instantEvalRefusalCopy(refusal, { viaConnect }) : null;
+  const refusalCopy = refusal ? instantEvalRefusalCopy(refusal, { viaConnect }) : null;
+  const lockCopy = refusalCopy && "lock" in refusalCopy ? refusalCopy : null;
+  const copy = refusalCopy && !("lock" in refusalCopy) ? refusalCopy : null;
   const action = copy?.action;
   const actionHref = action?.href;
   // Only a button that says Skip routes the words again; "Not now" just closes.
   const onDismiss = copy?.dismiss === "Skip" ? onSkip : onClose;
-  const licenseLock =
-    copy && refusal?.kind === "not_in_license" ? (
-      <EnterpriseLock
-        compact
-        feature="Instant Evals"
-        description={INSTANT_EVALS_DESCRIPTION}
-        canManage={canActivateLicense}
-        data-testid="instant-eval-enterprise-lock"
-        extraActions={
-          <>
-            <Button size="xs" variant="ghost" onClick={onDismiss}>
-              {copy.dismiss}
-            </Button>
-            {copy.more && (
-              <RoutedLink href={copy.more.href} target="_blank" rel="noopener noreferrer">
-                {copy.more.label}
-              </RoutedLink>
-            )}
-          </>
-        }
-      />
-    ) : null;
+  const licenseLock = lockCopy ? (
+    <EnterpriseLock
+      compact
+      feature="Instant Evals"
+      description={INSTANT_EVALS_DESCRIPTION}
+      canManage={canActivateLicense}
+      data-testid="instant-eval-enterprise-lock"
+      extraActions={
+        <>
+          <Button size="xs" variant="ghost" onClick={onDismiss}>
+            {lockCopy.dismiss}
+          </Button>
+          <RoutedLink href={lockCopy.more.href} target="_blank" rel="noopener noreferrer">
+            {lockCopy.more.label}
+          </RoutedLink>
+        </>
+      }
+    />
+  ) : null;
   return (
     <PopoverRoot
       open={refusal !== null}

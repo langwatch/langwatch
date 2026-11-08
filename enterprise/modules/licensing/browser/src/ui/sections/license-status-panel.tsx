@@ -9,6 +9,7 @@ import {
   type ConnectStatus,
   detectLicenseInputForm,
 } from "@langwatch/enterprise-licensing-contract";
+import { nowInstant } from "@langwatch/time";
 import { useState } from "react";
 
 import { connectApi } from "../../behavior/connect-api.ts";
@@ -56,17 +57,21 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
 
   // The sync line and a revocation are read from Connect, the same reading its page shows.
   const isConnected = !!status?.hasLicense && isConnectedLicense(status);
-  const [awaitedSync, setAwaitedSync] = useState<string | null>(null);
+  // A refresh waits for its outcome until the line moves or the deadline passes, with no timer.
+  const [awaitedSync, setAwaitedSync] = useState<{ from: string; until: number } | null>(null);
   const connectStatus = connectApi.connect.status.useQuery(
     { organizationId },
     {
       enabled: isConnected,
       refetchOnWindowFocus: false,
-      refetchInterval: awaitedSync === null ? false : SYNC_RECORD_POLL_MS,
+      refetchInterval: () =>
+        awaitedSync !== null && nowInstant().epochMilliseconds < awaitedSync.until
+          ? SYNC_RECORD_POLL_MS
+          : false,
     },
   );
   const recordedSync = syncKeyOf(connectStatus.data);
-  if (awaitedSync !== null && recordedSync !== awaitedSync) setAwaitedSync(null);
+  if (awaitedSync !== null && recordedSync !== awaitedSync.from) setAwaitedSync(null);
 
   const [activationCode, setActivationCode] = useState("");
   const { upload, activate, remove, refresh, isUploading, isRemoving, isRefreshing } =
@@ -84,8 +89,10 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
       onRefreshSettled: () => {
         if (!isConnected) return;
         // The sync outcome is recorded by a subscriber, so it lands a moment after the refresh.
-        setAwaitedSync(recordedSync);
-        setTimeout(() => setAwaitedSync(null), SYNC_RECORD_WAIT_MS);
+        setAwaitedSync({
+          from: recordedSync,
+          until: nowInstant().epochMilliseconds + SYNC_RECORD_WAIT_MS,
+        });
       },
     });
 

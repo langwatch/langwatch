@@ -101,7 +101,9 @@ describe("given an organization that cannot set single sign-on up yet", () => {
     expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/isn't switched on/);
     expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/talk to us/i);
 
-    rerenderWithSsoHost(<AvailabilityRefusalNotice refusal="license_required" canManage />);
+    rerenderWithSsoHost(
+      <AvailabilityRefusalNotice refusal="license_required" canManageOrganization />,
+    );
     expect(screen.getByTestId("sso-enterprise-required").textContent).toMatch(
       /Single sign-on is part of LangWatch Enterprise/,
     );

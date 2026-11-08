@@ -20,6 +20,7 @@ import type { ReactNode } from "react";
 import { useDirectoryFacts } from "../../behavior/use-directory-facts.ts";
 import { relativeTime } from "../../model/display-formatters.ts";
 import { isEnterpriseGateError } from "../../model/enterprise-gate.ts";
+import { useScimHost } from "../../model/scim-host.ts";
 
 const AUTHENTICATION_PAGE = "/settings/authentication";
 
@@ -34,7 +35,7 @@ export default function DirectorySummary({
 
   if (reconciliation.isError) {
     if (isEnterpriseGateError(reconciliation.error)) {
-      return <EnterpriseGate canManage={canReadMembership} />;
+      return <EnterpriseGate />;
     }
     return (
       <HandledErrorAlert
@@ -103,7 +104,8 @@ export default function DirectorySummary({
 }
 
 /** A plan state, not a failure: one quiet line, so the page never reads as Enterprise-only. */
-function EnterpriseGate({ canManage }: { canManage: boolean }) {
+function EnterpriseGate() {
+  const canManage = useScimHost().hasPermission("organization:manage");
   return (
     <EnterpriseLock
       variant="line"

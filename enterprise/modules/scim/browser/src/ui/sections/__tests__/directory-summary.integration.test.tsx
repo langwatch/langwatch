@@ -49,7 +49,7 @@ vi.mock("../../../behavior/scim-api.ts", () => {
 
 // The pool shares a module graph across files: the band and its host load fresh over this mock.
 vi.resetModules();
-const { renderWithScimHost } = await import("../../../testing.tsx");
+const { FakeScimHost, renderWithScimHost } = await import("../../../testing.tsx");
 const { default: DirectorySummary } = await import("../directory-summary.tsx");
 
 afterEach(cleanup);
@@ -195,7 +195,10 @@ describe("given a plan that does not carry directory sync", () => {
   /** @scenario "A member on a self-hosted install is told to ask an admin" */
   it("tells a reader who may not manage the organization to ask an admin", () => {
     state.readError = { data: { error: { code: "enterprise_plan_required" } } };
-    renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership={false} />);
+    renderWithScimHost(
+      <DirectorySummary organizationId="org-1" canReadMembership />,
+      new FakeScimHost({ withheld: ["organization:manage"] }),
+    );
 
     expect(
       screen.getByText("Ask an organization admin to activate a license."),

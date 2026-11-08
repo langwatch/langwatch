@@ -299,3 +299,23 @@ Feature: Connect on a self-hosted install
     Then the page says once that the license is no longer active
     And every hosted service is marked unavailable, with its switch off and disabled
     And no service reads "On"
+
+  @unit
+  Scenario Outline: Every refusal of the license itself closes the hosted services
+    Given the license is refused with "<code>", live or on the last sync
+    When the Connect page reads the status
+    Then every hosted service is closed
+    And only "connect_license_revoked" reads as revoked by LangWatch
+
+    Examples:
+      | code                           |
+      | connect_license_revoked        |
+      | connect_license_expired        |
+      | connect_license_not_registered |
+      | connect_wrong_instance         |
+
+  @unit
+  Scenario: A refusal that is not about the license leaves the hosted services open
+    Given the last sync failed because LangWatch could not be reached
+    When the Connect page reads the status
+    Then the hosted services are not closed

@@ -78,13 +78,16 @@ const AVAILABILITY_REFUSAL_COPY = {
  */
 export function AvailabilityRefusalNotice({
   refusal,
-  canManage = false,
+  canManageOrganization = false,
 }: {
   /** `license_required` is the Enterprise lock; the others are a banner. */
   refusal: keyof typeof AVAILABILITY_REFUSAL_COPY | "license_required";
-  canManage?: boolean;
+  /** The reader holds `organization:manage`, so the lock offers to activate a license. */
+  canManageOrganization?: boolean;
 }) {
-  if (refusal === "license_required") return <SsoEnterpriseLock canManage={canManage} />;
+  if (refusal === "license_required") {
+    return <SsoEnterpriseLock canManage={canManageOrganization} />;
+  }
   const copy = AVAILABILITY_REFUSAL_COPY[refusal];
 
   return (

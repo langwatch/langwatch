@@ -92,7 +92,7 @@ export default function SsoSetupScreen() {
 
 function SsoSetupPage({ organizationId }: { organizationId: string }) {
   const setup = ssoApi.ssoSetup.getSetup.useQuery({ organizationId });
-  const canManage = useSsoHost().canManage();
+  const canManageOrganization = useSsoHost().canManageOrganization();
 
   if (setup.isLoading) return <SetupStepsSkeleton />;
 
@@ -111,10 +111,15 @@ function SsoSetupPage({ organizationId }: { organizationId: string }) {
   const view = setup.data;
 
   if (!view.availability.available) {
-    return <AvailabilityRefusalNotice refusal={view.availability.refusal} canManage={canManage} />;
+    return (
+      <AvailabilityRefusalNotice
+        refusal={view.availability.refusal}
+        canManageOrganization={canManageOrganization}
+      />
+    );
   }
 
-  if (view.enterpriseRequired) return <SsoEnterpriseLock canManage={canManage} />;
+  if (view.enterpriseRequired) return <SsoEnterpriseLock canManage={canManageOrganization} />;
 
   if (view.connection === null) {
     return view.legacyRoute ? (

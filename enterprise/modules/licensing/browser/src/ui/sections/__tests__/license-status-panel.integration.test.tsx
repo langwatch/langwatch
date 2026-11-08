@@ -9,15 +9,15 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { LicenseStatus as LicenseStatusPayload } from "@langwatch/enterprise-licensing-contract";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type * as ReactModule from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LicensingHostApi, LicensingHostProvider } from "../../../model/licensing-host.ts";
 import { LicenseStatusPanel } from "../license-status-panel.tsx";
 
-const { statusResult, connectResult, connectQuery, actionOptions, actions } = vi.hoisted(() => ({
+const { statusResult, connectResult, actionOptions, actions } = vi.hoisted(() => ({
   statusResult: { current: undefined as unknown },
   connectResult: { current: undefined as unknown },
-  connectQuery: { options: undefined as { refetchInterval?: number | false } | undefined },
   actionOptions: { current: undefined as { onRefreshSettled?: () => void } | undefined },
   actions: {
     upload: vi.fn(),
@@ -71,18 +71,28 @@ vi.mock("../../../behavior/licensing-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../behavior/connect-api.ts", () => ({
-  connectApi: {
-    connect: {
-      status: {
-        useQuery: (_input: unknown, options: { refetchInterval?: number | false }) => {
-          connectQuery.options = options;
-          return { data: connectResult.current, refetch: vi.fn() };
+/** Answers what the server holds now, re-reading it on the interval the panel asks for. */
+vi.mock("../../../behavior/connect-api.ts", async () => {
+  const { useEffect, useState } = await vi.importActual<typeof ReactModule>("react");
+  return {
+    connectApi: {
+      connect: {
+        status: {
+          useQuery: (_input: unknown, options: { refetchInterval?: () => number | false }) => {
+            const [data, setData] = useState(() => connectResult.current);
+            const interval = options.refetchInterval?.() ?? false;
+            useEffect(() => {
+              if (interval === false) return;
+              const id = setInterval(() => setData(connectResult.current), interval);
+              return () => clearInterval(id);
+            }, [interval]);
+            return { data, refetch: vi.fn() };
+          },
         },
       },
     },
-  },
-}));
+  };
+});
 
 vi.mock("../use-license-actions.ts", () => ({
   useLicenseActions: (options: { onRefreshSettled?: () => void }) => {
@@ -242,22 +252,28 @@ describe("LicenseStatusPanel", () => {
     });
 
     /** @scenario The sync line follows a refresh once its outcome is recorded */
-    it("re-reads Connect after a refresh until the recorded sync changes", () => {
+    it("shows the recorded sync once a refresh's outcome lands", async () => {
       connectResult.current = connectOn({});
-      const view = renderWith(validStatus({ connected: true }));
-      expect(connectQuery.options?.refetchInterval).toBe(false);
+      renderWith(validStatus({ connected: true }));
 
       act(() => actionOptions.current?.onRefreshSettled?.());
-      expect(connectQuery.options?.refetchInterval).toBe(1_000);
+      connectResult.current = connectOn({ lastSyncAt: new Date().toISOString() });
+
+      await waitFor(
+        () => expect(screen.getByTestId("license-sync-line").textContent).toMatch(/^Last synced/),
+        { timeout: 3_000 },
+      );
+    });
+
+    /** @scenario The sync line follows a refresh once its outcome is recorded */
+    it("does not re-read Connect when no refresh is waiting", async () => {
+      connectResult.current = connectOn({});
+      renderWith(validStatus({ connected: true }));
 
       connectResult.current = connectOn({ lastSyncAt: new Date().toISOString() });
-      view.rerender(
-        <LicensingHostProvider value={new TestHost(true)}>
-          <LicenseStatusPanel organizationId="org-123" />
-        </LicensingHostProvider>,
-      );
-      expect(connectQuery.options?.refetchInterval).toBe(false);
-      expect(screen.getByTestId("license-sync-line").textContent).toMatch(/^Last synced/);
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+
+      expect(screen.getByTestId("license-sync-line").textContent).toBe("Not synced yet");
     });
 
     /** @scenario A revoked license is not called valid */

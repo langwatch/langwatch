@@ -62,6 +62,7 @@ describe("given the deployment has no classifier", () => {
   /** @scenario "A missing classifier opens the model popover and keeps the eval chip" */
   it("says Instant Evals can't run right now and offers a word with us, not the model settings", () => {
     const copy = instantEvalRefusalCopy({ kind: "model" });
+    if ("lock" in copy) throw new Error("a model refusal is not the license lock");
 
     expect(copy.title).toBe("Instant Evals can't run right now");
     expect(copy.body).toBe(

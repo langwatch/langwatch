@@ -29,12 +29,11 @@ export type EnterpriseLockProps = {
   canManage: boolean;
   /** Cloud only: the reader may open the plans page; defaults to `canManage`. */
   canSeePlans?: boolean;
-  /** Cloud only: replaces the "See plans" button. */
-  cloudAction?: ReactNode;
   /** Shown after the lock's own buttons, such as a "Not now" in a popover. */
   extraActions?: ReactNode;
   compact?: boolean;
-  /** `line` is one quiet sentence on a page the feature only adds to, such as Users. */
+  /** `line` is one quiet sentence on a page the feature only adds to, such as Users: the title
+   * and the way forward or who to ask, without the description. */
   variant?: "card" | "line";
   "data-testid"?: string;
 };
@@ -52,18 +51,27 @@ export function enterpriseLockCopy({
   isSaaS: boolean;
   canManage: boolean;
   canSeePlans?: boolean;
-}): { title: string; description: string; actions: "license" | "plans" | "none" } {
+}): {
+  title: string;
+  description: string;
+  actions: "license" | "plans" | "none";
+  askAdmin: string | null;
+} {
   if (isSaaS) {
+    const askAdmin = canSeePlans ? null : ASK_ADMIN_TO_UPGRADE;
     return {
       title: `${feature} is included in Enterprise`,
-      description: canSeePlans ? description : `${description} ${ASK_ADMIN_TO_UPGRADE}`,
+      description: askAdmin ? `${description} ${askAdmin}` : description,
       actions: canSeePlans ? "plans" : "none",
+      askAdmin,
     };
   }
+  const askAdmin = canManage ? null : ASK_ADMIN_TO_ACTIVATE;
   return {
     title: `${feature} is part of LangWatch Enterprise`,
-    description: canManage ? description : `${description} ${ASK_ADMIN_TO_ACTIVATE}`,
+    description: askAdmin ? `${description} ${askAdmin}` : description,
     actions: canManage ? "license" : "none",
+    askAdmin,
   };
 }
 
@@ -72,7 +80,6 @@ export function EnterpriseLock({
   description,
   canManage,
   canSeePlans,
-  cloudAction,
   extraActions,
   compact = false,
   variant = "card",
@@ -80,9 +87,9 @@ export function EnterpriseLock({
 }: EnterpriseLockProps) {
   const { isSaaS } = useUiDeployment();
   const copy = enterpriseLockCopy({ feature, description, isSaaS, canManage, canSeePlans });
-  if (variant === "line") return <EnterpriseLockLine copy={copy} isSaaS={isSaaS} testId={testId} />;
+  if (variant === "line") return <EnterpriseLockLine copy={copy} testId={testId} />;
   const size = compact ? "xs" : "sm";
-  const own = lockActions({ actions: copy.actions, size, cloudAction });
+  const own = lockActions({ actions: copy.actions, size });
   const actions =
     own || extraActions ? (
       <>
@@ -106,11 +113,9 @@ export function EnterpriseLock({
 function lockActions({
   actions,
   size,
-  cloudAction,
 }: {
   actions: "license" | "plans" | "none";
   size: "xs" | "sm";
-  cloudAction?: ReactNode;
 }): ReactNode {
   if (actions === "license") {
     return (
@@ -126,11 +131,9 @@ function lockActions({
   }
   if (actions === "none") return null;
   return (
-    cloudAction ?? (
-      <Button asChild size={size} colorPalette="orange">
-        <Link href={PLANS_HREF}>See plans</Link>
-      </Button>
-    )
+    <Button asChild size={size} colorPalette="orange">
+      <Link href={PLANS_HREF}>See plans</Link>
+    </Button>
   );
 }
 
@@ -142,11 +145,9 @@ const LINE_LINKS = {
 
 function EnterpriseLockLine({
   copy,
-  isSaaS,
   testId,
 }: {
   copy: ReturnType<typeof enterpriseLockCopy>;
-  isSaaS: boolean;
   testId?: string;
 }) {
   const link = LINE_LINKS[copy.actions];
@@ -161,7 +162,7 @@ function EnterpriseLockLine({
           </Link>
         </Text>
       ) : (
-        <Text>{isSaaS ? ASK_ADMIN_TO_UPGRADE : ASK_ADMIN_TO_ACTIVATE}</Text>
+        copy.askAdmin && <Text>{copy.askAdmin}</Text>
       )}
     </HStack>
   );

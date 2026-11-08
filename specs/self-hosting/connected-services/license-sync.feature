@@ -198,6 +198,13 @@ Feature: License sync
     And when no sync has run yet, it reads "Not synced yet"
     And the License page shows the same line from the same reading
 
+  @unit
+  Scenario: A sync time that cannot be read reads as not synced
+    Given the last sync time is missing or cannot be parsed
+    When the sync line is written
+    Then it reads "Not synced yet"
+    And a failed last sync still leads with "Last sync failed."
+
   @integration
   Scenario: The sync line follows a refresh once its outcome is recorded
     Given a license that names a hosted service

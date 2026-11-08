@@ -48,6 +48,7 @@ export function ProvisioningTokens({
   mayManage: boolean;
 }) {
   const tokens = useScimTokens({ organizationId });
+  const mayActivateLicense = useScimHost().hasPermission("organization:manage");
   const { list, connections, labelFor, setTokenToRevoke, onGenerateOpen } = tokens;
 
   return (
@@ -76,7 +77,7 @@ export function ProvisioningTokens({
           <EnterpriseLock
             feature="Directory sync"
             description="Sync people and groups from your identity provider, so joiners and leavers are handled for you."
-            canManage={mayManage}
+            canManage={mayActivateLicense}
             data-testid="scim-enterprise-gate"
           />
         )}

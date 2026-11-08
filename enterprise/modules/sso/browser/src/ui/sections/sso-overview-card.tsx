@@ -66,7 +66,7 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
         <SingleSignOnPreviewCard
           state={connection?.state ?? null}
           canManage={canOffer}
-          canActivate={canManage}
+          canActivate={host.canManageOrganization()}
           enterpriseRequired={enterpriseRequired}
           updatePhase={view?.migration?.phase ?? null}
           goLiveBlockedBecause={
