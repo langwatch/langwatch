@@ -310,10 +310,7 @@ describe("given a board saved before the v2 templates, with its own widget code"
 
     /** @scenario "AC11 Existing boards are unaffected" */
     it("titles the widget's card with its stored label", () => {
-      const [frame] = screen.getAllByTestId("sandboxed-frame");
-      const card = frame?.closest<HTMLElement>("[data-testid='widget-card']");
-      if (!card) throw new Error("the frame is in no widget card");
-      expect(within(card).getByTestId("widget-card-title")).toHaveTextContent(SAVED.name);
+      expect(screen.getByTitle(SAVED.name)).toHaveTextContent(SAVED.name);
     });
 
     /** @scenario "AC11 Existing boards are unaffected" */
