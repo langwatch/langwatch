@@ -15,7 +15,8 @@ export const NOTHING_YET_AFTER_MS = 30_000;
 /** Who the login on this machine is, as the login recorded it. */
 export type SignedInPerson = { email?: string; name?: string; organization?: string };
 
-const nonEmpty = (value: string | undefined): string | undefined => {
+/** The value without surrounding spaces, or undefined when nothing is left. */
+export const nonEmpty = (value: string | undefined): string | undefined => {
   const trimmed = value?.trim();
   return trimmed === "" ? undefined : trimmed;
 };
@@ -45,21 +46,23 @@ const switchHint = (askedBy: string): string =>
 
 /** The line printed after a while with no request: who the login is, and how to switch. */
 export function nothingYetMessage({ person }: { person: SignedInPerson }): string[] {
-  const who = person.email ?? person.name;
-  const login = who
-    ? `${who}${person.organization ? ` at ${person.organization}` : ""}`
-    : "this login";
+  const who = person.email ?? person.name ?? "this login";
+  const login = `${who}${person.organization ? ` at ${person.organization}` : ""}`;
   return [
     `No Langy request has reached ${login} yet.`,
     "If you asked Langy from another account, stop this command (Ctrl+C), run `langwatch login --device` and approve as that account, then run this command again.",
   ];
 }
 
+/**
+ * `"switched"`: a sign-in replaced the login on this machine, whoever it landed on, so the caller
+ * reloads its credentials. The others leave the login as it was.
+ */
 export type AccountOutcome = "same" | "switched" | "kept" | "unknown";
 
 /**
  * Compares the login with `--as`. On a mismatch it says so and, on a terminal, offers the device
- * login there and then; a sign-in that fails, or lands on the same person, keeps the login.
+ * login there and then.
  */
 export async function matchAskerAccount({
   askedBy,
@@ -109,10 +112,20 @@ export async function matchAskerAccount({
     await signIn();
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
+    // The flow can save the new login and then fail on a later step; name what is saved.
+    const saved = person().email ?? current;
+    if (sameEmail({ left: saved, right: current })) {
+      print(
+        chalk.yellow(`Could not sign in as ${asker} (${reason}). Staying signed in as ${current}.`),
+      );
+      return "kept";
+    }
     print(
-      chalk.yellow(`Could not sign in as ${asker} (${reason}). Staying signed in as ${current}.`),
+      chalk.yellow(
+        `Could not finish signing in as ${asker} (${reason}). Now signed in as ${saved}.`,
+      ),
     );
-    return "kept";
+    return "switched";
   }
   const after = person().email ?? current;
   if (sameEmail({ left: after, right: asker })) return "switched";
@@ -121,5 +134,5 @@ export async function matchAskerAccount({
     chalk.yellow(`${changed ? "Now signed in as" : "Still signed in as"} ${after}, not ${asker}.`),
   );
   print(chalk.gray(switchHint(asker)));
-  return changed ? "switched" : "kept";
+  return "switched";
 }

@@ -28,7 +28,7 @@ describe("given a login on this machine as riley@acme.test", () => {
     endpoint: process.env.LANGWATCH_ENDPOINT,
   };
 
-  const writeLogin = ({ email, key }: { email: string; key: string }): void => {
+  const writeLogin = ({ email, key }: { email?: string; key: string }): void => {
     fs.writeFileSync(
       configPath,
       JSON.stringify({
@@ -37,7 +37,7 @@ describe("given a login on this machine as riley@acme.test", () => {
         access_token: "session-token",
         expires_at: Math.floor(Date.now() / 1000) + 3600,
         cli_api_key: key,
-        user: { id: `user_${email}`, email, name: email.split("@")[0] },
+        user: email ? { id: `user_${email}`, email, name: email.split("@")[0] } : { id: "user_1" },
         organization: { id: "org_1", slug: "acme", name: "ACME" },
       }),
     );
@@ -120,8 +120,53 @@ describe("given a login on this machine as riley@acme.test", () => {
         print,
       });
 
-      expect(outcome).toBe("kept");
+      expect(outcome).toBe("switched");
       expect(printed).toContain("Still signed in as riley@acme.test, not sam@acme.test.");
+      vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const credentials = await ensureSignedIn({ login: vi.fn() });
+      expect(credentials.apiKey).toBe("sk-lw-riley-key-2");
+    });
+
+    /** @scenario "A sign-in that lands on a third login names it and waits with it" */
+    it("names jo as the new login when the browser approved as jo", async () => {
+      const { ask } = answering(true);
+      const signIn = vi.fn(async () => {
+        writeLogin({ email: "jo@acme.test", key: "sk-lw-jo-key" });
+      });
+
+      const outcome = await matchAskerAccount({
+        askedBy: "sam@acme.test",
+        signIn,
+        ask,
+        interactive: true,
+        print,
+      });
+
+      expect(outcome).toBe("switched");
+      expect(printed).toContain("Now signed in as jo@acme.test, not sam@acme.test.");
+      expect(printed.join("\n")).toContain("approve as sam@acme.test");
+    });
+
+    /** @scenario "A sign-in that fails after saving a login names the saved login" */
+    it("names the saved login, and reloads it, when the sign-in fails after saving", async () => {
+      const { ask } = answering(true);
+      const signIn = vi.fn(async () => {
+        writeLogin({ email: "sam@acme.test", key: "sk-lw-sam-key" });
+        throw new Error("the bootstrap request failed");
+      });
+
+      const outcome = await matchAskerAccount({
+        askedBy: "sam@acme.test",
+        signIn,
+        ask,
+        interactive: true,
+        print,
+      });
+
+      expect(outcome).toBe("switched");
+      expect(printed).toContain(
+        "Could not finish signing in as sam@acme.test (the bootstrap request failed). Now signed in as sam@acme.test.",
+      );
     });
 
     it("keeps the login, with the reason, when the sign-in fails", async () => {
@@ -182,6 +227,31 @@ describe("given a login on this machine as riley@acme.test", () => {
       expect(outcome).toBe("same");
       expect(asked).toEqual([]);
       expect(printed).toEqual([]);
+    });
+  });
+
+  describe("when the login recorded no email", () => {
+    /** @scenario "A login that recorded no email asks nothing" */
+    it("asks nothing and prints nothing, since there is nothing to compare", async () => {
+      writeLogin({ key: "sk-lw-riley-key" });
+      const { ask, asked } = answering(true);
+      const signIn = vi.fn();
+
+      const outcome = await matchAskerAccount({
+        askedBy: "sam@acme.test",
+        signIn,
+        ask,
+        interactive: true,
+        print,
+      });
+
+      expect(outcome).toBe("unknown");
+      expect(asked).toEqual([]);
+      expect(signIn).not.toHaveBeenCalled();
+      expect(printed).toEqual([]);
+      expect(nothingYetMessage({ person: signedInPerson() })[0]).toBe(
+        "No Langy request has reached this login at ACME yet.",
+      );
     });
   });
 

@@ -25,7 +25,7 @@ import {
 } from "../../utils/apiKey";
 import { isLoggedIn, loadConfig } from "../../utils/governance/config";
 import { untrustedCertHint } from "../../utils/localDevCa";
-import { NOTHING_YET_AFTER_MS } from "./account";
+import { NOTHING_YET_AFTER_MS, nonEmpty } from "./account";
 import { askBox, createStdinKeySource, type BoxCard, type KeySource } from "./approval";
 import { LocalCallFailure } from "./errors";
 import { askedAgo, consoleWriter, noticeRows, terminalWidth, wrapWords, type UiWriter } from "./ui";
@@ -389,11 +389,6 @@ async function signInAgain({
  * organization, as the login recorded them. A request is answered on its own
  * project, so no project and no --project belong in this line.
  */
-const nonEmpty = (value: string | undefined): string | undefined => {
-  const trimmed = value?.trim();
-  return trimmed === "" ? undefined : trimmed;
-};
-
 export function loginLine(): string {
   let cfg: ReturnType<typeof loadConfig> | undefined;
   try {

@@ -197,7 +197,30 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       When I run "langwatch langy --share-control --as sam@acme.test" and answer yes
       And the browser approves the login as riley@acme.test again
       Then the CLI says it is still signed in as riley@acme.test
-      And keeps waiting with that login
+      And keeps waiting with the key that sign-in saved
+
+    @unit
+    Scenario: A sign-in that lands on a third login names it and waits with it
+      Given a device session on this machine as riley@acme.test
+      When I run "langwatch langy --share-control --as sam@acme.test" and answer yes
+      And the browser approves the login as jo@acme.test
+      Then the CLI prints "Now signed in as jo@acme.test, not sam@acme.test."
+      And keeps waiting with the login as jo@acme.test
+
+    @unit
+    Scenario: A sign-in that fails after saving a login names the saved login
+      Given a device session on this machine as riley@acme.test
+      When I run "langwatch langy --share-control --as sam@acme.test" and answer yes
+      And the sign-in saves a login as sam@acme.test and then fails
+      Then the CLI says it could not finish and is now signed in as sam@acme.test
+      And keeps waiting with the login as sam@acme.test
+
+    @unit
+    Scenario: A login that recorded no email asks nothing
+      Given a device session on this machine that recorded no email
+      When I run "langwatch langy --share-control --as sam@acme.test"
+      Then the CLI asks no question about the login
+      And the thirty-second notice is what names the login
 
     @unit
     Scenario: Keeping the other login keeps waiting

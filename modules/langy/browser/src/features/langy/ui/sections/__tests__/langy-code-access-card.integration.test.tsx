@@ -2,12 +2,19 @@
  * @vitest-environment jsdom
  * The code access card's four states (ADR-129): fixtures are
  * `langy.getLocalWorkspace` answers, not tool payloads. Boundary mocks:
- * tRPC hooks and the GitHub connect popup.
+ * tRPC hooks, the GitHub connect popup, the host and the browser clipboard.
  * @see specs/langy/langy-code-access.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  LangyHostApi,
+  LangyHostProvider,
+  type LangyHostUser,
+  type LangyRouteReading,
+} from "../../../../../model/langy-host.ts";
 
 const setPreference = vi.fn();
 const refetchWorkspace = vi.fn();
@@ -18,9 +25,9 @@ let githubInstallations: {
   installationId: string;
   accountLogin: string;
 }[] = [];
-let sessionUser: { id: string; email: string } | null = null;
+let sessionUser: LangyHostUser | undefined;
 let namesAskerFlag = false;
-const copiedValues: string[] = [];
+const writeText = vi.fn((_text: string) => Promise.resolve());
 
 vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: (token: { name: string }) => ({
@@ -29,13 +36,47 @@ vi.mock("@langwatch/feature-flag-client", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/auth-session.ts", () => ({
-  useSession: () => ({ data: sessionUser ? { user: sessionUser } : null }),
-}));
-
-vi.mock("@langwatch/design-system/use-copy-to-clipboard", () => ({
-  useCopyToClipboard: () => ({ copied: false, copy: (value: string) => copiedValues.push(value) }),
-}));
+/** The signed-in reader comes from the host, as the app supplies it. */
+class FakeLangyHost extends LangyHostApi {
+  project() {
+    return { id: "p_1", slug: "acme", name: "acme" };
+  }
+  organization() {
+    return { id: "org_1" };
+  }
+  team() {
+    return { id: "team_1" };
+  }
+  organizationRole() {
+    return "MEMBER";
+  }
+  currentUser() {
+    return sessionUser;
+  }
+  hasOrganizationPermission() {
+    return false;
+  }
+  hasPermission() {
+    return true;
+  }
+  isLoading() {
+    return false;
+  }
+  isDemoProject() {
+    return false;
+  }
+  route(): LangyRouteReading {
+    return { params: {}, query: {}, pathname: "/" };
+  }
+  setQuery() {}
+  navigate() {}
+  planManagementUrl() {
+    return undefined;
+  }
+  succeeded() {}
+  failed() {}
+}
+const host = new FakeLangyHost();
 
 vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -100,9 +141,10 @@ beforeEach(() => {
   refetchWorkspace.mockClear();
   renewRequest.mockClear();
   workspaceError = null;
-  sessionUser = null;
+  sessionUser = undefined;
   namesAskerFlag = false;
-  copiedValues.length = 0;
+  writeText.mockClear();
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
   githubInstallations = [{ installationId: "i1", accountLogin: "acme" }];
   // The local-folder pick persists per browser, so one test's click would
   // otherwise open the next test's card already waiting.
@@ -122,15 +164,17 @@ const ASKING = {
 function renderCard(over: Partial<Parameters<typeof LangyCodeAccessCard>[0]> = {}) {
   return render(
     <DesignSystemProvider forcedTheme="light">
-      <LangyCodeAccessCard
-        projectId="p_1"
-        conversationId="c_1"
-        callId="call-1"
-        organizationId="org_1"
-        onChoiceSelect={vi.fn()}
-        onAskAgain={vi.fn()}
-        {...over}
-      />
+      <LangyHostProvider value={host}>
+        <LangyCodeAccessCard
+          projectId="p_1"
+          conversationId="c_1"
+          callId="call-1"
+          organizationId="org_1"
+          onChoiceSelect={vi.fn()}
+          onAskAgain={vi.fn()}
+          {...over}
+        />
+      </LangyHostProvider>
     </DesignSystemProvider>,
   );
 }
@@ -230,7 +274,7 @@ describe("given no folder and nothing remembered", () => {
   });
 
   /** @scenario "The waiting card's command names who asked" */
-  it("names the signed-in person in the command it shows and copies", () => {
+  it("names the signed-in person in the command it shows and copies", async () => {
     workspaceData = {
       ...ASKING,
       requestState: "open",
@@ -243,8 +287,10 @@ describe("given no folder and nothing remembered", () => {
 
     const command = "npx langwatch@latest langy --share-control --as riley@acme.test";
     expect(screen.getByText(command)).toBeDefined();
-    fireEvent.click(screen.getByLabelText("Copy the command"));
-    expect(copiedValues).toEqual([command]);
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Copy the command"));
+    });
+    expect(writeText).toHaveBeenCalledWith(command);
   });
 
   // Until the CLI release that accepts --as is on npm, an older CLI refuses the option.
