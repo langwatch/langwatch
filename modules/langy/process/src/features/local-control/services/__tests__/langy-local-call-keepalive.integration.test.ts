@@ -42,6 +42,20 @@ let now = 1_752_600_100_000;
 
 const startedAt = (): number => now;
 
+/** The person who shared the folder, as the user module answers for them. */
+const someone = {
+  id: "user_1",
+  name: "Ada Lovelace",
+  email: "ada@example.com",
+  emailVerified: true,
+  image: null,
+  pendingSsoSetup: false,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  lastLoginAt: null,
+  deactivatedAt: null,
+};
+
 function workspace(conversationId: string) {
   return {
     conversationId,
@@ -141,7 +155,7 @@ afterAll(async () => {
 describe("given a command running on the developer's machine", () => {
   describe("when it takes longer than the turn stall window", () => {
     /** @scenario "A long command keeps its turn alive" */
-    it("keeps the turn live and says on the panel what is running", async () => {
+    it("keeps the turn live and says on the panel whose machine it runs on", async () => {
       const conversationId = "conv_alive";
       const turnId = "turn_alive";
       const acceptedAt = startedAt();
@@ -152,6 +166,7 @@ describe("given a command running on the developer's machine", () => {
         workspace: MemoryLangyLocalWorkspaceChannel.create(),
         presence,
         buffer,
+        people: { findById: async ({ id }) => ({ ...someone, id }) },
         now: () => now,
         offlineWaitMs: 0,
         pollIntervalMs: 1,
@@ -193,7 +208,7 @@ describe("given a command running on the developer's machine", () => {
         .map((read) => read.entry)
         .filter((entry) => entry.type === "status")
         .map((entry) => (entry as { status: string }).status);
-      expect(statuses[0]).toBe("Running on rogerio-mbp: uv run pytest -q");
+      expect(statuses[0]).toBe("Running on Ada's machine");
     });
   });
 

@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { LIVE_STREAM_KEEPALIVE_MS } from "@langwatch/langy-contract";
+import { createLogger } from "@langwatch/observability";
 
 import type { LangyLocalCallRepository } from "../../../repositories/langy-local-call.repository.ts";
 import type { LangyLocalPresenceRepository } from "../../../repositories/langy-local-presence.repository.ts";
@@ -9,12 +10,17 @@ import type {
   StoredLocalCall,
 } from "../../../rules/langy-local-call-record.rules.ts";
 import { LANGY_LIVENESS } from "../../../rules/langy-streaming-constants.rules.ts";
+import type { LangyActorUserReader } from "../../../services/langy-actor-session.service.ts";
+
+const logger = createLogger("langwatch:langy:local-control:keepalive");
 
 interface LocalCallKeepaliveOptions {
   calls: Pick<LangyLocalCallRepository, "claimKeepaliveWindow">;
   presence: Pick<LangyLocalPresenceRepository, "getByConversationId">;
   /** Absent where no turn buffer was composed: polling then keeps nothing alive. */
   buffer: LocalCallBuffer | null;
+  /** Names the person whose machine it is; absent, the line names the machine instead. */
+  people?: LangyActorUserReader;
   now: () => number;
 }
 
@@ -87,8 +93,22 @@ export class LocalCallKeepaliveService {
       turnId: call.turnId,
       status: callActivityLine({
         call,
-        machine: workspace?.hostname ?? "your machine",
+        personName: workspace ? await this.personName(workspace.userId) : null,
+        hostname: workspace?.hostname ?? null,
       }),
     });
+  }
+
+  /** A name that cannot be read only costs the line its name, never the keepalive. */
+  private async personName(userId: string): Promise<string | null> {
+    const people = this.options.people;
+    if (!people) {
+      return null;
+    }
+    const user = await people.findById({ id: userId }).catch((error: unknown) => {
+      logger.warn({ error, userId }, "could not read the name for the activity line");
+      return null;
+    });
+    return user?.name ?? null;
   }
 }
