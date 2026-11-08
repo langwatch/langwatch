@@ -4,7 +4,7 @@ import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 
 /**
  * A page open, against the opening person's own profile,
- * never the organization admin's.
+ * never the organization admin's. Any tracked page open is an app open.
  */
 export function appOpenedSignals({
   data,
@@ -23,6 +23,7 @@ export function appOpenedSignals({
     case "settings_subscription":
     case "governance_costs":
       return [
+        { kind: "app_opened", ...base },
         { kind: "usage_page_opened", ...base },
         { kind: "usage_page_viewed", ...base },
       ];
