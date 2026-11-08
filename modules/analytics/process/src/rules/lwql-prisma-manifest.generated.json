@@ -499,6 +499,43 @@
       ]
     },
     {
+      "name": "UserErasure",
+      "tableName": "UserErasure",
+      "documentation": "One row per erased account, holding only its creation time: no id, name or address. It keeps\nthe install's first-created account knowable after an erasure deletes that row.\nSpec: modules/user/specs/user.feature",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "accountCreatedAt",
+          "columnName": "accountCreatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "erasedAt",
+          "columnName": "erasedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "User",
       "tableName": "User",
       "documentation": "",

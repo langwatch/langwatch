@@ -190,7 +190,7 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
         kind: "data",
         mode: "background",
         description:
-          "Grants the platform-operator role to the active users a still-set ADMIN_EMAILS names, while nobody holds it: verified ones, or with no email configured an unverified one only if it is the install's first-created account.",
+          "Grants the platform-operator role to the verified users a still-set ADMIN_EMAILS names, while nobody holds it.",
         run: async ({ dryRun }) => {
           const granted = await app.seedPlatformOperatorsFromAdminEmails({ dryRun });
           return dryRun ? { wouldGrant: granted } : { granted };
