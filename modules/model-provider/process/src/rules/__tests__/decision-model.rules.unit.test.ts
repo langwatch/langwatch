@@ -5,7 +5,7 @@ import { decisionModelResolutionOf, picksOwnDecisionModel } from "../decision-mo
 const CLEF = "cloudflare/decisions:clef";
 
 describe("decisionModelResolutionOf", () => {
-  /** @scenario "An unset column runs on LangWatch Instant Preview" */
+  /** @scenario "An unset column runs on LangWatch Evals Preview" */
   it("answers langwatch when nothing is stored", () => {
     expect(decisionModelResolutionOf({ model: undefined, row: undefined })).toEqual({
       kind: "langwatch",
@@ -37,6 +37,7 @@ describe("decisionModelResolutionOf", () => {
       wire: "cloudflare_jev",
       providerModel: "clef",
       endpoint: "https://api.cloudflare.com/client/v4/accounts/acct%201/ai/run/@cf/cloudflare/clef",
+      authHeader: "bearer",
       apiKey: "token",
     });
   });
@@ -73,6 +74,78 @@ describe("decisionModelResolutionOf", () => {
     });
 
     expect(resolved).toMatchObject({ kind: "own_unavailable", reason: "key_missing" });
+  });
+  describe("given an Azure decision model", () => {
+    const AZURE_DECISIONS = "azure/decisions:gpt-6-luna";
+    const DECISION_1 = "azure/decisions:microsoft-decision-1";
+    const azureRow = (customKeys: Record<string, string>) => ({ enabled: true, customKeys });
+
+    /** @scenario "An Azure decision model is sent to the project's own Azure resource" */
+    it("builds the endpoint from the row's resource and sends the key as api-key", () => {
+      const resolved = decisionModelResolutionOf({
+        model: AZURE_DECISIONS,
+        row: azureRow({
+          AZURE_OPENAI_API_KEY: "azure-key",
+          AZURE_OPENAI_ENDPOINT: "https://Acme-East.openai.azure.com/",
+        }),
+      });
+
+      expect(resolved).toEqual({
+        kind: "own",
+        model: AZURE_DECISIONS,
+        wire: "openai_decisions",
+        providerModel: "gpt-6-luna",
+        endpoint: "https://acme-east.openai.azure.com/openai/v1/decisions",
+        authHeader: "api_key",
+        apiKey: "azure-key",
+      });
+    });
+
+    /** @scenario "An Azure decision model is sent to the project's own Azure resource" */
+    it("sends Microsoft Decision 1 to the same resource's Foundry host, under its deployment name", () => {
+      const resolved = decisionModelResolutionOf({
+        model: DECISION_1,
+        row: azureRow({
+          AZURE_OPENAI_API_KEY: "azure-key",
+          AZURE_OPENAI_ENDPOINT: "https://acme.cognitiveservices.azure.com",
+          AZURE_DECISION_1_DEPLOYMENT: "decider-prod",
+        }),
+      });
+
+      expect(resolved).toMatchObject({
+        kind: "own",
+        wire: "jev",
+        providerModel: "decider-prod",
+        endpoint: "https://acme.services.ai.azure.com/providers/microsoft/v1/systemone",
+        authHeader: "api_key",
+      });
+    });
+
+    /** @scenario "An Azure key is never sent to a host outside Azure" */
+    it.each([
+      ["a gateway in front of Azure", "https://llm-gateway.acme.example/openai"],
+      ["a lookalike domain", "https://acme.openai.azure.com.evil.example"],
+      ["plain http", "http://acme.openai.azure.com"],
+      ["a custom port", "https://acme.openai.azure.com:8443"],
+      ["credentials in the URL", "https://user@acme.openai.azure.com"],
+      ["not a URL", "acme"],
+    ])("answers endpoint_invalid for %s", (_, endpoint) => {
+      expect(
+        decisionModelResolutionOf({
+          model: AZURE_DECISIONS,
+          row: azureRow({ AZURE_OPENAI_API_KEY: "azure-key", AZURE_OPENAI_ENDPOINT: endpoint }),
+        }),
+      ).toEqual({ kind: "own_unavailable", model: AZURE_DECISIONS, reason: "endpoint_invalid" });
+    });
+
+    it("answers key_missing when the row has no endpoint", () => {
+      expect(
+        decisionModelResolutionOf({
+          model: AZURE_DECISIONS,
+          row: azureRow({ AZURE_OPENAI_API_KEY: "azure-key" }),
+        }),
+      ).toEqual({ kind: "own_unavailable", model: AZURE_DECISIONS, reason: "key_missing" });
+    });
   });
 });
 

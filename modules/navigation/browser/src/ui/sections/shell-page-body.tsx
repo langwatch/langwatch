@@ -263,6 +263,7 @@ export const ShellPageBody = ({
             <SeatLimitBanner
               message={usage.data.seatLimitInfo.message}
               isEnterprisePlan={usage.data.activePlan.type === "ENTERPRISE"}
+              isSaaS={deployment.isSaaS}
               planManagementHref={planManagementHref(deployment.isSaaS)}
             />
           )}

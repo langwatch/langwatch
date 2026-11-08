@@ -1,7 +1,7 @@
 /**
  * The Instant Evals column: which decision model a project runs on, and whether an organization
- * may store one on its own key (ADR-182 decisions 4 and 5). The answer is kept a minute per
- * project, so a page of rows or a busy monitor asks the scope chain once.
+ * may store one on its own key (ADR-182 decisions 4 and 5). Kept five seconds per project: a
+ * page of rows asks once, and a saved model or key judges the next run.
  * @see specs/model-providers/instant-evals-decision-model.feature
  */
 
@@ -14,32 +14,45 @@ import {
   isOwnDecisionModelId,
   LANGWATCH_DECISION_MODEL_ID,
   ModelDefaultValidationError,
+  ModelProviderInvalidError,
   type BuiltInModel,
   type DecisionModelEntry,
   type DecisionModelResolution,
+  type ModelDefaultScope,
   type ModelProvider,
 } from "@langwatch/model-provider-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import { decisionModelResolutionOf, picksOwnDecisionModel } from "../rules/decision-model.rules.ts";
+import {
+  decisionModelResolutionOf,
+  ownDecisionPicksToCheck,
+  picksOwnDecisionModel,
+} from "../rules/decision-model.rules.ts";
 import type { ModelProviderResolutionService } from "./model-provider-resolution.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 
 /** Whether the organization has the own-decision-model flag, asked of the organization only. */
 export type OwnDecisionModelGate = (input: { organizationId: string }) => Promise<boolean>;
 
+type RowLookup = (input: {
+  scope: ModelDefaultScope;
+  provider: string;
+}) => Promise<ModelProvider | null>;
+
 type DecisionModelOptions = Readonly<{
   resolution: Pick<ModelProviderResolutionService, "resolve">;
-  scopes: Pick<ModelProviderScopeService, "getProjectContext">;
+  scopes: Pick<ModelProviderScopeService, "getProjectContext" | "getOrganizationIdForScopes">;
   findProviderForProject: (input: {
     projectId: string;
     provider: string;
   }) => Promise<ModelProvider | null>;
+  /** The row a Default models scope runs on, from that scope up only. */
+  findProviderForScope: RowLookup;
   isOwnModelAllowed: OwnDecisionModelGate;
   now?: () => Instant;
 }>;
 
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 5_000;
 const MAX_CACHED_PROJECTS = 10_000;
 
 type CachedResolution = Readonly<{
@@ -144,22 +157,104 @@ export class ModelProviderDecisionModelService {
     return decisionModelResolutionOf({ model, row: row ?? undefined });
   }
 
-  /** Refuses a config that picks an own decision model for an organization without the flag. */
+  /** Decision models a config on these scopes may hold: own ones only if every scope runs them. */
+  async listPickableForScopes({
+    projectId,
+    scopes,
+  }: {
+    projectId: string;
+    scopes: readonly ModelDefaultScope[];
+  }): Promise<readonly BuiltInModel[]> {
+    const hosted = findDecisionModel(LANGWATCH_DECISION_MODEL_ID);
+    const pickable: BuiltInModel[] = hosted ? [choiceOf(hosted)] : [];
+    if (scopes.length === 0) return pickable;
+
+    const { organizationId } = await this.options.scopes.getProjectContext(projectId);
+    const scopesOrganizationId = await this.options.scopes.getOrganizationIdForScopes([...scopes]);
+    if (scopesOrganizationId !== organizationId) {
+      throw new ModelProviderInvalidError(
+        "Default scope does not belong to the project organization",
+      );
+    }
+    if (!(await this.options.isOwnModelAllowed({ organizationId }))) return pickable;
+
+    const rowFor = this.rowLookup();
+    for (const entry of DECISION_MODELS) {
+      if (!isOwnDecisionModelId(entry.id)) continue;
+      if (await this.runsFromEvery({ model: entry.id, scopes, rowFor })) {
+        pickable.push(choiceOf(entry));
+      }
+    }
+    return pickable;
+  }
+
+  /**
+   * Refuses a config that picks an own decision model without the flag, or on a scope that has
+   * no key it would run on. A value kept as it was is checked only on the scopes it gains.
+   */
   async assertMayStore({
     organizationId,
     config,
     stored,
+    scopes,
+    storedScopes,
   }: {
     organizationId: string;
     config: Readonly<Record<string, string>>;
     stored?: Readonly<Record<string, string>>;
+    scopes: readonly ModelDefaultScope[];
+    storedScopes?: readonly ModelDefaultScope[];
   }): Promise<void> {
-    if (!picksOwnDecisionModel({ config, stored: stored ?? {} })) return;
-    if (await this.options.isOwnModelAllowed({ organizationId })) return;
+    const picks = ownDecisionPicksToCheck({ config, stored, scopes, storedScopes });
+    if (picks.length === 0) return;
 
-    throw new ModelDefaultValidationError(
-      "Running Instant Evals on your own decision model is not enabled for this organization. Keep LangWatch Instant Preview, or ask LangWatch to enable it.",
-    );
+    const isOwnModelAllowed = await this.options.isOwnModelAllowed({ organizationId });
+    if (!isOwnModelAllowed && picksOwnDecisionModel({ config, stored: stored ?? {} })) {
+      throw new ModelDefaultValidationError(
+        "Running Instant Evals on your own decision model is not enabled for this organization. Keep Evals Preview, or ask LangWatch to enable it.",
+      );
+    }
+    if (!isOwnModelAllowed) return;
+
+    const rowFor = this.rowLookup();
+    for (const pick of picks) {
+      if (await this.runsFromEvery({ model: pick.model, scopes: pick.scopes, rowFor })) continue;
+      const label = findDecisionModel(pick.model)?.label ?? pick.model;
+      throw new ModelDefaultValidationError(
+        `${label} can't run for every scope of this config: at least one has no enabled key ` +
+          "for it. Add the key at that scope or above, or keep Evals Preview.",
+      );
+    }
+  }
+
+  private async runsFromEvery({
+    model,
+    scopes,
+    rowFor,
+  }: {
+    model: string;
+    scopes: readonly ModelDefaultScope[];
+    rowFor: RowLookup;
+  }): Promise<boolean> {
+    const provider = findDecisionModel(model)?.provider ?? "";
+    for (const scope of scopes) {
+      const row = await rowFor({ scope, provider });
+      if (decisionModelResolutionOf({ model, row: row ?? undefined }).kind !== "own") return false;
+    }
+    return true;
+  }
+
+  /** Reads each provider row once per scope, however many of its models are checked. */
+  private rowLookup(): RowLookup {
+    const rows = new Map<string, Promise<ModelProvider | null>>();
+    return ({ scope, provider }) => {
+      const key = `${scope.scopeType}:${scope.scopeId}:${provider}`;
+      const known = rows.get(key);
+      if (known) return known;
+      const row = this.options.findProviderForScope({ scope, provider });
+      rows.set(key, row);
+      return row;
+    };
   }
 
   private async storedModel(projectId: string): Promise<string | undefined> {

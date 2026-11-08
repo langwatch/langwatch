@@ -28,6 +28,7 @@ import {
   LicensingApi,
   licensingSecrets,
 } from "@langwatch/enterprise-licensing-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type {
   Event,
   RegisteredFoldProjection,
@@ -59,6 +60,7 @@ import {
   AdminSessionExpiredError,
   AdminSurfaceHiddenError,
   OpsApi,
+  type SeatSharingCheck,
   adminResourceNameSchema,
   type CheckupAnswer,
   CheckupNotSelfHostedError,
@@ -364,6 +366,7 @@ import { QueueAuditService } from "../services/queue-audit.service.ts";
 import { QueueService } from "../services/queue.service.ts";
 import { SchedulerAuditService } from "../services/scheduler-audit.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
+import { SeatSharingCheckService } from "../services/seat-sharing-check.service.ts";
 import { SignUpHealthService } from "../services/sign-up-health.service.ts";
 import {
   StorageStatsCollectionService,
@@ -731,6 +734,8 @@ type OpsRuntimeDependencies = Readonly<{
   anomalies: AnomalyDetectorService | undefined;
   /** The measurement `ops_storage_stats` runs; absent where a composition built none. */
   storageStats: StorageStatsCollectionService | undefined;
+  /** The daily check `ops_seat_sharing` runs; absent where a composition built none. */
+  seatSharing: SeatSharingCheckService | undefined;
   /** The stranded-group reap `ops_group_queue_reaper` and the operator action run. */
   groupQueueReaper: GroupQueueReaperService;
   /** The orphaned-organization rate; absent where a composition built none. */
@@ -793,6 +798,7 @@ export class OpsModule implements OpsApi {
     // The checkup and the usage report ask each owner for its own facts.
     organizations: OrganizationApi,
     licensing: LicensingApi,
+    entitlement: EntitlementApi,
     modelProviders: ModelProviderApi,
     datasets: DatasetApi,
     annotations: AnnotationApi,
@@ -910,6 +916,18 @@ export class OpsModule implements OpsApi {
       logger,
     });
 
+    const seatSharing = SeatSharingCheckService.create({
+      organizationIds: repositories.organizationTenants,
+      peers: {
+        plans: dependencies.entitlement,
+        organizations: dependencies.organizations,
+        sessions: dependencies.auth,
+        users: dependencies.users,
+      },
+      checks: repositories.seatSharingChecks,
+      now: () => nowInstant().epochMilliseconds,
+    });
+
     const isCloud = config.isSaas || cloudOps;
     const upgradeDiagnostics = UpgradeDiagnosticsService.create({
       ledger: repositories.upgradeLedger,
@@ -937,6 +955,7 @@ export class OpsModule implements OpsApi {
       checkup,
       anomalies,
       storageStats,
+      seatSharing,
       signUpHealth: SignUpHealthService.create({
         organizations: dependencies.organizations,
         identity: dependencies.identity,
@@ -967,6 +986,7 @@ export class OpsModule implements OpsApi {
     checkup?: OpsCheckupService;
     anomalies?: AnomalyDetectorService;
     storageStats?: StorageStatsCollectionService;
+    seatSharing?: SeatSharingCheckService;
     signUpHealth?: SignUpHealthService;
     platformOperators?: PlatformOperatorsService;
     upgradeAlerts?: UpgradeAlertsService;
@@ -1017,6 +1037,7 @@ export class OpsModule implements OpsApi {
       }),
       anomalies: setup.anomalies,
       storageStats: setup.storageStats,
+      seatSharing: setup.seatSharing,
       groupQueueReaper: GroupQueueReaperService.create({
         repository: repositories.groupQueueReaper,
         audit: QueueAuditService.create({ auditLog: dependencies.auditLog }),
@@ -2220,6 +2241,24 @@ export class OpsModule implements OpsApi {
     const { storageStats } = this.#dependencies;
     if (!storageStats) throw new OpsCapabilityUnavailableError("storage stats");
     return storageStats.collect();
+  }
+
+  /** The last seat sharing check, Cloud admin only; empty before the first one. */
+  async findSeatSharingChecks(): Promise<SeatSharingCheck[]> {
+    this.#refuseWithoutCloudOps();
+    return this.#seatSharing.findLast();
+  }
+
+  /** One pass of `ops_seat_sharing`; a deployment without Cloud admin checks nothing. */
+  async runSeatSharingCheck(): Promise<void> {
+    if (!this.#dependencies.cloudOps) return;
+    await this.#seatSharing.run();
+  }
+
+  get #seatSharing(): SeatSharingCheckService {
+    const { seatSharing } = this.#dependencies;
+    if (!seatSharing) throw new OpsCapabilityUnavailableError("the seat sharing check");
+    return seatSharing;
   }
 
   /** Deletes the queue groups stranded long enough that no dispatch still holds them. */

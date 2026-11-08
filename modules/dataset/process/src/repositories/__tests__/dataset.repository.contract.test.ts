@@ -280,6 +280,114 @@ function contractCases(backend: Backend): void {
 
       expect(remaining.records.map((record) => record.id)).toEqual(["delete-2"]);
     });
+
+    it("replaces every entry of the dataset with the ones it is given", async () => {
+      const dataset = await create("replaced");
+      const other = await create("kept");
+      const projectId = backend.mine();
+      await backend.records().createMany({
+        datasetId: dataset.id,
+        projectId,
+        entries: [{ id: "old-1", input: "one" }],
+      });
+      await backend.records().createMany({
+        datasetId: other.id,
+        projectId,
+        entries: [{ id: "other-1", input: "kept" }],
+      });
+
+      await backend.records().replaceAll({
+        datasetId: dataset.id,
+        projectId,
+        entries: [
+          { id: "new-1", input: "uno" },
+          { id: "new-2", input: "dos" },
+        ],
+      });
+
+      const ids = async (datasetId: string) =>
+        (await backend.records().listAll({ datasetId, projectId, page: 1, limit: 50 })).records.map(
+          (record) => record.id,
+        );
+      expect(await ids(dataset.id)).toEqual(["new-1", "new-2"]);
+      expect(await ids(other.id)).toEqual(["other-1"]);
+    });
+
+    /** @scenario "Restoring a version keeps the version's row order" */
+    it("keeps the given order of the entries, whatever their ids", async () => {
+      const dataset = await create("replaced-in-order");
+      const projectId = backend.mine();
+
+      await backend.records().replaceAll({
+        datasetId: dataset.id,
+        projectId,
+        entries: [
+          { id: "row-c", input: "first" },
+          { id: "row-a", input: "second" },
+          { id: "row-b", input: "third" },
+        ],
+      });
+
+      const page = await backend.records().listAll({
+        datasetId: dataset.id,
+        projectId,
+        page: 1,
+        limit: 50,
+      });
+      expect(page.records.map((record) => record.id)).toEqual(["row-c", "row-a", "row-b"]);
+    });
+
+    it("dates no replaced entry after the write, so an entry added next reads last", async () => {
+      const dataset = await create("replaced-then-added");
+      const projectId = backend.mine();
+      const entries = Array.from({ length: 1500 }, (_, index) => ({
+        id: `restored-${String(index).padStart(4, "0")}`,
+        input: `row ${index}`,
+      }));
+
+      await backend.records().replaceAll({ datasetId: dataset.id, projectId, entries });
+      await backend.records().createMany({
+        datasetId: dataset.id,
+        projectId,
+        entries: [{ id: "added-after", input: "new" }],
+      });
+
+      const page = await backend.records().listAll({
+        datasetId: dataset.id,
+        projectId,
+        page: 1,
+        limit: 1501,
+      });
+      expect(page.records.at(-1)?.id).toBe("added-after");
+      expect(page.records.at(0)?.id).toBe("restored-0000");
+    });
+
+    it("keeps the old entries when a later batch of the replacement fails", async () => {
+      const dataset = await create("replace-failed");
+      const projectId = backend.mine();
+      await backend.records().createMany({
+        datasetId: dataset.id,
+        projectId,
+        entries: [{ id: "kept-1", input: "one" }],
+      });
+      const entries = Array.from({ length: 600 }, (_, index) => ({
+        id: `batch-${index}`,
+        input: `row ${index}`,
+      }));
+      entries.push({ id: "batch-0", input: "a duplicate id in the second batch" });
+
+      await expect(
+        backend.records().replaceAll({ datasetId: dataset.id, projectId, entries }),
+      ).rejects.toBeInstanceOf(Error);
+
+      const remaining = await backend.records().listAll({
+        datasetId: dataset.id,
+        projectId,
+        page: 1,
+        limit: 50,
+      });
+      expect(remaining.records.map((record) => record.id)).toEqual(["kept-1"]);
+    });
   });
 
   describe("when a storage migration pages the project's datasets", () => {
@@ -297,6 +405,7 @@ function contractCases(backend: Backend): void {
         archivedAt: nowInstant(),
       });
       await add("inventory-theirs", backend.theirs());
+      // Id order is the store's collation (Postgres orders "La" before "LZ"), so compare as a set.
       const ids = [kept.id, archived.id].toSorted();
 
       const first = await backend
@@ -308,9 +417,12 @@ function contractCases(backend: Backend): void {
         limit: 5,
       });
 
-      expect([...first, ...second].map((entry) => entry.id)).toEqual(ids);
-      expect(first[0]).toEqual({
-        id: ids[0],
+      const paged = [...first, ...second].map((entry) => entry.id);
+      expect(paged.toSorted()).toEqual(ids);
+      expect(first).toHaveLength(1);
+      expect(second.map((entry) => entry.id)).not.toContain(first[0]?.id);
+      expect([...first, ...second].find((entry) => entry.id === kept.id)).toEqual({
+        id: kept.id,
         projectId: backend.mine(),
         contentLayout: "postgres",
         status: "ready",

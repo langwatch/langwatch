@@ -47,12 +47,14 @@ export function BoardWidgetCard({
   dashboardId,
   boardName,
   period,
+  periodKey,
   isWriting,
   langy,
   onEdit,
   onDuplicate,
   onDelete,
   onEmptyChange,
+  onLimitFailureChange,
 }: {
   widget: BoardWidget;
   projectId: string;
@@ -61,6 +63,8 @@ export function BoardWidgetCard({
   /** The board's name, which an exported file is named for. */
   boardName: string;
   period: BoardPeriod;
+  /** The reader's chosen period, such as "1h:auto"; only a new choice restarts the widget. */
+  periodKey: string;
   isWriting: boolean;
   langy?: WidgetCardLangy;
   /**
@@ -72,6 +76,8 @@ export function BoardWidgetCard({
   onDelete?: () => void;
   /** Told whether the card shows none of the widget's data. */
   onEmptyChange?: (empty: boolean) => void;
+  /** Told whether the card's final failure is a resource limit. */
+  onLimitFailureChange?: (limited: boolean) => void;
 }) {
   const host = useAnalyticsHost();
   const readable = useReadableProjects({ projectId: host.project()?.id ?? "" });
@@ -149,10 +155,20 @@ export function BoardWidgetCard({
           maxHeight={widgetBodyHeightPx(widget.placement.rowSpan)}
           timeWindow={timeWindow}
           granularitySeconds={granularitySeconds}
+          periodKey={periodKey}
           onFaceChange={setFace}
+          limitAudience={{
+            kind: "editable",
+            editsDisabled: isWriting,
+            ...(langyOnData && onEdit
+              ? { onEditWithLangy: () => onEdit({ withLangy: true }) }
+              : {}),
+            ...(canEditCode && onEdit ? { onEditCode: () => onEdit({ withLangy: false }) } : {}),
+          }}
           onLimitsChange={setLimits}
           onExportChange={csvExport.onExportChange}
           onEmptyChange={onEmptyChange}
+          onLimitFailureChange={onLimitFailureChange}
           {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
         />
       )}

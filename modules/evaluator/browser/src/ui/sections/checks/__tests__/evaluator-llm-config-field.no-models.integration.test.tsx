@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The judge's picker offers Instant Evals only when the server releases the project, whatever
- * the flag says; the stand-in for the lent picker lists exactly the options this field hands it.
+ * The picker offers Instant Evals only when the server releases LangWatch's model, and own
+ * decision models either way; the stand-in picker lists exactly the options it is handed.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
@@ -13,11 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const OWN_DECISION_MODEL = {
   value: "openai/decisions:gpt-6-luna",
-  label: "OpenAI Decisions (gpt-6-luna)",
+  label: "gpt-6-luna",
 };
 const HOSTED_DECISION_MODEL = {
   value: "langwatch/instant-evals",
-  label: "LangWatch Instant Preview",
+  label: "Evals Preview",
 };
 
 const state = vi.hoisted(() => ({
@@ -55,7 +55,7 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => ({
     instantEval: {
       access: {
         useQuery: () => ({
-          data: { released: state.released, offer: "enable" },
+          data: { released: state.released, hostedReleased: state.released, offer: "enable" },
           isLoading: false,
         }),
       },
@@ -176,12 +176,12 @@ describe("EvaluatorLLMConfigField", () => {
     });
 
     describe("when the server does not release Instant Evals but answers with an own model", () => {
-      /** @scenario "The picker offers nothing of its own when Instant Evals are not released" */
-      it("offers neither Instant Evals nor the own decision model", () => {
+      /** @scenario "The picker offers own decision models when Instant Evals are not released" */
+      it("offers the own decision model but not Instant Evals", () => {
         state.decisionModels = [HOSTED_DECISION_MODEL, OWN_DECISION_MODEL];
         renderField();
 
-        expect(offeredLabels()).toEqual([]);
+        expect(offeredLabels()).toEqual([OWN_DECISION_MODEL.label]);
       });
     });
   });

@@ -41,6 +41,14 @@ const experimentWorkflowEvaluateSchemaDefinition = z
       .string()
       .optional()
       .describe("Platform dataset id to evaluate; mutually exclusive with data"),
+    dataset_version: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        "Version of the saved dataset to evaluate (dataset_id, else the workflow's attached dataset); defaults to its current content",
+      ),
     parameters: z
       .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
       .optional()
@@ -53,6 +61,10 @@ const experimentWorkflowEvaluateSchemaDefinition = z
   .refine((body) => !(body.data && body.dataset_id), {
     message: "Pass either data or a dataset_id, not both",
     path: ["data"],
+  })
+  .refine((body) => !(body.data && body.dataset_version !== undefined), {
+    message: "A dataset_version names a saved dataset's version; it cannot go with inline data",
+    path: ["dataset_version"],
   });
 export interface ExperimentWorkflowEvaluateSchema extends Named<
   typeof experimentWorkflowEvaluateSchemaDefinition

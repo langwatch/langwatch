@@ -1,6 +1,6 @@
 /**
- * An own decision model over HTTP: one POST per text with the organization's key, to the fixed
- * endpoint the catalogue names (ADR-182 decisions 8 and 9). The provider's own error text is
+ * An own decision model over HTTP: one POST per text with the organization's key, to the
+ * endpoint the catalogue builds (ADR-182 decisions 5, 8 and 9). The provider's own error text is
  * never read into a result or a log; only the status is.
  */
 
@@ -22,6 +22,7 @@ import {
   parseDecisionResponse,
 } from "../../rules/instant-eval-decision-wire.rules.ts";
 import type {
+  InstantEvalDecisionModelAnswer,
   InstantEvalDecisionModelChannel,
   InstantEvalDecisionModelRequest,
 } from "../instant-eval-decision-model.channel.ts";
@@ -60,7 +61,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
   async classify(
     { text, questions, decisionModel, isBilledToLangWatch }: InstantEvalDecisionModelRequest,
     signal?: AbortSignal,
-  ): Promise<InstantEvalJudgement> {
+  ): Promise<InstantEvalDecisionModelAnswer> {
     const limits = INSTANT_EVAL_CLASSIFIER_LIMITS;
     const budgetTokens = instantEvalTextBudget({ questions, limits });
     if (budgetTokens === 0) return instantEvalSkipped("classifier_input_too_large");
@@ -78,8 +79,9 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       const sent = await this.send({
         endpoint: decisionModel.endpoint,
-        apiKey: decisionModel.apiKey,
+        authorization: authorizationHeaderOf(decisionModel),
         body,
+        isOwnModel: !isBilledToLangWatch,
         signal,
       });
       if (sent.kind === "answered") {
@@ -92,6 +94,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
         return {
           verdicts: readClassifierVerdicts({ questions, response }),
           ...billedTokensOf({ isBilledToLangWatch, response }),
+          ...ownKeyUsageOf({ isBilledToLangWatch, response }),
           isTextTruncated: prepared.isTruncated,
         };
       }
@@ -111,13 +114,15 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
 
   private async send({
     endpoint,
-    apiKey,
+    authorization,
     body,
+    isOwnModel,
     signal,
   }: {
     endpoint: string;
-    apiKey: string;
+    authorization: Readonly<Record<string, string>>;
     body: string;
+    isOwnModel: boolean;
     signal: AbortSignal | undefined;
   }): Promise<
     | Readonly<{ kind: "answered"; body: unknown }>
@@ -132,7 +137,9 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
     try {
       const response = await undiciFetch(endpoint, {
         method: "POST",
-        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+        // A redirect would carry the key to another host; undici keeps `api-key` cross-origin.
+        redirect: "error",
+        headers: { ...authorization, "content-type": "application/json" },
         body,
         signal: requestSignal(signal),
         ...(this.dispatcher ? { dispatcher: this.dispatcher } : {}),
@@ -145,7 +152,7 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
       return {
         kind: "failed",
         status: response.status,
-        failure: decisionFailureOf({ status: response.status }),
+        failure: decisionFailureOf({ status: response.status, isOwnModel }),
         retryAfter: response.headers.get("retry-after"),
       };
     } catch (error) {
@@ -168,6 +175,14 @@ export class HttpInstantEvalDecisionModelChannel implements InstantEvalDecisionM
   }
 }
 
+/** Azure takes its key in `api-key`; every other provider takes a bearer token. */
+function authorizationHeaderOf({
+  authHeader,
+  apiKey,
+}: InstantEvalDecisionModelRequest["decisionModel"]): Readonly<Record<string, string>> {
+  return authHeader === "api_key" ? { "api-key": apiKey } : { authorization: `Bearer ${apiKey}` };
+}
+
 /**
  * An own model bills the organization, so LangWatch bills nothing for it (ADR-182). A send billed
  * to LangWatch carries every token the provider reports, input and output alike.
@@ -185,6 +200,20 @@ function billedTokensOf({
     inputTokens: response.usage?.input_tokens ?? 0,
     ...(outputTokens === undefined ? {} : { outputTokens }),
   };
+}
+
+/** The provider's tokens on the organization's own key, for the ledger; never on LangWatch's. */
+function ownKeyUsageOf({
+  isBilledToLangWatch,
+  response,
+}: {
+  isBilledToLangWatch: boolean | undefined;
+  response: { usage?: { input_tokens?: number; output_tokens?: number } | undefined };
+}): Pick<InstantEvalDecisionModelAnswer, "providerUsage"> {
+  if (isBilledToLangWatch || !response.usage) return {};
+  const { input_tokens: inputTokens = 0, output_tokens: outputTokens = 0 } = response.usage;
+  if (inputTokens === 0 && outputTokens === 0) return {};
+  return { providerUsage: { inputTokens, outputTokens } };
 }
 
 function waitMs({ attempt, retryAfter }: { attempt: number; retryAfter: string | null }): number {

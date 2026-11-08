@@ -6,8 +6,10 @@ import { useEffect, useState } from "react";
 
 import { isSameOrigin, signIn, useSession } from "../../behavior/auth-client.tsx";
 import { hardNavigate } from "../../behavior/browser-navigation.ts";
+import { UI_SIGN_OUT_PATH } from "../../behavior/ui-session-client.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
+import { describeProviderRefusal, SEAT_LIMIT_REFUSAL } from "../../model/refused-sign-in-copy.ts";
 import {
   bounceConnectionFrom,
   cutoverSignInRefusal,
@@ -17,13 +19,6 @@ import { AuthCard } from "../elements/auth-card.tsx";
 import { FrontDoorLinkButton } from "../elements/front-door-link-button.tsx";
 import { FRONT_DOOR_PRIMARY_STYLE } from "../elements/front-door-primary-button.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
-
-/**
- * Server route that clears the app session and, on Auth0 deployments, federates to Auth0
- * `/v2/logout` to clear the identity-provider session too (see logoutHandler in
- * server/routes/auth.ts). Other providers just clear the app session and return to sign-in.
- */
-export const FEDERATED_LOGOUT_PATH = "/api/auth/logout";
 
 /**
  * The registry's words for a code the boundary admits, when it holds any. Gated on the admitted
@@ -52,7 +47,7 @@ function admittedCopyFor(code: string): { title: string; description: string } |
  * never itself: `?error=` is caller-controlled, and echoing it made this
  * heading a place to put attacker-chosen words under LangWatch branding.
  */
-const errorTitle = (error: string): string => {
+const errorTitle = (error: string, idp: string | null): string => {
   switch (error) {
     case "OAuthAccountNotLinked":
       return "Account already exists";
@@ -66,7 +61,9 @@ const errorTitle = (error: string): string => {
     case "state_mismatch":
       return "Your sign-in expired";
     case "access_denied":
-      return "Sign-in was refused";
+      return describeProviderRefusal(idp).title;
+    case "seat_limit_reached":
+      return SEAT_LIMIT_REFUSAL.title;
     default:
       return (
         cutoverSignInRefusal(error)?.title ??
@@ -198,10 +195,12 @@ function SignInErrorDescription({
   error,
   callbackUrl,
   governingConnection,
+  idp,
 }: {
   error: string;
   callbackUrl: string | undefined;
   governingConnection: string | null;
+  idp: string | null;
 }) {
   if (governingConnection) {
     return (
@@ -218,7 +217,7 @@ function SignInErrorDescription({
           Continue with your organization&apos;s sign-in
         </Button>
         <FrontDoorLinkButton
-          href={FEDERATED_LOGOUT_PATH}
+          href={UI_SIGN_OUT_PATH}
           label="Sign out and try again"
           tone="secondary"
         />
@@ -238,7 +237,7 @@ function SignInErrorDescription({
           login.
         </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <a href={FEDERATED_LOGOUT_PATH}>Sign out and try again</a>
+          <a href={UI_SIGN_OUT_PATH}>Sign out and try again</a>
         </Button>
       </VStack>
     );
@@ -265,8 +264,12 @@ function SignInErrorDescription({
           Your organization requires single sign-on. Sign out and sign in again by entering your
           company email address, then choose your organization's login.
         </Text>
+        <Text textStyle="bodySm" color="fg.muted">
+          If your company&apos;s sign-in turns you away, your company may not have given you access
+          to LangWatch yet. Ask your IT administrator to check.
+        </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <a href={FEDERATED_LOGOUT_PATH}>Sign out and try again</a>
+          <a href={UI_SIGN_OUT_PATH}>Sign out and try again</a>
         </Button>
       </VStack>
     );
@@ -280,7 +283,7 @@ function SignInErrorDescription({
           provider.
         </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <a href={FEDERATED_LOGOUT_PATH}>Sign out</a>
+          <a href={UI_SIGN_OUT_PATH}>Sign out</a>
         </Button>
       </VStack>
     );
@@ -298,7 +301,7 @@ function SignInErrorDescription({
           meantime, sign in with a method you have used before.
         </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <a href={FEDERATED_LOGOUT_PATH}>Sign out and try again</a>
+          <a href={UI_SIGN_OUT_PATH}>Sign out and try again</a>
         </Button>
       </VStack>
     );
@@ -322,10 +325,21 @@ function SignInErrorDescription({
   if (error === "access_denied") {
     return (
       <VStack gap={4} align="stretch">
-        <Text>
-          The sign-in was cancelled, or your identity provider refused it. If you sign in through
-          your company, ask your IT administrator to give you access to the LangWatch app.
+        <Text>{describeProviderRefusal(idp).body}</Text>
+        <Text textStyle="bodySm" color="fg.muted">
+          If you cancelled the sign-in yourself, go back and try again.
         </Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <Link href="/auth/signin">Back to sign in</Link>
+        </Button>
+      </VStack>
+    );
+  }
+
+  if (error === "seat_limit_reached") {
+    return (
+      <VStack gap={4} align="stretch">
+        <Text>{SEAT_LIMIT_REFUSAL.body}</Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
           <Link href="/auth/signin">Back to sign in</Link>
         </Button>
@@ -352,7 +366,7 @@ function SignInErrorDescription({
       <VStack gap={4} align="stretch">
         <Text>{admitted.description}</Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
-          <a href={FEDERATED_LOGOUT_PATH}>Sign out and try again</a>
+          <a href={UI_SIGN_OUT_PATH}>Sign out and try again</a>
         </Button>
       </VStack>
     );
@@ -382,13 +396,15 @@ export function SignInError({ error: rawError }: { error: string }) {
   });
   // The handle on a cause we deliberately did not name, so the person has something to quote.
   const trace = query?.get("trace") ?? null;
+  const idp = query?.get("idp") ?? null;
 
   return (
-    <AuthCard title={errorTitle(error)}>
+    <AuthCard title={errorTitle(error, idp)}>
       <SignInErrorDescription
         error={error}
         callbackUrl={callbackUrl}
         governingConnection={governingConnection}
+        idp={idp}
       />
       {trace && (
         <Text textStyle="monoSm" color="fg.subtle" data-testid="sign-in-error-trace">

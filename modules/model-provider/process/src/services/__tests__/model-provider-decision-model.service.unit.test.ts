@@ -65,6 +65,8 @@ function harness({
   isFlagOn = true,
   row = openAiRow(),
   rowsByProvider,
+  rowsByScope = {},
+  scopesOrganizationId = "org_1",
 }: {
   /** The column value, or the error resolving it throws. */
   stored: string | Error;
@@ -72,6 +74,10 @@ function harness({
   row?: ModelProvider | null;
   /** When given, answers per provider instead of the one `row`; an absent provider has no row. */
   rowsByProvider?: Readonly<Record<string, ModelProvider>>;
+  /** What each Default models scope's own chain holds, keyed `TYPE:id`, then by provider. */
+  rowsByScope?: Readonly<Record<string, Readonly<Record<string, ModelProvider>>>>;
+  /** The organization the asked scopes belong to. */
+  scopesOrganizationId?: string;
 }) {
   const lookups: string[] = [];
   const providerLookups: string[] = [];
@@ -92,10 +98,15 @@ function harness({
         organizationId: "org_1",
         organizationName: "Org",
       }),
+      getOrganizationIdForScopes: async () => scopesOrganizationId,
     },
     findProviderForProject: async ({ provider }) => {
       providerLookups.push(provider);
       return rowsByProvider ? (rowsByProvider[provider] ?? null) : row;
+    },
+    findProviderForScope: async ({ scope, provider }) => {
+      providerLookups.push(`${scope.scopeType}:${scope.scopeId}:${provider}`);
+      return rowsByScope[`${scope.scopeType}:${scope.scopeId}`]?.[provider] ?? null;
     },
     isOwnModelAllowed: async () => isFlagOn,
     now: () => Temporal.Instant.fromEpochMilliseconds(nowMs),
@@ -122,7 +133,7 @@ function rowOf({
 
 describe("ModelProviderDecisionModelService.resolve", () => {
   describe("when the column is unset", () => {
-    /** @scenario "An unset column runs on LangWatch Instant Preview" */
+    /** @scenario "An unset column runs on LangWatch Evals Preview" */
     it("answers langwatch", async () => {
       const { service } = harness({
         stored: new ModelNotConfiguredError({ ...UNSET_ERROR.feature, ...UNSET_ERROR.rest }),
@@ -211,11 +222,22 @@ describe("ModelProviderDecisionModelService.resolve", () => {
       expect(lookups).toEqual(["proj_1"]);
     });
 
-    it("asks again once the minute has passed", async () => {
+    it("answers from the first lookup within five seconds", async () => {
       const { service, lookups, advance } = harness({ stored: OPENAI_DECISIONS });
 
       await service.resolve({ projectId: "proj_1" });
-      advance(60_001);
+      advance(4_999);
+      await service.resolve({ projectId: "proj_1" });
+
+      expect(lookups).toEqual(["proj_1"]);
+    });
+
+    /** @scenario "A saved decision model or key judges the next run" */
+    it("asks again once five seconds have passed", async () => {
+      const { service, lookups, advance } = harness({ stored: OPENAI_DECISIONS });
+
+      await service.resolve({ projectId: "proj_1" });
+      advance(5_001);
       await service.resolve({ projectId: "proj_1" });
 
       expect(lookups).toEqual(["proj_1", "proj_1"]);
@@ -260,7 +282,7 @@ describe("ModelProviderDecisionModelService.resolve", () => {
       });
     });
 
-    /** @scenario "A caller picking LangWatch Instant Preview runs on the hosted model" */
+    /** @scenario "A caller picking LangWatch Evals Preview runs on the hosted model" */
     it("answers langwatch for the hosted id, whatever the column holds", async () => {
       const { service, providerLookups } = harness({ stored: OPENAI_DECISIONS });
 
@@ -294,12 +316,12 @@ describe("ModelProviderDecisionModelService.resolve", () => {
 });
 
 describe("ModelProviderDecisionModelService.listPickable", () => {
-  /** @scenario "With the flag off only LangWatch Instant Preview is offered" */
+  /** @scenario "With the flag off only LangWatch Evals Preview is offered" */
   it("offers the hosted model alone when the flag is off", async () => {
     const { service } = harness({ stored: OPENAI_DECISIONS, isFlagOn: false });
 
     expect(await service.listPickable({ projectId: "proj_1" })).toEqual([
-      { value: LANGWATCH_DECISION_MODEL_ID, label: "LangWatch Instant Preview" },
+      { value: LANGWATCH_DECISION_MODEL_ID, label: "Evals Preview" },
     ]);
   });
 
@@ -318,7 +340,7 @@ describe("ModelProviderDecisionModelService.listPickable", () => {
       LANGWATCH_DECISION_MODEL_ID,
       OPENAI_DECISIONS,
     ]);
-    expect(offered[1]?.label).toBe("OpenAI Decisions (gpt-6-luna)");
+    expect(offered[1]?.label).toBe("OpenAI Decisions");
   });
 
   /** @scenario "A provider is asked for once however many of its models the catalogue holds" */
@@ -338,5 +360,88 @@ describe("ModelProviderDecisionModelService.listPickable", () => {
       "perplexity/decisions:pplx-decider-flash-v1.2",
     ]);
     expect(providerLookups.filter((provider) => provider === "perplexity")).toEqual(["perplexity"]);
+  });
+});
+
+describe("ModelProviderDecisionModelService.listPickableForScopes", () => {
+  const PROJECT_A = { scopeType: "PROJECT" as const, scopeId: "proj_a" };
+  const PROJECT_B = { scopeType: "PROJECT" as const, scopeId: "proj_b" };
+  const ORGANIZATION = { scopeType: "ORGANIZATION" as const, scopeId: "org_1" };
+  const OPENAI_ON_A = {
+    "PROJECT:proj_a": {
+      openai: rowOf({ provider: "openai", customKeys: { OPENAI_API_KEY: "k" } }),
+    },
+  };
+
+  /** @scenario "A config row offers the models its own scope runs, not the page's project" */
+  it("offers a model the edited project's keys run while the page is on another project", async () => {
+    const { service } = harness({ stored: OPENAI_DECISIONS, row: null, rowsByScope: OPENAI_ON_A });
+
+    const offered = await service.listPickableForScopes({
+      projectId: "proj_c",
+      scopes: [PROJECT_A],
+    });
+
+    expect(offered.map((model) => model.value)).toEqual([
+      LANGWATCH_DECISION_MODEL_ID,
+      OPENAI_DECISIONS,
+    ]);
+  });
+
+  /** @scenario "An organization row is not offered a key only one project holds" */
+  it("offers the organization only LangWatch when the key sits on one project", async () => {
+    const { service } = harness({ stored: OPENAI_DECISIONS, rowsByScope: OPENAI_ON_A });
+
+    const offered = await service.listPickableForScopes({
+      projectId: "proj_a",
+      scopes: [ORGANIZATION],
+    });
+
+    expect(offered.map((model) => model.value)).toEqual([LANGWATCH_DECISION_MODEL_ID]);
+  });
+
+  /** @scenario "A config on several scopes is offered only what every scope runs" */
+  it("drops a model one of the picked scopes cannot run", async () => {
+    const { service } = harness({ stored: OPENAI_DECISIONS, rowsByScope: OPENAI_ON_A });
+
+    const offered = await service.listPickableForScopes({
+      projectId: "proj_a",
+      scopes: [PROJECT_A, PROJECT_B],
+    });
+
+    expect(offered.map((model) => model.value)).toEqual([LANGWATCH_DECISION_MODEL_ID]);
+  });
+
+  /** @scenario "Scopes from another organization are refused" */
+  it("refuses scopes of another organization", async () => {
+    const { service } = harness({ stored: OPENAI_DECISIONS, scopesOrganizationId: "org_2" });
+
+    await expect(
+      service.listPickableForScopes({ projectId: "proj_a", scopes: [PROJECT_A] }),
+    ).rejects.toMatchObject({ code: "model_provider_invalid" });
+  });
+
+  it("offers only LangWatch with the flag off, without reading a row", async () => {
+    const { service, providerLookups } = harness({
+      stored: OPENAI_DECISIONS,
+      isFlagOn: false,
+      rowsByScope: OPENAI_ON_A,
+    });
+
+    const offered = await service.listPickableForScopes({
+      projectId: "proj_a",
+      scopes: [PROJECT_A],
+    });
+
+    expect(offered.map((model) => model.value)).toEqual([LANGWATCH_DECISION_MODEL_ID]);
+    expect(providerLookups).toEqual([]);
+  });
+
+  it("reads each provider once per scope", async () => {
+    const { service, providerLookups } = harness({ stored: OPENAI_DECISIONS, rowsByScope: {} });
+
+    await service.listPickableForScopes({ projectId: "proj_a", scopes: [PROJECT_A] });
+
+    expect(providerLookups.length).toBe(new Set(providerLookups).size);
   });
 });

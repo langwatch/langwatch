@@ -79,9 +79,14 @@ export class ClickHouseTraceClusteringSampleRepository extends TraceClusteringSa
   async findPageRows(input: {
     tenantId: string;
     windowStartMs: number;
+    windowEndMs?: number;
     unassignedFrom?: { topicIds: readonly string[]; subtopicIds: readonly string[] };
     searchAfter?: readonly [number, string];
   }): Promise<TraceClusteringSampleRow[]> {
+    const windowEnd =
+      input.windowEndMs === undefined
+        ? "now64(3)"
+        : "fromUnixTimestamp64Milli({fetchWindowEndMs:UInt64})";
     const topicIds = input.unassignedFrom?.topicIds ?? [];
     const subtopicIds = input.unassignedFrom?.subtopicIds ?? [];
     const pageHaving: string[] = [];
@@ -119,7 +124,7 @@ export class ClickHouseTraceClusteringSampleRepository extends TraceClusteringSa
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
             AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
-            AND OccurredAt < now64(3)
+            AND OccurredAt < ${windowEnd}
           GROUP BY TenantId, TraceId
           ${pageHavingClause}
           ORDER BY argMax(OccurredAt, UpdatedAt) DESC, TraceId ASC
@@ -134,13 +139,13 @@ export class ClickHouseTraceClusteringSampleRepository extends TraceClusteringSa
         FROM trace_summaries t
         WHERE TenantId = {tenantId:String}
           AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
-          AND OccurredAt < now64(3)
+          AND OccurredAt < ${windowEnd}
           AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
             WHERE TenantId = {tenantId:String}
               AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
-              AND OccurredAt < now64(3)
+              AND OccurredAt < ${windowEnd}
               AND TraceId IN (SELECT TraceId FROM page)
             GROUP BY TenantId, TraceId
           )
@@ -148,6 +153,7 @@ export class ClickHouseTraceClusteringSampleRepository extends TraceClusteringSa
       query_params: {
         tenantId: input.tenantId,
         fetchWindowStartMs: input.windowStartMs,
+        ...(input.windowEndMs === undefined ? {} : { fetchWindowEndMs: input.windowEndMs }),
         topicIds: topicIds.length > 0 ? [...topicIds] : ["__none__"],
         subtopicIds: subtopicIds.length > 0 ? [...subtopicIds] : ["__none__"],
         ...(input.searchAfter

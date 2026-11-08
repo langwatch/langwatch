@@ -235,7 +235,7 @@ describe("getAgentCommand()", () => {
 
       await getAgentCommand("agent_abc123");
 
-      expect(mockGet).toHaveBeenCalledWith("agent_abc123");
+      expect(mockGet).toHaveBeenCalledWith("agent_abc123", {});
     });
   });
 

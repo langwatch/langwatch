@@ -33,6 +33,22 @@ export interface ApiKeyTrpcOrganizationScopeSchema extends Named<
 export const apiKeyTrpcOrganizationScopeSchema: ApiKeyTrpcOrganizationScopeSchema =
   apiKeyTrpcOrganizationScopeSchemaDefinition;
 
+const apiKeyTrpcGrantableInputSchemaDefinition = z.object({
+  organizationId: z.string(),
+  scopes: z
+    .object({ scopeType: apiKeyScopeTypeSchema, scopeId: z.string().min(1) })
+    .array()
+    .min(1)
+    .max(50),
+  /** The personal key's owner when an admin assigns it to someone else; omitted, the caller. */
+  ownerUserId: z.string().optional(),
+});
+export interface ApiKeyTrpcGrantableInputSchema extends Named<
+  typeof apiKeyTrpcGrantableInputSchemaDefinition
+> {}
+export const apiKeyTrpcGrantableInputSchema: ApiKeyTrpcGrantableInputSchema =
+  apiKeyTrpcGrantableInputSchemaDefinition;
+
 const apiKeyTrpcNameByIdInputSchemaDefinition = z.object({
   organizationId: z.string(),
   apiKeyId: z.string(),
@@ -89,3 +105,13 @@ export interface ApiKeyTrpcRevokeInputSchema extends Named<
 > {}
 export const apiKeyTrpcRevokeInputSchema: ApiKeyTrpcRevokeInputSchema =
   apiKeyTrpcRevokeInputSchemaDefinition;
+
+const apiKeyTrpcRotateInputSchemaDefinition = z.object({
+  organizationId: z.string(),
+  apiKeyId: z.string(),
+});
+export interface ApiKeyTrpcRotateInputSchema extends Named<
+  typeof apiKeyTrpcRotateInputSchemaDefinition
+> {}
+export const apiKeyTrpcRotateInputSchema: ApiKeyTrpcRotateInputSchema =
+  apiKeyTrpcRotateInputSchemaDefinition;

@@ -5,6 +5,8 @@ Feature: A directory or a first single sign-on never takes a full seat the licen
   # too, the person is held pending (no access, shown to admins). Invitations are
   # refused at the limit (enforcement-members.feature); provisioning is not, because
   # the person already exists in the customer's directory and a refusal loses them.
+  # An interactive arrival held pending or admitted Lite opens a seat request, and a held
+  # person reads a waiting screen instead of onboarding: modules/organization/specs/seat-requests.feature.
 
   Background:
     Given an organization on a signed Enterprise licence
@@ -44,6 +46,19 @@ Feature: A directory or a first single sign-on never takes a full seat the licen
       When "arrival@acme.example" signs in through the connection for the first time
       Then the sign-in succeeds
       And "arrival@acme.example" is a Lite Member of the organization
+
+    # The older automatic join, for an organization that names its email domain rather than
+    # owning a connection, admits a brand-new account before any connection is asked. It wrote
+    # a full membership with no seat check, so on an organization that has both, a new person
+    # took a full seat past the licence and the connection then found them already a member.
+    @unit
+    Scenario: A new account joined by its email domain past the seats is admitted as a Lite Member
+      Given every full member seat the licence covers is in use
+      And a Lite Member seat is free
+      And the organization admits everybody with an "acme.example" address automatically
+      When "domain-joiner@acme.example" signs up for the first time
+      Then "domain-joiner@acme.example" is a Lite Member of the organization
+      And "domain-joiner@acme.example" holds an organization-wide Viewer grant
 
     @integration @unimplemented
     Scenario: A directory asserting the admin role past the seats takes no full seat
@@ -85,6 +100,23 @@ Feature: A directory or a first single sign-on never takes a full seat the licen
       Given every full member seat and every Lite Member seat the licence covers is in use
       When "late@acme.example" arrives by single sign-on or an approved join request
       Then "late@acme.example" holds no grant in the organization
+
+    @unit
+    Scenario: A new account joined by its email domain with no seat left is held with no grant
+      Given every full member seat and every Lite Member seat the licence covers is in use
+      And the organization admits everybody with an "acme.example" address automatically
+      When "domain-late@acme.example" signs up for the first time
+      Then "domain-late@acme.example" is held pending in the organization
+      And "domain-late@acme.example" holds no grant in the organization
+
+    # A Lite Member's admission can be left unfinished (the grant beside the row did not land).
+    # The next sign-in through a connection finishes it with the grant the seat is worth.
+    @unit
+    Scenario: A Lite Member's unfinished admission is resumed with the Viewer grant, never a full one
+      Given "unfinished@acme.example" holds a Lite Member seat whose grant has not landed yet
+      When "unfinished@acme.example" signs in through the connection again
+      Then "unfinished@acme.example" holds an organization-wide Viewer grant
+      And "unfinished@acme.example" holds no full member grant
 
   Rule: directory group grants never exceed the seat the person holds
 

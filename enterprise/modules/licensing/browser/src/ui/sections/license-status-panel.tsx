@@ -5,12 +5,22 @@
  */
 
 import { VStack } from "@langwatch/design-system/primitives";
-import { detectLicenseInputForm } from "@langwatch/enterprise-licensing-contract";
+import {
+  type ConnectStatus,
+  detectLicenseInputForm,
+} from "@langwatch/enterprise-licensing-contract";
+import { nowInstant } from "@langwatch/time";
 import { useState } from "react";
 
+import { connectApi } from "../../behavior/connect-api.ts";
 import { licensingApi } from "../../behavior/licensing-api.ts";
-import { licenseMetersSeats } from "../../model/license-status.ts";
-import { LicenseDetailsCard } from "../../ui/elements/license-details-card.tsx";
+import { isRevokedByLangWatch, syncLineOf } from "../../model/connect-sync.ts";
+import { isConnectedLicense, licenseMetersSeats } from "../../model/license-status.ts";
+import { type LicensingHostApi, useLicensingHost } from "../../model/licensing-host.ts";
+import {
+  type LicenseHostedState,
+  LicenseDetailsCard,
+} from "../../ui/elements/license-details-card.tsx";
 import { LicenseLoadError } from "../../ui/elements/license-load-error.tsx";
 import { LicenseLoadingSkeleton } from "../../ui/elements/license-loading-skeleton.tsx";
 import { OverSeatsCallout } from "../../ui/elements/over-seats-callout.tsx";
@@ -26,6 +36,10 @@ interface LicenseStatusPanelProps {
 
 export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) {
   const [licenseKey, setLicenseKey] = useState("");
+  const [isReplacing, setIsReplacing] = useState(false);
+  const host = useLicensingHost();
+  // The server refuses every change without organization:manage; this only hides what would fail.
+  const canManage = host.canManageOrganization();
 
   const {
     data: status,
@@ -41,6 +55,24 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
     },
   );
 
+  // The sync line and a revocation are read from Connect, the same reading its page shows.
+  const isConnected = !!status?.hasLicense && isConnectedLicense(status);
+  // A refresh waits for its outcome until the line moves or the deadline passes, with no timer.
+  const [awaitedSync, setAwaitedSync] = useState<{ from: string; until: number } | null>(null);
+  const connectStatus = connectApi.connect.status.useQuery(
+    { organizationId },
+    {
+      enabled: isConnected,
+      refetchOnWindowFocus: false,
+      refetchInterval: () =>
+        awaitedSync !== null && nowInstant().epochMilliseconds < awaitedSync.until
+          ? SYNC_RECORD_POLL_MS
+          : false,
+    },
+  );
+  const recordedSync = syncKeyOf(connectStatus.data);
+  if (awaitedSync !== null && recordedSync !== awaitedSync.from) setAwaitedSync(null);
+
   const [activationCode, setActivationCode] = useState("");
   const { upload, activate, remove, refresh, isUploading, isRemoving, isRefreshing } =
     useLicenseActions({
@@ -48,10 +80,19 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
       onUploadSuccess: () => {
         setLicenseKey("");
         setActivationCode("");
+        setIsReplacing(false);
         void refetch();
       },
       onRemoveSuccess: () => {
         void refetch();
+      },
+      onRefreshSettled: () => {
+        if (!isConnected) return;
+        // The sync outcome is recorded by a subscriber, so it lands a moment after the refresh.
+        setAwaitedSync({
+          from: recordedSync,
+          until: nowInstant().epochMilliseconds + SYNC_RECORD_WAIT_MS,
+        });
       },
     });
 
@@ -97,6 +138,7 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
           onActivationCodeChange={setActivationCode}
           onCodeActivate={handleCodeActivate}
           isActivating={isUploading}
+          canManage={canManage}
         />
       </VStack>
     );
@@ -113,7 +155,59 @@ export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) 
         isRemoving={isRemoving}
         onRefresh={refresh}
         isRefreshing={isRefreshing}
+        onReplace={() => setIsReplacing(true)}
+        canManage={canManage}
+        hosted={hostedStateOf({ host, status: connectStatus.data })}
       />
+      {isReplacing && canManage ? (
+        <NoLicenseCard
+          mode="replace"
+          onCancel={() => setIsReplacing(false)}
+          licenseKey={licenseKey}
+          onLicenseKeyChange={setLicenseKey}
+          onActivate={() => submitLicense(licenseKey)}
+          onFileActivate={submitLicense}
+          activationCode={activationCode}
+          onActivationCodeChange={setActivationCode}
+          onCodeActivate={handleCodeActivate}
+          isActivating={isUploading}
+          canManage={canManage}
+        />
+      ) : null}
     </VStack>
   );
+}
+
+/** The Connect reading in the card's words; absent until it is read or where Connect is off. */
+function hostedStateOf({
+  host,
+  status,
+}: {
+  host: LicensingHostApi;
+  status: ConnectStatus | undefined;
+}): LicenseHostedState | undefined {
+  if (status?.deployment !== "on") return void 0;
+  const line = syncLineOf(status.sync);
+  return {
+    syncText: line.text,
+    ...(status.sync.lastError
+      ? {
+          syncFailure: host.describeFailure({
+            error: { error: { code: status.sync.lastError.code } },
+            fallbackTitle: "The last license sync did not complete",
+          }),
+        }
+      : {}),
+    isRevoked: isRevokedByLangWatch(status),
+  };
+}
+
+/** How often, and for how long, the panel re-reads Connect for the sync a refresh recorded. */
+const SYNC_RECORD_POLL_MS = 1_000;
+const SYNC_RECORD_WAIT_MS = 10_000;
+
+/** What the last sync recorded, to tell when a newer outcome arrived. */
+function syncKeyOf(status: ConnectStatus | undefined): string {
+  if (!status || status.deployment !== "on") return "";
+  return `${status.sync.lastSyncAt ?? ""}|${status.sync.lastError?.code ?? ""}`;
 }

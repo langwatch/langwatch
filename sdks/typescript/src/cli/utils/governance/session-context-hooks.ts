@@ -16,8 +16,10 @@ import {
   HOOK_TIMEOUT_SECONDS,
   type HookedTool,
   type HooksTarget,
+  type OwnedHookFileTool,
   ownedHookFileToolForCommand,
   SESSION_CONTEXT_AGENTS,
+  type SessionContextAgentId,
 } from "./session-context-agents";
 
 export type { HookedTool } from "./session-context-agents";
@@ -46,6 +48,12 @@ const HOOK_EVENTS = ["SessionStart", "Stop"] as const;
  * them: `agentStop` closes every turn the way Claude Code's `Stop` does.
  */
 const COPILOT_HOOK_EVENTS = ["sessionStart", "agentStop"] as const;
+
+/**
+ * Grok reads Claude Code's hook shape. SubagentStart fires in the parent with
+ * the child's id, the one place a subagent's parent is known (ADR-192).
+ */
+const GROK_HOOK_EVENTS = ["SessionStart", "Stop", "SubagentStart"] as const;
 
 /** The only version of the Copilot hook file format there is. */
 const COPILOT_HOOK_FILE_VERSION = 1;
@@ -129,33 +137,41 @@ export function ownedHookFilePathHeldByUser({ command }: { command: string }): H
 /** What the user reads when their own file holds our hook file's path. */
 export function hookFileNotOursNotice({
   displayPath,
+  agentId,
   command,
 }: {
   displayPath: string;
+  agentId: SessionContextAgentId;
   command: string;
 }): string {
+  const agent = SESSION_CONTEXT_AGENTS[agentId].displayName;
   return (
-    `${displayPath} is not a LangWatch file, so it was left alone, and Copilot ` +
-    `sessions will not report their repository or branch. Copilot loads every .json file ` +
+    `${displayPath} is not a LangWatch file, so it was left alone, and ${agent} ` +
+    `sessions will not report their repository or branch. ${agent} loads every .json file ` +
     `in that folder: rename yours, then run \`langwatch instrument ${command}\` again.`
   );
 }
 
 /**
  * Writes the hook file of the agent `command` launches, when that file is ours
- * alone (Copilot). Null when there is none or the write failed: best-effort,
- * because the exports it rides beside are the wiring that matters.
+ * alone. Null when there is none or the write failed (warned on stderr):
+ * best-effort, because the exports it rides beside are the wiring that matters.
  */
 export function assertOwnedHookFileFor({
   command,
 }: {
   command: string;
-}): SessionContextHooksInstallResult | null {
+}): (SessionContextHooksInstallResult & { tool: OwnedHookFileTool }) | null {
   const tool = ownedHookFileToolForCommand(command);
   if (!tool) return null;
   try {
-    return installSessionContextHooks({ tool });
-  } catch {
+    return { ...installSessionContextHooks({ tool }), tool };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error(
+      `  ! Could not write ${sessionContextHooksTarget(tool).displayPath} (${reason}): ` +
+        `sessions will not report their repository or branch.`,
+    );
     return null;
   }
 }
@@ -329,7 +345,7 @@ function installOwnedHookFile({
     return { action: isRunningOurHook ? "user_file_runs_hook" : "not_ours", ...target };
   }
 
-  const document = copilotHookFileDocument(tool);
+  const document = ownedHookFileDocument(tool);
   if (existing === `${JSON.stringify(document, null, 2)}\n`) {
     return { action: "unchanged", ...target };
   }
@@ -358,6 +374,21 @@ function isMissingFileError(error: unknown): boolean {
   return isPlainObject(error) && error.code === "ENOENT";
 }
 
+/** The whole of our own hook file, in the format its agent reads. */
+function ownedHookFileDocument(tool: HookedTool): Record<string, unknown> {
+  return tool === "grok" ? grokHookFileDocument(tool) : copilotHookFileDocument(tool);
+}
+
+/** The file in Claude Code's hook shape, as Grok reads it: one matcher-less group per event. */
+function grokHookFileDocument(tool: HookedTool): Record<string, unknown> {
+  const group = {
+    hooks: [
+      { type: "command", command: sessionContextHookCommand(tool), timeout: HOOK_TIMEOUT_SECONDS },
+    ],
+  };
+  return { hooks: Object.fromEntries(GROK_HOOK_EVENTS.map((event) => [event, [group]])) };
+}
+
 /**
  * The file in Copilot's hook format: one command per event, under `bash` for
  * macOS and Linux and `powershell` for Windows, as Copilot reads them. The
@@ -380,8 +411,34 @@ function copilotHookFileDocument(tool: HookedTool): Record<string, unknown> {
 /** The keys an entry of ours carries, in what `copilotHookFileDocument` writes or wrote. */
 const OWNED_ENTRY_KEYS: ReadonlySet<string> = new Set(["type", "bash", "powershell", "timeoutSec"]);
 
+/** The keys a handler of ours carries, in what `grokHookFileDocument` writes. */
+const OWNED_HANDLER_KEYS: ReadonlySet<string> = new Set(["type", "command", "timeout"]);
+
 /** The top-level keys a hook file of ours carries. */
 const OWNED_FILE_KEYS: ReadonlySet<string> = new Set(["version", "hooks"]);
+
+/** Grok's file carries no version: `hooks` is all of it. */
+const GROK_OWNED_FILE_KEYS: ReadonlySet<string> = new Set(["hooks"]);
+
+/** A Grok matcher group whose every handler runs our command and nothing else. */
+function isOurGrokGroup({ group, command }: { group: unknown; command: string }): boolean {
+  if (!isPlainObject(group)) return false;
+  const hasOnlyHooks = Object.keys(group).every((key) => key === "hooks");
+  if (!hasOnlyHooks || !Array.isArray(group.hooks) || group.hooks.length === 0) return false;
+  return group.hooks.every((handler: unknown) => isOurHandler({ handler, command }));
+}
+
+function isOurHandler({ handler, command }: { handler: unknown; command: string }): boolean {
+  if (!isPlainObject(handler) || handler.command !== command) return false;
+  return Object.keys(handler).every((key) => OWNED_HANDLER_KEYS.has(key));
+}
+
+function isOurCopilotEntry({ entry, command }: { entry: unknown; command: string }): boolean {
+  if (!isPlainObject(entry) || entry.bash !== command) return false;
+  // A file an older CLI wrote carries no `powershell`; one that differs is the user's.
+  if ("powershell" in entry && entry.powershell !== command) return false;
+  return Object.keys(entry).every((key) => OWNED_ENTRY_KEYS.has(key));
+}
 
 /**
  * The owned hook file when it holds nothing but entries running our command.
@@ -402,16 +459,15 @@ function readOwnedHookFile({
     return null;
   }
   if (!isPlainObject(parsed) || !isPlainObject(parsed.hooks)) return null;
-  const hasOnlyOurKeys = Object.keys(parsed).every((key) => OWNED_FILE_KEYS.has(key));
+  const fileKeys = tool === "grok" ? GROK_OWNED_FILE_KEYS : OWNED_FILE_KEYS;
+  const hasOnlyOurKeys = Object.keys(parsed).every((key) => fileKeys.has(key));
   if (!hasOnlyOurKeys) return null;
   const events = Object.values(parsed.hooks);
   const command = sessionContextHookCommand(tool);
-  const isOurEntry = (entry: unknown): boolean => {
-    if (!isPlainObject(entry) || entry.bash !== command) return false;
-    // A file an older CLI wrote carries no `powershell`; one that differs is the user's.
-    if ("powershell" in entry && entry.powershell !== command) return false;
-    return Object.keys(entry).every((key) => OWNED_ENTRY_KEYS.has(key));
-  };
+  const isOurEntry = (entry: unknown): boolean =>
+    tool === "grok"
+      ? isOurGrokGroup({ group: entry, command })
+      : isOurCopilotEntry({ entry, command });
   const isOnlyOurs = (entries: unknown): boolean => {
     if (!Array.isArray(entries) || entries.length === 0) return false;
     return entries.every(isOurEntry);
@@ -432,9 +488,17 @@ function fileRunsHookCommand({ tool, filePath }: { tool: HookedTool; filePath: s
   }
   if (!isPlainObject(parsed) || !isPlainObject(parsed.hooks)) return false;
   const hookArgs = ["ingest", "hook", SESSION_CONTEXT_AGENTS[tool].hookArgument];
+  // Copilot names the command per shell on the entry; Claude's shape nests handlers in a group.
+  const commandsOf = (entry: Record<string, unknown>): unknown[] => [
+    entry.bash,
+    entry.powershell,
+    ...(Array.isArray(entry.hooks)
+      ? entry.hooks.map((handler) => (isPlainObject(handler) ? handler.command : undefined))
+      : []),
+  ];
   const runsCommand = (entry: unknown): boolean =>
     isPlainObject(entry) &&
-    [entry.bash, entry.powershell].some(
+    commandsOf(entry).some(
       (shellCommand) =>
         typeof shellCommand === "string" &&
         shellCommand.split(/&&|\|\||;/).some((part) => runsLangwatchWith({ part, args: hookArgs })),

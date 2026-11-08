@@ -1,8 +1,11 @@
 import { sitePath } from "../../../lib/site-path.ts";
+import { chooseTheme, storedTheme, type ThemeChoice } from "../../../lib/theme.ts";
 
 const GUTTER = 6;
 const EDGE = 8;
 const ITEM = '[role^="menuitem"]';
+/* The page actions and the theme menu, each prerendered in a template beside its trigger. */
+const TRIGGER = "[data-docs-page-menu], [data-docs-theme-menu]";
 
 type ShowPopoverOptions = { source: HTMLElement };
 
@@ -12,6 +15,8 @@ type PageMenu = {
   content: HTMLElement;
   /** When the menu last closed, so the click that light-dismissed it does not reopen it. */
   closedAt: number;
+  /** The menu is closing because the reader chose an item, not by light dismiss. */
+  choosing: boolean;
 };
 
 const menus = new WeakMap<HTMLElement, PageMenu>();
@@ -33,7 +38,8 @@ function onToggle({ event, menu }: { event: Event; menu: PageMenu }) {
   const open = (event as ToggleEvent).newState === "open";
   menu.trigger.setAttribute("aria-expanded", String(open));
   if (open) return;
-  menu.closedAt = performance.now();
+  menu.closedAt = menu.choosing ? Number.NEGATIVE_INFINITY : performance.now();
+  menu.choosing = false;
   highlight({ menu, item: null });
   if (!document.activeElement || menu.popover.contains(document.activeElement))
     menu.trigger.focus({ preventScroll: true });
@@ -66,7 +72,13 @@ function pageMenu({ trigger }: { trigger: HTMLElement }): PageMenu | null {
   const content = popover.querySelector<HTMLElement>('[role="menu"]');
   if (!content) return null;
   preparePopover({ content, popover });
-  const menu: PageMenu = { trigger, popover, content, closedAt: 0 };
+  const menu: PageMenu = {
+    trigger,
+    popover,
+    content,
+    closedAt: Number.NEGATIVE_INFINITY,
+    choosing: false,
+  };
   wireMenu({ menu });
   template?.after(popover);
   trigger.closest<HTMLElement>("[data-docs-menu-root]")?.setAttribute("data-mounted", "");
@@ -96,7 +108,17 @@ function place({ menu }: { menu: PageMenu }) {
   menu.popover.style.top = `${fitsBelow ? below : anchor.top - GUTTER - height}px`;
 }
 
+/** Ticks the reader's stored theme, which the prerendered menu cannot know. */
+function markTheme({ menu }: { menu: PageMenu }) {
+  const choice = storedTheme();
+  for (const item of items({ content: menu.content })) {
+    const value = item.dataset.docsThemeChoice;
+    if (value !== undefined) item.setAttribute("aria-checked", String(value === choice));
+  }
+}
+
 function open({ menu, fromKeyboard }: { menu: PageMenu; fromKeyboard: boolean }) {
+  markTheme({ menu });
   /* The source makes the trigger part of the menu for light dismiss where browsers support it. */
   menu.popover.showPopover({ source: menu.trigger } as ShowPopoverOptions);
   place({ menu });
@@ -158,8 +180,18 @@ async function copyAction({
   }
 }
 
-/** Links follow themselves and close the menu; a copy action stays open and says it copied. */
+/**
+ * Links follow themselves and close the menu; a theme choice applies and closes it; a copy action
+ * stays open and says it copied.
+ */
 function choose({ menu, item }: { menu: PageMenu; item: HTMLElement }) {
+  const theme = item.dataset.docsThemeChoice;
+  if (theme !== undefined) {
+    menu.choosing = true;
+    menu.popover.hidePopover();
+    chooseTheme({ choice: theme as ThemeChoice, origin: menu.trigger });
+    return;
+  }
   const value = item.dataset.docsMenuCopy;
   if (value === undefined) menu.popover.hidePopover();
   else void copyAction({ menu, item, value });
@@ -178,9 +210,7 @@ function markCopied({ item, on }: { item: HTMLElement; on: boolean }) {
 
 document.addEventListener("click", (event) => {
   const trigger =
-    event.target instanceof Element
-      ? event.target.closest<HTMLElement>("[data-docs-page-menu]")
-      : null;
+    event.target instanceof Element ? event.target.closest<HTMLElement>(TRIGGER) : null;
   if (!trigger) return;
   const menu = pageMenu({ trigger });
   if (!menu) return;

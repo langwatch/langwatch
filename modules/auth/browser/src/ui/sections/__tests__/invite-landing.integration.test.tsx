@@ -208,6 +208,26 @@ describe("given an invitation link", () => {
       );
     });
 
+    /** @scenario A member opening an invitation they already accepted goes in */
+    it("goes in without offering to join again when the invitation was already accepted", async () => {
+      sessionRef.current = { data: { user: { id: "u1", email: "dana@acme.test" } } };
+      landingRef.current = {
+        data: { organizationName: "Acme", inviterName: "Dana", alreadyAccepted: true },
+        error: null,
+        isLoading: false,
+      };
+      renderLanding();
+
+      expect(await screen.findByTestId("invite-already-accepted")).toHaveTextContent(/Acme/);
+      expect(screen.queryByRole("button", { name: "Join Acme" })).toBeNull();
+      expect(screen.getByRole("link", { name: "Continue to LangWatch" })).toHaveAttribute(
+        "href",
+        "/",
+      );
+      await vi.waitFor(() => expect(hardRedirectMock).toHaveBeenCalledWith("/"));
+      expect(acceptMock).not.toHaveBeenCalled();
+    });
+
     it("goes in instead of raising an alarm when the invitation was already spent", async () => {
       sessionRef.current = { data: { user: { id: "u1" } } };
       acceptStateRef.current = {

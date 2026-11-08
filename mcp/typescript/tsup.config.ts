@@ -2,7 +2,12 @@ import { defineConfig } from "tsup";
 
 // Source-only workspace packages -- must be bundled, not externalized, since
 // the published npm package has no runtime dep on them.
-const noExternal = ["@langwatch/handled-error", "@langwatch/redaction", "@langwatch/egress"];
+const noExternal = [
+  "@langwatch/evaluator-contract",
+  "@langwatch/handled-error",
+  "@langwatch/redaction",
+  "@langwatch/egress",
+];
 
 export default defineConfig([
   {

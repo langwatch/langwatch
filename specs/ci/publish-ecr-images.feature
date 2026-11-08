@@ -184,3 +184,23 @@ Feature: Publish every deployable image to the artifacts registry
     When it is dispatched again
     Then with a tag recording that commit it skips the build and succeeds
     And with a tag recording another commit, or none, it fails and asks for a new tag
+
+  # How Cloud's LangWatchQL access render Job knows whether an app image
+  # changes the rendered access model (langwatch-saas infrastructure/lwql.tf).
+  # Bound by tools/ecrtag/lwqlaccess_test.go, and that the workflow makes both
+  # calls by tools/ciguard/ecrskip_test.go.
+  @unit
+  Scenario: An app image records the fingerprint of the access model it renders
+    Given publish-docker-ecr built the langwatch-app image for a commit
+    When it renders the image's access model offline from two fixed sets of placeholder inputs
+    Then the per-arch manifest and the index get the tag lwql-access-<fingerprint>-<tag>
+    And the fingerprint is the same for two images that render the same files, and differs when either set renders a different file
+    And a render that writes other files, or no sums, records nothing
+
+  @unit
+  Scenario: A re-tagged app image keeps the fingerprint of the image it copies
+    Given the commit did not change the app, so its index is re-tagged from an ancestor's
+    When publish-docker-ecr publishes the commit tag
+    Then the new index gets lwql-access-<fingerprint>-<tag> with the ancestor's fingerprint
+    And an image with no fingerprint to copy is published without one, with a warning, and Cloud re-renders on every release of it
+

@@ -31,6 +31,14 @@ import type {
   RenameOrganizationGroupInput,
   RemoveOrganizationGroupGrantInput,
 } from "./features/group/group.ts";
+import type {
+  HeldMemberships,
+  OpenSeatRequests,
+  RecordRefusedSignInInput,
+  RefusedSignInOutcome,
+  SeatRequestResolved,
+  SeatRequestScope,
+} from "./features/seat-request/seat-request.ts";
 import type { TeamWithProjects } from "./features/team/team.responses.ts";
 import type {
   CreateOrganizationTeamWithMembersInput,
@@ -64,6 +72,10 @@ import type {
   OrganizationListedInvite,
   OrganizationInvitedMemberIds,
   OrganizationPendingInviteApplied,
+  OrganizationApiRemoveMemberInput,
+  OrganizationHeldSeats,
+  OrganizationMemberRemoved,
+  OrganizationSeatRemovalPreview,
 } from "./organization.responses.ts";
 import type {
   Organization,
@@ -175,11 +187,20 @@ export type OrganizationWithMembersAndTheirTeams = Organization & {
  */
 export type OrganizationInviteValidation = "strict" | "lenient";
 
-/** An organization's seats: full, lite and Developer (ADR-171), live invitations included. */
+/**
+ * An organization's seats: full, lite and Developer (ADR-171), live invitations included.
+ * `fullMembers` includes the seats held after a removal (seat-rotation.feature).
+ */
 export type OrganizationMemberSeats = Readonly<{
   fullMembers: number;
   liteMembers: number;
   developers: number;
+}>;
+
+/** Who held a seat in a window: the full-seat members now, and the people who left in it. */
+export type OrganizationSeatOccupants = Readonly<{
+  fullSeatHolderIds: readonly string[];
+  departedIds: readonly string[];
 }>;
 
 /** One invitation batch as a transport asks for it, with the mode it chose. */
@@ -282,6 +303,56 @@ export interface OrganizationApi {
     input: Readonly<{ organizationId: string; userId: string }>,
     by: OrganizationCaller | null,
   ): Promise<void>;
+  /**
+   * Removes a member; when their seat frees at once and a full seat fits, gives it to the person
+   * waiting the caller named (seat-rotation.feature).
+   */
+  removeMember(
+    input: OrganizationApiRemoveMemberInput,
+    by: OrganizationCaller,
+  ): Promise<OrganizationMemberRemoved>;
+  /** What removing this member does to their seat, and who waits for it: the remove dialog. */
+  getSeatRemovalPreview(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<OrganizationSeatRemovalPreview>;
+  /** The seats removed, disabled or demoted people still hold: the Users list's greyed rows. */
+  listHeldSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationHeldSeats>;
+  /**
+   * Keeps the full seat of a member about to leave by a path that deletes the membership row
+   * itself (directory offboarding), so leaving and coming back costs the same seat. Asked
+   * before that path runs; nothing when the seat frees at once (seat-rotation.feature).
+   */
+  holdSeatOfDepartingMember(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<void>;
+  /**
+   * A person admitted back within their seat hold, by a path that writes the membership row
+   * itself (directory provisioning), takes the held seat: its date stays and the hold goes.
+   */
+  takeBackHeldSeat(input: Readonly<{ organizationId: string; userId: string }>): Promise<void>;
+  /**
+   * Opens the seat request of an admission a caller wrote itself (directory provisioning) when a
+   * full seat was asked for and Lite or held was given (seat-requests.feature). A repeat only
+   * fills a missing request.
+   */
+  openSeatRequestForAdmission(
+    input: Readonly<{ organizationId: string; userId: string; admission: OrganizationAdmission }>,
+  ): Promise<void>;
+  /**
+   * Takes the organization's seat lease for a caller that writes a seat-holding row itself (a
+   * directory admission): waits while another seat change holds it, then refuses
+   * seat_change_busy. The holder renews it every `renewEveryMs` and releases it in a finally.
+   */
+  acquireSeatLease(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<Readonly<{ holder: string; renewEveryMs: number }>>;
+  /**
+   * Pushes this holder's lease expiry out again; false when the lease is no longer this
+   * holder's, so a caller about to write a seat-holding row must not write it.
+   */
+  renewSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<boolean>;
+  /** Drops this holder's seat lease, and only its own. */
+  releaseSeatLease(input: Readonly<{ organizationId: string; holder: string }>): Promise<void>;
   setMemberDisabled(
     input: Readonly<{ organizationId: string; userId: string; disabled: boolean }>,
     by: OrganizationCaller | null,
@@ -440,6 +511,22 @@ export interface OrganizationApi {
       origin?: OrganizationJoinOrigin;
     }>,
   ): Promise<OrganizationAdmission>;
+  /**
+   * After an identity provider refused a sign-in tied to an address: `seat_limit` when an
+   * arrival would be held pending (a seat request is opened, flagged refused), else records a
+   * refusal notice.
+   */
+  recordRefusedSignIn(input: RecordRefusedSignInInput): Promise<RefusedSignInOutcome>;
+  /** The organization's open seat requests and how a seat is approved for it (ruling R6). */
+  listOpenSeatRequests(input: Readonly<{ organizationId: string }>): Promise<OpenSeatRequests>;
+  /** Gives the person the full seat they asked for; refuses `member_seat_limit_reached`. */
+  approveSeatRequest(input: SeatRequestScope, by: OrganizationCaller): Promise<SeatRequestResolved>;
+  /** Closes the request; the membership stays as it is. */
+  declineSeatRequest(input: SeatRequestScope, by: OrganizationCaller): Promise<SeatRequestResolved>;
+  /** Whether this person holds an open seat request in the organization. */
+  isSeatRequested(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
+  /** The caller's memberships they cannot use, with whom to contact (ruling R2). */
+  getHeldMemberships(by: OrganizationCaller): Promise<HeldMemberships>;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
   memberOrganizationIds(
     input: Readonly<{ userId: string; organizationIds: string[] }>,
@@ -448,18 +535,13 @@ export interface OrganizationApi {
    * Every organization this person belongs to. Asked by a peer deciding something about the person
    * rather than about a listed organization.
    */
-  organizationIdsForMember(input: Readonly<{ userId: string }>): Promise<string[]>;
+  organizationIdsForMember(
+    input: Readonly<{ userId: string; activeOnly?: boolean }>,
+  ): Promise<string[]>;
   /** The organization an email domain is claimed by for SSO, or null when none claims it. */
   findBySsoDomain(
     input: Readonly<{ domain: string }>,
   ): Promise<{ id: string; name: string; ssoProvider: string | null } | null>;
-  /**
-   * Writes the plain MEMBER row an SSO domain auto-join admits (ADR-116); the caller grants
-   * the seat itself. A row already there is `"already-present"`: a concurrent callback.
-   */
-  createSsoDomainMembership(
-    input: Readonly<{ organizationId: string; userId: string }>,
-  ): Promise<"created" | "already-present">;
   /** How many organizations this person has a membership row in, disabled ones included. */
   countMembershipsForUser(input: Readonly<{ userId: string }>): Promise<number>;
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]>;
@@ -752,6 +834,13 @@ export interface OrganizationApi {
    * included, disabled memberships excluded. The one count a licence and a plan read.
    */
   countMemberSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationMemberSeats>;
+  /**
+   * The people who held a seat since `since`: today's full-seat members, and everyone
+   * removed or disabled since then. Read by the Ops seat sharing check.
+   */
+  findSeatOccupantsSince(
+    input: Readonly<{ organizationId: string; since: number }>,
+  ): Promise<OrganizationSeatOccupants>;
   /** Whether one more of a limited resource fits the organization's plan, for this caller. */
   checkLimit(
     input: Readonly<{ organizationId: string; limitType: LimitType }>,

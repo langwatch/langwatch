@@ -1,6 +1,6 @@
 /** Which models a picker offers, from the providers a project has stored. Pure: consumers fetch. */
 import { isCodexModel, isModelAllowedForFeature } from "./catalog/codex-restrictions.ts";
-import { isOwnDecisionModelId } from "./catalog/decision-models.ts";
+import { findDecisionModel, isOwnDecisionModelId } from "./catalog/decision-models.ts";
 import { allLitellmModels } from "./catalog/model-catalog.ts";
 import type { ModelOption } from "./model-options.ts";
 import { buildCustomModelDisplayNames, modelDisplayLabel } from "./model-provider-display-names.ts";
@@ -16,8 +16,11 @@ export type ModelOptionGroup = {
 /** A model LangWatch serves itself, so a project needs no provider of its own to pick it. */
 export type BuiltInModel = { value: string; label: string };
 
-/** The heading built-in models are listed under. */
-export const BUILT_IN_MODELS_GROUP_LABEL = "LangWatch";
+/**
+ * The heading built-in models are listed under. Not "LangWatch": an own decision model in it
+ * runs on the project's provider, which its icon names, as a chat model's does.
+ */
+export const BUILT_IN_MODELS_GROUP_LABEL = "Decision models";
 
 /**
  * The built-in group's key. A constant, never a model id's prefix: an own-key decision model
@@ -260,13 +263,19 @@ export function modelSelectionFrom({
     mode,
     isCustom: customModelIdSet.has(modelValue),
   }));
-  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label }) => ({
-    label,
-    value,
-    isDisabled: false,
-    mode,
-    isBuiltIn: true,
-  }));
+  // A decision model's line, and a shorter row title where it has one, come from the catalogue.
+  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label }) => {
+    const entry = findDecisionModel(value);
+    const subtitle = entry?.description;
+    return {
+      label: entry?.pickerLabel ?? label,
+      value,
+      isDisabled: false,
+      mode,
+      isBuiltIn: true,
+      ...(subtitle ? { subtitle } : {}),
+    };
+  });
   const builtInGroups: GroupedModelOptions =
     builtInOptions.length === 0
       ? []

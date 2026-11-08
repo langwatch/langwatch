@@ -19,7 +19,7 @@ export async function assertAgentSetup({ page, base, prompt }) {
   for (const agent of ["Claude Code", "Codex", "Cursor"]) {
     const button = setup.getByRole("button", { name: agent, exact: true });
     await button.click();
-    assert.equal(await button.getAttribute("aria-pressed"), "true");
+    await button.and(page.locator("[aria-pressed=true]")).waitFor({ timeout: 5000 });
     assert.equal(await setup.locator('[aria-pressed="true"]').count(), 1);
     assert.ok((await setup.textContent()).includes(`Open your project in ${agent}`));
   }

@@ -46,6 +46,17 @@ class TestBillingHost extends BillingHostApi {
     return "test-team-id";
   }
 
+  canInviteMembers(): boolean {
+    return true;
+  }
+
+  canReadMonthBreakdown(): boolean {
+    return true;
+  }
+  canReadHeldSeats(): boolean {
+    return true;
+  }
+
   routeQuery(): Readonly<Record<string, string | undefined>> {
     return {};
   }
@@ -63,6 +74,10 @@ class TestBillingHost extends BillingHostApi {
   }
 
   navigate(to: string): void {
+    this.navigations.push(to);
+  }
+
+  replace(to: string): void {
     this.navigations.push(to);
   }
 
@@ -122,6 +137,7 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         getOrganizationWithMembersAndTheirTeams: {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
+        listHeldSeats: { useQuery: () => setup.mockListHeldSeats() },
       },
       invite: {
         upgradeWithInvites: {
@@ -160,7 +176,25 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
           useQuery: () => setup.mockListInvoices(),
         },
         getLastSubscription: {
-          useQuery: () => setup.mockGetLastSubscription(),
+          useQuery: () => ({ ...setup.mockGetLastSubscription(), refetch: vi.fn() }),
+        },
+        developerSeats: {
+          useQuery: (_input: unknown, opts: { enabled: boolean }) => ({
+            ...(opts.enabled ? setup.mockDeveloperSeats() : { data: undefined }),
+            refetch: setup.mockDeveloperSeatsRefetch,
+          }),
+        },
+        previewDeveloperSeats: {
+          useQuery: (input: { quantity: number }, opts: { enabled: boolean }) =>
+            opts.enabled
+              ? setup.mockPreviewDeveloperSeats(input)
+              : { data: undefined, isLoading: false, isError: false },
+        },
+        setDeveloperSeats: {
+          useMutation: () => ({ mutateAsync: setup.mockSetDeveloperSeats, isPending: false }),
+        },
+        previewProration: {
+          useQuery: () => ({ data: undefined, isLoading: false, isError: false }),
         },
       },
       useUtils: vi.fn(() => ({
@@ -203,7 +237,7 @@ describe("<SubscriptionPage/>", () => {
         renderSubscriptionPage();
 
         await waitFor(() => {
-          expect(screen.getByRole("heading", { name: "Subscription" })).toBeInTheDocument();
+          expect(screen.getByRole("heading", { name: "Plan & billing" })).toBeInTheDocument();
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
           expect(screen.getByTestId("contact-sales-block")).toBeInTheDocument();
         });
@@ -229,14 +263,14 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.queryByTestId("tiered-pricing-alert")).not.toBeInTheDocument();
       });
 
-      it("hides upgrade plan block on free plan without seat changes", async () => {
+      it("offers the upgrade plan block on free plan without seat changes", async () => {
         renderSubscriptionPage();
 
         await waitFor(() => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
 
-        expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
+        expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
       });
 
       it("shows legacy paid plan name as current plan title", async () => {
@@ -261,7 +295,7 @@ describe("<SubscriptionPage/>", () => {
         });
       });
 
-      it("hides the update seats block on legacy paid plan with planned users", async () => {
+      it("plans nothing on a legacy paid plan: the drawer has no Done step", async () => {
         mockGetActivePlan.mockReturnValue({
           data: createMockPlan({
             type: "ACCELERATE",
@@ -278,13 +312,8 @@ describe("<SubscriptionPage/>", () => {
         renderSubscriptionPage();
 
         fireEvent.click(screen.getByTestId("user-count-link"));
-        fireEvent.click(await screen.findByRole("button", { name: /Add Seat/i }));
-        fireEvent.click(await screen.findByRole("button", { name: /Done/i }));
-
-        await waitFor(() => {
-          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
-        });
-
+        await screen.findByRole("button", { name: /Add person/i });
+        expect(screen.queryByRole("button", { name: /Done/i })).toBeNull();
         expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
       });
     });
@@ -323,6 +352,14 @@ describe("<SubscriptionPage/>", () => {
       });
     });
 
+    /** @scenario "A legacy plan within its seats is asked to upgrade without the danger tone" */
+    it("marks the upgrade as required in the warning tone", async () => {
+      renderSubscriptionPage();
+
+      const chip = await screen.findByTestId("upgrade-required-chip");
+      expect(chip).toHaveAttribute("data-tone", "warning");
+    });
+
     it("shows legacy tiered capabilities in the current plan block", async () => {
       renderSubscriptionPage();
 
@@ -359,6 +396,7 @@ describe("<SubscriptionPage/>", () => {
           expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
         });
         fireEvent.click(screen.getByRole("button", { name: /Upgrade now/i }));
+        fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
         await waitFor(() => {
           expect(host.failures).toHaveLength(1);
@@ -382,6 +420,7 @@ describe("<SubscriptionPage/>", () => {
         });
 
         fireEvent.click(screen.getByRole("button", { name: /Upgrade now/i }));
+        fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
         await waitFor(() => {
           expect(mockMutateAsync).toHaveBeenCalledWith(
@@ -485,7 +524,9 @@ describe("<SubscriptionPage/>", () => {
       const features = await screen.findByTestId("current-plan-features-grid");
 
       expect(within(features).getByText(ENTERPRISE_PLAN_FEATURES[0]!)).toBeInTheDocument();
-      expect(within(features).queryByText("Up to 20 core users")).not.toBeInTheDocument();
+      expect(
+        within(features).queryByText("Volume discounts above 20 users"),
+      ).not.toBeInTheDocument();
       expect(within(features).queryByText("200,000 events included")).not.toBeInTheDocument();
     });
 
@@ -567,7 +608,9 @@ describe("<SubscriptionPage/>", () => {
 
       expect(within(features).getByText("Up to 10 core users")).toBeInTheDocument();
       expect(within(features).getByText("100,000 events included")).toBeInTheDocument();
-      expect(within(features).queryByText("Up to 20 core users")).not.toBeInTheDocument();
+      expect(
+        within(features).queryByText("Volume discounts above 20 users"),
+      ).not.toBeInTheDocument();
     });
   });
 });

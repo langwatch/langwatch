@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { assistantKindOfAgent } from "../assistant-identity.ts";
+import { ASSISTANT_PRESETS } from "../assistant-presets.ts";
 
 describe("assistantKindOfAgent", () => {
   describe("given a slug the tiles already use", () => {
@@ -20,6 +21,13 @@ describe("assistantKindOfAgent", () => {
     it("resolves opencode to its own kind", () => {
       expect(assistantKindOfAgent("opencode")).toBe("opencode");
     });
+
+    /** @scenario "An agent slug resolves to its product name" */
+    it("resolves pi to its own kind, wearing pi's own mark", () => {
+      expect(assistantKindOfAgent("pi")).toBe("pi");
+      expect(ASSISTANT_PRESETS.pi.iconUrl).toBe("/images/external-icons/pi.svg");
+      expect(ASSISTANT_PRESETS.pi.darkModeInvert).toBe(false);
+    });
   });
 
   describe("given a slug the registry spells differently", () => {
@@ -31,6 +39,12 @@ describe("assistantKindOfAgent", () => {
     /** @scenario "An agent slug resolves to its product name" */
     it("folds copilot into github_copilot", () => {
       expect(assistantKindOfAgent("copilot")).toBe("github_copilot");
+    });
+
+    /** @scenario The session list names the agent Grok */
+    it("names grok as Grok, with its own preset", () => {
+      expect(assistantKindOfAgent("grok")).toBe("grok");
+      expect(ASSISTANT_PRESETS.grok.label).toBe("Grok");
     });
   });
 

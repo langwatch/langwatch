@@ -184,6 +184,34 @@ export const AUTHZ_RESOURCES = {
     actions: ["view", "manage"],
     scopes: ["organization"],
   },
+  // Moving a deploy label ("production") of an agent or an evaluator, and
+  // archiving one that carries a label. Editing stays `evaluations:*`, so a
+  // custom role can edit without deciding what production runs.
+  agents: {
+    actions: ["deploy"],
+    scopes: ["project", "team", "organization"],
+  },
+  evaluators: {
+    actions: ["deploy"],
+    scopes: ["project", "team", "organization"],
+  },
+  // Starting a paid subscription (`upgrade`), and changing a live one: seats, the billing
+  // portal, invoices (`manage`). The Billing role holds both without taking a seat.
+  subscription: {
+    actions: ["upgrade", "manage"],
+    scopes: ["organization"],
+  },
+  // Requests to approve a seat for someone the seat limit held back or admitted as Lite.
+  seatRequests: {
+    actions: ["view", "manage"],
+    scopes: ["organization"],
+  },
+  // The member directory and the roles each member holds. Every organization role reads it;
+  // changing it stays `organization:manage`.
+  members: {
+    actions: ["view"],
+    scopes: ["organization"],
+  },
 } as const satisfies Record<
   string,
   {
@@ -259,6 +287,13 @@ const MANAGE_IMPLIED_ACTIONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Never implied by `manage`: only a direct grant satisfies these. Deleting
+ * the organization is irreversible, so holding `organization:manage` (a CLI
+ * `--management` key, a key minted by one) must not reach it.
+ */
+const NEVER_IMPLIED_BY_MANAGE: ReadonlySet<string> = new Set(["organization:delete"]);
+
+/**
  * True when `requested` is satisfied by the `granted` set, applying the
  * manage-implication rule. `granted` may contain non-registry strings
  * (legacy custom-role rows) — membership is string-based on purpose.
@@ -271,6 +306,7 @@ export function permissionSatisfiedBy({
   requested: string;
 }): boolean {
   if (granted.has(requested)) return true;
+  if (NEVER_IMPLIED_BY_MANAGE.has(requested)) return false;
   const separator = requested.lastIndexOf(":");
   if (separator === -1) return false;
   const action = requested.slice(separator + 1);
