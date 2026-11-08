@@ -6,7 +6,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const API_URL = "https://api.typesafe.ai/v1/systemone";
@@ -229,7 +229,7 @@ function parseFrontmatter(src) {
   return { frontmatter, body: rest.replace(/^\n/, "") };
 }
 
-function splitSections(body, level) {
+export function splitSections(body, level) {
   const lines = body.split("\n");
   const sections = [];
   let current = { heading: "", level: 0, lines: [] };
@@ -504,19 +504,43 @@ function titleHowToFindings({ rule, section, doc }) {
 
 // An opening question warns instead of failing: writing-rules allows one, rarely,
 // when the answer lands in the same line in the reader's own words.
+const OPENER_KINDS = new Set(["prose", "heading", "list"]);
+const hasText = (unit) => /\w/.test(unit.replace(/<[^>]*>/g, ""));
+const QUESTION_END = /\?["')\]]*\s*$/;
+
+/** The H1 (even in a heading-only section) and the first sentence with text. */
+export function openerCandidates(sections, firstContentIndex) {
+  const out = [];
+  const h1 = sections.slice(0, firstContentIndex + 1).find((s) => s.level === 1);
+  if (h1) out.push({ sentence: h1.heading, raw: h1.heading });
+  const p = sections[firstContentIndex]?.paragraphs.find(
+    (x) => OPENER_KINDS.has(x.kind) && !x.exempt && x.units.some(hasText),
+  );
+  if (p) out.push({ sentence: p.units.find(hasText), raw: p.text });
+  return out;
+}
+
+/** The first opener that is a question, with whether its answer shares its line. */
+export function openingQuestion(sections, firstContentIndex) {
+  for (const c of openerCandidates(sections, firstContentIndex)) {
+    const question = c.sentence.split(/(?<=\?)\s/)[0];
+    if (!QUESTION_END.test(question)) continue;
+    const mark = c.raw.indexOf("?");
+    const lineEnd = c.raw.indexOf("\n", mark);
+    const rest = c.raw.slice(mark + 1, lineEnd < 0 ? undefined : lineEnd);
+    return { question, answeredInLine: rest.replace(/[#*_`\s]/g, "") !== "" };
+  }
+  return null;
+}
+
 function questionOpenerFindings({ rule, section, doc }) {
   if (section.index !== doc.firstContentIndex) return [];
-  const p = section.paragraphs.find((x) => ["prose", "heading", "list"].includes(x.kind) && !x.exempt);
-  const title = section.level === 1 ? section.heading : "";
-  const first = title || p?.units[0];
-  const question = first?.split(/(?<=\?)\s/)[0];
-  if (!question || !/\?["')\]]*\s*$/.test(question)) return [];
-  const line = title || (p.text.split("\n").find((l) => l.includes(first.slice(0, 20))) ?? "");
-  const rest = line.slice(line.indexOf("?") + 1).replace(/[#*_`\s]/g, "");
-  const note = rest
+  const found = openingQuestion(doc.sections, doc.firstContentIndex);
+  if (!found) return [];
+  const note = found.answeredInLine
     ? "answer in the same line: keep only if the question is the reader's own words"
     : "no answer in the same line";
-  return [{ rule, probability: 1, sentence: `${question} (${note})` }];
+  return [{ rule, probability: 1, sentence: `${found.question} (${note})` }];
 }
 
 /** The local checks by name; each returns the findings it raises for one section. */
@@ -636,7 +660,7 @@ async function askInBatches(key, state, questions, usage) {
   return answers;
 }
 
-const hasContent = (section) =>
+export const hasContent = (section) =>
   section.paragraphs.some((p) => p.kind === "code" || p.units.length > 0);
 
 // The state a section is judged in. `withAbove` adds everything the reader
@@ -918,7 +942,9 @@ async function main() {
   process.exit(reports.some((r) => r.failed) ? 1 : 0);
 }
 
-main().catch((e) => {
-  console.error(e.stack ?? String(e));
-  process.exit(2);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => {
+    console.error(e.stack ?? String(e));
+    process.exit(2);
+  });
+}

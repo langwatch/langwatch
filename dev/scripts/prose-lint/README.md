@@ -109,7 +109,7 @@ Jev charges 0.042 USD per million input tokens and nothing for output. Every jud
 | a 7-section page             | both  | 7        | 13       | 59,244       | 0.0025 |
 | a 10-section page            | both  | 10       | 16       | 86,023       | 0.0036 |
 
-So a docs page costs a tenth of a cent with the docs rules and a quarter to a third of a cent with both rule sets. The full calibration run over 15 fixtures is 0.006 USD. The request cap is 32k tokens for text and questions together; the tool keeps a 30k budget and splits the questions across requests when a section is long. It never splits the text: a section over the budget is reported as an error, and `--section-level 3` is the way to make sections smaller.
+So a docs page costs a tenth of a cent with the docs rules and a quarter to a third of a cent with both rule sets. The full calibration run over 17 fixtures is 0.0063 USD. The request cap is 32k tokens for text and questions together; the tool keeps a 30k budget and splits the questions across requests when a section is long. It never splits the text: a section over the budget is reported as an error, and `--section-level 3` is the way to make sections smaller.
 
 ## Calibrate
 
