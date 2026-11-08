@@ -611,7 +611,7 @@ describe("given the share-control command", () => {
       const onProject = (projectId: string): string =>
         `Basic ${Buffer.from(`${projectId}:${LOGIN_KEY}`).toString("base64")}`;
 
-      it("lists again on a project the key reaches, and keeps it for the approval", async () => {
+      it("lists again on a project the key reaches, and approves on the request's own project", async () => {
         const { impl, calls } = fetchInTurn([
           projectRequired([
             { id: "project_a", name: "ACME Shop" },
@@ -631,7 +631,22 @@ describe("given the share-control command", () => {
         expect(requests).toHaveLength(1);
         expect(calls).toHaveLength(3);
         expect(authorizationOf(calls[1]!)).toBe(onProject("project_a"));
-        expect(authorizationOf(calls[2]!)).toBe(onProject("project_a"));
+        expect(authorizationOf(calls[2]!)).toBe(onProject("project_1"));
+      });
+
+      it("cancels on the request's own project", async () => {
+        const { impl, calls } = fetchInTurn([
+          projectRequired([{ id: "project_a", name: "ACME Shop" }]),
+          { body: { requests: [requestNamed("req_1", "Instrument tracing")] } },
+          { body: { cancelled: true } },
+        ]);
+        const api = createControlApi({ endpoint: ENDPOINT, apiKey: LOGIN_KEY, fetchImpl: impl });
+
+        await api.list();
+        await api.cancel({ requestId: "req_1" });
+
+        expect(calls[2]!.url).toBe(`${ENDPOINT}/api/v1/langy/control/requests/req_1/cancel`);
+        expect(authorizationOf(calls[2]!)).toBe(onProject("project_1"));
       });
 
       it("says what to do when the key reaches no project yet, never the raw refusal", async () => {
