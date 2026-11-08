@@ -21,7 +21,6 @@ export const DEMO_PLATFORM_IDS = {
     escalation: "demo-scenario-escalation",
   },
   suite: "demo-suite-support-regression",
-  dataset: "demo-dataset-support-regression",
   experiment: "demo-experiment-support-quality",
 } as const;
 
