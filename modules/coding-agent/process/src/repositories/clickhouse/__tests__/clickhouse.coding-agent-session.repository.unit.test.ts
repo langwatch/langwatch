@@ -1,3 +1,4 @@
+import { SHARED_CLICKHOUSE_TARGET } from "@langwatch/clickhouse-client";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -9,6 +10,7 @@ import {
 import { NoopCodingAgentReadMetricsService } from "../../../__tests__/support/coding-agent-read-metrics-noop.service.ts";
 import {
   type CodingAgentReadMetrics,
+  type CodingAgentSessionListReadOutcome,
   type SessionIdIndexRead,
   SessionIdIndexNotReadyError,
 } from "../../coding-agent-session.repository.ts";
@@ -24,14 +26,23 @@ const DAY_MS = 86_400_000;
 const SPAN_FROM_MS = Date.parse("2026-08-03T10:00:00Z");
 const SPAN_TO_MS = Date.parse("2026-08-05T10:00:00Z");
 
-/** Counts the reads that found the session id index not ready. */
+/** Counts the reads that found the session id index not ready, and the list outcomes observed. */
 class NotReadyCounter implements CodingAgentReadMetrics {
-  readonly notReady: SessionIdIndexRead[] = [];
+  readonly notReady: { read: SessionIdIndexRead; target: string }[] = [];
+  readonly outcomes: CodingAgentSessionListReadOutcome[] = [];
 
-  observeSessionListRead(): void {}
+  observeSessionListRead({ outcome }: { outcome: CodingAgentSessionListReadOutcome }): void {
+    this.outcomes.push(outcome);
+  }
 
-  countSessionIdIndexNotReady({ read }: { read: SessionIdIndexRead }): void {
-    this.notReady.push(read);
+  countSessionIdIndexNotReady({
+    read,
+    target,
+  }: {
+    read: SessionIdIndexRead;
+    target: string;
+  }): void {
+    this.notReady.push({ read, target });
   }
 }
 
@@ -383,6 +394,22 @@ describe("Coding Agent session ClickHouse repository", () => {
         expect(endpoint.requests).toHaveLength(1);
       });
 
+      it("observes no_sessions, not empty, when the index names no session", async () => {
+        const metrics = new NotReadyCounter();
+        const { endpoint, repository } = await createRepository({ idIndexReady: true, metrics });
+        endpoint.queryRows.push(spanRow(0));
+
+        await repository.findManyRecent({
+          tenantId: "project-1",
+          fromMs: 100,
+          toMs: 200,
+          limit: 5,
+        });
+
+        expect(metrics.outcomes).toEqual(["no_sessions"]);
+        expect(endpoint.requests).toHaveLength(1);
+      });
+
       it("bounds a fenced page's dedup scope from the index under the fence's tenants", async () => {
         const { endpoint, repository } = await createRepository({ idIndexReady: true });
         endpoint.queryRows.push(spanRow(1), []);
@@ -422,6 +449,24 @@ describe("Coding Agent session ClickHouse repository", () => {
         expect(span?.body).toContain("HAVING SessionToAt >=");
         expect(span?.body).not.toContain("SessionFromAt <=");
         expect(dedupScopeOf(list?.body)).toContain("{spanFrom:Int64}");
+      });
+
+      it("reads no session rows when the index names no session since the caller's time", async () => {
+        const { endpoint, repository } = await createRepository({ idIndexReady: true });
+        endpoint.queryRows.push(spanRow(0));
+
+        await expect(
+          repository.findByRepositoryBranch({
+            tenantIds: ["project-1"],
+            repositoryHost: "github.com",
+            repositoryOwner: "acme",
+            repositoryName: "app",
+            branches: ["main"],
+            startedAtFromMs: 100,
+          }),
+        ).resolves.toEqual([]);
+
+        expect(endpoint.requests).toHaveLength(1);
       });
     });
 
@@ -508,7 +553,9 @@ describe("Coding Agent session ClickHouse repository", () => {
       ).rejects.toBeInstanceOf(SessionIdIndexNotReadyError);
 
       expect(endpoint.requests).toHaveLength(0);
-      expect(metrics.notReady).toEqual(["other_session_kind"]);
+      expect(metrics.notReady).toEqual([
+        { read: "other_session_kind", target: SHARED_CLICKHOUSE_TARGET },
+      ]);
     });
 
     it("lists recent sessions as before the index, and counts the unbounded read", async () => {
@@ -521,7 +568,65 @@ describe("Coding Agent session ClickHouse repository", () => {
       expect(endpoint.requests).toHaveLength(1);
       expect(dedupScopeOf(endpoint.requests[0]?.body)).not.toContain("{spanFrom");
       expect(endpoint.requests[0]?.body).not.toContain("_id_index");
-      expect(metrics.notReady).toEqual(["recent_list"]);
+      expect(metrics.notReady).toEqual([{ read: "recent_list", target: SHARED_CLICKHOUSE_TARGET }]);
+    });
+
+    it("lists a branch's sessions unbounded, and counts the read once", async () => {
+      const metrics = new NotReadyCounter();
+      const { endpoint, repository } = await createRepository({ metrics });
+      endpoint.queryRows.push([]);
+
+      await repository.findByRepositoryBranch({
+        tenantIds: ["project-1"],
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "app",
+        branches: ["main"],
+        startedAtFromMs: 100,
+      });
+
+      expect(endpoint.requests).toHaveLength(1);
+      expect(dedupScopeOf(endpoint.requests[0]?.body)).not.toContain("{spanFrom");
+      expect(endpoint.requests[0]?.body).not.toContain("_id_index");
+      expect(metrics.notReady).toEqual([{ read: "branch_list", target: SHARED_CLICKHOUSE_TARGET }]);
+    });
+
+    it("lists a fenced page unbounded, and counts the read once", async () => {
+      const metrics = new NotReadyCounter();
+      const { endpoint, repository } = await createRepository({ metrics });
+      endpoint.queryRows.push([]);
+
+      await repository.findManyRecentFenced({
+        authorization: aggregateProof({
+          projectId: "aggregate",
+          members: [{ projectId: "member-a", from: 1_000 }],
+        }),
+        fromMs: 100,
+        toMs: 200,
+        limit: 25,
+      });
+
+      expect(endpoint.requests).toHaveLength(1);
+      expect(dedupScopeOf(endpoint.requests[0]?.body)).not.toContain("{spanFrom");
+      expect(endpoint.requests[0]?.body).not.toContain("_id_index");
+      expect(metrics.notReady).toEqual([
+        { read: "recent_list_fenced", target: SHARED_CLICKHOUSE_TARGET },
+      ]);
+    });
+
+    it("counts usage unbounded, and counts the read once", async () => {
+      const metrics = new NotReadyCounter();
+      const { endpoint, repository } = await createRepository({ metrics });
+      endpoint.queryRows.push([{ Total: "0", FirstMs: "0" }], [{ Total: "0", FirstMs: "0" }]);
+
+      await repository.countUsage({ projectIds: ["project-1"] });
+
+      expect(endpoint.requests).toHaveLength(2);
+      for (const request of endpoint.requests) {
+        expect(request.body).not.toContain("{spanFrom");
+        expect(request.body).not.toContain("_id_index");
+      }
+      expect(metrics.notReady).toEqual([{ read: "usage_count", target: SHARED_CLICKHOUSE_TARGET }]);
     });
   });
 });

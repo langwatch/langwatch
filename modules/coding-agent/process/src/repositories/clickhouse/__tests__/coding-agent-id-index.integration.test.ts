@@ -385,6 +385,7 @@ describe("coding-agent session reads bounded by the session id index", () => {
         sessions.findOtherSessionKind({ tenantId, excludeSessionIds: sessionIds() }),
       ).resolves.toBe("none");
 
+      expect(statements).not.toHaveLength(0);
       expect(statements.every((request) => request.sql.includes("_id_index"))).toBe(true);
     });
   });

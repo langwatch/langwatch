@@ -58,8 +58,8 @@ const sessionSpanRowsSchema = z.array(
 /** Which tenants a span read covers: one tenant, or an organization's declared set. */
 type SpanTenants = { tenantId: string; tenantIds?: string[] };
 
-/** Reads already warned about a not-ready index; the counter carries every later one. */
-const warnedNotReady = new Set<SessionIdIndexRead>();
+/** `target:read` pairs already warned about a not-ready index; the counter has the rest. */
+const warnedNotReady = new Set<string>();
 
 /** The newest version first; ties keep the one that folded the most (ADR-071). */
 const LATEST_SESSION_ORDER = `ORDER BY
@@ -470,7 +470,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       .idIndexes()
       .isReady({ source: TABLE_NAME, key: SESSION_ID_KEY, target });
     if (!ready) {
-      this.reportIndexNotReady({ read, tenantId: tenants.tenantId, whenNotReady });
+      this.reportIndexNotReady({ read, target, tenantId: tenants.tenantId, whenNotReady });
       if (whenNotReady === "refuse") throw new SessionIdIndexNotReadyError({ read });
       return UNBOUNDED;
     }
@@ -478,21 +478,24 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     return span.n === 0 ? null : startedAtWithin(span);
   }
 
-  /** Counts every not-ready read, and warns once per read kind per process. */
+  /** Counts every not-ready read, and warns once per read kind and target per process. */
   private reportIndexNotReady({
     read,
+    target,
     tenantId,
     whenNotReady,
   }: {
     read: SessionIdIndexRead;
+    target: string;
     tenantId: string;
     whenNotReady: "unbounded" | "refuse";
   }): void {
-    this.metrics.countSessionIdIndexNotReady({ read });
-    if (warnedNotReady.has(read)) return;
-    warnedNotReady.add(read);
+    this.metrics.countSessionIdIndexNotReady({ read, target });
+    const key = `${target}:${read}`;
+    if (warnedNotReady.has(key)) return;
+    warnedNotReady.add(key);
     logger.warn(
-      { read, tenantId, whenNotReady },
+      { read, target, tenantId, whenNotReady },
       "coding-agent session id index not ready, the read ran without its bound or was refused",
     );
   }
@@ -832,7 +835,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
         whenNotReady: "unbounded",
       });
       if (dedup === null) {
-        observe("empty");
+        observe("no_sessions");
         return [];
       }
       ({ rows } = await this.clickhouse.query<Record<string, unknown>>({
@@ -874,10 +877,9 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       observe("error");
       throw error;
     }
-    // Timed around the read and its row deserialization, but NOT the mapping to
-    // domain rows. The `empty` outcome is the one ADR-071 sequencing step 3
-    // reads, and it carries no rows to deserialize, so it isolates the dedup
-    // scan's own floor from anything that scales with page size.
+    // `empty` means the dedup scan ran and returned nothing. `no_sessions` means the index
+    // found no session, so the scan never ran. Timings include the span read and the row
+    // deserialization, but not the mapping to domain rows.
     observe(rows.length > 0 ? "hit" : "empty");
 
     // Marked sessions left with the dedup group above; this repeats the rule on the settled row.
@@ -916,7 +918,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       const reader = this.reader(authorization);
       const dedup = await this.fencedDedupBound({ reader, fromMs, toMs });
       if (dedup === null) {
-        observe("empty");
+        observe("no_sessions");
         return [];
       }
       const result = await reader.query<Record<string, unknown>>({

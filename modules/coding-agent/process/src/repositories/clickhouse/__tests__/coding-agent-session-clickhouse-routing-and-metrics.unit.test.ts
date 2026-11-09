@@ -10,7 +10,10 @@ import { describe, expect, it } from "vitest";
 import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { NoopCodingAgentReadMetricsService } from "../../../__tests__/support/coding-agent-read-metrics-noop.service.ts";
 import { sessionIdIndexNotReady } from "../../../__tests__/support/session-id-index-not-ready.fixture.ts";
-import type { CodingAgentReadMetrics } from "../../coding-agent-session.repository.ts";
+import type {
+  CodingAgentReadMetrics,
+  CodingAgentSessionListReadOutcome,
+} from "../../coding-agent-session.repository.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 
 const WINDOW_FROM = new Date("2026-07-24T00:00:00.000Z").getTime();
@@ -138,9 +141,14 @@ describe("CodingAgentSessionClickHouseRepository branch-list read", () => {
  * an injected `CodingAgentReadMetrics`, so this is the seam the package's own tests
  */
 class CountingReadMetrics implements CodingAgentReadMetrics {
-  counts = { hit: 0, empty: 0, error: 0 };
+  counts: Record<CodingAgentSessionListReadOutcome, number> = {
+    hit: 0,
+    empty: 0,
+    no_sessions: 0,
+    error: 0,
+  };
 
-  observeSessionListRead(input: { outcome: "hit" | "empty" | "error" }): void {
+  observeSessionListRead(input: { outcome: CodingAgentSessionListReadOutcome }): void {
     this.counts[input.outcome] += 1;
   }
 

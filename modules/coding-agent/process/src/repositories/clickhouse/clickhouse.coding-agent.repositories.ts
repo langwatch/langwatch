@@ -51,7 +51,8 @@ export class ClickHouseCodingAgentRepositories {
         metrics: {
           observeSessionListRead: ({ table, outcome, durationMs }) =>
             sessionListReadDuration.observe(durationMs, { table, outcome }),
-          countSessionIdIndexNotReady: ({ read }) => sessionIdIndexNotReady.inc({ read }),
+          countSessionIdIndexNotReady: ({ read, target }) =>
+            sessionIdIndexNotReady.inc({ read, target }),
         },
         clock,
       }),

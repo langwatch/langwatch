@@ -348,7 +348,7 @@ describe("CodingAgentSessionFactsService", () => {
     });
 
     /** @scenario "A history check fails closed while the session id index is not ready" */
-    it("does not flag it when the session id index is not ready", async () => {
+    it("fails closed when the session id index is not ready", async () => {
       const { service, recorded } = factsOver({
         findOtherSessionKind: async () => {
           throw new SessionIdIndexNotReadyError({ read: "other_session_kind" });

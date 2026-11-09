@@ -5,7 +5,11 @@ import type {
   CodingAgentUsageCount,
 } from "@langwatch/coding-agent-contract";
 
-export type CodingAgentSessionListReadOutcome = "hit" | "empty" | "error";
+/**
+ * `no_sessions`: the id index found nothing in the window, so the dedup scan never ran;
+ * `empty` stays the dedup scan's own floor.
+ */
+export type CodingAgentSessionListReadOutcome = "hit" | "empty" | "no_sessions" | "error";
 
 /** The other sessions a tenant holds: a main-thread one, only helper threads, or none. */
 export type OtherSessionKind = "none" | "helpers_only" | "main";
@@ -25,8 +29,8 @@ export interface CodingAgentReadMetrics {
     outcome: CodingAgentSessionListReadOutcome;
     durationMs: number;
   }): void;
-  /** One read that found the session id index not ready on its target. */
-  countSessionIdIndexNotReady(input: { read: SessionIdIndexRead }): void;
+  /** One read that found the session id index not ready on its ClickHouse target. */
+  countSessionIdIndexNotReady(input: { read: SessionIdIndexRead; target: string }): void;
 }
 
 /** The session id index is not ready, so a read that may not scan unbounded refused to run. */
