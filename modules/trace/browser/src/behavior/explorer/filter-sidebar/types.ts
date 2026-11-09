@@ -97,6 +97,8 @@ export interface CategoricalSection extends SectionBase {
    * Used to show a "No values yet" placeholder instead of an empty list.
    */
   synthetic?: boolean;
+  /** Listed without values: they are counted once the section opens. */
+  deferred?: boolean;
 }
 
 export interface RangeSectionData extends SectionBase {

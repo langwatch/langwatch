@@ -39,8 +39,8 @@ const timeRange = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
 type BatchCall = {
   table: string;
   timeRange: unknown;
-  categoricalSpecs: { key: string }[];
-  rangeSpecs: { key: string }[];
+  categoricalSpecs: { key: string; expression: string }[];
+  rangeSpecs: { key: string; expression: string }[];
   filterWhere?: TraceFilterWhere;
 };
 
@@ -88,12 +88,14 @@ async function facetsFor({
   authorization = ownProof({ projectId: TENANT }),
   repositoryFor = recordingRepository,
   topicNames = { findNamesByIds: async () => new Map() },
+  facetKeys,
 }: {
   query: string;
   window?: { from: number; to: number; live?: boolean };
   authorization?: Authorization;
   repositoryFor?: typeof recordingRepository;
   topicNames?: Pick<TraceTopicNamesReadRepository, "findNamesByIds">;
+  facetKeys?: string[];
 }) {
   const { repository, calls } = repositoryFor();
   const service = TraceListService.create({
@@ -107,6 +109,7 @@ async function facetsFor({
     authorization,
     timeRange: window,
     filterKey: query,
+    ...(facetKeys ? { facetKeys } : {}),
     filterFor: createFacetFilterResolver({
       queryText: query,
       compile: (text) =>
@@ -351,6 +354,93 @@ describe("the sidebar's facet counts", () => {
       await request("status:error");
 
       expect(calls.batched).toHaveLength(2 * scansPerRun);
+    });
+  });
+
+  describe("given the span type facet, whose values read the span attribute map", () => {
+    /** Every expression a read sent to the store. */
+    const expressionsOf = (calls: ReturnType<typeof recordingRepository>["calls"]) => [
+      ...calls.batched.flatMap((c) => [...c.categoricalSpecs, ...c.rangeSpecs]),
+      ...calls.categorical.map((c) => ({ key: "", expression: c.facetExpression })),
+    ];
+
+    it("leaves the span attribute map out of the default read", async () => {
+      const { calls } = await facetsFor({ query: "status:error" });
+
+      for (const spec of expressionsOf(calls))
+        expect(spec.expression).not.toContain("SpanAttributes");
+      const spans = calls.batched.find((c) => c.table === "stored_spans");
+      expect(spans?.categoricalSpecs.map((s) => s.key)).toEqual(["spanName", "spanStatus"]);
+    });
+
+    it("lists span type without values, for the sidebar to ask for when opened", async () => {
+      const { facets } = await facetsFor({ query: "" });
+
+      expect(facets.find((facet) => facet.key === "spanType")).toEqual({
+        key: "spanType",
+        kind: "categorical",
+        label: "Span type",
+        group: "span",
+        topValues: [],
+        totalDistinct: 0,
+        deferred: true,
+      });
+    });
+
+    it("counts span type alone, under the query, when asked for by key", async () => {
+      const { facets, calls } = await facetsFor({
+        query: "status:error",
+        facetKeys: ["spanType"],
+        repositoryFor: () =>
+          recordingRepository({
+            batchedFacets: async () => ({
+              categoricals: {
+                spanType: { values: [{ value: "llm", count: 4 }], totalDistinct: 1 },
+              },
+              ranges: {},
+            }),
+          }),
+      });
+
+      expect(calls.batched).toHaveLength(1);
+      expect(calls.batched[0]?.table).toBe("stored_spans");
+      expect(calls.batched[0]?.categoricalSpecs.map((s) => s.key)).toEqual(["spanType"]);
+      expect(calls.batched[0]?.filterWhere?.sql).toContain(compiled("status:error"));
+      expect(calls.categorical).toHaveLength(0);
+      expect(calls.raw).toHaveLength(0);
+      expect(calls.discrete).toHaveLength(0);
+      expect(facets).toEqual([
+        expect.objectContaining({ key: "spanType", topValues: [{ value: "llm", count: 4 }] }),
+      ]);
+      expect(facets[0]).not.toHaveProperty("deferred");
+    });
+
+    it("leaves the span attribute map out of the cached discovery", async () => {
+      const { repository, calls } = recordingRepository();
+      let refreshed = false;
+      const service = TraceListService.create({
+        discoverUpdates: {
+          publishProjectEvent: async () => {
+            refreshed = true;
+          },
+        },
+        facets: CLICKHOUSE_FACET_CATALOG,
+        repository,
+        evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
+        topicNames: { findNamesByIds: async () => new Map() },
+      });
+      const params = {
+        authorization: ownProof({ projectId: "tenant-deferred-discover" }),
+        timeRange,
+      };
+
+      await service.getDiscover(params);
+      await vi.waitFor(() => expect(refreshed).toBe(true));
+      const { facets } = await service.getDiscover(params);
+
+      for (const spec of expressionsOf(calls))
+        expect(spec.expression).not.toContain("SpanAttributes");
+      expect(facets.find((facet) => facet.key === "spanType")).toMatchObject({ deferred: true });
     });
   });
 });

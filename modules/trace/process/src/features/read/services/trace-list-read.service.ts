@@ -66,6 +66,8 @@ interface FacetParams {
    * the same key count the same facets.
    */
   filterKey: string;
+  /** Count only these facets, deferred ones included; every other facet when absent. */
+  facetKeys?: readonly string[];
 }
 
 interface NewCountParams {
@@ -272,6 +274,7 @@ export class TraceListService {
       params.timeRange.to,
       params.timeRange.live === true,
       params.filterKey,
+      params.facetKeys ?? null,
     ]);
     const running = this.#facetsInFlight.get(key);
     if (running) return running;
@@ -280,6 +283,7 @@ export class TraceListService {
       .getFilteredFacets({
         params: { authorization: params.authorization, timeRange: params.timeRange },
         filterFor: params.filterFor,
+        ...(params.facetKeys ? { facetKeys: params.facetKeys } : {}),
       })
       .finally(() => this.#facetsInFlight.delete(key));
     this.#facetsInFlight.set(key, run);

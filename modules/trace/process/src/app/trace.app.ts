@@ -1964,23 +1964,28 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
   }
 
-  /** No `query` at all is the vocabulary read; a `query`, empty included, asks for counts. */
+  /**
+   * No `query` at all is the vocabulary read; a `query`, empty included, asks
+   * for counts, as do `facetKeys`, which narrow them to the facets named.
+   */
   async readDiscoverForQuery(input: {
     projectId: string;
     timeRange: { from: number; to: number; live?: boolean };
     query?: string | null;
     evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
+    facetKeys?: readonly string[];
     authorization: Authorization;
     protections?: Protections;
   }): Promise<DiscoverResult> {
-    if (input.query === null || input.query === undefined) {
+    if ((input.query === null || input.query === undefined) && !input.facetKeys) {
       return this.readDiscover({ authorization: input.authorization, timeRange: input.timeRange });
     }
     return this.readFilteredFacets({
       projectId: input.projectId,
       authorization: input.authorization,
       timeRange: input.timeRange,
-      query: input.query,
+      query: input.query ?? "",
+      ...(input.facetKeys ? { facetKeys: input.facetKeys } : {}),
       ...(input.protections ? { protections: input.protections } : {}),
       evalRuns: await this.findExplorerEvalRuns({
         projectId: input.projectId,
@@ -2747,6 +2752,8 @@ export class TraceModule implements TraceApi, CollectorApp {
     projectId: string;
     timeRange: { from: number; to: number; live?: boolean };
     query: string;
+    /** Count only these facets, deferred ones included. */
+    facetKeys?: readonly string[];
     evalRuns?: readonly ResolvedInstantEvalRun[];
     authorization: Authorization;
     protections?: Protections;
@@ -2773,6 +2780,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       authorization: input.authorization,
       timeRange: input.timeRange,
       filterFor,
+      ...(input.facetKeys ? { facetKeys: input.facetKeys } : {}),
       // Everything `filterFor` reads besides the proof and the window.
       filterKey: JSON.stringify([
         input.projectId,

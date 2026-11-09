@@ -45,7 +45,9 @@ import { useFilteredTraceFacets } from "../../../../../features/facet/behavior/u
 import { useTraceFacets } from "../../../../../features/facet/behavior/use-trace-facets.ts";
 import { hashColor } from "../../../../../model/display-formatters.ts";
 import {
+  deferredFacetKeysToLoad,
   type FacetCountState,
+  fillDeferredFacets,
   mergeFacetDescriptors,
 } from "../../../../../model/explorer/filter-sidebar/merge-facet-descriptors.ts";
 import { routeToggleViaOrGroups } from "../../../../../model/explorer/filter-sidebar/route-toggle-via-or-groups.ts";
@@ -293,7 +295,12 @@ function facetItemsFor({
 }): Map<string, FacetItem[]> {
   const map = new Map<string, FacetItem[]>();
   for (const cat of categoricals) {
-    const items = buildFacetItems({ cat, isSynthetic: cat.synthetic ?? isSynthetic, countState });
+    const items = buildFacetItems({
+      cat,
+      isSynthetic: cat.synthetic ?? isSynthetic,
+      // A deferred facet's values are not counted until its section opens.
+      countState: cat.deferred ? "pending" : countState,
+    });
     map.set(
       cat.key,
       withQueryValues({ items, ast, key: cat.key, extra: () => ({ dimmed: true }) }),
@@ -356,7 +363,7 @@ export function useFilterSidebarData() {
   const { data: discovered, isLoading: facetsLoading } = useTraceFacets();
   const filtered = useFilteredTraceFacets();
   const isSamplePreview = usePreviewTracesActive();
-  const { descriptors, countState } = useMemo(
+  const merged = useMemo(
     () =>
       isSamplePreview
         ? { descriptors: discovered, countState: "settled" as const }
@@ -369,6 +376,7 @@ export function useFilterSidebarData() {
   );
 
   const lensSectionOrder = useFacetLensStore((s) => s.lens.sectionOrder);
+  const sectionOpen = useFacetLensStore((s) => s.lens.sectionOpen);
   const setSectionOrder = useFacetLensStore((s) => s.setSectionOrder);
   const setAllSectionsOpen = useFacetLensStore((s) => s.setAllSectionsOpen);
   const density = useDensityStore((s) => s.density);
@@ -383,6 +391,22 @@ export function useFilterSidebarData() {
       isSectionShown({ key, activeFields, explicitlyHidden, explicitlyShown, density }),
     [density, activeFields, explicitlyHidden, explicitlyShown],
   );
+
+  // A deferred facet is counted only while its section shows and is open,
+  // with the same open rule as FacetSection: the reader's choice, else a filter.
+  const deferred = useFilteredTraceFacets({
+    facetKeys: deferredFacetKeysToLoad({
+      descriptors: merged.descriptors,
+      isOpen: (key) =>
+        isSectionVisibleForDensity(key) && (sectionOpen[key] ?? activeFields.has(key)),
+    }),
+  });
+  const descriptors = fillDeferredFacets({
+    descriptors: merged.descriptors,
+    loaded: deferred.data,
+    loadedIsPlaceholder: deferred.isPlaceholderData,
+  });
+  const { countState } = merged;
 
   const sections = useMemo(
     () => sectionsOf({ descriptors, activeFields }),
@@ -484,7 +508,8 @@ function keptCategoricalSections({
   activeFieldSet: ReadonlySet<string>;
 }): CategoricalSection[] {
   const isSynthetic = (d as { synthetic?: boolean }).synthetic;
-  const isKept = d.topValues.length > 0 || activeFieldSet.has(d.key) || isSynthetic;
+  const isDeferred = d.deferred !== undefined;
+  const isKept = d.topValues.length > 0 || activeFieldSet.has(d.key) || isSynthetic || isDeferred;
   if (!isKept) return [];
   return [
     {
@@ -494,6 +519,7 @@ function keptCategoricalSections({
       group: d.group,
       topValues: d.topValues,
       synthetic: isSynthetic,
+      ...(d.deferred ? { deferred: true } : {}),
     },
   ];
 }

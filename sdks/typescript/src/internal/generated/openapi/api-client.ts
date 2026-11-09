@@ -16135,6 +16135,7 @@ export interface operations {
                                 }[];
                             }[];
                             totalDistinct: number;
+                            deferred?: boolean;
                         } | {
                             key: string;
                             /** @constant */

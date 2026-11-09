@@ -159,12 +159,19 @@ export class TraceDiscoverTaskService {
    * Distinct-value discovery for `isDiscrete`-flagged integer facets. Runs as its own GROUP BY per
    * facet, since the batched range pass only yields min and max.
    */
-  discreteTasks(
-    params: DiscoverParams,
-    filters: FacetFilters,
-    wrap: TaskTimer,
-  ): Promise<Outcome>[] {
-    return this.facets.registry
+  discreteTasks({
+    params,
+    registry,
+    filters,
+    wrap,
+  }: {
+    params: DiscoverParams;
+    /** The facets this read counts. */
+    registry: readonly FacetDefinition[];
+    filters: FacetFilters;
+    wrap: TaskTimer;
+  }): Promise<Outcome>[] {
+    return registry
       .filter((def): def is RangeFacetDef => def.kind === "range" && def.isDiscrete === true)
       .map((def) =>
         wrap(

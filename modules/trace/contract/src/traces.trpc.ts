@@ -354,9 +354,9 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withOutput(tracesConversationContextSchema)
 
   /**
-   * The sidebar's facets: with no `query` field the tenant's cached snapped
-   * discovery, with one (empty string included) every facet counted under it in
-   * the window the list reads, each exempt from its own terms. ADR-139.
+   * The sidebar's facets: no `query` is the tenant's cached discovery; a query
+   * (empty included) or `facetKeys` counts every facet, or just those named,
+   * in the list's window, each exempt from its own terms. ADR-139.
    */
   .query("discover")
   .withInput(
@@ -365,6 +365,7 @@ export const tracesTrpc = defineTrpcContract("traces")
       timeRange: timeRangeSchema,
       query: z.string().nullish(),
       evalRuns: explorerInstantEvalRunsSchema,
+      facetKeys: z.array(z.string().max(64)).min(1).max(16).optional(),
     }),
   )
   .withOutput(discoverResultSchema)

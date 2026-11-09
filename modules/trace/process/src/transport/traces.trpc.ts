@@ -424,6 +424,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           timeRange: input.timeRange,
           query: input.query,
           evalRuns: input.evalRuns,
+          ...(input.facetKeys ? { facetKeys: input.facetKeys } : {}),
         }),
       ),
     )
