@@ -425,6 +425,23 @@ describe("the shared fs module cache", () => {
       expect(secondRun.cacheLog).not.toContain(`[read] ${helperLine(encodedSecond)}`);
     }, 120_000);
 
+    /** @scenario "Checkouts under a path with a dollar sign share entries and keep their own paths" */
+    it("restores a root containing $$ verbatim in the checkout that reads it", async () => {
+      const cache = fresh("dollar-cache");
+      // `$$` is a replacement pattern: restored as a plain string it becomes `$`
+      const dollarFirst = checkout("price$$/first", { "shared/helper.ts": HELPER });
+      const dollarSecond = checkout("price$$/second", { "shared/helper.ts": HELPER });
+
+      const firstRun = await runVitest(dollarFirst, "file", cache);
+      const secondRun = await runVitest(dollarSecond, "file", cache);
+
+      expect(secondRun.cacheLog).toContain(`[read] ${helperLine(dollarSecond)}`);
+      for (const dollarRun of [firstRun, secondRun]) {
+        expect(dollarRun.results["reads its own checkout's path"]?.status).toBe("passed");
+        expect(dollarRun.results["imports the helper this checkout has"]?.status).toBe("passed");
+      }
+    }, 120_000);
+
     /** @scenario "A module whose source contains the cache's root token is never cached" */
     it("never caches a module whose source contains the root token", async () => {
       const cache = fresh("token-cache");

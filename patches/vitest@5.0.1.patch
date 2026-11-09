@@ -12,7 +12,7 @@ index 7f8ab40e591a03cffbb914d5bcd8f06702ae4619..f225ac1d63417509cf35a8da6515f61a
 +function readCachedModuleCode(file, portable) {
 +	const code = readFileSync(file, "utf-8");
 +	const root = process.env.VITEST_FS_MODULE_CACHE_ROOT;
-+	return portable && root && code.includes("@@vitest-fs-module-cache-root@@") ? code.replaceAll("@@vitest-fs-module-cache-root@@", root) : code;
++	return portable && root && code.includes("@@vitest-fs-module-cache-root@@") ? code.replaceAll("@@vitest-fs-module-cache-root@@", () => root) : code;
 +}
  const VITEST_VM_CONTEXT_SYMBOL = "__vitest_vm_context__";
  const cwd = process.cwd();
@@ -219,7 +219,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..d1246d7a1e17229a1ea5ac852daaaf77
 +		return text.replaceAll(`${root}/`, `${FS_CACHE_ROOT_TOKEN}/`).replaceAll(`"${root}"`, `"${FS_CACHE_ROOT_TOKEN}"`);
 +	}
 +	fromPortable(text) {
-+		return text.includes(FS_CACHE_ROOT_TOKEN) ? text.replaceAll(FS_CACHE_ROOT_TOKEN, this.workspaceRoot) : text;
++		return text.includes(FS_CACHE_ROOT_TOKEN) ? text.replaceAll(FS_CACHE_ROOT_TOKEN, () => this.workspaceRoot) : text;
 +	}
 +	// The tsconfig.json files that apply to a module: the nearest one up its directory
 +	// tree and the files it extends. Vite's esbuild reads them to transform TypeScript,
@@ -504,7 +504,7 @@ index 08c3c116fbf8fe4685b45dee57f0f645b1270d81..d1246d7a1e17229a1ea5ac852daaaf77
  					if ("tmp" in result) {
 -						const code = await readFile(result.tmp);
 +						// LangWatch: an entry marked portable names the root with the shared cache's token
-+						const code = await readFile(result.tmp, "utf-8").then((text) => result.portable && process.env[FS_CACHE_ROOT_ENV] ? text.replaceAll(FS_CACHE_ROOT_TOKEN, process.env[FS_CACHE_ROOT_ENV]) : text);
++						const code = await readFile(result.tmp, "utf-8").then((text) => result.portable && process.env[FS_CACHE_ROOT_ENV] ? text.replaceAll(FS_CACHE_ROOT_TOKEN, () => process.env[FS_CACHE_ROOT_ENV]) : text);
  						return { result: {
  							...result,
  							code
@@ -530,7 +530,7 @@ index bce0952f82a0a6e8ff5a1b18db56d67ba988d1a2..a1e0847c7881135398bb185007f722ab
 +function readCachedModuleCode(file, portable) {
 +	const code = readFileSync(file, "utf-8");
 +	const root = process.env.VITEST_FS_MODULE_CACHE_ROOT;
-+	return portable && root && code.includes("@@vitest-fs-module-cache-root@@") ? code.replaceAll("@@vitest-fs-module-cache-root@@", root) : code;
++	return portable && root && code.includes("@@vitest-fs-module-cache-root@@") ? code.replaceAll("@@vitest-fs-module-cache-root@@", () => root) : code;
 +}
  import { o as onCancel, V as VitestEvaluatedModules, a as rpcDone, c as createRuntimeRpc } from './rpc.Bvs-iVxs.js';
  import { s as setupInspect } from './inspector.CvyFGlXm.js';

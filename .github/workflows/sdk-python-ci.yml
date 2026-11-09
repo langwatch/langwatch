@@ -308,8 +308,9 @@ jobs:
           echo "===== langwatch workers (last 300 lines) ====="
           tail -300 /tmp/langwatch-workers.log || true
 
-  # The ends of the interpreter range declared by requires-python. `test`
-  # above covers the middle on the repo's own pinned version.
+  # The ends of the interpreter range declared by requires-python, and one
+  # version between them: `test` above runs on the repo's pinned version,
+  # which is the floor (3.11), so nothing else covers the middle.
   #
   # Installs the package and its own dependencies only. The dev and examples
   # groups pull packages that have no wheels for the newest interpreter
@@ -326,7 +327,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.14"]
+        python-version: ["3.11", "3.13", "3.14"]
 
     steps:
       - name: Checkout

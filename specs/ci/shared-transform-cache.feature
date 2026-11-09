@@ -113,6 +113,13 @@ Feature: Vitest's transform cache is shared across checkouts
     And each checkout's tests pass
 
   @integration
+  Scenario: Checkouts under a path with a dollar sign share entries and keep their own paths
+    Given two checkouts whose root contains "$$", which URL-encoding leaves as it is
+    When each runs the same suite against the same cache
+    Then the second checkout reads the first checkout's modules
+    And each module's import.meta paths name its own checkout, dollar signs intact
+
+  @integration
   Scenario: A module whose source contains the cache's root token is never cached
     Given a module whose source contains the cache's root token
     When two checkouts run their tests
