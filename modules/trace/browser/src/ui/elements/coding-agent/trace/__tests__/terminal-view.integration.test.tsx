@@ -245,7 +245,7 @@ describe("TerminalView", () => {
 
   describe("given a session name", () => {
     it("shows it in the bottom bar", () => {
-      renderView({ sessionName: "Fix the flaky CI job" });
+      renderView({ promptLine: "Fix the flaky CI job" });
       expect(screen.getByText("Fix the flaky CI job")).toBeInTheDocument();
     });
 

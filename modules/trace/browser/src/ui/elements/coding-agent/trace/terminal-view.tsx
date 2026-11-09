@@ -319,8 +319,8 @@ interface TerminalViewProps {
   toolSpans?: ToolSpanIndex;
   /** Claude Code's own version, model, and repo — shown above the first prompt. */
   banner?: SessionBanner;
-  /** The trace's name, shown in the bottom bar where Claude Code shows its input. */
-  sessionName?: string | null;
+  /** The trace's name or the session's first prompt, shown in the bottom bar's input line. */
+  promptLine?: string | null;
   /**
    * A stable identity per entry, parallel to `entries`. Without it rows are
    * keyed by position, which is only safe while nothing is ever prepended.
@@ -634,7 +634,7 @@ export const TerminalView = memo(function TerminalView({
   entries,
   toolSpans = NO_TOOL_SPANS,
   banner,
-  sessionName,
+  promptLine,
   rowKeys,
   turnDividers,
   scrollback,
@@ -775,7 +775,7 @@ export const TerminalView = memo(function TerminalView({
         sessionCostUsd={sessionCostUsd ?? null}
         elapsedMs={point?.elapsedMs ?? 0}
         model={modelAtScroll}
-        sessionName={sessionName}
+        promptLine={promptLine}
       />
     </VStack>
   );
@@ -1672,7 +1672,7 @@ function StatusLine({
   sessionCostUsd,
   elapsedMs,
   model,
-  sessionName,
+  promptLine,
 }: {
   stepCount: number;
   currentStep: number;
@@ -1683,7 +1683,7 @@ function StatusLine({
   sessionCostUsd: number | null;
   elapsedMs: number;
   model?: string | null;
-  sessionName?: string | null;
+  promptLine?: string | null;
 }) {
   const costLabel = statusLineCostLabel({ costUsd, sessionCostUsd });
   return (
@@ -1709,7 +1709,7 @@ function StatusLine({
             ❯
           </Text>
           <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate minWidth={0} flex={1}>
-            {sessionName ?? "Untitled session"}
+            {promptLine ?? "Untitled session"}
           </Text>
         </HStack>
       </AsciiBox>

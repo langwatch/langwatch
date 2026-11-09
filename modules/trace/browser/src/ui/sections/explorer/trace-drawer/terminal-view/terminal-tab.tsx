@@ -127,7 +127,7 @@ export function TerminalTab({
       sessionStartAtMs={session.sessionStartAtMs}
       sessionCostUsd={sessionCostUsd}
       banner={banner}
-      sessionName={promptLine}
+      promptLine={promptLine}
     />
   );
 }

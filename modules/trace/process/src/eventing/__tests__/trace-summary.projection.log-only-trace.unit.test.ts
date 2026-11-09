@@ -151,6 +151,20 @@ describe("TraceSummaryFoldProjection, given a logs-only Grok turn", () => {
     expect(state.totalDurationMs).toBe(0);
   });
 
+  /** @scenario "Only Grok's synthesized records time a trace" */
+  it.each(["claude_synthesized", "codex_synthesized"] as const)(
+    "leaves the window to spans for a %s record",
+    (correlationSource) => {
+      const state = fold([
+        grokContribution({ eventName: "user_prompt", atMs: TURN_START_MS, correlationSource }),
+        grokContribution({ eventName: "api_request", atMs: TURN_START_MS + 900, correlationSource }),
+      ]);
+
+      expect(state.occurredAt).toBe(0);
+      expect(state.totalDurationMs).toBe(0);
+    },
+  );
+
   it("freezes the storage anchor where the analytics fold does: the first accept time", () => {
     const turn = grokTurn();
     const summary = makeProjection();

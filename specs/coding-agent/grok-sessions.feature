@@ -211,6 +211,14 @@ Rule: A Grok turn reads back in the Trace Explorer
     When they contribute to the trace in any order
     Then the trace starts at the user_prompt and lasts 4120ms
 
+  # Claude and Codex keep a valid wire trace id when only the span id is missing, so their
+  # synthesized records can land on a trace whose spans already time it.
+  @unit
+  Scenario: Only Grok's synthesized records time a trace
+    Given a Claude or Codex record correlated by its session, not by trace context
+    When it contributes to the trace
+    Then the trace's start and duration are left to its spans
+
   # Every Grok turn record names the model as `model` (captured: "grok-4.7" on
   # session_start, user_prompt, api_request, turn_completed and session_end).
   @unit

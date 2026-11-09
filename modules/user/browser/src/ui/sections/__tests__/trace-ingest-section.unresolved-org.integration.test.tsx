@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  * /me renders before the organisation resolves; no read may go out with a
  * placeholder organisation id, which the server answers with FORBIDDEN.
+ * @see modules/user/specs/user.feature
  */
 import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { cleanup, render } from "@testing-library/react";
@@ -55,6 +56,7 @@ describe("given the trace ingest section on /me", () => {
   });
 
   describe("when the organisation has not resolved yet", () => {
+    /** @scenario "The trace ingest section waits for the organisation before reading" */
     it("sends no ingestion read and names no placeholder organisation", () => {
       render(
         <DesignSystemTestProvider>
@@ -70,6 +72,7 @@ describe("given the trace ingest section on /me", () => {
   });
 
   describe("when the organisation has resolved", () => {
+    /** @scenario "The trace ingest section reads for the organisation once it resolves" */
     it("reads templates and keys for that organisation", () => {
       scope.organization = { id: "org_acme", name: "ACME" };
 
