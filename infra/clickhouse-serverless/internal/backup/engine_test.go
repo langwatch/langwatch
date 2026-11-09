@@ -198,6 +198,64 @@ func TestSidecar_AdoptsAfterRestart(t *testing.T) {
 	}
 }
 
+// @scenario "A backup running past STALE_BACKUP_HOURS is reported, waited for and never doubled"
+func TestEngine_OverrunningBackup(t *testing.T) {
+	old := inFlight(Full, "langwatch_full_20261022T163000Z", ago(20*time.Hour))
+	running := func() *fakeStore {
+		b := old
+		return &fakeStore{
+			inFlight:    []Backup{old},
+			statusOf:    map[string]*Backup{old.ID: &b},
+			finalStatus: "CREATING_BACKUP",
+			replicas:    Replicas{Total: 1, Reachable: []int{0}},
+			lastInc:     ago(time.Minute),
+		}
+	}
+
+	t.Run("a one-shot wait gives up but starts no second", func(t *testing.T) {
+		f := running()
+		e := engineFor(f)
+		res := e.wait(context.Background(), Result{}, old.ID)
+		if res.Outcome != Failed || !strings.Contains(res.Err.Error(), "no second one starts") {
+			t.Errorf("%+v", res)
+		}
+		if res := e.Run(context.Background(), Full, RunOptions{}); res.Outcome != Failed || len(f.execs) != 0 {
+			t.Errorf("a full started beside a 20h full: %+v, execs %v", res, f.execs)
+		}
+	})
+
+	t.Run("the sidecar adopts it, keeps waiting and flags it", func(t *testing.T) {
+		f := running()
+		f.finalStatus = "BACKUP_CREATED"
+		f.polls = -50 // still running for the first polls, well past the threshold
+		s := sidecarFor(f, SidecarRun, 0)
+		s.Engine.KeepWaiting = true
+		tick(s)
+		if len(f.execs) != 0 {
+			t.Fatalf("a second backup started: %v", f.execs)
+		}
+		st := s.Metrics.Status()
+		if st.Modes[Full].LastOutcome != string(Succeeded) || st.Modes[Full].LastBackup != old.Path {
+			t.Errorf("the overrunning backup was not adopted to completion: %+v", st.Modes[Full])
+		}
+		var b strings.Builder
+		s.Metrics.WritePrometheus(&b)
+		for _, want := range []string{`clickhouse_backup_overrunning{mode="full"} 1`, `clickhouse_backup_overrunning{mode="incremental"} 0`} {
+			if !strings.Contains(b.String(), want) {
+				t.Errorf("missing %s in\n%s", want, b.String())
+			}
+		}
+	})
+
+	t.Run("observe mode flags it too", func(t *testing.T) {
+		s := sidecarFor(running(), SidecarObserve, 0)
+		tick(s)
+		if !s.Metrics.Status().Modes[Full].Overrunning {
+			t.Error("observe mode did not flag an overrunning full")
+		}
+	})
+}
+
 // @scenario "Exactly one replica runs backups, failing over to the next that answers"
 func TestSidecar_OnlyTheRunnerBacksUp(t *testing.T) {
 	for self := 0; self < 3; self++ {
@@ -408,5 +466,15 @@ func TestCredentialsWaitForTheLocalAdmin(t *testing.T) {
 	// A one-shot command still asks for a user rather than wait.
 	if _, err := (Config{Host: "localhost", BootstrapDir: t.TempDir()}).Credentials(true); err == nil {
 		t.Error("a one-shot command without a user or password file was accepted")
+	}
+
+	// Standard mode leaves the directory at its default: a loopback sidecar
+	// without BACKUP_USER is a configuration error, not an endless retry.
+	std, err := LoadConfig(func(k string) string { return map[string]string{"BACKUP_SIDECAR": "run"}[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := std.Credentials(false); err == nil || !strings.Contains(err.Error(), "BACKUP_USER") {
+		t.Errorf("standard mode without BACKUP_USER: %v, want a configuration error", err)
 	}
 }

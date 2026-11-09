@@ -235,6 +235,29 @@ groups:
           {{- with $mon.runbookUrl }}
           runbook_url: {{ . | quote }}
           {{- end }}
+
+      # A backup still running past STALE_BACKUP_HOURS. It blocks the next run
+      # of its mode at any age, so without this a hung one only shows as stale.
+      - alert: ClickHouseBackupOverrunning
+        expr: max by (namespace) (clickhouse_backup_overrunning{{ printf "{%s, mode=%q}" $sel $mode }}) > 0
+        for: {{ $mon.for | default "15m" | quote }}
+        labels:
+          severity: warning
+          backup: {{ $mode | quote }}
+          source: sidecar
+          {{- with $mon.additionalLabels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        annotations:
+          summary: {{ printf "ClickHouse %s backup running longer than %vh" $mode $.Values.backup.staleHours | quote }}
+          description: >-
+            A {{ $mode }} backup of {{ $fullname }} in namespace {{ $ns }} has been in
+            flight for longer than STALE_BACKUP_HOURS ({{ $.Values.backup.staleHours }}h).
+            No other {{ $mode }} backup starts while it runs. Find it in
+            `system.backups` (status CREATING_BACKUP); a server restart ends it.
+          {{- with $mon.runbookUrl }}
+          runbook_url: {{ . | quote }}
+          {{- end }}
 {{- end }}
 
       # Every rule above reads series that vanish with the sidecar or its

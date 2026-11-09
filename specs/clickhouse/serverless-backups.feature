@@ -28,10 +28,17 @@ Feature: clickhouse-serverless takes chained native backups from CronJobs or its
     And a full that is due while an incremental runs still starts
 
   @unit
-  Scenario: In-flight entries older than STALE_BACKUP_HOURS are orphans
+  Scenario: A backup in flight blocks a same-mode run at any age
     Given a CREATING_BACKUP entry older than STALE_BACKUP_HOURS
     When a run decides
-    Then that entry neither blocks it nor makes an incremental stand down
+    Then a same-mode run fails, or the sidecar adopts it, and an incremental behind a full stands down
+
+  @unit
+  Scenario: A backup running past STALE_BACKUP_HOURS is reported, waited for and never doubled
+    Given a backup still in flight past STALE_BACKUP_HOURS
+    When a one-shot run waits for it, or the sidecar ticks
+    Then the one-shot run gives up and starts no second backup
+    And the sidecar adopts it, keeps waiting, and sets clickhouse_backup_overrunning in run and observe mode
 
   @unit
   Scenario: The base is looked up in the persistent backup_log, on every replica
@@ -143,7 +150,7 @@ Feature: clickhouse-serverless takes chained native backups from CronJobs or its
   Scenario: Sidecar-mode alerts read the runner's own metrics
     Given backup monitoring is on in sidecar mode
     When the alert rules are rendered
-    Then each mode has a stale and a failing alert on the sidecar's metrics
+    Then each mode has a stale, a failing and an overrunning alert on the sidecar's metrics
     And a missing runner, two runners or an invalid configuration alert too
 
   @unit
@@ -152,6 +159,7 @@ Feature: clickhouse-serverless takes chained native backups from CronJobs or its
     When the backup runner or a one-shot command logs in
     Then it uses the local admin, re-reading the password on every request
     And against a remote host, or without the directory, it uses the password file
+    And with the directory left at its default and no backup user, the sidecar reports a configuration error
 
   @unit
   Scenario: A dynamic-only backup runner waits for the server's password file

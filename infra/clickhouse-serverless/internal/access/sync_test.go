@@ -75,7 +75,7 @@ func TestSyncer_KeepsTheLastGoodFile(t *testing.T) {
 		if fx.rendered() != good {
 			t.Error("the rendered users changed although an input could not be read")
 		}
-		if fx.logs.FilterMessage("password files not applied, keeping the last good passwords").Len() == 0 {
+		if fx.logs.FilterMessage("password directory not applied, keeping the user's last good passwords").Len() == 0 {
 			t.Error("the failure was not logged")
 		}
 	})
@@ -130,8 +130,43 @@ func TestSyncer_ExpiresPasswordsPastABadDirectory(t *testing.T) {
 	if !strings.Contains(got, sha("app-password-0123456")) {
 		t.Errorf("the malformed user lost its last good password:\n%s", got)
 	}
-	if fx.logs.FilterMessage("password files not applied, keeping the last good passwords").Len() == 0 {
+	if fx.logs.FilterMessage("password directory not applied, keeping the user's last good passwords").Len() == 0 {
 		t.Error("the failure was not logged")
+	}
+}
+
+// @scenario "After a restart a malformed password directory fails closed for its user only"
+func TestSyncer_FreshSyncerIsolatesABadDirectory(t *testing.T) {
+	fx := newSyncFixture(t)
+	other := filepath.Join(filepath.Dir(fx.secrets), "app")
+	writeFiles(t, fx.secrets, map[string]string{
+		"old":             "expired-password-0123",
+		"old.valid_until": now.Add(-time.Minute).Format(time.RFC3339),
+	})
+	writeFiles(t, other, map[string]string{"current": "short"}) // malformed
+	fx.writeAccess("users:\n" +
+		"  - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n" +
+		"  - {name: app, tier: read, databases: [analytics], login: {rolling: {dir: " + other + "}}}\n")
+	// users.d persists across a sidecar restart: the previous process
+	// rendered both users, the expired password and app's old one included.
+	writeFiles(t, fx.syncer.UsersD, map[string]string{UsersFileName: "users:\n" +
+		"  metabase: {auth_methods: {password_1: {password_sha256_hex: " + sha("expired-password-0123") + "}}}\n" +
+		"  app: {auth_methods: {password_1: {password_sha256_hex: " + sha("app-old-password-0123") + "}}}\n"})
+
+	fx.syncer.Sync() // a fresh Syncer: no last good passwords in this process
+	got := fx.rendered()
+	if strings.Contains(got, sha("expired-password-0123")) {
+		t.Errorf("a password past its valid_until survived the restart:\n%s", got)
+	}
+	if !strings.Contains(got, sha("current-password-0123")) {
+		t.Errorf("the healthy user lost its valid password:\n%s", got)
+	}
+	if strings.Contains(got, sha("app-old-password-0123")) || strings.Contains(got, "app:") {
+		t.Errorf("the malformed user kept file passwords with nothing good to keep:\n%s", got)
+	}
+	logged := fx.logs.FilterMessageSnippet("rendering the user with no file passwords").All()
+	if len(logged) != 1 || logged[0].ContextMap()["user"] != "app" || logged[0].ContextMap()["dir"] != other {
+		t.Errorf("want one error naming the user and directory, got %+v", logged)
 	}
 }
 

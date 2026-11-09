@@ -35,8 +35,9 @@ func Render(f *File, in Inputs, now time.Time, usersD string) (Planned, bool, er
 
 // Syncer keeps users.d/access-users.yaml current with the access file and the
 // password directories. An access file that cannot be read keeps the last
-// good users file. A password directory that cannot be read keeps the last
-// good passwords, re-planned each pass so valid_until still applies.
+// good users file. Each password directory loads on its own: one that cannot
+// be read keeps its user's last good passwords from this process, re-planned
+// each pass so valid_until still applies, or else renders that user with none.
 type Syncer struct {
 	AccessFile string
 	UsersD     string
@@ -47,8 +48,8 @@ type Syncer struct {
 
 	lastRaw      []byte
 	lastWarnings string
-	// lastIn holds the last passwords read, and lastDirs where each came from.
-	lastIn   Inputs
+	// lastIn holds each user's last passwords read, lastDirs where they came from.
+	lastIn   map[string][]Password
 	lastDirs map[string]string
 }
 
@@ -75,18 +76,7 @@ func (s *Syncer) Sync() time.Duration {
 			s.OnLoad(f)
 		}
 	}
-	in, err := Gather(f)
-	if err != nil {
-		if s.lastDirs == nil {
-			s.Log.Error("password files not applied, keeping the last rendered users", zap.Error(err))
-			return SyncInterval
-		}
-		// Re-plan from the last good passwords, so expiry still applies.
-		s.Log.Error("password files not applied, keeping the last good passwords", zap.Error(err))
-		in = s.lastGood(f)
-	} else {
-		s.lastIn, s.lastDirs = in, rollingDirs(f)
-	}
+	in := s.gather(f)
 	p, changed, err := Render(f, in, now, s.UsersD)
 	if err != nil {
 		s.Log.Error("writing the access users failed", zap.Error(err))
@@ -104,14 +94,39 @@ func (s *Syncer) Sync() time.Duration {
 	return nextDelay(p, now)
 }
 
-// lastGood is the last passwords read for each of f's rolling users whose
-// directory has not moved since. A user with none is left out of the plan.
-func (s *Syncer) lastGood(f *File) Inputs {
-	in := Inputs{Passwords: map[string][]Password{}}
-	for name, dir := range rollingDirs(f) {
-		if s.lastDirs[name] == dir {
-			in.Passwords[name] = s.lastIn.Passwords[name]
+// gather reads each rolling user's directory. A user whose directory fails
+// keeps the passwords this process last read from that same directory; with
+// none it gets no file passwords, so it cannot log in (fail closed). The other
+// users render normally either way. After a restart nothing is kept: a
+// password rendered by the previous process never outlives its valid_until.
+func (s *Syncer) gather(f *File) Inputs {
+	in, errs := GatherEach(f)
+	dirs := rollingDirs(f)
+	if s.lastIn == nil {
+		s.lastIn, s.lastDirs = map[string][]Password{}, map[string]string{}
+	}
+	for name := range s.lastIn {
+		if _, ok := dirs[name]; !ok {
+			delete(s.lastIn, name)
+			delete(s.lastDirs, name)
 		}
+	}
+	for name, passwords := range in.Passwords {
+		s.lastIn[name], s.lastDirs[name] = passwords, dirs[name]
+	}
+	for _, u := range f.Users {
+		err, failed := errs[u.Name]
+		if !failed {
+			continue
+		}
+		fields := []zap.Field{zap.String("user", u.Name), zap.String("dir", dirs[u.Name]), zap.Error(err)}
+		if last, ok := s.lastIn[u.Name]; ok && s.lastDirs[u.Name] == dirs[u.Name] {
+			s.Log.Error("password directory not applied, keeping the user's last good passwords", fields...)
+			in.Passwords[u.Name] = last
+			continue
+		}
+		s.Log.Error("password directory not applied and no last good passwords; "+
+			"rendering the user with no file passwords", fields...)
 	}
 	return in
 }

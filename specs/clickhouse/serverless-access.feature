@@ -88,6 +88,14 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
     And the other user keeps its last good password
 
   @unit
+  Scenario: After a restart a malformed password directory fails closed for its user only
+    Given a freshly started sidecar with no last good passwords and a users file from before the restart
+    And one user's directory is malformed while another's holds an expired and a valid password
+    When the sidecar syncs
+    Then the other user keeps its valid password and loses the expired one
+    And the malformed user renders with no file passwords, and the error names the user and directory
+
+  @unit
   Scenario: A token login is accepted for the user its claim names
     Given a token user bound to an issuer and a subject
     When ClickHouse asks the sidecar about a token signed by that issuer for that subject and audience

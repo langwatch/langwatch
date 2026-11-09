@@ -36,6 +36,7 @@ type modeMetrics struct {
 	LastDecision  string    `json:"last_decision,omitempty"`
 	Failures      uint64    `json:"failures_total"`
 	InFlight      bool      `json:"in_flight"`
+	Overrunning   bool      `json:"overrunning"`
 	NextScheduled time.Time `json:"next_scheduled,omitzero"`
 }
 
@@ -87,6 +88,17 @@ func (m *Metrics) SetNext(mode Mode, at time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.modes[mode].NextScheduled = at
+}
+
+// SetOverrunning records whether a backup of mode has been in flight for
+// longer than STALE_BACKUP_HOURS. It reports whether the flag just rose.
+func (m *Metrics) SetOverrunning(mode Mode, over bool) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	mm := m.modes[mode]
+	rose := over && !mm.Overrunning
+	mm.Overrunning = over
+	return rose
 }
 
 // Begin marks a run of mode as in flight from at.
@@ -183,6 +195,9 @@ func (m *Metrics) WritePrometheus(w io.Writer) {
 		func(mm *modeMetrics) (float64, bool) { return float64(mm.Failures), true })
 	perMode("clickhouse_backup_in_flight", "gauge", "1 while this sidecar runs or waits for a backup of the mode.",
 		func(mm *modeMetrics) (float64, bool) { return b2f(mm.InFlight), true })
+	perMode("clickhouse_backup_overrunning", "gauge",
+		"1 while a backup of the mode has run longer than STALE_BACKUP_HOURS (runner only).",
+		func(mm *modeMetrics) (float64, bool) { return b2f(mm.Overrunning), true })
 
 	if m.state == SidecarObserve {
 		family("clickhouse_backup_dry_run_decisions_total", "counter", "Decisions taken in observe mode, by action.")

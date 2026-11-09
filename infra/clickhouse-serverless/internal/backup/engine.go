@@ -22,6 +22,10 @@ type Engine struct {
 	// PollErrorBudget is how long polling may fail in a row before the run
 	// is given up as failed. The backup itself carries on on the server.
 	PollErrorBudget time.Duration
+	// KeepWaiting waits past Policy.StaleHours, with a warning, rather than
+	// giving up (the sidecar). A one-shot run gives up and exits non-zero;
+	// either way the backup carries on and blocks a second one.
+	KeepWaiting bool
 }
 
 // Outcome is how a run ended.
@@ -141,6 +145,7 @@ func (e *Engine) wait(ctx context.Context, res Result, id string) Result {
 		budget = 5 * time.Minute
 	}
 	var failingSince time.Time
+	warned := false
 	for {
 		b, found, err := e.Store.Status(ctx, id)
 		now := e.Now()
@@ -169,8 +174,16 @@ func (e *Engine) wait(ctx context.Context, res Result, id string) Result {
 				return res
 			case "CREATING_BACKUP", "RESTORING":
 				if now.Sub(b.Start) > time.Duration(e.Policy.StaleHours)*time.Hour {
-					res.Outcome, res.Err = Failed, fmt.Errorf("backup %s still %s after %dh, past STALE_BACKUP_HOURS", id, b.Status, e.Policy.StaleHours)
-					return res
+					if !e.KeepWaiting {
+						res.Outcome, res.Err = Failed, fmt.Errorf("backup %s still %s after %dh, past STALE_BACKUP_HOURS; "+
+							"it carries on on the server and no second one starts while it runs", id, b.Status, e.Policy.StaleHours)
+						return res
+					}
+					if !warned {
+						warned = true
+						e.Log.Warn("backup running longer than STALE_BACKUP_HOURS, still waiting for it",
+							zap.String("id", id), zap.Time("started", b.Start), zap.Int("stale_hours", e.Policy.StaleHours))
+					}
 				}
 			default:
 				res.Outcome, res.Err = Failed, fmt.Errorf("%s %s: %s", id, b.Status, firstLine(b.Error))

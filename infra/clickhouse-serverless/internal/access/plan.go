@@ -16,20 +16,35 @@ type Inputs struct {
 	Passwords map[string][]Password // by user name
 }
 
-// Gather reads every rolling user's password directory.
+// Gather reads every rolling user's password directory, failing on the first
+// that cannot be read. `ch-config generate` uses it: a bad input stops startup.
 func Gather(f *File) (Inputs, error) {
+	in, errs := GatherEach(f)
+	for _, u := range f.Users {
+		if err, ok := errs[u.Name]; ok {
+			return Inputs{}, fmt.Errorf("user %q: %w", u.Name, err)
+		}
+	}
+	return in, nil
+}
+
+// GatherEach reads each rolling user's password directory on its own. A user
+// whose directory cannot be read is left out of Inputs and named in errs.
+func GatherEach(f *File) (Inputs, map[string]error) {
 	in := Inputs{Passwords: map[string][]Password{}}
+	errs := map[string]error{}
 	for _, u := range f.Users {
 		if u.Login.Rolling == nil {
 			continue
 		}
 		passwords, err := ReadPasswordDir(u.Login.Rolling.Dir)
 		if err != nil {
-			return Inputs{}, fmt.Errorf("user %q: %w", u.Name, err)
+			errs[u.Name] = err
+			continue
 		}
 		in.Passwords[u.Name] = passwords
 	}
-	return in, nil
+	return in, errs
 }
 
 // Planned is the users.d document for the access users, and when it changes

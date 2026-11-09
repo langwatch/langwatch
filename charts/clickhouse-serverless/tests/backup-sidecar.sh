@@ -75,6 +75,9 @@ test_sidecar_alerts() {
   out="$(helm template t . -f tests/values-backup-sidecar.yaml --namespace clickhouse --show-only templates/backup-alerts.yaml)"
   [ "$(grep -c 'alert: ClickHouseBackupStale' <<<"$out")" = "2" ] || fail "want a stale alert per mode"
   [ "$(grep -c 'alert: ClickHouseBackupFailing' <<<"$out")" = "2" ] || fail "want a failure alert per mode"
+  [ "$(grep -c 'alert: ClickHouseBackupOverrunning' <<<"$out")" = "2" ] || fail "want an overrunning alert per mode"
+  grep -qF 'clickhouse_backup_overrunning{namespace="clickhouse", pod=~"t-clickhouse-[0-9]+", mode="full"}' <<<"$out" \
+    || fail "the overrunning alert does not read the sidecar's flag"
   for want in 'alert: ClickHouseBackupNoRunner' 'alert: ClickHouseBackupMultipleRunners' 'alert: ClickHouseBackupConfigError' \
     'absent(clickhouse_backup_runner{namespace="clickhouse", pod=~"t-clickhouse-[0-9]+"})' \
     'clickhouse_backup_sidecar_start_timestamp_seconds' 'mode="incremental"' '> 10800' '> 93600'; do

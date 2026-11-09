@@ -38,6 +38,9 @@ type Config struct {
 	// BootstrapDir holds dynamic-only mode's per-boot local admin password
 	// (CLICKHOUSE_ACCESS_BOOTSTRAP_DIR); when present it is the login.
 	BootstrapDir string
+	// bootstrapDirSet: CLICKHOUSE_ACCESS_BOOTSTRAP_DIR was set, which the
+	// chart does in dynamic-only mode only.
+	bootstrapDirSet bool
 
 	Database      string // BACKUP_DATABASE
 	RetentionDays int    // BACKUP_RETENTION_DAYS
@@ -56,9 +59,8 @@ type Config struct {
 const (
 	DefaultDatabase      = "langwatch"
 	DefaultRetentionDays = 7
-	// DefaultStaleHours sits above the chart's 8h full CronJob deadline, so
-	// a slow full is never taken for an orphan and doubled. A server restart
-	// clears system.backups, so crash orphans do not need a short cutoff.
+	// DefaultStaleHours is when a backup in flight counts as overrunning: a
+	// warning and a metric, never a reason to start a second one beside it.
 	DefaultStaleHours          = 12
 	DefaultFullSchedule        = "0 */12 * * *"
 	DefaultIncrementalSchedule = "0 * * * *"
@@ -74,6 +76,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		PasswordFile:        or(getenv("BACKUP_PASSWORD_FILE"), getenv("CLICKHOUSE_PASSWORD_FILE")),
 		envPassword:         getenv("CLICKHOUSE_PASSWORD"),
 		BootstrapDir:        or(getenv("CLICKHOUSE_ACCESS_BOOTSTRAP_DIR"), bootstrap.DefaultDir),
+		bootstrapDirSet:     getenv("CLICKHOUSE_ACCESS_BOOTSTRAP_DIR") != "",
 		Database:            or(getenv("BACKUP_DATABASE"), DefaultDatabase),
 		Cluster:             getenv("BACKUP_CLUSTER"),
 		Sidecar:             SidecarMode(or(strings.ToLower(getenv("BACKUP_SIDECAR")), string(SidecarOff))),
@@ -155,8 +158,10 @@ func (c Config) Credentials(allowEnvPassword bool) (chclient.Credentials, error)
 		}
 		// The server writes the file as it starts, alongside the sidecar.
 		// With no other login, take the local admin now: early requests
-		// fail and the sidecar retries them until the file appears.
-		if c.User == "" && !allowEnvPassword {
+		// fail and the sidecar retries them until the file appears. Only
+		// with the directory set explicitly (dynamic-only): otherwise a
+		// missing BACKUP_USER would retry forever, not report an error.
+		if c.bootstrapDirSet && c.User == "" && !allowEnvPassword {
 			return bootstrapLogin{dir: c.BootstrapDir}, nil
 		}
 	}

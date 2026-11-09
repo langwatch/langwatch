@@ -88,15 +88,20 @@ func (s *Sidecar) TickOnce(ctx context.Context, wg *sync.WaitGroup) {
 		}
 	}
 	if !runner {
+		for _, mode := range Modes {
+			s.Metrics.SetOverrunning(mode, false)
+		}
 		return
 	}
 
-	var inFlight []Backup
-	if s.Mode == SidecarRun {
-		var err error
-		if inFlight, err = store.InFlight(ctx); err != nil {
-			s.Log.Warn("could not check for backups to adopt", zap.Error(err))
-		}
+	inFlight, err := store.InFlight(ctx)
+	if err != nil {
+		s.Log.Warn("could not check for backups in flight", zap.Error(err))
+	} else {
+		s.reportOverrunning(inFlight, now)
+	}
+	if s.Mode != SidecarRun {
+		inFlight = nil // observe mode never adopts
 	}
 	for _, mode := range Modes {
 		s.mu.Lock()
@@ -106,7 +111,7 @@ func (s *Sidecar) TickOnce(ctx context.Context, wg *sync.WaitGroup) {
 		if busy {
 			continue
 		}
-		if b, ok := s.adoptable(mode, inFlight, now); ok {
+		if b, ok := s.adoptable(mode, inFlight); ok {
 			s.start(ctx, wg, mode, time.Time{}, func(ctx context.Context) Result {
 				return s.Engine.Await(ctx, mode, b)
 			})
@@ -130,14 +135,35 @@ func (s *Sidecar) TickOnce(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-// adoptable finds a live same-mode backup to wait for, after a restart.
-func (s *Sidecar) adoptable(mode Mode, inFlight []Backup, now time.Time) (Backup, bool) {
+// adoptable finds a same-mode backup in flight to wait for, after a restart.
+// system.backups is cleared by a server restart, so any entry is live.
+func (s *Sidecar) adoptable(mode Mode, inFlight []Backup) (Backup, bool) {
 	for _, b := range inFlight {
-		if b.Mode == mode && b.Start.After(now.Add(-time.Duration(s.Engine.Policy.StaleHours)*time.Hour)) {
+		if b.Mode == mode {
 			return b, true
 		}
 	}
 	return Backup{}, false
+}
+
+// reportOverrunning flags each mode with a backup in flight for longer than
+// STALE_BACKUP_HOURS, for the overrunning alert.
+func (s *Sidecar) reportOverrunning(inFlight []Backup, now time.Time) {
+	limit := time.Duration(s.Engine.Policy.StaleHours) * time.Hour
+	for _, mode := range Modes {
+		var oldest *Backup
+		for i := range inFlight {
+			b := &inFlight[i]
+			if b.Mode == mode && now.Sub(b.Start) > limit && (oldest == nil || b.Start.Before(oldest.Start)) {
+				oldest = b
+			}
+		}
+		if s.Metrics.SetOverrunning(mode, oldest != nil) {
+			s.Log.Warn("backup running longer than STALE_BACKUP_HOURS", zap.String("mode", string(mode)),
+				zap.String("backup", oldest.Path), zap.String("host", oldest.Host), zap.Time("started", oldest.Start),
+				zap.Int("stale_hours", s.Engine.Policy.StaleHours))
+		}
+	}
 }
 
 // refresh raises the last-success times from backup_log.
@@ -239,6 +265,7 @@ func RunSidecar(ctx context.Context, cfg Config, cfgErr error, log *zap.Logger) 
 		MaxBandwidth: cfg.MaxBandwidth,
 		Log:          log,
 		Now:          time.Now,
+		KeepWaiting:  true,
 	}
 	log.Info("backup sidecar started", zap.String("state", string(cfg.Sidecar)), zap.String("database", cfg.Database),
 		zap.String("full_schedule", cfg.FullSchedule), zap.String("incremental_schedule", cfg.IncrementalSchedule),

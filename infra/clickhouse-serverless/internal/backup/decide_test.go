@@ -46,33 +46,27 @@ func TestDecide_FullAndIncrementalOverlap(t *testing.T) {
 	}
 }
 
-// @scenario "In-flight entries older than STALE_BACKUP_HOURS are orphans"
-func TestDecide_StaleInFlightIsAnOrphan(t *testing.T) {
-	orphanFull := inFlight(Full, "langwatch_full_20261022T050000Z", ago(3*time.Hour+time.Minute))
-	st := State{
-		InFlight:  []Backup{orphanFull, inFlight(Incremental, "langwatch_incremental_20261023T083000Z", ago(4*time.Hour))},
+// @scenario "A backup in flight blocks a same-mode run at any age"
+func TestDecide_InFlightBlocksAtAnyAge(t *testing.T) {
+	// system.backups is cleared by a server restart: a 20h-old entry is a
+	// backup still running, well past STALE_BACKUP_HOURS (3h here).
+	slow := State{
+		InFlight:  []Backup{inFlight(Full, "langwatch_full_20261022T163000Z", ago(20*time.Hour))},
 		Created:   []Backup{created(Full, "langwatch_full_20261021T050000Z", ago(55*time.Hour), ago(54*time.Hour))},
 		FullsEver: 1,
 	}
-	if d := Decide(Full, st, policy, now, false); d.Action != Start {
-		t.Errorf("full behind an orphaned full: %+v, want start", d)
+	if d := Decide(Full, slow, policy, now, false); d.Action != Fail || !strings.Contains(d.Reason, "already in flight") {
+		t.Errorf("full behind a 20h full: %+v, want fail", d)
 	}
-	if d := Decide(Incremental, st, policy, now, false); d.Action != Start {
-		t.Errorf("incremental behind orphans: %+v, want start", d)
+	if d := Decide(Full, slow, policy, now, true); d.Action != Adopt {
+		t.Errorf("sidecar full behind a 20h full: %+v, want adopt", d)
 	}
-
-	// The default cutoff outlasts the 8h full deadline: a slow full is live.
-	slow := State{
-		InFlight:  []Backup{inFlight(Full, "langwatch_full_20261023T000000Z", ago(7*time.Hour))},
-		Created:   st.Created,
-		FullsEver: 1,
+	if d := Decide(Incremental, slow, policy, now, false); d.Action != StandDown {
+		t.Errorf("incremental behind a 20h full: %+v, want stand-down", d)
 	}
-	def := Policy{Database: "langwatch", RetentionDays: 7, StaleHours: DefaultStaleHours}
-	if d := Decide(Full, slow, def, now, false); d.Action != Fail {
-		t.Errorf("full behind a 7h full: %+v, want fail", d)
-	}
-	if d := Decide(Incremental, slow, def, now, false); d.Action != StandDown {
-		t.Errorf("incremental behind a 7h full: %+v, want stand-down", d)
+	oldInc := State{InFlight: []Backup{inFlight(Incremental, "langwatch_incremental_20261022T163000Z", ago(20*time.Hour))}}
+	if d := Decide(Incremental, oldInc, policy, now, false); d.Action != Fail {
+		t.Errorf("incremental behind a 20h incremental: %+v, want fail", d)
 	}
 }
 

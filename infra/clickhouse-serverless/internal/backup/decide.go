@@ -33,7 +33,7 @@ type State struct {
 type Policy struct {
 	Database      string
 	RetentionDays int // lifecycle expiry of the backups prefix
-	StaleHours    int // older CREATING_BACKUP entries are orphans
+	StaleHours    int // a backup in flight for longer is overrunning: alerted, still live
 }
 
 // BaseMaxAge is how old a base may be: retention less a day of margin, at
@@ -76,15 +76,10 @@ type Decision struct {
 func Decide(mode Mode, st State, p Policy, now time.Time, adopt bool) Decision {
 	d := Decision{Mode: mode}
 
-	// Entries stay CREATING_BACKUP forever when a server dies mid-backup, so
-	// only recent ones are live; an unbounded check lets one orphan wedge
-	// every later run.
-	var live []Backup
-	for _, b := range st.InFlight {
-		if b.Start.After(now.Add(-time.Duration(p.StaleHours) * time.Hour)) {
-			live = append(live, b)
-		}
-	}
+	// system.backups lives in memory and a server restart clears it, so every
+	// in-flight entry is a backup still running, at any age. One that runs
+	// past StaleHours is reported as overrunning, never started beside.
+	live := append([]Backup(nil), st.InFlight...)
 	sort.Slice(live, func(i, j int) bool { return live[i].Start.After(live[j].Start) })
 
 	// Only a backup of the same mode blocks this one: a full runs for

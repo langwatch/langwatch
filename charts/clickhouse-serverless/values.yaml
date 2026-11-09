@@ -52,8 +52,9 @@ backup:
   retentionDays: 7
   # Sidecar mode: max_backup_bandwidth in bytes per second (0 = unlimited).
   maxBandwidth: 0
-  # In-flight backups older than this many hours are orphans. Keep it above
-  # the full CronJob's 8h deadline, or a slow full gets a second one beside it.
+  # A backup in flight for longer than this many hours is overrunning: the
+  # sidecar flags it (ClickHouseBackupOverrunning) and a one-shot run stops
+  # waiting. It still blocks a second backup of its mode at any age.
   staleHours: 12
   sidecar:
     # Pod ordinal that runs backups while it answers; else the next one that does.

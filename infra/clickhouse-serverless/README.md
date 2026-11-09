@@ -186,7 +186,10 @@ token signed by the user's issuer, with `aud` containing the audience, a live
 **The sidecar.** `ch-config sidecar` re-reads the access file and the password
 directories every 10 seconds (and at the next `valid_until`), rewrites
 `users.d/access-users.yaml` only when it changes, and keeps the last good file
-when an input cannot be read. ClickHouse reloads `users.d` within seconds. A
+when the access file cannot be read. Each password directory loads on its own:
+one that cannot be read keeps its user's last good passwords from the running
+sidecar, or else leaves that user without file passwords. Other users render
+as usual. ClickHouse reloads `users.d` within seconds. A
 plain `docker run` starts it inside the container; the Helm chart runs it as its
 own container. While it is down, token logins fail and an expired password
 stays valid until it returns.
@@ -256,7 +259,7 @@ A run exits 0 only when it wrote a backup, or when an incremental stands down: f
 | `BACKUP_PASSWORD_FILE`        | `CLICKHOUSE_PASSWORD_FILE` | Password file. One-shot commands also take `CLICKHOUSE_PASSWORD`; the sidecar never does     |
 | `BACKUP_DATABASE`             | `langwatch`                | Database to back up and restore                                                              |
 | `BACKUP_RETENTION_DAYS`       | `7`                        | The lifecycle rule on the backups prefix; a base is at most this less a day old (12h floor)  |
-| `STALE_BACKUP_HOURS`          | `12`                       | In-flight entries older than this are orphans                                                |
+| `STALE_BACKUP_HOURS`          | `12`                       | A backup in flight longer than this is overrunning: warned and flagged, still never doubled  |
 | `BACKUP_CLUSTER`              | unset                      | Look up bases and in-flight backups on every replica of this cluster                         |
 | `BACKUP_MAX_BANDWIDTH`        | `0`                        | `max_backup_bandwidth`, bytes per second (0: unlimited)                                      |
 | `BACKUP_SIDECAR`              | `off`                      | `run`: the sidecar schedules backups. `observe`: it decides and reports, never backs up      |
@@ -271,9 +274,9 @@ Example cadence, a full every third day at 05:00 UTC and an hourly incremental a
 BACKUP_SIDECAR=run BACKUP_FULL_SCHEDULE='0 5 */3 * *' BACKUP_INCREMENTAL_SCHEDULE='30 * * * *'
 ```
 
-The sidecar runs in the ClickHouse pod (embedded in the container when there is no sidecar container). A firing is owed until a backup of its mode completes after it, whoever wrote it: a restart across a firing catches up, and a backup a CronJob finished counts. A restarted sidecar adopts a backup still in flight. Backup failures never end the process. Retention is the object store's lifecycle rule; nothing here deletes backups.
+The sidecar runs in the ClickHouse pod (embedded in the container when there is no sidecar container). A firing is owed until a backup of its mode completes after it, whoever wrote it: a restart across a firing catches up, and a backup a CronJob finished counts. A restarted sidecar adopts a backup still in flight, at any age: `system.backups` is cleared by a server restart, so every entry there is live. One running past `STALE_BACKUP_HOURS` is logged and flagged as `clickhouse_backup_overrunning`, and the sidecar keeps waiting for it. Backup failures never end the process. Retention is the object store's lifecycle rule; nothing here deletes backups.
 
-To run it beside existing CronJobs without double backups, set `BACKUP_SIDECAR=observe`: it logs what it would do, exports the same metrics and counts the CronJobs' backups as successes. In dynamic-only mode the sidecar and one-shot commands inside the pod log in as the per-boot local admin; restore there with `kubectl exec <pod> -c access -- ch-config backup restore --name <name> --confirm`.
+To run it beside existing CronJobs without double backups, set `BACKUP_SIDECAR=observe`: it logs what it would do, exports the same metrics and counts the CronJobs' backups as successes. In dynamic-only mode the sidecar and one-shot commands inside the pod log in as the per-boot local admin. A sidecar without `BACKUP_USER` waits for that password only when `CLICKHOUSE_ACCESS_BOOTSTRAP_DIR` is set explicitly; otherwise it reports a configuration error. Restore there with `kubectl exec <pod> -c access -- ch-config backup restore --name <name> --confirm`.
 
 ## What Gets Computed
 
