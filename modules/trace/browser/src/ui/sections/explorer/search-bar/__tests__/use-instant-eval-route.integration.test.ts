@@ -289,14 +289,18 @@ describe("given Instant Evals are off and the reader may not switch them on", ()
 });
 
 describe("given Instant Evals are off and the organization may run its own decision model", () => {
-  /** @scenario "The eval popover picks the project's own decision model in place" */
-  it("pins the picked model on the project, closes the popover and estimates the held submit", () => {
-    const { result } = renderHook(() =>
+  let result: { readonly current: ReturnType<typeof useInstantEvalRoute> };
+
+  beforeEach(() => {
+    ({ result } = renderHook(() =>
       useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer: "contact_us" }),
-    );
+    ));
     act(() => result.current.onInstantEvalRoute(payload));
     act(() => result.current.pickDecisionModel("azure/decisions:microsoft-decision-1"));
+  });
 
+  /** @scenario "The eval popover picks the project's own decision model in place" */
+  it("pins the picked model on the project, closes the popover and estimates the held submit", () => {
     const assign = lastCall(mutations.assign);
     expect(assign.input).toEqual({
       scopeType: "PROJECT",
@@ -314,11 +318,6 @@ describe("given Instant Evals are off and the organization may run its own decis
   });
 
   it("warns and keeps the popover when the server refuses the pick", () => {
-    const { result } = renderHook(() =>
-      useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer: "contact_us" }),
-    );
-    act(() => result.current.onInstantEvalRoute(payload));
-    act(() => result.current.pickDecisionModel("azure/decisions:microsoft-decision-1"));
     act(() => lastCall(mutations.assign).options.onError?.(new Error("forbidden")));
 
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ type: "warning" }));

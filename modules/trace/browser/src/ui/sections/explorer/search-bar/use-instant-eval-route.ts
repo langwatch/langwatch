@@ -298,6 +298,43 @@ function useInstantEvalStarter({
   return { isStarting: start.isPending, applyChip, startRun };
 }
 
+/** A switch or a pick landed: drop the popover and route the held submit, unless dismissed since. */
+function resumeHeld({
+  seq,
+  seqRef,
+  held,
+  heldRef,
+  setRefusal,
+  route,
+}: {
+  seq: number;
+  seqRef: RefObject<number>;
+  held: InstantEvalRoutePayload;
+  heldRef: RefObject<InstantEvalRoutePayload | null>;
+  setRefusal: (refusal: InstantEvalRefusal | null) => void;
+  route: (args: { payload: InstantEvalRoutePayload; seq: number }) => void;
+}): void {
+  if (seq !== seqRef.current) return;
+  heldRef.current = null;
+  setRefusal(null);
+  route({ payload: held, seq });
+}
+
+/** A refused switch or pick is a warning and the popover stays, unless dismissed since. */
+function warnIfCurrent({
+  seq,
+  seqRef,
+  error,
+}: {
+  seq: number;
+  seqRef: RefObject<number>;
+  error: unknown;
+}): void {
+  if (seq !== seqRef.current) return;
+  const { title, description } = explainAnyError(error);
+  toaster.create({ title, ...(description ? { description } : {}), type: "warning" });
+}
+
 /**
  * The organization's switch from the `opt_in` popover: on success the access read is primed and
  * the held submit is routed; a refusal is a warning and the popover stays. Dismissing drops the
@@ -339,16 +376,9 @@ function useInstantEvalSwitch({
         {
           onSuccess: () => {
             void utils.instantEval.access.invalidate();
-            if (seq !== seqRef.current) return;
-            heldRef.current = null;
-            setRefusal(null);
-            route({ payload: held, seq });
+            resumeHeld({ seq, seqRef, held, heldRef, setRefusal, route });
           },
-          onError: (error) => {
-            if (seq !== seqRef.current) return;
-            const { title, description } = explainAnyError(error);
-            toaster.create({ title, ...(description ? { description } : {}), type: "warning" });
-          },
+          onError: (error) => warnIfCurrent({ seq, seqRef, error }),
         },
       );
     },
@@ -366,16 +396,9 @@ function useInstantEvalSwitch({
         onSuccess: (access) => {
           utils.instantEval.access.setData({ projectId: held.projectId }, access);
           void utils.instantEval.access.invalidate();
-          if (seq !== seqRef.current) return;
-          heldRef.current = null;
-          setRefusal(null);
-          route({ payload: held, seq });
+          resumeHeld({ seq, seqRef, held, heldRef, setRefusal, route });
         },
-        onError: (error) => {
-          if (seq !== seqRef.current) return;
-          const { title, description } = explainAnyError(error);
-          toaster.create({ title, ...(description ? { description } : {}), type: "warning" });
-        },
+        onError: (error) => warnIfCurrent({ seq, seqRef, error }),
       },
     );
   }, [enable, heldRef, refusal, route, seqRef, setRefusal, utils]);
