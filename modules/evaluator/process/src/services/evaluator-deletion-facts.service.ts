@@ -46,23 +46,31 @@ export class EvaluatorDeletionFactsService {
 
   /**
    * Records that an evaluator was created, once its row is written. Never throws: the
-   * evaluator already exists, so a lost fact is logged rather than failing the create.
+   * evaluator already exists, so failing here would invite a duplicate row on retry.
+   * A lost fact is logged at error level with its ids so it can be found and resent;
+   * there is no automatic retry yet.
    */
   async recordEvaluatorCreated(input: { projectId: string; evaluatorId: string }): Promise<void> {
+    const ids = {
+      tenantId: input.projectId,
+      projectId: input.projectId,
+      evaluatorId: input.evaluatorId,
+    };
     const senders = this.#senders;
-    if (!senders) return;
+    if (!senders) {
+      logger.error(
+        ids,
+        "evaluator created fact was not recorded: evaluator_lifecycle is not registered in this process",
+      );
+      return;
+    }
     try {
       await senders.recordEvaluatorCreated.send({
-        tenantId: input.projectId,
-        projectId: input.projectId,
-        evaluatorId: input.evaluatorId,
+        ...ids,
         occurredAt: nowInstant().epochMilliseconds,
       });
     } catch (error) {
-      logger.warn(
-        { error, evaluatorId: input.evaluatorId, projectId: input.projectId },
-        "evaluator created fact was not recorded",
-      );
+      logger.error({ error, ...ids }, "evaluator created fact was not recorded");
     }
   }
 }
