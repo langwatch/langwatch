@@ -63,7 +63,8 @@ Feature: Publish every deployable image to the artifacts registry
   Scenario: A .dockerignore change rebuilds every image
     Given a merge to main changes .dockerignore
     When publish-docker-ecr selects the images to build
-    Then every image is rebuilt, because every build reads the repository root as its context
+    Then every image is rebuilt whose build context holds that .dockerignore
+    And each image reads the .dockerignore at its own build context, the repository root unless its matrix row names one
 
   @unimplemented
   Scenario: A failed Lambda build does not hold back the service images

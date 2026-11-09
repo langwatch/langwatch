@@ -75,6 +75,8 @@ spec:
                   value: {{ .Values.backup.database | quote }}
                 - name: STALE_BACKUP_HOURS
                   value: {{ .Values.backup.staleHours | quote }}
+                - name: BACKUP_RETENTION_DAYS
+                  value: {{ .Values.backup.retentionDays | quote }}
 ---
 # Incremental backup
 apiVersion: batch/v1
@@ -149,6 +151,8 @@ spec:
                   value: {{ .Values.backup.database | quote }}
                 - name: STALE_BACKUP_HOURS
                   value: {{ .Values.backup.staleHours | quote }}
+                - name: BACKUP_RETENTION_DAYS
+                  value: {{ .Values.backup.retentionDays | quote }}
 {{- end }}
 {{- /* Dynamic-only has no password a Job could hold: restore with
        kubectl exec into the access container (ADR-198). */}}

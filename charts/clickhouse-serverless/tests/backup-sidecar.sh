@@ -24,6 +24,8 @@ test_cronjob_default() {
   ! grep -q 'kind: PodMonitor' <<<"$out" || fail "default mode should render no PodMonitor"
   [ "$(grep -A1 'name: STALE_BACKUP_HOURS' <<<"$out" | grep -c 'value: "12"')" = "2" ] \
     || fail "both backup CronJobs need STALE_BACKUP_HOURS"
+  [ "$(grep -A1 'name: BACKUP_RETENTION_DAYS' <<<"$out" | grep -c 'value: "7"')" = "2" ] \
+    || fail "both backup CronJobs need BACKUP_RETENTION_DAYS, or a base outlives the bucket"
   echo "PASS: CronJob mode is the default and unchanged"
 }
 

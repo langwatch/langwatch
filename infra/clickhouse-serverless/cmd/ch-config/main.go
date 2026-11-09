@@ -145,7 +145,11 @@ func runAccess(ctx context.Context, log *zap.Logger, accessFile, outputDir strin
 	if bootstrapDir == "" {
 		bootstrapDir = bootstrap.DefaultDir
 	}
-	auditor := &access.Auditor{Q: &bootstrap.Client{Dir: bootstrapDir}, Log: log}
+	auditURL := bootstrap.DefaultURL
+	if port := os.Getenv("CLICKHOUSE_HTTP_PORT"); port != "" {
+		auditURL = "http://127.0.0.1:" + port + "/"
+	}
+	auditor := &access.Auditor{Q: &bootstrap.Client{Dir: bootstrapDir, URL: auditURL}, Log: log}
 	go auditor.Run(ctx, access.AuditInterval, func() bool {
 		_, err := os.Stat(filepath.Join(syncer.UsersD, bootstrap.UsersFileName))
 		return err == nil

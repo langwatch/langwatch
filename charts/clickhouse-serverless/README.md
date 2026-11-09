@@ -171,7 +171,7 @@ per-boot local admin.
 | `backup.incremental.schedule`         | Cron schedule for incremental backups                                                        | `0 * * * *`                                    |
 | `backup.mode`                         | `cronjob`, `sidecar` or `cronjob-observe` (see above)                                        | `cronjob`                                      |
 | `backup.passwordSecret.name` / `.key` | Sidecar modes: Secret key with `backup.user`'s password, mounted as a file                   | chart Secret's password                        |
-| `backup.retentionDays`                | Sidecar modes: lifecycle expiry of the backups prefix; bounds a base's age                   | `7`                                            |
+| `backup.retentionDays`                | Lifecycle expiry of the backups prefix; bounds a base's age                                  | `7`                                            |
 | `backup.maxBandwidth`                 | Sidecar modes: `max_backup_bandwidth`, bytes per second                                      | `0` (unlimited)                                |
 | `backup.staleHours`                   | A backup in flight longer than this is overrunning (alerted); it still blocks a second one   | `12`                                           |
 | `backup.sidecar.runnerOrdinal`        | Pod ordinal that runs backups while it answers; else the next that does                      | `0`                                            |
