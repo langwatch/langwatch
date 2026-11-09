@@ -38,6 +38,7 @@ import {
   attachedContextToChip,
   type LangyPanelEffect,
   type LangyPanelMode,
+  selectConversationOpenIn,
   useLangyStore,
 } from "../../../../behavior/langy.store.ts";
 import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut.ts";
@@ -235,7 +236,7 @@ function LangyPanel({
   const isOpen = useLangyStore((s) => s.isOpen);
   const closePanel = useLangyStore((s) => s.closePanel);
   const pickModel = useLangyStore((s) => s.pickModel);
-  const activeConversationId = useLangyStore((s) => s.activeConversationId);
+  const activeConversationId = useLangyStore((s) => selectConversationOpenIn(s, projectId));
   const pendingPrompt = useLangyStore((s) => s.pendingPrompt);
   const pendingKickoff = useLangyStore((s) => s.pendingKickoff);
   const guidedTourRunning = useGuidedTour().useRunning();

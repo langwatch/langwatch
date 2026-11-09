@@ -590,6 +590,15 @@ export function isTurnInPanelScope({
   return !scope?.projectId || scope.projectId === projectId;
 }
 
+/**
+ * The open conversation, if it belongs to `projectId`. The scope reset clears it one render
+ * after a move, so reads pairing the new project with the old id answer "not found".
+ */
+export function selectConversationOpenIn(s: LangyState, projectId: string | undefined) {
+  const owner = s.activeConversationScope?.projectId;
+  return owner && owner !== projectId ? null : s.activeConversationId;
+}
+
 function withConversationConfirmed(s: LangyState, id: string): Partial<LangyState> {
   if (!s.unconfirmedConversations[id]) return s;
   const { [id]: _confirmed, ...rest } = s.unconfirmedConversations;
