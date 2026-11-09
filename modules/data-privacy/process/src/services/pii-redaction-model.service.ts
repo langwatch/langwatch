@@ -1,3 +1,4 @@
+import type { PiiLevel } from "@langwatch/data-privacy-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -61,6 +62,8 @@ type ModelClearInput = {
   piiRedactionLevel: PIIRedactionLevel;
   entities?: readonly string[] | undefined;
   projectId?: string | undefined;
+  /** The level of the tenant's resolved policy; absent when none was resolved. */
+  resolvedPiiLevel?: PiiLevel | undefined;
   spareNamesAndPlaces?: readonly boolean[] | undefined;
 };
 
@@ -119,6 +122,9 @@ export class PiiRedactionModelService {
 
   /** The model's clearing of one batch, or null when the batch stays on Presidio. */
   async findClearing(input: ModelClearInput): Promise<(string | null)[] | null> {
+    // A custom level, or a policy that could not be resolved, stays on Presidio exactly as
+    // today: the request's own level says STRICT for both, so only the resolved one counts.
+    if (input.resolvedPiiLevel !== "strict") return null;
     const projectId = input.projectId;
     if (!projectId) return null;
     const organizationId = await this.#routedOrganizationOf({ projectId });

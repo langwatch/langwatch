@@ -47,6 +47,11 @@ the `release_pii_redaction_model_enabled` flag only, on a deployment that sets
 Any problem with the model sends the batch to Presidio, then Google DLP, as for every other
 organization.
 
+- **Strict only.** Only a batch whose project's resolved privacy policy is `strict` can reach the
+  model. A custom level, even one that selects every analysis-service entity, and a batch whose
+  policy could not be loaded stay on Presidio exactly as today, without reading the flag. The
+  request's own level is not enough: both of those send `STRICT` batches too.
+
 - **Time cap.** A model call is aborted after 50 s (`PII_REDACTION_MODEL_TIMEOUT_MS`) and the batch
   goes to Presidio. Presidio then gets its own 60 s timeout: the two timers are separate, so a
   batch can wait up to 110 s (50 + 60) before it reaches Google DLP.

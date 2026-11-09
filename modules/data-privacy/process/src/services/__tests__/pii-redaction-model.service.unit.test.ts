@@ -1,10 +1,18 @@
-import { DATA_PRIVACY_PRESIDIO_TIMEOUT_MS } from "@langwatch/data-privacy-contract";
+import {
+  DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
+  EMPTY_AUDIENCE,
+  type PiiLevel,
+  type ResolvedDataPrivacy,
+} from "@langwatch/data-privacy-contract";
 import {
   LangevalsPiiDetectionError,
   type PiiDetectionOutcome,
   type PiiDetectionRequest,
 } from "@langwatch/evaluation-contract";
+import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
+import { STRICT_ONLY_PII_ENTITIES } from "@langwatch/redaction";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -24,6 +32,7 @@ import {
 } from "../../rules/pii-redaction-model.rules.ts";
 import { DataPrivacyProjectScopeService } from "../data-privacy-project-scope.service.ts";
 import { GoogleDlpRedactionService } from "../google-dlp-redaction.service.ts";
+import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
 import type { PiiRedactionModelFallbackReason } from "../pii-analysis-metrics-otel.service.ts";
 import { PiiAnalysisService } from "../pii-analysis.service.ts";
 import {
@@ -241,8 +250,44 @@ const strictBatch = (
 ) => ({
   texts: ["call Ana"],
   piiRedactionLevel: "STRICT" as const,
+  resolvedPiiLevel: "strict" as const,
   projectId,
 });
+
+/** A resolved policy at the given PII level, capturing every category. */
+function policyAt({
+  level,
+  entities = [],
+}: {
+  level: PiiLevel;
+  entities?: string[];
+}): ResolvedDataPrivacy {
+  const capture = () => ({ disposition: "capture" as const, audience: { ...EMPTY_AUDIENCE } });
+  return {
+    categories: { input: capture(), output: capture(), system: capture(), tools: capture() },
+    pii: { level, entities, exceptPatterns: [] },
+    secrets: { enabled: false, customPatterns: [] },
+    customAttributes: [],
+  };
+}
+
+function spanWith(value: string): OtlpSpan {
+  return {
+    traceId: "trace-1",
+    spanId: "span-1",
+    name: "llm",
+    kind: 1,
+    startTimeUnixNano: "1",
+    endTimeUnixNano: "2",
+    attributes: [{ key: "langwatch.input", value: { stringValue: value } }],
+    events: [],
+    links: [],
+    status: {},
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+  };
+}
 
 describe("PiiRedactionModelService", () => {
   describe("given an organization allowlisted for the model", () => {
@@ -328,6 +373,7 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio({
         texts: ["call Ana at +3161234567", "nothing here"],
         piiRedactionLevel: "STRICT",
+        resolvedPiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
@@ -406,6 +452,115 @@ describe("PiiRedactionModelService", () => {
 
       expect(fallbacks).toEqual(["routing_error"]);
       expect(usage).toHaveLength(0);
+    });
+  });
+
+  describe("given an allowlisted organization, by its resolved privacy policy", () => {
+    /** The whole redaction pass, its policy resolved as `resolve` says. */
+    function redactionUnder({
+      analysis,
+      resolve,
+    }: {
+      analysis: PiiAnalysisService;
+      resolve: () => Promise<ResolvedDataPrivacy>;
+    }) {
+      return OtlpSpanPiiRedactionService.create({
+        transport: analysis,
+        isLangevalsConfigured: async () => true,
+        isProduction: true,
+        nativePolicyEnforced: true,
+        piiRedactionMaxAttributeLength: 400_000,
+        dataPrivacy: { getResolvedForProject: resolve },
+      });
+    }
+
+    /** A span redacted through the whole span pass. */
+    async function redactSpanUnder(input: {
+      analysis: PiiAnalysisService;
+      resolve: () => Promise<ResolvedDataPrivacy>;
+    }) {
+      const service = redactionUnder(input);
+      const span = spanWith("call Ana");
+      await service.redactSpan({
+        span,
+        resource: null,
+        piiRedactionLevel: "STRICT",
+        tenantId: createTenantId(PROJECT_ID),
+      });
+      return span.attributes[0]?.value.stringValue;
+    }
+
+    /** @scenario "Only a resolved strict policy reaches the PII redaction model" */
+    it("sends a strict policy's batch to the model", async () => {
+      const { analysis, presidio, memoryModel, sent } = setup();
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+
+      const redacted = await redactSpanUnder({
+        analysis,
+        resolve: async () => policyAt({ level: "strict" }),
+      });
+
+      expect(redacted).toBe("call [PERSON]");
+      expect(sent(memoryModel)).toHaveLength(1);
+      expect(sent(presidio)).toHaveLength(0);
+    });
+
+    /** @scenario "Only a resolved strict policy reaches the PII redaction model" */
+    it("sends a custom policy's batch to Presidio, though the request says STRICT", async () => {
+      const { analysis, presidio, memoryModel, flagReads, sent } = setup();
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      const redacted = await redactSpanUnder({
+        analysis,
+        // Every analysis-service entity, so the batch is the one a strict policy sends.
+        resolve: async () => policyAt({ level: "custom", entities: [...STRICT_ONLY_PII_ENTITIES] }),
+      });
+
+      expect(redacted).toBe("call [PERSON]");
+      expect(sent(presidio)).toHaveLength(1);
+      expect(sent(memoryModel)).toHaveLength(0);
+      expect(flagReads).toHaveLength(0);
+    });
+
+    /** @scenario "Only a resolved strict policy reaches the PII redaction model" */
+    it("sends the batch to Presidio when the policy cannot be loaded", async () => {
+      const { analysis, presidio, memoryModel, flagReads, sent } = setup();
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      const redacted = await redactSpanUnder({
+        analysis,
+        resolve: () => Promise.reject(new Error("database unreachable")),
+      });
+
+      expect(redacted).toBe("call [PERSON]");
+      expect(sent(presidio)).toHaveLength(1);
+      expect(sent(memoryModel)).toHaveLength(0);
+      expect(flagReads).toHaveLength(0);
+    });
+
+    it("sends a strict policy's log record to the model too", async () => {
+      const { analysis, presidio, memoryModel, sent } = setup();
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+      const log = { body: "call Ana", attributes: {}, resourceAttributes: {} };
+
+      await redactionUnder({
+        analysis,
+        resolve: async () => policyAt({ level: "strict" }),
+      }).redactLog(log, "STRICT", createTenantId(PROJECT_ID));
+
+      expect(log.body).toBe("call [PERSON]");
+      expect(sent(memoryModel)).toHaveLength(1);
+      expect(sent(presidio)).toHaveLength(0);
+    });
+
+    it("keeps a batch with no resolved level on Presidio without asking the flag", async () => {
+      const { analysis, presidio, memoryModel, flagReads, sent } = setup();
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio({ ...strictBatch(), resolvedPiiLevel: undefined });
+
+      expect(sent(memoryModel)).toHaveLength(0);
+      expect(flagReads).toHaveLength(0);
     });
   });
 
@@ -514,6 +669,7 @@ describe("PiiRedactionModelService", () => {
 
         const cleared = policy.clearBatch([{ text: "call Ana", isNameExempt: false }], {
           piiRedactionLevel: "STRICT",
+          resolvedPiiLevel: "strict",
           mainMethod: "presidio",
           projectId: PROJECT_ID,
         });
@@ -556,6 +712,7 @@ describe("PiiRedactionModelService", () => {
 
       const cleared = await policy.clearBatch([{ text: "call Ana", isNameExempt: false }], {
         piiRedactionLevel: "STRICT",
+        resolvedPiiLevel: "strict",
         mainMethod: "presidio",
         projectId: PROJECT_ID,
       });
@@ -597,6 +754,7 @@ describe("PiiRedactionModelService", () => {
       const cleared = await analysis.clearPresidio({
         texts: ["a".repeat(5_000), "b".repeat(3_001)],
         piiRedactionLevel: "STRICT",
+        resolvedPiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
@@ -612,6 +770,7 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio({
         texts: ["a".repeat(8_000)],
         piiRedactionLevel: "STRICT",
+        resolvedPiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
@@ -627,6 +786,7 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio({
         texts: ["a".repeat(8_001)],
         piiRedactionLevel: "STRICT",
+        resolvedPiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
@@ -853,6 +1013,7 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio({
         texts: ["a".repeat(8_001)],
         piiRedactionLevel: "STRICT",
+        resolvedPiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
