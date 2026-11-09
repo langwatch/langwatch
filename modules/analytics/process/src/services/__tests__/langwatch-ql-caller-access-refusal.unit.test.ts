@@ -16,6 +16,7 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
 import { MAX_VIOLATIONS } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { langWatchQLAccessRefusals } from "../langwatch-ql-access-refusal.service.ts";
@@ -25,7 +26,11 @@ import { catalogueWithout, EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-a
 
 const FAILURE_METRIC = "lwql_query_failure_total";
 const GATEWAY_PROBE = "SELECT 1 AS present FROM gateway_request_spend LIMIT 1";
-const lwql = LangWatchQLService.create({ executor: null, database: "analytics" });
+const lwql = LangWatchQLService.create({
+  runTelemetry: TEST_RUN_TELEMETRY,
+  executor: null,
+  database: "analytics",
+});
 const withoutGatewayUsage = { catalogue: catalogueWithout("gatewayUsage:view") };
 
 let meter: RecordingMeterProvider;
@@ -135,6 +140,7 @@ describe("given a caller's access refusal wrapped as the cause of another error"
 describe("given a view no caller could see", () => {
   const gateway = LWQL_VIEW_CATALOG.find((view) => view.name === "gateway_request_spend")!;
   const service = LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
     executor: null,
     database: "analytics",
     views: [...LWQL_VIEW_CATALOG, { ...gateway, name: "orphan_view" }],
