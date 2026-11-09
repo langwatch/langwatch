@@ -69,6 +69,7 @@ function fixture(input: {
   for (const page of input.recordPages ?? [[]]) {
     recordPageQuery.mockResolvedValueOnce(page);
   }
+  const misfiledCount = vi.fn(async () => [{ count: 0n }]);
   const recordAggregate = vi.fn(async () => fingerprintRow({ count: 0, maxUpdatedAt: null }));
   const update = vi.fn(async () => {});
   const executeRaw = vi.fn(async () => 1);
@@ -92,7 +93,11 @@ function fixture(input: {
     datasetRecord: {
       aggregate: recordAggregate,
     },
-    $queryRaw: recordPageQuery,
+    // The move's two raw reads: its count of rows filed under another project, and record pages.
+    $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) =>
+      strings.join("?").includes('"projectId" <>')
+        ? misfiledCount()
+        : recordPageQuery(strings, ...values),
     $transaction: runTransaction,
   };
   const storage = new FixtureStorage();
@@ -300,6 +305,9 @@ describe("PrismaDatasetMigrationRepository", () => {
         alreadyMigrated: 1,
         skippedConcurrentWrite: 1,
         failed: 1,
+        archived: 0,
+        empty: 1,
+        rowsUnderOtherProject: [],
       },
     });
   });
@@ -317,6 +325,9 @@ describe("PrismaDatasetMigrationRepository", () => {
         alreadyMigrated: 0,
         skippedConcurrentWrite: 0,
         failed: 0,
+        archived: 0,
+        empty: 0,
+        rowsUnderOtherProject: [],
       },
     });
     expect(subject.datasetFindMany).toHaveBeenNthCalledWith(

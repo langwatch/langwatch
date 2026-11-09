@@ -8,6 +8,7 @@ import type {
   DatasetMigrationRepository,
   DatasetMigrationRunResult,
   DatasetMigrationSummary,
+  DatasetMoveNotes,
 } from "../repositories/dataset-migration.repository.ts";
 import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
 
@@ -91,18 +92,28 @@ export class DatasetMigrationService {
     input: { datasetId: string; projectId: string },
     options: { dryRun?: boolean } = {},
   ): Promise<DatasetMigrationOutcome> {
+    return (await this.moveDataset(input, options)).outcome;
+  }
+
+  /** The move of one dataset, with what the report says about it once moved. */
+  private async moveDataset(
+    input: { datasetId: string; projectId: string },
+    options: { dryRun?: boolean | undefined },
+  ): Promise<{ outcome: DatasetMigrationOutcome; notes?: DatasetMoveNotes; rowCount?: number }> {
     if (options.dryRun) {
       logger.info(input, "[dry-run] would migrate dataset content to chunked JSONL");
-      return "would-migrate";
+      return { outcome: "would-migrate" };
     }
 
-    if (!(await this.repository.isPostgresLayout(input))) return "already-migrated";
+    if (!(await this.repository.isPostgresLayout(input))) return { outcome: "already-migrated" };
 
+    const notes = await this.repository.findMoveNotes(input);
     const baseline = await this.repository.getFingerprint(input);
     const metadata = await this.writeChunks(input);
     await this.storage.deleteChunksFrom({ ...input, fromIndex: metadata.chunkCount });
 
-    return this.repository.commit({ ...input, baseline, metadata });
+    const outcome = await this.repository.commit({ ...input, baseline, metadata });
+    return { outcome, notes, rowCount: metadata.rowCount };
   }
 
   private async writeChunks(input: { datasetId: string; projectId: string }) {
@@ -128,6 +139,9 @@ export class DatasetMigrationService {
       alreadyMigrated: 0,
       skippedConcurrentWrite: 0,
       failed: 0,
+      archived: 0,
+      empty: 0,
+      rowsUnderOtherProject: [],
     };
 
     let after = input.afterProjectId;
@@ -183,7 +197,9 @@ export class DatasetMigrationService {
     for (const datasetId of page) {
       if (input.signal?.aborted) return;
       try {
-        increment(summary, await this.migrateDataset({ datasetId, projectId }, input));
+        const moved = await this.moveDataset({ datasetId, projectId }, input);
+        increment(summary, moved.outcome);
+        if (moved.outcome === "migrated") note(summary, { datasetId, projectId }, moved);
       } catch (error) {
         summary.failed += 1;
         logger.warn(
@@ -198,6 +214,18 @@ export class DatasetMigrationService {
 /** Datasets this run left on the postgres layout: failed or changed while moving. */
 function remaining(summary: DatasetMigrationSummary): number {
   return summary.failed + summary.skippedConcurrentWrite;
+}
+
+/** What a moved dataset adds to the report: archived, empty, or rows it left under another project. */
+function note(
+  summary: DatasetMigrationSummary,
+  key: { datasetId: string; projectId: string },
+  moved: { notes?: DatasetMoveNotes; rowCount?: number },
+): void {
+  if (moved.notes?.archived) summary.archived += 1;
+  if (moved.rowCount === 0) summary.empty += 1;
+  const rows = moved.notes?.rowsUnderOtherProject ?? 0;
+  if (rows > 0) summary.rowsUnderOtherProject.push({ ...key, rows });
 }
 
 function increment(summary: DatasetMigrationSummary, outcome: DatasetMigrationOutcome): void {
