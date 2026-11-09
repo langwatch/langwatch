@@ -111,6 +111,27 @@ describe("LogRequestCollectionService", () => {
     });
   });
 
+  // A logs-only agent's trace has no span to name its service; without it the drawer hides Terminal.
+  describe("given a coding agent's log correlated to a trace", () => {
+    it("names the agent's service on the contribution", async () => {
+      const { result, contributed } = collect({
+        accepted: [preparedLog({ providerKind: "grok", serviceName: "grok-cli" })],
+      });
+
+      await result;
+      expect(contributed[0]?.[0]?.liftedAttributes["service.name"]).toBe("grok-cli");
+    });
+
+    it("leaves an application log's service to its spans", async () => {
+      const { result, contributed } = collect({
+        accepted: [preparedLog({ providerKind: "generic", serviceName: "checkout" })],
+      });
+
+      await result;
+      expect(contributed[0]?.[0]?.liftedAttributes).not.toHaveProperty("service.name");
+    });
+  });
+
   describe("when the canonical batch cannot be recorded", () => {
     it("answers unavailable without naming the storage, and contributes nothing", async () => {
       const { result, contributed } = collect({ accepted: [preparedLog({})], recordFails: true });

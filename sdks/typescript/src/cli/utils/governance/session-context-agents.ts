@@ -55,6 +55,8 @@ export interface SessionContextAgent {
    * it, since it follows the session into a worktree it switches to.
    */
   projectDirVar?: string;
+  /** The `langwatch ingest guidance` argument its SessionStart entry also runs, if any. */
+  sessionStartGuidance?: string;
   hookTarget: HookTarget;
 }
 
@@ -93,6 +95,7 @@ export const SESSION_CONTEXT_AGENTS = {
     keySourceType: only("claude_code"),
     sessionIdVar: "CLAUDE_CODE_SESSION_ID",
     projectDirVar: "CLAUDE_PROJECT_DIR",
+    sessionStartGuidance: "claude-code",
     hookTarget: {
       kind: "entries",
       resolve: () => {

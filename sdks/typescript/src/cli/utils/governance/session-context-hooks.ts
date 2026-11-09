@@ -20,6 +20,7 @@ import {
   type OwnedHookFileTool,
   ownedHookFileToolForCommand,
   SESSION_CONTEXT_AGENTS,
+  type SessionContextAgent,
   type SessionContextAgentId,
 } from "./session-context-agents";
 
@@ -267,17 +268,18 @@ function mergeHookEntries({
 }
 
 /**
- * No matcher: every session start counts. Still ONE entry per event --
- * claude's SessionStart carries the guidance hook as a second command, so
- * removal holds for both. Codex's guidance rides the AGENTS.md block instead.
+ * No matcher: every session start counts. Still ONE entry per event: an agent
+ * row naming `sessionStartGuidance` carries it as a second command, so removal
+ * holds for both. Codex's guidance rides the AGENTS.md block instead.
  */
 function sessionContextHookEntry(
   tool: HookedTool,
   event: (typeof HOOK_EVENTS)[number],
 ): Record<string, unknown> {
   const commands = [sessionContextHookCommand(tool)];
-  if (tool === "claude_code" && event === "SessionStart") {
-    commands.push(`${GUIDANCE_COMMAND_PREFIX} claude-code`);
+  const agent: SessionContextAgent = SESSION_CONTEXT_AGENTS[tool];
+  if (agent.sessionStartGuidance !== undefined && event === "SessionStart") {
+    commands.push(`${GUIDANCE_COMMAND_PREFIX} ${agent.sessionStartGuidance}`);
   }
   return {
     hooks: commands.map((command) => ({

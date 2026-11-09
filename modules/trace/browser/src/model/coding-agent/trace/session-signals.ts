@@ -120,7 +120,7 @@ const SIGNAL_RULES: readonly SignalRule[] = [
     title: (row) =>
       `${row.toolsDenied} ${row.toolsDenied === 1 ? "action was" : "actions were"} declined`,
     detail: () =>
-      "Someone said no. Those actions never ran, so they leave no other trace in this session.",
+      "The user or a permission rule said no. Those actions never ran, so they leave no other trace in this session.",
   },
   {
     id: "hooks-blocked",

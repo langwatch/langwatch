@@ -4,7 +4,7 @@ import {
   projectIdsReadBy,
 } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
-import { teaserOf, TraceNotFoundError } from "@langwatch/trace-contract";
+import { deriveTraceTimestamp, teaserOf, TraceNotFoundError } from "@langwatch/trace-contract";
 
 import type { SpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
 import type {
@@ -94,7 +94,12 @@ export class TraceSummaryService {
     }
 
     const cutoff = visibilityCutoffMs;
-    if (cutoff !== null && cutoff !== undefined && result.occurredAt < cutoff) {
+    // A logs-only trace has no span baseline (0); its storage anchor dates it, as the header does.
+    const tracedAt = deriveTraceTimestamp({
+      occurredAt: result.occurredAt,
+      storageAnchorMs: result.storageAnchorMs,
+    });
+    if (cutoff !== null && cutoff !== undefined && tracedAt < cutoff) {
       // Gated reads get a teaser regardless — resolving the full value only
       // to redact it would be a wasted spans + event_log read.
       return {

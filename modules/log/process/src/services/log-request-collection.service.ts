@@ -238,6 +238,12 @@ function makeTraceContribution({
     }
   }
 
+  // A logs-only coding agent (Grok) has no span to name the trace's service; its log must.
+  const serviceName = normalized.resourceAttributes["service.name"];
+  if (record.providerKind !== "generic" && typeof serviceName === "string" && serviceName) {
+    liftedAttributes["service.name"] = serviceName;
+  }
+
   const { input, output, truncated } = traces.extractLogRecordIO(legacyView);
   if (truncated) {
     liftedAttributes["langwatch.reserved.log_io_truncated"] = true;

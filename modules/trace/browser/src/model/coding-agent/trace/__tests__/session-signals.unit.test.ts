@@ -199,12 +199,20 @@ describe("deriveSessionSignals", () => {
     });
   });
 
-  describe("given a tool the user declined", () => {
+  describe("given a declined tool", () => {
     // A denied tool produces NO span at all, so if this doesn't say it, nothing
     // in the entire trace does.
     it("reports it, since it leaves no other trace", () => {
       const signals = deriveSessionSignals(session({ toolsDenied: 1 }));
       expect(signals.find((s) => s.id === "tools-denied")!.title).toBe("1 action was declined");
+    });
+
+    // The count holds policy denials too, so the detail must not pin them on a person.
+    it("names the user or a permission rule, not only a person", () => {
+      const signals = deriveSessionSignals(session({ toolsDenied: 2 }));
+      expect(signals.find((s) => s.id === "tools-denied")!.detail).toMatch(
+        /^The user or a permission rule said no\./,
+      );
     });
   });
 
