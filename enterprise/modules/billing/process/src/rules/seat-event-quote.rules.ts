@@ -27,9 +27,24 @@ export type QuotedAmounts = {
   taxCents: number;
 };
 
-/** The tax inside a charge, never more than the charge itself nor below zero. */
-const taxWithin = ({ taxCents, dueCents }: { taxCents: number; dueCents: number }): number =>
-  Math.max(0, Math.min(taxCents, dueCents));
+/**
+ * The tax inside the part of a total actually charged: credit pays a share of the whole
+ * invoice, tax included, so the charge carries the same share of the tax. Never more than
+ * the charge itself nor below zero.
+ */
+const taxWithin = ({
+  taxCents,
+  totalCents,
+  dueCents,
+}: {
+  taxCents: number;
+  totalCents: number;
+  dueCents: number;
+}): number => {
+  if (totalCents <= 0 || dueCents <= 0) return 0;
+  const charged = Math.round((taxCents * Math.min(dueCents, totalCents)) / totalCents);
+  return Math.max(0, Math.min(charged, dueCents));
+};
 
 /**
  * The money figures a seat quote reports, read off a previewed invoice.
@@ -44,7 +59,11 @@ export const quotedAmounts = (preview: AlwaysInvoicePreview): QuotedAmounts => {
     // smaller than the change itself. Zero on a clean account, and never
     // reported for a credit — nothing is drawn down by one.
     creditAppliedCents: isCredit ? 0 : invoiceTotalCents - preview.amountDue,
-    taxCents: isCredit ? 0 : taxWithin({ taxCents: preview.tax ?? 0, dueCents: preview.amountDue }),
+    taxCents: taxWithin({
+      taxCents: preview.tax ?? 0,
+      totalCents: invoiceTotalCents,
+      dueCents: preview.amountDue,
+    }),
   };
 };
 
@@ -75,7 +94,7 @@ export const chargedAmounts = ({
   return {
     prorationCents,
     creditAppliedCents,
-    taxCents: totalCents < 0 ? 0 : taxWithin({ taxCents, dueCents: prorationCents }),
+    taxCents: taxWithin({ taxCents, totalCents, dueCents: prorationCents }),
   };
 };
 

@@ -31,6 +31,12 @@ export function seatQuoteOf(data: unknown): SeatQuote | undefined {
   return parsed.success ? parsed.data : undefined;
 }
 
+/** "€20.72 + €4.35 VAT" under a quoted charge with VAT; undefined when it has none. */
+export function quoteVatSplit(quote: SeatQuote): string | undefined {
+  if (!quote.formattedAmountDueExcludingTax || !quote.formattedTax) return undefined;
+  return `${quote.formattedAmountDueExcludingTax} + ${quote.formattedTax} VAT`;
+}
+
 /** A billing day as the drawer prints it, "1 Dec"; periods turn over at midnight UTC. */
 export function billingDay(epochMilliseconds: number): string {
   return format(epochMilliseconds, "d MMM", { timeZone: "UTC" });

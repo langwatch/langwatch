@@ -82,6 +82,14 @@ Feature: Proration Preview Before Seat Update
     And the amount due before VAT
 
   @unit
+  Scenario: Account credit carries its share of the tax
+    Given the organization owes VAT on top of the price
+    And account credit pays part of the change
+    When I preview a seat increase
+    Then the VAT reported is the share inside the amount left to pay
+    And the amount before VAT plus that VAT equals the amount due
+
+  @unit
   Scenario: A quote with no tax names none
     Given the organization owes no VAT on the change
     When I preview a seat increase

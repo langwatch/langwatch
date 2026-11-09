@@ -29,6 +29,7 @@ import type {
   BillingSubscriptionRepository,
 } from "../repositories/subscription.repository.ts";
 import type { SubscriptionItemUpdate } from "../rules/billing-stripe-shapes.rules.ts";
+import type { SeatEventProrationQuote } from "../rules/seat-event-quote.rules.ts";
 import { BillingInvoicesService } from "./billing-invoices.service.ts";
 import type { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
 import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
@@ -295,17 +296,7 @@ export class BillingSubscriptionService {
   }: {
     organizationId: string;
     newTotalSeats: number;
-  }): Promise<{
-    amountDueCents: number;
-    formattedAmountDue: string;
-    formattedCreditApplied: string | null;
-    taxCents: number;
-    formattedAmountDueExcludingTax: string | null;
-    formattedTax: string | null;
-    formattedRecurringTotal: string;
-    billingInterval: string;
-    quotedAt: number;
-  }> {
+  }): Promise<SeatEventProrationQuote> {
     if (!this.seatEventService) {
       throw new SeatBillingUnavailableError();
     }

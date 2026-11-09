@@ -18,14 +18,9 @@ export function SeatSummaryLines({ lines }: { lines: SeatSummaryLine[] }) {
       {lines.map((line) => (
         <VStack key={line.label} align="stretch" gap={2}>
           {line.ruled && <Separator />}
-          <HStack justify="space-between" color={line.muted ? "fg.muted" : undefined}>
+          <HStack justify="space-between" align="start" color={line.muted ? "fg.muted" : undefined}>
             <Text fontWeight={line.emphasis ? "semibold" : undefined}>{line.label}</Text>
-            <HStack gap={1.5} align="baseline">
-              {line.note && (
-                <Text fontSize="xs" color="fg.muted" fontVariantNumeric="tabular-nums">
-                  {line.note}
-                </Text>
-              )}
+            <VStack align="end" gap={0}>
               <Text
                 fontWeight={line.muted ? "normal" : "semibold"}
                 color={line.emphasis ? "blue.fg" : undefined}
@@ -33,7 +28,12 @@ export function SeatSummaryLines({ lines }: { lines: SeatSummaryLine[] }) {
               >
                 {line.value}
               </Text>
-            </HStack>
+              {line.note && (
+                <Text fontSize="xs" color="fg.muted" fontVariantNumeric="tabular-nums">
+                  {line.note}
+                </Text>
+              )}
+            </VStack>
           </HStack>
         </VStack>
       ))}

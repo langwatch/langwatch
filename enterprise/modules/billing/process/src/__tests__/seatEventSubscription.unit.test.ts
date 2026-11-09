@@ -45,9 +45,9 @@ const subscriptionOf = (fields: Partial<BillingSubscription>): BillingSubscripti
   ...fields,
 });
 
-/** An invoice preview as the provider computes it; decoy lines, subtotal and tax go unread. */
+/** An invoice preview as the provider computes it; tax is read, decoy lines are not. */
 const previewOf = (
-  preview: BillingInvoicePreview & { lines?: unknown; subtotal?: number; tax?: number },
+  preview: BillingInvoicePreview & { lines?: unknown; subtotal?: number },
 ): BillingInvoicePreview => preview;
 
 const createMockSubscriptions = (): {

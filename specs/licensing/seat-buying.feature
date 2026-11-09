@@ -410,3 +410,16 @@ Feature: Buying seats
       And the change charges €29.24 today, €5.07 of it VAT
       Then the summary reads "Due today, prorated" "€29.24" with "€24.17 + €5.07 VAT"
       And "Then from 1 Dec" "€116/mo" with "excl. VAT"
+
+    @unit
+    Scenario: Lowering seats says each recurring price excludes VAT
+      Given Manage seats on Growth lowers the seats from 4 to 3
+      Then the summary and the confirm read "Until 1 Dec" "€116/mo" with "excl. VAT"
+      And "From 1 Dec" "€87/mo" with "excl. VAT"
+
+    @unit
+    Scenario: The monthly price with no seat change, and Free past its seats, exclude VAT
+      Given Manage seats on Growth keeps 3 seats
+      Then the summary reads "Monthly price" "€87/mo" with "excl. VAT"
+      And on Free, inviting past the included seats reads "Monthly price" "€87/mo" with "excl. VAT"
+      And on Free within the included seats the €0 price carries no note
