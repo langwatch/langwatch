@@ -36,8 +36,7 @@ Feature: Remaining dataset rows move to object storage and leave the records tab
 
   Rule: A new background step moves every dataset still in the records table
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: The remaining-content move runs where the first move is already recorded done
       Given the first content move is recorded done
       And a dataset created afterwards still keeps its 4 rows in the records table
@@ -46,24 +45,21 @@ Feature: Remaining dataset rows move to object storage and leave the records tab
       And the dataset reads its 4 rows from object storage with the same ids, in the same order
 
     # Old images (3.21.0 to 3.23.0) still create records-table datasets until they stop serving.
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: The remaining-content move waits until no older image is serving
       Given an image that still creates datasets in the records table is serving
       When the worker sweeps background steps
       Then the remaining-content move stays pending
 
     # findPostgresDatasetIds does not filter archivedAt (prisma.dataset-migration.repository.ts:37-46).
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: An archived dataset is moved too
       Given an archived dataset whose 2 rows are in the records table
       When the remaining-content move runs
       Then the archived dataset reads its 2 rows from object storage
       And it stays archived
 
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: An empty dataset is moved as an empty dataset
       Given a dataset in the records table with no rows
       When the remaining-content move runs
@@ -71,16 +67,14 @@ Feature: Remaining dataset rows move to object storage and leave the records tab
 
     # The move reads rows by dataset and project (prisma.dataset-migration.repository.ts:78-92), so a
     # row filed under another project is never copied.
-    # becomes @unit
-    @unimplemented
+    @unit
     Scenario: Rows filed under a different project than their dataset are reported, not moved
       Given a dataset with 3 rows in the records table, one of them filed under another project
       When the remaining-content move runs
       Then the dataset reads its 2 rows from object storage
       And the step's report counts 1 row filed under another project for that dataset
 
-    # becomes @integration
-    @unimplemented
+    @integration
     Scenario: A dataset that fails to move stays readable from the records table
       Given object storage refuses the chunk writes of one dataset
       When the remaining-content move runs
