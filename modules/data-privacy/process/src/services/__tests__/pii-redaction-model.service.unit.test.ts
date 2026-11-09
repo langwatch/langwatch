@@ -1,3 +1,4 @@
+import { DATA_PRIVACY_PRESIDIO_TIMEOUT_MS } from "@langwatch/data-privacy-contract";
 import type { PiiDetectionOutcome, PiiDetectionRequest } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -350,6 +351,40 @@ describe("PiiRedactionModelService", () => {
       presidio.answerWith(anonymized("call <PERSON>"));
 
       await expect(analysis.clearPresidio(strictBatch())).resolves.toEqual(["call [PERSON]"]);
+    });
+
+    describe("when the model has not answered at the time cap", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      /** @scenario "A slow model call is aborted well before the redaction budget" */
+      it("aborts the Lambda invoke at 50 seconds and sends the batch to Presidio", async () => {
+        vi.useFakeTimers();
+        const lambda = hangingLambda();
+        const { analysis, presidio, sent } = setup({
+          model: lambda.channel,
+          modelTimeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
+        });
+        presidio.answerWith(anonymized("call <PERSON>"));
+
+        const cleared = analysis.clearPresidio(strictBatch());
+        await vi.advanceTimersByTimeAsync(PII_REDACTION_MODEL_TIMEOUT_MS - 1);
+        expect(lambda.signals).toHaveLength(1);
+        expect(lambda.signals[0]!.aborted).toBe(false);
+        expect(sent(presidio)).toHaveLength(0);
+
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(lambda.signals[0]!.aborted).toBe(true);
+        await expect(cleared).resolves.toEqual(["call [PERSON]"]);
+        expect(sent(presidio)).toHaveLength(1);
+      });
+
+      it("caps the model call at 50 seconds, under the 60 second Presidio budget", () => {
+        expect(PII_REDACTION_MODEL_TIMEOUT_MS).toBe(50_000);
+        expect(PII_REDACTION_MODEL_TIMEOUT_MS).toBeLessThan(DATA_PRIVACY_PRESIDIO_TIMEOUT_MS);
+      });
     });
 
     /** @scenario "A model failure falls back to Presidio, never to unredacted text" */

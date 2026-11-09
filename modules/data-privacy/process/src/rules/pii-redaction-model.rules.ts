@@ -2,10 +2,10 @@
 export const PII_REDACTION_MODEL_FLAG = "release_pii_redaction_model_enabled";
 
 /**
- * How long one model call may take: the Lambda's own 110 s timeout plus a margin, so the
- * caller never gives up on a cold start the function would still have answered.
+ * When a model call is aborted and its batch goes to Presidio: well under the 60 s Presidio
+ * timeout, so a slow call leaves Presidio time to answer. A cold start falls back.
  */
-export const PII_REDACTION_MODEL_TIMEOUT_MS = 115_000;
+export const PII_REDACTION_MODEL_TIMEOUT_MS = 50_000;
 
 /** AWS's ceiling for a synchronous invoke request; a larger batch stays on Presidio. */
 export const LAMBDA_SYNC_INVOKE_PAYLOAD_LIMIT_BYTES = 6 * 1024 * 1024;

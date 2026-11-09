@@ -274,6 +274,13 @@ Feature: Redacting personal data out of a span at ingestion
     And when Presidio fails too, the Google DLP fallback is reached as today
 
   @unit
+  Scenario: A slow model call is aborted well before the redaction budget
+    Given an organization allowlisted for the PII redaction model
+    When the model has not answered after 50 seconds
+    Then the model invoke is aborted, not just left running in the background
+    And the batch is sent to Presidio with time left for Presidio to answer
+
+  @unit
   Scenario: A deployment that names no model behaves exactly as today
     Given neither PII_REDACTION_MODEL_LAMBDA_ARN nor PII_REDACTION_MODEL_ENDPOINT is set
     When a strict batch is analysed
