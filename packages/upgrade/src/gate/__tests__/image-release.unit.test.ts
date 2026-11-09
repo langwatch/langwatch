@@ -135,16 +135,15 @@ describe("stampTreeRelease()", () => {
         prismaFolders: [...stamped.prismaFolders, "20260201000000_next"],
         codeSteps: [codeStep],
       };
-      const { manifest, refusal } = stampTreeRelease({
+      const manifest = stampTreeRelease({
         ...next,
         release: "3.21.0",
         tree,
         earlier: manifests,
       });
-      const withIt = manifest ? [...manifests, manifest] : manifests;
+      const withIt = [...manifests, manifest];
 
-      expect(refusal).toBeNull();
-      expect(manifest?.steps.map(({ id }) => id)).toEqual([
+      expect(manifest.steps.map(({ id }) => id)).toEqual([
         "prisma:20260201000000_next",
         codeStep.id,
       ]);
@@ -159,7 +158,7 @@ describe("stampTreeRelease()", () => {
         ...stamped,
         prismaFolders: [...stamped.prismaFolders, "20260201000000_lost", "20260301000000_next"],
       };
-      const { manifest } = stampTreeRelease({
+      const manifest = stampTreeRelease({
         ...next,
         previous: "3.21.0",
         release: "3.22.0",
@@ -167,7 +166,7 @@ describe("stampTreeRelease()", () => {
         earlier: manifests,
       });
 
-      expect(manifest?.steps.map(({ id }) => id)).toEqual([
+      expect(manifest.steps.map(({ id }) => id)).toEqual([
         "prisma:20260201000000_lost",
         "prisma:20260301000000_next",
       ]);

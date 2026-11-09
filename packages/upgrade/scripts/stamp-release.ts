@@ -157,7 +157,7 @@ const current = readTree(reader);
 const cutAt =
   options["cut-at"] ?? git(["log", "-1", "--format=%cI", options.tree ?? "HEAD"]).trim();
 
-const stamped = stampTreeRelease({
+const manifest = stampTreeRelease({
   release,
   previous,
   cutAt,
@@ -168,14 +168,8 @@ const stamped = stampTreeRelease({
       ? null
       : ownerFromTables({ tables: tablesTouched({ sql: current.sqlOf({ id }) }), tableOwners }),
 });
-if (stamped.refusal) {
-  const { code, message } = stamped.refusal;
-  process.stderr.write(`refused to stamp ${release} [${code}]: ${message}\n`);
-  process.exit(1);
-}
-const manifest = releaseManifestSchema.parse(stamped.manifest);
 const target = join(out, `${release}.json`);
-writeFileSync(target, `${JSON.stringify(manifest, null, 2)}\n`);
+writeFileSync(target, `${JSON.stringify(releaseManifestSchema.parse(manifest), null, 2)}\n`);
 process.stdout.write(
   `stamped ${release} (previous ${previous ?? "none"}): ${manifest.steps.length} steps -> ${target}\n`,
 );
