@@ -15,6 +15,8 @@ export type BillingSubscriptionRecord = {
   /** Seats a decrease leaves usable until `seatsKeptUntil`, the end of the period paid for. */
   seatsKept: number | null;
   seatsKeptUntil: Instant | null;
+  /** The retention the checkout was bought with; absent when it offered no choice. */
+  maxRetentionDays?: number | null;
 };
 
 type BillingOrganizationRecord = {

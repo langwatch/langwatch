@@ -61,6 +61,8 @@ export const subscriptionTrpc = defineTrpcContract("subscription")
       tracesToAdd: z.number().optional(),
       currency: currencySchema.optional(),
       billingInterval: subscriptionBillingIntervalSchema.optional(),
+      /** The retention picked in the upgrade dialog; set on the organization once it is paid. */
+      retentionDays: z.number().int().positive().optional(),
     }),
   )
   .withOutput(billingRedirectSchema)

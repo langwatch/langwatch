@@ -2580,6 +2580,9 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../../packages/browser-host
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/data-retention/contract
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../../packages/design-system

@@ -10,6 +10,8 @@ import {
 const labels = (items: { label: string }[]) => items.map((i) => i.label);
 const values = (items: { value: string }[]) => items.map((i) => i.value);
 
+const PAID_LABELS = ["1 month", "2 months", "3 months", "6 months", "1 year"];
+
 describe("buildRetentionMenuItems", () => {
   describe("given a paid (non-enterprise) org", () => {
     const items = buildRetentionMenuItems({
@@ -18,17 +20,20 @@ describe("buildRetentionMenuItems", () => {
       legacyDays: null,
     });
 
-    /** @scenario "A paid organization sees only the two fixed options" */
-    it("offers exactly the two fixed presets, in order", () => {
-      expect(labels(items)).toEqual(["1 month", "2 months"]);
+    /**
+     * @scenario "A paid organization sees only the fixed Growth options"
+     * @scenario "Growth administrators can pick the same options later in settings"
+     */
+    it("offers exactly the Growth presets, in order", () => {
+      expect(labels(items)).toEqual(PAID_LABELS);
     });
 
-    /** @scenario "A paid organization sees only the two fixed options" */
+    /** @scenario "A paid organization sees only the fixed Growth options" */
     it("offers no custom option", () => {
       expect(values(items)).not.toContain(CUSTOM_PRESET_VALUE);
     });
 
-    /** @scenario "A paid organization sees only the two fixed options" */
+    /** @scenario "A paid organization sees only the fixed Growth options" */
     it("offers no keep-forever option", () => {
       expect(values(items)).not.toContain(INDEFINITE_PRESET_VALUE);
     });
@@ -43,14 +48,7 @@ describe("buildRetentionMenuItems", () => {
 
     /** @scenario "An enterprise organization gets the full menu and a custom value" */
     it("offers the full preset list plus custom", () => {
-      expect(labels(items)).toEqual([
-        "1 month",
-        "2 months",
-        "3 months",
-        "1 year",
-        "5 years",
-        "Custom…",
-      ]);
+      expect(labels(items)).toEqual([...PAID_LABELS, "5 years", "Custom…"]);
     });
 
     /**
@@ -81,14 +79,14 @@ describe("buildRetentionMenuItems", () => {
       const items = buildRetentionMenuItems({
         isEnterprise: false,
         isPlatformAdmin: false,
-        legacyDays: 371,
+        legacyDays: 1827,
       });
       expect(items[0]).toEqual({
         value: LEGACY_PRESET_VALUE,
-        label: "Current: 371 days (legacy)",
+        label: "Current: 1827 days (legacy)",
       });
       // The real plan options still follow.
-      expect(labels(items).slice(1)).toEqual(["1 month", "2 months"]);
+      expect(labels(items).slice(1)).toEqual(PAID_LABELS);
     });
 
     it("labels an indefinite legacy value as keep-forever", () => {

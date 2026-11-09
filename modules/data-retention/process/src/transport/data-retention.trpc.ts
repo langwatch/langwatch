@@ -100,4 +100,10 @@ export const dataRetentionTrpcTransport: TrpcRouterDeclaration<
       userId: actor.id,
     }),
   )
+
+  .procedure("getOrganizationStorageEstimate")
+  .withPermission("subscription:upgrade")
+  .handle(async ({ app, input }) =>
+    app.getOrganizationStorageEstimate({ organizationId: input.organizationId }),
+  )
   .build();

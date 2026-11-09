@@ -37,10 +37,14 @@ export const growthOverageCentsPer100k = (currency: Currency): number =>
 const growthEventsPricingString = (currency: Currency): string =>
   `${formatPrice({ cents: growthOverageCentsPer100k(currency), currency })} per additional 100,000 events`;
 
+/** What one GB a month of storage beyond the retention Growth includes costs, in cents. */
+export const retentionStorageCentsPerGb = (currency: Currency): number =>
+  currency === Currency.EUR ? 300 : 400;
+
 const growthRetentionPricingString = (currency: Currency): string =>
   currency === Currency.EUR
-    ? "30 days retention (+ custom at \u20AC3/GB)"
-    : "30 days retention (+ custom at $4/GB)";
+    ? "90 days retention (+ custom at \u20AC3/GB)"
+    : "90 days retention (+ custom at $4/GB)";
 
 /**
  * Growth plan features for upgrade block.
@@ -51,7 +55,7 @@ export const getGrowthFeatures = (currency: Currency): string[] => [
   `${formatNumber(GROWTH_INCLUDED_EVENTS)} events included`,
   growthEventsPricingString(currency),
   "Unlimited lite users",
-  "30 days retention",
+  "90 days retention",
   "Unlimited evals",
   "Private Slack support",
 ];

@@ -29,6 +29,7 @@ type SubscriptionRow = {
   lastPaymentFailedDate: Date | null;
   seatsKept: number | null;
   seatsKeptUntil: Date | null;
+  maxRetentionDays?: number | null;
 };
 
 /** The subscription row on the one clock every reader above this file uses. */
@@ -48,6 +49,7 @@ function subscriptionRecordOf(row: SubscriptionRow): BillingSubscriptionRecord {
     lastPaymentFailedDate: row.lastPaymentFailedDate ? fromDate(row.lastPaymentFailedDate) : null,
     seatsKept: row.seatsKept,
     seatsKeptUntil: row.seatsKeptUntil ? fromDate(row.seatsKeptUntil) : null,
+    maxRetentionDays: row.maxRetentionDays ?? null,
   };
 }
 

@@ -8,6 +8,7 @@ import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  organizationStorageEstimateSchema,
   retentionPolicySnapshotSchema,
   retentionStorageUsageSchema,
 } from "./data-retention.snapshot.ts";
@@ -136,4 +137,9 @@ export const dataRetentionTrpc = defineTrpcContract("dataRetention")
   .query("getScopeStorageUsage")
   .withInput(retentionScopeTargetInputSchema)
   .withOutput(retentionStorageUsageSchema)
+
+  /** The organization's stored bytes and the days they cover, for the upgrade dialog's price. */
+  .query("getOrganizationStorageEstimate")
+  .withInput(z.object({ organizationId: z.string().min(1) }))
+  .withOutput(organizationStorageEstimateSchema)
   .build();

@@ -104,6 +104,7 @@ export interface BillingApi {
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
     customerEmail: string | null;
+    retentionDays?: number;
   }): Promise<{ url: string | null; subscriptionId: string }>;
 }
 

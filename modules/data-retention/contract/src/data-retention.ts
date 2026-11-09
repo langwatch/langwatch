@@ -100,7 +100,7 @@ export type UnpinTraceInput = z.infer<typeof unpinTraceInputSchema>;
 export const RETENTION_WEEK_DAYS = 7;
 export const MIN_RETENTION_DAYS = 35;
 export const ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS = 49;
-export const PAID_RETENTION_PRESET_DAYS = [35, 63] as const;
+export const PAID_RETENTION_PRESET_DAYS = [35, 63, 91, 182, 371] as const;
 export const MAX_RETENTION_DAYS = 65534;
 export const INDEFINITE_RETENTION_DAYS = 0;
 export const MIGRATION_DEFAULT_RETENTION_DAYS = 308;
@@ -110,6 +110,45 @@ export const MIGRATION_DEFAULT_RETENTION_DAYS = 308;
  * for browser surfaces that name the default.
  */
 export const PLATFORM_DEFAULT_RETENTION_DAYS = 49;
+
+/** The retention Growth includes at no extra cost: 90 days, kept as 13 whole weeks. */
+export const GROWTH_INCLUDED_RETENTION_DAYS = 91;
+
+/**
+ * What a Growth buyer picks from at upgrade. Each label is a round number of days, kept up to
+ * one week longer because tables drop data in whole weekly partitions (ADR-024).
+ */
+export const GROWTH_RETENTION_OPTIONS = [
+  { label: "30 days", days: 35 },
+  { label: "60 days", days: 63 },
+  { label: "90 days", days: GROWTH_INCLUDED_RETENTION_DAYS },
+  { label: "180 days", days: 182 },
+  { label: "365 days", days: 371 },
+] as const;
+
+export const growthRetentionDaysSchema = z
+  .number()
+  .int()
+  .refine((days) => GROWTH_RETENTION_OPTIONS.some((option) => option.days === days), {
+    message: "Retention must be one of the Growth plan options.",
+  });
+
+/**
+ * The bytes a retention would keep beyond what Growth includes, at the rate the organization
+ * stores data today: its stored bytes spread over the days they cover.
+ */
+export function estimateBytesAboveIncludedRetention({
+  totalBytes,
+  coveredDays,
+  retentionDays,
+}: {
+  totalBytes: number;
+  coveredDays: number;
+  retentionDays: number;
+}): number {
+  if (retentionDays <= GROWTH_INCLUDED_RETENTION_DAYS || coveredDays <= 0) return 0;
+  return (totalBytes / coveredDays) * (retentionDays - GROWTH_INCLUDED_RETENTION_DAYS);
+}
 
 /**
  * Boot validates and injects this value. The portable contract never reads

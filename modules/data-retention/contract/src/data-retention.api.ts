@@ -1,6 +1,10 @@
 import { moduleApi } from "@langwatch/module";
 
-import type { RetentionPolicySnapshot, RetentionStorageUsage } from "./data-retention.snapshot.ts";
+import type {
+  OrganizationStorageEstimate,
+  RetentionPolicySnapshot,
+  RetentionStorageUsage,
+} from "./data-retention.snapshot.ts";
 import type {
   IdIndexRetentionRaiseInput,
   KillRetroactiveMutationInput,
@@ -73,6 +77,10 @@ export interface DataRetentionApi {
   getScopeStorageUsage(
     input: { projectId: string; scope: ScopeAssignment } & RetentionCallerInput,
   ): Promise<RetentionStorageUsage>;
+  /** Asked `subscription:upgrade` at the door; the total spans all the organization's projects. */
+  getOrganizationStorageEstimate(input: {
+    organizationId: string;
+  }): Promise<OrganizationStorageEstimate>;
   previewScopeRemoval(
     input: { organizationId?: string; scope: ScopeAssignment } & RetentionCallerInput,
   ): Promise<ResolvedRetention>;

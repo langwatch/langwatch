@@ -78,6 +78,7 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
     organizationId: string;
     plan: GrowthSeatPlanType;
     maxMembers: number;
+    maxRetentionDays?: number;
   }): Promise<{ id: string }> {
     const id = generate("sub").toString();
     this.store.subscriptions.push({
@@ -95,6 +96,7 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
       lastPaymentFailedDate: null,
       seatsKept: null,
       seatsKeptUntil: null,
+      maxRetentionDays: input.maxRetentionDays ?? null,
     });
     return { id };
   }

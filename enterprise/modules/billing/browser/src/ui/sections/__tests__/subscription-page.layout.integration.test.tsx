@@ -127,6 +127,9 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
   const setup = await import("./subscription-test-setup.ts");
   return {
     billingApi: {
+      dataRetention: {
+        getOrganizationStorageEstimate: { useQuery: () => ({ data: undefined, isError: false }) },
+      },
       limits: {
         getUsage: {
           useQuery: () => setup.mockGetUsage(),

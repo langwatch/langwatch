@@ -44,6 +44,8 @@ const subscriptionStartedEventDataSchemaDefinition = z.object({
   subscriptionId: z.string().min(1),
   plan: z.string().min(1),
   memberUserIds: z.array(z.string().min(1)),
+  /** The retention the buyer picked at checkout; absent on checkouts that offered none. */
+  retentionDays: z.number().int().positive().optional(),
 });
 export interface SubscriptionStartedEventDataSchema extends Named<
   typeof subscriptionStartedEventDataSchemaDefinition

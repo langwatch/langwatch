@@ -85,6 +85,12 @@ export class MemoryRetentionDirectory implements DataRetentionDirectoryReader {
   async findScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return [{ id: this.graph.projectId, teamId: this.graph.teamId }];
   }
+
+  async findOrganizationCreatedAt(): ReturnType<
+    DataRetentionDirectoryReader["findOrganizationCreatedAt"]
+  > {
+    return [];
+  }
 }
 
 const epoch = new Date(0);

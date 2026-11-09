@@ -229,6 +229,7 @@ export class BillingSubscriptionLifecycleService {
       organizationId: subscription.organizationId,
       subscriptionId: subscription.id,
       plan: subscription.plan,
+      ...(subscription.maxRetentionDays ? { retentionDays: subscription.maxRetentionDays } : {}),
     });
   }
 

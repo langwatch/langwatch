@@ -184,6 +184,7 @@ export class SeatEventSubscriptionService {
     membersToAdd,
     isUpgradeFromTiered = false,
     startedByUserId,
+    retentionDays,
   }: {
     organizationId: string;
     customerId: string;
@@ -193,6 +194,8 @@ export class SeatEventSubscriptionService {
     membersToAdd: number;
     isUpgradeFromTiered?: boolean;
     startedByUserId?: string;
+    /** Kept on the pending row; data-retention sets it on the organization once it is paid. */
+    retentionDays?: number;
   }): Promise<{ url: string | null; subscriptionId: string }> => {
     // Resolve the currency before touching the database. A checkout we cannot
     // build in the customer's own currency will be rejected outright, and every
@@ -221,6 +224,7 @@ export class SeatEventSubscriptionService {
       membersToAdd,
       checkoutCurrency,
       billingInterval,
+      ...(retentionDays === undefined ? {} : { retentionDays }),
     });
 
     const { url } = await this.checkoutSessions.open({
@@ -252,16 +256,19 @@ export class SeatEventSubscriptionService {
     membersToAdd,
     checkoutCurrency,
     billingInterval,
+    retentionDays,
   }: {
     organizationId: string;
     membersToAdd: number;
     checkoutCurrency: Currency;
     billingInterval: BillingInterval;
+    retentionDays?: number;
   }): Promise<{ id: string }> {
     const subscription = await this.subscriptions.createPendingSeatCheckout({
       organizationId,
       plan: resolveGrowthSeatPlanType({ currency: checkoutCurrency, interval: billingInterval }),
       maxMembers: membersToAdd,
+      ...(retentionDays === undefined ? {} : { maxRetentionDays: retentionDays }),
     });
     return subscription;
   }

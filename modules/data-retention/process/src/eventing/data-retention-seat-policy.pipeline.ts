@@ -40,7 +40,10 @@ export function buildDataRetentionSeatPolicyPipeline({
       data: subscriptionStartedEventDataSchema,
       options: { enqueue: { filter: (data) => isGrowthSeatEventPlan(data.plan) } },
       handle: async (fact) => {
-        await seatPolicies.provisionMissing({ organizationId: fact.organizationId });
+        await seatPolicies.provisionMissing({
+          organizationId: fact.organizationId,
+          ...(fact.retentionDays === undefined ? {} : { retentionDays: fact.retentionDays }),
+        });
       },
     })
     .build();

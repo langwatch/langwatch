@@ -53,6 +53,7 @@ export interface BillingSubscriptionApi {
     billingInterval?: SubscriptionBillingInterval;
     /** Who opened the checkout; given the Billing role when it completes. */
     startedByUserId?: string;
+    retentionDays?: number;
   }): Promise<{ url: string | null }>;
   createBillingPortalSession(input: {
     customerId: string;
@@ -137,6 +138,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
       ...(input.tracesToAdd === undefined ? {} : { tracesToAdd: input.tracesToAdd }),
       ...(input.currency === undefined ? {} : { currency: input.currency }),
       ...(input.billingInterval === undefined ? {} : { billingInterval: input.billingInterval }),
+      ...(input.retentionDays === undefined ? {} : { retentionDays: input.retentionDays }),
     });
   })
 

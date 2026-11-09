@@ -608,6 +608,7 @@ export class BillingModule
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
     startedByUserId?: string;
+    retentionDays?: number;
   }): Promise<{ url: string | null }> {
     return this.#subscriptionDoor.subscriptions.createOrUpdateSubscription(input);
   }
@@ -671,6 +672,7 @@ export class BillingModule
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
     customerEmail: string | null;
+    retentionDays?: number;
   }): Promise<{ url: string | null; subscriptionId: string }> {
     const { customerEmail, ...checkout } = input;
     const customerId = await this.getOrCreateCustomerId({

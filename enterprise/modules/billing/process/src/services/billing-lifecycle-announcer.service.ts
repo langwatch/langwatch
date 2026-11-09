@@ -90,6 +90,8 @@ export class BillingLifecycleAnnouncerService {
     organizationId: string;
     subscriptionId: string;
     plan: string;
+    /** The retention the buyer picked at checkout, when the checkout offered one. */
+    retentionDays?: number;
   }): Promise<void> {
     const { organizationId } = input;
     await this.#subscriptionChanged({

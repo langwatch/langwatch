@@ -8,6 +8,7 @@ import {
   type DataRetentionServerConfig,
   type IdIndexRetentionRaiseInput,
   type KillRetroactiveMutationInput,
+  type OrganizationStorageEstimate,
   type PinTraceInput,
   type PinnedTrace,
   type ResolvedRetention,
@@ -25,6 +26,7 @@ import {
 } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureSetup } from "@langwatch/process";
+import type { Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
 import {
@@ -38,6 +40,7 @@ import {
 } from "../services/data-retention-policy.service.ts";
 import { DataRetentionSnapshotService } from "../services/data-retention-snapshot.service.ts";
 import { DataRetentionService } from "../services/data-retention.service.ts";
+import { OrganizationStorageEstimateService } from "../services/organization-storage-estimate.service.ts";
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
 import { RetentionPlanService } from "../services/retention-plan.service.ts";
 import { SeatRetentionPolicyService } from "../services/seat-retention-policy.service.ts";
@@ -86,6 +89,9 @@ export interface DataRetentionDirectoryReader {
     organizationId: string;
     scope: ScopeAssignment;
   }): Promise<readonly { id: string; teamId: string }[]>;
+
+  /** When the organization was created; an empty answer when there is no such organization. */
+  findOrganizationCreatedAt(input: { organizationId: string }): Promise<readonly Instant[]>;
 }
 
 type DataRetentionSetup = FeatureSetup<
@@ -108,6 +114,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
   readonly #snapshots: DataRetentionSnapshotService;
   readonly #scopeMeter: StorageMeterScopeService;
   readonly #seatPolicies: SeatRetentionPolicyService;
+  readonly #storageEstimates: OrganizationStorageEstimateService;
   readonly #users: UserApi;
 
   private constructor(services: {
@@ -116,6 +123,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     snapshots: DataRetentionSnapshotService;
     scopeMeter: StorageMeterScopeService;
     seatPolicies: SeatRetentionPolicyService;
+    storageEstimates: OrganizationStorageEstimateService;
     users: UserApi;
   }) {
     this.#retention = services.retention;
@@ -123,6 +131,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     this.#snapshots = services.snapshots;
     this.#scopeMeter = services.scopeMeter;
     this.#seatPolicies = services.seatPolicies;
+    this.#storageEstimates = services.storageEstimates;
     this.#users = services.users;
   }
 
@@ -168,6 +177,11 @@ export class DataRetentionModule implements DataRetentionApiContract {
         permissions,
       }),
       seatPolicies: SeatRetentionPolicyService.create({ rules: retention }),
+      storageEstimates: OrganizationStorageEstimateService.create({
+        meter: storageMeter,
+        directory: repositories.directory,
+        retention,
+      }),
       users: dependencies.users,
     });
   }
@@ -269,6 +283,12 @@ export class DataRetentionModule implements DataRetentionApiContract {
       scope: input.scope,
       actor: await this.#actor(input.userId),
     });
+  }
+
+  getOrganizationStorageEstimate(input: {
+    organizationId: string;
+  }): Promise<OrganizationStorageEstimate> {
+    return this.#storageEstimates.getEstimate(input);
   }
 
   /**

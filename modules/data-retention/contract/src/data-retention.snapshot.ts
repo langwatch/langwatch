@@ -89,3 +89,19 @@ export interface RetentionStorageUsageSchema extends Named<
 export const retentionStorageUsageSchema: RetentionStorageUsageSchema =
   retentionStorageUsageSchemaDefinition;
 export type RetentionStorageUsage = z.infer<typeof retentionStorageUsageSchema>;
+
+/**
+ * What an organization stores today and how many days of data that is, so the upgrade dialog
+ * can price a longer retention before the buyer picks it.
+ */
+const organizationStorageEstimateSchemaDefinition = z.object({
+  totalBytes: z.number().nonnegative(),
+  /** The organization's traces retention, or its age in days when it is younger than that. */
+  coveredDays: z.number().int().positive(),
+});
+export interface OrganizationStorageEstimateSchema extends Named<
+  typeof organizationStorageEstimateSchemaDefinition
+> {}
+export const organizationStorageEstimateSchema: OrganizationStorageEstimateSchema =
+  organizationStorageEstimateSchemaDefinition;
+export type OrganizationStorageEstimate = z.infer<typeof organizationStorageEstimateSchema>;
