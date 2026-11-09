@@ -110,6 +110,26 @@ export interface ConnectedBillingInvoiceEvents {
   completeRenewalIfDue(input: { organizationId: string }): Promise<unknown>;
 }
 
+type WebhookServiceOptions = {
+  /** Failed payment recovery; absent where a suite composes none. */
+  recovery?: PaymentRecoveryHandler;
+  subscriptionRepository: BillingWebhookSubscriptionRepository;
+  organizationRepository: BillingWebhookOrganizationRepository;
+  stripeSubscriptions: StripeSubscriptionsChannel;
+  itemCalculator: ItemCalculator;
+  /** Clears a trial's licence once its subscription activates; organization owns the row. */
+  licenses: LicenseClearer;
+  licensePurchaseHandler?: LicensePurchaseHandler;
+  licensePaymentLinkId?: string;
+  licenseRenewal?: LicenseRenewalHandler;
+  host: BillingWebhookHost;
+  connectedBilling?: ConnectedBillingInvoiceEvents;
+  /** Records the checkout and subscription changes for peers; absent where none is composed. */
+  announcer?: BillingLifecycleAnnouncerService;
+  /** Hands the Billing role to a checkout's starter; absent where no authz is composed. */
+  billingRoles?: CheckoutBillingRoles;
+};
+
 export class EEWebhookService implements WebhookService {
   private readonly subscriptionRepository: BillingWebhookSubscriptionRepository;
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
@@ -139,25 +159,7 @@ export class EEWebhookService implements WebhookService {
     announcer,
     billingRoles,
     recovery,
-  }: {
-    /** Failed payment recovery; absent where a suite composes none. */
-    recovery?: PaymentRecoveryHandler;
-    subscriptionRepository: BillingWebhookSubscriptionRepository;
-    organizationRepository: BillingWebhookOrganizationRepository;
-    stripeSubscriptions: StripeSubscriptionsChannel;
-    itemCalculator: ItemCalculator;
-    /** Clears a trial's licence once its subscription activates; organization owns the row. */
-    licenses: LicenseClearer;
-    licensePurchaseHandler?: LicensePurchaseHandler;
-    licensePaymentLinkId?: string;
-    licenseRenewal?: LicenseRenewalHandler;
-    host: BillingWebhookHost;
-    connectedBilling?: ConnectedBillingInvoiceEvents;
-    /** Records the checkout and subscription changes for peers; absent where none is composed. */
-    announcer?: BillingLifecycleAnnouncerService;
-    /** Hands the Billing role to a checkout's starter; absent where no authz is composed. */
-    billingRoles?: CheckoutBillingRoles;
-  }) {
+  }: WebhookServiceOptions) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
     this.stripeSubscriptions = stripeSubscriptions;
@@ -189,21 +191,7 @@ export class EEWebhookService implements WebhookService {
     });
   }
 
-  static create(options: {
-    subscriptionRepository: BillingWebhookSubscriptionRepository;
-    organizationRepository: BillingWebhookOrganizationRepository;
-    stripeSubscriptions: StripeSubscriptionsChannel;
-    itemCalculator: ItemCalculator;
-    licenses: LicenseClearer;
-    licensePurchaseHandler?: LicensePurchaseHandler;
-    licensePaymentLinkId?: string;
-    licenseRenewal?: LicenseRenewalHandler;
-    host: BillingWebhookHost;
-    connectedBilling?: ConnectedBillingInvoiceEvents;
-    announcer?: BillingLifecycleAnnouncerService;
-    billingRoles?: CheckoutBillingRoles;
-    recovery?: PaymentRecoveryHandler;
-  }): EEWebhookService {
+  static create(options: WebhookServiceOptions): EEWebhookService {
     return new EEWebhookService(options);
   }
 
