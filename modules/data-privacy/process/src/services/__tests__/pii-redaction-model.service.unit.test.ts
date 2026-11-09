@@ -1,5 +1,9 @@
 import { DATA_PRIVACY_PRESIDIO_TIMEOUT_MS } from "@langwatch/data-privacy-contract";
-import type { PiiDetectionOutcome, PiiDetectionRequest } from "@langwatch/evaluation-contract";
+import {
+  LangevalsPiiDetectionError,
+  type PiiDetectionOutcome,
+  type PiiDetectionRequest,
+} from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -14,7 +18,10 @@ import { MemoryPresidioChannel } from "../../channels/memory/memory.presidio.cha
 import type { PresidioChannel } from "../../channels/presidio.channel.ts";
 import type { DataPrivacyProjectScopeRepository } from "../../repositories/data-privacy-project-scope.repository.ts";
 import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
-import { PII_REDACTION_MODEL_TIMEOUT_MS } from "../../rules/pii-redaction-model.rules.ts";
+import {
+  PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS,
+  PII_REDACTION_MODEL_TIMEOUT_MS,
+} from "../../rules/pii-redaction-model.rules.ts";
 import { DataPrivacyProjectScopeService } from "../data-privacy-project-scope.service.ts";
 import { GoogleDlpRedactionService } from "../google-dlp-redaction.service.ts";
 import type { PiiRedactionModelFallbackReason } from "../pii-analysis-metrics-otel.service.ts";
@@ -90,6 +97,50 @@ function hangingLambda() {
   };
 }
 
+/** How the scripted model meets one batch. */
+type ModelTurn =
+  | { kind: "answer"; afterMs?: number }
+  | { kind: "hang" }
+  | { kind: "stall" }
+  | { kind: "throttle" }
+  | { kind: "refuse" };
+
+/**
+ * A model that meets each batch as its script says, as the Lambda channel would: a hang ends in
+ * the SDK's AbortError at the time cap, a throttle in Lambda's TooManyRequestsException. A stall
+ * ignores the abort and never settles.
+ */
+function scriptedModel(turns: ModelTurn[]) {
+  const batches: string[][] = [];
+  const channel: PresidioChannel = {
+    detect: (input: PiiDetectionRequest) => {
+      if (input.texts.length === 0) return Promise.resolve({ kind: "detected", results: [] });
+      batches.push([...input.texts]);
+      const turn = turns.shift() ?? { kind: "answer" };
+      if (turn.kind === "stall") return new Promise(() => void 0);
+      return new Promise((resolve, reject) => {
+        input.signal.addEventListener("abort", () => {
+          const aborted = new Error("Request aborted");
+          aborted.name = "AbortError";
+          reject(aborted);
+        });
+        if (turn.kind === "answer") {
+          const answer = () => resolve(anonymized("call <PERSON>"));
+          if (turn.afterMs) setTimeout(answer, turn.afterMs);
+          else answer();
+        } else if (turn.kind === "throttle") {
+          const throttled = new Error("Rate exceeded");
+          throttled.name = "TooManyRequestsException";
+          reject(throttled);
+        } else if (turn.kind === "refuse") {
+          reject(new LangevalsPiiDetectionError("PII redaction model answered 500"));
+        }
+      });
+    },
+  };
+  return { batches, channel };
+}
+
 function setup({
   modelConfigured = true,
   allowlisted = true,
@@ -162,6 +213,7 @@ function setup({
         info: (fields, message) => usage.push({ level: "info", fields, message }),
         warn: (fields, message) => usage.push({ level: "warn", fields, message }),
       },
+      now: () => Date.now(),
     }),
     dlp: GoogleDlpRedactionService.create({ dlp, disabled: false, metrics }),
   });
@@ -590,6 +642,221 @@ describe("PiiRedactionModelService", () => {
           durationMs: 0,
         },
       ]);
+    });
+  });
+
+  describe("given a model that has just timed out", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** Answers every Presidio batch, so a skipped or failed model call still clears. */
+    function setupWith(turns: ModelTurn[]) {
+      vi.useFakeTimers();
+      const model = scriptedModel(turns);
+      const context = setup({
+        model: model.channel,
+        modelTimeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
+      });
+      for (let i = 0; i < 10; i++) context.presidio.answerWith(anonymized("call <PERSON>"));
+      return { ...context, model };
+    }
+
+    /** One batch that waits out the full time cap on the model before Presidio answers it. */
+    async function timeOut(analysis: PiiAnalysisService) {
+      const cleared = analysis.clearPresidio(strictBatch());
+      await vi.advanceTimersByTimeAsync(PII_REDACTION_MODEL_TIMEOUT_MS);
+      await expect(cleared).resolves.toEqual(["call [PERSON]"]);
+    }
+
+    /** @scenario "A model that times out is skipped for two minutes" */
+    it("sends the next batches to Presidio without calling the model", async () => {
+      const { analysis, model, presidio, sent, fallbacks, usage } = setupWith([{ kind: "hang" }]);
+
+      await timeOut(analysis);
+      await expect(analysis.clearPresidio(strictBatch())).resolves.toEqual(["call [PERSON]"]);
+      await expect(analysis.clearPresidio(strictBatch())).resolves.toEqual(["call [PERSON]"]);
+
+      expect(model.batches).toHaveLength(1);
+      expect(sent(presidio)).toHaveLength(3);
+      expect(fallbacks).toEqual(["timeout", "breaker_open", "breaker_open"]);
+      expect(usage.map((line) => line.fields.outcome)).toEqual([
+        "timeout",
+        "breaker_open",
+        "breaker_open",
+      ]);
+      expect(usage[1]).toEqual({
+        level: "info",
+        message: "PII redaction model call",
+        fields: {
+          organizationId: ORGANIZATION_ID,
+          projectId: PROJECT_ID,
+          texts: 1,
+          characters: 8,
+          spansFound: 0,
+          outcome: "breaker_open",
+          durationMs: 0,
+        },
+      });
+      expect(JSON.stringify(usage)).not.toContain("Ana");
+    });
+
+    /** @scenario "A model that times out is skipped for two minutes" */
+    it("keeps skipping the model until the cool-down has passed", async () => {
+      expect(PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS).toBe(120_000);
+      const { analysis, model } = setupWith([{ kind: "hang" }, { kind: "answer" }]);
+
+      await timeOut(analysis);
+      await vi.advanceTimersByTimeAsync(PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS - 1);
+      await analysis.clearPresidio(strictBatch());
+      expect(model.batches).toHaveLength(1);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await analysis.clearPresidio(strictBatch());
+      expect(model.batches).toHaveLength(2);
+    });
+
+    /** @scenario "A model that times out is skipped for two minutes" */
+    it("lets one batch try the model after the cool-down while the others skip it", async () => {
+      const { analysis, model, fallbacks } = setupWith([
+        { kind: "hang" },
+        { kind: "answer", afterMs: 1_000 },
+      ]);
+
+      await timeOut(analysis);
+      await vi.advanceTimersByTimeAsync(PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS);
+      const batches = [
+        analysis.clearPresidio(strictBatch()),
+        analysis.clearPresidio(strictBatch()),
+        analysis.clearPresidio(strictBatch()),
+      ];
+      await vi.advanceTimersByTimeAsync(1_000);
+      await expect(Promise.all(batches)).resolves.toEqual([
+        ["call [PERSON]"],
+        ["call [PERSON]"],
+        ["call [PERSON]"],
+      ]);
+
+      expect(model.batches).toHaveLength(2);
+      expect(fallbacks).toEqual(["timeout", "breaker_open", "breaker_open"]);
+    });
+
+    /** @scenario "A model that times out is skipped for two minutes" */
+    it("sends every batch to the model again once the try succeeds", async () => {
+      const { analysis, model, fallbacks } = setupWith([{ kind: "hang" }]);
+
+      await timeOut(analysis);
+      await vi.advanceTimersByTimeAsync(PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS);
+      await analysis.clearPresidio(strictBatch());
+      await analysis.clearPresidio(strictBatch());
+      await analysis.clearPresidio(strictBatch());
+
+      expect(model.batches).toHaveLength(4);
+      expect(fallbacks).toEqual(["timeout"]);
+    });
+
+    /** @scenario "A model that times out is skipped for two minutes" */
+    it("skips the model for another cool-down when the try times out too", async () => {
+      const { analysis, model, fallbacks } = setupWith([{ kind: "hang" }, { kind: "hang" }]);
+
+      await timeOut(analysis);
+      await vi.advanceTimersByTimeAsync(PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS);
+      await timeOut(analysis);
+      await vi.advanceTimersByTimeAsync(PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS - 1);
+      await analysis.clearPresidio(strictBatch());
+      expect(model.batches).toHaveLength(2);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await analysis.clearPresidio(strictBatch());
+      expect(model.batches).toHaveLength(3);
+      expect(fallbacks).toEqual(["timeout", "timeout", "breaker_open"]);
+    });
+
+    it("tries the model again a cool-down after a try that never settles", async () => {
+      const { analysis, model } = setupWith([{ kind: "hang" }, { kind: "stall" }]);
+
+      await timeOut(analysis);
+      await vi.advanceTimersByTimeAsync(PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS);
+      void analysis.clearPresidio(strictBatch());
+      await vi.advanceTimersByTimeAsync(PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS - 1);
+      await analysis.clearPresidio(strictBatch());
+      expect(model.batches).toHaveLength(2);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await analysis.clearPresidio(strictBatch());
+      expect(model.batches).toHaveLength(3);
+    });
+
+    /** @scenario "A model that times out is skipped for two minutes" */
+    it("keeps skipping when a batch sent before the timeout answers late", async () => {
+      const { analysis, model, fallbacks } = setupWith([
+        { kind: "hang" },
+        { kind: "answer", afterMs: 45_000 },
+      ]);
+
+      const timedOut = analysis.clearPresidio(strictBatch());
+      await vi.advanceTimersByTimeAsync(20_000);
+      const late = analysis.clearPresidio(strictBatch());
+      await vi.advanceTimersByTimeAsync(30_000);
+      await timedOut;
+      await vi.advanceTimersByTimeAsync(15_000);
+      await late;
+      await analysis.clearPresidio(strictBatch());
+
+      expect(model.batches).toHaveLength(2);
+      expect(fallbacks).toEqual(["timeout", "breaker_open"]);
+    });
+
+    /** @scenario "A model that times out is skipped for two minutes" */
+    it("skips the model after it is throttled, counting the throttle", async () => {
+      const { analysis, model, fallbacks, usage } = setupWith([{ kind: "throttle" }]);
+
+      await analysis.clearPresidio(strictBatch());
+      await analysis.clearPresidio(strictBatch());
+
+      expect(model.batches).toHaveLength(1);
+      expect(fallbacks).toEqual(["throttled", "breaker_open"]);
+      expect(usage[0]!.fields).toMatchObject({
+        outcome: "throttled",
+        errorName: "TooManyRequestsException",
+      });
+    });
+
+    /** @scenario "A model that times out is skipped for two minutes" */
+    it("still calls the model after a refusal, which is not a timeout", async () => {
+      const { analysis, model, fallbacks } = setupWith([{ kind: "refuse" }]);
+
+      await analysis.clearPresidio(strictBatch());
+      await analysis.clearPresidio(strictBatch());
+
+      expect(model.batches).toHaveLength(2);
+      expect(fallbacks).toEqual(["error"]);
+    });
+
+    /** @scenario "A model that times out is skipped for two minutes" */
+    it("closes after a try the model refuses, since it answered in time", async () => {
+      const { analysis, model, fallbacks } = setupWith([{ kind: "hang" }, { kind: "refuse" }]);
+
+      await timeOut(analysis);
+      await vi.advanceTimersByTimeAsync(PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS);
+      await analysis.clearPresidio(strictBatch());
+      await analysis.clearPresidio(strictBatch());
+
+      expect(model.batches).toHaveLength(3);
+      expect(fallbacks).toEqual(["timeout", "error"]);
+    });
+
+    it("logs a long batch as too_long, not breaker_open, while the model is skipped", async () => {
+      const { analysis, fallbacks } = setupWith([{ kind: "hang" }]);
+
+      await timeOut(analysis);
+      await analysis.clearPresidio({
+        texts: ["a".repeat(8_001)],
+        piiRedactionLevel: "STRICT",
+        projectId: PROJECT_ID,
+      });
+
+      expect(fallbacks).toEqual(["timeout", "too_long"]);
     });
   });
 });

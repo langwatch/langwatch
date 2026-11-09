@@ -55,8 +55,8 @@ organization.
   with `organizationId`, `projectId`, `texts`, `characters`, `spansFound`, `outcome` (`ok`, or the
   fallback reason) and `durationMs`; an error adds its class name only. It never holds a text, a
   finding's value or an error message. Fallbacks are also counted by `reason` on
-  `pii_redaction_model_fallbacks` (`timeout`, `error`, and `routing_error` when the flag or the
-  project could not be read).
+  `pii_redaction_model_fallbacks` (`too_long`, `timeout`, `throttled`, `error`, `breaker_open`,
+  and `routing_error` when the flag or the project could not be read).
 - **No change without the flag or the settings.** With neither setting, the model channel answers
   "not configured" and nothing new is read: no flag, no project, no request. With a setting but
   without the flag, the only new work is one flag read per batch and one project read per project
@@ -65,3 +65,14 @@ organization.
   (`PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS`) skips the model and goes to Presidio, logged and
   counted as `too_long`. The limit is per batch, not per text: one batch is one invoke, and the
   model's time grows with every character in it, so many short texts are as slow as one long one.
+- **Cool-down after a timeout.** When a model call times out, or Lambda throttles it
+  (`TooManyRequestsException`), the process skips the model for 2 minutes
+  (`PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS`): every routed batch goes straight to Presidio,
+  logged and counted as `breaker_open`. Then one batch tries the model while the others still
+  skip it; if it answers, the model is used again, if it times out, another cool-down starts. A
+  refusal or a bad answer does not start one: the model answered in time. The breaker is in
+  memory and per process, not per organization: the model is one deployment for every
+  organization, so a slow model costs each worker at most one 50 s wait per cool-down, not one
+  per organization. Batches already in flight when it opens still run to their own time cap.
+  Over HTTP (`PII_REDACTION_MODEL_ENDPOINT`) a throttle cannot be told from other refusals, so
+  only a timeout opens it there.

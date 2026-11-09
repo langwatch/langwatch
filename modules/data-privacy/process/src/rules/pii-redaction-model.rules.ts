@@ -8,6 +8,13 @@ export const PII_REDACTION_MODEL_FLAG = "release_pii_redaction_model_enabled";
  */
 export const PII_REDACTION_MODEL_TIMEOUT_MS = 50_000;
 
+/**
+ * After a model call times out or is throttled, this process sends every routed batch straight
+ * to Presidio for this long; then one batch tries the model again. Without it a slow model costs
+ * every batch the full time cap, one after another.
+ */
+export const PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS = 2 * 60_000;
+
 /** AWS's ceiling for a synchronous invoke request; a larger batch stays on Presidio. */
 export const LAMBDA_SYNC_INVOKE_PAYLOAD_LIMIT_BYTES = 6 * 1024 * 1024;
 

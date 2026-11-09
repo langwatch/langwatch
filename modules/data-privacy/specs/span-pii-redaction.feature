@@ -282,6 +282,18 @@ Feature: Redacting personal data out of a span at ingestion
     And a batch that neither answers reaches Google DLP after 110 seconds at most
 
   @unit
+  Scenario: A model that times out is skipped for two minutes
+    Given an organization allowlisted for the PII redaction model
+    When a model call in this process times out or is throttled
+    Then for the next two minutes every routed batch goes straight to Presidio without calling the model
+    And each such batch logs its usage line and is counted with the reason breaker_open
+    And after two minutes one batch tries the model while the others still go to Presidio
+    And when that try answers, every batch goes to the model again
+    And when that try times out too, the model is skipped for another two minutes
+    And a refusal or a bad answer does not skip the model
+    And a batch that set off before the timeout and answers late does not end the cool-down
+
+  @unit
   Scenario: A deployment that names no model behaves exactly as today
     Given neither PII_REDACTION_MODEL_LAMBDA_ARN nor PII_REDACTION_MODEL_ENDPOINT is set
     When a strict batch is analysed
