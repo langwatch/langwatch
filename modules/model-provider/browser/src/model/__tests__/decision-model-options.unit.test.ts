@@ -47,6 +47,18 @@ describe("decisionModelPickerOptions", () => {
       expect(openai?.disabled).toBeFalsy();
     });
 
+    it("lists an own model that would run before the ones that need a key", () => {
+      const typesafe = { value: "typesafe/decisions:jev-1.14.0", label: "TypeSafe Jev 1.14" };
+      const own = decisionModelPickerOptions({
+        pickable: [HOSTED, typesafe],
+        isJudgeRouted: false,
+        isOwnModelEnabled: true,
+      }).filter((option) => option.value !== LANGWATCH_DECISION_MODEL_ID);
+      expect(own[0]).toMatchObject({ value: typesafe.value });
+      expect(own[0]?.disabled).toBeFalsy();
+      expect(own.slice(1).every((option) => option.disabled)).toBe(true);
+    });
+
     it("tells how to enable a model whose provider has no key, and keeps it unpickable", () => {
       const inception = options.find((option) => option.label === "Inception Mercury Decide");
       expect(inception).toMatchObject({

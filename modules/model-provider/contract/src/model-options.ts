@@ -93,14 +93,19 @@ function ownModelOption({
 }
 
 /**
- * The own-key catalogue in order: what the server says would run (`pickable`) can be picked, the
- * rest say which key to add.
+ * The own-key catalogue: what the server says would run (`pickable`) comes first and can be
+ * picked, the rest follow in catalogue order and say which key to add. Unpickable rows keep full
+ * opacity, so without the order one usable model hides at the bottom of a long list.
  */
 export function ownDecisionModelPickerOptions(
   pickable: readonly { value: string }[],
 ): ModelPickerOption[] {
   const offered = new Set(pickable.map((model) => model.value));
-  return DECISION_MODELS.filter((entry) => isOwnDecisionModelId(entry.id)).map((entry) =>
+  const options = DECISION_MODELS.filter((entry) => isOwnDecisionModelId(entry.id)).map((entry) =>
     ownModelOption({ entry, offered }),
   );
+  return [
+    ...options.filter((option) => !option.disabled),
+    ...options.filter((option) => option.disabled),
+  ];
 }
