@@ -643,6 +643,8 @@ export function LangyActivityParts({
                 heldGroups={heldGroup ? [heldGroup] : []}
                 failures={receiptFailures}
                 heldFailures={heldFailure ? [heldFailure] : []}
+                cardSteps={capabilityCalls.length}
+                runningSteps={runningGroups.length + pending.length}
                 reasoningTitles={reasoningTitles}
                 devMode={devMode}
               />
@@ -810,6 +812,8 @@ function CompletedActivityBatch({
   heldGroups = [],
   failures,
   heldFailures = [],
+  cardSteps = 0,
+  runningSteps = 0,
   reasoningTitles = [],
   devMode,
 }: {
@@ -823,6 +827,10 @@ function CompletedActivityBatch({
   failures: FailedToolCall[];
   /** The newest failure, standing beside the receipt as one line; the header still counts it. */
   heldFailures?: FailedToolCall[];
+  /** Capability calls that rendered as their own cards: steps that worked, outside the receipt. */
+  cardSteps?: number;
+  /** Steps still running: not failed, so the turn is not all failures yet. */
+  runningSteps?: number;
   /** The turn's folded thinking steps — rows of the receipt, expanded only. */
   reasoningTitles?: string[];
   devMode: boolean;
@@ -892,7 +900,8 @@ function CompletedActivityBatch({
         _hover={{ borderColor: "border.emphasized" }}
       >
         <ReceiptHeader
-          actionCount={worked.length}
+          actionCount={worked.length + cardSteps}
+          runningCount={runningSteps}
           callCount={callCount}
           failedCount={failedCount}
           open={open}
@@ -941,17 +950,19 @@ function CompletedActivityBatch({
  */
 function ReceiptHeader({
   actionCount,
+  runningCount,
   callCount,
   failedCount,
   open,
 }: {
   actionCount: number;
+  runningCount: number;
   callCount: number;
   failedCount: number;
   open: boolean;
 }) {
   const plural = (count: number) => (count === 1 ? "action" : "actions");
-  const allFailed = actionCount === 0;
+  const allFailed = actionCount === 0 && runningCount === 0;
   const calls = `${callCount} ${callCount === 1 ? "tool call" : "tool calls"}`;
   return (
     <HStack gap={2}>
@@ -961,7 +972,9 @@ function ReceiptHeader({
       <Text textStyle="xs" fontWeight="560" color="fg" flex={1} truncate>
         {allFailed
           ? `${failedCount} ${plural(failedCount)} failed`
-          : `${actionCount} ${plural(actionCount)} completed`}
+          : actionCount === 0
+            ? "Working"
+            : `${actionCount} ${plural(actionCount)} completed`}
       </Text>
       {allFailed ? null : (
         <Text textStyle="2xs" color="fg.subtle">

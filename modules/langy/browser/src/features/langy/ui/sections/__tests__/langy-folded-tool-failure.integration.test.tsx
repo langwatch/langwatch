@@ -24,6 +24,12 @@ vi.mock("../../../behavior/use-langy-automation-data.ts", () => ({
   useLangyAutomationNow: () => ({ fresh: undefined, nextFiring: undefined }),
 }));
 
+// The capability card's own rendering is not under test here, only that it stands as a step that worked.
+vi.mock("../capabilities/langy-capability-renderer.tsx", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../capabilities/langy-capability-renderer.tsx")>()),
+  LangyCapabilityRenderer: () => <div data-testid="capability-card" />,
+}));
+
 const { useLangyStore } = await import("../../../../../behavior/langy.store.ts");
 const { LangyToolActivity } = await import("../langy-tool-activity.tsx");
 
@@ -74,6 +80,14 @@ const runningRead = {
   toolCallId: "read-2",
   state: "input-available",
   input: { filePath: "CHANGELOG.md" },
+} as never;
+
+const datasetCard = {
+  type: "tool-langwatch.dataset.list",
+  toolCallId: "dataset-1",
+  state: "output-available",
+  input: { command: "langwatch dataset list" },
+  output: JSON.stringify({ data: [], pagination: { total: 0 } }),
 } as never;
 
 const deniedStep = {
@@ -165,6 +179,8 @@ describe("a failed step", () => {
       expect(container.textContent).toContain("$ cat a.txt");
       expect(container.textContent).toContain("No such file or directory");
       expect(screen.queryByRole("alert")).toBeNull();
+      // The raw block already carries the error line, so the generic copy is not said again.
+      expect(container.textContent).not.toContain("This step couldn't be completed.");
     });
 
     /** @scenario "A failed step folds into the record of the work" */
@@ -270,6 +286,29 @@ describe("a failed step", () => {
 
       expect(receiptHeader().textContent).toContain("3 actions failed");
       expect(receiptHeader().textContent).not.toContain("tool call");
+    });
+  });
+
+  describe("given a failed step beside a capability card that worked", () => {
+    /** @scenario "The record of the work counts its failures quietly" */
+    it("does not read as all failed", () => {
+      renderActivity({ parts: [failA, datasetCard, reply], live: false });
+
+      expect(screen.getByTestId("capability-card")).toBeTruthy();
+      const header = screen.getByRole("button", { name: /\d+ actions? completed/ });
+      expect(header.textContent).toContain("1 action completed");
+      expect(screen.queryByRole("button", { name: /^\d+ actions? failed/ })).toBeNull();
+    });
+  });
+
+  describe("given a failed step beside a step still running", () => {
+    /** @scenario "A step that fails while the turn is running folds into the record too" */
+    it("does not read as all failed while the next step runs", () => {
+      renderActivity({ parts: [failA, runningRead], live: true });
+
+      const header = screen.getByRole("button", { name: /Working/ });
+      expect(header.textContent).not.toMatch(/actions? failed/);
+      expect(header.textContent).toContain("1 tool call, 1 failed");
     });
   });
 
