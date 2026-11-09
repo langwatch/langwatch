@@ -21,6 +21,13 @@ Feature: Plan-gated data-retention menu
     And there is no keep-forever option
 
   @unit
+  Scenario: A stored preset reads as the option that was picked
+    Given an organization whose retention was set to the "1 year" option
+    And the stored value carries the whole-week margin
+    When the retention is shown in settings
+    Then it reads "1 year", not the stored number of days
+
+  @unit
   Scenario: A paid organization cannot save an off-menu retention value
     Given an organization on a paid, non-enterprise plan
     When a manager attempts to set a retention of five years

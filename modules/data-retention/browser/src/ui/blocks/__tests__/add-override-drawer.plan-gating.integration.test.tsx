@@ -62,7 +62,7 @@ describe("AddOverrideDrawer plan-gated behavior", () => {
     const legacyTarget: RetentionEditTarget = {
       scope: { scopeType: "ORGANIZATION", scopeId: "org-1" },
       scopeName: "Acme",
-      retentionDays: 371, // enterprise-only value, not on the paid menu
+      retentionDays: 1827, // enterprise-only value, not on the paid menu
     };
 
     /** @scenario "A grandfathered value is shown but never silently changed" */
@@ -71,7 +71,7 @@ describe("AddOverrideDrawer plan-gated behavior", () => {
       renderDrawer({ isEnterprise: false, editTarget: legacyTarget, onSave });
       // The label shows in both the selected-value readout and the option list,
       // so assert at least one occurrence rather than a unique match.
-      expect(screen.getAllByText("Current: 371 days (legacy)").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Current: 1827 days (legacy)").length).toBeGreaterThan(0);
       // Grandfathering: never coerce or silently shorten. Save is clickable, says why it
       // cannot save the read-only legacy value, and never reaches onSave.
       const save = screen.getByRole("button", { name: "Save changes" });

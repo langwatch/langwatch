@@ -11,7 +11,7 @@ Data retention: the retention policy per scope, the pins that keep data past it,
 | Classification | core (`modules/catalogue.json`)                                                                                                  |
 | Subjects       | data-retention                                                                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                                         |
-| Api token      | `DataRetentionApi` = `moduleApi<DataRetentionApi>()("data-retention")`, `contract/src/data-retention.api.ts:107` (24 operations) |
+| Api token      | `DataRetentionApi` = `moduleApi<DataRetentionApi>()("data-retention")`, `contract/src/data-retention.api.ts:115` (25 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                                       |
 
 ## What data-retention owns
@@ -20,7 +20,7 @@ Data retention: the retention policy per scope, the pins that keep data past it,
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Postgres table                 | `RetentionPolicy`                                                                                          | `process/src/repositories/prisma/prisma.data-retention.repository.ts:21`           |
 | Postgres table                 | `PinnedTrace`                                                                                              | `process/src/repositories/prisma/prisma.pinned-trace.repository.ts:13`             |
-| Postgres, accessed not claimed | `Organization`, `Project`, `Team`                                                                          | `process/src/repositories/prisma/prisma.data-retention-directory.repository.ts:16` |
+| Postgres, accessed not claimed | `Organization`, `Project`, `Team`                                                                          | `process/src/repositories/prisma/prisma.data-retention-directory.repository.ts:17` |
 | Stores required                | prisma, clickhouse, redis                                                                                  | `process/src/repositories/live/live.data-retention.repositories.ts:24`             |
 | Config                         | `platformDefaultDays` (LANGWATCH_DEFAULT_RETENTION_DAYS), `isSaas` (IS_SAAS), `nodeEnvironment` (NODE_ENV) | `contract/src/data-retention.config.ts:15`                                         |
 

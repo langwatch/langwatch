@@ -1941,7 +1941,7 @@ type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/orga
 type Output = z.infer<typeof organizationListedInvitesSchema>; // ../contract/src/organization.responses.ts:114
 
 // invite.acceptInvite
-// Input: organizationApiAcceptInviteInputSchema, ../contract/src/organization.trpc-schemas.ts:246
+// Input: organizationApiAcceptInviteInputSchema, ../contract/src/organization.trpc-schemas.ts:248
 interface Input {
   inviteCode: string;
 }
@@ -1960,19 +1960,20 @@ interface Output {
 }
 
 // invite.upgradeWithInvites
-// Input: organizationApiSeatCheckoutInputSchema, ../contract/src/organization.trpc-schemas.ts:223
+// Input: organizationApiSeatCheckoutInputSchema, ../contract/src/organization.trpc-schemas.ts:225
 interface Input {
   organizationId: string;
   baseUrl: string;
   currency?: "USD" | "EUR";
   billingInterval?: "monthly" | "annual";
   totalSeats: number;
+  retentionDays?: number;
   invites: {
     email: string;
     role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
   }[];
 }
-// Output: organizationSeatCheckoutRedirectSchema, ../contract/src/organization.trpc-schemas.ts:236
+// Output: organizationSeatCheckoutRedirectSchema, ../contract/src/organization.trpc-schemas.ts:238
 interface Output {
   url: string | null;
 }
@@ -2200,7 +2201,7 @@ interface Output {
 }
 
 // organization.updateTeamMemberRole
-// Input: organizationApiUpdateTeamMemberRoleInputSchema, ../contract/src/organization.trpc-schemas.ts:311
+// Input: organizationApiUpdateTeamMemberRoleInputSchema, ../contract/src/organization.trpc-schemas.ts:313
 interface Input {
   teamId: string;
   userId: string;
@@ -2220,7 +2221,7 @@ type Output = {
 }[];
 
 // organization.updateMemberRole
-// Input: organizationApiUpdateMemberRoleInputSchema, ../contract/src/organization.trpc-schemas.ts:270
+// Input: organizationApiUpdateMemberRoleInputSchema, ../contract/src/organization.trpc-schemas.ts:272
 interface Input {
   userId: string;
   organizationId: string;
@@ -2242,7 +2243,7 @@ interface Output {
 }
 
 // organization.getAuditLogs
-// Input: organizationApiAuditLogsInputSchema, ../contract/src/organization.trpc-schemas.ts:335
+// Input: organizationApiAuditLogsInputSchema, ../contract/src/organization.trpc-schemas.ts:337
 interface Input {
   organizationId: string;
   projectId?: string;
