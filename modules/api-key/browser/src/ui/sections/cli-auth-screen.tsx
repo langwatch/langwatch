@@ -4,6 +4,7 @@
 import {
   CLI_KEY_MANAGEMENT_PERMISSIONS,
   cliKeyManagementPermissions,
+  cliPermissionCategories,
   type CliKeyManagementPermission,
 } from "@langwatch/api-key-contract";
 import { InlineCode } from "@langwatch/design-system/inline-code";
@@ -826,6 +827,7 @@ function CliKeyPermissionsField({
             selections={selections}
             userPermissions={userPermissions}
             onChange={onChange}
+            categories={cliPermissionCategories()}
           />
           {permissionCount === 0 && (
             <Text textStyle="xs" color="fg.muted">

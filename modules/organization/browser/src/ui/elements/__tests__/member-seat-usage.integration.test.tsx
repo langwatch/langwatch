@@ -101,6 +101,26 @@ describe("given an organization with a seat allowance of each kind", () => {
     });
   });
 
+  describe("when the plan has no Lite Member seats", () => {
+    /** @scenario A plan without Lite Member seats shows no Lite card on the member list */
+    it("shows no Lite card rather than zero of zero", async () => {
+      mockUsageData.current = { membersCount: 2, membersLiteCount: 0, membersDeveloperCount: 0 };
+
+      renderSeatUsage({ maxMembers: 2, maxMembersLite: 0 });
+
+      expect(await screen.findByText("members: 2 / 2")).toBeInTheDocument();
+      expect(screen.queryByText(/membersLite/)).toBeNull();
+    });
+
+    it("still shows Lite Members someone holds over the plan", async () => {
+      mockUsageData.current = { membersCount: 2, membersLiteCount: 1, membersDeveloperCount: 0 };
+
+      renderSeatUsage({ maxMembers: 2, maxMembersLite: 0 });
+
+      expect(await screen.findByText("membersLite: 1 / 0")).toBeInTheDocument();
+    });
+  });
+
   describe("when the counts have not arrived yet", () => {
     it("renders nothing rather than a zero it does not know", () => {
       const { container } = renderSeatUsage({

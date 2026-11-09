@@ -227,13 +227,16 @@ function fullAccessSelections(
 export function clampSelectionsToAvailability({
   selections,
   userPermissions,
+  categories = PERMISSION_CATEGORIES,
 }: {
   selections: Record<string, AccessLevel | "none">;
   userPermissions: string[];
+  /** The categories the selections speak; the CLI approval passes `cliPermissionCategories()`. */
+  categories?: readonly PermissionCategory[];
 }): Record<string, AccessLevel | "none"> {
   const clamped: Record<string, AccessLevel | "none"> = {};
   for (const [key, level] of Object.entries(selections)) {
-    const category = PERMISSION_CATEGORIES.find((c) => c.key === key);
+    const category = categories.find((c) => c.key === key);
     clamped[key] =
       level === "none" || !category
         ? "none"

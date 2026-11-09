@@ -18,6 +18,8 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
+import { PrismaSeatHoldRepository } from "../repositories/prisma/prisma.seat-hold.repository.ts";
+import { withSeatHolds } from "../services/__tests__/support/seat-holds.ts";
 import type {
   OrganizationGrantCache,
   OrganizationSeatRevocationNotice,
@@ -48,6 +50,8 @@ const recordingGrantsWriter = createApiFixture<AuthzGrantsService>({
 const seats: OrganizationSeatLicense = {
   checkLimit: vi.fn(),
   assertRoleChangeAllowed: vi.fn(),
+  holdsFullSeat: vi.fn(async () => true),
+  withSeat: ({ work }) => work({ assertHeld: async () => {} }),
 };
 const seatNotices: OrganizationSeatRevocationNotice = {
   memberDisabled: vi.fn(),
@@ -77,10 +81,13 @@ describe.skipIf(!DB_URL)(
         memberRemoved: () => Promise.resolve(),
         memberDepartmentChanged: () => Promise.resolve(),
       },
-      repository: PrismaOrganizationMembershipRepository.create({
-        database: prisma,
-        cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-        grants: recordingGrantsWriter,
+      ...withSeatHolds({
+        repository: PrismaOrganizationMembershipRepository.create({
+          database: prisma,
+          cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+          grants: recordingGrantsWriter,
+        }),
+        holds: PrismaSeatHoldRepository.create(prisma),
       }),
       creations,
       seats,

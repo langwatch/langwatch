@@ -9,6 +9,7 @@ import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc"
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
 import {
   catalogueWithout,
   EVERY_CATALOGUE_PERMISSION,
@@ -17,7 +18,11 @@ import { LangWatchQLValidationReportService } from "../../services/langwatch-ql-
 import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import { analyticsLwqlTrpcTransport, type AnalyticsLwqlApi } from "../analytics-lwql.trpc.ts";
 
-const lwql = LangWatchQLService.create({ executor: null, database: "analytics" });
+const lwql = LangWatchQLService.create({
+  runTelemetry: TEST_RUN_TELEMETRY,
+  executor: null,
+  database: "analytics",
+});
 
 type Handler = (args: {
   input: unknown;

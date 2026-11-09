@@ -27,10 +27,10 @@ stay with the presentation registry and the refusing feature.
 
 ## Disputes
 
-Four plan facts are still stated two ways in the codebase. The catalogue
+Five plan facts are still stated two ways in the codebase. The catalogue
 carries the value billing enforces today and records the other; see
 [`drift.md`](./drift.md) and `planCatalogue.disputes()`. They are Alex's to
-resolve, and a fifth one fails the suite.
+resolve, and a sixth one fails the suite.
 
 See `dev/docs/adr/131-plans-catalogue.md` and
 `specs/dependencies/plan-catalogue.feature`.

@@ -65,6 +65,7 @@ describe("organizationMemberDirectorySchema", () => {
           updatedAt: at,
           departmentId: null,
           disabledAt: null,
+          seatPendingSince: null,
           user: {
             id: "user_1",
             name: "Ada",

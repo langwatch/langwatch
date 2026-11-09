@@ -140,6 +140,10 @@ export class UserService {
     return this.repository.countUsageAmong({ userIds: memberUserIds });
   }
 
+  findSignedInSince(input: { userIds: readonly string[]; since: number }): Promise<string[]> {
+    return this.repository.findSignedInSince(input);
+  }
+
   /** A domain with a wildcard in it is no domain, so it matches nobody. */
   hasAccountOnDomain({ domain }: { domain: string }): Promise<boolean> {
     const normalised = domain.trim().toLowerCase();

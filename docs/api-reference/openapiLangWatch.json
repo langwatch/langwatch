@@ -17083,7 +17083,12 @@
                                           "sso:view",
                                           "sso:manage",
                                           "agents:deploy",
-                                          "evaluators:deploy"
+                                          "evaluators:deploy",
+                                          "subscription:upgrade",
+                                          "subscription:manage",
+                                          "seatRequests:view",
+                                          "seatRequests:manage",
+                                          "members:view"
                                         ]
                                       }
                                     ]
@@ -17306,7 +17311,12 @@
                                     "sso:view",
                                     "sso:manage",
                                     "agents:deploy",
-                                    "evaluators:deploy"
+                                    "evaluators:deploy",
+                                    "subscription:upgrade",
+                                    "subscription:manage",
+                                    "seatRequests:view",
+                                    "seatRequests:manage",
+                                    "members:view"
                                   ]
                                 }
                               ]
@@ -17929,7 +17939,12 @@
                                                   "sso:view",
                                                   "sso:manage",
                                                   "agents:deploy",
-                                                  "evaluators:deploy"
+                                                  "evaluators:deploy",
+                                                  "subscription:upgrade",
+                                                  "subscription:manage",
+                                                  "seatRequests:view",
+                                                  "seatRequests:manage",
+                                                  "members:view"
                                                 ]
                                               }
                                             ]
@@ -18152,7 +18167,12 @@
                                             "sso:view",
                                             "sso:manage",
                                             "agents:deploy",
-                                            "evaluators:deploy"
+                                            "evaluators:deploy",
+                                            "subscription:upgrade",
+                                            "subscription:manage",
+                                            "seatRequests:view",
+                                            "seatRequests:manage",
+                                            "members:view"
                                           ]
                                         }
                                       ]
@@ -18596,7 +18616,12 @@
                                         "sso:view",
                                         "sso:manage",
                                         "agents:deploy",
-                                        "evaluators:deploy"
+                                        "evaluators:deploy",
+                                        "subscription:upgrade",
+                                        "subscription:manage",
+                                        "seatRequests:view",
+                                        "seatRequests:manage",
+                                        "members:view"
                                       ]
                                     }
                                   ]
@@ -110430,7 +110455,9 @@
                         "langy:view",
                         "agentCache:view",
                         "governanceCost:view",
-                        "sso:view"
+                        "sso:view",
+                        "seatRequests:view",
+                        "members:view"
                       ]
                     }
                   },
@@ -110600,7 +110627,9 @@
                               "langy:view",
                               "agentCache:view",
                               "governanceCost:view",
-                              "sso:view"
+                              "sso:view",
+                              "seatRequests:view",
+                              "members:view"
                             ]
                           }
                         },
@@ -110730,7 +110759,9 @@
                             "langy:view",
                             "agentCache:view",
                             "governanceCost:view",
-                            "sso:view"
+                            "sso:view",
+                            "seatRequests:view",
+                            "members:view"
                           ]
                         },
                         "generation": {
@@ -110843,7 +110874,9 @@
                 "langy:view",
                 "agentCache:view",
                 "governanceCost:view",
-                "sso:view"
+                "sso:view",
+                "seatRequests:view",
+                "members:view"
               ]
             },
             "required": true

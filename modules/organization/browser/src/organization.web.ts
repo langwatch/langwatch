@@ -11,6 +11,7 @@ import {
   CreateTeamDrawerToken,
   EditProjectDrawerToken,
   InviteMemberDrawerToken,
+  HeldMembershipGateToken,
   JoinInsteadToken,
   JoinOfferToken,
   PendingJoinRequestsToken,
@@ -45,7 +46,7 @@ export const organizationWeb = defineBrowserModule("organization")
     "pages/settings/directory": {
       path: "/settings/directory",
       within: "settings",
-      label: "Directory",
+      label: "Users",
       load: () => import("./ui/sections/organization/directory.screen.tsx"),
     },
     "pages/settings/authentication": {
@@ -108,6 +109,10 @@ export const organizationWeb = defineBrowserModule("organization")
   /** The organization form's quiet way back to the team, once the offer was declined. */
   .lends(JoinInsteadToken, {
     load: () => import("./features/join-offer/ui/blocks/join-instead-action.tsx"),
+  })
+  /** Onboarding's welcome, held back for somebody whose only memberships give no access. */
+  .lends(HeldMembershipGateToken, {
+    load: () => import("./ui/sections/held-membership-gate.tsx"),
   })
   /** People waiting at the door, lent to project's home for those who can answer (§10.1). */
   .lends(PendingJoinRequestsToken, {

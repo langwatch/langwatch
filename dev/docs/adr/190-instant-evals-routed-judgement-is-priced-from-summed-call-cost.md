@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-29
 
-**Status:** Proposed
+**Status:** Accepted
 
 > One line: when a judge call carries a **route**, the Instant Evals judge may ask a decision model, Jev and an LLM judge, add up what every call cost at deploy-time prices, and charge that sum at the one published markup. Unrouted calls keep the ADR-174 rule.
 
@@ -23,8 +23,9 @@
 5. **A run may mix routed and unrouted calls.** Because each token is billed by the rule that covers it, a run that routes some calls and not others is billed correctly. Resolving the route once per run is still recommended, so one run's spend row names one model and rate version. A routed call whose question kind the table does not route still asks the hosted classifier, and carries that classifier's cost at its routed price.
 6. **Unrouted calls keep ADR-174 pricing.** Unrouted calls, runs and judged queries keep the classifier's input-token rule, the `jev` model and the `instant_eval@<rate>x<markup>` rate version.
 7. **A judged query is held at the dearest base input rate it can reach, as a best-effort hold, not a hard cap.** Before a query is judged, its hold is the query token budget priced at the dearest base input rate over every backend the route table can reach (enabled entries and enabled fallbacks), never below the classifier rate, at the one markup. The leaf computes the rate once at boot and exposes it as `InstantEvalJudgeApi.queryHoldPricing()`. With the public jev-only table the hold is unchanged. A routed query can spend past its hold: it may send the same text on several legs (a pair, a fallback, an escalation), its LLM leg sends the full text once per question, and it pays output tokens and long-context input rates, none of which the hold counts. Queries do not route today, so this is not reachable yet; see "Before queries route".
-8. **Routing is gated per organization by `release_instant_evals_judge_router`,** off by default, so decision 11 of ADR-174 does not cover routing. Turning it on needs a caller that builds the route (see the open questions).
+8. **Routing is gated per organization by `release_instant_evals_judge_router`,** on by default on LangWatch Cloud and turned off per organization by a targeting rule, so decision 11 of ADR-174 does not cover routing. A self-hosted install (`IS_SAAS` unset) defaults it off through the flag's `selfHostedDefaultValue`: its judgements go through Connect, which carries no route, so it never offers routing unless an operator switches the flag on. The flag is read for the project within its organization, so an organization rule applies.
 9. **Rollout.** Routing stays off until a deploy has fully rolled out. The routed event fields (`costNanoUsd`, `routedInputTokens`) are new, and an old pod that reads a new event strips them, which would price a routed judgement from tokens alone. The `late_page_billed` event and the run process's late-page fields (`isFinishRecorded`, `unbilledLatePages`, `lateHoldUntilMs`) are new as well; an old pod neither folds the event nor keeps the fields, and only a routed run produces either.
+10. **One caller routes: an LLM-as-judge evaluation on LangWatch Evals Preview.** With the flag on, an LLM judge (boolean, score or category) whose project runs on LangWatch's model sends the route `{ job: "llm_judge" }`; the table picks the slot and mode. An own decision model is never routed, and the flag is not read for it. Judged queries and scenario judges send no route yet (see "Before queries route"). A routed result's details name the backends that answered and how many questions escalated, and with the flag on the Instant Evals column says LangWatch Evals Preview routes.
 
 ## Relation to ADR-174
 
@@ -36,12 +37,12 @@ This record supersedes ADR-174 in part:
 
 It amends decision 13. The leaf now owns two pricing rules and four upstreams: the hosted classifier, the hosted decisions endpoint, Anthropic and OpenAI. It still calls no peer Api.
 
-## Open questions
+## Resolved questions
 
-These are for Andrei and Rogerio. The code assumes the first answer in each pair and changes in one place if the answer differs.
+Both were answered with the first option.
 
-1. **Does the 1.3 markup apply to third-party LLM cost?** The markup was set for Jev at its published rate. The router applies it to the summed cost, so the cost of an Anthropic or OpenAI leg is marked up at 1.3 too. The alternative is a separate markup per backend, which needs a field on the price table (it has none today).
-2. **Does the router ship dark, or with one caller behind the flag?** Today no non-test code sets a route, so the router, its flag and its event fields are unreachable in production. One option is to ship dark and add the caller in a later pull request. The other is to wire one caller, read the flag where the judged rows build their classify input, and ship it behind `release_instant_evals_judge_router`.
+1. **Does the 1.3 markup apply to third-party LLM cost?** Yes: one published markup on the summed cost. The markup was set for Jev at its published rate. The router applies it to the summed cost, so the cost of an Anthropic or OpenAI leg is marked up at 1.3 too. The alternative is a separate markup per backend, which needs a field on the price table (it has none today).
+2. **Does the router ship dark, or with one caller behind the flag?** One caller behind the flag (decision 10). Before this decision no non-test code set a route, so the router, its flag and its event fields were unreachable in production. The caller that now ships is `EvaluationJudgingService`: it sends the `llm_judge` route when `release_instant_evals_judge_router` is on. One option is to ship dark and add the caller in a later pull request. The other is to wire one caller, read the flag where the judged rows build their classify input, and ship it behind `release_instant_evals_judge_router`.
 
 ## Before queries route
 
@@ -67,7 +68,7 @@ Rejected: a second judge module for the router. Evaluation and Instant Evals wou
 - A run's cost and price are the sum of routed cost and unrouted token price, both marked up once.
 - The page budget check reads a running row that stores no routed token count, so it prices every token at the classifier rate on top of the routed cost. That is an upper bound on the bill, never an under-count.
 - Once a deploy sets a route table with LLM backends, judged query holds rise to the LLM rate, even before a caller routes queries. A free organization's query can be refused earlier. That is the conservative side.
-- Until a caller sends a route, production prices every call the ADR-174 way.
+- An organization without the flag is priced the ADR-174 way. With it, its LLM-judge evaluations on LangWatch Evals Preview are priced by decision 3.
 
 ## References
 

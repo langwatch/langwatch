@@ -18,6 +18,11 @@ const mockListAllForProjectForFrontend = vi.fn();
 const mockSave = vi.fn();
 const mockInvalidate = vi.fn();
 
+// The drawer asks the judge router flag; off unless a case turns it on.
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     closeDrawer: mockCloseDrawer,

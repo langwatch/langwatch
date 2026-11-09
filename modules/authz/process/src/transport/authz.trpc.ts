@@ -5,9 +5,11 @@ import { toLedgerActor } from "@langwatch/authorization";
 import {
   AuthzApi,
   authzApplyMemberBindingsInputSchema,
+  authzBillingMemberSchema,
   authzBindingMutationSuccessSchema,
   authzChangeGrantRoleInputSchema,
   authzCreateGrantInputSchema,
+  authzListBillingMembersInputSchema,
   authzListGrantsInputSchema,
   authzListManagedBindingsForOrganizationInputSchema,
   authzListManagedBindingsForOrganizationOutputSchema,
@@ -16,6 +18,7 @@ import {
   authzOwnStandingInputSchema,
   authzOwnStandingSchema,
   authzRevokeGrantByIdInputSchema,
+  authzSetBillingRoleInputSchema,
   assignsCustomGrantRole,
   grantPageSchema,
   grantRevokedSchema,
@@ -23,6 +26,7 @@ import {
   type AuthzPrincipalRef,
 } from "@langwatch/authz-contract";
 import { defineTrpcContract } from "@langwatch/module";
+import { z } from "zod";
 
 /** Whose permissions bound a grant is the session's, so the input never names it. */
 const IMPLIED_BY_SESSION = { caller: true, actor: true } as const;
@@ -59,6 +63,16 @@ export const authzTrpc = defineTrpcContract("authz")
   .mutation("applyMemberGrants")
   .withInput(authzApplyMemberBindingsInputSchema.omit(IMPLIED_BY_SESSION))
   .withOutput(authzBindingMutationSuccessSchema)
+
+  .query("listBillingMembers")
+  .withInput(authzListBillingMembersInputSchema)
+  .withOutput(z.array(authzBillingMemberSchema))
+
+  .mutation("setMemberBillingRole")
+  .withInput(
+    authzSetBillingRoleInputSchema.pick({ organizationId: true, userId: true, holds: true }),
+  )
+  .withOutput(z.object({ success: z.literal(true) }))
   .build();
 
 /** The session as the escalation ceiling: a person, or the key a CLI session arrived on. */
@@ -74,8 +88,8 @@ const customRoles = { feature: "RBAC", when: assignsCustomGrantRole };
 
 /**
  * Membership itself is the only requirement for the standing: the answer is the
- * caller's own, and a non-member resolves to the empty set. The grant writes sit
- * at `organization:manage`, as `/api/grants` does, and never exceed the caller.
+ * caller's own. Every organization role reads who holds what (`members:view`); the
+ * grant writes sit at `organization:manage`, as `/api/grants` does, never beyond the caller.
  */
 export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrpc> =
   defineTrpcRouter(AuthzApi, authzTrpc)
@@ -113,12 +127,12 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
 
     /** Every grant in the organization with its principal and scope named. */
     .procedure("listManagedGrants")
-    .withPermission("organization:manage")
+    .withPermission("members:view")
     .handle(async ({ app, input }) => app.listManagedBindingsForOrganization(input))
 
     /** One member's grants, cheaper than listing the organization and filtering. */
     .procedure("listMemberGrants")
-    .withPermission("organization:manage")
+    .withPermission("members:view")
     .handle(async ({ app, input }) => app.listManagedBindingsForUser(input))
 
     /** One member's revokes and creates together, so the sheet cannot half-apply. */
@@ -128,4 +142,17 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     .handle(async ({ app, input, actor }) =>
       app.applyMemberBindings({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
     )
+
+    /** Who pays for the organization; read by every role, as the directory is. */
+    .procedure("listBillingMembers")
+    .withPermission("members:view")
+    .handle(async ({ app, input }) => [...(await app.listBillingMembers(input))])
+
+    /** Grants or revokes the Billing role on one member; it takes no seat. */
+    .procedure("setMemberBillingRole")
+    .withPermission("organization:manage")
+    .handle(async ({ app, input, actor }) => {
+      await app.setBillingRole({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) });
+      return { success: true as const };
+    })
     .build();

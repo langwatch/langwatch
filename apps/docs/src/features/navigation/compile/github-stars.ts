@@ -1,9 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+import { GITHUB_ACCEPT, REPOSITORY_API_URL, starCount } from "../../../lib/github-repository.ts";
 import { cacheRoot } from "../../../paths.ts";
 
-const STARS_URL = "https://api.github.com/repos/langwatch/langwatch";
 const cacheFile = path.join(cacheRoot, "docs-site/stars.json");
 let starsRead: Promise<number | null> | undefined;
 
@@ -15,12 +15,12 @@ export function readStars() {
 
 async function fetchStars(): Promise<number | null> {
   try {
-    const response = await fetch(STARS_URL, {
+    const response = await fetch(REPOSITORY_API_URL, {
       signal: AbortSignal.timeout(4000),
-      headers: { accept: "application/vnd.github+json" },
+      headers: { accept: GITHUB_ACCEPT },
     });
-    const count = (await response.json()).stargazers_count;
-    if (response.ok && Number.isInteger(count)) {
+    const count = starCount({ body: await response.json() });
+    if (response.ok && count !== null) {
       mkdirSync(path.dirname(cacheFile), { recursive: true });
       writeFileSync(cacheFile, JSON.stringify({ count }));
       return count;

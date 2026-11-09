@@ -10,6 +10,7 @@ import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
+  skipTenantCheck,
 } from "@langwatch/prisma-client";
 import { fromDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
@@ -102,7 +103,9 @@ describe.skipIf(!connection)("PrismaGovernanceTenantHistoryRepository", () => {
         });
       }
 
-      await prisma().$executeRawUnsafe(backfill ?? "");
+      // The shipped backfill spans every organization by design; migrations run outside the guard.
+      const replay = skipTenantCheck({ SKIP_TENANT_CHECK: true }).sql;
+      await prisma().$executeRawUnsafe(`${replay}${backfill ?? ""}`);
 
       const history = await repository().findAllByOrganization({ organizationId: LEGACY_ORG_ID });
       expect(history.map((row) => row.tenantId).toSorted()).toEqual(
