@@ -73,6 +73,8 @@ export interface RunWithRetryOptions extends Omit<
   onRetry?: ((notice: RetryAttemptNotice) => void) | undefined;
   /** Stop retrying once this reports true. Nobody is waiting any more. */
   isAborted?: (() => boolean) | undefined;
+  /** A failure this answers true for is the statement's verdict, never retried. */
+  isFinal?: ((error: unknown) => boolean) | undefined;
 }
 
 /**
@@ -91,6 +93,7 @@ export async function runWithRetry<T>(
     random,
     onRetry,
     isAborted,
+    isFinal,
   }: RunWithRetryOptions = {},
 ): Promise<T> {
   // Without this, `maxAttempts: 0` never enters the loop and throws the
@@ -115,7 +118,7 @@ export async function runWithRetry<T>(
       });
       // An aborted caller is not waiting for the answer any more, so spending
       // the rest of the budget only adds load.
-      if (!transient || isLastAttempt || isAborted?.() === true) {
+      if (!transient || isLastAttempt || isAborted?.() === true || isFinal?.(error) === true) {
         throw error;
       }
 
@@ -150,6 +153,15 @@ export async function runWithRetry<T>(
   throw lastError;
 }
 
+/** ClickHouse's TIMEOUT_EXCEEDED (159): the server stopped the statement at its time cap. */
+function isServerTimeout(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const { code, type } = error as { code?: unknown; type?: unknown };
+  return (
+    code === "159" || type === "TIMEOUT_EXCEEDED" || error.message.includes("TIMEOUT_EXCEEDED")
+  );
+}
+
 /**
  * A configured retry policy, reusable across statements. Holds its options
  * once instead of threading them through every call, so the client holds
@@ -182,9 +194,12 @@ export class RetryPolicy {
     // reading only the explicit one would silently retry work nobody is
     // waiting for, which is the exact failure this option exists to prevent.
     const abortSignal = signal ?? request?.signal;
+    const ownTimeCap = request?.settings?.max_execution_time !== undefined;
     return runWithRetry(task, {
       ...this.options,
       isAborted: () => abortSignal?.aborted === true,
+      // A statement that set its own time cap and hit it would hit it again.
+      isFinal: (error) => ownTimeCap && isServerTimeout(error),
       ...(onRetry === undefined
         ? {}
         : {

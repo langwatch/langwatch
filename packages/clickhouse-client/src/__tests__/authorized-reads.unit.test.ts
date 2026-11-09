@@ -117,6 +117,20 @@ describe("AuthorizedClickHouse", () => {
         expect(sent().SKIP_COLD_SCAN_CHECK).toBe(true);
       });
 
+      it("hands the caller's abort signal to the routed client", async () => {
+        const { sent, clickhouse } = clientWith();
+        const reader = clickhouse.as(proof(), { reads: "traces" });
+        const abandon = new AbortController();
+
+        await reader.query({
+          query: `SELECT TraceId FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
+          format: "JSONEachRow",
+          abort_signal: abandon.signal,
+        });
+
+        expect(sent().signal).toBe(abandon.signal);
+      });
+
       // @scenario "The client adds the tenant set from the proof"
       it("restricts the query to tenants aggregate, A and B, and A and B to their windows", async () => {
         const { sent, resolveClient, clickhouse } = clientWith();

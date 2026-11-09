@@ -272,4 +272,54 @@ describe("retry", () => {
       });
     });
   });
+
+  describe("given a statement that sets its own time cap", () => {
+    const capped: QueryRequest = { ...request, settings: { max_execution_time: 20 } };
+    const serverTimeout = () =>
+      new Error(
+        "Code: 159. DB::Exception: Timeout exceeded: elapsed 20000 ms, maximum: 20000 ms. (TIMEOUT_EXCEEDED)",
+      );
+
+    describe("when the server stops it at that cap", () => {
+      /** @scenario "A facet read stops on the server once the app abandons it" */
+      it("answers the timeout instead of running the statement again", async () => {
+        const { sleep } = fakeSleep();
+        const next = vi.fn().mockRejectedValue(serverTimeout());
+
+        await expect(
+          new RetryPolicy({ sleep, transientMessageFragments: ["TIMEOUT_EXCEEDED"] }).run(
+            () => (next as never)(capped),
+            { request: capped },
+          ),
+        ).rejects.toThrow("TIMEOUT_EXCEEDED");
+
+        expect(next).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the failure is a dropped connection", () => {
+      it("still retries it", async () => {
+        const { sleep } = fakeSleep();
+        const next = vi.fn().mockRejectedValueOnce(transient()).mockResolvedValue({ rows: [] });
+
+        await new RetryPolicy({ sleep }).run(() => (next as never)(capped), { request: capped });
+
+        expect(next).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe("when a statement without its own cap times out on the server", () => {
+      it("keeps retrying it as transient", async () => {
+        const { sleep } = fakeSleep();
+        const next = vi.fn().mockRejectedValueOnce(serverTimeout()).mockResolvedValue({ rows: [] });
+
+        await new RetryPolicy({ sleep, transientMessageFragments: ["TIMEOUT_EXCEEDED"] }).run(
+          () => (next as never)(request),
+          { request },
+        );
+
+        expect(next).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
 });
