@@ -12,6 +12,8 @@ import type { UIMessage } from "ai";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type * as capabilityRenderer from "../capabilities/langy-capability-renderer.tsx";
+
 let devMode = false;
 
 vi.mock("../../../../../behavior/use-langy-dev-mode.ts", () => ({
@@ -24,9 +26,10 @@ vi.mock("../../../behavior/use-langy-automation-data.ts", () => ({
   useLangyAutomationNow: () => ({ fresh: undefined, nextFiring: undefined }),
 }));
 
-// The capability card's own rendering is not under test here, only that it stands as a step that worked.
+// The capability card's own rendering is not under test here, only that it stands as a step
+// that worked.
 vi.mock("../capabilities/langy-capability-renderer.tsx", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../capabilities/langy-capability-renderer.tsx")>()),
+  ...(await importOriginal<typeof capabilityRenderer>()),
   LangyCapabilityRenderer: () => <div data-testid="capability-card" />,
 }));
 
@@ -297,6 +300,7 @@ describe("a failed step", () => {
       expect(screen.getByTestId("capability-card")).toBeTruthy();
       const header = screen.getByRole("button", { name: /\d+ actions? completed/ });
       expect(header.textContent).toContain("1 action completed");
+      expect(header.textContent).toContain("2 tool calls, 1 failed");
       expect(screen.queryByRole("button", { name: /^\d+ actions? failed/ })).toBeNull();
     });
   });

@@ -859,7 +859,10 @@ function CompletedActivityBatch({
   };
   const failedCount = failures.length + heldFailures.length;
   const worked = [...groups, ...heldGroups];
-  const callCount = worked.reduce((count, group) => count + group.calls.length, failedCount);
+  const callCount = worked.reduce(
+    (count, group) => count + group.calls.length,
+    failedCount + cardSteps,
+  );
   const steps = [
     ...groups.map((group) => ({
       order: group.order,
@@ -963,18 +966,19 @@ function ReceiptHeader({
 }) {
   const plural = (count: number) => (count === 1 ? "action" : "actions");
   const allFailed = actionCount === 0 && runningCount === 0;
+  const title = (() => {
+    if (allFailed) return `${failedCount} ${plural(failedCount)} failed`;
+    if (actionCount === 0) return "Working";
+    return `${actionCount} ${plural(actionCount)} completed`;
+  })();
   const calls = `${callCount} ${callCount === 1 ? "tool call" : "tool calls"}`;
   return (
     <HStack gap={2}>
-      <Box color={allFailed ? "fg.subtle" : "green.fg"} display="flex" flexShrink={0}>
-        {allFailed ? <AlertCircle size={11} aria-hidden="true" /> : <Check size={11} />}
+      <Box color={actionCount === 0 ? "fg.subtle" : "green.fg"} display="flex" flexShrink={0}>
+        {actionCount === 0 ? <AlertCircle size={11} aria-hidden="true" /> : <Check size={11} />}
       </Box>
       <Text textStyle="xs" fontWeight="560" color="fg" flex={1} truncate>
-        {allFailed
-          ? `${failedCount} ${plural(failedCount)} failed`
-          : actionCount === 0
-            ? "Working"
-            : `${actionCount} ${plural(actionCount)} completed`}
+        {title}
       </Text>
       {allFailed ? null : (
         <Text textStyle="2xs" color="fg.subtle">
