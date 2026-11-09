@@ -1,7 +1,7 @@
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   type JoinableOrganization,
@@ -95,8 +95,12 @@ export function JoinBeforeCreateInterstitial({
         workspace.
       </Text>
       <FrontDoorPrimaryButton onClick={() => onJoinOrganization(leading)}>
+        {/* Only the name gives way to a long one: the count is half of what the button says. */}
         <Text as="span" truncate title={leading.name}>
-          Join {leading.name} ({colleagues(leading.colleagueCount)})
+          Join {leading.name}
+        </Text>{" "}
+        <Text as="span" flexShrink={0}>
+          ({colleagues(leading.colleagueCount)})
         </Text>
       </FrontDoorPrimaryButton>
       {others.length > 0 ? (
@@ -123,6 +127,7 @@ function OtherOrganizations({
 }) {
   const [showingAll, setShowingAll] = useState(false);
   const [query, setQuery] = useState("");
+  const search = useRef<HTMLInputElement>(null);
 
   const folds = organizations.length > VISIBLE_OTHER_ORGANIZATIONS;
   const searchable = folds && showingAll;
@@ -138,6 +143,7 @@ function OtherOrganizations({
       </Text>
       {searchable ? (
         <Input
+          ref={search}
           size="sm"
           placeholder="Search organizations"
           aria-label="Search organizations"
@@ -186,7 +192,13 @@ function OtherOrganizations({
             <NoDataInfoBlock
               size="line"
               title={`No organization matches "${query.trim()}".`}
-              action={{ label: "Clear search", onClick: () => setQuery("") }}
+              action={{
+                label: "Clear search",
+                onClick: () => {
+                  setQuery("");
+                  search.current?.focus();
+                },
+              }}
             />
           </Box>
         ) : null}
