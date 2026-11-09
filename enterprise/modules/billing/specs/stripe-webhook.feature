@@ -208,11 +208,18 @@ Feature: Stripe webhook handling grants and removes plans correctly
 
     @unit
     Scenario: A late activation for a cancelled Growth subscription retires nothing
-      Given an organization's Growth seat subscription is cancelled in our records
+      Given an organization's Growth seat subscription is cancelled in our records and at Stripe
       And its tiered subscription is active
       When a delayed update reports the Growth subscription active
       Then the Growth subscription stays cancelled and nothing is announced
       And nothing is recorded for retirement
+
+    @unit
+    Scenario: An active update for a cancelled row that Stripe confirms active restores it
+      Given a subscription we cancelled after a non-active update
+      And Stripe now reports it active
+      When the active update arrives
+      Then the subscription is active again and its start is announced
 
     @unit
     Scenario: A renewal with nothing left to retire changes nothing

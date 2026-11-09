@@ -111,8 +111,10 @@ function setup({
   growthStatus,
   tieredStatus = SubscriptionStatus.ACTIVE,
   supersededRefusals = 0,
+  growthAtStripe = "active",
 }: {
   growthStatus: string;
+  growthAtStripe?: "active" | "canceled";
   tieredStatus?: string | null;
   supersededRefusals?: number;
 }) {
@@ -132,9 +134,12 @@ function setup({
 
   const stripe = MemoryStripeSubscriptionsChannel.create();
   const slackConfirmations: string[] = [];
-  for (const id of [GROWTH.stripeSubscriptionId, TIERED.stripeSubscriptionId]) {
+  for (const [id, status] of [
+    [GROWTH.stripeSubscriptionId, growthAtStripe],
+    [TIERED.stripeSubscriptionId, "active"],
+  ] as const) {
     stripe.seed({
-      subscription: { id, status: "active", canceledAt: null, billingThreshold: null, items: [] },
+      subscription: { id, status, canceledAt: null, billingThreshold: null, items: [] },
     });
   }
   const { announcer, pricingModels, started, superseded } = announcerRefusingSupersededPlans({
@@ -282,6 +287,7 @@ describe("Growth seat upgrade records the tiered plans it supersedes", () => {
     it("changes nothing, announces nothing and records nothing", async () => {
       const { service, stripe, started, superseded, slackConfirmations, statusOf } = setup({
         growthStatus: SubscriptionStatus.CANCELLED,
+        growthAtStripe: "canceled",
       });
 
       await subscriptionActive(service);
@@ -292,6 +298,21 @@ describe("Growth seat upgrade records the tiered plans it supersedes", () => {
       expect(stripe.cancellations).toEqual([]);
       expect(started).toEqual([]);
       expect(slackConfirmations).toEqual([]);
+    });
+  });
+
+  describe("when Stripe confirms a subscription we cancelled is active again", () => {
+    /** @scenario "An active update for a cancelled row that Stripe confirms active restores it" */
+    it("activates it and records the plans it supersedes", async () => {
+      const { service, started, superseded, statusOf } = setup({
+        growthStatus: SubscriptionStatus.CANCELLED,
+      });
+
+      await subscriptionActive(service);
+
+      expect(statusOf(GROWTH.id)).toBe(SubscriptionStatus.ACTIVE);
+      expect(started).toHaveLength(1);
+      expect(superseded).toHaveLength(1);
     });
   });
 

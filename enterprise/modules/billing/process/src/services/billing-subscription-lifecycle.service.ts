@@ -189,11 +189,13 @@ export class BillingSubscriptionLifecycleService {
     subscription: Stripe.Subscription;
     existing: BillingSubscriptionRecord;
   }): Promise<void> {
-    // Stripe delivers out of order: an active update for a row already cancelled is stale.
-    if (existing.status === SubscriptionStatus.CANCELLED) {
+    if (
+      existing.status === SubscriptionStatus.CANCELLED &&
+      !(await this.isLiveAtStripe(existing))
+    ) {
       logger.info(
         { subscriptionId: existing.id },
-        "[stripeWebhook] Active update for a cancelled subscription, skipping",
+        "[stripeWebhook] Active update for a subscription Stripe has ended, skipping",
       );
       return;
     }
@@ -213,6 +215,18 @@ export class BillingSubscriptionLifecycleService {
     // Stripe may report the seat subscription active here before the invoice is paid, and
     // the invoice path then sees an active subscription; the retirement cannot wait for it.
     await this.recordSeatEventMove({ updated: updatedSubscription, activated: shouldNotify });
+  }
+
+  /**
+   * Stripe delivers out of order, so an active update for a row we cancelled may be stale. Stripe's
+   * current status decides; a failed read throws so Stripe redelivers.
+   */
+  private async isLiveAtStripe(existing: BillingSubscriptionRecord): Promise<boolean> {
+    if (!existing.stripeSubscriptionId) return false;
+    const atStripe = await this.stripeSubscriptions.getSubscription({
+      subscriptionId: existing.stripeSubscriptionId,
+    });
+    return atStripe.status === "active";
   }
 
   /**

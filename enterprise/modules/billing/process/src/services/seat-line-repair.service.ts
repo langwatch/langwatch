@@ -26,7 +26,6 @@ export const SEAT_REPAIR_FLAG_AFTER_ATTEMPTS = 5;
 /** Repairs younger than this are skipped: their seat change may still be running. */
 export const SEAT_REPAIR_GRACE_MS = 5 * 60 * 1000;
 
-/** Subscriptions Stripe ended: nothing bills next cycle, so there is nothing to put back. */
 /** Subscriptions whose items Stripe refuses to change until the first payment lands. */
 const UNCHANGEABLE_STATUSES = new Set(["incomplete"]);
 
