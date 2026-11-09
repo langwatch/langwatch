@@ -53,7 +53,8 @@ func (oneTag) Tags(context.Context, string) ([]string, error) { return []string{
 func (oneTag) Manifest(context.Context, ecrtag.Ref) (ecrtag.Manifest, error) {
 	return ecrtag.Manifest{}, nil
 }
-func (oneTag) Put(context.Context, ecrtag.Ref, ecrtag.Manifest) error { return nil }
+func (oneTag) Put(context.Context, ecrtag.Ref, ecrtag.Manifest) error  { return nil }
+func (oneTag) ImageTags(context.Context, ecrtag.Ref) ([]string, error) { return nil, nil }
 func (oneTag) Label(context.Context, ecrtag.Ref, string) (string, error) {
 	return "", nil
 }
@@ -98,6 +99,25 @@ func TestParseDiffBase(t *testing.T) {
 		{"-repositories", "r", "-tag", "release", "-revision", "abc", "-custom=true"},
 	} {
 		_, err := parse("diffbase", args)
+		assert.Error(t, err, args)
+	}
+}
+
+func TestParseLwqlAccess(t *testing.T) {
+	o, err := parse("lwql-access", []string{"-repository", "langwatch-app", "-tag", "git-1", "-from", "git-1-arm64 git-0"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"git-1-arm64", "git-0"}, o.from)
+
+	o, err = parse("lwql-access", []string{"-repository", "langwatch-app", "-tag", "git-1-arm64", "-image", "registry/langwatch-app:git-1-arm64"})
+	require.NoError(t, err)
+	assert.Equal(t, "registry/langwatch-app:git-1-arm64", o.image)
+
+	for _, args := range [][]string{
+		{"-repository", "r", "-tag", "t"},
+		{"-repository", "r", "-tag", "t", "-image", "i", "-from", "a"},
+		{"-tag", "t", "-image", "i"},
+	} {
+		_, err := parse("lwql-access", args)
 		assert.Error(t, err, args)
 	}
 }

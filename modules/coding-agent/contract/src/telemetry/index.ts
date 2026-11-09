@@ -15,7 +15,11 @@ export type {
   GenAiOperationRole,
   TokenType,
 } from "./coding-agent-definition.ts";
-export { codingAgentSchema } from "./coding-agent-definition.ts";
+export {
+  codingAgentSchema,
+  type CodingTerminal,
+  codingTerminalSchema,
+} from "./coding-agent-definition.ts";
 export { isModelCallSpan, pickString } from "./coding-agent-span.ts";
 export {
   type ToolDecisionOutcome,

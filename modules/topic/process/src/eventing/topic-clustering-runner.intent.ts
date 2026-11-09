@@ -7,11 +7,9 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 import {
-  type BatchClusteringParams,
   CLUSTERING_ERROR_CODES,
   ClusteringError,
   type ClusteringErrorCode,
-  type IncrementalClusteringParams,
   type TopicClusteringResponse,
   type TopicClusteringSubtopic,
   type TopicClusteringTopic,
@@ -26,6 +24,7 @@ import {
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
   type TopicClusteringPageOutcome,
   type TopicClusteringRun,
+  type TopicClusteringRunWindow,
 } from "./topic-clustering.intent.ts";
 
 const logger = createLogger("langwatch:topicClustering");
@@ -111,11 +110,13 @@ export class TopicClusteringRunner implements TopicClusteringRun {
     searchAfter: [number, string] | null;
     runId: string;
     page: number;
+    window?: TopicClusteringRunWindow | null;
   }): Promise<TopicClusteringPageOutcome> {
     return clusterTopicsForProject(this.deps, {
       projectId: params.projectId,
       searchAfter: params.searchAfter ?? undefined,
       runContext: { runId: params.runId, page: params.page },
+      ...(params.window ? { window: params.window } : {}),
     });
   }
 }
@@ -144,6 +145,21 @@ function batchCadence({
   };
 }
 
+/** Batch re-clusters the whole hot tier, so only an incremental page starts at the watermark. */
+function pageWindowBounds({
+  window,
+  isIncrementalProcessing,
+}: {
+  window: TopicClusteringRunWindow | undefined;
+  isIncrementalProcessing: boolean;
+}): { occurredSinceMs?: number; occurredBeforeMs?: number } {
+  if (!window) return {};
+  if (!isIncrementalProcessing || window.sinceMs === null) {
+    return { occurredBeforeMs: window.untilMs };
+  }
+  return { occurredSinceMs: window.sinceMs, occurredBeforeMs: window.untilMs };
+}
+
 // Runs one clustering page; cadence gate throttles run STARTS only, not continuation pages.
 // Caller owns continuing the walk; this function never schedules its own next page.
 export const clusterTopicsForProject = async (
@@ -152,10 +168,13 @@ export const clusterTopicsForProject = async (
     projectId,
     searchAfter,
     runContext,
+    window,
   }: {
     projectId: string;
     searchAfter?: [number, string];
     runContext?: ClusteringRunContext;
+    /** The run's OccurredAt range; an incremental page reads only traces past its watermark. */
+    window?: TopicClusteringRunWindow;
   },
 ): Promise<ClusteringPageOutcome> => {
   const project = await deps.repository.findProject(projectId);
@@ -216,13 +235,15 @@ export const clusterTopicsForProject = async (
     "Starting trace search for topic clustering",
   );
 
-  const { traces, lastSort, returnedCount } = await deps.traces.readTopicClusteringPage({
-    projectId,
-    isIncrementalProcessing,
-    topicIds,
-    subtopicIds,
-    ...(searchAfter ? { searchAfter } : {}),
-  });
+  const { traces, lastSort, returnedCount, occurredAtMsByTraceId } =
+    await deps.traces.readTopicClusteringPage({
+      projectId,
+      isIncrementalProcessing,
+      topicIds,
+      subtopicIds,
+      ...(searchAfter ? { searchAfter } : {}),
+      ...pageWindowBounds({ window, isIncrementalProcessing }),
+    });
 
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
 
@@ -261,8 +282,8 @@ export const clusterTopicsForProject = async (
   }
 
   const outcome = isIncrementalProcessing
-    ? await incrementalClustering({ deps, projectId, traces, runContext })
-    : await batchClusterTraces({ deps, projectId, traces, runContext });
+    ? await incrementalClustering({ deps, projectId, traces, runContext, occurredAtMsByTraceId })
+    : await batchClusterTraces({ deps, projectId, traces, runContext, occurredAtMsByTraceId });
 
   logger.info({ projectId }, "done! project");
 
@@ -328,11 +349,13 @@ const batchClusterTraces = async ({
   projectId,
   traces,
   runContext,
+  occurredAtMsByTraceId,
 }: {
   deps: TopicClusteringRunnerDeps;
   projectId: string;
   traces: TopicClusteringTrace[];
   runContext?: ClusteringRunContext;
+  occurredAtMsByTraceId: Readonly<Record<string, number>>;
 }): Promise<ClusteringRunOutcome> => {
   logger.info({ tracesLength: traces.length, projectId }, "batch clustering topics");
 
@@ -341,22 +364,27 @@ const batchClusterTraces = async ({
     return { kind: "not_configured" };
   }
   const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
-  const fetched = await fetchTopicsBatchClustering(deps, projectId, {
-    project_id: projectId,
-    litellm_params: await deps.models.prepareLitellmParams({
-      model: topicModel.model,
-      modelProvider: topicModel.modelProvider,
-      projectId,
-    }),
-    embeddings_litellm_params: {
-      ...(await deps.models.prepareLitellmParams({
-        model: embeddingsModel.model,
-        modelProvider: embeddingsModel.modelProvider,
+  const fetched = await requestClustering(deps, {
+    projectId,
+    mode: "batch",
+    ...requestKeyOf(runContext),
+    params: {
+      project_id: projectId,
+      litellm_params: await deps.models.prepareLitellmParams({
+        model: topicModel.model,
+        modelProvider: topicModel.modelProvider,
         projectId,
-      })),
-      dimensions: OPENAI_EMBEDDING_DIMENSION,
+      }),
+      embeddings_litellm_params: {
+        ...(await deps.models.prepareLitellmParams({
+          model: embeddingsModel.model,
+          modelProvider: embeddingsModel.modelProvider,
+          projectId,
+        })),
+        dimensions: OPENAI_EMBEDDING_DIMENSION,
+      },
+      traces,
     },
-    traces,
   });
 
   if (fetched.kind === "not_configured") {
@@ -371,6 +399,7 @@ const batchClusterTraces = async ({
       clusteringResult: fetched.response,
       isIncremental: false,
       runContext,
+      occurredAtMsByTraceId,
     }),
   };
 };
@@ -380,11 +409,13 @@ const incrementalClustering = async ({
   projectId,
   traces,
   runContext,
+  occurredAtMsByTraceId,
 }: {
   deps: TopicClusteringRunnerDeps;
   projectId: string;
   traces: TopicClusteringTrace[];
   runContext?: ClusteringRunContext;
+  occurredAtMsByTraceId: Readonly<Record<string, number>>;
 }): Promise<ClusteringRunOutcome> => {
   logger.info({ tracesLength: traces.length, projectId }, "incremental topic clustering");
 
@@ -412,24 +443,29 @@ const incrementalClustering = async ({
     return { kind: "not_configured" };
   }
   const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
-  const fetched = await fetchTopicsIncrementalClustering(deps, projectId, {
-    project_id: projectId,
-    litellm_params: await deps.models.prepareLitellmParams({
-      model: topicModel.model,
-      modelProvider: topicModel.modelProvider,
-      projectId,
-    }),
-    embeddings_litellm_params: {
-      ...(await deps.models.prepareLitellmParams({
-        model: embeddingsModel.model,
-        modelProvider: embeddingsModel.modelProvider,
+  const fetched = await requestClustering(deps, {
+    projectId,
+    mode: "incremental",
+    ...requestKeyOf(runContext),
+    params: {
+      project_id: projectId,
+      litellm_params: await deps.models.prepareLitellmParams({
+        model: topicModel.model,
+        modelProvider: topicModel.modelProvider,
         projectId,
-      })),
-      dimensions: OPENAI_EMBEDDING_DIMENSION,
+      }),
+      embeddings_litellm_params: {
+        ...(await deps.models.prepareLitellmParams({
+          model: embeddingsModel.model,
+          modelProvider: embeddingsModel.modelProvider,
+          projectId,
+        })),
+        dimensions: OPENAI_EMBEDDING_DIMENSION,
+      },
+      traces,
+      topics,
+      subtopics,
     },
-    traces,
-    topics,
-    subtopics,
   });
 
   if (fetched.kind === "not_configured") {
@@ -444,6 +480,7 @@ const incrementalClustering = async ({
       clusteringResult: fetched.response,
       isIncremental: true,
       runContext,
+      occurredAtMsByTraceId,
     }),
   };
 };
@@ -506,14 +543,18 @@ export const storeResults = async ({
   clusteringResult,
   isIncremental,
   runContext,
+  occurredAtMsByTraceId = {},
 }: {
   deps: TopicClusteringRunnerDeps;
   projectId: string;
   clusteringResult: TopicClusteringResponse;
   isIncremental: boolean;
   runContext?: ClusteringRunContext;
+  /** Each trace's own OccurredAt; its assignment folds at that time (now when unknown). */
+  occurredAtMsByTraceId?: Readonly<Record<string, number>>;
 }): Promise<ClusteringStoreSummary> => {
-  const { topics, subtopics, traces: tracesToAssign, cost } = clusteringResult;
+  const { topics, subtopics, cost } = clusteringResult;
+  const tracesToAssign = mergeAssignmentsPerTrace(clusteringResult.traces);
 
   logger.info(
     {
@@ -549,7 +590,7 @@ export const storeResults = async ({
             subtopicId: subtopic_id,
             subtopicName: subtopic_id ? (subtopicNameMap.get(subtopic_id) ?? null) : null,
             isIncremental,
-            occurredAt: nowInstant().epochMilliseconds,
+            occurredAt: assignmentOccurredAt(occurredAtMsByTraceId[trace_id]),
           }),
         ),
       );
@@ -581,18 +622,31 @@ export const storeResults = async ({
   };
 };
 
-export const fetchTopicsBatchClustering = (
-  deps: TopicClusteringRunnerDeps,
-  projectId: string,
-  params: BatchClusteringParams,
-): Promise<TopicClusteringFetch> => requestClustering(deps, { projectId, mode: "batch", params });
+/** One assignment per trace: the service lists a trace twice when a new subtopic claims it. */
+function mergeAssignmentsPerTrace(
+  assignments: TopicClusteringResponse["traces"],
+): TopicClusteringResponse["traces"] {
+  const merged = new Map<string, TopicClusteringResponse["traces"][number]>();
+  for (const assignment of assignments) {
+    const previous = merged.get(assignment.trace_id);
+    merged.set(assignment.trace_id, {
+      trace_id: assignment.trace_id,
+      topic_id: assignment.topic_id ?? previous?.topic_id ?? null,
+      subtopic_id: assignment.subtopic_id ?? previous?.subtopic_id ?? null,
+    });
+  }
+  return [...merged.values()];
+}
 
-export const fetchTopicsIncrementalClustering = (
-  deps: TopicClusteringRunnerDeps,
-  projectId: string,
-  params: IncrementalClusteringParams,
-): Promise<TopicClusteringFetch> =>
-  requestClustering(deps, { projectId, mode: "incremental", params });
+function assignmentOccurredAt(traceOccurredAtMs: number | undefined): number {
+  return traceOccurredAtMs !== undefined && traceOccurredAtMs > 0
+    ? traceOccurredAtMs
+    : nowInstant().epochMilliseconds;
+}
+
+/** The outbox page a clustering call serves, so a retried page reports its spend once. */
+const requestKeyOf = (runContext: ClusteringRunContext | undefined): { requestKey?: string } =>
+  runContext ? { requestKey: `run:${runContext.runId}:page-${runContext.page}` } : {};
 
 type ClusteringCall = TopicClusteringRequest extends infer R
   ? R extends TopicClusteringRequest
@@ -617,7 +671,7 @@ const clusteringCodeOfRefusal = (error: LangevalsClusteringError): ClusteringErr
   CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE;
 
 /** The whole exchange, staging upload and body read included, lives inside the deadline. */
-const requestClustering = async (
+export const requestClustering = async (
   deps: TopicClusteringRunnerDeps,
   call: ClusteringCall,
 ): Promise<TopicClusteringFetch> => {

@@ -330,11 +330,18 @@ describe("given Instant Evals are off for a self-serve organization", () => {
     expect(enable.input).toEqual({ projectId: "project-1" });
     expect(mutations.estimate.mutate).not.toHaveBeenCalled();
 
-    act(() => enable.options.onSuccess?.({ released: true, offer: "enable", viaConnect: false }));
+    act(() =>
+      enable.options.onSuccess?.({
+        released: true,
+        hostedReleased: true,
+        offer: "enable",
+        viaConnect: false,
+      }),
+    );
 
     expect(mutations.setAccess).toHaveBeenCalledWith(
       { projectId: "project-1" },
-      { released: true, offer: "enable", viaConnect: false },
+      { released: true, hostedReleased: true, offer: "enable", viaConnect: false },
     );
     expect(mutations.invalidateAccess).toHaveBeenCalledTimes(1);
     expect(result.current.refusal).toBeNull();
@@ -372,7 +379,12 @@ describe("given Instant Evals are off for a self-serve organization", () => {
     const dismissed = lastCall(mutations.enable);
     act(() => result.current.dismissRefusal());
     act(() =>
-      dismissed.options.onSuccess?.({ released: true, offer: "enable", viaConnect: false }),
+      dismissed.options.onSuccess?.({
+        released: true,
+        hostedReleased: true,
+        offer: "enable",
+        viaConnect: false,
+      }),
     );
 
     act(() => result.current.onInstantEvalRoute(payload));
@@ -380,7 +392,12 @@ describe("given Instant Evals are off for a self-serve organization", () => {
     const superseded = lastCall(mutations.enable);
     act(() => result.current.abandonPendingRun());
     act(() =>
-      superseded.options.onSuccess?.({ released: true, offer: "enable", viaConnect: false }),
+      superseded.options.onSuccess?.({
+        released: true,
+        hostedReleased: true,
+        offer: "enable",
+        viaConnect: false,
+      }),
     );
 
     expect(mutations.setAccess).toHaveBeenCalledTimes(2);

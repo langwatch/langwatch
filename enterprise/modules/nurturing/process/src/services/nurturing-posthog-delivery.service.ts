@@ -74,6 +74,7 @@ export class NurturingPostHogDeliveryService {
       case "scenario_run_succeeded":
       case "first_trace_integrated":
       case "project_active_day":
+      case "insight_acted":
         return track(activationTrackInput(signal));
       case "experiment_ran":
       case "evaluation_ran":

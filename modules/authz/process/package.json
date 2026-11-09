@@ -32,6 +32,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",

@@ -41,6 +41,7 @@ export {
   nlpCodeBlockTimeoutSeconds,
   nlpServiceUrl,
   nodeEnvironment,
+  nodeEnvProxy,
   otelResourceAttributes,
   outboundProxy,
   passkeysEnabled,

@@ -83,6 +83,10 @@ export class BrowserSessionService {
     return this.deps.sessions.countSignedInUsersAmong(input);
   }
 
+  findSessionUsersSince(input: { userIds: readonly string[]; since: number }): Promise<string[]> {
+    return this.deps.sessions.findSessionUsersSince(input);
+  }
+
   /** `fresh` re-reads the person: the browser's session poll follows the user's own save. */
   async resolveBrowserSession(input: {
     verified: VerifiedBrowserSession;

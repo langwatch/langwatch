@@ -22,8 +22,10 @@ describe("assistantKindOfAgent", () => {
     });
 
     /** @scenario "An agent slug resolves to its product name" */
-    it("resolves pi to its own kind", () => {
+    it("resolves pi to its own kind, wearing pi's own mark", () => {
       expect(assistantKindOfAgent("pi")).toBe("pi");
+      expect(ASSISTANT_PRESETS.pi.iconUrl).toBe("/images/external-icons/pi.svg");
+      expect(ASSISTANT_PRESETS.pi.darkModeInvert).toBe(false);
     });
   });
 

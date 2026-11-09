@@ -35,6 +35,10 @@ jobs:
           push: true
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}:${{ needs.meta.outputs.image_tag }}-${{ matrix.arch }}
+      - name: Fingerprint
+        env:
+          CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
+        run: go run ./cmd/ecrtag lwql-access -repository langwatch-app -tag "${TAG}" -custom="${CUSTOM_TAG}" -image "${REGISTRY}/langwatch-app:${TAG}"
       - name: Export
         uses: docker/build-push-action@0000000000000000000000000000000000000000 # v7
         with:
@@ -71,6 +75,7 @@ jobs:
           exists=$(go run ./cmd/ecrtag published -repository r -tag "${IMAGE_TAG}" \
             -source annotation -revision s -custom="${CUSTOM_TAG}" "${from[@]}")
           docker buildx imagetools create -t "${repo}:${IMAGE_TAG}" src
+          go run ./cmd/ecrtag lwql-access -repository r -tag "${IMAGE_TAG}" -custom="${CUSTOM_TAG}" -from "${IMAGE_TAG}-arm64 ${previous}"
           go run ./cmd/ecrtag lambda -repository r -tag t -revision s -custom="${CUSTOM_TAG}"
 `
 
@@ -122,6 +127,8 @@ func TestECRSkipGatesHoldOnThisRepository(t *testing.T) {
 
 // @scenario "A re-run publishes nothing that is already there"
 // @scenario "A private build reuses a tag only for the commit it records"
+// @scenario "An app image records the fingerprint of the access model it renders"
+// @scenario "A re-tagged app image keeps the fingerprint of the image it copies"
 func TestEveryECRPushAsksEcrtagFirst(t *testing.T) {
 	t.Run("gated workflows pass", func(t *testing.T) {
 		assert.Empty(t, skipRepo(t, gatedImages, gatedPrivate))
@@ -257,6 +264,17 @@ func TestEveryECRPushAsksEcrtagFirst(t *testing.T) {
 			problems := skipRepo(t, strings.Replace(gatedImages, c.from, c.to, 1), gatedPrivate)
 			require.Len(t, problems, 1, problems)
 			assert.Contains(t, problems[0], c.want)
+		})
+	}
+	for name, c := range map[string]struct{ from, to string }{
+		"a build that records no access-model fingerprint": {` -image "${REGISTRY}/langwatch-app:${TAG}"`, ""},
+		"an index that copies no access-model fingerprint": {` -from "${IMAGE_TAG}-arm64 ${previous}"`, ""},
+	} {
+		t.Run(name+" is refused", func(t *testing.T) {
+			require.Contains(t, gatedImages, c.from)
+			problems := skipRepo(t, strings.Replace(gatedImages, c.from, c.to, 1), gatedPrivate)
+			require.Len(t, problems, 1, problems)
+			assert.Contains(t, problems[0], "lwql-access")
 		})
 	}
 	t.Run("an index tag written without asking ecrtag is refused", func(t *testing.T) {

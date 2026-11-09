@@ -21,6 +21,7 @@ const { state } = vi.hoisted(() => ({
     keys: [] as Record<string, unknown>[],
     members: [] as Record<string, unknown>[],
     createToken: "sk-lw-mintedtokenvalue0001",
+    rotateToken: "sk-lw-rotatedtokenvalue002",
     legacyKeys: [] as {
       projectId: string;
       projectName: string;
@@ -40,9 +41,22 @@ const mutations = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   revoke: vi.fn(),
+  rotate: vi.fn(),
   revokeLegacy: vi.fn(),
   invalidateLegacy: vi.fn(),
 }));
+
+// The ceiling is the server's answer; faked here over the seeded bindings.
+vi.mock("../../../behavior/use-grantable-permissions.ts", async () => {
+  const { fakeGrantableHook } = await import("./support/fake-grantable.ts");
+  return {
+    useGrantablePermissions: fakeGrantableHook({
+      bindings: () =>
+        state.myBindings as { scopeType: string; scopeId: string; role: string }[] | undefined,
+      projectTeams: { "proj-1": "team-1", "proj-2": "team-1" },
+    }),
+  };
+});
 
 vi.mock("../../../behavior/api-key-api.ts", () => ({
   apiKeyApi: {
@@ -98,6 +112,15 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
           mutate: (input: unknown, handlers: { onSuccess: () => void }) => {
             mutations.revoke(input);
             handlers.onSuccess();
+          },
+        }),
+      },
+      rotate: {
+        useMutation: () => ({
+          isPending: false,
+          mutate: (input: unknown, handlers: { onSuccess: (r: unknown) => void }) => {
+            mutations.rotate(input);
+            handlers.onSuccess({ token: state.rotateToken });
           },
         }),
       },
@@ -240,6 +263,7 @@ beforeEach(() => {
   state.myBindingsFail = false;
   mutations.create.mockClear();
   mutations.revoke.mockClear();
+  mutations.rotate.mockClear();
   mutations.revokeLegacy.mockClear();
   mutations.invalidateLegacy.mockClear();
 });
@@ -287,8 +311,8 @@ describe("given the organization has an ingestion key and a regular key", () => 
       expect(screen.queryByRole("button", { name: "Edit API key claude wrapper" })).toBeNull();
     });
 
-    /** @scenario A key row offers Edit and Revoke */
-    it("offers Edit and Revoke on a regular key row, and nothing else", async () => {
+    /** @scenario A key row offers Edit, Rotate and Revoke */
+    it("offers Edit, Rotate and Revoke on a regular key row, and nothing else", async () => {
       const user = userEvent.setup();
       state.members = [{ id: "user-1", name: "Dev", email: "dev@example.com" }];
       renderWithApiKeyHost(<ApiKeysScreen />);
@@ -296,7 +320,7 @@ describe("given the organization has an ingestion key and a regular key", () => 
       await user.click(screen.getByRole("button", { name: "Actions for API key CI Pipeline" }));
 
       const actions = await screen.findAllByRole("menuitem");
-      expect(actions.map((action) => action.textContent)).toEqual(["Edit", "Revoke"]);
+      expect(actions.map((action) => action.textContent)).toEqual(["Edit", "Rotate", "Revoke"]);
     });
 
     /** @scenario Deep link opens the page on a specific key */
@@ -321,6 +345,127 @@ describe("given the organization has only regular API keys", () => {
     state.keys = [keyRow()];
     renderWithApiKeyHost(<ApiKeysScreen />);
     expect(screen.queryByRole("heading", { name: "Ingestion keys" })).toBeNull();
+  });
+});
+
+describe("given a key the reader owns", () => {
+  beforeEach(() => {
+    state.keys = [
+      keyRow({
+        description: "Deploys from CI",
+        expiresAt: new Date("2027-01-01T00:00:00Z"),
+        lastUsedAt: new Date("2026-06-01T00:00:00Z"),
+      }),
+    ];
+    state.members = [{ id: "user-1", name: "Dev", email: "dev@example.com" }];
+  });
+
+  describe("when the reader clicks the key", () => {
+    /** @scenario Clicking a key opens its details */
+    it("opens its settings with the masked prefix and no secret", async () => {
+      const user = userEvent.setup();
+      renderWithApiKeyHost(<ApiKeysScreen />);
+
+      await user.click(screen.getByRole("button", { name: "Open API key CI Pipeline" }));
+
+      const details = await screen.findByTestId("api-key-details");
+      for (const label of [
+        "Secret key",
+        "Owner",
+        "Scope",
+        "Permissions",
+        "Expires",
+        "Created",
+        "Last used",
+      ]) {
+        expect(within(details).getByText(label)).toBeInTheDocument();
+      }
+      expect(within(details).getByText("Deploys from CI")).toBeInTheDocument();
+      expect(within(details).getByText("dev@example.com")).toBeInTheDocument();
+      expect(within(details).getByTitle("sk-lw-ab12c…")).toBeInTheDocument();
+      expect(details.textContent).not.toContain(state.createToken);
+      expect(details.textContent).not.toContain(state.rotateToken);
+    });
+
+    /** @scenario Clicking a key opens its details */
+    it("lists what a restricted key may reach", async () => {
+      state.keys = [
+        keyRow({
+          permissionMode: "restricted",
+          grants: [
+            {
+              id: "rb-1",
+              role: "CUSTOM",
+              customRoleId: "role-1",
+              customRoleName: null,
+              customRolePermissions: ["traces:view"],
+              scopeType: "PROJECT",
+              scopeId: "proj-1",
+              scopeName: "Web App",
+            },
+          ],
+        }),
+      ];
+      const user = userEvent.setup();
+      renderWithApiKeyHost(<ApiKeysScreen />);
+
+      await user.click(screen.getByRole("button", { name: "Open API key CI Pipeline" }));
+
+      const permissions = await screen.findByTestId("api-key-details-permissions");
+      expect(permissions).toHaveTextContent("Traces: Read");
+    });
+
+    /** @scenario The details view offers Edit, Rotate and Revoke to whoever may change the key */
+    it("offers Edit, Rotate and Revoke from the details", async () => {
+      const user = userEvent.setup();
+      renderWithApiKeyHost(<ApiKeysScreen />);
+
+      await user.click(screen.getByRole("button", { name: "Open API key CI Pipeline" }));
+
+      expect(await screen.findByTestId("api-key-details-edit")).toHaveTextContent("Edit");
+      expect(screen.getByTestId("api-key-details-rotate")).toHaveTextContent("Rotate");
+      expect(screen.getByTestId("api-key-details-revoke")).toHaveTextContent("Revoke");
+    });
+  });
+
+  describe("when the reader chooses Rotate", () => {
+    /** @scenario Rotate asks for confirmation before the old secret stops working */
+    it("asks first, says the current secret stops at once, and rotates nothing yet", async () => {
+      const user = userEvent.setup();
+      renderWithApiKeyHost(<ApiKeysScreen />);
+
+      await user.click(screen.getByRole("button", { name: "Actions for API key CI Pipeline" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Rotate" }));
+
+      const dialog = await screen.findByRole("alertdialog", { name: "Rotate API key" });
+      expect(dialog).toHaveTextContent("The current secret stops working immediately");
+      expect(mutations.rotate).not.toHaveBeenCalled();
+
+      await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      expect(mutations.rotate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The new secret is shown once with a copy button */
+    it("shows the new secret once with a copy button, then leaves the key listed", async () => {
+      const user = userEvent.setup();
+      renderWithApiKeyHost(<ApiKeysScreen />);
+
+      await user.click(screen.getByRole("button", { name: "Open API key CI Pipeline" }));
+      await user.click(await screen.findByTestId("api-key-details-rotate"));
+      await user.click(await screen.findByTestId("api-key-rotate-confirm"));
+
+      expect(mutations.rotate).toHaveBeenCalledWith({ organizationId: "org-1", apiKeyId: "key-1" });
+      expect(await screen.findByText("Key rotated")).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("token-created-key")).getByText("CI Pipeline"),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Copy API key" })).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("token-created-done"));
+      await waitFor(() => expect(screen.queryByText("Key rotated")).toBeNull());
+      expect(screen.getByRole("button", { name: "Open API key CI Pipeline" })).toBeInTheDocument();
+    });
   });
 });
 
@@ -913,8 +1058,6 @@ describe("given a key is being created", () => {
       ).toBeInTheDocument();
 
       await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "CI");
-      await user.click(screen.getByText("Choose when this key expires"));
-      await user.click(await screen.findByRole("option", { name: "No expiration" }));
       await user.click(screen.getByTestId("clear-scopes"));
       await user.click(screen.getByRole("button", { name: "Create secret key" }));
 
@@ -935,8 +1078,6 @@ describe("given a key is being created", () => {
 
       await user.click(screen.getByRole("button", { name: /Create new secret key/ }));
       await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "CI");
-      await user.click(screen.getByText("Choose when this key expires"));
-      await user.click(await screen.findByRole("option", { name: "No expiration" }));
       await user.click(screen.getByRole("button", { name: "Create secret key" }));
 
       expect(await screen.findByText("Token created")).toBeInTheDocument();

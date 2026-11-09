@@ -25,7 +25,10 @@ import {
 } from "../../__tests__/support/instant-eval-judge-router.test-fakes.ts";
 import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
 import type { InstantEvalClassifyRequest } from "../../channels/instant-eval-classifier.channel.ts";
+import type { InstantEvalDecisionModelAnswer } from "../../channels/instant-eval-decision-model.channel.ts";
+import type { InstantEvalProviderSpend } from "../../channels/instant-eval-judge.channels.ts";
 import { MemoryInstantEvalDecisionModelChannel } from "../../channels/memory/memory.instant-eval-decision-model.channel.ts";
+import { MemoryInstantEvalProviderSpendChannel } from "../../channels/memory/memory.instant-eval-provider-spend.channel.ts";
 import {
   MemoryInstantEvalJudgeProjectRepository,
   MemoryInstantEvalJudgeRepositories,
@@ -68,6 +71,8 @@ function harness({
   spentNanoUsd = 0n,
   routeUsdPerMillion = 1,
   mint,
+  decisionAnswer,
+  spend,
 }: {
   isCloud?: boolean;
   hasClassifier?: boolean;
@@ -80,6 +85,8 @@ function harness({
   routeUsdPerMillion?: number;
   /** Stands in for the request id source; a counter otherwise. */
   mint?: () => string;
+  decisionAnswer?: () => InstantEvalDecisionModelAnswer;
+  spend?: InstantEvalProviderSpend;
 } = {}) {
   const repositories = {
     ...MemoryInstantEvalJudgeRepositories.create(),
@@ -94,11 +101,13 @@ function harness({
   const { logger, lines } = createTestLogger();
   let minted = 0;
   const decisionModels = ScriptedInstantEvalDecisionModelChannel.create({
-    answer: () => ({
-      verdicts: [{ questionId: QUESTION.id, probability: 0.7 }],
-      inputTokens: 0,
-      isTextTruncated: false,
-    }),
+    answer:
+      decisionAnswer ??
+      (() => ({
+        verdicts: [{ questionId: QUESTION.id, probability: 0.7 }],
+        inputTokens: 0,
+        isTextTruncated: false,
+      })),
   });
   const limiter = MemoryInstantEvalRateLimiter.create();
   const routePricing = {
@@ -125,6 +134,7 @@ function harness({
   });
   const service = InstantEvalJudgeService.create({
     decisionModels,
+    ...(spend ? { spend } : {}),
     repositories,
     classifier: hasClassifier ? classifier : undefined,
     // A router over a synthetic table whose LLM leg answers yes; only a call with a route uses it.
@@ -537,6 +547,64 @@ describe("given a judge call on an own decision model", () => {
       expect(decisionModels.requests[0]?.decisionModel).toEqual(decisionModel);
       expect(classifier.classify).not.toHaveBeenCalled();
       expect(recorded).toEqual([]);
+    });
+  });
+
+  describe("when the own model reports the provider tokens it billed", () => {
+    const decisionAnswer = (): InstantEvalDecisionModelAnswer => ({
+      verdicts: [{ questionId: QUESTION.id, probability: 0.7 }],
+      inputTokens: 0,
+      isTextTruncated: false,
+      providerUsage: { inputTokens: 1_800, outputTokens: 12 },
+    });
+
+    /** @scenario An own Instant Evals decision model records the provider tokens it used */
+    it("writes those tokens to the spend ledger and keeps the customer price at zero", async () => {
+      const ledger = MemoryInstantEvalProviderSpendChannel.create();
+      const { service, recorded } = harness({ decisionAnswer, spend: ledger });
+
+      const answer = await service.judge({ ...call, decisionModel });
+
+      expect(answer).toMatchObject({ outcome: "judged", priceUsd: 0 });
+      expect(answer.outcome === "judged" && answer.judgement).not.toHaveProperty("providerUsage");
+      expect(recorded).toEqual([]);
+      expect(ledger.recorded).toEqual([
+        {
+          requestId: "instant_eval_decision_model:minted-1:inception/decisions:mercury-decide",
+          projectId: PROJECT_ID,
+          model: "inception/decisions:mercury-decide",
+          requestType: "instant_eval_decision_model",
+          usage: { input_tokens: 1_800, output_tokens: 12 },
+          durationMs: 0,
+          occurredAt: NOW,
+        },
+      ]);
+    });
+
+    it("writes a redelivered call under the same request id as the first delivery", async () => {
+      const ledger = MemoryInstantEvalProviderSpendChannel.create();
+      const { service } = harness({ decisionAnswer, spend: ledger });
+
+      await service.judge({ ...call, decisionModel, requestKey: "evaluation-7" });
+      await service.judge({ ...call, decisionModel, requestKey: "evaluation-7" });
+
+      const requestIds = ledger.recorded.map(({ requestId }) => requestId);
+      expect(requestIds).toEqual([
+        "instant_eval_decision_model:instantevaljudge_evaluation-7:inception/decisions:mercury-decide",
+        "instant_eval_decision_model:instantevaljudge_evaluation-7:inception/decisions:mercury-decide",
+      ]);
+    });
+
+    it("logs a ledger refusal and keeps the verdict", async () => {
+      const { service, lines } = harness({
+        decisionAnswer,
+        spend: { recordProviderUsage: async () => ({ status: "unattributed" }) },
+      });
+
+      const answer = await service.judge({ ...call, decisionModel });
+
+      expect(answer.outcome === "judged" && answer.judgement.verdicts).toHaveLength(1);
+      expect(lines.findLine("error", "own decision model usage not written")).toBeDefined();
     });
   });
 });

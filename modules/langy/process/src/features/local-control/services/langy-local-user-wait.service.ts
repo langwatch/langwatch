@@ -24,8 +24,6 @@ import { nowInstant } from "@langwatch/time";
 
 import { LANGY_ID_RESOURCES } from "../../../eventing/langy-conversation-process.schemas.ts";
 import type { LangyLocalUserWaitRepository } from "../../../repositories/langy-local-user-wait.repository.ts";
-
-const logger = createLogger("langwatch:langy:local-control:waits");
 import {
   blankUserWait,
   given,
@@ -38,6 +36,10 @@ import {
   type UserWaitQuestion,
 } from "../../../rules/langy-local-user-wait-record.rules.ts";
 import { UserWaitCardsService } from "./langy-local-user-wait-cards.service.ts";
+
+type CancelStep = { step: string; run: () => Promise<void> };
+
+const logger = createLogger("langwatch:langy:local-control:waits");
 
 interface UserWaitServiceOptions {
   waits: LangyLocalUserWaitRepository;
@@ -261,7 +263,7 @@ export class UserWaitService {
 
   /**
    * Ends every card still waiting on one turn. The turn's Stop path and the worker's own cancel
-   * both call this, so it has to be idempotent. A confirmation card the platform raised is left
+   * both call this, so it is idempotent. A confirmation card the platform raised is left
    * waiting: its click is read in a later turn, so it stays answerable after this one ends.
    */
   async cancelTurn({
@@ -275,20 +277,53 @@ export class UserWaitService {
     for (const wait of await this.listPending({ conversationId, turnId })) {
       if (wait.confirm) continue;
       const next: StoredUserWait = { ...wait, state: "cancelled" };
-      await this.persist(next);
-      await this.end(next, "cancelled");
-      if (next.kind === "permission" && next.callId) {
-        await this.sendPermission({
-          conversationId: next.conversationId,
-          callId: next.callId,
-          decision: "expired",
-        });
-      }
-
-      cancelled.push(next);
+      if (await this.cancelOne({ wait: next })) cancelled.push(next);
     }
 
     return cancelled;
+  }
+
+  /**
+   * Ends one card of a stopped turn. A failed step is logged, never thrown, so the other cards
+   * still end; only a failed save keeps it waiting. Once saved it reads cancelled, and a
+   * waiting command still gets its expired answer.
+   */
+  private async cancelOne({ wait }: { wait: StoredUserWait }): Promise<boolean> {
+    const attempt = async ({ step, run }: CancelStep): Promise<boolean> => {
+      try {
+        await run();
+        return true;
+      } catch (error) {
+        logger.warn(
+          {
+            waitId: wait.waitId,
+            conversationId: wait.conversationId,
+            turnId: wait.turnId,
+            step,
+            error,
+          },
+          "ending a card of a stopped turn failed; ending the rest of the turn's cards anyway",
+        );
+        return false;
+      }
+    };
+    if (!(await attempt({ step: "persist", run: () => this.persist(wait) }))) return false;
+
+    await attempt({ step: "end", run: () => this.end(wait, "cancelled") });
+    if (wait.kind === "permission" && wait.callId) {
+      const { callId } = wait;
+      await attempt({
+        step: "sendPermission",
+        run: () =>
+          this.sendPermission({
+            conversationId: wait.conversationId,
+            callId,
+            decision: "expired",
+          }),
+      });
+    }
+
+    return true;
   }
 
   /** Every card still waiting on one turn. */

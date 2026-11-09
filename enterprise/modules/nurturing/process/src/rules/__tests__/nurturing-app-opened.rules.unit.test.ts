@@ -20,6 +20,21 @@ describe("appOpenedSignals", () => {
     ]);
   });
 
+  /** @scenario "Any tracked page open identifies app_last_opened_at" */
+  it.each([
+    "me_sessions",
+    "me_overview",
+    "settings_usage",
+    "settings_plans",
+    "settings_subscription",
+    "governance_costs",
+  ] as const)("raises app_opened first for %s", (page) => {
+    expect(appOpenedSignals({ data: open(page) })[0]).toMatchObject({
+      kind: "app_opened",
+      userId: "user-1",
+    });
+  });
+
   /** @scenario "A usage, cost or plan page open identifies usage_page_viewed_at on the opening user" */
   it.each([
     "me_overview",
@@ -29,6 +44,7 @@ describe("appOpenedSignals", () => {
     "governance_costs",
   ] as const)("raises the usage page signals for %s", (page) => {
     expect(appOpenedSignals({ data: open(page) }).map(({ kind }) => kind)).toEqual([
+      "app_opened",
       "usage_page_opened",
       "usage_page_viewed",
     ]);

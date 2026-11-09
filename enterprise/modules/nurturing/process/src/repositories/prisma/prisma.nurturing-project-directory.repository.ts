@@ -7,9 +7,12 @@ import type {
 } from "../nurturing-project-directory.repository.ts";
 
 /** Only the shared delegates this reader touches; it claims no table (R40). */
-type PrismaNurturingProjectDirectoryDatabase = Pick<PrismaClient, "project" | "team">;
+type PrismaNurturingProjectDirectoryDatabase = Pick<
+  PrismaClient,
+  "project" | "team" | "organization"
+>;
 
-/** Project's `Project` and organization's `Team` rows, read through their shares (R40). */
+/** Project's `Project` and organization's `Team` and `Organization` rows, through shares (R40). */
 export class PrismaNurturingProjectDirectoryRepository implements NurturingProjectDirectoryRepository {
   private constructor(private readonly prisma: PrismaNurturingProjectDirectoryDatabase) {}
 
@@ -38,6 +41,16 @@ export class PrismaNurturingProjectDirectoryRepository implements NurturingProje
       : { outcome: "unknown" };
   }
 
+  async findPersonalOwnerUserIds({
+    projectId,
+  }: Readonly<{ projectId: string }>): Promise<string[]> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { isPersonal: true, ownerUserId: true },
+    });
+    return project?.isPersonal && project.ownerUserId ? [project.ownerUserId] : [];
+  }
+
   async getFirstProjectCreatedAt({
     organizationId,
   }: Readonly<{ organizationId: string }>): Promise<{ firstProjectCreatedAt: number | null }> {
@@ -51,6 +64,16 @@ export class PrismaNurturingProjectDirectoryRepository implements NurturingProje
       _min: { createdAt: true },
     });
     return { firstProjectCreatedAt: _min.createdAt ? _min.createdAt.getTime() : null };
+  }
+
+  async getOrganizationCreatedAt({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<{ organizationCreatedAt: number | null }> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { createdAt: true },
+    });
+    return { organizationCreatedAt: organization?.createdAt.getTime() ?? null };
   }
 
   async hasTracedProject({

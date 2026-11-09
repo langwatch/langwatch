@@ -4846,6 +4846,14 @@
               "unit": null,
               "gates": [],
               "available": true
+            },
+            {
+              "name": "WebSearchRequests",
+              "type": "UInt64",
+              "description": "WebSearchRequests",
+              "unit": null,
+              "gates": [],
+              "available": true
             }
           ],
           "exampleSql": "SELECT GatewayRequestId, OrganizationId, VirtualKeyId\nFROM analytics.gateway_request_spend\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
