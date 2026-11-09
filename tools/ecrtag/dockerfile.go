@@ -55,21 +55,47 @@ func parseDockerfile(text string) ([]stage, error) {
 }
 
 // checkInherited fails a stage that runs go build on top of an earlier stage
-// that read the build context: the files its build reads were counted, if at
-// all, for that stage's builds, not this one's.
+// that read the build context, directly or through stages between them: the
+// files its build reads were counted, if at all, for that stage's builds, not
+// this one's.
 func checkInherited(stages []stage) error {
 	for i := range stages {
 		if len(stages[i].mains) == 0 {
 			continue
 		}
-		for j := range stages[:i] {
-			if readsContext(stages[j]) && inheritsFrom(stages[i], stages[j], j) {
+		for _, j := range ancestors(stages, i) {
+			if readsContext(stages[j]) {
 				return fmt.Errorf("go build %s runs on stage %s, which read the build context; the inputs reader cannot follow it", stages[i].mains[0].pkg, stageName(stages[j], j))
 			}
 		}
 	}
 
 	return nil
+}
+
+// ancestors lists, in order, every earlier stage stage i builds on, copies or
+// mounts from, followed through each stage between them.
+func ancestors(stages []stage, i int) []int {
+	seen := make([]bool, i)
+	queue := []int{i}
+	for len(queue) > 0 {
+		s := stages[queue[0]]
+		queue = queue[1:]
+		for j := range stages[:i] {
+			if !seen[j] && inheritsFrom(s, stages[j], j) {
+				seen[j] = true
+				queue = append(queue, j)
+			}
+		}
+	}
+	var out []int
+	for j, ok := range seen {
+		if ok {
+			out = append(out, j)
+		}
+	}
+
+	return out
 }
 
 func readsContext(s stage) bool { return len(s.sources) > 0 || len(s.mains) > 0 }

@@ -166,6 +166,7 @@ func TestWhatItCannotReadFails(t *testing.T) {
 		"a build on a stage that read the context":        "FROM golang AS deps\nCOPY cmd ./cmd\nFROM deps\nRUN go build ./cmd/service\n",
 		"a build after COPY --from a stage that read it":  "FROM golang AS src\nCOPY cmd ./cmd\nFROM golang\nCOPY --from=src /cmd ./cmd\nRUN go build ./cmd/service\n",
 		"a build mounting a stage that read it, by index": "FROM golang\nCOPY cmd ./cmd\nFROM golang\nRUN --mount=from=0,target=/cmd go build ./cmd/service\n",
+		"a build two stages above one that read it":       "FROM golang AS a\nCOPY cmd ./cmd\nRUN go build ./cmd/service\nFROM a AS b\nFROM b\nRUN go build ./cmd/service\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := inputsOf(goTree(), dockerfile).Files(context.Background(), "infra/docker/Dockerfile.go")

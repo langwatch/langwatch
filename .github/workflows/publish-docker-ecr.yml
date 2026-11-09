@@ -208,12 +208,29 @@ jobs:
           role-to-assume: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
           role-session-name: publish-docker-ecr-changes-${{ github.run_id }}
 
+      # A push reads the inputs label of the image a re-tag would copy, through
+      # `docker buildx imagetools`. See the note on the same step in build-and-push.
+      - name: Log in to Amazon ECR
+        if: github.event_name == 'push'
+        id: ecr
+        env:
+          ROLE_ARN: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(printf '%s' "${ROLE_ARN}" | cut -d: -f5)"
+          echo "::add-mask::${ACCOUNT_ID}"
+          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          echo "registry=${REGISTRY}" >> "$GITHUB_OUTPUT"
+          aws ecr get-login-password --region "${AWS_REGION}" \
+            | docker login --username AWS --password-stdin "${REGISTRY}"
+
       - name: Select the images to build
         id: select
         env:
           # A push compares each image with the one its re-tag would copy; a
           # dispatch builds every image.
           PUSH: ${{ github.event_name == 'push' }}
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
           IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
           CUSTOM_TAG: ${{ needs.meta.outputs.custom_tag }}
         run: |
