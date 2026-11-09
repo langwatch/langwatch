@@ -102,13 +102,11 @@ export const CANCELLED_ON_CLIENT_CLOSE = {
   cancel_http_readonly_queries_on_client_close: "1",
 } as const;
 
-/** A read's settings: the caller's, cancelled on client close; a stricter `readonly=1` stays. */
+/** A read's settings: the caller's, read-only and cancelled on client close, whatever it set. */
 export function readSettings(
   settings: Record<string, string | number> | undefined,
 ): Record<string, string | number> {
-  const own = settings?.readonly;
-  const stricter = own !== undefined && String(own).trim() === "1";
-  return { ...settings, ...CANCELLED_ON_CLIENT_CLOSE, ...(stricter ? { readonly: own } : {}) };
+  return { ...settings, ...CANCELLED_ON_CLIENT_CLOSE };
 }
 
 /** One read, sent with the cancellation settings over the caller's own. */

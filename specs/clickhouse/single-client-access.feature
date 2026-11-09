@@ -333,11 +333,10 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
       And the read's own settings and parameters still apply
 
     @unit
-    Scenario: A read cannot loosen its read-only mode, but may tighten it
+    Scenario: A read cannot change its read-only mode
       Given a read that sets readonly itself
       When the read is sent
       Then readonly=0 is replaced by readonly=2
-      And readonly=1 is kept
 
     @unit
     Scenario: Commands and inserts are not sent read-only

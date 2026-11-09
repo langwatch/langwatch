@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ClickHouseQueryClient } from "../client.ts";
 import { ClickHouseConfigService } from "../config.ts";
 import { ClickHouseConnection } from "../connection.ts";
+import { RetryPolicy } from "../retry.ts";
 import { routingDriver } from "../routingDriver.ts";
 import { createTenantRouter, parseRoutingTable } from "../tenancy.ts";
 import { TenantGuard } from "../tenantGuard.ts";
@@ -22,7 +23,10 @@ const READONLY_REFUSAL = Object.assign(
 );
 
 /** A server whose `query` answers rows unless `refuse` names a failure for the call. */
-function routed({ refuse }: { refuse?: (params: unknown) => Error | undefined } = {}) {
+function routed({
+  refuse,
+  retries,
+}: { refuse?: (params: unknown) => Error | undefined; retries?: RetryPolicy } = {}) {
   const server = {
     query: vi.fn(async (params: unknown) => {
       const failure = refuse?.(params);
@@ -51,6 +55,7 @@ function routed({ refuse }: { refuse?: (params: unknown) => Error | undefined } 
   const client = new ClickHouseQueryClient({
     driver: routingDriver(connection),
     tenantGuard: new TenantGuard(),
+    retries,
   });
   return { client, connection, server };
 }
@@ -119,7 +124,7 @@ describe("routingDriver read cancellation", () => {
   });
 
   describe("when a read names readonly itself", () => {
-    /** @scenario "A read cannot loosen its read-only mode, but may tighten it" */
+    /** @scenario "A read cannot change its read-only mode" */
     it("never lets a read loosen readonly to 0", async () => {
       const { client, connection, server } = routed();
 
@@ -127,22 +132,6 @@ describe("routingDriver read cancellation", () => {
         await client.query({ ...tenantRead, settings: { readonly: "0" } });
 
         expect(settingsOf(server.query.mock.calls[0]?.[0])).toEqual(CANCELLED_ON_CLOSE);
-      } finally {
-        await connection.closeOnce();
-      }
-    });
-
-    /** @scenario "A read cannot loosen its read-only mode, but may tighten it" */
-    it("keeps a read's stricter readonly=1", async () => {
-      const { client, connection, server } = routed();
-
-      try {
-        await client.query({ ...tenantRead, settings: { readonly: 1 } });
-
-        expect(settingsOf(server.query.mock.calls[0]?.[0])).toEqual({
-          readonly: 1,
-          cancel_http_readonly_queries_on_client_close: "1",
-        });
       } finally {
         await connection.closeOnce();
       }
@@ -193,7 +182,10 @@ describe("routingDriver read cancellation", () => {
   describe("when the server refuses a read for readonly", () => {
     /** @scenario "A read the server refuses for readonly fails and is not resent" */
     it("fails a read refused for its own readonly change, without resending it", async () => {
-      const { client, connection, server } = routed({ refuse: () => READONLY_REFUSAL });
+      const { client, connection, server } = routed({
+        refuse: () => READONLY_REFUSAL,
+        retries: new RetryPolicy({ maxAttempts: 3, sleep: async () => undefined }),
+      });
 
       try {
         await expect(client.query(tenantRead)).rejects.toBe(READONLY_REFUSAL);

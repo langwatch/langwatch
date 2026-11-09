@@ -2,14 +2,12 @@
 
 /**
  * A read the app abandons must stop on the server, read back from `system.processes`.
- * Its own container, on prod's ClickHouse version rather than the suites' shared image.
  * Spec: specs/clickhouse/single-client-access.feature; ADR-196.
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { TEST_CLICKHOUSE_TUNING } from "../clickhouse-test-endpoints.ts";
+import { startTestClickHouseEndpoints } from "../clickhouse-test-endpoints.ts";
 import { ClickHouseQueryClient } from "../client.ts";
 import { ClickHouseConfigService } from "../config.ts";
 import {
@@ -24,8 +22,6 @@ import { createTenantRouter, parseRoutingTable } from "../tenancy.ts";
 import { TenantGuard } from "../tenantGuard.ts";
 
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-
-const PROD_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:26.8.36.3";
 
 const REQUEST_TIMEOUT_MS = 1_500;
 const STOP_DEADLINE_MS = 10_000;
@@ -51,20 +47,14 @@ class TimedVendorFactory extends ClickHouseClientFactory<ClickHouseClient> {
       url: input.url,
       max_open_connections: input.maxOpenConnections,
       request_timeout: this.requestTimeoutMs,
+      clickhouse_settings: { date_time_input_format: "best_effort" },
     });
   }
 }
 
-let container: StartedClickHouseContainer;
+let endpointUrl: string;
 let probe: ClickHouseClient;
 const opened: ClickHouseConnection<ClickHouseClient>[] = [];
-
-function serverUrl({ user, password }: { user: string; password: string }): string {
-  const url = new URL(container.getHttpUrl());
-  url.username = user;
-  url.password = password;
-  return url.toString();
-}
 
 function routed({
   url,
@@ -146,18 +136,14 @@ async function watched(marker: string, task: () => Promise<unknown>) {
 
 describe("a routed read the app abandons", () => {
   beforeAll(async () => {
-    container = await new ClickHouseContainer(PROD_CLICKHOUSE_IMAGE)
-      .withLabels({
-        "langwatch.test": "true",
-        "langwatch.test.read-cancellation": "v2",
-      })
-      .withReuse()
-      .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING])
-      .withStartupTimeout(120_000)
-      .start();
-    probe = createClient({
-      url: serverUrl({ user: container.getUsername(), password: container.getPassword() }),
+    const [endpoint] = await startTestClickHouseEndpoints({
+      suite: "read-cancellation",
+      names: ["shared"],
+      environment: process.env,
     });
+    if (!endpoint) throw new Error("A ClickHouse endpoint was not provisioned");
+    endpointUrl = endpoint.url;
+    probe = createClient({ url: endpointUrl });
   }, 300_000);
 
   afterEach(async () => {
@@ -172,13 +158,11 @@ describe("a routed read the app abandons", () => {
     await probe?.close();
   }, 60_000);
 
-  const admin = () => ({ user: container.getUsername(), password: container.getPassword() });
-
   describe("when the read outlasts the client's request timeout", () => {
     /** @scenario "A read the app abandons stops running on the server" */
     it("stops on the server once the client times out", async () => {
       const marker = `${RUN}-timeout`;
-      const client = routed({ url: serverUrl(admin()) });
+      const client = routed({ url: endpointUrl });
 
       const { outcome, seen } = await watched(marker, () => client.query(slowRead(marker)));
 
@@ -190,7 +174,7 @@ describe("a routed read the app abandons", () => {
     /** @scenario "A read the app abandons stops running on the server" */
     it("keeps running on the server when sent without the read-only settings", async () => {
       const marker = `${RUN}-control`;
-      const plain = createClient({ url: serverUrl(admin()), request_timeout: REQUEST_TIMEOUT_MS });
+      const plain = createClient({ url: endpointUrl, request_timeout: REQUEST_TIMEOUT_MS });
       try {
         const read = slowRead(marker);
         await expect(
@@ -209,7 +193,7 @@ describe("a routed read the app abandons", () => {
     /** @scenario "A read the app abandons stops running on the server" */
     it("stops on the server once the signal fires", async () => {
       const marker = `${RUN}-abort`;
-      const client = routed({ url: serverUrl(admin()), requestTimeoutMs: 120_000 });
+      const client = routed({ url: endpointUrl, requestTimeoutMs: 120_000 });
       const controller = new AbortController();
 
       const read = client.query({ ...slowRead(marker), signal: controller.signal });
@@ -231,7 +215,7 @@ describe("a routed read the app abandons", () => {
       const marker = `${RUN}-retry`;
       const retried: number[] = [];
       const client = routed({
-        url: serverUrl(admin()),
+        url: endpointUrl,
         retries: new RetryPolicy({
           maxAttempts: 3,
           baseDelayMs: 500,

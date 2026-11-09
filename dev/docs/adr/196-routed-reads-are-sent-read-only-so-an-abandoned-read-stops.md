@@ -23,7 +23,9 @@ still run. Without the fix, a test shows three attempts running at once.
 
 ClickHouse 25.10 and 26.8 behave the same here: with `readonly=2` and the
 cancel setting, the server stops the query within about 30 ms of the close.
-Without them, it runs on.
+Without them, it runs on. The integration test runs on the suites' shared
+25.10 image; 26.8.36.3, prod's version, was checked by hand with the same
+test and probes.
 
 ## Decision
 
@@ -31,8 +33,8 @@ The routing driver sends every read (`execute` and `stream`) with
 `readonly=2` and `cancel_http_readonly_queries_on_client_close=1`, over the
 read's own settings. Commands and inserts are sent as before.
 
-- A read cannot loosen this: a caller's `readonly=0` is replaced. A caller's
-  `readonly=1` is kept, since it is stricter.
+- A read cannot change this: whatever `readonly` a caller sets is replaced by 2. Only 1 would be stricter, and `readonly=1` would forbid the cancel
+  setting sent beside it, so it can only fail the read.
 - `readonly=2` still allows per-query settings, query parameters, `SHOW`,
   `DESCRIBE`, `EXISTS`, `EXPLAIN`, `system.*` reads and table functions. It
   refuses writes to tables, `ALTER`, `OPTIMIZE`, DDL and `SYSTEM` with
