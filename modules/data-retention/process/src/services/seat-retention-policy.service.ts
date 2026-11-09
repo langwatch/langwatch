@@ -8,7 +8,7 @@ import type { DataRetentionService } from "./data-retention.service.ts";
 
 /**
  * A paid Growth Seat activation records retention as explicit organization policies: the
- * buyer's pick for every category, or, without one, the platform default where none is set.
+ * buyer's pick where it keeps data longer, or, without one, the platform default where none is set.
  * Spec: specs/billing/seat-subscription-retention-policy.feature
  */
 export class SeatRetentionPolicyService {
@@ -24,7 +24,7 @@ export class SeatRetentionPolicyService {
     private readonly rules: Pick<DataRetentionService, "listOrganizationRules" | "setForScope">,
   ) {}
 
-  /** The buyer's pick is written for every category; without one, create-if-absent. */
+  /** The buyer's pick fills every category and lengthens shorter rules; never shortens one. */
   async provisionMissing({
     organizationId,
     retentionDays,
@@ -43,8 +43,7 @@ export class SeatRetentionPolicyService {
 
     for (const category of retentionCategories) {
       const current = covered.get(category);
-      const settled = pick === undefined ? current !== undefined : current === pick;
-      if (settled) continue;
+      if (current !== undefined && !lengthens({ current, pick })) continue;
       await this.rules.setForScope({
         organizationId,
         scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
@@ -53,4 +52,9 @@ export class SeatRetentionPolicyService {
       });
     }
   }
+}
+
+/** A pick replaces an existing rule only when it keeps data longer; 0 already keeps forever. */
+function lengthens({ current, pick }: { current: number; pick: number | undefined }): boolean {
+  return pick !== undefined && current !== 0 && pick > current;
 }

@@ -58,6 +58,23 @@ describe("SeatRetentionPolicyService", () => {
     });
   });
 
+  describe("when the organization already keeps some data longer than the pick", () => {
+    /** @scenario "A shorter pick never shortens a longer existing retention" */
+    it("keeps the longer rules and fills only the missing category", async () => {
+      const store = organizationRules([
+        { category: "traces", retentionDays: 371 },
+        { category: "scenarios", retentionDays: 0 },
+      ]);
+      const service = SeatRetentionPolicyService.create({ rules: store.rules });
+
+      await service.provisionMissing({ organizationId: ORGANIZATION_ID, retentionDays: 91 });
+
+      expect(store.rows.get("traces")).toBe(371);
+      expect(store.rows.get("scenarios")).toBe(0);
+      expect(store.rows.get("experiments")).toBe(91);
+    });
+  });
+
   describe("when the checkout carried a value that is not a Growth option", () => {
     /** @scenario "A retention that is not a Growth option is ignored" */
     it("provisions the platform default for the categories that have none", async () => {

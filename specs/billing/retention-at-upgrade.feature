@@ -78,6 +78,14 @@ Feature: Data retention choice in the Growth upgrade dialog
     Then every retention category of the organization is set to 182 days
 
   @unit
+  Scenario: A shorter pick never shortens a longer existing retention
+    Given the organization already keeps traces for 371 days and scenarios forever
+    And a pending Growth Seat subscription bought with a retention of 91 days
+    When the subscription is activated by a successful payment
+    Then traces stay at 371 days and scenarios stay forever
+    And experiments, which had no rule, are set to 91 days
+
+  @unit
   Scenario: A retention that is not a Growth option is ignored
     Given a pending Growth Seat subscription that carries a retention of 40 days
     When the subscription is activated by a successful payment

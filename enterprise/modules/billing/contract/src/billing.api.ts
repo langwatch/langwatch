@@ -17,8 +17,8 @@ import type {
   ConnectedRenewRequest,
 } from "./connected-billing.schemas.ts";
 import type { RenewalCompletion } from "./connected-billing.ts";
+import type { RetentionStorageOutcome, RetentionStorageReport } from "./growth-seat-event.ts";
 import type { Currency } from "./pricing.ts";
-import type { RetentionStorageOutcome, RetentionStorageReport } from "./retention-storage.ts";
 import type { SubscriptionBillingInterval } from "./subscription.trpc.ts";
 
 /**
