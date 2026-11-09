@@ -77,6 +77,11 @@
       "cells": ["C1", "C3"],
       "note": "heavy creates the dataset by REST with no rows yet; rows in Postgres need a row door (REST rows route)"
     },
+    "dataset:move-remaining-content-to-object-storage": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs a postgres-layout dataset with records-table rows created after the first move ran, as 3.21.0 to 3.23.0 created them; current doors create object-storage datasets, so it needs SQL at the old schema"
+    },
     "dataset:convert-single-file-datasets": {
       "status": "pending",
       "seed": "unplanned",
