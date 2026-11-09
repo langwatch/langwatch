@@ -54,7 +54,7 @@ describe("given the By customer widgets", () => {
         expect(text, `${id}/${name}`).toContain("multiIf(");
         expect(text, `${id}/${name}`).toMatch(new RegExp(`\\bFROM ${view}\\b`));
         expect(text, `${id}/${name}`).toContain(UNIT_EXPRESSION[view]);
-        if (view === "trace_metrics") expect(text, `${id}/${name}`).not.toMatch(/\bFROM traces\b/);
+        expect(/\bFROM traces\b/.test(text), `${id}/${name}`).toBe(view === "traces");
       }
     }
   });
