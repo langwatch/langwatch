@@ -183,7 +183,7 @@ export class DatasetChunkService {
         });
       }
 
-      const lines = toChunkLines(entries, { forcedIds });
+      const lines = toChunkLines(entries, { forcedIds, allowDuplicateIds: skipDuplicates });
       const stored = await this.reads.findRecords({
         dataset: current,
         projectId,
@@ -192,7 +192,14 @@ export class DatasetChunkService {
       });
       const existing = new Map(stored.map((record) => [record.id, record]));
       if (verifyExisting) verifyExistingDatasetRecords({ records: lines, stored });
-      const pending = skipDuplicates ? lines.filter((line) => !existing.has(line.id)) : lines;
+      const acceptedIds = new Set(existing.keys());
+      const pending = skipDuplicates
+        ? lines.filter((line) => {
+            if (acceptedIds.has(line.id)) return false;
+            acceptedIds.add(line.id);
+            return true;
+          })
+        : lines;
       if (pending.length > 0) {
         await this.appendLines({
           tx,

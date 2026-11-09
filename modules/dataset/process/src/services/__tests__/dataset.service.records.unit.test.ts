@@ -513,6 +513,65 @@ describe.each(["s3_jsonl", "single-file"] as const)("verified retries in %s", (l
   });
 });
 
+describe.each(["postgres", "s3_jsonl", "single-file"] as const)(
+  "same-batch duplicates in %s",
+  (layout) => {
+    /** @scenario "Identical IDs in one batch are stored once in every layout" */
+    it.each([false, true])("stores one row with verifyExisting=%s", async (verifyExisting) => {
+      const repositories = MemoryDatasetRepositories.create();
+      const dataset = await repositories.content.create({
+        projectId: PROJECT_ID,
+        name: "Batch duplicates",
+        slug: "batch-duplicates",
+        columnTypes: [{ name: "input", type: "string" }],
+        contentLayout: layout === "s3_jsonl" ? "s3_jsonl" : "postgres",
+        useS3: layout === "single-file",
+        s3RecordCount: 0,
+        rowCount: 0,
+        chunkCount: 0,
+        chunkOffsets: [],
+        sizeBytes: 0n,
+      });
+      const app = createDatasetTestApp({ repositories });
+      const lookup = { slugOrId: dataset.id, projectId: PROJECT_ID };
+
+      await app.batchCreateRecords({
+        ...lookup,
+        entries: [
+          { id: "r1", input: "same" },
+          { id: "r1", input: "same" },
+        ],
+        skipDuplicates: true,
+        readBackExisting: true,
+        verifyExisting,
+      });
+
+      await expect(
+        app.batchCreateRecords({
+          ...lookup,
+          entries: [
+            { id: "r2", input: "first" },
+            { id: "r2", input: "changed" },
+          ],
+          skipDuplicates: true,
+          verifyExisting: true,
+        }),
+      ).rejects.toMatchObject({ code: "dataset_record_conflict" });
+
+      const page = await app.listRecords(lookup);
+      expect(page.data).toEqual([expect.objectContaining({ id: "r1", entry: { input: "same" } })]);
+      expect(page.pagination.total).toBe(1);
+      const stored = await repositories.content.getOne({ id: dataset.id, projectId: PROJECT_ID });
+      const counts = {
+        postgres: page.pagination.total,
+        s3_jsonl: stored.rowCount,
+        "single-file": stored.s3RecordCount,
+      };
+      expect(counts[layout]).toBe(1);
+    });
+  },
+);
+
 describe("MemoryDatasetRecordRepository.createMany", () => {
   const repository = () =>
     MemoryDatasetRecordRepository.create({ database: MemoryDatasetDatabase.create() });

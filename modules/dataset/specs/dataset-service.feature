@@ -258,3 +258,10 @@ Feature: Shared Dataset service
     And no new rows from that batch remain
     And columns removed from the mapping are included in the comparison
     And identical normalized entries remain safe to retry
+
+  @unit
+  Scenario: Identical IDs in one batch are stored once in every layout
+    Given an empty dataset in any storage layout
+    When a batch contains two identical rows with the same id and skips duplicates
+    Then exactly one row is stored and counted
+    And this holds with and without existing-content verification
