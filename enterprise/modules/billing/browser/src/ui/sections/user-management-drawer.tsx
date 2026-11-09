@@ -554,6 +554,7 @@ function useGrowthSeats({
     quote,
     developer,
     developerDueCents: developerAdded ? developerQuote.data?.amountDueCents : 0,
+    developerTaxCents: developerAdded ? developerQuote.data?.taxCents : 0,
     periodEndsAt: developerSeats.data?.periodEndsAt ?? undefined,
   };
   const pendingReason =

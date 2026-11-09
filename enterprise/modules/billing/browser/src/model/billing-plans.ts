@@ -23,6 +23,9 @@ export const currencySymbol: Record<Currency, string> = {
   [Currency.USD]: "$",
 };
 
+/** Beside a Cloud price: the provider adds VAT on top where the buyer owes it. */
+export const EXCLUDING_VAT = "excl. VAT";
+
 /** The events a Growth plan includes each month before overage. */
 export const GROWTH_INCLUDED_EVENTS = 200_000;
 

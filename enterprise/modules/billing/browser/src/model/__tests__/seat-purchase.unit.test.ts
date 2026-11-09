@@ -47,6 +47,7 @@ describe("upgradeTotal()", () => {
   it("totals the seats and breaks the price down", () => {
     expect(upgradeTotal({ seats: 3, price: EUR })).toEqual({
       total: "€87/mo",
+      note: "excl. VAT",
       breakdown: "3 seats × €29",
     });
   });
@@ -141,6 +142,44 @@ describe("growthSeatPlan()", () => {
   });
 });
 
+describe("recurring prices outside an increase", () => {
+  /** @scenario "Lowering seats says each recurring price excludes VAT" */
+  it("says the kept and the lowered price exclude VAT, in the drawer and the confirm", () => {
+    const plan = growth({ paid: 4, seats: 3 });
+    expect(growthSeatPlan(plan).summary).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Until 1 Dec", value: "€116/mo", note: "excl. VAT" }),
+        expect.objectContaining({ label: "From 1 Dec", value: "€87/mo", note: "excl. VAT" }),
+      ]),
+    );
+    const confirm = seatConfirm({ plan, emails: [], todayMs: NOV_6 });
+    expect(confirm.lines).toEqual([
+      expect.objectContaining({ label: "Until 1 Dec", value: "€116/mo", note: "excl. VAT" }),
+      expect.objectContaining({ label: "From 1 Dec", value: "€87/mo", note: "excl. VAT" }),
+    ]);
+  });
+
+  /** @scenario "The monthly price with no seat change, and Free past its seats, exclude VAT" */
+  it("says the unchanged Growth price and the Free over-cap price exclude VAT", () => {
+    expect(growthSeatPlan(growth({})).summary).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Monthly price", value: "€87/mo", note: "excl. VAT" }),
+      ]),
+    );
+    const over = freeSeatPlan({ includedSeats: 2, inUse: 1, invites: 2, price: EUR });
+    expect(over.summary).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Monthly price", value: "€87/mo", note: "excl. VAT" }),
+      ]),
+    );
+  });
+
+  it("says nothing beside a free price", () => {
+    const within = freeSeatPlan({ includedSeats: 2, inUse: 1, invites: 0, price: EUR });
+    expect(within.summary.find((line) => line.label === "Monthly price")?.note).toBeUndefined();
+  });
+});
+
 describe("seatConfirm()", () => {
   const quote = {
     amountDueCents: 2417,
@@ -170,9 +209,72 @@ describe("seatConfirm()", () => {
       label: "From 1 Dec",
       detail: "4 seats × €29",
       value: "€116/mo",
+      note: "excl. VAT",
     });
     expect(confirm.body).toBe("qux@acme.example gets the invite as soon as the seat is added.");
     expect(confirm.actionLabel).toBe("Pay €24.17 and add");
+  });
+
+  describe("when the charge today carries VAT", () => {
+    const taxed = { ...quote, amountDueCents: 2924, formattedAmountDue: "€29.24", taxCents: 507 };
+
+    it("charges the VAT-inclusive amount and splits the VAT out under it", () => {
+      const confirm = seatConfirm({
+        plan: growth({ seats: 4, invites: 1, quote: taxed }),
+        emails: ["qux@acme.example"],
+        todayMs: NOV_6,
+      });
+      expect(confirm.lines[0]).toEqual({
+        label: "Today",
+        detail: "Charged today to the card on file, for 6 Nov to 1 Dec.",
+        value: "€29.24",
+        note: "€24.17 + €5.07 VAT",
+      });
+      expect(confirm.lines[1]).toMatchObject({ value: "€116/mo", note: "excl. VAT" });
+      expect(confirm.actionLabel).toBe("Pay €29.24 and add");
+    });
+
+    it("adds the Developer seats' VAT to the full seats' VAT", () => {
+      const confirm = seatConfirm({
+        plan: growth({
+          seats: 4,
+          quote: taxed,
+          developer: { current: 0, target: 2, unitCents: 500 },
+          developerDueCents: 1008,
+          developerTaxCents: 175,
+        }),
+        emails: [],
+        todayMs: NOV_6,
+      });
+      expect(confirm.lines[0]).toMatchObject({ value: "€39.32", note: "€32.50 + €6.82 VAT" });
+    });
+
+    /** @scenario "The drawer summary splits VAT out of the amount due today" */
+    it("splits the VAT out in the drawer summary too", () => {
+      const { summary } = growthSeatPlan(growth({ seats: 4, quote: taxed }));
+      expect(summary).toContainEqual(
+        expect.objectContaining({
+          label: "Due today, prorated",
+          value: "€29.24",
+          note: "€24.17 + €5.07 VAT",
+        }),
+      );
+      expect(summary).toContainEqual(
+        expect.objectContaining({ label: "Then from 1 Dec", value: "€116/mo", note: "excl. VAT" }),
+      );
+    });
+  });
+
+  /** @scenario "A charge today with no VAT names no split" */
+  it("names no VAT split for a charge without VAT, and still says the price excludes it", () => {
+    const confirm = seatConfirm({
+      plan: growth({ seats: 4, quote: { ...quote, taxCents: 0 } }),
+      emails: [],
+      todayMs: NOV_6,
+    });
+    expect(confirm.lines[0]?.value).toBe("€24.17");
+    expect(confirm.lines[0]?.note).toBeUndefined();
+    expect(confirm.lines[1]?.note).toBe("excl. VAT");
   });
 
   it("says nothing is due when the seats are already kept", () => {

@@ -115,6 +115,29 @@ describe("<SeatProrationPreview/>", () => {
       expect(screen.getAllByText("Due today").length).toBeGreaterThan(0);
       expect(screen.getAllByText("€320").length).toBeGreaterThan(0);
       expect(screen.getAllByText(/€1,920 per year/).length).toBeGreaterThan(0);
+      expect(screen.queryByTestId("proration-vat-split")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "Seats mode modal splits VAT out of the amount charged today" */
+    it("charges the VAT-inclusive amount and splits the VAT out under it", () => {
+      previewQuery.mockReturnValue(
+        quote({
+          amountDueCents: 2507,
+          formattedAmountDue: "€25.07",
+          taxCents: 435,
+          formattedAmountDueExcludingTax: "€20.72",
+          formattedTax: "€4.35",
+          formattedRecurringTotal: "€58",
+        }),
+      );
+
+      renderPreview(seatUpdate());
+
+      expect(screen.getAllByText("€25.07").length).toBeGreaterThan(0);
+      expect(screen.getAllByTestId("proration-vat-split")[0]).toHaveTextContent(
+        "€20.72 + €4.35 VAT",
+      );
+      expect(screen.getAllByText("excl. VAT").length).toBeGreaterThan(0);
     });
 
     /** @scenario "Cancelling proration preview does nothing" */

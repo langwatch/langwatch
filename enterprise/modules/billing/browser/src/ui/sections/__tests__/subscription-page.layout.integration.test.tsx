@@ -643,6 +643,14 @@ describe("<SubscriptionPage/> layout", () => {
       expect(header).not.toHaveTextContent("€");
     });
 
+    /** @scenario "The plan card price says it excludes VAT" */
+    it("says the price excludes VAT", async () => {
+      renderSubscriptionPage();
+
+      const price = await screen.findByTestId("plan-price");
+      expect(price).toHaveTextContent("€58/mo excl. VAT");
+    });
+
     /** @scenario "A paid plan's card carries subscription management as its action" */
     it("offers subscription management and no upgrade on the plan card", async () => {
       renderSubscriptionPage();

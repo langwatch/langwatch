@@ -177,14 +177,17 @@ describe("DeveloperSeatService", () => {
     /** @scenario "The Developer seat quote prices the change before it is confirmed" */
     it("quotes the amount due today, the monthly price and the instant priced", async () => {
       seedProvider(0);
-      stripeSubscriptions.seedPreview({ preview: { total: 833, amountDue: 833, currency: "eur" } });
+      stripeSubscriptions.seedPreview({
+        preview: { total: 1008, amountDue: 1008, tax: 175, currency: "eur" },
+      });
       const quote = await service(WITH_DEVELOPER).previewDeveloperSeats({
         organizationId: "org_1",
         quantity: 2,
       });
       expect(quote).toEqual({
-        amountDueCents: 833,
-        formattedAmountDue: "€8.33",
+        amountDueCents: 1008,
+        formattedAmountDue: "€10.08",
+        taxCents: 175,
         formattedRecurringTotal: "€10",
         billingInterval: "month",
         quotedAt: NOW_SECONDS,
