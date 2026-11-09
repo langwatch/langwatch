@@ -30,9 +30,10 @@ const licenses = createApiFixture<LicensingApi>({
   removeLicense: async () => ({ removed: true }),
 });
 
-/** A real announcer; `pricingModelChanged` is recorded, and refused the given number of times. */
-function announcerRefusingPricingModel({ refusals }: { refusals: number }) {
+/** A real announcer; `supersededPlansFound` is recorded, and refused the given number of times. */
+function announcerRefusingSupersededPlans({ refusals }: { refusals: number }) {
   const pricingModels: Record<string, unknown>[] = [];
+  const superseded: Record<string, unknown>[] = [];
   const started: Record<string, unknown>[] = [];
   let remaining = refusals;
   const unused = {
@@ -46,6 +47,7 @@ function announcerRefusingPricingModel({ refusals }: { refusals: number }) {
     organizations: { findActiveMemberIds: async () => [] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+    retireTieredPlans: async () => {},
     billingOrganizations: {
       getOrganizationForBilling: async () => ({ outcome: "not_usage_billed" }),
     },
@@ -65,18 +67,24 @@ function announcerRefusingPricingModel({ refusals }: { refusals: number }) {
     recordCheckoutCurrencySelected: quiet,
     recordPricingModelChanged: {
       send: async (payload: Record<string, unknown>) => {
-        if (remaining > 0) {
-          remaining--;
-          throw new Error("recordPricingModelChanged refused");
-        }
         pricingModels.push(payload);
       },
       ...unused,
     },
     recordSeatCheckoutPaid: quiet,
     recordSeatCheckoutsAbandoned: quiet,
+    recordSupersededPlansFound: {
+      send: async (payload: Record<string, unknown>) => {
+        if (remaining > 0) {
+          remaining--;
+          throw new Error("recordSupersededPlansFound refused");
+        }
+        superseded.push(payload);
+      },
+      ...unused,
+    },
   });
-  return { announcer, pricingModels, started };
+  return { announcer, pricingModels, started, superseded };
 }
 
 function subscriptionRow(
@@ -91,6 +99,8 @@ function subscriptionRow(
     startDate: Temporal.Now.instant(),
     endDate: null,
     lastPaymentFailedDate: null,
+    seatsKept: null,
+    seatsKeptUntil: null,
     maxMembers: null,
     maxMembersLite: null,
     maxMessagesPerMonth: null,
@@ -100,11 +110,11 @@ function subscriptionRow(
 function setup({
   growthStatus,
   tieredStatus = SubscriptionStatus.ACTIVE,
-  pricingModelRefusals = 0,
+  supersededRefusals = 0,
 }: {
   growthStatus: string;
   tieredStatus?: string | null;
-  pricingModelRefusals?: number;
+  supersededRefusals?: number;
 }) {
   const store = MemoryBillingStore.create();
   store.organizations.set(ORGANIZATION_ID, {
@@ -127,8 +137,8 @@ function setup({
       subscription: { id, status: "active", canceledAt: null, billingThreshold: null, items: [] },
     });
   }
-  const { announcer, pricingModels, started } = announcerRefusingPricingModel({
-    refusals: pricingModelRefusals,
+  const { announcer, pricingModels, started, superseded } = announcerRefusingSupersededPlans({
+    refusals: supersededRefusals,
   });
   const service = EEWebhookService.create({
     subscriptionRepository: MemoryBillingWebhookSubscriptionRepository.create({
@@ -150,7 +160,7 @@ function setup({
     announcer,
   });
   const statusOf = (id: string) => store.subscriptions.find((row) => row.id === id)?.status;
-  return { service, stripe, pricingModels, started, slackConfirmations, statusOf };
+  return { service, stripe, pricingModels, started, superseded, slackConfirmations, statusOf };
 }
 
 /** Lets Stripe's consistency wait pass; a rejection is caught first so it stays the caller's. */
@@ -182,7 +192,13 @@ const ACTIVE_SEAT_SUBSCRIPTION = {
 const subscriptionActive = (service: EEWebhookService) =>
   settle(service.handleSubscriptionUpdated({ subscription: ACTIVE_SEAT_SUBSCRIPTION }));
 
-describe("Growth seat upgrade retires the tiered subscription", () => {
+/** The fact the webhook records for the seat subscription, whatever its stamp. */
+const SUPERSEDED_FACT = expect.objectContaining({
+  organizationId: ORGANIZATION_ID,
+  seatStripeSubscriptionId: GROWTH.stripeSubscriptionId,
+});
+
+describe("Growth seat upgrade records the tiered plans it supersedes", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -191,25 +207,38 @@ describe("Growth seat upgrade retires the tiered subscription", () => {
     vi.useRealTimers();
   });
 
-  describe("when recording the move to seat pricing fails the first time", () => {
-    /** @scenario "Retiring the old plan fails, and Stripe's redelivery retires it" */
-    it("retires the tiered subscription on Stripe's redelivery", async () => {
-      const { service, stripe, pricingModels, started, slackConfirmations, statusOf } = setup({
-        growthStatus: SubscriptionStatus.PENDING,
-        pricingModelRefusals: 1,
-      });
+  describe("when the invoice for a new Growth seat subscription is paid", () => {
+    /** @scenario "A Growth seat activation records the tiered plans it supersedes" */
+    it("records the fact, moves to seat pricing and cancels nothing itself", async () => {
+      const { service, stripe, pricingModels, started, superseded, slackConfirmations, statusOf } =
+        setup({ growthStatus: SubscriptionStatus.PENDING });
 
-      await expect(invoicePaid(service)).rejects.toThrow("recordPricingModelChanged refused");
       await invoicePaid(service);
 
       expect(statusOf(GROWTH.id)).toBe(SubscriptionStatus.ACTIVE);
-      expect(statusOf(TIERED.id)).toBe(SubscriptionStatus.CANCELLED);
-      expect(stripe.cancellations).toEqual([
-        { subscriptionId: TIERED.stripeSubscriptionId, prorate: true },
-      ]);
+      expect(superseded).toEqual([SUPERSEDED_FACT]);
       expect(pricingModels).toEqual([
         expect.objectContaining({ organizationId: ORGANIZATION_ID, pricingModel: "SEAT_EVENT" }),
       ]);
+      expect(stripe.cancellations).toEqual([]);
+      expect(statusOf(TIERED.id)).toBe(SubscriptionStatus.ACTIVE);
+      expect(started).toHaveLength(1);
+      expect(slackConfirmations).toEqual(["confirmed"]);
+    });
+  });
+
+  describe("when recording the superseded plans fails the first time", () => {
+    /** @scenario "Recording the superseded plans fails, and Stripe's redelivery records them" */
+    it("fails the delivery, and the redelivery records the fact without announcing again", async () => {
+      const { service, superseded, started, slackConfirmations } = setup({
+        growthStatus: SubscriptionStatus.PENDING,
+        supersededRefusals: 1,
+      });
+
+      await expect(invoicePaid(service)).rejects.toThrow("recordSupersededPlansFound refused");
+      await invoicePaid(service);
+
+      expect(superseded).toEqual([SUPERSEDED_FACT]);
       expect(started).toHaveLength(1);
       expect(slackConfirmations).toEqual(["confirmed"]);
     });
@@ -217,19 +246,17 @@ describe("Growth seat upgrade retires the tiered subscription", () => {
 
   describe("when Stripe reports the subscription active before the invoice paid", () => {
     /** @scenario "The subscription update arrives before the invoice is paid" */
-    it("retires the tiered subscription once", async () => {
-      const { service, stripe, started, slackConfirmations, statusOf } = setup({
+    it("records the fact from the update and announces the start once", async () => {
+      const { service, stripe, started, superseded, slackConfirmations } = setup({
         growthStatus: SubscriptionStatus.PENDING,
       });
 
       await subscriptionActive(service);
+      expect(superseded).toEqual([SUPERSEDED_FACT]);
+
       await invoicePaid(service);
 
-      expect(statusOf(GROWTH.id)).toBe(SubscriptionStatus.ACTIVE);
-      expect(statusOf(TIERED.id)).toBe(SubscriptionStatus.CANCELLED);
-      expect(stripe.cancellations).toEqual([
-        { subscriptionId: TIERED.stripeSubscriptionId, prorate: true },
-      ]);
+      expect(stripe.cancellations).toEqual([]);
       expect(started).toHaveLength(1);
       expect(slackConfirmations).toEqual(["confirmed"]);
     });
@@ -237,17 +264,14 @@ describe("Growth seat upgrade retires the tiered subscription", () => {
 
   describe("when an organization is already billed for both plans", () => {
     /** @scenario "An organization already billed for both plans is healed by its next payment" */
-    it("retires the tiered subscription on the next paid invoice", async () => {
-      const { service, stripe, started, slackConfirmations, statusOf } = setup({
+    it("records the fact on the next paid invoice and announces nothing", async () => {
+      const { service, superseded, started, slackConfirmations } = setup({
         growthStatus: SubscriptionStatus.ACTIVE,
       });
 
       await invoicePaid(service);
 
-      expect(statusOf(TIERED.id)).toBe(SubscriptionStatus.CANCELLED);
-      expect(stripe.cancellations).toEqual([
-        { subscriptionId: TIERED.stripeSubscriptionId, prorate: true },
-      ]);
+      expect(superseded).toEqual([SUPERSEDED_FACT]);
       expect(started).toEqual([]);
       expect(slackConfirmations).toEqual([]);
     });
@@ -255,8 +279,8 @@ describe("Growth seat upgrade retires the tiered subscription", () => {
 
   describe("when a delayed update reports a cancelled Growth subscription active", () => {
     /** @scenario "A late activation for a cancelled Growth subscription retires nothing" */
-    it("changes nothing and announces nothing", async () => {
-      const { service, stripe, started, slackConfirmations, statusOf } = setup({
+    it("changes nothing, announces nothing and records nothing", async () => {
+      const { service, stripe, started, superseded, slackConfirmations, statusOf } = setup({
         growthStatus: SubscriptionStatus.CANCELLED,
       });
 
@@ -264,6 +288,7 @@ describe("Growth seat upgrade retires the tiered subscription", () => {
 
       expect(statusOf(GROWTH.id)).toBe(SubscriptionStatus.CANCELLED);
       expect(statusOf(TIERED.id)).toBe(SubscriptionStatus.ACTIVE);
+      expect(superseded).toEqual([]);
       expect(stripe.cancellations).toEqual([]);
       expect(started).toEqual([]);
       expect(slackConfirmations).toEqual([]);
@@ -272,8 +297,8 @@ describe("Growth seat upgrade retires the tiered subscription", () => {
 
   describe("when a renewal has nothing left to retire", () => {
     /** @scenario "A renewal with nothing left to retire changes nothing" */
-    it("cancels nothing and announces no pricing model", async () => {
-      const { service, stripe, pricingModels } = setup({
+    it("records nothing and announces no pricing model", async () => {
+      const { service, superseded, pricingModels } = setup({
         growthStatus: SubscriptionStatus.ACTIVE,
         tieredStatus: null,
       });
@@ -281,7 +306,7 @@ describe("Growth seat upgrade retires the tiered subscription", () => {
       await invoicePaid(service);
       await subscriptionActive(service);
 
-      expect(stripe.cancellations).toEqual([]);
+      expect(superseded).toEqual([]);
       expect(pricingModels).toEqual([]);
     });
   });

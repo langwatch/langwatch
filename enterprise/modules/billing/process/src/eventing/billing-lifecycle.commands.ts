@@ -11,6 +11,7 @@ import {
   SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE,
   SUBSCRIPTION_CHANGED_EVENT_TYPE,
   SUBSCRIPTION_STARTED_EVENT_TYPE,
+  SUPERSEDED_PLANS_FOUND_EVENT_TYPE,
   USAGE_BILLING_CHANGED_EVENT_TYPE,
 } from "@langwatch/enterprise-billing-contract";
 import type { Command, CommandHandler } from "@langwatch/eventing";
@@ -57,6 +58,10 @@ import {
   type SeatCheckoutsAbandonedEvent,
   type RecordSeatCheckoutsAbandonedCommandData,
   recordSeatCheckoutsAbandonedCommandDataSchema,
+  RECORD_SUPERSEDED_PLANS_FOUND_COMMAND_TYPE,
+  type SupersededPlansFoundEvent,
+  type RecordSupersededPlansFoundCommandData,
+  recordSupersededPlansFoundCommandDataSchema,
 } from "./billing-lifecycle.events.ts";
 
 /** Records that an organization's subscription state changed. */
@@ -403,4 +408,47 @@ export class RecordSeatCheckoutsAbandonedCommand implements CommandHandler<
   static getAggregateId(payload: RecordSeatCheckoutsAbandonedCommandData): string {
     return payload.organizationId;
   }
+}
+
+/** Records that a Growth seat subscription found tiered plans it supersedes still alive. */
+export class RecordSupersededPlansFoundCommand implements CommandHandler<
+  Command<RecordSupersededPlansFoundCommandData>,
+  SupersededPlansFoundEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_SUPERSEDED_PLANS_FOUND_COMMAND_TYPE,
+    recordSupersededPlansFoundCommandDataSchema,
+    "Record that a Growth seat subscription supersedes live tiered plans",
+  );
+
+  handle(command: Command<RecordSupersededPlansFoundCommandData>): SupersededPlansFoundEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<SupersededPlansFoundEvent>({
+        aggregateType: BILLING_LIFECYCLE_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: SUPERSEDED_PLANS_FOUND_EVENT_TYPE,
+        version: BILLING_LIFECYCLE_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: supersededPlansFoundKey(data),
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordSupersededPlansFoundCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** One fact per finding; the retirement's intent is keyed by the same identity. */
+export function supersededPlansFoundKey(
+  data: Pick<
+    RecordSupersededPlansFoundCommandData,
+    "organizationId" | "seatStripeSubscriptionId" | "occurredAt"
+  >,
+): string {
+  return `${data.organizationId}:superseded_plans_found:${data.seatStripeSubscriptionId}:${data.occurredAt}`;
 }

@@ -91,7 +91,6 @@ const createMockRepository = (): {
   cancel: vi.fn(),
   cancelTrialSubscriptions: vi.fn(),
   findSupersededBySeatEvent: vi.fn().mockResolvedValue([]),
-  migrateToSeatEvent: vi.fn(),
   updateQuantities: vi.fn(),
 });
 

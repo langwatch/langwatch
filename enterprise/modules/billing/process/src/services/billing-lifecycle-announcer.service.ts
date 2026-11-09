@@ -35,6 +35,8 @@ type BillingLifecycleAnnouncerDeps = Readonly<{
   resourceLimitAlerts: BuildBillingLifecyclePipelineInput["alerts"];
   /** The ops alert usage's limit-reached fact ends in, subscribed on the same pipeline. */
   planLimitAlerts: BuildBillingLifecyclePipelineInput["planLimitAlerts"];
+  /** Runs the retirement intent the lifecycle pipeline's process manager emits. */
+  retireTieredPlans: BuildBillingLifecyclePipelineInput["retireTieredPlans"];
   /** The meter's own read of an organization, uncached, for the usage-billing fact. */
   billingOrganizations: Pick<BillingReportOrganizationRepository, "getOrganizationForBilling">;
   /** The clock a usage-billing fact is stamped by; a test names its own. */
@@ -62,6 +64,7 @@ export class BillingLifecycleAnnouncerService {
     this.pipeline = buildBillingLifecyclePipeline({
       alerts: deps.resourceLimitAlerts,
       planLimitAlerts: deps.planLimitAlerts,
+      retireTieredPlans: deps.retireTieredPlans,
     });
   }
 
@@ -238,6 +241,17 @@ export class BillingLifecycleAnnouncerService {
     await this.#connected().recordPricingModelChanged.send({
       ...this.#rowFact(input.organizationId),
       pricingModel: input.pricingModel,
+    });
+  }
+
+  /** A Growth seat subscription found tiered plans still alive; billing's process retires them. */
+  async supersededPlansFound(input: {
+    organizationId: string;
+    seatStripeSubscriptionId: string;
+  }): Promise<void> {
+    await this.#connected().recordSupersededPlansFound.send({
+      ...this.#rowFact(input.organizationId),
+      seatStripeSubscriptionId: input.seatStripeSubscriptionId,
     });
   }
 

@@ -165,29 +165,37 @@ Feature: Stripe webhook handling grants and removes plans correctly
   Rule: An upgrade to Growth seats never leaves the old tiered subscription billing
 
     Moving a legacy tiered organization to Growth seats activates the new
-    subscription and cancels the old one. The two happen in separate steps,
-    and Stripe reports activation through two different events in no fixed
-    order. If retiring the old subscription were tied to the first activation
-    only, a failed step or the events arriving the other way round would leave
-    the customer paying for both plans. So every confirmation that a Growth
-    seat subscription is active retires whatever tiered subscription is still
-    alive, and a redelivery finishes what an earlier attempt left undone.
+    subscription and cancels the old one. Stripe reports activation through two
+    events in no fixed order, and either may be redelivered. So the webhook only
+    records a fact: every confirmation that a Growth seat subscription is active,
+    while a tiered subscription is still alive, records that it supersedes live
+    tiered plans. Billing's own process manager turns each fact into one
+    retirement, run through the outbox until it succeeds. The retirement reads
+    Stripe before it cancels, so a retry or a second fact cancels nothing twice.
 
     @unit
-    Scenario: Retiring the old plan fails, and Stripe's redelivery retires it
+    Scenario: A Growth seat activation records the tiered plans it supersedes
       Given an organization on a tiered plan has paid for Growth seats
-      And recording the move to seat pricing fails the first time
-      When the invoice-paid webhook is handled and then redelivered
-      Then the tiered subscription is cancelled in Stripe and in our records
+      When the invoice-paid webhook is handled
+      Then billing records that the seat subscription supersedes live tiered plans
       And the organization is moved to seat pricing
+      And the webhook cancels nothing in Stripe itself
+      And the subscription is announced as started once
+
+    @unit
+    Scenario: Recording the superseded plans fails, and Stripe's redelivery records them
+      Given an organization on a tiered plan has paid for Growth seats
+      And recording the superseded plans fails the first time
+      When the invoice-paid webhook is handled and then redelivered
+      Then the first delivery fails so Stripe redelivers it
+      And the redelivery records that the seat subscription supersedes live tiered plans
       And the subscription is announced as started once
 
     @unit
     Scenario: The subscription update arrives before the invoice is paid
       Given an organization on a tiered plan has paid for Growth seats
       When Stripe reports the subscription active before it reports the invoice paid
-      Then the tiered subscription is cancelled in Stripe and in our records
-      And it is cancelled once, not again when the invoice event arrives
+      Then the update records that the seat subscription supersedes live tiered plans
       And the subscription is announced as started once
 
     @unit
@@ -195,7 +203,7 @@ Feature: Stripe webhook handling grants and removes plans correctly
       Given an organization's Growth seat subscription is active
       And its old tiered subscription is still active
       When its next invoice is paid
-      Then the tiered subscription is cancelled in Stripe and in our records
+      Then billing records that the seat subscription supersedes live tiered plans
       And no subscription is announced as started
 
     @unit
@@ -204,24 +212,55 @@ Feature: Stripe webhook handling grants and removes plans correctly
       And its tiered subscription is active
       When a delayed update reports the Growth subscription active
       Then the Growth subscription stays cancelled and nothing is announced
-      And the tiered subscription stays active and nothing is cancelled in Stripe
-
-    @integration
-    Scenario: A retirement cancels the live tiered subscription and hands it to Stripe
-      Given an organization's tiered subscription is active
-      When its Growth seat subscription retires the plans it supersedes
-      Then the tiered subscription is cancelled in our records
-      And it is handed back to be cancelled in Stripe
-
-    @integration
-    Scenario: Two retirements at once cancel the tiered subscription in Stripe once
-      Given two deliveries retire the same tiered subscription at the same time
-      When the second waits on the first's write and then re-checks the row
-      Then only the first is handed the tiered subscription to cancel in Stripe
+      And nothing is recorded for retirement
 
     @unit
     Scenario: A renewal with nothing left to retire changes nothing
       Given an organization's Growth seat subscription is active
       And it holds no other live subscription
       When its next invoice is paid
-      Then no subscription is cancelled and the pricing model is not announced again
+      Then nothing is recorded for retirement and the pricing model is not announced again
+
+    @unit
+    Scenario: Each superseded-plans fact asks for one retirement
+      Given billing recorded that a Growth seat subscription supersedes live tiered plans
+      When the retirement process manager handles the fact, and handles it again
+      Then it asks for one retirement keyed by the fact, the same key both times
+
+    @unit
+    Scenario: A retirement cancels the tiered subscription in Stripe and in our records
+      Given an organization's Growth seat subscription is active
+      And its tiered subscription is still active in Stripe and in our records
+      When the retirement runs
+      Then the tiered subscription is cancelled in Stripe with proration
+      And it is cancelled in our records
+      And the organization is moved to seat pricing
+
+    @unit
+    Scenario: A redelivered retirement cancels in Stripe once
+      Given a retirement cancelled the tiered subscription in Stripe and then failed to record it
+      When the outbox runs the retirement again
+      Then the tiered subscription is cancelled in our records
+      And Stripe was asked to cancel it once
+
+    @unit
+    Scenario: A tiered subscription Stripe already cancelled is not cancelled again
+      Given an organization's tiered subscription is cancelled in Stripe but live in our records
+      When the retirement runs
+      Then Stripe is not asked to cancel it
+      And it is cancelled in our records
+
+    @unit
+    Scenario: A seat subscription that is not active retires nothing
+      Given an organization's Growth seat subscription is not active in our records
+      And its tiered subscription is still active
+      When the retirement runs
+      Then nothing is cancelled in Stripe or in our records
+
+    @unit
+    Scenario: A Stripe failure fails the retirement so the outbox retries it
+      Given Stripe refuses to cancel the tiered subscription
+      When the retirement runs
+      Then the retirement fails so the outbox retries it
+      And the tiered subscription stays active in our records
+      And a later run cancels it once

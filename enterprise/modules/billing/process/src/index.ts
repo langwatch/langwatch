@@ -77,7 +77,7 @@ export type {
 // `platform/app/src/server/app-layer/billing/`.
 export { BillingWebhookHost } from "./channels/billing-webhook-host.channel.ts";
 export type {
-  CancelledSubscription,
+  SupersededSubscription,
   SubscriptionWithOrg,
 } from "./repositories/billing-webhook-subscription.repository.ts";
 export {

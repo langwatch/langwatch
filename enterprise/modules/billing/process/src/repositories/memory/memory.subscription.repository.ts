@@ -157,35 +157,17 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
   async findSupersededBySeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<{ stripeSubscriptionId: string | null }[]> {
-    return this.supersededBySeatEvent(input).map(({ stripeSubscriptionId }) => ({
-      stripeSubscriptionId,
-    }));
-  }
-
-  async migrateToSeatEvent(input: {
-    organizationId: string;
-    excludeSubscriptionId: string;
-  }): Promise<{ stripeSubscriptionId: string | null }[]> {
-    const superseded = this.supersededBySeatEvent(input);
-
-    for (const subscription of superseded) await this.cancel({ id: subscription.id });
-
-    return superseded.map(({ stripeSubscriptionId }) => ({ stripeSubscriptionId }));
-  }
-
-  private supersededBySeatEvent(input: {
-    organizationId: string;
-    excludeSubscriptionId: string;
-  }): BillingSubscriptionRecord[] {
-    return this.store.subscriptions.filter(
-      (subscription) =>
-        subscription.organizationId === input.organizationId &&
-        subscription.id !== input.excludeSubscriptionId &&
-        subscription.status !== CANCELLED &&
-        subscription.stripeSubscriptionId !== null &&
-        TIERED_PLANS.includes(subscription.plan),
-    );
+  }): Promise<{ id: string; stripeSubscriptionId: string | null }[]> {
+    return this.store.subscriptions
+      .filter(
+        (subscription) =>
+          subscription.organizationId === input.organizationId &&
+          subscription.id !== input.excludeSubscriptionId &&
+          subscription.status !== CANCELLED &&
+          subscription.stripeSubscriptionId !== null &&
+          TIERED_PLANS.includes(subscription.plan),
+      )
+      .map(({ id, stripeSubscriptionId }) => ({ id, stripeSubscriptionId }));
   }
 
   async updateQuantities(input: {

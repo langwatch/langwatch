@@ -19,6 +19,7 @@ export const CHECKOUT_CURRENCY_SELECTED_EVENT_TYPE =
 export const PRICING_MODEL_CHANGED_EVENT_TYPE = "lw.billing.pricing_model_changed" as const;
 export const SEAT_CHECKOUT_PAID_EVENT_TYPE = "lw.billing.seat_checkout_paid" as const;
 export const SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE = "lw.billing.seat_checkouts_abandoned" as const;
+export const SUPERSEDED_PLANS_FOUND_EVENT_TYPE = "lw.billing.superseded_plans_found" as const;
 export const BILLING_LIFECYCLE_EVENT_VERSION = "2026-09-30" as const;
 
 /** An organization gained or lost its subscription, with the members who carry the fact. */
@@ -183,3 +184,19 @@ export interface SeatCheckoutsAbandonedEventDataSchema extends Named<
 export const seatCheckoutsAbandonedEventDataSchema: SeatCheckoutsAbandonedEventDataSchema =
   seatCheckoutsAbandonedEventDataSchemaDefinition;
 export type SeatCheckoutsAbandonedEventData = z.infer<typeof seatCheckoutsAbandonedEventDataSchema>;
+
+/**
+ * An active Growth seat subscription found live tiered subscriptions it supersedes; billing's
+ * own process manager retires them. Spec: enterprise/modules/billing/specs/stripe-webhook.feature
+ */
+const supersededPlansFoundEventDataSchemaDefinition = z.object({
+  ...organizationRowFactSchema.shape,
+  /** Stripe's id for the Growth seat subscription that supersedes them. */
+  seatStripeSubscriptionId: z.string().min(1),
+});
+export interface SupersededPlansFoundEventDataSchema extends Named<
+  typeof supersededPlansFoundEventDataSchemaDefinition
+> {}
+export const supersededPlansFoundEventDataSchema: SupersededPlansFoundEventDataSchema =
+  supersededPlansFoundEventDataSchemaDefinition;
+export type SupersededPlansFoundEventData = z.infer<typeof supersededPlansFoundEventDataSchema>;

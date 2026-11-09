@@ -24,6 +24,7 @@ import {
   RecordPricingModelChangedCommand,
   RecordSeatCheckoutPaidCommand,
   RecordSeatCheckoutsAbandonedCommand,
+  RecordSupersededPlansFoundCommand,
 } from "./billing-lifecycle.commands.ts";
 import {
   billingAuditRecordedEventSchema,
@@ -36,6 +37,7 @@ import {
   pricingModelChangedEventSchema,
   seatCheckoutPaidEventSchema,
   seatCheckoutsAbandonedEventSchema,
+  supersededPlansFoundEventSchema,
   type BillingLifecycleEvent,
   type RecordBillingAuditCommandData,
   type RecordCheckoutCompletedCommandData,
@@ -47,6 +49,7 @@ import {
   type RecordPricingModelChangedCommandData,
   type RecordSeatCheckoutPaidCommandData,
   type RecordSeatCheckoutsAbandonedCommandData,
+  type RecordSupersededPlansFoundCommandData,
 } from "./billing-lifecycle.events.ts";
 import {
   BILLING_PLAN_LIMIT_REACHED_SUBSCRIBER_NAME,
@@ -56,6 +59,14 @@ import {
   BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
   seatLimitReachedSubscriber,
 } from "./seat-limit-reached.subscriber.ts";
+import {
+  retireTieredPlansIntentSchema,
+  TIERED_PLAN_RETIREMENT_INITIAL_STATE,
+  TIERED_PLAN_RETIREMENT_PROCESS_NAME,
+  tieredPlanRetirementStateSchema,
+  tieredPlanRetirementSupersededPlansFound,
+  type RetireTieredPlansIntent,
+} from "./tiered-plan-retirement.process.ts";
 
 export type BillingLifecyclePipeline = StaticPipelineDefinition<
   BillingLifecycleEvent,
@@ -70,17 +81,21 @@ export type BillingLifecyclePipeline = StaticPipelineDefinition<
   | { name: "recordPricingModelChanged"; payload: RecordPricingModelChangedCommandData }
   | { name: "recordSeatCheckoutPaid"; payload: RecordSeatCheckoutPaidCommandData }
   | { name: "recordSeatCheckoutsAbandoned"; payload: RecordSeatCheckoutsAbandonedCommandData }
+  | { name: "recordSupersededPlansFound"; payload: RecordSupersededPlansFoundCommandData }
 >;
 
 /** billing_lifecycle: billing records its facts; peers react from their own side (§9). */
 export type BuildBillingLifecyclePipelineInput = Readonly<{
   alerts: Parameters<typeof seatLimitReachedSubscriber>[0]["alerts"];
   planLimitAlerts: Parameters<typeof planLimitReachedSubscriber>[0]["alerts"];
+  /** Retires the tiered plans a Growth seat subscription supersedes; throws to be retried. */
+  retireTieredPlans: (input: RetireTieredPlansIntent) => Promise<void>;
 }>;
 
 export function buildBillingLifecyclePipeline({
   alerts,
   planLimitAlerts,
+  retireTieredPlans,
 }: BuildBillingLifecyclePipelineInput): BillingLifecyclePipeline {
   return definePipeline({
     name: BILLING_LIFECYCLE_PIPELINE_NAME,
@@ -97,6 +112,7 @@ export function buildBillingLifecyclePipeline({
       pricingModelChangedEventSchema,
       seatCheckoutPaidEventSchema,
       seatCheckoutsAbandonedEventSchema,
+      supersededPlansFoundEventSchema,
     ])
     .withCommand("recordSubscriptionChanged", RecordSubscriptionChangedCommand)
     .withCommand("recordSubscriptionStarted", RecordSubscriptionStartedCommand)
@@ -108,6 +124,7 @@ export function buildBillingLifecyclePipeline({
     .withCommand("recordPricingModelChanged", RecordPricingModelChangedCommand)
     .withCommand("recordSeatCheckoutPaid", RecordSeatCheckoutPaidCommand)
     .withCommand("recordSeatCheckoutsAbandoned", RecordSeatCheckoutsAbandonedCommand)
+    .withCommand("recordSupersededPlansFound", RecordSupersededPlansFoundCommand)
     .withPeerSubscriber(
       BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
       seatLimitReachedSubscriber({ alerts }),
@@ -115,6 +132,18 @@ export function buildBillingLifecyclePipeline({
     .withPeerSubscriber(
       BILLING_PLAN_LIMIT_REACHED_SUBSCRIBER_NAME,
       planLimitReachedSubscriber({ alerts: planLimitAlerts }),
+    )
+    .withProcessManager(TIERED_PLAN_RETIREMENT_PROCESS_NAME, (pm) =>
+      pm
+        .state(tieredPlanRetirementStateSchema, TIERED_PLAN_RETIREMENT_INITIAL_STATE)
+        // The aggregate is the organization, so one organization's retirements run in order.
+        .keyBy((event) => event.aggregateId)
+        .intent("retireTieredPlans", retireTieredPlansIntentSchema, (input) =>
+          retireTieredPlans(input),
+        )
+        .on(supersededPlansFoundEventSchema, tieredPlanRetirementSupersededPlansFound)
+        // A retirement cancels at the payment provider; each retry skips what is already done.
+        .outbox({ maxAttempts: 8, leaseDurationMs: 2 * 60 * 1000 }),
     )
     .build();
 }

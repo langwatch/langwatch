@@ -7,7 +7,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   BillingWebhookSubscriptionRepository,
   type ActivateSubscriptionResult,
-  type CancelledSubscription,
+  type SupersededSubscription,
   type SubscriptionMutationResult,
   type SubscriptionWithOrg,
 } from "../billing-webhook-subscription.repository.ts";
@@ -87,15 +87,8 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
   findSupersededBySeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<CancelledSubscription[]> {
+  }): Promise<SupersededSubscription[]> {
     return this.subscriptions.findSupersededBySeatEvent(input);
-  }
-
-  migrateToSeatEvent(input: {
-    organizationId: string;
-    excludeSubscriptionId: string;
-  }): Promise<CancelledSubscription[]> {
-    return this.subscriptions.migrateToSeatEvent(input);
   }
 
   async updateQuantities(input: {

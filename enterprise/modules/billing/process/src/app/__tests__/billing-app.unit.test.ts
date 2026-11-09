@@ -92,6 +92,7 @@ function lifecycleRecording() {
     organizations: { findActiveMemberIds: async () => [] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+    retireTieredPlans: async () => {},
     billingOrganizations: { getOrganizationForBilling: async () => ({ outcome: "not_found" }) },
   });
   lifecycle.connect({
@@ -105,6 +106,7 @@ function lifecycleRecording() {
     recordPricingModelChanged: ignored(),
     recordSeatCheckoutPaid: ignored(),
     recordSeatCheckoutsAbandoned: ignored(),
+    recordSupersededPlansFound: ignored(),
   });
   return { lifecycle, audited };
 }

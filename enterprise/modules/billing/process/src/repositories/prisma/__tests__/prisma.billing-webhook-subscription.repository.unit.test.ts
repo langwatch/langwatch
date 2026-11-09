@@ -56,7 +56,6 @@ function repositoryDouble(
     cancel: vi.fn(() => Promise.resolve()),
     cancelTrialSubscriptions: vi.fn(() => Promise.resolve()),
     findSupersededBySeatEvent: vi.fn(() => Promise.resolve([])),
-    migrateToSeatEvent: vi.fn(() => Promise.resolve([])),
     updateQuantities: vi.fn(() => Promise.resolve(WITH_ORGANIZATION)),
     ...overrides,
   };

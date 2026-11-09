@@ -2,7 +2,7 @@
 
 import {
   type ActivateSubscriptionResult,
-  type CancelledSubscription,
+  type SupersededSubscription,
   type SubscriptionMutationResult,
   type SubscriptionWithOrg,
   BillingWebhookSubscriptionRepository,
@@ -95,15 +95,8 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
   async findSupersededBySeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<CancelledSubscription[]> {
+  }): Promise<SupersededSubscription[]> {
     return this.subscriptions.findSupersededBySeatEvent(input);
-  }
-
-  async migrateToSeatEvent(input: {
-    organizationId: string;
-    excludeSubscriptionId: string;
-  }): Promise<CancelledSubscription[]> {
-    return this.subscriptions.migrateToSeatEvent(input);
   }
 
   async updateQuantities(input: {

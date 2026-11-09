@@ -54,11 +54,7 @@ export abstract class BillingSubscriptionRepository {
   abstract findSupersededBySeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<{ stripeSubscriptionId: string | null }[]>;
-  abstract migrateToSeatEvent(input: {
-    organizationId: string;
-    excludeSubscriptionId: string;
-  }): Promise<{ stripeSubscriptionId: string | null }[]>;
+  }): Promise<{ id: string; stripeSubscriptionId: string | null }[]>;
   abstract updateQuantities(input: {
     id: string;
     maxMembers: number | null;

@@ -43,7 +43,7 @@ type BillingSubscriptionLifecycleOptions = {
   organizationRepository: BillingWebhookOrganizationRepository;
   /** Clears a trial's licence once its subscription activates; organization owns the row. */
   licenses: LicenseClearer;
-  stripeSubscriptions: Pick<StripeSubscriptionsChannel, "getSubscription" | "cancelSubscription">;
+  stripeSubscriptions: Pick<StripeSubscriptionsChannel, "getSubscription">;
   itemCalculator: Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
     prices: StripePriceMap;
   };
@@ -51,7 +51,10 @@ type BillingSubscriptionLifecycleOptions = {
   /** Records subscription changes for peers; absent where nothing composes a lifecycle. */
   announcer?: Pick<
     BillingLifecycleAnnouncerService,
-    "subscriptionActivated" | "subscriptionCancelled" | "pricingModelChanged"
+    | "subscriptionActivated"
+    | "subscriptionCancelled"
+    | "pricingModelChanged"
+    | "supersededPlansFound"
   >;
 };
 
@@ -209,7 +212,7 @@ export class BillingSubscriptionLifecycleService {
     if (shouldNotify) await this.announceSubscriptionStarted(updatedSubscription);
     // Stripe may report the seat subscription active here before the invoice is paid, and
     // the invoice path then sees an active subscription; the retirement cannot wait for it.
-    await this.retireSupersededPlans({ updated: updatedSubscription, activated: shouldNotify });
+    await this.recordSeatEventMove({ updated: updatedSubscription, activated: shouldNotify });
   }
 
   /**
@@ -334,9 +337,9 @@ export class BillingSubscriptionLifecycleService {
       await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");
       await this.announceSubscriptionStarted(updatedSubscription);
     }
-    // Every paid invoice re-checks: a redelivery after a failed retirement, or a renewal of
-    // an organization still billed for its old plan, finishes what the activation left.
-    await this.retireSupersededPlans({ updated: updatedSubscription, activated });
+    // Every paid invoice re-checks: a redelivery after a failed record, or a renewal of an
+    // organization still billed for its old plan, asks again for what is still alive.
+    await this.recordSeatEventMove({ updated: updatedSubscription, activated });
   }
 
   /**
@@ -385,11 +388,11 @@ export class BillingSubscriptionLifecycleService {
   }
 
   /**
-   * Retires the tiered plans a seat-event subscription supersedes. On activation it always
-   * moves the organization to seat pricing; afterwards only while a tiered plan is still
-   * alive, which means an earlier activation did not finish.
+   * A Growth seat subscription moves the organization to seat pricing on activation, and on
+   * every active confirmation records the live tiered plans it supersedes; the lifecycle
+   * pipeline's process manager retires them. Throws, so Stripe redelivers a lost record.
    */
-  private async retireSupersededPlans({
+  private async recordSeatEventMove({
     updated,
     activated,
   }: {
@@ -397,51 +400,22 @@ export class BillingSubscriptionLifecycleService {
     activated: boolean;
   }): Promise<void> {
     if (!isGrowthSeatEventPlan(updated.plan)) return;
-    if (!activated) {
-      const superseded = await this.subscriptionRepository.findSupersededBySeatEvent({
+    if (activated) {
+      await this.announcer?.pricingModelChanged({
         organizationId: updated.organizationId,
-        excludeSubscriptionId: updated.id,
+        pricingModel: "SEAT_EVENT",
       });
-      if (superseded.length === 0) return;
-      logger.warn(
-        { organizationId: updated.organizationId, superseded: superseded.length },
-        "[stripeWebhook] Seat subscription active beside a live tiered plan; retiring it now",
-      );
     }
-    await this.migrateToSeatEventPlan(updated);
-  }
-
-  /** Moves the organization to seat pricing and cancels its tiered plans, records first. */
-  private async migrateToSeatEventPlan(updated: SubscriptionWithOrg): Promise<void> {
-    // Organization sets the pricing model from the fact; a refused fact fails before any row moves.
-    await this.announcer?.pricingModelChanged({
-      organizationId: updated.organizationId,
-      pricingModel: "SEAT_EVENT",
-    });
-    const oldSubscriptions = await this.subscriptionRepository.migrateToSeatEvent({
+    if (!updated.stripeSubscriptionId) return;
+    const superseded = await this.subscriptionRepository.findSupersededBySeatEvent({
       organizationId: updated.organizationId,
       excludeSubscriptionId: updated.id,
     });
-
-    // Cancel in Stripe after the records are consistent, outside the transaction.
-    for (const oldSub of oldSubscriptions) {
-      if (!oldSub.stripeSubscriptionId) {
-        continue;
-      }
-
-      try {
-        await this.stripeSubscriptions.cancelSubscription({
-          subscriptionId: oldSub.stripeSubscriptionId,
-          prorate: true,
-        });
-      } catch (err) {
-        logger.error(
-          { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
-          "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during " +
-            "upgrade. Manual intervention required.",
-        );
-      }
-    }
+    if (superseded.length === 0) return;
+    await this.announcer?.supersededPlansFound({
+      organizationId: updated.organizationId,
+      seatStripeSubscriptionId: updated.stripeSubscriptionId,
+    });
   }
 
   private async clearTrialLicenseIfPresent(
