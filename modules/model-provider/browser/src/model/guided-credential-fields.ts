@@ -136,6 +136,11 @@ export function guidedModelCatalogFor({ providerKey }: { providerKey: string }):
   return GUIDED_PANEL_SPECS[providerKey]?.modelCatalog ?? providerKey;
 }
 
+/** A refusal about the chosen model, not the credentials: it reads under the model field. */
+export function isModelRefusal({ code }: { code: string | undefined }): boolean {
+  return code === "provider_deployment_not_found";
+}
+
 /** Every required field typed: what makes Connect clickable. */
 export function areGuidedFieldsFilled({
   fields,

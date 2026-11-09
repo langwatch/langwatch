@@ -4,6 +4,15 @@ import { Sparkles } from "lucide-react";
 import type { GuidedDeploymentField } from "../../model/guided-credential-fields.ts";
 import { GuidedFieldLabel } from "./guided-provider-panel.tsx";
 
+/** The refusal that names the chosen model, read under the model field. */
+function GuidedModelError({ error }: { error: string }) {
+  return (
+    <Text textStyle="caption" mt={1} color="fg.error" role="alert">
+      {error}
+    </Text>
+  );
+}
+
 /** A typed model or deployment name, with the hint that says when to type it. */
 function GuidedTypedModelInput({
   label,
@@ -12,6 +21,7 @@ function GuidedTypedModelInput({
   placeholder,
   locked,
   hint,
+  error,
 }: {
   label: string;
   value: string;
@@ -19,6 +29,7 @@ function GuidedTypedModelInput({
   placeholder: string | undefined;
   locked: boolean;
   hint: string;
+  error: string | undefined;
 }) {
   return (
     <chakra.label display="block">
@@ -30,10 +41,11 @@ function GuidedTypedModelInput({
         onChange={(e) => onType(e.target.value)}
         placeholder={placeholder}
         disabled={locked}
+        aria-invalid={error ? true : undefined}
         w="full"
         borderRadius="12px"
         border="1px solid"
-        borderColor="border"
+        borderColor={error ? "fg.error" : "border"}
         bg="bg.page"
         px={3}
         py={2.5}
@@ -41,9 +53,13 @@ function GuidedTypedModelInput({
         _placeholder={{ color: "fg.subtle" }}
         _focus={{ borderColor: "border.emphasized" }}
       />
-      <Text textStyle="micro" as="span" display="block" mt={1} color="fg.subtle">
-        {hint}
-      </Text>
+      {error ? (
+        <GuidedModelError error={error} />
+      ) : (
+        <Text textStyle="micro" as="span" display="block" mt={1} color="fg.subtle">
+          {hint}
+        </Text>
+      )}
     </chakra.label>
   );
 }
@@ -62,6 +78,7 @@ export function GuidedChatModelField({
   providerName,
   modelPlaceholder,
   deploymentField,
+  error,
 }: {
   guidedModels: string[];
   pickedModel: string | undefined;
@@ -73,6 +90,8 @@ export function GuidedChatModelField({
   providerName: string;
   modelPlaceholder: string | undefined;
   deploymentField: GuidedDeploymentField | undefined;
+  /** A refusal naming the model (Azure's missing deployment); it reads here, not under a key. */
+  error?: string;
 }) {
   if (guidedModels.length === 0) {
     return (
@@ -83,6 +102,7 @@ export function GuidedChatModelField({
         placeholder={modelPlaceholder}
         locked={locked}
         hint={`Type it exactly as deployed: ${providerName} has no model list we can read for you.`}
+        error={error}
       />
     );
   }
@@ -95,7 +115,7 @@ export function GuidedChatModelField({
         onPick={onPick}
         locked={locked}
       />
-      {deploymentField && (
+      {deploymentField ? (
         <GuidedTypedModelInput
           label={deploymentField.label}
           value={typedModel}
@@ -103,7 +123,10 @@ export function GuidedChatModelField({
           placeholder={deploymentField.placeholder}
           locked={locked}
           hint={deploymentField.hint}
+          error={error}
         />
+      ) : (
+        error && <GuidedModelError error={error} />
       )}
     </VStack>
   );

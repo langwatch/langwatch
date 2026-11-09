@@ -255,6 +255,7 @@ Feature: Guided welcome flow and takeover screens
     Given I selected Azure and typed a deployment name the resource does not have
     When I click Connect
     Then I read that there is no deployment by that name
+    And the message sits under the deployment name, not under the endpoint it says works
     And nothing is saved
     When I correct the deployment name and click Connect
     Then the key is checked again against the corrected deployment

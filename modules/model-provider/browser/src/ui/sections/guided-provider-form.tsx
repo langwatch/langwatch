@@ -7,7 +7,11 @@ import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../behavior/use-model-provider-form.ts";
-import { areGuidedFieldsFilled, guidedPanelSpecFor } from "../../model/guided-credential-fields.ts";
+import {
+  areGuidedFieldsFilled,
+  guidedPanelSpecFor,
+  isModelRefusal,
+} from "../../model/guided-credential-fields.ts";
 import { hasUserEnteredNewApiKey } from "../../model/model-provider-helpers.ts";
 import { CodexSignIn } from "./codex-sign-in.tsx";
 import { GuidedChatModelField } from "./guided-chat-model-field.tsx";
@@ -37,6 +41,7 @@ export function GuidedProviderForm({
   fieldErrors,
   setFieldErrors,
   refusal,
+  refusalCode,
   clearRefusal,
   connectLabel,
   onConnect,
@@ -56,6 +61,8 @@ export function GuidedProviderForm({
   fieldErrors: Record<string, string>;
   setFieldErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   refusal: string | undefined;
+  /** The refusal's error code, which decides the field it reads under. */
+  refusalCode: string | undefined;
   clearRefusal: () => void;
   connectLabel: string;
   onConnect: () => void;
@@ -88,6 +95,7 @@ export function GuidedProviderForm({
   const credentialsReady =
     isUsingEnvVars || areGuidedFieldsFilled({ fields: spec.fields, values: state.customKeys });
   const showServerKeyHint = isUsingEnvVars && !hasUserEnteredNewApiKey(state.customKeys);
+  const modelRefusal = isModelRefusal({ code: refusalCode }) ? refusal : undefined;
 
   const changeCredential = (key: string, value: string) => {
     actions.setCustomKey(key, value);
@@ -117,7 +125,7 @@ export function GuidedProviderForm({
           spec={spec}
           values={state.customKeys}
           fieldErrors={fieldErrors}
-          refusal={refusal}
+          refusal={modelRefusal ? undefined : refusal}
           serverKeyHint={
             showServerKeyHint ? <GuidedServerKeyHint providerName={spec.name} /> : null
           }
@@ -134,6 +142,7 @@ export function GuidedProviderForm({
           providerName={spec.name}
           modelPlaceholder={spec.modelPlaceholder}
           deploymentField={spec.deploymentField}
+          error={modelRefusal}
         />
         <GuidedConnectButton
           ready={canResolveTarget && credentialsReady && typedModel}

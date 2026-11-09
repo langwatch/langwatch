@@ -305,6 +305,9 @@ describe("the shared provider form in its guided presentation", () => {
       await user.click(screen.getByRole("button", { name: "Connect" }));
 
       expect(await screen.findByText(/no deployment named "acme-typo"/)).toBeInTheDocument();
+      // The copy says the endpoint works, so the endpoint must not be the field marked wrong.
+      expect(screen.getByLabelText("Deployment name")).toHaveAttribute("aria-invalid", "true");
+      expect(screen.getByLabelText("Endpoint")).not.toHaveAttribute("aria-invalid");
       expect(updateProvider).not.toHaveBeenCalled();
 
       await user.clear(screen.getByLabelText("Deployment name"));

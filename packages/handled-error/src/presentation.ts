@@ -1764,9 +1764,14 @@ const presentations = {
     // fault: provider. It answered and said no, but not in terms we can map —
     // a 429 or a 503 is theirs to fix, so the copy must not send the customer
     // hunting through their own key settings.
+    // A 404 is the one refusal that never clears on a retry: the address is wrong.
     title: "The provider refused the check",
-    describe: () =>
-      "It answered, but wouldn't confirm the key. This is usually temporary — try again in a moment.",
+    titleFor: (error) =>
+      error.meta.status === 404 ? "Nothing answers at that address" : undefined,
+    describe: (error) =>
+      error.meta.status === 404
+        ? "The provider answered 404, so the key was not checked. Check the endpoint is the base URL of your resource, with no path after it."
+        : "It answered, but wouldn't confirm the key. This is usually temporary — try again in a moment.",
   },
   provider_service_disabled: {
     // The single most useful thing this whole flow says: the key is fine, the

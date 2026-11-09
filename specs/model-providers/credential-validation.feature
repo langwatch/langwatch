@@ -243,6 +243,7 @@ Feature: Credential Validation
   Scenario: A bare Azure 404 does not claim the key works
     Given Azure answers the check with 404 and no DeploymentNotFound code
     Then the check is reported as refused, not as a missing deployment
+    And the message sends me to check the endpoint, not to try again later
 
   @unit
   Scenario: Azure answering past authentication proves the credential

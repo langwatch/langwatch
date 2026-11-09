@@ -938,6 +938,7 @@ export const EditModelProviderForm = ({
         fieldErrors={fieldErrors}
         setFieldErrors={setFieldErrors}
         refusal={apiKeyValidationError}
+        refusalCode={apiKeyValidationErrorCode}
         clearRefusal={clearApiKeyError}
         connectLabel={probeRequired ? "Connect" : saveLabel}
         onConnect={() => void handleSave()}
