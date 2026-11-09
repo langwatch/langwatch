@@ -38,9 +38,13 @@ failing|paused --voided, uncollectible, deleted--> none (no email)
   when the sweep is late. Nothing is deleted; limits only refuse new additions.
 - **Notices.** A scheduled process manager on billing's pipeline wakes hourly, finds open cases and
   sends the latest notice due, advancing `paymentRecoveryNoticeDay` with a compare-and-set, so two
-  sweeps or a missed day send one notice.
+  sweeps or a missed day send one notice. The recipients and the invoice are read before that
+  write, so a failed lookup leaves the notice due for the next sweep instead of dropping it.
 - **Closing.** `invoice.paid` for the case's invoice clears it with a conditional write; the write
   that clears it sends one email. `past_due` and `unpaid` updates no longer cancel the row.
+- **Self-healing.** Every sweep reads each open case's invoice from Stripe, notice due or not, and
+  closes a case whose invoice is paid, void or uncollectible. A lost `invoice.paid` event therefore
+  restores a paused organization within an hour.
 - **Mail.** Five transactional emails (failed on day 0, reminder on days 3 and 7, final on day 14,
   paused on day 21, restored on payment) go through billing's own mail channel over
   `@langwatch/mail`, to the organization's admins and Billing role holders (authz

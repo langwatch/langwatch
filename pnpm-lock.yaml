@@ -11551,6 +11551,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-billing-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/client
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract

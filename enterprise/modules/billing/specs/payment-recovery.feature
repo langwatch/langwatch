@@ -65,14 +65,14 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     And the email names the amount, the card and an "Update card" button
     And the plain members get nothing
 
-  @integration @unimplemented
+  @integration
   Scenario: A member who can pay sees the payment failed banner
     Given an organization with an open recovery case
     When an admin or a billing member opens any page
     Then a banner says the payment failed and names the date access stops
     And the banner's button opens the page to pay the open invoice
 
-  @integration @unimplemented
+  @integration
   Scenario: A plain member sees no banner before access stops
     Given an organization with an open recovery case on day 4
     When a member without billing permission opens any page
@@ -161,14 +161,14 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     When the recovery sweep runs twice
     Then one access paused fact is recorded for peers
 
-  @integration @unimplemented
+  @integration
   Scenario: An admin of a paused organization sees the paused notice with a pay button
     Given an organization paused for an unpaid invoice
     When an admin or a billing member opens any page
     Then a notice says the organization is on Free limits until the invoice is paid
     And its button opens the page to pay the open invoice
 
-  @integration @unimplemented
+  @integration
   Scenario: A plain member of a paused organization is told to ask an admin
     Given an organization paused for an unpaid invoice
     When a member without billing permission opens any page
@@ -205,7 +205,7 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     Then the case closes
     And the people who can pay get one "Thanks, you're back" email
 
-  @integration @unimplemented
+  @integration
   Scenario: Recovery clears the banner
     Given a paused organization
     When its open invoice is paid

@@ -31,6 +31,16 @@ export type LicenseBillingSectionProps = {
   commitUsdCents: number;
 };
 
+/** The organization a page is about; the banner reads the case and the reader's grants itself. */
+export type PaymentRecoveryBannerProps = {
+  organizationId: string;
+  organizationName: string;
+};
+
+/** The failed payment banner and paused notice the shell draws above every page. */
+export const PaymentRecoveryBannerToken =
+  uiTokens("billing").component<PaymentRecoveryBannerProps>("paymentRecoveryBanner");
+
 export const LicenseBillingSectionToken =
   uiTokens("billing").component<LicenseBillingSectionProps>("licenseBillingSection");
 export const ContactSalesToken = uiTokens("billing").component<ContactSalesProps>("contactSales");

@@ -10,6 +10,7 @@ import type { NavigationTeam } from "@langwatch/navigation-contract";
 import { useEffect, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
+import { PaymentRecoveryBanner } from "../../behavior/lent-payment-recovery-banner.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { planManagementHref } from "../../model/plan-management-href.ts";
@@ -242,6 +243,12 @@ export const ShellPageBody = ({
           >
             Set {missingServiceVariables(deployment).join(" and ")}.
           </Banner>
+        )}
+        {organization && deployment.isSaaS && (
+          <PaymentRecoveryBanner
+            organizationId={organization.id}
+            organizationName={organization.name}
+          />
         )}
         {usage.data?.messageLimitInfo && usage.data.messageLimitInfo.status !== "ok" && (
           <Banner
