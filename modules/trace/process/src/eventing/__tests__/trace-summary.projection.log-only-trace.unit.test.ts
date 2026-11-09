@@ -157,7 +157,11 @@ describe("TraceSummaryFoldProjection, given a logs-only Grok turn", () => {
     (correlationSource) => {
       const state = fold([
         grokContribution({ eventName: "user_prompt", atMs: TURN_START_MS, correlationSource }),
-        grokContribution({ eventName: "api_request", atMs: TURN_START_MS + 900, correlationSource }),
+        grokContribution({
+          eventName: "api_request",
+          atMs: TURN_START_MS + 900,
+          correlationSource,
+        }),
       ]);
 
       expect(state.occurredAt).toBe(0);

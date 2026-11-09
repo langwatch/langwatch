@@ -46,10 +46,9 @@ export function accumulateSpanTiming({
 const LOG_TIME_MAX_SKEW_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Timing for a Grok trace, built only from log records (ADR-192): the window from its first record
- * to its last. Grok sends no spans, so nothing else times it. Claude and Codex synthesize from a
- * valid wire trace id when only the span id is missing, so their records can join a span-timed
- * trace; they, and wire-correlated logs, leave the window to spans.
+ * A Grok trace's window from its first log record to its last (ADR-192); Grok sends no spans.
+ * Claude and Codex records can join a span-timed trace through a valid wire trace id, so they,
+ * like wire-correlated logs, leave the window to spans.
  */
 export function accumulateLogTiming({
   state,
