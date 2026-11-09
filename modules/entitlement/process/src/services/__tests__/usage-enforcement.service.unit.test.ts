@@ -1,4 +1,8 @@
-import type { PlanInfo, PricingModel } from "@langwatch/entitlement-contract";
+import {
+  type PlanInfo,
+  type PricingModel,
+  RecentCountFailureError,
+} from "@langwatch/entitlement-contract";
 /**
  * @vitest-environment node
  * Spec: specs/licensing/usage-enforcement-plan-resolution.feature.
@@ -10,7 +14,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BillableEventsMeterRepository } from "../../repositories/billable-events-meter.repository.ts";
 import { MemoryTraceCountRepository } from "../../repositories/memory/memory.trace-count.repository.ts";
 import { MemoryUsageCacheRepository } from "../../repositories/memory/memory.usage-cache.repository.ts";
-import { RecentCountFailureError } from "../count-read-coalescer.service.ts";
 import { UsageCountingService } from "../usage-counting.service.ts";
 import {
   type EntitlementUsagePeers,

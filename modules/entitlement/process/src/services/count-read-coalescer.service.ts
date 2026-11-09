@@ -1,4 +1,5 @@
-import { HandledError, isHandledTransientRefusal } from "@langwatch/handled-error";
+import { RecentCountFailureError } from "@langwatch/entitlement-contract";
+import { isHandledTransientRefusal } from "@langwatch/handled-error";
 
 /**
  * How long a count that failed is answered with its failure instead of being read again. The
@@ -6,24 +7,6 @@ import { HandledError, isHandledTransientRefusal } from "@langwatch/handled-erro
  * of memory only repeats the same expensive failure on the cluster the batch is written to.
  */
 const FAILED_COUNT_RETRY_AFTER_MS = 30_000;
-
-/**
- * A count answered from a recent failure: a transient 503, so callers warn and retry. Fresh per
- * call, so its log line keeps its own trace. The store's error is a logged reason, never the body.
- */
-export class RecentCountFailureError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor({ failure }: { failure: Error }) {
-    super("service_unavailable", "The usage count failed moments ago; it is read again shortly.", {
-      httpStatus: 503,
-      fault: "platform",
-      retryable: true,
-      reasons: [failure],
-    });
-    this.name = "RecentCountFailureError";
-  }
-}
 
 /** Shares one read per key between concurrent callers and remembers the last failure per key. */
 export class CountReadCoalescerService<T> {
