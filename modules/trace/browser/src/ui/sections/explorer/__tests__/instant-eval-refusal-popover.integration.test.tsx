@@ -115,6 +115,14 @@ describe("given the Instant Evals flag is off for the project", () => {
     expect(onSkip).not.toHaveBeenCalled();
   });
 
+  it("leaves the own model out of the words when the own-model switch is off", () => {
+    const copy = instantEvalRefusalCopy({ kind: "unreleased" });
+
+    expect(copy).toMatchObject({
+      body: "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate Evals Preview, our hosted model, for you.",
+    });
+  });
+
   it("renders nothing while there is no refusal", () => {
     render(
       <InstantEvalRefusalPopover

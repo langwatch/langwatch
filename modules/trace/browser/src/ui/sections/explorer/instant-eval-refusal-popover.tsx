@@ -160,7 +160,10 @@ export function isSelfHostedRefusal(
  */
 export function instantEvalRefusalCopy(
   refusal: InstantEvalRefusal,
-  { viaConnect = false }: { viaConnect?: boolean } = {},
+  {
+    viaConnect = false,
+    offersOwnModel = false,
+  }: { viaConnect?: boolean; offersOwnModel?: boolean } = {},
 ): InstantEvalRefusalCopy | InstantEvalLicenseLockCopy {
   const what =
     "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do.";
@@ -211,9 +214,14 @@ export function instantEvalRefusalCopy(
       dismiss: "Not now",
     };
   }
+  const powerful =
+    "Instant Evals are a powerful new tool that turns plain language questions into native filters.";
   return {
     title: "Instant Evals aren't enabled for this project yet",
-    body: "Instant Evals are a powerful new tool that turns plain language questions into native filters. Run them now on your own decision model, or contact us so we can activate Evals Preview, our hosted model, for you.",
+    // The own-model offer is spoken only where its link is shown, so the copy never offers a dead end.
+    body: offersOwnModel
+      ? `${powerful} Run them now on your own decision model, or contact us so we can activate Evals Preview, our hosted model, for you.`
+      : `${powerful} Contact us so we can activate Evals Preview, our hosted model, for you.`,
     action: { label: "Contact us", href: CONTACT_US_HREF },
     ownModel: OWN_MODEL_LINK,
     dismiss: "Not now",
@@ -231,7 +239,9 @@ export function InstantEvalRefusalPopover({
   offersOwnModel = false,
   children,
 }: InstantEvalRefusalPopoverProps) {
-  const refusalCopy = refusal ? instantEvalRefusalCopy(refusal, { viaConnect }) : null;
+  const refusalCopy = refusal
+    ? instantEvalRefusalCopy(refusal, { viaConnect, offersOwnModel })
+    : null;
   const lockCopy = refusalCopy && "lock" in refusalCopy ? refusalCopy : null;
   const copy = refusalCopy && !("lock" in refusalCopy) ? refusalCopy : null;
   const action = copy?.action;
