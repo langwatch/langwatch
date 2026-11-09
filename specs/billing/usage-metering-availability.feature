@@ -53,7 +53,7 @@ Feature: Usage decisions when the count cannot be taken
   Scenario: A count that failed is not read again until its retry window passes
     Given the counting store failed to read an organization's count
     When limit checks for that organization run within the 30-second retry window
-    Then each fails naming the earlier failure, without reading the store
+    Then each fails as a retryable 503 whose logged reason is the earlier failure, without reading the store
     And the first check after the window reads the store again
       # the doors admit a batch whose check failed, so the window costs at most
       # one count-cache TTL of enforcement after the store recovers

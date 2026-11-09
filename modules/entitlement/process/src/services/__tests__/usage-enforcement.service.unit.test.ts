@@ -3,7 +3,7 @@ import type { PlanInfo, PricingModel } from "@langwatch/entitlement-contract";
  * @vitest-environment node
  * Spec: specs/licensing/usage-enforcement-plan-resolution.feature.
  */
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, isHandledTransientRefusal } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -534,7 +534,12 @@ describe("given limit checks that read the counting store", () => {
       clock.ms += 29_000;
       const reused = service.checkLimitForOrganization({ organizationId: "org-1" });
       await expect(reused).rejects.toBeInstanceOf(RecentCountFailureError);
-      await expect(reused).rejects.toThrow("memory limit exceeded");
+      await expect(reused).rejects.toSatisfy(
+        (error: RecentCountFailureError) =>
+          isHandledTransientRefusal(error) &&
+          error.reasons[0]?.message === "memory limit exceeded" &&
+          !error.message.includes("memory limit exceeded"),
+      );
       expect(reads).toBe(1);
 
       clock.ms += 1_000;
