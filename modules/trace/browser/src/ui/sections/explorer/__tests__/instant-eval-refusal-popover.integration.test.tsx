@@ -365,22 +365,25 @@ describe("given an eval chip refused by a gate on LangWatch's own model", () => 
   );
 
   /** @scenario "Every refusal of LangWatch's own model offers the project's own decision model" */
-  it.each(gated)("offers no own-model link for $kind when the own-model switch is off", (refusal) => {
-    render(
-      <InstantEvalRefusalPopover
-        refusal={refusal}
-        onClose={vi.fn()}
-        onSkip={vi.fn()}
-        onEnable={vi.fn()}
-        isEnabling={false}
-      >
-        <span>anchor</span>
-      </InstantEvalRefusalPopover>,
-      { wrapper },
-    );
+  it.each(gated)(
+    "offers no own-model link for $kind when the own-model switch is off",
+    (refusal) => {
+      render(
+        <InstantEvalRefusalPopover
+          refusal={refusal}
+          onClose={vi.fn()}
+          onSkip={vi.fn()}
+          onEnable={vi.fn()}
+          isEnabling={false}
+        >
+          <span>anchor</span>
+        </InstantEvalRefusalPopover>,
+        { wrapper },
+      );
 
-    expect(screen.queryByTestId("instant-eval-own-model-link")).toBeNull();
-  });
+      expect(screen.queryByTestId("instant-eval-own-model-link")).toBeNull();
+    },
+  );
 
   /** @scenario "Every refusal of LangWatch's own model offers the project's own decision model" */
   it("offers no own-model link when the judge can't run right now", () => {

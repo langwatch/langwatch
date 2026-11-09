@@ -1,6 +1,4 @@
 import { Kbd } from "@langwatch/design-system/kbd";
-import { useFeatureFlag } from "@langwatch/feature-flag-client";
-import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   Box,
   chakra,
@@ -12,6 +10,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import type { AiActionError } from "@langwatch/trace-contract";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { AlertCircle, ChevronDown, ChevronUp, Search, X } from "lucide-react";
