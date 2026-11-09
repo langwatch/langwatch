@@ -110,6 +110,24 @@ const openToMany = (count: number): JoinLookupDecision => ({
 /** A row's accessible name: the organization and its rounded count. */
 const row = (name: string) => screen.getByRole("button", { name: `Join ${name} (1+ colleague)` });
 
+describe("given a few organizations open to requests from the domain", () => {
+  afterEach(() => cleanup());
+
+  describe("when sign-up reaches the join-before-create step", () => {
+    /** @scenario A few organizations list as rows with nothing to unfold */
+    it("lists every other organization as a row with no toggle and no filter", async () => {
+      renderStep({ lookup: openToMany(4) });
+
+      expect(
+        await screen.findByRole("button", { name: "Join Acme (10+ colleagues)" }),
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: /^Join Acme team/ })).toHaveLength(3);
+      expect(screen.queryByRole("button", { name: /^Show all/ })).toBeNull();
+      expect(screen.queryByRole("textbox")).toBeNull();
+    });
+  });
+});
+
 describe("given many organizations open to requests from the domain", () => {
   afterEach(() => cleanup());
 
@@ -137,6 +155,8 @@ describe("given many organizations open to requests from the domain", () => {
             { organizationId: "org_acme", name: "Acme", colleagueCount: 20 },
             { organizationId: "org_data", name: "Acme Data", colleagueCount: 10 },
             { organizationId: "org_labs", name: "Acme Labs", colleagueCount: 1 },
+            { organizationId: "org_ops", name: "Acme Ops", colleagueCount: 1 },
+            { organizationId: "org_qa", name: "Acme QA", colleagueCount: 1 },
           ],
         },
       });
@@ -165,20 +185,6 @@ describe("given many organizations open to requests from the domain", () => {
       expect(onJoinOrganization).toHaveBeenCalledWith(
         expect.objectContaining({ id: "org_11", name: "Acme team 11" }),
       );
-    });
-  });
-
-  describe("when only a few other organizations are open", () => {
-    /** @scenario A few organizations list as rows with nothing to unfold */
-    it("lists every other organization as a row with no toggle and no filter", async () => {
-      renderStep({ lookup: openToMany(4) });
-
-      expect(
-        await screen.findByRole("button", { name: "Join Acme (10+ colleagues)" }),
-      ).toBeInTheDocument();
-      expect(screen.getAllByRole("button", { name: /^Join Acme team/ })).toHaveLength(3);
-      expect(screen.queryByRole("button", { name: /^Show all/ })).toBeNull();
-      expect(screen.queryByRole("textbox")).toBeNull();
     });
   });
 
