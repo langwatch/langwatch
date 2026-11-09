@@ -42,6 +42,22 @@ Feature: Usage decisions when the count cannot be taken
       # a cached unknown would outlive the outage by the length of the cache TTL,
       # leaving enforcement off for minutes after ClickHouse came back
 
+  # Prod 2026-10-22: one organization's count ran out of memory on every ingested batch.
+  @unit
+  Scenario: Concurrent limit checks for one organization share one count
+    Given several limit checks for the same organization arrive while its count is being read
+    When the count is read
+    Then the counting store is read once and every check gets its answer
+
+  @unit
+  Scenario: A count that failed is not read again until its retry window passes
+    Given the counting store failed to read an organization's count
+    When limit checks for that organization run within the 30-second retry window
+    Then each fails naming the earlier failure, without reading the store
+    And the first check after the window reads the store again
+      # the doors admit a batch whose check failed, so the window costs at most
+      # one count-cache TTL of enforcement after the store recovers
+
   @unit
   Scenario: A partial per-project breakdown is reported as unknown, not as zeros
     Given the counting store cannot report usage for one of the projects
@@ -59,3 +75,21 @@ Feature: Usage decisions when the count cannot be taken
       # its whole premise is that usage is high; sending it with every project
       # reading 0 tells an admin their usage collapsed
     And the threshold is still crossed on the next run, when the numbers are real
+
+  @unit
+  Scenario: A failed enforcement count does not fail the usage display
+    Given a limit check left a failed count for an organization
+    When the usage display asks for that organization's count
+    Then it reads the store instead of answering the failure
+
+  @unit
+  Scenario: A failed enforcement count does not fail the licence usage read
+    Given a limit check left a failed count for an organization
+    When the licence status asks for that organization's count
+    Then it reads the store instead of answering the failure
+
+  @unit
+  Scenario: A busy or unreachable store is asked again on the next check
+    Given the counting store refused an organization's count as busy or unreachable
+    When the next limit check for that organization runs
+    Then it reads the store again rather than waiting out a retry window
