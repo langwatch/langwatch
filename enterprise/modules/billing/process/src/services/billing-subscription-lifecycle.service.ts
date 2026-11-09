@@ -332,7 +332,7 @@ export class BillingSubscriptionLifecycleService {
     const updatedSubscription = activationResult.subscription;
 
     const activated = previousSubscription.status !== SubscriptionStatus.ACTIVE;
-    // Announced first: a redelivery that finishes a failed retirement must not announce again.
+    // Announced first, once: a redelivery after a failed record must not announce again.
     if (activated) {
       await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");
       await this.announceSubscriptionStarted(updatedSubscription);

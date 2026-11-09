@@ -49,7 +49,7 @@ function setup({
   recordRefusals = 0,
 }: {
   growthStatus?: string;
-  tieredAtStripe?: "active" | "canceled";
+  tieredAtStripe?: "active" | "canceled" | "incomplete_expired";
   /** Times our record of the cancellation is refused before it lands. */
   recordRefusals?: number;
 } = {}) {
@@ -130,16 +130,19 @@ describe("TieredPlanRetirementService", () => {
     });
   });
 
-  describe("when Stripe already cancelled the tiered subscription", () => {
+  describe("when the tiered subscription has already ended at Stripe", () => {
     /** @scenario "A tiered subscription Stripe already cancelled is not cancelled again" */
-    it("does not ask Stripe to cancel it and cancels it in our records", async () => {
-      const { service, stripe, tieredStatus } = setup({ tieredAtStripe: "canceled" });
+    it.each(["canceled", "incomplete_expired"] as const)(
+      "does not ask Stripe to cancel it while it is %s and cancels it in our records",
+      async (tieredAtStripe) => {
+        const { service, stripe, tieredStatus } = setup({ tieredAtStripe });
 
-      await service.retireTieredPlans(RETIREMENT);
+        await service.retireTieredPlans(RETIREMENT);
 
-      expect(stripe.cancellations).toEqual([]);
-      expect(tieredStatus()).toBe(SubscriptionStatus.CANCELLED);
-    });
+        expect(stripe.cancellations).toEqual([]);
+        expect(tieredStatus()).toBe(SubscriptionStatus.CANCELLED);
+      },
+    );
   });
 
   describe("when the Growth seat subscription is not active", () => {

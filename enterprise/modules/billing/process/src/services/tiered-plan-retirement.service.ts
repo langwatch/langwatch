@@ -12,6 +12,7 @@ import type {
   BillingWebhookSubscriptionRepository,
   SupersededSubscription,
 } from "../repositories/billing-webhook-subscription.repository.ts";
+import { ENDED_SUBSCRIPTION_STATUSES } from "../rules/billing-stripe-shapes.rules.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 
 const logger = createLogger("langwatch:billing:tieredPlanRetirement");
@@ -82,13 +83,13 @@ export class TieredPlanRetirementService {
     }
   }
 
-  /** Cancels at Stripe unless Stripe already did, then records the cancellation. */
+  /** Cancels at Stripe unless it has already ended there, then records the cancellation. */
   private async retire({ id, stripeSubscriptionId }: SupersededSubscription): Promise<void> {
     if (stripeSubscriptionId) {
       const atStripe = await this.deps.stripeSubscriptions.getSubscription({
         subscriptionId: stripeSubscriptionId,
       });
-      if (atStripe.status !== "canceled") {
+      if (!ENDED_SUBSCRIPTION_STATUSES.has(atStripe.status)) {
         await this.deps.stripeSubscriptions.cancelSubscription({
           subscriptionId: stripeSubscriptionId,
           prorate: true,
