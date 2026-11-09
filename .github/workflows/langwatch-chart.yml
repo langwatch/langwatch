@@ -275,6 +275,12 @@ jobs:
         if: "!cancelled()"
         run: ./tests/workers-shutdown.sh
 
+      # A name set in both app and workers extraEnvs must render once on the
+      # workers container: helm upgrade's patch refuses a duplicate env name.
+      - name: "assert workers carry no duplicate extraEnvs name"
+        if: "!cancelled()"
+        run: ./tests/workers-extra-envs.sh
+
       - name: "assert ClickHouse pool sizing follows fleet capacity"
         if: "!cancelled()"
         run: ./tests/clickhouse-pool-sizing.sh
