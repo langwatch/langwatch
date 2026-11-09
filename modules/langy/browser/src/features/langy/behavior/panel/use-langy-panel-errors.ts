@@ -98,16 +98,22 @@ export function useLangyHistoryError({
 
 /**
  * A conversation the reader can no longer see runs nothing they could stop, and no fold of it
- * will ever arrive to settle the turn: the composer goes back to Send.
+ * will ever arrive to settle the turn: the composer goes back to Send, and the engine lets go
+ * of the turn's stream, which would otherwise hold that Send back while it stays open.
  */
 export function useReleaseTurnOfLostConversation({
   errorKinds,
+  stopEngine,
 }: {
   errorKinds: readonly (string | null | undefined)[];
+  stopEngine: () => unknown;
 }) {
   const lost = errorKinds.some(isLostLangyConversation);
+  const stopEngineRef = useRef(stopEngine);
+  stopEngineRef.current = stopEngine;
   useEffect(() => {
     if (!lost) return;
+    void stopEngineRef.current();
     const store = useLangyStore.getState();
     if (store.turnPhase !== "idle") store.settleTurn(store.activeTurnId);
   }, [lost]);

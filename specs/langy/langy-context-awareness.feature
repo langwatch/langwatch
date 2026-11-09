@@ -263,6 +263,7 @@ Feature: Langy lights up what it can use as context ("glow and go")
     When the conversation turns out to be gone, or not mine
     Then the panel says the conversation is no longer available
     And the composer offers Send again, not Stop
+    And that Send is not held back by the lost turn's stream
 
   Scenario: A project I come back to is where I left it
     Given I was in the middle of a conversation on a project

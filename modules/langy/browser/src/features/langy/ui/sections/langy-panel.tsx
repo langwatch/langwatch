@@ -402,6 +402,7 @@ function LangyPanel({
   });
   useReleaseTurnOfLostConversation({
     errorKinds: [failure.turnError?.kind, historyError.presentation?.kind],
+    stopEngine: engine.stop,
   });
   useLangyOutlivedTurnError({
     error: engine.error,
