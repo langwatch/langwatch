@@ -15,6 +15,7 @@ describe("given an overlay with its own form, opened from inside another form", 
   afterEach(cleanup);
 
   describe("when the dialog's submit button is pressed", () => {
+    /** @scenario "A footer submit action submits the right form once" */
     it("submits only the dialog's form", () => {
       const outer = vi.fn((event: React.FormEvent) => event.preventDefault());
       const inner = vi.fn();
@@ -40,6 +41,7 @@ describe("given an overlay with its own form, opened from inside another form", 
   });
 
   describe("when the drawer's form is submitted", () => {
+    /** @scenario "A footer submit action submits the right form once" */
     it("submits only the drawer's form", () => {
       const outer = vi.fn((event: React.FormEvent) => event.preventDefault());
       const inner = vi.fn();
