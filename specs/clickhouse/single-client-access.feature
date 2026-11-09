@@ -321,6 +321,52 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
       Then the batches before the failure arrive
       And the stream then fails with the server's code
 
+  # ClickHouse cancels a query whose HTTP client went away only for a read-only query, and a POST
+  # is read-only only under readonly 1 or 2. ADR-196.
+  Rule: A read the app abandons stops on the server
+
+    @unit
+    Scenario: A routed read is sent read-only, so the server cancels it when the app leaves
+      Given a repository reads through the routed client, whole or streamed
+      When the read is sent
+      Then it carries readonly=2 and cancel_http_readonly_queries_on_client_close=1
+      And the read's own settings and parameters still apply
+
+    @unit
+    Scenario: A read cannot loosen its read-only mode, but may tighten it
+      Given a read that sets readonly itself
+      When the read is sent
+      Then readonly=0 is replaced by readonly=2
+      And readonly=1 is kept
+
+    @unit
+    Scenario: Commands and inserts are not sent read-only
+      Given a command or an insert through the routed client
+      When it is sent
+      Then it carries only its own settings
+
+    @integration
+    Scenario: A read the app abandons stops running on the server
+      Given a routed read that runs for minutes on the server
+      When the client's request timeout fires, or the caller aborts it
+      Then the server no longer runs it
+      And the same read sent without the read-only settings keeps running
+
+    @integration
+    Scenario: A timed-out read that is retried never runs twice on the server at once
+      Given a routed read that outlasts the request timeout on every attempt
+      When the retry policy tries it three times
+      Then the server runs three queries, one at a time
+      And none is still running after the last attempt fails
+
+    @integration
+    Scenario: A server user already at readonly=1 still answers routed reads
+      Given the routed client connects as a user whose profile pins readonly=1
+      When a repository reads through it
+      Then the refused read is sent again with the read's own settings only
+      And later reads to that server skip the refused settings
+      And an abandoned read stops through the user's own profile
+
   @unit
   Scenario: ClickHouse is reached through a repository, from the application object
     Given a service needs data that lives in ClickHouse

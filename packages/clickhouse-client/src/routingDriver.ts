@@ -93,6 +93,56 @@ function queryParams(request: QueryRequest): Record<string, unknown> {
 }
 
 /**
+ * ClickHouse cancels a query whose client went away only when the query is read-only, and a POST
+ * is read-only only under `readonly` 1 or 2. Every routed read carries both, so a read the app
+ * abandons stops on the server (ADR-196).
+ */
+export const CANCELLED_ON_CLIENT_CLOSE = {
+  readonly: "2",
+  cancel_http_readonly_queries_on_client_close: "1",
+} as const;
+
+/** A read's settings: the caller's, cancelled on client close; a stricter `readonly=1` stays. */
+export function readSettings(
+  settings: Record<string, string | number> | undefined,
+): Record<string, string | number> {
+  const own = settings?.readonly;
+  const stricter = own !== undefined && String(own).trim() === "1";
+  return { ...settings, ...CANCELLED_ON_CLIENT_CLOSE, ...(stricter ? { readonly: own } : {}) };
+}
+
+/** READONLY (164) for a setting this driver adds: the server's user is already `readonly=1`. */
+function refusesReadSettings(error: unknown): boolean {
+  if (!(error instanceof Error) || (error as { code?: unknown }).code !== "164") return false;
+  return Object.keys(CANCELLED_ON_CLIENT_CLOSE).some((name) =>
+    error.message.includes(`Cannot modify '${name}' setting in readonly mode`),
+  );
+}
+
+type ReadResult = Awaited<ReturnType<RoutableStatementClient["query"]>>;
+
+/**
+ * Sends one read with the cancellation settings. A `readonly=1` user refuses any setting change,
+ * so its client is remembered and its reads go with the caller's settings only; such a read is
+ * already read-only, and its profile decides whether a close cancels it.
+ */
+async function sendRead<Client extends RoutableStatementClient>(
+  vendor: Client,
+  request: QueryRequest,
+  readonlyUsers: WeakSet<Client>,
+): Promise<ReadResult> {
+  const plain = { ...queryParams(request), format: "JSONEachRow" };
+  if (readonlyUsers.has(vendor)) return vendor.query(plain);
+  try {
+    return await vendor.query({ ...plain, clickhouse_settings: readSettings(request.settings) });
+  } catch (error) {
+    if (!refusesReadSettings(error)) throw error;
+    readonlyUsers.add(vendor);
+    return vendor.query(plain);
+  }
+}
+
+/**
  * A server before 25.11 that fails after its 200 writes the failure as a last `{"exception"}`
  * row, which the vendor client hands over as data; read it as the failure it is, with the
  * server's code, as VendorClientResilience does (specs/clickhouse/single-client-access.feature).
@@ -163,6 +213,7 @@ function targetTagged<Client extends RoutableStatementClient>(
 export function routingDriver<Client extends RoutableStatementClient>(
   connection: ClickHouseConnection<Client>,
 ): QueryDriver {
+  const readonlyUsers = new WeakSet<Client>();
   return {
     async insert(request: InsertRequest): Promise<void> {
       const vendor = await serverFor(connection, request);
@@ -179,7 +230,7 @@ export function routingDriver<Client extends RoutableStatementClient>(
 
       const started = nowInstant().epochMilliseconds;
       const rows = await onTarget(connection, vendor, async () => {
-        const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
+        const resultSet = await sendRead(vendor, request, readonlyUsers);
         const read = (await resultSet.json()) as Row[];
         refuseInbandException(read);
         return read;
@@ -190,7 +241,7 @@ export function routingDriver<Client extends RoutableStatementClient>(
     async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
       const vendor = await serverFor(connection, request);
       try {
-        const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
+        const resultSet = await sendRead(vendor, request, readonlyUsers);
         for await (const batch of resultSet.stream<Row>()) {
           const rows = batch.map((row) => row.json());
           refuseInbandException(rows);

@@ -111,6 +111,7 @@ Reusable framework decisions live with their packages:
 | [193](./193-platform-calls-on-stored-credentials-report-usage.md)              | Platform calls on stored credentials report their usage to the spend ledger                                                | Accepted                  |
 | [195](./195-outbound-proxy-in-the-egress-fence.md)                             | The egress fence carries a request through the outbound proxy                                                              | Proposed                  |
 | [196](./196-vitest-transform-cache-is-shared-across-checkouts.md)              | Vitest's transform cache is shared across checkouts                                                                        | Proposed                  |
+| [196](./196-routed-reads-are-sent-read-only-so-an-abandoned-read-stops.md)     | Routed reads are sent read-only, so an abandoned read stops                                                                | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)
