@@ -492,6 +492,7 @@ describe("when an evaluator is created", () => {
     ]);
   });
 
+  /** @scenario "creating an evaluator records that it was created" */
   it("records one created fact when the public API creates on resolved models", async () => {
     const { app } = anApp();
     const sent = recordingCreatedFacts(app);
@@ -513,6 +514,7 @@ describe("when an evaluator is created", () => {
     ]);
   });
 
+  /** @scenario "creating an evaluator records that it was created" */
   it("records one created fact when the caller already resolved the models", async () => {
     const { app } = anApp();
     const sent = recordingCreatedFacts(app);

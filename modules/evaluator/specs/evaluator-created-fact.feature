@@ -39,3 +39,4 @@ Feature: Evaluator records that an evaluator was created
     Given evaluator_lifecycle is not registered in the process, or its record fails
     When an evaluator is created
     Then the evaluator is created and nothing is thrown
+    And one error is logged naming the tenant, project and evaluator ids
