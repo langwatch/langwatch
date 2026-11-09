@@ -270,6 +270,26 @@ interface LogContribution {
   nonBillable: boolean;
 }
 
+/** A log's service and origin only fill a gap: a value a span or resolution set stands. */
+const LOG_FILL_ONLY_KEYS: ReadonlySet<string> = new Set([
+  ATTR_KEYS.SERVICE_NAME,
+  TRACE_ANALYTICS_ATTR_KEYS.ORIGIN,
+]);
+
+/** Merges a log's lifted attributes into the trace's, leaving fill-only keys already set. */
+function mergeLogAttributes({
+  merged,
+  lifted,
+}: {
+  merged: Record<string, string>;
+  lifted: Record<string, unknown>;
+}): void {
+  for (const [key, value] of Object.entries(lifted)) {
+    if (LOG_FILL_ONLY_KEYS.has(key) && merged[key]) continue;
+    merged[key] = String(value);
+  }
+}
+
 // ─── Fold projection class ──────────────────────────────────────────
 
 /**
@@ -666,12 +686,7 @@ export class TraceAnalyticsFoldProjection
     const mergedAttributes = { ...state.attributes };
     const logCount = parseInt(mergedAttributes["langwatch.reserved.log_record_count"] ?? "0", 10);
     mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
-    for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
-      // A log's service and origin only fill a gap: a value a span or resolution set stands.
-      const fillOnly = key === ATTR_KEYS.SERVICE_NAME || key === TRACE_ANALYTICS_ATTR_KEYS.ORIGIN;
-      if (fillOnly && mergedAttributes[key]) continue;
-      mergedAttributes[key] = String(value);
-    }
+    mergeLogAttributes({ merged: mergedAttributes, lifted: contribution.liftedAttributes });
 
     let models = state.models;
     let totalCost = state.totalCost;
