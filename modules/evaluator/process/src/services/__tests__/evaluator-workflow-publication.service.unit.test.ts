@@ -57,7 +57,7 @@ function serviceWith({
 
   /** Each created fact, with whether its row was already written when it was recorded. */
   const recorded: { projectId: string; evaluatorId: string; rowWritten: boolean }[] = [];
-  const facts: Pick<EvaluatorLifecycleFactsService, "recordEvaluatorCreated"> = {
+  const lifecycleFacts: Pick<EvaluatorLifecycleFactsService, "recordEvaluatorCreated"> = {
     recordEvaluatorCreated: async (input) =>
       void recorded.push({ ...input, rowWritten: written.includes(input.evaluatorId) }),
   };
@@ -70,7 +70,7 @@ function serviceWith({
       workflows,
       evaluators,
       creationCaps: { assertCreationAllowed: async () => void 0 },
-      facts,
+      lifecycleFacts,
       versions: {
         assertDeletable: async ({ evaluatorId }) => {
           if (deployed) {

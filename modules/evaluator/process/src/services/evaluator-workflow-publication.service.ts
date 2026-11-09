@@ -21,7 +21,7 @@ export class EvaluatorWorkflowPublicationService {
     evaluators: Pick<EvaluatorService, "findByWorkflow" | "create" | "update" | "archive">;
     creationCaps: Pick<EvaluatorCreationCapService, "assertCreationAllowed">;
     versions: Pick<EvaluatorVersionService, "assertDeletable">;
-    facts: Pick<EvaluatorLifecycleFactsService, "recordEvaluatorCreated">;
+    lifecycleFacts: Pick<EvaluatorLifecycleFactsService, "recordEvaluatorCreated">;
   }): EvaluatorWorkflowPublicationService {
     return new EvaluatorWorkflowPublicationService(deps);
   }
@@ -110,7 +110,7 @@ export class EvaluatorWorkflowPublicationService {
       config: {},
       workflowId,
     });
-    await this.deps.facts.recordEvaluatorCreated({ projectId, evaluatorId: created.id });
+    await this.deps.lifecycleFacts.recordEvaluatorCreated({ projectId, evaluatorId: created.id });
     return created;
   }
 }

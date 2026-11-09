@@ -192,7 +192,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
         evaluators,
         creationCaps,
         versions,
-        facts: lifecycleFacts,
+        lifecycleFacts,
       }),
       publicBaseUrl: config.publicBaseUrl,
     });
