@@ -1,4 +1,8 @@
-import { type Authorization, ownProjectIdReadBy } from "@langwatch/authorization";
+import {
+  type Authorization,
+  ownProjectIdReadBy,
+  readScopeKeyOf,
+} from "@langwatch/authorization";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -60,6 +64,12 @@ interface FacetParams {
   timeRange: { from: number; to: number; live?: boolean };
   /** The predicate each facet is counted under. */
   filterFor: FacetFilterResolver;
+  /**
+   * Names everything `filterFor` was built from beyond the proof and window
+   * (the query, the eval runs, the viewer's protections): two requests with
+   * the same key count the same facets.
+   */
+  filterKey: string;
 }
 
 interface NewCountParams {
@@ -257,11 +267,30 @@ export class TraceListService {
    * warm start stay with `getDiscover`.
    */
   getFacets(params: FacetParams): Promise<FacetDescriptor[]> {
-    return this.discover.getFilteredFacets({
-      params: { authorization: params.authorization, timeRange: params.timeRange },
-      filterFor: params.filterFor,
-    });
+    // A repeat of a request still counting shares its run: the page re-asks
+    // while a slow count holds its statement slots, and each repeat used to
+    // start another full scan beside it. Nothing is kept once it answers.
+    const key = JSON.stringify([
+      readScopeKeyOf(params.authorization),
+      params.timeRange.from,
+      params.timeRange.to,
+      params.timeRange.live === true,
+      params.filterKey,
+    ]);
+    const running = this.#facetsInFlight.get(key);
+    if (running) return running;
+
+    const run = this.discover
+      .getFilteredFacets({
+        params: { authorization: params.authorization, timeRange: params.timeRange },
+        filterFor: params.filterFor,
+      })
+      .finally(() => this.#facetsInFlight.delete(key));
+    this.#facetsInFlight.set(key, run);
+    return run;
   }
+
+  readonly #facetsInFlight = new Map<string, Promise<FacetDescriptor[]>>();
 
   async getNewCount(params: NewCountParams): Promise<number> {
     return this.repository.findCount({

@@ -171,6 +171,19 @@ function buildWhereClause({
   return { sql: parts.join(" AND "), baseSql, params };
 }
 
+/**
+ * The guard on every sidebar facet read. These reads scan a tenant's whole
+ * window and share the per-process statement slots with every other tenant's
+ * reads, which wait 20 s for one. A scan past these limits is stopped on the
+ * server, so it hands its slot back and cannot fill a replica's memory; the
+ * sidebar omits that facet instead (`collectDiscoverOutcomes`).
+ */
+export const FACET_READ_SETTINGS: Record<string, string> = {
+  // ClickHouse settings are string-typed over the wire.
+  max_execution_time: "20",
+  max_memory_usage: String(2 * 1024 * 1024 * 1024), // 2 GiB
+};
+
 function buildWhereClauseForTable({
   timeRange,
   timeColumn,
@@ -641,6 +654,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         offset: params.offset,
         ...(params.prefix ? { prefix: params.prefix } : {}),
       },
+      clickhouse_settings: FACET_READ_SETTINGS,
       format: "JSONEachRow",
     });
 
@@ -694,6 +708,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         LIMIT {limit:UInt32}
       `,
       query_params: { ...filter.params, ...queryParams, limit: params.limit },
+      clickhouse_settings: FACET_READ_SETTINGS,
       format: "JSONEachRow",
     });
 
@@ -721,7 +736,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       query_params: params.query.params,
       // Per-query guard (e.g. the key-discovery facets' memory ceiling); absent
       // for facets that don't set one.
-      ...(params.query.settings ? { clickhouse_settings: params.query.settings } : {}),
+      // A ceiling the facet sets itself wins over the shared one.
+      clickhouse_settings: { ...FACET_READ_SETTINGS, ...params.query.settings },
       format: "JSONEachRow",
     });
 
@@ -772,6 +788,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           ${filter.sql}
       `,
       query_params: { ...filter.params, ...queryParams },
+      clickhouse_settings: FACET_READ_SETTINGS,
       format: "JSONEachRow",
     });
 
@@ -836,6 +853,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const result = await client.query({
       query,
       query_params: { ...queryParams, topN },
+      clickhouse_settings: FACET_READ_SETTINGS,
       format: "JSONEachRow",
     });
 
@@ -894,6 +912,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const result = await client.query({
       query,
       query_params: queryParams,
+      clickhouse_settings: FACET_READ_SETTINGS,
       format: "JSONEachRow",
     });
 
