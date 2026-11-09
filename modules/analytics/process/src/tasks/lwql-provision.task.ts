@@ -17,15 +17,18 @@ import {
 } from "../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLSelfProvisioningService,
+  type LwqlAccessModelMode,
   type LwqlAppOwnedDrift,
   type LwqlCollectionProbe,
   type LwqlPostgresGap,
   type LwqlSelfProvisionRequest,
+  NO_COLLECTION_STATE,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../repositories/langwatch-ql-postgres.repository.ts";
 import type {
   LangWatchQLProvisioningRepository,
+  LwqlCollectionState,
   ProvisioningFailureLevel,
   SkippedProvisioningStatement,
 } from "../repositories/langwatch-ql-provisioning.repository.ts";
@@ -278,6 +281,23 @@ async function probeCollection({
   return { shown: true };
 }
 
+/** Every collection the engine tables bind to must hold the app's values. */
+async function probeCollections({
+  repository,
+  probes,
+  cluster,
+}: {
+  repository: LangWatchQLProvisioningRepository;
+  probes: readonly LwqlCollectionProbe[];
+  cluster: string | undefined;
+}): Promise<LwqlCollectionProbeResult> {
+  for (const probe of probes) {
+    const result = await probeCollection({ repository, probe, cluster });
+    if (!result.shown) return result;
+  }
+  return { shown: true };
+}
+
 /** What the gate decided, and the present engine tables it left (with their views) as they are. */
 interface LwqlEngineTableGate {
   readonly collectionLoaded: boolean;
@@ -295,6 +315,8 @@ async function gateEngineTables({
   request,
   names,
   schema,
+  mode,
+  server,
   only,
   cluster,
 }: {
@@ -302,18 +324,23 @@ async function gateEngineTables({
   request: Extract<LwqlSelfProvisionRequest, { complete: true }>;
   names: LangWatchQLNames;
   schema: string;
+  mode: LwqlAccessModelMode;
+  server: LwqlCollectionState;
   only: readonly string[] | undefined;
   /** `CLICKHOUSE_CLUSTER`: set, both reads must pass on every replica. */
   cluster: string | undefined;
 }): Promise<LwqlEngineTableGate> {
   const engineTables = selfProvisioning.engineTablesIn({ only });
   if (engineTables.length === 0) return { collectionLoaded: false, only };
-  const probe = selfProvisioning.collectionProbe({
+  const probes = selfProvisioning.collectionProbes({
     names,
     postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
     schema,
+    mode,
+    server,
+    engineTables,
   });
-  const result = await probeCollection({ repository, probe, cluster });
+  const result = await probeCollections({ repository, probes, cluster });
   if (result.shown) return { collectionLoaded: true, only };
   const { read, error } = result;
   logger.warn(
@@ -379,6 +406,13 @@ async function convergeClickHouse({
   if (mode === "sql") {
     await clusterGuard.assertSafe({ query: (sql) => repository.queryRows(sql), source });
   }
+  const server =
+    mode === "rendered"
+      ? await repository.readCollectionState({
+          database: names.database,
+          candidates: selfProvisioning.renderedCollectionCandidates({ names }),
+        })
+      : NO_COLLECTION_STATE;
   const render = ({ collectionLoaded, only: drifted }: LwqlEngineTableGate) =>
     selfProvisioning.clickHouseStatements({
       names,
@@ -388,6 +422,7 @@ async function convergeClickHouse({
       schema,
       includeAppFunctions,
       mode,
+      server,
       collectionLoaded,
       ...(drifted === undefined ? {} : { only: drifted }),
     });
@@ -399,6 +434,8 @@ async function convergeClickHouse({
       request,
       names,
       schema,
+      mode,
+      server,
       only,
       cluster: source.CLICKHOUSE_CLUSTER || undefined,
     });
@@ -654,7 +691,6 @@ export async function findLwqlAppOwnedDrift({
   const { names, request } = plan;
   const relations = selfProvisioning.appOwnedRelations({ names });
   const credentialFingerprint = selfProvisioning.credentialFingerprint({
-    names,
     postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
     schema: plan.schema,
   });

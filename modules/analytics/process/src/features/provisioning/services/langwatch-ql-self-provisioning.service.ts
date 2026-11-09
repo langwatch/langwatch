@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 
 import type { LangWatchQLConnection } from "../../../repositories/langwatch-ql-executor.repository.ts";
 import type { LwqlPostgresViewFound } from "../../../repositories/langwatch-ql-postgres.repository.ts";
+import type { LwqlCollectionState } from "../../../repositories/langwatch-ql-provisioning.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../../services/langwatch-ql-access-model-definition.service.ts";
 import {
@@ -56,6 +57,12 @@ export const LWQL_SELF_PROVISION_DEFAULTS = {
   ...LWQL_CONNECTION_DEFAULTS,
   postgresReaderRole: LWQL_POSTGRES_READER_ROLE,
 } as const;
+
+/** The collection a config store delivers; every released chart install binds to this name. */
+export const LWQL_RENDERED_NAMED_COLLECTION = "lwql_postgres";
+
+/** Nothing read: every rendered-mode engine table takes the preferred collection. */
+export const NO_COLLECTION_STATE: LwqlCollectionState = { available: [], bound: {} };
 
 /** The PostgreSQL endpoint the named collection dials, from `DATABASE_URL`. */
 type LwqlPostgresEndpoint = Readonly<{
@@ -109,6 +116,28 @@ export interface LwqlAppOwnedDrift {
 
 /** The PostgreSQL connection the app expects the named collection to hold. */
 type LwqlPostgresSettings = Readonly<{ endpoint: LwqlPostgresEndpoint; readerPassword: string }>;
+
+/** How each engine table of one run is bound: its collection, schema and credential stamp. */
+interface EngineTableBinding {
+  readonly collectionFor: (table: string) => string;
+  readonly schema: string;
+  readonly credentialFingerprint: string | undefined;
+}
+
+/** The reader role's connection values, which every collection the app renders holds. */
+function readerConnection({
+  postgres,
+}: {
+  postgres: LwqlPostgresSettings;
+}): Omit<PostgresNamedCollection, "collection"> {
+  return {
+    host: postgres.endpoint.host,
+    port: postgres.endpoint.port,
+    database: postgres.endpoint.database,
+    user: LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole,
+    password: postgres.readerPassword,
+  };
+}
 
 /**
  * Two reads that together prove the collection holds the app's values: one through the collection,
@@ -178,10 +207,55 @@ export class LangWatchQLSelfProvisioningService {
     return { requested: true, complete: true, connection, postgresReaderPassword, endpoint };
   }
 
-  /** Named collections are server-global: one per ClickHouse database, so stacks sharing a
-   * server never overwrite each other's. */
-  namedCollection({ names }: { names: LangWatchQLNames }): string {
-    return `lwql_postgres_${names.database}`;
+  /**
+   * Rendered mode keeps `lwql_postgres`: the server's own config store holds it, and released
+   * installs bound their engine tables to it, so a rename detaches them on the next restart.
+   * In sql mode one server can hold several stacks, so each database gets its own.
+   */
+  namedCollection({ names, mode }: { names: LangWatchQLNames; mode: LwqlAccessModelMode }): string {
+    return mode === "rendered" ? LWQL_RENDERED_NAMED_COLLECTION : `lwql_postgres_${names.database}`;
+  }
+
+  /**
+   * Both names a rendered-mode engine table may be bound to, preferred first: the one released
+   * config stores mount, then the per-database one a server outside the chart may hold.
+   */
+  renderedCollectionCandidates({ names }: { names: LangWatchQLNames }): string[] {
+    return [LWQL_RENDERED_NAMED_COLLECTION, this.namedCollection({ names, mode: "sql" })];
+  }
+
+  /**
+   * The names config.d delivers beside `lwql_postgres`, so a table a previous config bound to
+   * the per-database name still attaches once the pods roll onto this one.
+   */
+  renderedCollectionAliases({ names }: { names: LangWatchQLNames }): string[] {
+    return this.renderedCollectionCandidates({ names }).filter(
+      (name) => name !== LWQL_RENDERED_NAMED_COLLECTION,
+    );
+  }
+
+  /**
+   * A rendered-mode engine table keeps its binding while that candidate exists on the server,
+   * else takes the first candidate the server holds. With neither visible it takes the
+   * preferred name, so the statement fails where the collection is truly absent.
+   */
+  renderedCollectionFor({
+    names,
+    table,
+    server,
+  }: {
+    names: LangWatchQLNames;
+    table: string;
+    server: LwqlCollectionState;
+  }): string {
+    const candidates = this.renderedCollectionCandidates({ names });
+    const bound = server.bound[table];
+    if (bound !== undefined && candidates.includes(bound) && server.available.includes(bound)) {
+      return bound;
+    }
+    return (
+      candidates.find((name) => server.available.includes(name)) ?? LWQL_RENDERED_NAMED_COLLECTION
+    );
   }
 
   accessModelMode({ source }: { source: Record<string, string | undefined> }): LwqlAccessModelMode {
@@ -192,55 +266,89 @@ export class LangWatchQLSelfProvisioningService {
   namedCollectionValues({
     names,
     postgres,
+    mode,
   }: {
     names: LangWatchQLNames;
     postgres: LwqlPostgresSettings;
+    mode: LwqlAccessModelMode;
   }): PostgresNamedCollection {
-    return {
-      collection: this.namedCollection({ names }),
-      host: postgres.endpoint.host,
-      port: postgres.endpoint.port,
-      database: postgres.endpoint.database,
-      user: LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole,
-      password: postgres.readerPassword,
-    };
+    return { collection: this.namedCollection({ names, mode }), ...readerConnection({ postgres }) };
   }
 
-  /** The fingerprint of {@link namedCollectionValues} and the schema, which a current table has. */
+  /** The fingerprint of the collection's values and the schema, which a current table carries. */
   credentialFingerprint({
-    names,
     postgres,
     schema,
   }: {
-    names: LangWatchQLNames;
     postgres: LwqlPostgresSettings;
     schema: string;
   }): string {
-    const { host, port, database, user, password } = this.namedCollectionValues({
-      names,
-      postgres,
-    });
     return postgresMapping.credentialFingerprint({
-      connection: { host, port, database, user, password },
+      connection: readerConnection({ postgres }),
       schema,
     });
   }
 
-  /** What to read before stamping an engine table with the app's collection values. */
+  /** The collection an engine table binds to: per table in rendered mode, one in sql mode. */
+  collectionFor({
+    names,
+    mode,
+    server,
+    table,
+  }: {
+    names: LangWatchQLNames;
+    mode: LwqlAccessModelMode;
+    server: LwqlCollectionState;
+    table: string;
+  }): string {
+    return mode === "rendered"
+      ? this.renderedCollectionFor({ names, table, server })
+      : this.namedCollection({ names, mode });
+  }
+
+  /** What to read through `collection` before stamping an engine table with the app's values. */
   collectionProbe({
+    collection,
+    postgres,
+    schema,
+  }: {
+    collection: string;
+    postgres: LwqlPostgresSettings;
+    schema: string;
+  }): LwqlCollectionProbe {
+    const [first] = catalogShapes.postgresViews(LWQL_VIEW_CATALOG);
+    if (!first) throw new Error("lwql self-provisioning: the catalog maps no PostgreSQL dataset");
+    sqlText.assertIdentifier(collection, "named collection");
+    return {
+      collection,
+      relation: first.postgres.approvedView,
+      connection: readerConnection({ postgres }),
+      schema,
+    };
+  }
+
+  /** One probe per distinct collection the given engine tables bind to. */
+  collectionProbes({
     names,
     postgres,
     schema,
+    mode,
+    server,
+    engineTables,
   }: {
     names: LangWatchQLNames;
     postgres: LwqlPostgresSettings;
     schema: string;
-  }): LwqlCollectionProbe {
-    const { collection, ...connection } = this.namedCollectionValues({ names, postgres });
-    const [first] = catalogShapes.postgresViews(LWQL_VIEW_CATALOG);
-    if (!first) throw new Error("lwql self-provisioning: the catalog maps no PostgreSQL dataset");
-    sqlText.assertIdentifier(collection, "named collection");
-    return { collection, relation: first.postgres.approvedView, connection, schema };
+    mode: LwqlAccessModelMode;
+    server: LwqlCollectionState;
+    engineTables: readonly string[];
+  }): LwqlCollectionProbe[] {
+    const collections = new Set(
+      engineTables.map((table) => this.collectionFor({ names, mode, server, table })),
+    );
+    return [...collections].map((collection) =>
+      this.collectionProbe({ collection, postgres, schema }),
+    );
   }
 
   /** The engine tables a converge creates: every one, or those among the check's drift. */
@@ -271,6 +379,7 @@ export class LangWatchQLSelfProvisioningService {
     includeAppFunctions = true,
     mode = "sql",
     only,
+    server = NO_COLLECTION_STATE,
     collectionLoaded = false,
   }: {
     names: LangWatchQLNames;
@@ -285,6 +394,8 @@ export class LangWatchQLSelfProvisioningService {
     mode?: LwqlAccessModelMode;
     /** The reconvergence check's drift: only these app-owned objects, never the access entities. */
     only?: readonly string[];
+    /** Rendered mode: the collections the server holds and each engine table's binding. */
+    server?: LwqlCollectionState;
     /** The task found ClickHouse holds the app's collection values: engine tables are stamped. */
     collectionLoaded?: boolean;
   }): string[] {
@@ -293,33 +404,33 @@ export class LangWatchQLSelfProvisioningService {
         `lwql self-provisioning: the LangWatchQL database ("${names.database}") must be the application's own ClickHouse database ("${sourceDatabase}")`,
       );
     }
-    const collection = this.namedCollection({ names });
-    const credentialFingerprint = collectionLoaded
-      ? this.credentialFingerprint({ names, postgres, schema })
-      : undefined;
+    const engineTable: EngineTableBinding = {
+      collectionFor: (table) => this.collectionFor({ names, mode, server, table }),
+      schema,
+      credentialFingerprint: collectionLoaded
+        ? this.credentialFingerprint({ postgres, schema })
+        : undefined,
+    };
     if (only !== undefined) {
       return this.#driftedStatements({
         names,
         sourceDatabase,
-        collection,
-        schema,
+        engineTable,
         includeAppFunctions,
         only,
-        credentialFingerprint,
       });
     }
     const definition = accessModelDefinition.build({
       names,
       passwordSha256Hex: createHash("sha256").update(restrictedPassword).digest("hex"),
-      namedCollection: this.namedCollectionValues({ names, postgres }),
+      namedCollection: this.namedCollectionValues({ names, postgres, mode }),
       sourceDatabase,
     });
     const structural = accessModel.setupStatements({ names, sourceDatabase, includeAppFunctions });
-    const engineTables = postgresViews.engineTableStatements({
+    const engineTables = this.#engineTableStatements({
       names,
-      collection,
-      schema,
-      ...(credentialFingerprint === undefined ? {} : { credentialFingerprint }),
+      engineTable,
+      views: catalogShapes.postgresViews(LWQL_VIEW_CATALOG),
     });
     const views = viewProvisioning.setupStatements({
       names,
@@ -336,23 +447,41 @@ export class LangWatchQLSelfProvisioningService {
     ];
   }
 
+  /** One engine table per PostgreSQL dataset, each on the collection `collectionFor` picks. */
+  #engineTableStatements({
+    names,
+    engineTable,
+    views,
+  }: {
+    names: LangWatchQLNames;
+    engineTable: EngineTableBinding;
+    views: readonly LangWatchQLViewDefinition[];
+  }): string[] {
+    const { collectionFor, schema, credentialFingerprint } = engineTable;
+    return views.flatMap((view) =>
+      postgresViews.engineTableStatements({
+        names,
+        collection: collectionFor(view.sourceTable),
+        schema,
+        views: [view],
+        ...(credentialFingerprint === undefined ? {} : { credentialFingerprint }),
+      }),
+    );
+  }
+
   /** The drifted objects, and every view over an engine table that is about to be replaced. */
   #driftedStatements({
     names,
     sourceDatabase,
-    collection,
-    schema,
+    engineTable,
     includeAppFunctions,
     only,
-    credentialFingerprint,
   }: {
     names: LangWatchQLNames;
     sourceDatabase: string;
-    collection: string;
-    schema: string;
+    engineTable: EngineTableBinding;
     includeAppFunctions: boolean;
     only: readonly string[];
-    credentialFingerprint: string | undefined;
   }): string[] {
     const drifted = new Set(only);
     const engineTables = catalogShapes
@@ -372,13 +501,7 @@ export class LangWatchQLSelfProvisioningService {
       ...(drifted.has(names.keyMapTable)
         ? [accessModel.keyMapTableStatement({ names, sourceDatabase })]
         : []),
-      ...postgresViews.engineTableStatements({
-        names,
-        collection,
-        schema,
-        views: engineTables,
-        ...(credentialFingerprint === undefined ? {} : { credentialFingerprint }),
-      }),
+      ...this.#engineTableStatements({ names, engineTable, views: engineTables }),
       ...viewProvisioning.setupStatements({
         names,
         sourceDatabase,

@@ -129,7 +129,7 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
       startLangWatchQLPostgres(),
     ]);
     names = { ...harness.names, database: harness.factDatabase };
-    collection = selfProvisioning.namedCollection({ names });
+    collection = selfProvisioning.namedCollection({ names, mode: "rendered" });
     // The app's own reader role, which the deploy's PostgreSQL half converges in production.
     for (const statement of selfProvisioning.postgresReaderStatements({
       readerPassword: postgres.readerPassword,

@@ -115,7 +115,7 @@ describe("given the approved views live in a PostgreSQL schema other than public
         },
       });
       const probe = selfProvisioning.collectionProbe({
-        names: harness.names,
+        collection: lwqlTestNamedCollection(harness.names),
         postgres: {
           endpoint: {
             host: "host.docker.internal",
