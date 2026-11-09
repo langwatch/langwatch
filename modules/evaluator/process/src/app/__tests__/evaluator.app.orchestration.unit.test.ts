@@ -395,6 +395,37 @@ describe("when copying an evaluator into another project", () => {
       projectId: "target",
     });
   });
+
+  /** @scenario "copying an evaluator into another project records the copy as created" */
+  it("records one created fact for the copy, keyed to the target project", async () => {
+    const { app, repository } = anApp();
+    const sent = recordingCreatedFacts(app);
+    await repository.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: {},
+    });
+
+    await app.copy({
+      evaluatorId: "evaluator-1",
+      projectId: "project-2",
+      sourceProjectId: "project-1",
+      newEvaluatorId: "evaluator-copy",
+      actorId: "user-1",
+      shouldCheckEvaluatorCap: false,
+    });
+
+    expect(sent).toEqual([
+      {
+        tenantId: "project-2",
+        projectId: "project-2",
+        evaluatorId: "evaluator-copy",
+        occurredAt: expect.any(Number),
+      },
+    ]);
+  });
 });
 
 describe("when an evaluator is created", () => {
@@ -532,43 +563,6 @@ describe("when an evaluator is created", () => {
         tenantId: "project-1",
         projectId: "project-1",
         evaluatorId: "evaluator-1",
-        occurredAt: expect.any(Number),
-      },
-    ]);
-  });
-});
-
-describe("when an evaluator is copied into another project", () => {
-  /** @scenario "copying an evaluator into another project records the copy as created" */
-  it("records one created fact for the copy, keyed to the target project", async () => {
-    const { app, repository } = anApp();
-    const sent: unknown[] = [];
-    app.connectLifecycle({
-      recordEvaluatorDeleted: { send: async () => undefined },
-      recordEvaluatorCreated: { send: async (data) => void sent.push(data) },
-    });
-    await repository.create({
-      id: "evaluator-1",
-      projectId: "project-1",
-      name: "Exact match",
-      type: "evaluator",
-      config: {},
-    });
-
-    await app.copy({
-      evaluatorId: "evaluator-1",
-      projectId: "project-2",
-      sourceProjectId: "project-1",
-      newEvaluatorId: "evaluator-copy",
-      actorId: "user-1",
-      shouldCheckEvaluatorCap: false,
-    });
-
-    expect(sent).toEqual([
-      {
-        tenantId: "project-2",
-        projectId: "project-2",
-        evaluatorId: "evaluator-copy",
         occurredAt: expect.any(Number),
       },
     ]);

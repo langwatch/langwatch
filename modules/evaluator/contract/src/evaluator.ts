@@ -197,7 +197,12 @@ export const EVALUATOR_CREATED_EVENT_TYPE = "lw.evaluator.created" as const;
 export const EVALUATOR_CREATED_EVENT_VERSION = "2026-11-09" as const;
 
 /** Ids only, as for deleted: a peer reads the evaluator itself through `EvaluatorApi`. */
-const evaluatorCreatedEventDataSchemaDefinition = evaluatorDeletedEventDataSchemaDefinition;
+const evaluatorCreatedEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  evaluatorId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
 export interface EvaluatorCreatedEventDataSchema extends Named<
   typeof evaluatorCreatedEventDataSchemaDefinition
 > {}
