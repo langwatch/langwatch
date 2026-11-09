@@ -4,6 +4,7 @@ import type { DatasetContentRepository } from "./dataset-content.repository.ts";
 import type { DatasetCountRepository } from "./dataset-count.repository.ts";
 import type { DatasetMigrationRepository } from "./dataset-migration.repository.ts";
 import type { DatasetRecordRepository } from "./dataset-record.repository.ts";
+import type { DatasetSingleFileConversionRepository } from "./dataset-single-file-conversion.repository.ts";
 import type { DatasetSingleFileRepository } from "./dataset-single-file.repository.ts";
 import type { DatasetStorageAuditRepository } from "./dataset-storage-audit.repository.ts";
 import type { DatasetVersionContentRepository } from "./dataset-version-content.repository.ts";
@@ -31,6 +32,8 @@ export interface DatasetRepositories {
   readonly storageAudit: DatasetStorageAuditRepository;
   /** The previous release's single-file datasets, read and rewritten where it kept them. */
   readonly singleFiles: DatasetSingleFileRepository;
+  /** Which single-file datasets the conversion step still has to convert. */
+  readonly singleFileConversion: DatasetSingleFileConversionRepository;
   /** The numbered snapshots of each dataset and the runs that read them. */
   readonly versions: DatasetVersionRepository;
   /** The rows of each snapshot, in object storage beside the dataset's chunks. */

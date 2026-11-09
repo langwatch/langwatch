@@ -241,10 +241,20 @@ export class DatasetModule implements DatasetApi {
       inlineAttachments,
     });
 
+    const content = DatasetContentService.create({
+      datasets: repositories.content,
+      storage: chunks,
+    });
     const singleFile = DatasetSingleFileService.create({
       files: repositories.singleFiles,
       datasets: repositories.content,
       generateId: () => generate(DATASET_RECORD_KSUID_RESOURCE).toString(),
+      // A write that waited behind the conversion step finds the dataset on chunks.
+      converted: {
+        content,
+        reload: (key) =>
+          this.#datasets.getBySlugOrId({ slugOrId: key.datasetId, projectId: key.projectId }),
+      },
     });
 
     this.#datasets = DatasetService.create({
@@ -260,7 +270,7 @@ export class DatasetModule implements DatasetApi {
         singleFile,
       }),
       queue: this.#normalization,
-      content: DatasetContentService.create({ datasets: repositories.content, storage: chunks }),
+      content,
       singleFile,
       // The identifier format a new entry is written under is this module's
       // own business, not something a composing process supplies: every real

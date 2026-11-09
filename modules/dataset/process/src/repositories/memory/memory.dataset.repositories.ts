@@ -9,6 +9,7 @@ import { MemoryDatasetContentRepository } from "./memory.dataset-content.reposit
 import { MemoryDatasetCountRepository } from "./memory.dataset-count.repository.ts";
 import { MemoryDatasetMigrationRepository } from "./memory.dataset-migration.repository.ts";
 import { MemoryDatasetRecordRepository } from "./memory.dataset-record.repository.ts";
+import { MemoryDatasetSingleFileConversionRepository } from "./memory.dataset-single-file-conversion.repository.ts";
 import { MemoryDatasetStorageAuditRepository } from "./memory.dataset-storage-audit.repository.ts";
 import { MemoryDatasetVersionRepository } from "./memory.dataset-version.repository.ts";
 import { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
@@ -33,6 +34,7 @@ export class MemoryDatasetRepositories {
       migrationChunks: chunks,
       storageAudit: MemoryDatasetStorageAuditRepository.create({ database }),
       singleFiles: ObjectStorageDatasetSingleFileRepository.create({ objectStorage }),
+      singleFileConversion: MemoryDatasetSingleFileConversionRepository.create({ database }),
       versions: MemoryDatasetVersionRepository.create(),
       versionContent: ObjectStorageDatasetVersionContentRepository.create({ objectStorage }),
     };

@@ -9,6 +9,7 @@ import { datasetVersionsEventing } from "#eventing/dataset-versions.pipeline";
 import { datasetRepositories } from "#repositories/dataset-repositories.registry";
 import { DatasetEmptySlugService } from "#services/dataset-empty-slug.service";
 import { DatasetMigrationService } from "#services/dataset-migration.service";
+import { DatasetSingleFileConversionService } from "#services/dataset-single-file-conversion.service";
 import { DatasetStorageAuditService } from "#services/dataset-storage-audit.service";
 import { DatasetStorageAuditTask } from "#tasks/dataset-storage-audit.task";
 import { datasetRecordTrpcTransport } from "#transport/dataset-record.trpc";
@@ -59,6 +60,23 @@ export const datasetProcessModule: PublishedProcessModule<
           DatasetMigrationService.create({
             repository: repositories.migration,
             storage: repositories.migrationChunks,
+            projects: dependencies.projects,
+          }).runStep(args),
+      }),
+      // Background, after old writers are gone: an older image still rewrites the single file.
+      defineMigrationStep({
+        id: "dataset:convert-single-file-datasets",
+        kind: "data",
+        mode: "background",
+        description:
+          "Converts each dataset an older release kept as one file into object-storage chunks, keeping the old file.",
+        needsOldWritersGone: true,
+        run: (args) =>
+          DatasetSingleFileConversionService.create({
+            conversion: repositories.singleFileConversion,
+            datasets: repositories.content,
+            files: repositories.singleFiles,
+            chunks: repositories.chunks,
             projects: dependencies.projects,
           }).runStep(args),
       }),
