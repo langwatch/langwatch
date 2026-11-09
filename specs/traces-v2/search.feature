@@ -1083,6 +1083,22 @@ Rule: Facet count updates
     Then the counts are requested again for the new input
     And a count kept for a previous input is never shown as the current one
 
+  # One tenant's slow facet scan must not hold the statement slots every other
+  # tenant's reads queue for.
+  @unit
+  Scenario: A capped facet read gives its shared slot back
+    When a sidebar facet read runs past its time or memory cap
+    Then the server stops that scan and the sidebar omits that facet
+    And a facet that sets its own memory ceiling keeps it, with the time cap added
+
+  @unit
+  Scenario: A repeated facet request shares the count still running
+    Given the facet counts for a query, window and viewer are still running
+    When the same request arrives again
+    Then it is answered by the running count, not a second scan
+    And a request differing in query, eval runs or protections runs its own count
+    And a repeat after the count has answered counts afresh
+
   Scenario: Facet counts leave out the hidden origin and the traces outside the window
     Given the project has a trace from Langy's own origin in the window
     And a trace outside the selected window
