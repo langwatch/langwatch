@@ -362,6 +362,14 @@ The same figures for one organization, counted over the members the caller names
 countUsageForMembers(input: { memberUserIds: readonly string[] }): Promise<UserUsageCount>;
 ```
 
+#### `findSignedInSince`
+
+Which of these people last signed in at or after `since` (epoch ms).
+
+```typescript
+findSignedInSince(input: { userIds: readonly string[]; since: number; }): Promise<readonly string[]>;
+```
+
 #### `hasAccountOnDomain`
 
 Whether anybody with an address on this domain has an account; no address leaves.

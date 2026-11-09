@@ -28,6 +28,7 @@ export const EMPTY_SPEND_USAGE: SpendUsage = {
   input_image_tokens: 0,
   output_image_tokens: 0,
   image_count: 0,
+  web_search_requests: 0,
 };
 
 type SpendAttributionData = {
@@ -194,6 +195,7 @@ const spendUsagePayloadSchema = z.object({
   input_image_tokens: z.number().int().min(0).default(0),
   output_image_tokens: z.number().int().min(0).default(0),
   image_count: z.number().int().min(0).default(0),
+  web_search_requests: z.number().int().min(0).default(0),
 });
 
 /** Everything the deliver executor needs to rate, build the envelope, and

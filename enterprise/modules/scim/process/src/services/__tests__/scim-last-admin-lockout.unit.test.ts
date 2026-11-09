@@ -29,6 +29,12 @@ import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 /** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
 const openSeats = {
   countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+  findLiveHoldUserIds: async () => [],
+  withSeatLock: <T>({
+    work,
+  }: {
+    work: (lease: { assertHeld(): Promise<void> }) => Promise<T>;
+  }): Promise<T> => work({ assertHeld: async () => {} }),
 };
 
 const ORGANIZATION = "org_acme";

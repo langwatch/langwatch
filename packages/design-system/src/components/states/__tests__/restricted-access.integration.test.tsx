@@ -53,6 +53,19 @@ describe("given a permission gate", () => {
   });
 });
 
+describe("given a page that needs platform operator access", () => {
+  /** @scenario "An organization admin without platform operator access opens an operator page" */
+  it("says it needs platform operator access, not an organization admin", () => {
+    renderWithDesignSystem(<RestrictedAccess permission="ops:view" />);
+    expect(
+      screen.getByText(
+        "This page needs platform operator access. It is for the people who run this LangWatch install.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Ask an organization admin/)).toBeNull();
+  });
+});
+
 describe("given an Enterprise gate", () => {
   /** @scenario An Enterprise gate names the missing plan and offers a next step */
   it("names the feature and preserves the owner's action", () => {

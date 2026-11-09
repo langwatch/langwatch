@@ -13,7 +13,12 @@ export type {
   SsrfUrlValidator,
   SsrfValidationResult,
 } from "./ssrf/url-validator.ts";
-export { fetchValidatedDestination, RedirectRefusedError } from "./ssrf/fenced-fetch.ts";
+export {
+  fetchValidatedDestination,
+  OutboundProxyMisconfiguredError,
+  OutboundProxyUnreachableError,
+  RedirectRefusedError,
+} from "./ssrf/fenced-fetch.ts";
 export type { EgressTlsPolicy, FencedFetchOptions } from "./ssrf/fenced-fetch.ts";
 
 /**
@@ -22,6 +27,7 @@ export type { EgressTlsPolicy, FencedFetchOptions } from "./ssrf/fenced-fetch.ts
  * how). Every HTTPS caller resolves it the same way, so no bypass via a second `no_proxy` copy.
  */
 export {
+  globalFetchUsesEnvProxy,
   hostnameOf,
   isProxyBypassed,
   parseOutboundProxyConfig,

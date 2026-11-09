@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { withLinkMarker } from "../link-marker.ts";
 import {
   CountTiles,
   DataTable,
@@ -56,9 +57,27 @@ export const triggerDigestMail = z.object({
    * mail can offer to write one; without it, it says nothing.
    */
   triggerId: z.string().min(1).optional(),
+  /**
+   * The query pair a row link to our own app carries so the app counts the landing. The sender
+   * names it (automation-contract's `ALERT_LINK_PARAM`/`ALERT_LINK_VALUE`); without it, links are
+   * left as they are.
+   */
+  linkMarker: z.object({ param: z.string().min(1), value: z.string().min(1) }).optional(),
 });
 
 export type TriggerDigestMail = z.infer<typeof triggerDigestMail>;
+
+/** A row link with the sender's marker, when the sender names one. */
+const marked = ({
+  url,
+  baseHost,
+  linkMarker,
+}: {
+  url: string;
+  baseHost: string;
+  linkMarker: TriggerDigestMail["linkMarker"];
+}): string =>
+  linkMarker ? withLinkMarker({ url, appBaseUrl: baseHost, marker: linkMarker }) : url;
 
 /**
  * Where a row points: a graph automation's match is a chart threshold, not
@@ -67,15 +86,24 @@ export type TriggerDigestMail = z.infer<typeof triggerDigestMail>;
  */
 const linkFor = (
   entry: TriggerDigestEntry,
-  { projectSlug, baseHost }: { projectSlug: string; baseHost: string },
+  {
+    projectSlug,
+    baseHost,
+    linkMarker,
+  }: Pick<TriggerDigestMail, "projectSlug" | "baseHost" | "linkMarker">,
 ): string => {
-  if (entry.graphId) return `${baseHost}/${projectSlug}/analytics/custom/${entry.graphId}`;
+  if (entry.graphId) {
+    const url = `${baseHost}/${projectSlug}/analytics/custom/${entry.graphId}`;
+    return marked({ url, baseHost, linkMarker });
+  }
   if (entry.traceId) {
     const trace = `${baseHost}/${projectSlug}/traces/${entry.traceId}`;
     const hint = entry.occurredAtMs;
-    return hint !== undefined && Number.isFinite(hint) && hint > 0
-      ? `${trace}?t=${Math.floor(hint)}`
-      : trace;
+    const url =
+      hint !== undefined && Number.isFinite(hint) && hint > 0
+        ? `${trace}?t=${Math.floor(hint)}`
+        : trace;
+    return marked({ url, baseHost, linkMarker });
   }
   return "#";
 };
@@ -185,6 +213,7 @@ export const triggerDigestEmailTemplate = defineTemplate({
       triggerMessage: "Three or more low-satisfaction answers in the checkout flow.",
       projectSlug: "support-agent",
       baseHost: "https://app.langwatch.ai",
+      linkMarker: { param: "lw_from", value: "alert" },
       entries: [
         {
           traceId: "trace_4KpQ2mXv9dLbR7",
@@ -216,6 +245,7 @@ export const triggerDigestEmailTemplate = defineTemplate({
       triggerMessage: "",
       projectSlug: "support-agent",
       baseHost: "https://app.langwatch.ai",
+      linkMarker: { param: "lw_from", value: "alert" },
       entries: [{ traceId: "trace_4KpQ2mXv9dLbR7" }, { graphId: "graph_5RmB6qEs2vNkP4" }],
       triggerId: "auto_7Kd2ppQ4",
     },
@@ -225,6 +255,7 @@ export const triggerDigestEmailTemplate = defineTemplate({
       triggerMessage: "",
       projectSlug: "support-agent",
       baseHost: "https://app.langwatch.ai",
+      linkMarker: { param: "lw_from", value: "alert" },
       entries: Array.from({ length: 24 }, (_unused, index) => ({
         traceId: `trace_${String(index).padStart(4, "0")}aXcVbNmQwE`,
       })),

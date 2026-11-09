@@ -15,7 +15,9 @@ import {
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
 import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
+import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
+import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import { boardSetupDraft, boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
@@ -25,7 +27,7 @@ import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
-import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
+import { LimitFailedWidgetsBanner } from "../blocks/limit-failed-widgets-banner.tsx";
 import { CuratedWidgetsGrid } from "./curated-widgets-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
@@ -48,9 +50,17 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
     widgets: board.widgets,
   });
   useBoardOnScreen({ boardId: subject.id });
+  useDashboardViewed({
+    dashboardId: subject.id,
+    dashboardKind: "curated",
+    widgetCount: board.widgets.length,
+    isLoaded: true,
+    templateId: board.templateId,
+  });
   const langy = useLangyAsk();
   const empty = useEmptyWidgets();
   const emptyWidgetNames = empty.emptyNames({ widgets: board.widgets, keyOf: ({ key }) => key });
+  const limitFailedWidgets = useLimitFailedWidgets();
 
   return (
     <BoardPage
@@ -92,6 +102,10 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
                   : undefined
               }
             />
+            <LimitFailedWidgetsBanner
+              failed={limitFailedWidgets.count({ widgets: board.widgets, keyOf: ({ key }) => key })}
+              total={board.widgets.length}
+            />
             <CuratedWidgetsGrid
               projectId={projectId}
               projectSlug={saved.projectSlug}
@@ -99,6 +113,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
               boardName={board.name}
               widgets={board.widgets}
               period={period}
+              periodKey={`${range}:${grain}`}
               onAskLangy={
                 langy.enabled
                   ? (widget) => langy.ask(widgetPromptDraft({ widget, board: subject, period }))
@@ -106,6 +121,9 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
               }
               onEmptyChange={({ widget, empty: isEmpty }) =>
                 empty.report({ key: widget.key, empty: isEmpty })
+              }
+              onLimitFailureChange={({ widget, limited }) =>
+                limitFailedWidgets.report({ key: widget.key, limited })
               }
             />
           </VStack>
@@ -119,12 +137,7 @@ function Curated() {
   const templateId = useAnalyticsHost().route().params.templateId ?? "";
   const board = curatedBoardById(templateId);
   if (!board) return <UiPageNotFound />;
-  return (
-    <>
-      <OldAnalyticsBanner />
-      <OpenCuratedBoard key={board.templateId} board={board} />
-    </>
-  );
+  return <OpenCuratedBoard key={board.templateId} board={board} />;
 }
 
 export default function CuratedBoardScreen() {

@@ -20,6 +20,8 @@ import {
   type GatewayLicenseTokenRefusal,
   type GatewayLicenseTokenResolution,
   type GatewayPricedSpend,
+  type GatewayProviderUsage,
+  type GatewayProviderUsageResult,
   type GatewayPricedSpendResult,
   type GatewayInternalSpendSubmission,
   type VirtualKeyWithScopes,
@@ -77,6 +79,8 @@ export type GatewayInternalProtocolMembers = Readonly<{
   budgetSpend: GatewayBudgetSpendRepository | undefined;
   /** Owns the Codex session a 401 on a Codex-backed provider is recovered through. */
   modelProviders: Pick<ModelProviderApi, "refreshCodexForGateway">;
+  /** The stored row a platform call ran on; absent leaves an unnamed row empty. */
+  providerRows?: Pick<ModelProviderApi, "findRowServingModel" | "getExecutionProviders">;
   /** All-or-nothing; a guardrail that cannot verdict must refuse, never answer allow. */
   guardrails: GatewayGuardrailEvaluationService;
   /** Absent with no spend pipeline registered; /spend-commands then answers 503. */
@@ -249,6 +253,11 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
   /** Appends one outcome the caller priced itself (see the ingest service). */
   recordPricedSpend(input: GatewayPricedSpend): Promise<GatewayPricedSpendResult> {
     return this.#spendCommands.recordPricedSpend(input);
+  }
+
+  /** Appends one call made with stored provider credentials (see the ingest service). */
+  recordProviderUsage(input: GatewayProviderUsage): Promise<GatewayProviderUsageResult> {
+    return this.#spendCommands.recordProviderUsage(input);
   }
 
   async reserveRealtimeSession(

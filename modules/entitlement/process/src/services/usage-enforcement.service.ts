@@ -40,6 +40,12 @@ export interface UsageCounter {
 
   /** Main's enforcement read: whether the organization spent its monthly allowance. */
   checkLimitForOrganization(input: Readonly<{ organizationId: string }>): Promise<UsageLimitResult>;
+
+  /** The month's count per named project, the read the usage limit email lists. */
+  getCountByProjects(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<ProjectUsageCounts>;
 }
 
 /**
@@ -211,7 +217,7 @@ interface UsageServiceDependencies {
  * resolves the counting unit (traces/events). Counting execution is delegated to
  * TraceUsageService or EventUsageService depending on the resolved meter.
  */
-export class UsageService {
+export class UsageService implements UsageCounter {
   private readonly organizations: UsageOrganization;
   private readonly traceUsageService: UsageVolumeCounter;
   private readonly eventUsageService: UsageVolumeCounter;

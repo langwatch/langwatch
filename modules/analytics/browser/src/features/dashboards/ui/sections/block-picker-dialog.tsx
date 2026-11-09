@@ -18,8 +18,10 @@ import {
   type WidgetQuestion,
   type WidgetQuestionIcon,
 } from "@langwatch/analytics-catalogue";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { langyQuestionAsked } from "@langwatch/langy-contract";
 import {
   Activity,
   AlertTriangle,
@@ -83,6 +85,7 @@ export function BlockPickerDialog({
   onClose: () => void;
 }) {
   const langy = useLangyAsk();
+  const analytics = useUiAnalytics();
   // Closed here first: the address that unmounts the picker commits in a transition, which a
   // board busy drawing the picked widget holds back for seconds.
   const [isOpen, setIsOpen] = useState(true);
@@ -111,6 +114,8 @@ export function BlockPickerDialog({
   const askLangy = (text: string) => {
     const question = text.trim() === "" ? "Help me build a dashboard" : text;
     langy.ask(boardQuestion({ question, board, period }));
+    // A question the member put to Langy; the drafts seeded after an add send nothing.
+    analytics.track(langyQuestionAsked({ surface: "add_widget" }));
     onClose();
   };
 

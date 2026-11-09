@@ -13,6 +13,7 @@ import type { EntitlementRepositories } from "../../repositories/entitlement.rep
 import { MemoryEntitlementRepositories } from "../../repositories/memory/memory.entitlement.repositories.ts";
 import {
   USAGE_UNKNOWN,
+  type ProjectUsageCounts,
   type UsageCount,
   type UsageCounter,
   type UsageLimitResult,
@@ -39,11 +40,21 @@ export class TestUsageCounter implements UsageCounter {
     private readonly count: UsageCount,
     private readonly usageUnit: UsageUnit,
     private readonly limit: UsageLimitResult = { exceeded: false },
+    private readonly projectCounts: ProjectUsageCounts = [],
   ) {}
 
   /** The same counter, answering `limit` to every enforcement read. */
   withLimit(limit: UsageLimitResult): TestUsageCounter {
-    return new TestUsageCounter(this.count, this.usageUnit, limit);
+    return new TestUsageCounter(this.count, this.usageUnit, limit, this.projectCounts);
+  }
+
+  /** The same counter, answering `projectCounts` to every per-project read. */
+  withProjectCounts(projectCounts: ProjectUsageCounts): TestUsageCounter {
+    return new TestUsageCounter(this.count, this.usageUnit, this.limit, projectCounts);
+  }
+
+  async getCountByProjects(): Promise<ProjectUsageCounts> {
+    return this.projectCounts;
   }
 
   async checkLimitForOrganization(): Promise<UsageLimitResult> {

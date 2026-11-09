@@ -687,6 +687,13 @@ export class UserModule implements UserApi {
     return this.#users.countUsageForMembers(input);
   }
 
+  findSignedInSince(input: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<readonly string[]> {
+    return this.#users.findSignedInSince(input);
+  }
+
   hasAccountOnDomain(input: { domain: string }): Promise<boolean> {
     return this.#users.hasAccountOnDomain(input);
   }

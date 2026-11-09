@@ -110,7 +110,7 @@ export function findEvaluationRejection(
   const evaluations = Array.isArray(body.evaluations) ? body.evaluations : [];
   for (const evaluation of evaluations.filter(isRecord)) {
     if (hasNoVerdict(evaluation)) {
-      logger.error(
+      logger.warn(
         { projectId, evaluationId: evaluation.id },
         "evaluation has no passed, score or label",
       );
@@ -129,7 +129,7 @@ export function findEvaluationRejection(
     }
 
     if (evaluationTimestampsNotMilliseconds(evaluation)) {
-      logger.error(
+      logger.warn(
         { projectId, evaluationId: evaluation.id },
         "evaluation timestamps not in milliseconds",
       );
@@ -373,7 +373,7 @@ export function resolveTraceId(
   const { projectId, nullableTraceId } = input;
   const traceId = nullableTraceId ?? spans[0]?.trace_id;
   if (!traceId) {
-    logger.error(
+    logger.warn(
       {
         projectId,
         traceId: nullableTraceId,
@@ -390,7 +390,7 @@ export function resolveTraceId(
     new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id)),
   );
   if (traceIds[0] && (traceIds.length > 1 || traceIds[0] !== traceId)) {
-    logger.error({ projectId, traceId, traceIds }, "trace ids are not the same");
+    logger.warn({ projectId, traceId, traceIds }, "trace ids are not the same");
 
     return {
       rejected: true,
@@ -472,7 +472,7 @@ export function findSpanRejection(
     if (invalid) return invalid;
 
     if (spanTimestampsNotMilliseconds(span)) {
-      logger.error(
+      logger.warn(
         { traceId: input.traceId, projectId: input.projectId },
         "timestamps not in milliseconds for span",
       );

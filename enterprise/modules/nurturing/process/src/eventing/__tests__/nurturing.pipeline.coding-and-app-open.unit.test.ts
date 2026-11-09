@@ -99,7 +99,8 @@ describe("nurturing's appPageOpened peer subscriber", () => {
 
   describe("when auth records an open of the usage page", () => {
     /** @scenario "A usage, cost or plan page open identifies usage_page_viewed_at on the opening user" */
-    it("delivers the usage page signals and nothing about the sessions page", async () => {
+    /** @scenario "Any tracked page open identifies app_last_opened_at" */
+    it("delivers the app open and usage page signals and nothing about the sessions page", async () => {
       const { delivered, lanesOf } = nurturing();
 
       for (const lane of lanesOf(APP_PAGE_OPENED_EVENT_TYPE)) {
@@ -112,6 +113,7 @@ describe("nurturing's appPageOpened peer subscriber", () => {
       expect(
         delivered.map((signal) => [signal.kind, "userId" in signal ? signal.userId : null]),
       ).toEqual([
+        ["app_opened", "user-1"],
         ["usage_page_opened", "user-1"],
         ["usage_page_viewed", "user-1"],
       ]);

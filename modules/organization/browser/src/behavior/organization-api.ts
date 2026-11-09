@@ -12,6 +12,7 @@ import {
 } from "@langwatch/api/web";
 import type {
   AuthzApplyMemberBindingsInput,
+  AuthzBillingMember,
   AuthzChangeGrantRoleInput,
   AuthzCreateGrantInput,
   AuthzListManagedBindingsForOrganizationInput,
@@ -27,6 +28,7 @@ import type {
   EnrichedAuditLog,
   groupTrpc,
   licenseEnforcementTrpc,
+  seatRequestTrpc,
   OrganizationDirectoryCounts,
   OrganizationInvite,
   OrganizationMemberDirectory,
@@ -65,6 +67,24 @@ export type AuditLogFilters = {
 export type AuditLogPage = {
   auditLogs: EnrichedAuditLog[];
   totalCount: number;
+};
+
+/** What removing a member does to their seat (specs/licensing/seat-rotation.feature). */
+export type SeatRemovalPreview = {
+  holdsFullSeat: boolean;
+  /** ISO instant the seat frees; null when it frees at once or there is no full seat. */
+  seatFreesAt: string | null;
+  waiting: { userId: string; name: string | null; email: string | null } | null;
+};
+
+/** A seat still held after its person was removed, disabled or demoted. */
+export type HeldSeat = {
+  userId: string;
+  name: string | null;
+  email: string | null;
+  seatTakenAt: string;
+  seatFreesAt: string;
+  reason: "REMOVED" | "DISABLED" | "DEMOTED";
 };
 
 /** A member row, as the "search by user" box matches against it. */
@@ -199,9 +219,10 @@ export type DepartmentAssignments = {
   projects: DepartmentAssignment[];
 };
 
-/** `licenseEnforcement.*` and `group.*` derive from organization contracts; the rest is here. */
+/** `licenseEnforcement.*`, `group.*` and `seatRequest.*` derive from organization contracts. */
 export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
-  ContractApiMap<typeof groupTrpc> & {
+  ContractApiMap<typeof groupTrpc> &
+  ContractApiMap<typeof seatRequestTrpc> & {
     organization: {
       /**
        * `pageOffset`/`pageSize` are real offset paging — a Prisma `skip` read,
@@ -288,9 +309,25 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
         };
       };
 
-      /** Removes a seat outright. */
+      /** Removes a member; may give their freed seat to the person waiting for one. */
       deleteMember: {
-        mutation: { input: { organizationId: string; userId: string }; output: unknown };
+        mutation: {
+          input: { organizationId: string; userId: string; giveSeatToUserId?: string | null };
+          output: { success: true; seatGivenToUserId: string | null; seatHandoverFailed: boolean };
+        };
+      };
+
+      /** What removing a member does to their seat, and who waits for it: the remove dialog. */
+      getSeatRemovalPreview: {
+        query: {
+          input: { organizationId: string; userId: string };
+          output: SeatRemovalPreview;
+        };
+      };
+
+      /** The seats removed, disabled or demoted people still hold, ending soonest first. */
+      listHeldSeats: {
+        query: { input: { organizationId: string }; output: { heldSeats: HeldSeat[] } };
       };
 
       /** Frees a seat reversibly, which is what a licence counts. */
@@ -516,6 +553,17 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
       applyMemberGrants: {
         mutation: {
           input: Omit<AuthzApplyMemberBindingsInput, "caller" | "actor">;
+          output: { success: true };
+        };
+      };
+      /** Who pays for the organization; every role reads it. */
+      listBillingMembers: {
+        query: { input: { organizationId: string }; output: AuthzBillingMember[] };
+      };
+      /** Grants or revokes Billing on one member; administrators only. */
+      setMemberBillingRole: {
+        mutation: {
+          input: { organizationId: string; userId: string; holds: boolean };
           output: { success: true };
         };
       };

@@ -66,7 +66,7 @@ function harness(resolution: DecisionModelResolution) {
 }
 
 describe("InstantEvalDecisionModelJudgeService", () => {
-  describe("when the project runs on LangWatch Instant Preview", () => {
+  describe("when the project runs on LangWatch Evals Preview", () => {
     it("classifies with the deployment's judge", async () => {
       const { judge, hostedCalls, ownCalls } = harness({ kind: "langwatch" });
 

@@ -294,6 +294,13 @@ describe("given a module declaring a screen that requires a grant", () => {
       load: async () => ({ default: Page }),
       requires: "workflows:view",
     },
+    "pages/[project]/own-refusal": {
+      load: async () => ({
+        default: Page,
+        Forbidden: ({ permission }: { permission: string }) => <p>locked without {permission}</p>,
+      }),
+      requires: "workflows:view",
+    },
     "pages/[project]/open": { load: async () => ({ default: Page }) },
     "pages/[project]/flagged": {
       load: async () => ({ default: Page }),
@@ -335,6 +342,14 @@ describe("given a module declaring a screen that requires a grant", () => {
 
     expect(screen.getByText("Missing permission: workflows:view")).toBeDefined();
     expect(screen.queryByText("the page")).toBeNull();
+  });
+
+  /** @scenario "A declared screen answers its own refusal when its chunk exports Forbidden" */
+  it("shows the screen's own Forbidden export to a viewer without the grant", async () => {
+    await renderDeclared({ page: "pages/[project]/own-refusal", permissions: [] });
+
+    expect(screen.getByText("locked without workflows:view")).toBeDefined();
+    expect(screen.queryByText(/Missing permission/)).toBeNull();
   });
 
   /** @scenario "A declared screen that requires a grant opens for a viewer holding it" */
@@ -379,5 +394,56 @@ describe("given a module declaring a screen that requires a grant", () => {
     const load = installedModuleScreens([probeWeb]).loaders["pages/[project]/open"];
 
     await expect(load?.()).resolves.toEqual({ default: Page });
+  });
+});
+
+class OrganizationOnlySession extends AnsweringSession {
+  hasPermission(): boolean {
+    return false;
+  }
+
+  hasOrganizationPermission(permission: string): boolean {
+    return this.answers.permissions.includes(permission);
+  }
+}
+
+describe("given a page whose grant is asked at the organization", () => {
+  function renderAtOrganization(session: AnsweringSession) {
+    const Guarded = withUiPageGuard({
+      permission: "members:view",
+      permissionAt: "organization",
+      fallbacks: {
+        loading: () => <div>still asking</div>,
+        notFound: () => <div>not here</div>,
+        forbidden: ({ permission }) => <div>missing {permission}</div>,
+      },
+    })(Page);
+    render(
+      <UiHostServicesContextProvider value={hostServices(session)}>
+        <UiHostServiceProvider value={new Map()}>
+          <Guarded />
+        </UiHostServiceProvider>
+      </UiHostServicesContextProvider>,
+    );
+  }
+
+  describe("when the reader holds it at the organization but not on the active project", () => {
+    it("opens the page", () => {
+      renderAtOrganization(
+        new OrganizationOnlySession({ flags: {}, permissions: ["members:view"], settled: true }),
+      );
+
+      expect(screen.queryByText("the page")).not.toBeNull();
+    });
+  });
+
+  describe("when the organization does not grant it", () => {
+    it("names the missing permission", () => {
+      renderAtOrganization(
+        new OrganizationOnlySession({ flags: {}, permissions: [], settled: true }),
+      );
+
+      expect(screen.queryByText("missing members:view")).not.toBeNull();
+    });
   });
 });

@@ -163,7 +163,7 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
       expect(saved.config).toEqual({ INSTANT_EVALS: MERCURY, FAST: "openai/gpt-5.4-mini" });
     });
 
-    it("accepts LangWatch Instant Preview", async () => {
+    it("accepts LangWatch Evals Preview", async () => {
       const writer = await writerOver({ isFlagOn: false });
 
       const saved = await writer.save({

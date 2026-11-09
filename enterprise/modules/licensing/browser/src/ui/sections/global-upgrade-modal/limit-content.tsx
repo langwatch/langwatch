@@ -15,7 +15,35 @@ const SEAT_LIMIT_TYPES = new Set(["members", "membersLite"]);
 /** Creation caps on the cloud Free plan: only one more is refused, what exists stays usable. */
 const CREATION_LIMIT_TYPES = new Set(["scenarios", "scenarioSets", "evaluators"]);
 
-/** What the plan allows, what is used, and the way to a bigger plan. */
+/** What the license holds: a self-hosted install meets its license's limit, never a plan's. */
+function limitWords({ isSaaS, isSeatLimit }: { isSaaS: boolean; isSeatLimit: boolean }): {
+  dialogTitle: string;
+  title: string;
+  description: string;
+  holder: string;
+} {
+  if (isSaaS) {
+    return {
+      dialogTitle: "Upgrade required",
+      title: "You've reached your plan's limit",
+      description:
+        "Choose a plan with more capacity to continue, or ask an organization admin to review your plan.",
+      holder: "your current plan",
+    };
+  }
+  return {
+    dialogTitle: isSeatLimit ? "No seats left on your license" : "License limit reached",
+    title: isSeatLimit
+      ? "All seats on your license are in use"
+      : "You've reached your license's limit",
+    description: isSeatLimit
+      ? "Add seats to your license to invite more people. An organization admin manages the license."
+      : "Raise this limit on your license to continue. An organization admin manages the license.",
+    holder: "your license",
+  };
+}
+
+/** What the plan or license allows, what is used, and the way to more. */
 export function LimitContent({
   open,
   variant,
@@ -30,12 +58,13 @@ export function LimitContent({
   const buttonLabel = isSaaS ? "Compare plans" : "Manage license";
   const href = planManagementUrl(isSaaS);
   const navigation = useOptionalUiHostServices()?.navigation;
+  const words = limitWords({ isSaaS, isSeatLimit: SEAT_LIMIT_TYPES.has(variant.limitType) });
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title="Upgrade required"
+      title={words.dialogTitle}
       size="md"
       primaryAction={{
         label: buttonLabel,
@@ -44,18 +73,13 @@ export function LimitContent({
         onNavigate: navigation ? ({ href: to }) => navigation.navigate(to) : undefined,
       }}
     >
-      <AccessState
-        kind="upgrade"
-        title="You've reached your plan's limit"
-        compact
-        description="Choose a plan with more capacity to continue, or ask an organization admin to review your plan."
-      >
+      <AccessState kind="upgrade" title={words.title} compact description={words.description}>
         <VStack gap={4} align="start">
           {typeof variant.max === "number" ? (
             <>
               <Text>
-                You've reached the limit of {variant.max} {LIMIT_TYPE_LABELS[variant.limitType]} on
-                your current plan.
+                You've reached the limit of {variant.max} {LIMIT_TYPE_LABELS[variant.limitType]} on{" "}
+                {words.holder}.
               </Text>
               <Text color="fg.muted">
                 Current usage: {variant.current} / {variant.max}
@@ -63,8 +87,7 @@ export function LimitContent({
             </>
           ) : (
             <Text>
-              You've reached the limit of {LIMIT_TYPE_LABELS[variant.limitType]} on your current
-              plan.
+              You've reached the limit of {LIMIT_TYPE_LABELS[variant.limitType]} on {words.holder}.
             </Text>
           )}
           {CREATION_LIMIT_TYPES.has(variant.limitType) && (
