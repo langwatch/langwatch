@@ -67,6 +67,7 @@ Feature: Stock trace widgets read the light trace table
       Given a trace from the window before the period with a second trace_metrics row inside the period
       When the queries that split the period run under the application list and the langy list
       Then each counts the trace in the window before only, as its traces form does
+      And the other moved queries, which have no first-row filter, still count the trace in the period, unlike their traces form
 
     @integration
     Scenario: A conversation in two units counts once in each unit's share
