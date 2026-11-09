@@ -13,9 +13,17 @@ Feature: The trace analytics metadata columns are stored in existing rows after 
   @unit
   Scenario: The step starts storing the metadata columns once when no mutation is recorded
     Given no mutation for the columns is recorded
+    And an active trace_analytics part does not yet store the nine columns
     When the step runs
     Then it starts the columns' mutation once
     And it waits on the mutation that start recorded
+
+  @unit
+  Scenario: The step starts no mutation when the parts already store the metadata columns
+    Given no mutation for the columns is recorded, since ClickHouse pruned the finished one
+    And every active trace_analytics part already stores the nine columns
+    When the step runs
+    Then it finishes without starting a mutation
 
   @unit
   Scenario: A failed metadata-column mutation fails the step naming the columns

@@ -7,6 +7,7 @@
 import {
   bucketOf,
   END,
+  firstTraceMetricsRow,
   inPeriod,
   inPeriodAndPrevious,
   MIDPOINT,
@@ -138,8 +139,12 @@ GROUP BY unit
 ORDER BY conversations DESC
 LIMIT 8`;
 
+/**
+ * `conversations` is the share denominator, so it counts (unit, conversation) pairs: a thread
+ * whose traces fall in two units counts once in each unit row, and so twice here too.
+ */
 export const UNIT_TOTALS_SQL = `WITH ${METRICS_UNIT_KEY}
-SELECT uniqExact(${METRICS_CONVERSATION}) AS conversations,
+SELECT uniqExact((${METRICS_UNIT}, ${METRICS_CONVERSATION})) AS conversations,
   uniqExact(${METRICS_UNIT}) AS units,
   sum(TotalCost) AS cost
 FROM trace_metrics
@@ -308,6 +313,7 @@ export const REVIEW_TREND_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket,
   uniqExactIf(TraceId, ${SENT_TO_REVIEW}) AS sent
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}
 GROUP BY bucket
 ORDER BY bucket`;
 
@@ -317,7 +323,8 @@ export const REVIEW_SUMMARY_SQL = `SELECT uniqExact(TraceId) AS traces,
   uniqExactIf(TraceId, ${REPORTS_REVIEW} AND OccurredAt < ${MIDPOINT}) AS documents_first,
   uniqExactIf(TraceId, ${SENT_TO_REVIEW} AND OccurredAt < ${MIDPOINT}) AS sent_first
 FROM trace_metrics
-WHERE ${inPeriod("OccurredAt")}`;
+WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}`;
 
 /** The unit sent most, by share of its own documents; a unit under 30 documents ranks last. */
 export const REVIEW_BY_UNIT_SQL = `WITH ${METRICS_UNIT_KEY}

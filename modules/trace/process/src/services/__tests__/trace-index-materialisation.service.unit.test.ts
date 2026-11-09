@@ -38,6 +38,9 @@ class IndexlessTable extends TraceIndexMaterialisationRepository {
   async findAnalyticsMetadataColumnMutations() {
     return [];
   }
+  async countPartsMissingAnalyticsMetadataColumns() {
+    return 1;
+  }
   async materialiseAnalyticsMetadataColumns() {
     this.started += 1;
   }
@@ -210,6 +213,17 @@ describe("TraceIndexMaterialisationService, for the trace analytics metadata col
     expect(mutations.issued()).toBe(0);
     expect(saved).toEqual([{ mutationId: "mutation_memory_1.txt", partsToDo: 1 }]);
     expect(result.mutationId).toBe("mutation_memory_1.txt");
+  });
+
+  /** @scenario "The step starts no mutation when the parts already store the metadata columns" */
+  it("finishes without a mutation when every part already stores the columns", async () => {
+    const mutations = MemoryTraceIndexMaterialisationRepository.create();
+    mutations.holdPartsMissingAnalyticsMetadataColumns(0);
+    const { saved, run } = metadataHarness(mutations);
+
+    await expect(run()).resolves.toEqual({ mutationId: null, partsToDo: 0 });
+    expect(mutations.issuedAnalyticsMetadataColumns()).toBe(0);
+    expect(saved).toEqual([]);
   });
 
   /** @scenario "A failed metadata-column mutation fails the step naming the columns" */

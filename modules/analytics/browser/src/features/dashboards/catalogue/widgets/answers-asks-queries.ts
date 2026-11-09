@@ -8,6 +8,7 @@ import {
   END,
   START,
   bucketOf,
+  firstTraceMetricsRow,
   inPeriod,
   inPeriodAndPrevious,
 } from "../../templates/model/lwql-period.ts";
@@ -216,6 +217,7 @@ export const TOPIC_SHARES_SQL = `SELECT ${TOPIC} AS topic,
 FROM trace_metrics AS t
 LEFT JOIN topics AS p ON p.TopicId = t.TopicId
 WHERE ${inPeriodAndPrevious("t.OccurredAt")}
+  AND ${firstTraceMetricsRow({ view: "t" })}
   AND topic IS NOT NULL
 GROUP BY topic`;
 
@@ -225,6 +227,7 @@ export const TOPIC_DAILY_SQL = `SELECT ${bucketOf("t.OccurredAt")} AS bucket,
 FROM trace_metrics AS t
 LEFT JOIN topics AS p ON p.TopicId = t.TopicId
 WHERE ${inPeriod("t.OccurredAt")}
+  AND ${firstTraceMetricsRow({ view: "t" })}
   AND topic IS NOT NULL
 GROUP BY bucket, topic
 ORDER BY bucket`;

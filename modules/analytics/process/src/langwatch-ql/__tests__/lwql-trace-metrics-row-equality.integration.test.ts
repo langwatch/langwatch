@@ -47,6 +47,15 @@ const SUMS_COST = [
   "att-table/units",
 ];
 
+/** The queries that split the period into halves, windows or buckets by a row's OccurredAt. */
+const SPLITS = [
+  "ask-rising/shares",
+  "ask-rising/daily",
+  "ext-human-review/trend",
+  "ext-human-review/summary",
+  "gen-acceptance/actions",
+];
+
 const TENANT = TENANT_A.tenantId;
 /** Topics the Postgres harness seeds for every tenant; the `topics` view reads them. */
 const TOPIC_ONE = `${TENANT}-topic-1`;
@@ -277,10 +286,16 @@ describe("given traces of each source carrying the metadata the widgets read", (
     }
   }
 
-  /** The moved queries whose rows differ from their `traces` form under `list`. */
-  async function differing(list: readonly string[]): Promise<string[]> {
+  /** The moved queries, or the `only` ones, whose rows differ from their `traces` form. */
+  async function differing({
+    list,
+    only,
+  }: {
+    list: readonly string[];
+    only?: readonly string[];
+  }): Promise<string[]> {
     const labels: string[] = [];
-    for (const { label, sql } of BASELINE) {
+    for (const { label, sql } of BASELINE.filter((query) => only?.includes(query.label) ?? true)) {
       const now = await run({ sql: STOCK.get(label) ?? "", list });
       const before = await run({ sql, list });
       expect(now.error, `${label} now`).toBeUndefined();
@@ -331,7 +346,7 @@ describe("given traces of each source carrying the metadata the widgets read", (
   /** @scenario "A moved widget query returns the rows its traces form returned" */
   it.each(LISTS)("returns each moved query's traces rows under $list", async ({ list }) => {
     expect(BASELINE).toHaveLength(14);
-    expect(await differing(list)).toEqual([]);
+    expect(await differing({ list })).toEqual([]);
   });
 
   /** @scenario "A moved widget query returns the rows its traces form returned" */
@@ -357,7 +372,82 @@ describe("given traces of each source carrying the metadata the widgets read", (
       values: [analyticsRow(first, timeOf(first) + 3_600_000)],
     });
 
-    expect((await differing(["application"])).toSorted()).toEqual(SUMS_COST.toSorted());
-    expect(await differing(["langy"])).toEqual([]);
+    expect((await differing({ list: ["application"] })).toSorted()).toEqual(SUMS_COST.toSorted());
+    expect(await differing({ list: ["langy"] })).toEqual([]);
   });
+
+  /** Writes a second `trace_analytics` row for `trace`, `days` after its first. */
+  async function moveAnchor({ trace, days }: { trace: string; days: number }): Promise<void> {
+    const seed = SEEDS.find((candidate) => candidate.trace === trace);
+    if (!seed) throw new Error(`no seed ${trace}`);
+    await harness.admin.insert({
+      table: `${harness.factDatabase}.trace_analytics`,
+      format: "JSONEachRow",
+      values: [analyticsRow(seed, timeOf(seed) + days * DAY)],
+    });
+  }
+
+  /** @scenario "A second trace_metrics row in another bucket or half counts the trace once" */
+  it("counts a trace once when its second row lands in another bucket and half", async () => {
+    // app_2 starts on day 2. Day 3.75 is past the day-3 bucket edge (buckets are whole days)
+    // and past MIDPOINT (day 3.5): the bucket queries would count it on day 2 and day 3.
+    await moveAnchor({ trace: "app_2", days: 1.75 });
+
+    expect((await differing({ list: ["application"] })).toSorted()).toEqual(SUMS_COST.toSorted());
+    expect(await differing({ list: ["langy"] })).toEqual([]);
+  });
+
+  /** @scenario "A second trace_metrics row past the period start keeps the trace before it" */
+  it("keeps a trace that began before the period out of it", async () => {
+    // app_before and chat_before start on days -2 and -1. Day 0.5 is past the period start, so
+    // the rows would count each trace in in_previous and in_period, and in the period's buckets.
+    // Only the split queries are checked: the others still count the inside row (window edge).
+    await moveAnchor({ trace: "app_before", days: 2.5 });
+    await moveAnchor({ trace: "chat_before", days: 1.5 });
+
+    for (const { list } of LISTS) {
+      expect(await differing({ list, only: SPLITS }), list.join()).toEqual([]);
+    }
+  });
+
+  /** @scenario "A conversation in two units counts once in each unit's share" */
+  it("totals conversations as the sum of the per-unit conversations", async () => {
+    const [first] = SEEDS;
+    if (!first) throw new Error("no seed");
+    // thread_1 is acme's; this trace puts it under globex too, so it is a conversation of both.
+    await harness.admin.insert({
+      table: `${harness.factDatabase}.trace_analytics`,
+      format: "JSONEachRow",
+      values: [
+        analyticsRow({ ...first, trace: "app_globex_thread", customer: "globex", day: 3, labels: [] }),
+      ],
+    });
+
+    const list = ["application"];
+    const perUnit = await rowsOf({ sql: STOCK.get("att-share/units") ?? "", list });
+    const summed = perUnit.reduce((sum, row) => sum + Number(row.conversations), 0);
+    expect(perUnit.map((row) => row.unit)).toEqual(expect.arrayContaining(["acme", "globex"]));
+
+    // Both widgets read one totals query; its conversations are the share denominator.
+    for (const totals of ["att-share/totals", "cost-by-segment/totals"]) {
+      const [total] = await rowsOf({ sql: STOCK.get(totals) ?? "", list });
+      expect(Number(total?.conversations), totals).toBe(summed);
+    }
+  });
+
+  /** The query's rows as ClickHouse returns them. */
+  async function rowsOf({
+    sql,
+    list,
+  }: {
+    sql: string;
+    list: readonly string[];
+  }): Promise<Record<string, unknown>[]> {
+    const result = await client.query({
+      query: sql,
+      query_params: { ...PARAMETERS, dashboard_context_sources: list },
+      format: "JSONEachRow",
+    });
+    return result.json<Record<string, unknown>>();
+  }
 });

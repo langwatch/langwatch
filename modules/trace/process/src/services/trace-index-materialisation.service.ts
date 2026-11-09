@@ -16,17 +16,23 @@ type WaitArguments = Readonly<{
   onPoll: (progress: MaterialisationProgress) => Promise<void>;
 }>;
 
-/** One materialisation: how to read its mutations, how to start it, and what it builds. */
+/**
+ * One materialisation: how to read its mutations, how to start it, and what it builds. `built`,
+ * where the table can say so, tells a finished build whose mutation ClickHouse pruned from one
+ * never started, so the step does not rewrite the whole table again.
+ */
 type Materialisation = Readonly<{
   find: () => Promise<MaterialisationMutation[]>;
   start: () => Promise<void>;
   builds: string;
+  built?: () => Promise<boolean>;
 }>;
 
 /**
  * Waits on the ClickHouse mutations goose starts over the trace module's tables (00103's
  * `idx_updated_at` on `trace_summaries`, 00125's metadata columns on `trace_analytics`), so their
- * progress and failure reach the upgrade ledger. Starts one once when no mutation is recorded.
+ * progress and failure reach the upgrade ledger. Starts one once when no mutation is recorded
+ * and the table does not already hold what it builds.
  */
 export class TraceIndexMaterialisationService {
   private constructor(
@@ -62,6 +68,7 @@ export class TraceIndexMaterialisationService {
         find: () => this.mutations.findAnalyticsMetadataColumnMutations(),
         start: () => this.mutations.materialiseAnalyticsMetadataColumns(),
         builds: "the trace_analytics metadata columns",
+        built: async () => (await this.mutations.countPartsMissingAnalyticsMetadataColumns()) === 0,
       },
     });
   }
@@ -79,6 +86,7 @@ export class TraceIndexMaterialisationService {
       if (!latest) {
         // Started and still unrecorded: the table has nothing to build, so nothing is left.
         if (dryRun || started) return { mutationId: null, partsToDo: 0 };
+        if (await materialisation.built?.()) return { mutationId: null, partsToDo: 0 };
         await materialisation.start();
         started = true;
         continue;

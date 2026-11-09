@@ -7,6 +7,7 @@
 import {
   bucketOf,
   END,
+  firstTraceMetricsRow,
   inPeriod,
   inPeriodAndPrevious,
   MIDPOINT,
@@ -272,6 +273,7 @@ export const OUTPUT_ACTIONS_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket,
   uniqExact(TraceId) AS outputs
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}
   AND MetadataOutputAction != ''
 GROUP BY bucket, action
 ORDER BY bucket`;

@@ -29,6 +29,8 @@ class MemoryMaterialisation {
 export class MemoryTraceIndexMaterialisationRepository extends TraceIndexMaterialisationRepository {
   readonly #index = new MemoryMaterialisation();
   readonly #metadataColumns = new MemoryMaterialisation();
+  /** One part written before goose 00125 until a test says the columns are on disk. */
+  #partsMissingMetadataColumns = 1;
 
   static create(): MemoryTraceIndexMaterialisationRepository {
     return new MemoryTraceIndexMaterialisationRepository();
@@ -53,6 +55,11 @@ export class MemoryTraceIndexMaterialisationRepository extends TraceIndexMateria
     this.#metadataColumns.record(mutation);
   }
 
+  /** Sets how many active parts do not yet store every metadata column; 0 means all do. */
+  holdPartsMissingAnalyticsMetadataColumns(parts: number): void {
+    this.#partsMissingMetadataColumns = parts;
+  }
+
   /** How many times the metadata columns' materialisation was started. */
   issuedAnalyticsMetadataColumns(): number {
     return this.#metadataColumns.issued;
@@ -68,6 +75,10 @@ export class MemoryTraceIndexMaterialisationRepository extends TraceIndexMateria
 
   async findAnalyticsMetadataColumnMutations(): Promise<MaterialisationMutation[]> {
     return [...this.#metadataColumns.mutations];
+  }
+
+  async countPartsMissingAnalyticsMetadataColumns(): Promise<number> {
+    return this.#partsMissingMetadataColumns;
   }
 
   async materialiseAnalyticsMetadataColumns(): Promise<void> {

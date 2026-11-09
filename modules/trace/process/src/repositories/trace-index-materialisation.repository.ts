@@ -33,8 +33,10 @@ export abstract class TraceIndexMaterialisationRepository {
   abstract findUpdatedAtIndexMutations(): Promise<MaterialisationMutation[]>;
   /** Starts the materialisation again; a no-op on a table without the index. */
   abstract materialiseUpdatedAtIndex(): Promise<void>;
-  /** Newest first, as for the index: the mutation that stores the metadata columns. */
+  /** Newest first, as for the index: mutations whose command stores all nine metadata columns. */
   abstract findAnalyticsMetadataColumnMutations(): Promise<MaterialisationMutation[]>;
+  /** Active `trace_analytics` parts that do not yet store every metadata column on disk. */
+  abstract countPartsMissingAnalyticsMetadataColumns(): Promise<number>;
   /** Starts storing the metadata columns in every part again, as one mutation. */
   abstract materialiseAnalyticsMetadataColumns(): Promise<void>;
 }

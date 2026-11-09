@@ -55,6 +55,26 @@ Feature: Stock trace widgets read the light trace table
       Then only the queries that sum TotalCost differ from their traces form
       And trace counts stay the same, since they count uniqExact(TraceId)
 
+    @integration
+    Scenario: A second trace_metrics row in another bucket or half counts the trace once
+      Given an application trace with a second trace_metrics row a bucket later and past the period's midpoint
+      When the moved queries run
+      Then the queries that bucket or halve the period count the trace once, at its first OccurredAt
+      And only the queries that sum TotalCost differ from their traces form
+
+    @integration
+    Scenario: A second trace_metrics row past the period start keeps the trace before it
+      Given a trace from the window before the period with a second trace_metrics row inside the period
+      When the queries that split the period run under the application list and the langy list
+      Then each counts the trace in the window before only, as its traces form does
+
+    @integration
+    Scenario: A conversation in two units counts once in each unit's share
+      Given a conversation whose traces belong to two customers
+      When the share widgets read their per-unit rows and their totals
+      Then the totals' conversations equal the sum of the per-unit conversations
+      And the shares add up to 100%
+
   Rule: The moved widgets render on the app
 
     # Checked by hand on a local stack with seeded traces; see the PR.
