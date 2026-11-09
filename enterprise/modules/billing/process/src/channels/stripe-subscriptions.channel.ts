@@ -12,6 +12,7 @@ import type {
   BillingPurchasedLineItem,
   BillingSubscription,
   BillingSubscriptionChange,
+  BillingSubscriptionCheckout,
   BillingSubscriptionPreviewChange,
 } from "../rules/billing-stripe-shapes.rules.ts";
 
@@ -19,9 +20,11 @@ export abstract class StripeSubscriptionsChannel {
   /** Throws the provider's `resource_missing` refusal for a subscription it never held. */
   abstract getSubscription(input: { subscriptionId: string }): Promise<BillingSubscription>;
 
+  /** `timeoutMs` bounds each attempt of the request; absent uses the client's own timeout. */
   abstract updateSubscription(input: {
     subscriptionId: string;
     change: BillingSubscriptionChange;
+    timeoutMs?: number;
   }): Promise<BillingSubscription>;
 
   /** `prorate` for a superseded plan; absent cancels as the provider defaults. */
@@ -36,6 +39,11 @@ export abstract class StripeSubscriptionsChannel {
   abstract listCheckoutLineItems(input: {
     checkoutSessionId: string;
   }): Promise<BillingPurchasedLineItem[]>;
+
+  /** The checkout session that created the subscription; empty when none did. */
+  abstract findSubscriptionCheckouts(input: {
+    subscriptionId: string;
+  }): Promise<BillingSubscriptionCheckout[]>;
 
   abstract createBillingPortalSession(input: {
     customerId: string;

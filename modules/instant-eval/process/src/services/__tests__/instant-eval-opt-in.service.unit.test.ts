@@ -20,6 +20,7 @@ function service(overrides: Partial<InstantEvalOptInPeers> = {}) {
     isEnterprisePlan: async () => false,
     mayManageOrganization: async () => true,
     isReleased: async () => false,
+    isHostedReleased: async () => false,
     recordOptIn: async (input) => {
       recorded.push(input);
     },
@@ -36,6 +37,7 @@ describe("given an organization on the hosted service that is not on an enterpri
     it("offers the switch", async () => {
       await expect(service().optIns.getAccess(asked)).resolves.toEqual({
         released: false,
+        hostedReleased: false,
         offer: "enable",
         viaConnect: false,
       });
@@ -56,10 +58,24 @@ describe("given an organization on the hosted service that is not on an enterpri
       const { optIns, recorded } = service();
       await expect(optIns.optIn(asked)).resolves.toEqual({
         released: true,
+        hostedReleased: true,
         offer: "enable",
         viaConnect: false,
       });
       expect(recorded).toEqual([{ organizationId: "organization-1", userId: "user-1" }]);
+    });
+  });
+});
+
+describe("given a project released by its own decision model alone", () => {
+  describe("when the explorer asks for its Instant Evals access", () => {
+    /** @scenario "The popover reports LangWatch's model apart from an own one" */
+    it("is released, and LangWatch's own model is not", async () => {
+      const { optIns } = service({ isReleased: async () => true });
+      await expect(optIns.getAccess(asked)).resolves.toMatchObject({
+        released: true,
+        hostedReleased: false,
+      });
     });
   });
 });

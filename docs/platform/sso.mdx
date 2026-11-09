@@ -69,6 +69,31 @@ LangWatch sign-in form. To reach the local sign-in, open
   <img src="/images/access/sso-active-dark.png" alt="An active SAML connection with verified-domain admission and completed setup checks" className="hidden dark:block" />
 </Frame>
 
+### People your provider refuses
+
+When your identity provider refuses someone, for example because they are not
+assigned to the LangWatch app, LangWatch shows a screen saying the company
+sign-in refused them and that their IT team can assign them the app. When the
+organization has no free seat, the screen says they are waiting for a seat
+instead. An administrator then has to free or buy a seat, and the provider may
+still need to assign them the app.
+
+Some providers, Okta included, show their own error page instead of sending
+the person back to LangWatch. The setup page lists an **Access error page**
+address for the connection, in the form
+`https://<your-langwatch>/api/auth/sso/refused/<connection>`. In Okta, open
+the app's **General** tab, click **Edit** in the **App Embed Link** section,
+choose a custom error page under **Application access error page** and paste
+this address. Okta then sends refused people to the LangWatch screen.
+
+This address names no person, so LangWatch does not notify your administrators
+about visits to it.
+
+OIDC apps in Okta show the **App Embed Link** section only after extra setup,
+and Okta Classic Engine does not use the custom error page when a sign-on
+policy denies a custom OIDC app. See Okta's
+[App Embed Link guide](https://support.okta.com/help/s/article/oidc-apps-do-not-have-the-app-embeded-link-section?language=en_US).
+
 To change the provider, open the same page and prepare a replacement. Read the
 state shown on the page before removing the old connection. The removal action
 explains whether the connection is still being prepared, active or already
@@ -102,7 +127,7 @@ SCIM `DELETE` or `PATCH active: false`. Those operations revoke the person's
 browser sessions and CLI tokens, remove organization membership and role
 bindings, and keep their LangWatch data.
 
-In **Directory**, **Disable** is reversible: it refuses the person's requests,
+In **Users**, **Disable** is reversible: it refuses the person's requests,
 preserves their role and bindings, and frees their seat. **Remove from
 organization** ends membership and access.
 
@@ -130,9 +155,9 @@ people that connection provisioned, and can take on a member that no connector
 has claimed yet. It cannot manage people owned by another connection. Revoke a
 token from the **Provisioning tokens** table when that integration should stop.
 
-SCIM creates an organization Member. Use **Settings > Directory > People** to
+SCIM creates an organization Member. Use **Settings > Users > People** to
 give the person a different organization role or direct access. Use
-**Settings > Directory > Groups** to assign access through a group. A SCIM
+**Settings > Users > Groups** to assign access through a group. A SCIM
 `PATCH` with `active: false` deactivates the account, removes its organization
 membership and role bindings, and revokes browser sessions and CLI tokens. A
 SCIM `DELETE` has the same access and session effects while keeping the
@@ -189,5 +214,5 @@ that are already past it.
 | Set up or replace the identity provider | **Settings > Authentication > Identity provider** |
 | Check directory sync or issue a provisioning token | **Settings > Authentication > Connectors** |
 | Change who can join, account lockout or session limits | **Settings > Authentication > Overview > Organization policies** |
-| Edit a person, team or project assignment | **Settings > Directory > People** or **Settings > Directory > Teams & projects** |
+| Edit a person, team or project assignment | **Settings > Users > People** or **Settings > Users > Teams & projects** |
 | Define roles or review assignments | **Settings > Roles > Roles** or **Settings > Roles > Role assignments** |

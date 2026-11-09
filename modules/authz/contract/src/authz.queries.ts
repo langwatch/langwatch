@@ -640,14 +640,15 @@ const authzResolvedScopeSchema = z
   .strict();
 
 /**
- * The caller's OWN standing at one scope. A scope they have no standing in —
- * or one that does not resolve at all — answers a null scope and the empty
- * set, which is the engine's no-default-access rather than a special case.
+ * The caller's OWN standing at one scope; one with no standing, or no scope at all, answers a
+ * null scope and the empty set (no default access). `organizationPermissions` is the standing at
+ * the scope's organization from the same read; a server that predates it reads as empty.
  */
 const authzOwnStandingSchemaDefinition = z
   .object({
     scope: authzResolvedScopeSchema.nullable(),
     permissions: z.array(z.string()),
+    organizationPermissions: z.array(z.string()).default([]),
   })
   .strict();
 export interface AuthzOwnStandingSchema extends Named<typeof authzOwnStandingSchemaDefinition> {}

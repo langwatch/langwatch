@@ -62,6 +62,8 @@ export const computeCost = (input: {
   outputImageTokens?: number;
   inputCharacters?: number;
   audioSeconds?: number;
+  /** Web search tool calls, each billed a flat rate on top of the tokens. */
+  webSearchRequests?: number;
 }): number | undefined => {
   const rate = input.rate;
   const hasAnyRate =
@@ -75,7 +77,8 @@ export const computeCost = (input: {
     !!rate.inputAudioCostPerToken ||
     !!rate.outputAudioCostPerToken ||
     !!rate.inputImageCostPerToken ||
-    !!rate.outputImageCostPerToken;
+    !!rate.outputImageCostPerToken ||
+    !!rate.webSearchCostPerQuery;
   if (!hasAnyRate) return undefined;
 
   const inputRate = rate.inputCostPerToken ?? 0;
@@ -99,7 +102,8 @@ export const computeCost = (input: {
     cacheWrite1h * cacheCreation1hRate +
     (cacheWriteTotal - cacheWrite1h) * cacheCreationRate +
     (input.inputCharacters ?? 0) * (rate.inputCostPerCharacter ?? 0) +
-    (input.audioSeconds ?? 0) * (rate.inputCostPerSecond ?? 0)
+    (input.audioSeconds ?? 0) * (rate.inputCostPerSecond ?? 0) +
+    (input.webSearchRequests ?? 0) * (rate.webSearchCostPerQuery ?? 0)
   );
 };
 

@@ -1878,9 +1878,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When its SQL changes, saved from the editor, by Langy or through the API
     Then the card starts the widget over and runs the new SQL
     And the earlier answer is not shown for the new query
-    # What a run is keyed by: widget id and its queries, their sources included, start the frame
-    # over; the period and grain re-run it through the dashboard context. Nothing else caches a
-    # result: analytics.lwql.query is a mutation, and the server keeps no LangWatchQL cache
+    # What a run is keyed by: widget id, its queries (sources included), the chosen period and its
+    # grain start the frame over; a refresh of the same choice moves only the window's end. Nothing
+    # else caches a result: analytics.lwql.query is a mutation, and the server keeps no LangWatchQL cache
 
   # ---------------------------------------------------------------------------
   # A widget query's parameters: sources and projects
@@ -2192,7 +2192,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # Guard rails
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: AC11 Existing boards are unaffected
     Given a board created before this change
     Then its widgets keep their stored code, labels and number format

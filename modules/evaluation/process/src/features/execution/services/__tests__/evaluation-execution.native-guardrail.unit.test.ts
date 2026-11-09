@@ -68,6 +68,7 @@ function buildService(langevalsEvaluate: Mock<LangevalsEvaluatorService["evaluat
       },
     },
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
+    judgeRouting: { isRouted: async () => false },
     installEnvironment: {},
   };
 

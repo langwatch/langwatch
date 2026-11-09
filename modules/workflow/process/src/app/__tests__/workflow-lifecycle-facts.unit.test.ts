@@ -7,6 +7,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -77,7 +78,11 @@ async function setup() {
     config,
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets,
-    channels: await HttpWorkflowChannels.create({ config, secrets }),
+    channels: await HttpWorkflowChannels.create({
+      config,
+      secrets,
+      bound: { spend: createApiFixture<GatewayApi>() },
+    }),
     repositories,
   });
   type Commands = EventingCommands<WorkflowLifecyclePipeline>;

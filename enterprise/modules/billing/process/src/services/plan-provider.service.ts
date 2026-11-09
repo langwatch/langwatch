@@ -5,8 +5,10 @@ import {
   type PlanTypes,
 } from "@langwatch/enterprise-billing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
+import { nowInstant } from "@langwatch/time";
 
 import type { BillingSubscriptionRepository } from "../repositories/subscription.repository.ts";
+import { effectiveMaxMembers } from "../rules/seat-kept.rules.ts";
 
 // Fields that exist on both PlanInfo (as number) and Subscription (as Int?)
 type NumericOverrideField = "maxMembers" | "maxMembersLite" | "maxMessagesPerMonth";
@@ -59,6 +61,14 @@ export class SaaSPlanProviderService extends BillingService {
       if (activeSubscription?.[field] != null) {
         customLimits[field] = activeSubscription[field]!;
       }
+    }
+    // Seats lowered from the next cycle stay usable until the period paid for ends.
+    if (activeSubscription?.maxMembers != null) {
+      customLimits.maxMembers = effectiveMaxMembers({
+        ...activeSubscription,
+        maxMembers: activeSubscription.maxMembers,
+        now: nowInstant(),
+      });
     }
 
     if (!activeSubscription) {

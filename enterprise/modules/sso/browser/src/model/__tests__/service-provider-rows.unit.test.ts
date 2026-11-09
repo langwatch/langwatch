@@ -13,25 +13,27 @@ const ADDRESSES: ServiceProviderAddresses = {
   assertionConsumerServiceUrl: "https://app.langwatch.ai/api/auth/sso/saml2/sp/acs/{connection}",
   entityId: "https://app.langwatch.ai/api/auth/sso/saml2/sp/metadata/{connection}",
   metadataUrl: "https://app.langwatch.ai/api/auth/sso/saml2/sp/metadata/{connection}",
+  refusalPageUrl: "https://app.test/api/auth/sso/refused/ssoc_1",
 };
 
 describe("given an OpenID Connect connection", () => {
-  it("shows the one address it takes, and nothing SAML would want", () => {
+  it("shows the address it takes and the access error page, and nothing SAML would want", () => {
     const rows = serviceProviderRowsFor({ protocol: "oidc", addresses: ADDRESSES });
 
-    expect(rows.map((row) => row.label)).toEqual(["Redirect address"]);
+    expect(rows.map((row) => row.label)).toEqual(["Redirect address", "Access error page"]);
     expect(rows[0]?.value).toBe(ADDRESSES.redirectUrl);
   });
 });
 
 describe("given a SAML connection", () => {
-  it("shows the three it takes, and never the redirect address", () => {
+  it("shows the three it takes and the access error page, and never the redirect address", () => {
     const rows = serviceProviderRowsFor({ protocol: "saml", addresses: ADDRESSES });
 
     expect(rows.map((row) => row.label)).toEqual([
       "Assertion address",
       "Entity id",
       "Service provider metadata",
+      "Access error page",
     ]);
     expect(rows.map((row) => row.value)).not.toContain(ADDRESSES.redirectUrl);
   });

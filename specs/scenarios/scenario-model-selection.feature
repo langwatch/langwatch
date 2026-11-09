@@ -29,6 +29,7 @@ Feature: Scenario user-simulator and judge model selection
   #
   # Resolution precedence for a single run:
   #   simulator/judge:      scenario override -> scenarios.user_simulator / scenarios.judge default
+  #   (scenarios.judge reads the Judge column, then Default: judge-default-model.feature)
   #   agent under test:     prompt's own model -> scenarios.agent_under_test default (prompt targets only)
 
   Background:
@@ -36,17 +37,17 @@ Feature: Scenario user-simulator and judge model selection
     And I have access to a project with an enabled model provider
 
   @unit
-  Scenario: User-simulator and judge are registered as DEFAULT-role features
+  Scenario: User-simulator is a DEFAULT-role feature and judge a JUDGE-role feature
     Given the model feature registry
     Then it contains a "scenarios.user_simulator" feature with role "DEFAULT"
-    And it contains a "scenarios.judge" feature with role "DEFAULT"
+    And it contains a "scenarios.judge" feature with role "JUDGE"
 
   @unit
-  Scenario: New scenario model features surface under the Default role expansion
+  Scenario: The user-simulator surfaces under the Default role expansion
     Given the model feature registry grouped by role
     When I list the DEFAULT-role features
     Then "scenarios.user_simulator" is included
-    And "scenarios.judge" is included
+    And "scenarios.judge" is not, since it sits under the Judge role
 
   @unit
   Scenario: Defaults resolve to the smart Default model when the scenario has no override

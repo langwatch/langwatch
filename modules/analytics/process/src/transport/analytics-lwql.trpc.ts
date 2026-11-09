@@ -147,6 +147,9 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
       ...(input.sources === undefined ? {} : { sources: input.sources }),
       ...(input.projects === undefined ? {} : { projects: input.projects, userId: actor.id }),
       ...(signal ? { signal } : {}),
+      telemetry: input.telemetry
+        ? { caller: "dashboard_widget", ...input.telemetry }
+        : { caller: "workbench" },
     });
   })
   .build();

@@ -12,6 +12,9 @@ const MEMBER_FACT_KINDS = [
   ...TRACE_FACT_KINDS,
   "coding_session_stored",
   "coding_agent_types",
+  "coding_terminal_types",
+  "coding_repo_count",
+  "coding_session_days_first_3",
 ] as const;
 
 export type TraceFactSignal = NurturingSignalOf<(typeof TRACE_FACT_KINDS)[number]>;
@@ -39,6 +42,12 @@ export function memberFactTraits(signal: MemberFactSignal): Partial<CioPersonTra
       return { coding_last_session_at: unixSecondsOf(signal.occurredAt) };
     case "coding_agent_types":
       return { coding_agent_types: signal.agentTypes };
+    case "coding_terminal_types":
+      return { coding_terminal_types: signal.terminalTypes };
+    case "coding_repo_count":
+      return { coding_repo_count: signal.codingRepoCount };
+    case "coding_session_days_first_3":
+      return { coding_session_days_first_3: signal.codingSessionDaysFirst3 };
     default: {
       signal satisfies never;
       return {};

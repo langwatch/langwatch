@@ -47,7 +47,7 @@ import {
 import {
   compareConfigsByScopeThenName,
   mostSpecificScope,
-  resolveAtScope,
+  resolveRoleAtScope,
   MODEL_ROLE_LABEL,
   type AnchorScope,
 } from "../../model/default-model-cascade.ts";
@@ -366,9 +366,10 @@ function ConfigCell({
   // carries the role, the cell renders a "Not configured" badge — AI features
   // for this role are disabled at this scope until the reader fixes it.
   const resolvedRole = anchorScope
-    ? resolveAtScope({ key: role, configs, anchor: anchorScope, hierarchy })
+    ? resolveRoleAtScope({ role, configs, anchor: anchorScope, hierarchy })
     : null;
   const resolvedRoleModel = resolvedRole?.model ?? config[role] ?? null;
+  const isBorrowed = !!resolvedRole?.inherited;
 
   // Feature override rows render only when THIS policy pins a feature key AND
   // its value differs from the role-resolved model. If the role is itself
@@ -387,6 +388,7 @@ function ConfigCell({
         ) : (
           <RoleModelChip
             model={resolvedRoleModel}
+            isBorrowed={isBorrowed}
             isInvalid={isInvalid}
             displayNames={displayNames}
           />
@@ -411,7 +413,7 @@ function ConfigCell({
 
 /**
  * The Instant Evals cell: unset, or an id the catalogue no longer offers, reads as the
- * LangWatch Instant Preview default (faded), never "Not configured" (ADR-182 decision 1).
+ * LangWatch Evals Preview default (faded), never "Not configured" (ADR-182 decision 1).
  * Only an own model can need an update: the hosted default has no provider row.
  */
 function DecisionModelChip({
@@ -433,13 +435,18 @@ function DecisionModelChip({
   );
 }
 
-/** Any other role's cell: its resolved model, or "Not configured" when the cascade has none. */
+/**
+ * Any other role's cell: its resolved model, faded when borrowed from its fallback role
+ * (Judge reads Default), or "Not configured" when the cascade has none.
+ */
 function RoleModelChip({
   model,
+  isBorrowed,
   isInvalid,
   displayNames,
 }: {
   model: string | null;
+  isBorrowed: boolean;
   isInvalid: (model: string) => boolean;
   displayNames: Record<string, string>;
 }) {
@@ -451,7 +458,13 @@ function RoleModelChip({
     );
   }
   return (
-    <ModelChip model={model} size="sm" invalid={isInvalid(model)} displayNames={displayNames} />
+    <ModelChip
+      model={model}
+      size="sm"
+      inherited={isBorrowed}
+      invalid={isInvalid(model)}
+      displayNames={displayNames}
+    />
   );
 }
 

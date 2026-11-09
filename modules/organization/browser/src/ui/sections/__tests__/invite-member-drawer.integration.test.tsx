@@ -13,7 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeOrganizationHost, renderWithOrganizationHost } from "../../../testing.tsx";
 import { InviteMemberDrawer } from "../invite-member-drawer.tsx";
 
-const calls = vi.hoisted(() => ({ createInvites: vi.fn(), invalidated: [] as string[] }));
+const calls = vi.hoisted(() => ({
+  createInvites: vi.fn(),
+  invalidated: [] as string[],
+  created: [] as unknown[],
+}));
 
 vi.mock("../../../behavior/organization-api.ts", () => {
   const answers: Record<string, unknown> = {
@@ -27,7 +31,7 @@ vi.mock("../../../behavior/organization-api.ts", () => {
       mutate: (input: unknown, handlers?: { onSuccess?: (data: unknown) => void }) => {
         if (path === "invite.createInvites") {
           calls.createInvites(input);
-          handlers?.onSuccess?.([]);
+          handlers?.onSuccess?.(calls.created);
           return;
         }
         handlers?.onSuccess?.(void 0);
@@ -58,6 +62,15 @@ vi.mock("../../../behavior/organization-api.ts", () => {
 vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: { HAS_EMAIL_PROVIDER_KEY: true } }),
 }));
+
+const CREATED_INVITE = {
+  invite: { inviteCode: "code-1", email: "new@acme.com" },
+  emailNotSent: false,
+};
+
+beforeEach(() => {
+  calls.created = [CREATED_INVITE];
+});
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -97,6 +110,28 @@ describe("the invite drawer", () => {
     /** @scenario Invitation changes refresh the visible seat usage */
     it("drops the cached seat limits once an invitation is created", async () => {
       await waitFor(() => expect(calls.invalidated).toContain("licenseEnforcement.checkLimit"));
+    });
+  });
+
+  describe("given the server answers the batch with no invitation created", () => {
+    /** @scenario The invite drawer never reports success when no invitation was created */
+    it("tells the admin nothing was sent and stays open", async () => {
+      calls.created = [];
+      const host = new FakeOrganizationHost({ grants: new Set(["organization:manage"]) });
+      renderWithOrganizationHost(<InviteMemberDrawer open={true} />, host);
+
+      await userEvent.type(
+        screen.getByPlaceholderText("alice@example.com, bob@example.com"),
+        "sam@acme.com",
+      );
+      await userEvent.click(screen.getByRole("button", { name: /send invites/i }));
+
+      await waitFor(() => expect(calls.createInvites).toHaveBeenCalled());
+      expect(host.failures).toContainEqual(
+        expect.objectContaining({ fallbackTitle: "No invitations were sent" }),
+      );
+      expect(host.successes).toEqual([]);
+      expect(host.overlays).not.toContainEqual({ name: null });
     });
   });
 
