@@ -234,11 +234,15 @@ export interface TraceListRead {
     offset: number;
     prefix?: string;
     filterWhere?: { sql: string; params: Record<string, unknown> };
+    /** Abandons the read; the server stops it too. */
+    signal?: AbortSignal;
   }): Promise<CategoricalFacetResult>;
 
   findCategoricalFacetRaw(params: {
     authorization: Authorization;
     query: TraceListFacetQuery;
+    /** Abandons the read; the server stops it too. */
+    signal?: AbortSignal;
   }): Promise<CategoricalFacetResult>;
 
   findRangeStatsForTable(params: {
@@ -248,6 +252,8 @@ export interface TraceListRead {
     timeColumn: string;
     column: string;
     filterWhere?: { sql: string; params: Record<string, unknown> };
+    /** Abandons the read; the server stops it too. */
+    signal?: AbortSignal;
   }): Promise<{ min: number; max: number }>;
 
   /**
@@ -262,6 +268,8 @@ export interface TraceListRead {
     column: string;
     limit: number;
     filterWhere?: { sql: string; params: Record<string, unknown> };
+    /** Abandons the read; the server stops it too. */
+    signal?: AbortSignal;
   }): Promise<DiscreteFacetResult>;
 
   /**
@@ -278,6 +286,8 @@ export interface TraceListRead {
     rangeSpecs: { key: string; expression: string }[];
     topN: number;
     filterWhere?: { sql: string; params: Record<string, unknown> };
+    /** Abandons the read; the server stops it too. */
+    signal?: AbortSignal;
   }): Promise<BatchedFacetResult>;
 
   /**

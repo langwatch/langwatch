@@ -9,6 +9,8 @@ import { type Authorization, readScopeKeyOf } from "@langwatch/authorization";
 export interface DiscoverParams {
   authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
+  /** Abandons the pass's reads; never part of a cache key. */
+  signal?: AbortSignal;
 }
 
 export interface FacetValuesParams {
@@ -109,4 +111,33 @@ export function discoverCacheKey({
   // windows both classify as "1h") don't collide on one cache slot — without `from`
   // the second viewer's facets would be served for a window they aren't looking at.
   return [scopeKeyOf(authorization), snapped.label, snapped.from, snapped.to].join("|");
+}
+
+/**
+ * One discover lineage: the same tenant scope and window span, whatever minute
+ * its bucket rolled to. One pass per lineage runs at a time.
+ */
+export function discoverLineageKey({
+  authorization,
+  snapped,
+}: {
+  authorization: Authorization;
+  snapped: ReturnType<typeof snapToWindowPreset>;
+}): string {
+  return [scopeKeyOf(authorization), snapped.label, snapped.to - snapped.from].join("|");
+}
+
+/**
+ * The window part of a facet count's in-flight key. A live window's bounds roll
+ * forward every request, so it is keyed by its span to the minute: a repeat
+ * shares the count still running instead of starting a second one.
+ */
+export function facetCountWindowKey(timeRange: {
+  from: number;
+  to: number;
+  live?: boolean;
+}): readonly (string | number)[] {
+  if (timeRange.live !== true) return [timeRange.from, timeRange.to];
+
+  return ["live", Math.round((timeRange.to - timeRange.from) / CACHE_TIME_BUCKET_MS)];
 }

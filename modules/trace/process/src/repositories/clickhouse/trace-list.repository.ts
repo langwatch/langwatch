@@ -171,15 +171,32 @@ function buildWhereClause({
   return { sql: parts.join(" AND "), baseSql, params };
 }
 
+/** Seconds a sidebar facet read may run before ClickHouse stops it. */
+const FACET_READ_MAX_EXECUTION_SECONDS = 20;
+
 /**
- * Caps every sidebar facet read: a scan past these limits is stopped on the
- * server, freeing its shared slot; the sidebar omits that facet instead.
+ * Stops a facet read on the server at its time cap, or as soon as the app drops
+ * its connection: ClickHouse cancels on close only for a readonly statement.
+ * The sidebar omits a stopped facet. specs/traces-v2/search.feature
  */
-const FACET_READ_SETTINGS: Record<string, string> = {
+const FACET_READ_STOP_SETTINGS: Record<string, string> = {
   // ClickHouse settings are string-typed over the wire.
-  max_execution_time: "20",
-  max_memory_usage: String(2 * 1024 * 1024 * 1024), // 2 GiB
+  max_execution_time: String(FACET_READ_MAX_EXECUTION_SECONDS),
+  timeout_overflow_mode: "throw",
+  readonly: "2",
+  cancel_http_readonly_queries_on_client_close: "1",
 };
+
+/** Every sidebar facet read: the stop settings and a 2 GiB memory cap. */
+const FACET_READ_SETTINGS: Record<string, string> = {
+  ...FACET_READ_STOP_SETTINGS,
+  max_memory_usage: String(2 * 1024 * 1024 * 1024),
+};
+
+/** The driver's abort for a facet read, absent when nothing can abandon it. */
+function abortOf(signal: AbortSignal | undefined): { abort_signal?: AbortSignal } {
+  return signal === undefined ? {} : { abort_signal: signal };
+}
 
 function buildWhereClauseForTable({
   timeRange,
@@ -599,6 +616,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     offset: number;
     prefix?: string;
     filterWhere?: TraceFilterWhere;
+    /** Abandons the read, which stops it on the server too. */
+    signal?: AbortSignal;
   }): Promise<CategoricalFacetResult> {
     const { sql: whereClause, params: queryParams } = buildWhereClauseForTable({
       timeRange: params.timeRange,
@@ -652,6 +671,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         ...(params.prefix ? { prefix: params.prefix } : {}),
       },
       clickhouse_settings: FACET_READ_SETTINGS,
+      ...abortOf(params.signal),
       format: "JSONEachRow",
     });
 
@@ -667,6 +687,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     column: string;
     limit: number;
     filterWhere?: TraceFilterWhere;
+    /** Abandons the read, which stops it on the server too. */
+    signal?: AbortSignal;
   }): Promise<DiscreteFacetResult> {
     const { sql: whereClause, params: queryParams } = buildWhereClauseForTable({
       timeRange: params.timeRange,
@@ -706,6 +728,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       `,
       query_params: { ...filter.params, ...queryParams, limit: params.limit },
       clickhouse_settings: FACET_READ_SETTINGS,
+      ...abortOf(params.signal),
       format: "JSONEachRow",
     });
 
@@ -724,6 +747,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   async findCategoricalFacetRaw(params: {
     authorization: Authorization;
     query: TraceListFacetQuery;
+    signal?: AbortSignal;
   }): Promise<CategoricalFacetResult> {
     const client = this.clickhouse.as(params.authorization, {
       reads: "traces",
@@ -731,8 +755,13 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const result = await client.query({
       query: params.query.sql,
       query_params: params.query.params,
-      // The shared guard always applies; a facet's own ceiling overrides it.
-      clickhouse_settings: { ...FACET_READ_SETTINGS, ...params.query.settings },
+      // A facet's own memory ceiling overrides the shared one; the stop settings always apply.
+      clickhouse_settings: {
+        ...FACET_READ_SETTINGS,
+        ...params.query.settings,
+        ...FACET_READ_STOP_SETTINGS,
+      },
+      ...abortOf(params.signal),
       format: "JSONEachRow",
     });
 
@@ -747,6 +776,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     timeColumn: TenantScopeTimeColumn;
     column: string;
     filterWhere?: TraceFilterWhere;
+    /** Abandons the read, which stops it on the server too. */
+    signal?: AbortSignal;
   }): Promise<{ min: number; max: number }> {
     const { sql: whereClause, params: queryParams } = buildWhereClauseForTable({
       timeRange: params.timeRange,
@@ -784,6 +815,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       `,
       query_params: { ...filter.params, ...queryParams },
       clickhouse_settings: FACET_READ_SETTINGS,
+      ...abortOf(params.signal),
       format: "JSONEachRow",
     });
 
@@ -805,6 +837,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     filterClause,
     queryParams,
     topN,
+    signal,
   }: {
     client: TenantScopedReader;
     specs: { key: string; expression: string }[];
@@ -814,6 +847,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     filterClause: string;
     queryParams: Record<string, unknown>;
     topN: number;
+    signal: AbortSignal | undefined;
   }): Promise<Record<string, CategoricalFacetResult>> {
     const tupleArray = specs
       .map((s) => `(${this.quoteIdentifier(s.key)}, toString(${s.expression}))`)
@@ -849,6 +883,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       query,
       query_params: { ...queryParams, topN },
       clickhouse_settings: FACET_READ_SETTINGS,
+      ...abortOf(signal),
       format: "JSONEachRow",
     });
 
@@ -880,6 +915,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     dedupFilter,
     filterClause,
     queryParams,
+    signal,
   }: {
     client: TenantScopedReader;
     specs: { key: string; expression: string }[];
@@ -888,6 +924,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     dedupFilter: string;
     filterClause: string;
     queryParams: Record<string, unknown>;
+    signal: AbortSignal | undefined;
   }): Promise<Record<string, { min: number; max: number }>> {
     const aggClauses = specs
       .flatMap((s, i) => [
@@ -908,6 +945,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       query,
       query_params: queryParams,
       clickhouse_settings: FACET_READ_SETTINGS,
+      ...abortOf(signal),
       format: "JSONEachRow",
     });
 
@@ -934,6 +972,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     rangeSpecs: { key: string; expression: string }[];
     topN: number;
     filterWhere?: TraceFilterWhere;
+    /** Abandons the read, which stops it on the server too. */
+    signal?: AbortSignal;
   }): Promise<BatchedFacetResult> {
     const { sql: whereClause, params: baseParams } = buildWhereClauseForTable({
       timeRange: params.timeRange,
@@ -963,6 +1003,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       dedupFilter,
       filterClause: filter.sql,
       queryParams,
+      signal: params.signal,
     };
 
     const categoricalsPromise =

@@ -29,7 +29,15 @@ const DISCOVER_TOP_N = 50;
  */
 const DISCRETE_VALUE_LIMIT = 50;
 
-type TaskTimer = <T>(label: string, p: Promise<T>) => Promise<T>;
+/**
+ * One unit of a discovery pass, not started until the pass runs it: its label,
+ * how many ClickHouse statements it holds at once, and the read itself.
+ */
+export interface DiscoverTask {
+  label: string;
+  statements: number;
+  run: () => Promise<Outcome>;
+}
 
 /**
  * One batch slot is one table under one predicate. Facets that share both
@@ -55,6 +63,70 @@ export interface FacetFilters {
   slotKeyOf: (def: FacetDefinition) => string;
 }
 
+/** One `settle` run: the statements it holds, the task it starts next, and its results. */
+class CappedRun {
+  private readonly settled: PromiseSettledResult<Outcome>[];
+  private held = 0;
+  private next = 0;
+  private open: number;
+
+  constructor(
+    private readonly run: {
+      tasks: readonly DiscoverTask[];
+      limit: number;
+      signal: AbortSignal;
+      resolve: (settled: PromiseSettledResult<Outcome>[]) => void;
+    },
+  ) {
+    this.settled = Array.from({ length: run.tasks.length });
+    this.open = run.tasks.length;
+  }
+
+  start(): void {
+    if (this.open === 0) return this.run.resolve(this.settled);
+    this.run.signal.addEventListener("abort", () => this.pump(), { once: true });
+    this.pump();
+  }
+
+  /** Starts every task the held statements leave room for; settles the rest once aborted. */
+  private pump(): void {
+    while (this.next < this.run.tasks.length) {
+      if (!this.startNext()) return;
+    }
+  }
+
+  /** False when the next task must wait for a running one to give its statements back. */
+  private startNext(): boolean {
+    const index = this.next;
+    const task = this.run.tasks[index]!;
+    if (this.run.signal.aborted) {
+      this.next += 1;
+      this.finish(index, { status: "rejected", reason: this.run.signal.reason });
+      return true;
+    }
+    const weight = Math.min(task.statements, this.run.limit);
+    if (this.held > 0 && this.held + weight > this.run.limit) return false;
+    this.next += 1;
+    this.held += weight;
+    void (async () => task.run())()
+      .then(
+        (value) => this.finish(index, { status: "fulfilled", value }),
+        (reason: unknown) => this.finish(index, { status: "rejected", reason }),
+      )
+      .finally(() => {
+        this.held -= weight;
+        this.pump();
+      });
+    return true;
+  }
+
+  private finish(index: number, result: PromiseSettledResult<Outcome>): void {
+    this.settled[index] = result;
+    this.open -= 1;
+    if (this.open === 0) this.run.resolve(this.settled);
+  }
+}
+
 export class TraceDiscoverTaskService {
   private readonly repository: TraceListRead;
   private readonly descriptors: TraceFacetDescriptorService;
@@ -78,15 +150,32 @@ export class TraceDiscoverTaskService {
     return new TraceDiscoverTaskService(deps);
   }
 
+  /**
+   * Runs `tasks` holding at most `limit` statements at once, settled in input order. A task
+   * not started when `signal` aborts is never started; it settles rejected with the reason.
+   */
+  settle({
+    tasks,
+    limit,
+    signal,
+  }: {
+    tasks: readonly DiscoverTask[];
+    limit: number;
+    signal: AbortSignal;
+  }): Promise<PromiseSettledResult<Outcome>[]> {
+    return new Promise((resolve) => new CappedRun({ tasks, limit, signal, resolve }).start());
+  }
+
   /** Simple-expression facets per table share one batched ClickHouse scan. */
-  batchTasks(
-    params: DiscoverParams,
-    batched: BatchedRegistrySlots,
-    wrap: TaskTimer,
-  ): Promise<Outcome>[] {
-    return [...batched].map(([slotKey, slot]) =>
-      wrap(
-        `batch:${slotKey}`,
+  batchTasks(params: DiscoverParams, batched: BatchedRegistrySlots): DiscoverTask[] {
+    return [...batched].map(([slotKey, slot]) => ({
+      label: `batch:${slotKey}`,
+      // One statement for the categoricals and one for the ranges, run side by side.
+      statements: Math.max(
+        1,
+        Number(slot.categoricals.length > 0) + Number(slot.ranges.length > 0),
+      ),
+      run: () =>
         this.repository
           .findBatchedFacets({
             authorization: params.authorization,
@@ -100,10 +189,10 @@ export class TraceDiscoverTaskService {
             rangeSpecs: slot.ranges.map((d) => ({ key: d.key, expression: d.expression })),
             topN: DISCOVER_TOP_N,
             ...(slot.filterWhere ? { filterWhere: slot.filterWhere } : {}),
+            ...(params.signal ? { signal: params.signal } : {}),
           })
           .then((result): Outcome => ({ kind: "batch", slotKey, result })),
-      ),
-    );
+    }));
   }
 
   /** arrayJoin, queryBuilder and dynamic-keys facets cannot share a scan. */
@@ -111,64 +200,58 @@ export class TraceDiscoverTaskService {
     params,
     standalone,
     filters,
-    wrap,
   }: {
     params: DiscoverParams;
     standalone: FacetDefinition[];
     filters: FacetFilters;
-    wrap: TaskTimer;
-  }): Promise<Outcome>[] {
-    return standalone.map((def) =>
-      wrap(
-        `standalone:${def.kind}:${def.key}`,
-        (async (): Promise<Outcome> => {
-          const filterWhere = filters.of(def);
-          let descriptor: FacetDescriptor;
-          switch (def.kind) {
-            case "categorical":
-              descriptor = await this.descriptors.discoverCategorical({
-                def,
-                params,
-                limit: DISCOVER_TOP_N,
-                ...(filterWhere ? { filterWhere } : {}),
-              });
-              break;
-            case "range":
-              descriptor = await this.descriptors.discoverRange({
-                def,
-                params,
-                ...(filterWhere ? { filterWhere } : {}),
-              });
-              break;
-            case "dynamic_keys":
-              descriptor = await this.descriptors.discoverDynamicKeys({
-                def,
-                params,
-                limit: DISCOVER_TOP_N,
-              });
-              break;
-          }
+  }): DiscoverTask[] {
+    return standalone.map((def) => ({
+      label: `standalone:${def.kind}:${def.key}`,
+      statements: 1,
+      run: async (): Promise<Outcome> => {
+        const filterWhere = filters.of(def);
+        let descriptor: FacetDescriptor;
+        switch (def.kind) {
+          case "categorical":
+            descriptor = await this.descriptors.discoverCategorical({
+              def,
+              params,
+              limit: DISCOVER_TOP_N,
+              ...(filterWhere ? { filterWhere } : {}),
+            });
+            break;
+          case "range":
+            descriptor = await this.descriptors.discoverRange({
+              def,
+              params,
+              ...(filterWhere ? { filterWhere } : {}),
+            });
+            break;
+          case "dynamic_keys":
+            descriptor = await this.descriptors.discoverDynamicKeys({
+              def,
+              params,
+              limit: DISCOVER_TOP_N,
+            });
+            break;
+        }
 
-          return { kind: "standalone", key: def.key, descriptor };
-        })(),
-      ),
-    );
+        return { kind: "standalone", key: def.key, descriptor };
+      },
+    }));
   }
 
   /**
    * Distinct-value discovery for `isDiscrete`-flagged integer facets. Runs as its own GROUP BY per
    * facet, since the batched range pass only yields min and max.
    */
-  discreteTasks(
-    params: DiscoverParams,
-    filters: FacetFilters,
-    wrap: TaskTimer,
-  ): Promise<Outcome>[] {
+  discreteTasks(params: DiscoverParams, filters: FacetFilters): DiscoverTask[] {
     return this.facets.registry
       .filter((def): def is RangeFacetDef => def.kind === "range" && def.isDiscrete === true)
-      .map((def) =>
-        wrap(
-          `discrete:${def.key}`,
+      .map((def) => ({
+        label: `discrete:${def.key}`,
+        statements: 1,
+        run: () =>
           this.repository
             .findDiscreteValues({
               authorization: params.authorization,
@@ -178,9 +261,9 @@ export class TraceDiscoverTaskService {
               column: def.expression,
               limit: DISCRETE_VALUE_LIMIT,
               ...(filters.of(def) ? { filterWhere: filters.of(def) } : {}),
+              ...(params.signal ? { signal: params.signal } : {}),
             })
             .then((result): Outcome => ({ kind: "discrete", key: def.key, result })),
-        ),
-      );
+      }));
   }
 }
