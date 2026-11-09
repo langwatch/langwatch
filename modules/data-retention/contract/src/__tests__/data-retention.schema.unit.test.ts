@@ -140,7 +140,8 @@ describe("plan-tier retention constants", () => {
 describe("Growth retention options", () => {
   it("keeps each round label at least as long as it says, within one week", () => {
     for (const option of GROWTH_RETENTION_OPTIONS) {
-      const labelDays = Number.parseInt(option.label, 10);
+      const [count = "", unit = ""] = option.label.split(" ");
+      const labelDays = Number.parseInt(count, 10) * (unit.startsWith("year") ? 365 : 1);
       expect(option.days % RETENTION_WEEK_DAYS).toBe(0);
       expect(option.days).toBeGreaterThanOrEqual(labelDays);
       expect(option.days - labelDays).toBeLessThan(RETENTION_WEEK_DAYS);

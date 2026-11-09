@@ -3,10 +3,10 @@
  * billing. Rows older than 90 days, not total x (R - 90) / R, so a young organization pays for
  * nothing. Spec: specs/billing/retention-storage-billing.feature
  */
-import type { RetentionStorageMeasuredEventData } from "@langwatch/data-retention-contract";
 import type { BillingApi, RetentionStorageOutcome } from "@langwatch/enterprise-billing-contract";
 
 import type { DataRetentionDirectoryReader } from "../app/data-retention.app.ts";
+import { type RetentionStorageMeasuredEventData } from "../eventing/retention-storage-report.events.ts";
 import type { DataRetentionRepository } from "../repositories/data-retention.repository.ts";
 import type { StorageMeterRepository } from "../repositories/storage-meter.repository.ts";
 import {

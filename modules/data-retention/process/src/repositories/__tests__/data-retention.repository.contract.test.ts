@@ -325,7 +325,7 @@ describe.skipIf(!databaseUrl)("given the Postgres data retention repository", ()
           distinct: ["organizationId"],
           select: { organizationId: true },
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/findMany action on the RetentionPolicy model/);
     });
   });
 });

@@ -15,10 +15,6 @@ import {
   startTestClickHouseEndpoints,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
-import {
-  RETENTION_STORAGE_AGGREGATE_TYPE,
-  RETENTION_STORAGE_MEASURED_EVENT_TYPE,
-} from "@langwatch/data-retention-contract";
 import type {
   BillingApi,
   RetentionStorageOutcome,
@@ -36,6 +32,10 @@ import { retentionStorageDayOf } from "../../rules/retention-storage.rules.ts";
 import { RetentionStorageReportService } from "../../services/retention-storage-report.service.ts";
 import { ReportRetentionStorageCommand } from "../retention-storage-report.commands.ts";
 import type { ReportRetentionStorageCommandData } from "../retention-storage-report.events.ts";
+import {
+  RETENTION_STORAGE_AGGREGATE_TYPE,
+  RETENTION_STORAGE_MEASURED_EVENT_TYPE,
+} from "../retention-storage-report.events.ts";
 import { buildRetentionStorageReportPipeline } from "../retention-storage-report.pipeline.ts";
 
 const DAY_MS = 86_400_000;

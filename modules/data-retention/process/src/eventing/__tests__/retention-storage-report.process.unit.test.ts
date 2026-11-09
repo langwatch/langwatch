@@ -3,10 +3,10 @@
  * process asks for one bill per day however often the day's measurement arrives.
  * @see specs/billing/retention-storage-billing.feature
  */
-import type { RetentionStorageMeasuredEventData } from "@langwatch/data-retention-contract";
 import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it } from "vitest";
 
+import { type RetentionStorageMeasuredEventData } from "../retention-storage-report.events.ts";
 import {
   RETENTION_STORAGE_BILLING_INITIAL_STATE,
   RETENTION_STORAGE_REPORT_INITIAL_STATE,

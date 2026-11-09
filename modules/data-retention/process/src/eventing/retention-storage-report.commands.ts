@@ -1,9 +1,3 @@
-import {
-  REPORT_RETENTION_STORAGE_COMMAND_TYPE,
-  RETENTION_STORAGE_AGGREGATE_TYPE,
-  RETENTION_STORAGE_EVENT_VERSION,
-  RETENTION_STORAGE_MEASURED_EVENT_TYPE,
-} from "@langwatch/data-retention-contract";
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 
@@ -12,6 +6,10 @@ import {
   type ReportRetentionStorageCommandData,
   reportRetentionStorageCommandDataSchema,
   type RetentionStorageEvent,
+  REPORT_RETENTION_STORAGE_COMMAND_TYPE,
+  RETENTION_STORAGE_AGGREGATE_TYPE,
+  RETENTION_STORAGE_EVENT_VERSION,
+  RETENTION_STORAGE_MEASURED_EVENT_TYPE,
 } from "./retention-storage-report.events.ts";
 
 /**

@@ -1,7 +1,7 @@
-import type { RetentionStorageMeasuredEventData } from "@langwatch/data-retention-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { RetentionStorageRequestOutcome } from "../services/retention-storage-report-request.service.ts";
+import { type RetentionStorageMeasuredEventData } from "./retention-storage-report.events.ts";
 import {
   RETENTION_STORAGE_BILLING_PROCESS_NAME,
   RETENTION_STORAGE_REPORT_PROCESS_NAME,

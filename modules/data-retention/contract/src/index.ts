@@ -4,4 +4,3 @@ export * from "./data-retention.errors.ts";
 export * from "./data-retention.snapshot.ts";
 export * from "./data-retention.trpc.ts";
 export * from "./data-retention.config.ts";
-export * from "./retention-storage.events.ts";

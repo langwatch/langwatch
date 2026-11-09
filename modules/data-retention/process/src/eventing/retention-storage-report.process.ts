@@ -3,10 +3,13 @@
  * outbox, and the billing process, one per organization, that turns each day's measurement into
  * one `bill` intent. Pure and synchronous; the outbox carries the work and its retries.
  */
-import type { RetentionStorageMeasuredEventData } from "@langwatch/data-retention-contract";
-import { retentionStorageMeasuredEventDataSchema } from "@langwatch/data-retention-contract";
 import type { EventHandler, IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { z } from "zod";
+
+import {
+  type RetentionStorageMeasuredEventData,
+  retentionStorageMeasuredEventDataSchema,
+} from "./retention-storage-report.events.ts";
 
 export const RETENTION_STORAGE_REPORT_PROCESS_NAME = "retentionStorageReport";
 export const RETENTION_STORAGE_BILLING_PROCESS_NAME = "retentionStorageBilling";

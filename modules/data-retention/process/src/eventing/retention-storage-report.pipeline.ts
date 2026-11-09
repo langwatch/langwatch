@@ -4,11 +4,6 @@
  * billing process sends it to billing's meter, retried apart from the measuring.
  */
 import {
-  RETENTION_STORAGE_AGGREGATE_TYPE,
-  RETENTION_STORAGE_PIPELINE_NAME,
-  type RetentionStorageMeasuredEventData,
-} from "@langwatch/data-retention-contract";
-import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
@@ -18,7 +13,12 @@ import {
 import type { DataRetentionModule } from "../app/data-retention.app.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
 import { ReportRetentionStorageCommand } from "./retention-storage-report.commands.ts";
-import { retentionStorageMeasuredEventSchema } from "./retention-storage-report.events.ts";
+import {
+  retentionStorageMeasuredEventSchema,
+  RETENTION_STORAGE_AGGREGATE_TYPE,
+  RETENTION_STORAGE_PIPELINE_NAME,
+  type RetentionStorageMeasuredEventData,
+} from "./retention-storage-report.events.ts";
 import {
   runRetentionStorageBill,
   runRetentionStorageReportSweep,
