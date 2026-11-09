@@ -1,6 +1,7 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import type * as Observability from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
@@ -19,6 +20,21 @@ import type { PromptService } from "../../services/prompt.service.ts";
 import { PromptModule } from "../prompt.app.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
+
+/** Every error line any prompt logger writes, so a lost lifecycle fact can be checked. */
+const loggedErrors = vi.hoisted((): { fields: unknown; message: unknown }[] => []);
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof Observability>()),
+  createLogger: () => ({
+    debug: () => undefined,
+    info: () => undefined,
+    warn: () => undefined,
+    error: (fields: unknown, message: unknown) => void loggedErrors.push({ fields, message }),
+  }),
+}));
+
+const lostFacts = (fact: string) =>
+  loggedErrors.filter((e) => e.message === `prompt ${fact} was not recorded`);
 
 /** A sender that records each payload it is given. */
 function recorder<T>(into: unknown[], fail = false) {
@@ -539,6 +555,37 @@ describe("PromptModule lifecycle facts", () => {
         occurredAt: expect.any(Number),
         promptId: created.id,
         projectId: "project-1",
+      },
+    ]);
+  });
+
+  /** @scenario "a lost lifecycle fact never fails the write" */
+  it("logs exactly one error with its ids for each lost fact", async () => {
+    const { app, createOne } = connected({ fail: true });
+    const created = await createOne();
+    loggedErrors.length = 0;
+
+    const saved = await app.update(
+      { idOrHandle: created.id, projectId: "project-1", data: { commitMessage: "Edit" } },
+      { id: "user-1" },
+    );
+    await app.delete({ idOrHandle: created.id, projectId: "project-1" });
+    await flush();
+
+    expect(lostFacts("version_saved")).toEqual([
+      {
+        fields: expect.objectContaining({
+          projectId: "project-1",
+          promptId: created.id,
+          versionId: saved.versionId,
+        }),
+        message: "prompt version_saved was not recorded",
+      },
+    ]);
+    expect(lostFacts("deleted")).toEqual([
+      {
+        fields: expect.objectContaining({ projectId: "project-1", promptId: created.id }),
+        message: "prompt deleted was not recorded",
       },
     ]);
   });
