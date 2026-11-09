@@ -124,11 +124,19 @@ function setup({
     projects: [dataPrivacyTestPlacement()],
   });
   const scopeReads: string[] = [];
+  let scopeReadFails = false;
   const repository: DataPrivacyProjectScopeRepository = {
-    find: (input) => {
+    find: async (input) => {
       scopeReads.push(input.projectId);
+      if (scopeReadFails) {
+        scopeReadFails = false;
+        throw new Error("database unreachable");
+      }
       return placements.find(input);
     },
+  };
+  const failNextScopeRead = () => {
+    scopeReadFails = true;
   };
 
   const fallbacks: PiiRedactionModelFallbackReason[] = [];
@@ -169,6 +177,7 @@ function setup({
     dlp,
     flagReads,
     scopeReads,
+    failNextScopeRead,
     sent,
     fallbacks,
     usage,
@@ -212,6 +221,34 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio(strictBatch());
 
       expect(scopeReads).toEqual([PROJECT_ID]);
+    });
+
+    it("reads the project's organization once for concurrent batches", async () => {
+      const { analysis, memoryModel, scopeReads } = setup();
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+
+      const cleared = await Promise.all([
+        analysis.clearPresidio(strictBatch()),
+        analysis.clearPresidio(strictBatch()),
+        analysis.clearPresidio(strictBatch()),
+      ]);
+
+      expect(cleared).toEqual([["call [PERSON]"], ["call [PERSON]"], ["call [PERSON]"]]);
+      expect(scopeReads).toEqual([PROJECT_ID]);
+    });
+
+    it("reads the organization again after a failed lookup", async () => {
+      const { analysis, memoryModel, presidio, scopeReads, failNextScopeRead } = setup();
+      presidio.answerWith(anonymized("call <PERSON>"));
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+      failNextScopeRead();
+
+      await expect(analysis.clearPresidio(strictBatch())).resolves.toEqual(["call [PERSON]"]);
+      await expect(analysis.clearPresidio(strictBatch())).resolves.toEqual(["call [PERSON]"]);
+
+      expect(scopeReads).toEqual([PROJECT_ID, PROJECT_ID]);
     });
   });
 

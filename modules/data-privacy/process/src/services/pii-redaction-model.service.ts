@@ -75,6 +75,8 @@ export class PiiRedactionModelService {
   }
 
   readonly #organizations = new Map<string, { organizationId: string; expiresAt: number }>();
+  /** Lookups in flight, so concurrent batches of one project share one read, as ADR-177 does. */
+  readonly #organizationLookups = new Map<string, Promise<string>>();
   private readonly model: PresidioRedactionService;
   private readonly featureFlags: FeatureFlagApi;
   private readonly scopes: DataPrivacyProjectScopeService;
@@ -171,6 +173,18 @@ export class PiiRedactionModelService {
     const cached = this.#organizations.get(projectId);
     if (cached && cached.expiresAt > this.now()) return cached.organizationId;
 
+    const pending = this.#organizationLookups.get(projectId);
+    if (pending) return pending;
+    const lookup = this.#readOrganization({ projectId }).finally(() => {
+      if (this.#organizationLookups.get(projectId) === lookup) {
+        this.#organizationLookups.delete(projectId);
+      }
+    });
+    this.#organizationLookups.set(projectId, lookup);
+    return lookup;
+  }
+
+  async #readOrganization({ projectId }: { projectId: string }): Promise<string> {
     const { organizationId } = await this.scopes.getScopeFacts({ projectId });
     this.#organizations.set(projectId, {
       organizationId,
