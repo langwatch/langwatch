@@ -45,10 +45,9 @@ export class EvaluatorDeletionFactsService {
   }
 
   /**
-   * Records that an evaluator was created, once its row is written. Never throws: the
-   * evaluator already exists, so failing here would invite a duplicate row on retry.
-   * A lost fact is logged at error level with its ids so it can be found and resent;
-   * there is no automatic retry yet.
+   * Records that an evaluator was created, once its row is written. Never throws: failing
+   * here would invite a duplicate row on retry. A lost fact is logged at error level with
+   * its ids so it can be found and resent; there is no automatic retry yet.
    */
   async recordEvaluatorCreated(input: { projectId: string; evaluatorId: string }): Promise<void> {
     const ids = {
