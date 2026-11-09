@@ -1,10 +1,7 @@
 /**
- * The stock queries moved from `traces` to `trace_metrics` (tasks#1117) return, on a real
- * ClickHouse, the rows their `traces` form returns under the application and the langy lists.
- * Tables shaped as the catalogue's views stand in for them; both forms come from committed
- * fixtures.
- * @see specs/lwql/stock-widgets-on-trace-metrics.feature
  * @vitest-environment node
+ * Each query moved to trace_metrics (tasks#1117) returns its traces-form rows on the shipped
+ * migrations and views. @see specs/lwql/stock-widgets-on-trace-metrics.feature
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -12,13 +9,20 @@ import { fileURLToPath } from "node:url";
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import {
+  expectRestrictedIdentity,
+  type LangWatchQLClickHouseHarness,
+  type LangWatchQLPostgresHarness,
+  mapPostgresIntoClickHouse,
+  startLangWatchQLClickHouse,
+  startLangWatchQLPostgres,
+  TENANT_A,
+} from "./lwql-clickhouse-harness.ts";
 
-const url =
-  process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??
-  process.env.TEST_CLICKHOUSE_URL ??
-  process.env.CI_CLICKHOUSE_URL;
-const DATABASE = `lwql_trace_metrics_rows_${process.pid}`;
+const viewProvisioning = LangWatchQLViewProvisioningService.create();
 
 const LISTS = [{ list: ["application"] }, { list: ["langy"] }];
 
@@ -43,6 +47,11 @@ const SUMS_COST = [
   "att-table/units",
 ];
 
+const TENANT = TENANT_A.tenantId;
+/** Topics the Postgres harness seeds for every tenant; the `topics` view reads them. */
+const TOPIC_ONE = `${TENANT}-topic-1`;
+const TOPIC_TWO = `${TENANT}-topic-2`;
+
 const DAY = 86_400_000;
 const PERIOD_END = Math.floor(Date.now() / DAY) * DAY;
 const PERIOD_START = PERIOD_END - 7 * DAY;
@@ -59,8 +68,8 @@ type Seed = {
   trace: string;
   /** Days after the period start; negative is the window before it. */
   day: number;
-  /** The source of its `trace_metrics` row; null for a trace with no row there. */
-  source: string | null;
+  /** The `Origin` of its `trace_analytics` row, whose `Source` the view derives; null for none. */
+  origin: string | null;
   metadata: Record<string, string>;
   customer?: string;
   labels?: string[];
@@ -74,11 +83,11 @@ const SEEDS: Seed[] = [
   {
     trace: "app_1",
     day: 1,
-    source: "application",
+    origin: "application",
     customer: "acme",
     labels: ["vip", "beta"],
     thread: "thread_1",
-    topic: "topic_billing",
+    topic: TOPIC_ONE,
     cost: 0.25,
     metadata: {
       output_action: "accepted",
@@ -91,7 +100,7 @@ const SEEDS: Seed[] = [
   {
     trace: "app_2",
     day: 2,
-    source: "application",
+    origin: "application",
     customer: "acme",
     thread: "thread_1",
     cost: 0.5,
@@ -107,7 +116,7 @@ const SEEDS: Seed[] = [
   {
     trace: "app_3",
     day: 3.5,
-    source: "application",
+    origin: "application",
     customer: "globex",
     labels: ["beta"],
     cost: 0.125,
@@ -121,17 +130,26 @@ const SEEDS: Seed[] = [
     },
   },
   {
+    // An empty Origin counts as application through the view's derived `Source`.
+    trace: "app_no_origin",
+    day: 2.5,
+    origin: "",
+    customer: "globex",
+    cost: 0.0625,
+    metadata: { output_action: "accepted", outcome: "resolved", document_type: "receipt" },
+  },
+  {
     trace: "app_before",
     day: -2,
-    source: "application",
-    topic: "topic_billing",
+    origin: "application",
+    topic: TOPIC_ONE,
     cost: 0.25,
     metadata: { topic: "billing" },
   },
   {
     trace: "chat_1",
     day: 1.5,
-    source: "langy",
+    origin: "langy",
     labels: ["x"],
     thread: "thread_9",
     cost: 0.5,
@@ -145,7 +163,7 @@ const SEEDS: Seed[] = [
   {
     trace: "chat_2",
     day: 4,
-    source: "langy",
+    origin: "langy",
     cost: 0.25,
     metadata: {
       outcome: "resolved",
@@ -157,15 +175,15 @@ const SEEDS: Seed[] = [
   {
     trace: "chat_before",
     day: -1,
-    source: "langy",
-    topic: "topic_refunds",
+    origin: "langy",
+    topic: TOPIC_TWO,
     cost: 0.125,
     metadata: { topic: "refunds" },
   },
   {
     trace: "sim_1",
     day: 2,
-    source: "simulation",
+    origin: "simulation",
     customer: "acme",
     cost: 1,
     metadata: { output_action: "accepted", outcome: "handover", document_type: "invoice" },
@@ -173,7 +191,7 @@ const SEEDS: Seed[] = [
   {
     trace: "no_row",
     day: 3,
-    source: null,
+    origin: null,
     customer: "initech",
     cost: 1,
     metadata: { output_action: "accepted", outcome: "handover", document_type: "invoice" },
@@ -182,46 +200,46 @@ const SEEDS: Seed[] = [
 
 const timeOf = (seed: Seed) => PERIOD_START + seed.day * DAY;
 
-function metricsRow(seed: Seed, source: string): Record<string, unknown> {
-  const value = (key: string) => seed.metadata[key] ?? "";
-  return {
-    TenantId: "tenant",
-    TraceId: seed.trace,
-    OccurredAt: at(timeOf(seed)),
-    UpdatedAt: at(timeOf(seed)),
-    TraceName: seed.trace,
-    TopicId: seed.topic ?? null,
-    ConversationId: seed.thread ?? null,
-    CustomerId: seed.customer ?? null,
-    Origin: source,
-    Source: source,
-    Models: ["gpt-5"],
-    Labels: seed.labels ?? [],
-    TotalCost: seed.cost,
-    TotalDurationMs: 1200,
-    HasError: false,
-    MetadataOutputAction: value("output_action"),
-    MetadataOutcome: value("outcome"),
-    MetadataSentToReview: value("sent_to_review"),
-    MetadataDocumentType: value("document_type"),
-    MetadataFlow: value("flow"),
-    MetadataLanguage: value("language"),
-    MetadataSegment: value("segment"),
-    MetadataTeam: value("team"),
-    MetadataTopic: value("topic"),
-  };
-}
-
-function traceRow(seed: Seed): Record<string, unknown> {
+/** The trace-level attributes both fact tables carry for a seed. */
+function attributesOf(seed: Seed): Record<string, string> {
   const attributes: Record<string, string> = Object.fromEntries(
     Object.entries(seed.metadata).map(([key, value]) => [`metadata.${key}`, value]),
   );
   if (seed.customer) attributes["langwatch.customer_id"] = seed.customer;
   if (seed.labels) attributes["langwatch.labels"] = JSON.stringify(seed.labels);
   if (seed.thread) attributes["langwatch.thread.id"] = seed.thread;
+  return attributes;
+}
+
+/** A `trace_analytics` row; ClickHouse derives its Metadata* columns from `Attributes`. */
+function analyticsRow(seed: Seed, occurredAt = timeOf(seed)): Record<string, unknown> {
   return {
-    TenantId: "tenant",
+    TenantId: TENANT,
     TraceId: seed.trace,
+    Version: "1",
+    OccurredAt: at(occurredAt),
+    CreatedAt: at(timeOf(seed)),
+    UpdatedAt: at(timeOf(seed)),
+    TraceName: seed.trace,
+    TopicId: seed.topic ?? null,
+    ConversationId: seed.thread ?? null,
+    CustomerId: seed.customer ?? null,
+    Origin: seed.origin ?? "",
+    Models: ["gpt-5"],
+    Labels: seed.labels ?? [],
+    TotalCost: seed.cost,
+    TotalDurationMs: 1200,
+    HasError: false,
+    Attributes: attributesOf(seed),
+  };
+}
+
+function summaryRow(seed: Seed): Record<string, unknown> {
+  return {
+    ProjectionId: `${TENANT}/${seed.trace}`,
+    TenantId: TENANT,
+    TraceId: seed.trace,
+    Version: "1",
     OccurredAt: at(timeOf(seed)),
     UpdatedAt: at(timeOf(seed)),
     TraceName: seed.trace,
@@ -229,42 +247,13 @@ function traceRow(seed: Seed): Record<string, unknown> {
     Models: ["gpt-5"],
     TotalCost: seed.cost,
     TopicId: seed.topic ?? null,
-    Attributes: attributes,
+    Attributes: attributesOf(seed),
   };
 }
 
-function seedRows(): Record<string, Record<string, unknown>[]> {
-  return {
-    traces: SEEDS.map(traceRow),
-    trace_metrics: SEEDS.flatMap((seed) => (seed.source ? [metricsRow(seed, seed.source)] : [])),
-    topics: ["topic_billing", "topic_refunds"].map((id) => ({
-      TenantId: "tenant",
-      TopicId: id,
-      TopicName: id.replace("topic_", ""),
-      AutomaticallyGenerated: true,
-      CreatedAt: at(PERIOD_START),
-      UpdatedAt: at(PERIOD_START),
-    })),
-  };
-}
-
-/** The views the SQL names after FROM or JOIN. */
-function namedViews(sql: string): string[] {
-  return [...sql.matchAll(/\b(?:FROM|JOIN)\s+(?:analytics\.)?([a-z_]+)/gi)].map(
-    (match) => match[1] ?? "",
-  );
-}
-
-/** The server's URL on this suite's database: the client takes a URL path over `database`. */
-function urlOnDatabase(): string {
-  const onDatabase = new URL(String(url));
-  onDatabase.pathname = `/${DATABASE}`;
-
-  return onDatabase.toString();
-}
-
-describe.skipIf(!url)("given traces of each source carrying the metadata the widgets read", () => {
-  let admin: ClickHouseClient;
+describe("given traces of each source carrying the metadata the widgets read", () => {
+  let harness: LangWatchQLClickHouseHarness;
+  let postgres: LangWatchQLPostgresHarness;
   let client: ClickHouseClient;
 
   /** The query's rows in a stable order, or its error, so one failure does not hide the rest. */
@@ -280,7 +269,6 @@ describe.skipIf(!url)("given traces of each source carrying the metadata the wid
         query: sql,
         query_params: { ...PARAMETERS, dashboard_context_sources: list },
         format: "JSONEachRow",
-        clickhouse_settings: { max_threads: 1 },
       });
       const rows = (await result.json<Record<string, unknown>>()).map((row) => JSON.stringify(row));
       return { rows: JSON.stringify(rows.toSorted()) };
@@ -304,35 +292,40 @@ describe.skipIf(!url)("given traces of each source carrying the metadata the wid
   }
 
   beforeAll(async () => {
-    admin = createClient({ url });
-    await admin.command({ query: `DROP DATABASE IF EXISTS ${DATABASE}` });
-    await admin.command({ query: `CREATE DATABASE ${DATABASE}` });
-    client = createClient({ url: urlOnDatabase() });
-
-    const views = new Set(
-      BASELINE.flatMap(({ label, sql }) => [
-        ...namedViews(sql),
-        ...namedViews(STOCK.get(label) ?? ""),
-      ]),
+    // `topics` is PostgreSQL-resident, so the moved topic queries need the mapped engine tables.
+    postgres = await startLangWatchQLPostgres();
+    harness = await startLangWatchQLClickHouse({ suite: "trace-metrics-rows", facts: "migrated" });
+    const { names, factDatabase: facts } = harness;
+    await mapPostgresIntoClickHouse({ harness, postgres });
+    await harness.applyAsAdmin(
+      viewProvisioning.setupStatements({ names, sourceDatabase: facts, dedup: SHIPPED_LWQL_DEDUP }),
     );
-    for (const name of views) {
-      const view = LWQL_VIEW_CATALOG.find((candidate) => candidate.name === name);
-      if (!view) throw new Error(`a moved query reads "${name}", which the catalogue lacks`);
-      const columns = view.columns.map((column) => `\`${column.name}\` ${column.type}`);
-      await client.command({
-        query: `CREATE TABLE ${DATABASE}.${name} (${columns.join(", ")}) ENGINE = Memory`,
-      });
-    }
+    await harness.applyAccessModel({ views: LWQL_VIEW_CATALOG, sourceDatabase: facts });
 
-    for (const [table, values] of Object.entries(seedRows())) {
-      await client.insert({ table: `${DATABASE}.${table}`, values, format: "JSONEachRow" });
-    }
-  });
+    await harness.admin.insert({
+      table: `${facts}.trace_summaries`,
+      format: "JSONEachRow",
+      values: SEEDS.map(summaryRow),
+    });
+    await harness.admin.insert({
+      table: `${facts}.trace_analytics`,
+      format: "JSONEachRow",
+      values: SEEDS.flatMap((seed) => (seed.origin === null ? [] : [analyticsRow(seed)])),
+    });
+
+    // Unqualified view names, as the stored widget queries write them.
+    client = createClient({
+      ...harness.restrictedConnection(),
+      database: names.database,
+      clickhouse_settings: { [names.tenantSetting]: harness.tenantA.keyHash },
+    });
+    await expectRestrictedIdentity({ client, names });
+  }, 600_000);
 
   afterAll(async () => {
-    await admin.command({ query: `DROP DATABASE IF EXISTS ${DATABASE}` });
-    await client.close();
-    await admin.close();
+    await client?.close();
+    await harness?.stop();
+    await postgres?.stop();
   });
 
   /** @scenario "A moved widget query returns the rows its traces form returned" */
@@ -358,14 +351,10 @@ describe.skipIf(!url)("given traces of each source carrying the metadata the wid
     const [first] = SEEDS;
     if (!first) throw new Error("no seed");
     // A row written before the storage anchor froze, whose OccurredAt later moved (ADR-082).
-    const moved = {
-      ...metricsRow(first, "application"),
-      OccurredAt: at(timeOf(first) + 3_600_000),
-    };
-    await client.insert({
-      table: `${DATABASE}.trace_metrics`,
-      values: [moved],
+    await harness.admin.insert({
+      table: `${harness.factDatabase}.trace_analytics`,
       format: "JSONEachRow",
+      values: [analyticsRow(first, timeOf(first) + 3_600_000)],
     });
 
     expect((await differing(["application"])).toSorted()).toEqual(SUMS_COST.toSorted());

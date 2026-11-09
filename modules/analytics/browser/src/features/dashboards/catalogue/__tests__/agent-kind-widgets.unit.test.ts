@@ -17,6 +17,19 @@ function built(id: string) {
 
 const UNIT_WIDGETS = ["att-share", "att-table", "att-change", "cost-by-segment"];
 
+/** The view each unit-grouped query reads: those needing a prompt version stay on `traces`. */
+const UNIT_QUERY_VIEWS: Record<string, Record<string, "traces" | "trace_metrics">> = {
+  "att-share": { units: "trace_metrics", totals: "trace_metrics" },
+  "att-table": { units: "trace_metrics", passRates: "traces" },
+  "att-change": { units: "traces" },
+  "cost-by-segment": { units: "trace_metrics", totals: "trace_metrics" },
+};
+
+const UNIT_EXPRESSION = {
+  traces: "JSONExtractString(Attributes['langwatch.labels'], 1)",
+  trace_metrics: "unit_key = 'langwatch.labels', Labels[1]",
+} as const;
+
 describe("given the By customer widgets", () => {
   /** @scenario "AC80 By customer: the board groups by the first key the traces carry" */
   it("picks the first grouping key any trace carries, in the seed's order", () => {
@@ -32,16 +45,16 @@ describe("given the By customer widgets", () => {
     ]);
     for (const id of UNIT_WIDGETS) {
       const { sql } = built(id);
-      const grouped = Object.values(sql).filter((text) => text.includes("AS unit_key"));
-      expect(grouped.length, id).toBeGreaterThan(0);
-      for (const text of grouped) {
-        expect(text, id).toContain("multiIf(");
-        // The queries that need a prompt version still read `traces`; the rest its typed columns.
-        expect(text, id).toContain(
-          /\bFROM traces\b/.test(text)
-            ? "JSONExtractString(Attributes['langwatch.labels'], 1)"
-            : "unit_key = 'langwatch.labels', Labels[1]",
-        );
+      const grouped = Object.entries(sql).filter(([, text]) => text.includes("AS unit_key"));
+      const views = UNIT_QUERY_VIEWS[id] ?? {};
+      expect(grouped.map(([name]) => name).toSorted(), id).toEqual(Object.keys(views).toSorted());
+      for (const [name, text] of grouped) {
+        const view = views[name];
+        if (!view) throw new Error(`${id}/${name} has no expected view`);
+        expect(text, `${id}/${name}`).toContain("multiIf(");
+        expect(text, `${id}/${name}`).toMatch(new RegExp(`\\bFROM ${view}\\b`));
+        expect(text, `${id}/${name}`).toContain(UNIT_EXPRESSION[view]);
+        if (view === "trace_metrics") expect(text, `${id}/${name}`).not.toMatch(/\bFROM traces\b/);
       }
     }
   });
@@ -65,7 +78,7 @@ describe("given the By customer widgets", () => {
   /** @scenario "AC81 By customer: conversations by customer with each one's share" */
   it("ranks six customers by conversations, with their share and the count of the rest", () => {
     const { code, sql } = built("att-share");
-    expect(sql.units).toContain("uniqExact(if(Attributes['langwatch.thread.id'] != ''");
+    expect(sql.units).toContain("uniqExact(coalesce(nullIf(ConversationId, ''), TraceId))");
     expect(sql.units).toContain("ORDER BY conversations DESC");
     expect(sql.totals).toContain("AS units");
     expect(code).toContain("units.data.slice(0, 6)");

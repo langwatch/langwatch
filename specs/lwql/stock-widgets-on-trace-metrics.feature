@@ -10,8 +10,7 @@ Feature: Stock trace widgets read the light trace table
 
   Rule: The metadata keys are columns of trace_metrics
 
-    # Proved by hand on a local ClickHouse 25.10 (goose 00125 and its mutation); see the PR.
-    @integration @unimplemented
+    @integration
     Scenario: The migration fills the metadata columns for existing rows
       Given trace_analytics rows written before migration 00125
       When the migration and its background step have run
