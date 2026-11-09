@@ -166,44 +166,39 @@ export class PromptModule implements PromptApi {
     // Tied the knot: the callback below fires only once a request calls
     // `announceCreated`, by which point `app` is always assigned.
     const appRef: { current?: PromptModule } = {};
-    const afterPromptCreated: PromptInfrastructure["afterPromptCreated"] = (input) => {
+    /** Sends a fact in the background; a failed send is logged with its ids, never thrown. */
+    const fireAndLog = (
+      send: (app: PromptModule) => Promise<unknown>,
+      ids: Record<string, string>,
+      message: string,
+    ): void => {
       const app = appRef.current;
       if (!app) return;
-      void app.#recordPromptCreated(input).catch((error: unknown) =>
-        logger.error({ error, projectId: input.projectId }, "prompt_created was not recorded"),
-      );
+      void send(app).catch((error: unknown) => logger.error({ error, ...ids }, message));
     };
-    const afterPromptVersionSaved: PromptInfrastructure["afterPromptVersionSaved"] = (input) => {
-      const app = appRef.current;
-      if (!app) return;
-      void app.#recordVersionSaved(input).catch((error: unknown) =>
-        logger.error(
-          {
-            error,
-            tenantId: input.projectId,
-            projectId: input.projectId,
-            promptId: input.promptId,
-            versionId: input.versionId,
-          },
-          "prompt version_saved was not recorded",
-        ),
+    const afterPromptCreated: PromptInfrastructure["afterPromptCreated"] = (input) =>
+      fireAndLog(
+        (app) => app.#recordPromptCreated(input),
+        { projectId: input.projectId },
+        "prompt_created was not recorded",
       );
-    };
-    const afterPromptDeleted: PromptInfrastructure["afterPromptDeleted"] = (input) => {
-      const app = appRef.current;
-      if (!app) return;
-      void app.#recordDeleted(input).catch((error: unknown) =>
-        logger.error(
-          {
-            error,
-            tenantId: input.projectId,
-            projectId: input.projectId,
-            promptId: input.promptId,
-          },
-          "prompt deleted was not recorded",
-        ),
+    const afterPromptVersionSaved: PromptInfrastructure["afterPromptVersionSaved"] = (input) =>
+      fireAndLog(
+        (app) => app.#recordVersionSaved(input),
+        {
+          tenantId: input.projectId,
+          projectId: input.projectId,
+          promptId: input.promptId,
+          versionId: input.versionId,
+        },
+        "prompt version_saved was not recorded",
       );
-    };
+    const afterPromptDeleted: PromptInfrastructure["afterPromptDeleted"] = (input) =>
+      fireAndLog(
+        (app) => app.#recordDeleted(input),
+        { tenantId: input.projectId, projectId: input.projectId, promptId: input.promptId },
+        "prompt deleted was not recorded",
+      );
     const app = new PromptModule({
       prompts,
       projects: dependencies.projects,
