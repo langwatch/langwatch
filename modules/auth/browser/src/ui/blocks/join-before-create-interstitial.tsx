@@ -96,12 +96,14 @@ export function JoinBeforeCreateInterstitial({
       </Text>
       <FrontDoorPrimaryButton onClick={() => onJoinOrganization(leading)}>
         {/* Only the name gives way to a long one: the count is half of what the button says. */}
-        <Text as="span" truncate title={leading.name}>
-          Join {leading.name}
-        </Text>{" "}
-        <Text as="span" flexShrink={0}>
-          ({colleagues(leading.colleagueCount)})
-        </Text>
+        <HStack as="span" gap={1} minWidth={0}>
+          <Text as="span" truncate title={leading.name}>
+            Join {leading.name}
+          </Text>{" "}
+          <Text as="span" flexShrink={0}>
+            ({colleagues(leading.colleagueCount)})
+          </Text>
+        </HStack>
       </FrontDoorPrimaryButton>
       {others.length > 0 ? (
         <OtherOrganizations organizations={others} onJoinOrganization={onJoinOrganization} />
