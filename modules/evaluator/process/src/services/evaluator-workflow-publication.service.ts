@@ -6,7 +6,7 @@ import {
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { EvaluatorCreationCapService } from "./evaluator-creation-cap.service.ts";
-import type { EvaluatorDeletionFactsService } from "./evaluator-deletion-facts.service.ts";
+import type { EvaluatorLifecycleFactsService } from "./evaluator-lifecycle-facts.service.ts";
 import type { EvaluatorVersionService } from "./evaluator-version.service.ts";
 import type { EvaluatorService } from "./evaluator.service.ts";
 
@@ -21,7 +21,7 @@ export class EvaluatorWorkflowPublicationService {
     evaluators: Pick<EvaluatorService, "findByWorkflow" | "create" | "update" | "archive">;
     creationCaps: Pick<EvaluatorCreationCapService, "assertCreationAllowed">;
     versions: Pick<EvaluatorVersionService, "assertDeletable">;
-    facts: Pick<EvaluatorDeletionFactsService, "recordEvaluatorCreated">;
+    facts: Pick<EvaluatorLifecycleFactsService, "recordEvaluatorCreated">;
   }): EvaluatorWorkflowPublicationService {
     return new EvaluatorWorkflowPublicationService(deps);
   }

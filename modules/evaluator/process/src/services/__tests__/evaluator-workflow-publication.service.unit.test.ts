@@ -5,7 +5,7 @@ import {
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { EvaluatorDeletionFactsService } from "../evaluator-deletion-facts.service.ts";
+import type { EvaluatorLifecycleFactsService } from "../evaluator-lifecycle-facts.service.ts";
 import { EvaluatorWorkflowPublicationService } from "../evaluator-workflow-publication.service.ts";
 import type { EvaluatorService } from "../evaluator.service.ts";
 
@@ -44,23 +44,28 @@ function serviceWith({
     findWorkflowFlags: vi.fn<WorkflowApi["findWorkflowFlags"]>(async () => flags),
     setWorkflowFlags: vi.fn<WorkflowApi["setWorkflowFlags"]>(async () => undefined),
   };
+  const written: string[] = [];
   const evaluators = {
     findByWorkflow: vi.fn<EvaluatorService["findByWorkflow"]>(async () => linked),
-    create: vi.fn<EvaluatorService["create"]>(async () => existingEvaluator),
+    create: vi.fn<EvaluatorService["create"]>(async () => {
+      written.push(existingEvaluator.id);
+      return existingEvaluator;
+    }),
     update: vi.fn<EvaluatorService["update"]>(async () => existingEvaluator),
     archive: vi.fn<EvaluatorService["archive"]>(async () => existingEvaluator),
   };
 
-  const facts = {
-    recordEvaluatorCreated: vi.fn<EvaluatorDeletionFactsService["recordEvaluatorCreated"]>(
-      async () => undefined,
-    ),
+  /** Each created fact, with whether its row was already written when it was recorded. */
+  const recorded: { projectId: string; evaluatorId: string; rowWritten: boolean }[] = [];
+  const facts: Pick<EvaluatorLifecycleFactsService, "recordEvaluatorCreated"> = {
+    recordEvaluatorCreated: async (input) =>
+      void recorded.push({ ...input, rowWritten: written.includes(input.evaluatorId) }),
   };
 
   return {
     workflows,
     evaluators,
-    facts,
+    recorded,
     service: EvaluatorWorkflowPublicationService.create({
       workflows,
       evaluators,
@@ -133,7 +138,7 @@ describe("the studio's evaluator switch", () => {
   describe("when the workflow is saved as an evaluator", () => {
     /** @scenario "publishing a workflow as an evaluator records the new evaluator as created" */
     it("records the new evaluator as created", async () => {
-      const { facts, service } = serviceWith({ flags: archivedFlags, linked: [] });
+      const { recorded, service } = serviceWith({ flags: archivedFlags, linked: [] });
 
       await service.toggleSaveAsEvaluator({
         workflowId: "workflow_archived",
@@ -141,16 +146,14 @@ describe("the studio's evaluator switch", () => {
         isEvaluator: true,
       });
 
-      expect(facts.recordEvaluatorCreated).toHaveBeenCalledTimes(1);
-      expect(facts.recordEvaluatorCreated).toHaveBeenCalledWith({
-        projectId: "project_1",
-        evaluatorId: "evaluator_1",
-      });
+      expect(recorded).toEqual([
+        { projectId: "project_1", evaluatorId: "evaluator_1", rowWritten: true },
+      ]);
     });
 
     /** @scenario "renaming an already published workflow records nothing new" */
     it("records nothing when an evaluator already wraps the workflow", async () => {
-      const { facts, service } = serviceWith({
+      const { recorded, service } = serviceWith({
         flags: archivedFlags,
         linked: [existingEvaluator],
       });
@@ -161,7 +164,7 @@ describe("the studio's evaluator switch", () => {
         isEvaluator: true,
       });
 
-      expect(facts.recordEvaluatorCreated).not.toHaveBeenCalled();
+      expect(recorded).toEqual([]);
     });
   });
 

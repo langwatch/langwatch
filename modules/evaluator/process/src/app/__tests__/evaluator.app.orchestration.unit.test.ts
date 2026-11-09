@@ -6,7 +6,8 @@
  * @see modules/evaluator/specs/evaluator-deleted-fact.feature
  * @see modules/evaluator/specs/evaluator-created-fact.feature
  */
-import { describe, expect, it, vi } from "vitest";
+import type * as Observability from "@langwatch/observability";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MemoryEvaluatorRepository } from "../../repositories/memory/memory.evaluator.repository.ts";
 import type { EvaluatorGraph } from "../evaluator.app.ts";
@@ -17,6 +18,35 @@ import {
 } from "./evaluator.fixture.ts";
 
 const graph = testEvaluatorGraph;
+
+/** Every error line any evaluator logger writes, so a lost created fact can be checked. */
+const loggedErrors = vi.hoisted((): { fields: unknown; message: unknown }[] => []);
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof Observability>()),
+  createLogger: () => ({
+    debug: () => undefined,
+    info: () => undefined,
+    warn: () => undefined,
+    error: (fields: unknown, message: unknown) => void loggedErrors.push({ fields, message }),
+  }),
+}));
+
+const lostCreatedFacts = () =>
+  loggedErrors.filter(
+    (e) =>
+      typeof e.message === "string" &&
+      e.message.startsWith("evaluator created fact was not recorded"),
+  );
+
+/** Connects a created-fact sender that keeps what it is sent. */
+function recordingCreatedFacts(app: ReturnType<typeof anApp>["app"]) {
+  const sent: unknown[] = [];
+  app.connectLifecycle({
+    recordEvaluatorDeleted: { send: async () => undefined },
+    recordEvaluatorCreated: { send: async (data) => void sent.push(data) },
+  });
+  return sent;
+}
 
 function anApp(
   options: {
@@ -368,6 +398,10 @@ describe("when copying an evaluator into another project", () => {
 });
 
 describe("when an evaluator is created", () => {
+  beforeEach(() => {
+    loggedErrors.length = 0;
+  });
+
   /** @scenario "creating an evaluator records that it was created" */
   it("records one created fact of ids only, after the row exists", async () => {
     const { app, repository } = anApp();
@@ -405,7 +439,7 @@ describe("when an evaluator is created", () => {
   });
 
   /** @scenario "a lost created fact never fails the create" */
-  it("creates the evaluator when evaluator_lifecycle is not registered", async () => {
+  it("creates the evaluator when evaluator_lifecycle is not registered, and logs the lost fact", async () => {
     const { app } = anApp();
 
     const created = await app.create({
@@ -417,10 +451,16 @@ describe("when an evaluator is created", () => {
     });
 
     expect(created.id).toBe("evaluator-1");
+    expect(lostCreatedFacts()).toEqual([
+      {
+        fields: { tenantId: "project-1", projectId: "project-1", evaluatorId: "evaluator-1" },
+        message: expect.any(String),
+      },
+    ]);
   });
 
   /** @scenario "a lost created fact never fails the create" */
-  it("creates the evaluator when the record fails", async () => {
+  it("creates the evaluator when the record fails, and logs the lost fact", async () => {
     const { app } = anApp();
     app.connectLifecycle({
       recordEvaluatorDeleted: { send: async () => undefined },
@@ -440,6 +480,59 @@ describe("when an evaluator is created", () => {
     });
 
     expect(created.id).toBe("evaluator-1");
+    expect(lostCreatedFacts()).toEqual([
+      {
+        fields: expect.objectContaining({
+          tenantId: "project-1",
+          projectId: "project-1",
+          evaluatorId: "evaluator-1",
+        }),
+        message: expect.any(String),
+      },
+    ]);
+  });
+
+  it("records one created fact when the public API creates on resolved models", async () => {
+    const { app } = anApp();
+    const sent = recordingCreatedFacts(app);
+
+    await app.createWithResolvedDefaults({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      config: { evaluatorType: "ragas/faithfulness" },
+    });
+
+    expect(sent).toEqual([
+      {
+        tenantId: "project-1",
+        projectId: "project-1",
+        evaluatorId: "evaluator-1",
+        occurredAt: expect.any(Number),
+      },
+    ]);
+  });
+
+  it("records one created fact when the caller already resolved the models", async () => {
+    const { app } = anApp();
+    const sent = recordingCreatedFacts(app);
+
+    await app.createWithDefaults({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: { evaluatorType: "ragas/faithfulness" },
+    });
+
+    expect(sent).toEqual([
+      {
+        tenantId: "project-1",
+        projectId: "project-1",
+        evaluatorId: "evaluator-1",
+        occurredAt: expect.any(Number),
+      },
+    ]);
   });
 });
 

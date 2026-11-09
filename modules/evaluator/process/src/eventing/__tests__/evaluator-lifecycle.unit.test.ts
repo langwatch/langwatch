@@ -13,7 +13,7 @@ import {
 import { createTenantId, type Command } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
-import { EvaluatorDeletionFactsService } from "../../services/evaluator-deletion-facts.service.ts";
+import { EvaluatorLifecycleFactsService } from "../../services/evaluator-lifecycle-facts.service.ts";
 import {
   RecordEvaluatorCreatedCommand,
   RecordEvaluatorDeletedCommand,
@@ -59,7 +59,7 @@ describe("evaluator's deleted fact", () => {
   describe("when evaluator_lifecycle is not registered in the process", () => {
     /** @scenario "an evaluator deletion outside a registered pipeline is refused by name" */
     it("refuses the record, naming the pipeline", async () => {
-      const facts = EvaluatorDeletionFactsService.create();
+      const facts = EvaluatorLifecycleFactsService.create();
 
       await expect(
         facts.recordEvaluatorDeleted({ projectId: "project-1", evaluatorId: "evaluator-1" }),

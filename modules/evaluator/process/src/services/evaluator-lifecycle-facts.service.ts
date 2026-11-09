@@ -19,11 +19,11 @@ export type EvaluatorLifecycleSenders = Readonly<{
  * Records evaluator's lifecycle facts on its own pipeline: its creation, and its deletion,
  * which monitor reacts to from its side.
  */
-export class EvaluatorDeletionFactsService {
+export class EvaluatorLifecycleFactsService {
   #senders: EvaluatorLifecycleSenders | undefined;
 
-  static create(): EvaluatorDeletionFactsService {
-    return new EvaluatorDeletionFactsService();
+  static create(): EvaluatorLifecycleFactsService {
+    return new EvaluatorLifecycleFactsService();
   }
 
   private constructor() {}
