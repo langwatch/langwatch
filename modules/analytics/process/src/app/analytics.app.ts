@@ -59,6 +59,7 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
@@ -111,7 +112,7 @@ import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-quest
 import { keyRunTelemetry } from "../rules/langwatch-ql-key-caller.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { langWatchQLQueryHashKey } from "../rules/langwatch-ql-run-telemetry.rules.ts";
-import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
+import { dashboardsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
@@ -215,6 +216,8 @@ interface AnalyticsAppDependencies {
   dataPrivacy: DataPrivacyApi;
   /** The SAME project peer the rollout gate and the run-caller's identity read. */
   projects: ProjectApi;
+  /** Instant Evals' answer to whether a project may call an eval function (ADR-182). */
+  instantEvals: Pick<InstantEvalApi, "isEnabled">;
   /** The per-project window every LangWatchQL execution is counted against. */
   lwqlBounds: LangWatchQLBoundsService;
   /** The peer every app-function value is read and rendered through. */
@@ -551,6 +554,7 @@ export class AnalyticsModule
         authz: setup.dependencies.authz,
         dataPrivacy: setup.dependencies.dataPrivacy,
         projects: setup.dependencies.projects,
+        instantEvals: setup.channels.judge,
         lwqlBounds: LangWatchQLBoundsService.create({
           entitlement: setup.dependencies.plans,
           projects: setup.dependencies.projects,
@@ -995,13 +999,12 @@ export class AnalyticsModule
     return this.#dependencies.langWatchQL.executePass(input);
   }
 
-  /** This project's eval-function rollout, the answer a member's own statement reads. */
+  /**
+   * Whether a member's own statement may call an eval function: Instant Evals' answer, so an own
+   * decision model or an opted-in organization counts, not the release flag alone.
+   */
   #isInstantEvalsEnabled(projectId: string): Promise<boolean> {
-    return instantEvalsEnabled({
-      featureFlags: this.#dependencies.featureFlags,
-      projectId,
-      projects: this.#dependencies.projects,
-    });
+    return this.#dependencies.instantEvals.isEnabled({ projectId });
   }
 
   upsertEvaluationAnalytics(input: AnalyticsEvaluationUpsertInput): Promise<void> {

@@ -14,6 +14,9 @@ import {
   CONTACT_US_HREF,
   InstantEvalRefusalPopover,
   instantEvalRefusalCopy,
+  type InstantEvalRefusal,
+  MODEL_PROVIDERS_HREF,
+  OWN_MODEL_LINK,
   SELF_HOSTED_INSTANT_EVALS_HREF,
   UPGRADE_HREF,
   WHERE_THE_TEXT_GOES_HREF,
@@ -74,7 +77,7 @@ describe("given the deployment has no classifier", () => {
 
 describe("given the Instant Evals flag is off for the project", () => {
   /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
-  it("says Instant Evals aren't enabled yet, offers Contact us, and dismisses on Not now", () => {
+  it("says Instant Evals aren't enabled yet, offers Contact us and the own model, and dismisses on Not now", () => {
     const onClose = vi.fn();
     const onSkip = vi.fn();
     render(
@@ -93,12 +96,17 @@ describe("given the Instant Evals flag is off for the project", () => {
     expect(screen.getByText("Instant Evals aren't enabled for this project yet")).toBeTruthy();
     expect(
       screen.getByText(
-        "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate it for you.",
+        "Instant Evals are a powerful new tool that turns plain language questions into native filters. Run them now on your own decision model, or contact us so we can activate Evals Preview, our hosted model, for you.",
       ),
     ).toBeTruthy();
     expect(screen.getByRole("link", { name: "Contact us" }).getAttribute("href")).toBe(
       CONTACT_US_HREF,
     );
+    expect(
+      screen
+        .getByRole("link", { name: "Run them on your own decision model" })
+        .getAttribute("href"),
+    ).toBe(MODEL_PROVIDERS_HREF);
 
     fireEvent.click(screen.getByRole("button", { name: "Not now" }));
 
@@ -313,5 +321,50 @@ describe("given an eval chip refused on a self-hosted install", () => {
       expect(screen.getByText(/whoever runs it decides/)).toBeInTheDocument();
       expect(screen.queryByText("Contact us")).toBeNull();
     });
+  });
+});
+
+describe("given an eval chip refused by a gate on LangWatch's own model", () => {
+  const gated: InstantEvalRefusal[] = [
+    { kind: "budget" },
+    { kind: "opt_in" },
+    { kind: "ask_admin" },
+    { kind: "unreleased" },
+    { kind: "not_in_license" },
+    { kind: "switched_off" },
+    { kind: "not_connected" },
+    { kind: "ask_operator" },
+  ];
+
+  /** @scenario "Every refusal of LangWatch's own model offers the project's own decision model" */
+  it.each(gated)(
+    "links $kind to Default models for the project's own decision model",
+    (refusal) => {
+      expect(instantEvalRefusalCopy(refusal).ownModel).toEqual(OWN_MODEL_LINK);
+
+      render(
+        <InstantEvalRefusalPopover
+          refusal={refusal}
+          onClose={vi.fn()}
+          onSkip={vi.fn()}
+          onEnable={vi.fn()}
+          isEnabling={false}
+        >
+          <span>anchor</span>
+        </InstantEvalRefusalPopover>,
+        { wrapper },
+      );
+
+      expect(screen.getByTestId("instant-eval-own-model-link").getAttribute("href")).toBe(
+        MODEL_PROVIDERS_HREF,
+      );
+    },
+  );
+
+  /** @scenario "Every refusal of LangWatch's own model offers the project's own decision model" */
+  it("offers no own-model link when the judge can't run right now", () => {
+    const copy = instantEvalRefusalCopy({ kind: "model" });
+
+    expect("ownModel" in copy ? copy.ownModel : undefined).toBeUndefined();
   });
 });

@@ -136,6 +136,13 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       When the explorer asks for its Instant Evals access
       Then it is released, and LangWatch's own model is not
 
+
+    @integration
+    Scenario: Every refusal of LangWatch's own model offers the project's own decision model
+      Given an eval chip refused for the plan, the release, the organization's switch, a license or an install
+      When the refusal popover opens
+      Then it links to Default models to run Instant Evals on the project's own decision model
+      And a judge that can't run right now offers no such link
   Rule: The switch is the organization's, and the first click is the one that counts
 
     @integration
@@ -220,6 +227,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Given an organization that is offered a word with us
       When the reader submits an eval chip
       Then a closable popover anchored under the search bar says Instant Evals aren't enabled for this project and offers to contact us
+      And it offers to run them now on the project's own decision model, in Default models
       And no estimate is requested and the typed query stays in the bar
       And closing it, by Escape or a click outside, keeps the typed query and searches nothing
 

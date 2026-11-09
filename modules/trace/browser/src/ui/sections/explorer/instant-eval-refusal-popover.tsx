@@ -37,6 +37,15 @@ export const UPGRADE_HREF = "/settings/subscription";
 /** Where a model provider is connected, which is what a judge runs on. */
 export const MODEL_PROVIDERS_HREF = "/settings/model-providers";
 
+/**
+ * Every refusal but a broken judge gates LangWatch's own model only: a project on its own decision
+ * model, picked in Default models, runs whatever the release, plan or license says (ADR-182).
+ */
+export const OWN_MODEL_LINK = {
+  label: "Run them on your own decision model",
+  href: MODEL_PROVIDERS_HREF,
+} as const;
+
 /** What an Instant Eval does, said once on the Enterprise lock. */
 const INSTANT_EVALS_DESCRIPTION =
   "Ask your traces a question in plain language and keep only the results that answer it.";
@@ -81,6 +90,8 @@ interface InstantEvalRefusalCopy {
   action?: { label: string; href?: string };
   /** A second, quieter link beside the action, when the copy has one. */
   more?: { label: string; href: string };
+  /** The way round a gate on LangWatch's own model: the project's own decision model. */
+  ownModel?: { label: string; href: string };
   dismiss: string;
 }
 
@@ -88,6 +99,7 @@ interface InstantEvalRefusalCopy {
 interface InstantEvalLicenseLockCopy {
   lock: "license";
   more: { label: string; href: string };
+  ownModel: { label: string; href: string };
   dismiss: string;
 }
 
@@ -103,11 +115,17 @@ const SELF_HOSTED_REFUSAL_COPY: { not_in_license: InstantEvalLicenseLockCopy } &
   InstantEvalRefusalCopy
 > = {
   // Also the answer with no license at all, so it never says what a license holds.
-  not_in_license: { lock: "license", more: READ_MORE_SELF_HOSTED, dismiss: "Not now" },
+  not_in_license: {
+    lock: "license",
+    more: READ_MORE_SELF_HOSTED,
+    ownModel: OWN_MODEL_LINK,
+    dismiss: "Not now",
+  },
   switched_off: {
     title: "Instant Evals are switched off for your organization",
     body: "Your license includes Instant Evals, and an organization admin switched them off. An admin can switch them back on in Settings, Connect.",
     action: { label: "Open Connect settings", href: CONNECT_SETTINGS_HREF },
+    ownModel: OWN_MODEL_LINK,
     dismiss: "Not now",
   },
   not_connected: {
@@ -115,12 +133,14 @@ const SELF_HOSTED_REFUSAL_COPY: { not_in_license: InstantEvalLicenseLockCopy } &
     title: "This install isn't connected to LangWatch",
     body: `Instant Evals on a self-hosted install judge through LangWatch. The install needs Connect switched on and ${CONNECT_HOSTS} reachable.`,
     more: READ_MORE_SELF_HOSTED,
+    ownModel: OWN_MODEL_LINK,
     dismiss: "Not now",
   },
   ask_operator: {
     title: "Instant Evals are off on this install",
     body: "This install doesn't judge through LangWatch, so whoever runs it decides when Instant Evals are on. Ask them to switch Instant Evals on.",
     more: READ_MORE_SELF_HOSTED,
+    ownModel: OWN_MODEL_LINK,
     dismiss: "Not now",
   },
 };
@@ -148,6 +168,7 @@ export function instantEvalRefusalCopy(
       title: "Your free Instant Evals quota is used up",
       body: `${what} Upgrade to keep judging. ${skip}`,
       action: { label: "Compare plans", href: UPGRADE_HREF },
+      ownModel: OWN_MODEL_LINK,
       dismiss: "Skip",
     };
   }
@@ -175,6 +196,7 @@ export function instantEvalRefusalCopy(
       body: `${whereItGoes} Enable turns this on for every project in your organization.`,
       action: { label: "Enable" },
       more: { label: "Read more", href: WHERE_THE_TEXT_GOES_HREF },
+      ownModel: OWN_MODEL_LINK,
       dismiss: "Not now",
     };
   }
@@ -183,13 +205,15 @@ export function instantEvalRefusalCopy(
       title: "Instant Evals aren't turned on for your organization yet",
       body: `${whereItGoes} Ask an organization admin to turn it on for every project in your organization.`,
       more: { label: "Read more", href: WHERE_THE_TEXT_GOES_HREF },
+      ownModel: OWN_MODEL_LINK,
       dismiss: "Not now",
     };
   }
   return {
     title: "Instant Evals aren't enabled for this project yet",
-    body: "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate it for you.",
+    body: "Instant Evals are a powerful new tool that turns plain language questions into native filters. Run them now on your own decision model, or contact us so we can activate Evals Preview, our hosted model, for you.",
     action: { label: "Contact us", href: CONTACT_US_HREF },
+    ownModel: OWN_MODEL_LINK,
     dismiss: "Not now",
   };
 }
@@ -226,6 +250,7 @@ export function InstantEvalRefusalPopover({
           <RoutedLink href={lockCopy.more.href} target="_blank" rel="noopener noreferrer">
             {lockCopy.more.label}
           </RoutedLink>
+          <OwnModelLink link={lockCopy.ownModel} />
         </>
       }
     />
@@ -265,6 +290,7 @@ export function InstantEvalRefusalPopover({
                         {copy.more.label}
                       </RoutedLink>
                     )}
+                    <OwnModelLink link={copy.ownModel} />
                   </>
                 }
               />
@@ -291,6 +317,7 @@ export function InstantEvalRefusalPopover({
                   <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
                     {copy.body}
                   </Text>
+                  <OwnModelLink link={copy.ownModel} />
                   <HStack gap={2}>
                     {action && actionHref === undefined && (
                       <Button
@@ -332,5 +359,17 @@ export function InstantEvalRefusalPopover({
         </PopoverBody>
       </PopoverContent>
     </PopoverRoot>
+  );
+}
+
+/** The quiet link to Default models, where a project picks its own decision model. */
+function OwnModelLink({ link }: { link: { label: string; href: string } | undefined }) {
+  if (!link) return null;
+  return (
+    <Text textStyle="xs">
+      <RoutedLink href={link.href} data-testid="instant-eval-own-model-link">
+        {link.label}
+      </RoutedLink>
+    </Text>
   );
 }
