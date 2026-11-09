@@ -30,7 +30,16 @@ type SubscriptionRow = {
   seatsKept: number | null;
   seatsKeptUntil: Date | null;
   maxRetentionDays?: number | null;
+  paymentRecoveryInvoiceId?: string | null;
+  paymentRecoveryStartedAt?: Date | null;
+  paymentRecoveryNoticeDay?: number | null;
 };
+
+const RECOVERY_CLEARED = {
+  paymentRecoveryInvoiceId: null,
+  paymentRecoveryStartedAt: null,
+  paymentRecoveryNoticeDay: null,
+} as const;
 
 /** The subscription row on the one clock every reader above this file uses. */
 function subscriptionRecordOf(row: SubscriptionRow): BillingSubscriptionRecord {
@@ -50,6 +59,11 @@ function subscriptionRecordOf(row: SubscriptionRow): BillingSubscriptionRecord {
     seatsKept: row.seatsKept,
     seatsKeptUntil: row.seatsKeptUntil ? fromDate(row.seatsKeptUntil) : null,
     maxRetentionDays: row.maxRetentionDays ?? null,
+    paymentRecoveryInvoiceId: row.paymentRecoveryInvoiceId ?? null,
+    paymentRecoveryStartedAt: row.paymentRecoveryStartedAt
+      ? fromDate(row.paymentRecoveryStartedAt)
+      : null,
+    paymentRecoveryNoticeDay: row.paymentRecoveryNoticeDay ?? null,
   };
 }
 
@@ -200,6 +214,8 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
         status: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
         endDate: toDate(nowInstant()),
         ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
+        // A cancelled subscription has nothing left to recover; no email goes for it.
+        ...RECOVERY_CLEARED,
       },
     });
   }

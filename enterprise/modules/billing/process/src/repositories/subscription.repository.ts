@@ -17,6 +17,10 @@ export type BillingSubscriptionRecord = {
   seatsKeptUntil: Instant | null;
   /** The retention the checkout was bought with; absent when it offered no choice. */
   maxRetentionDays?: number | null;
+  /** An open failed payment recovery case: its invoice, day 0, and the last notice sent. */
+  paymentRecoveryInvoiceId?: string | null;
+  paymentRecoveryStartedAt?: Instant | null;
+  paymentRecoveryNoticeDay?: number | null;
 };
 
 type BillingOrganizationRecord = {

@@ -4685,6 +4685,11 @@ model Subscription {
   /// The lease a seat change or seat line repair holds while it reads and moves the seat line.
   seatLineLeaseToken    String?
   seatLineLeaseUntil    DateTime?
+  /// An open failed payment recovery case: the unpaid renewal invoice, day 0 (its first failed
+  /// charge) and the last notice sent (0, 3, 7, 14 or 21). Cleared when the case closes.
+  paymentRecoveryInvoiceId String?
+  paymentRecoveryStartedAt DateTime?
+  paymentRecoveryNoticeDay Int?
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]

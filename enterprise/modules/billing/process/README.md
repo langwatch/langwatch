@@ -6,7 +6,7 @@ The server half of [billing](../README.md). Billing: subscriptions, invoices and
 
 ## Installation
 
-`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withEventing(seatLineRepairEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:44`.
+`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withEventing(seatLineRepairEventing).withEventing(paymentRecoveryEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:45`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -113,7 +113,7 @@ getPricingModel(input: { organizationId: string; }): Promise<{ pricingModel: Bil
 Opens a seat checkout for `membersToAdd`, the customer resolved from `customerEmail`. Answers the pending subscription organization holds the checkout's invitations against (C2 A).
 
 ```typescript
-createSeatCheckout(input: { organizationId: string; baseUrl: string; membersToAdd: number; currency?: Currency; billingInterval?: SubscriptionBillingInterval; customerEmail: string | null; }): Promise<{ url: string | null; subscriptionId: string }>;
+createSeatCheckout(input: { organizationId: string; baseUrl: string; membersToAdd: number; currency?: Currency; billingInterval?: SubscriptionBillingInterval; customerEmail: string | null; retentionDays?: number; }): Promise<{ url: string | null; subscriptionId: string }>;
 ```
 
 ## REST transport
@@ -233,38 +233,41 @@ interface Output {
 
 ### `subscription`
 
-Contract `../contract/src/subscription.trpc.ts:36`, router `src/transport/subscription.trpc.ts:103`.
+Contract `../contract/src/subscription.trpc.ts:41`, router `src/transport/subscription.trpc.ts:111`.
 
-| Procedure                            | Kind     | Gate                              | Input                     | Output                           |
-| ------------------------------------ | -------- | --------------------------------- | ------------------------- | -------------------------------- |
-| `subscription.addTeamMemberOrEvents` | mutation | Permission `subscription:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
-| `subscription.create`                | mutation | Permission `subscription:upgrade` | inline                    | `billingRedirectSchema`          |
-| `subscription.manage`                | mutation | Permission `subscription:manage`  | inline                    | `billingPortalSessionSchema`     |
-| `subscription.previewProration`      | query    | Permission `subscription:manage`  | inline                    | `providerOwnedSchema`            |
-| `subscription.getLastSubscription`   | query    | Permission `organization:view`    | `organizationScopeSchema` | `providerOwnedSchema`            |
-| `subscription.prospective`           | mutation | Permission `subscription:manage`  | inline                    | `providerOwnedSchema`            |
-| `subscription.developerSeats`        | query    | Permission `organization:view`    | `organizationScopeSchema` | `developerSeatsSchema`           |
-| `subscription.previewDeveloperSeats` | query    | Permission `organization:manage`  | inline                    | `developerSeatQuoteSchema`       |
-| `subscription.setDeveloperSeats`     | mutation | Permission `organization:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
-| `subscription.listInvoices`          | query    | Permission `subscription:manage`  | `organizationScopeSchema` | inline                           |
+| Procedure                             | Kind     | Gate                              | Input                     | Output                           |
+| ------------------------------------- | -------- | --------------------------------- | ------------------------- | -------------------------------- |
+| `subscription.addTeamMemberOrEvents`  | mutation | Permission `subscription:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
+| `subscription.create`                 | mutation | Permission `subscription:upgrade` | inline                    | `billingRedirectSchema`          |
+| `subscription.manage`                 | mutation | Permission `subscription:manage`  | inline                    | `billingPortalSessionSchema`     |
+| `subscription.previewProration`       | query    | Permission `subscription:manage`  | inline                    | `providerOwnedSchema`            |
+| `subscription.getLastSubscription`    | query    | Permission `organization:view`    | `organizationScopeSchema` | `providerOwnedSchema`            |
+| `subscription.prospective`            | mutation | Permission `subscription:manage`  | inline                    | `providerOwnedSchema`            |
+| `subscription.developerSeats`         | query    | Permission `organization:view`    | `organizationScopeSchema` | `developerSeatsSchema`           |
+| `subscription.previewDeveloperSeats`  | query    | Permission `organization:manage`  | inline                    | `developerSeatQuoteSchema`       |
+| `subscription.setDeveloperSeats`      | mutation | Permission `organization:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
+| `subscription.listInvoices`           | query    | Permission `subscription:manage`  | `organizationScopeSchema` | inline                           |
+| `subscription.paymentRecovery`        | query    | Permission `organization:view`    | `organizationScopeSchema` | `paymentRecoverySummarySchema`   |
+| `subscription.paymentRecoveryDetails` | query    | Permission `subscription:manage`  | `organizationScopeSchema` | `paymentRecoveryDetailsSchema`   |
+| `subscription.paymentRecoveryPayLink` | mutation | Permission `subscription:manage`  | `organizationScopeSchema` | `paymentRecoveryPayLinkSchema`   |
 
 ```typescript
 // subscription.addTeamMemberOrEvents
-// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, upgradeMembers… (inline, ../contract/src/subscription.trpc.ts:39)
+// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, upgradeMembers… (inline, ../contract/src/subscription.trpc.ts:44)
 // Output: subscriptionItemsUpdatedSchema, ../contract/src/billing-types.ts:234
 interface Output {
   success: boolean;
 }
 
 // subscription.create
-// Input: z.object({ ...organizationScopeSchema.shape, baseUrl: z.string(), plan: subscribablePlanS… (inline, ../contract/src/subscription.trpc.ts:56)
+// Input: z.object({ ...organizationScopeSchema.shape, baseUrl: z.string(), plan: subscribablePlanS… (inline, ../contract/src/subscription.trpc.ts:61)
 // Output: billingRedirectSchema, ../contract/src/billing-types.ts:218
 interface Output {
   url: string | null;
 }
 
 // subscription.manage
-// Input: inline, ../contract/src/subscription.trpc.ts:69
+// Input: inline, ../contract/src/subscription.trpc.ts:76
 interface Input {
   organizationId: string;
   baseUrl: string;
@@ -275,27 +278,27 @@ interface Output {
 }
 
 // subscription.previewProration
-// Input: inline, ../contract/src/subscription.trpc.ts:73
+// Input: inline, ../contract/src/subscription.trpc.ts:80
 interface Input {
   organizationId: string;
   newTotalSeats: number;
 }
-// Output: providerOwnedSchema, ../contract/src/subscription.trpc.ts:34
+// Output: providerOwnedSchema, ../contract/src/subscription.trpc.ts:39
 type Output = unknown;
 
 // subscription.getLastSubscription
-// Input: organizationScopeSchema, ../contract/src/subscription.trpc.ts:20
+// Input: organizationScopeSchema, ../contract/src/subscription.trpc.ts:25
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:34
+type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:39
 
 // subscription.prospective
-// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, customerName: … (inline, ../contract/src/subscription.trpc.ts:82)
-type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:34
+// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, customerName: … (inline, ../contract/src/subscription.trpc.ts:89)
+type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:39
 
 // subscription.developerSeats
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:20
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:25
 // Output: developerSeatsSchema, ../contract/src/billing-types.ts:294
 interface Output {
   available: boolean;
@@ -307,7 +310,7 @@ interface Output {
 }
 
 // subscription.previewDeveloperSeats
-// Input: inline, ../contract/src/subscription.trpc.ts:99
+// Input: inline, ../contract/src/subscription.trpc.ts:106
 interface Input {
   organizationId: string;
   quantity: number;
@@ -323,7 +326,7 @@ interface Output {
 }
 
 // subscription.setDeveloperSeats
-// Input: inline, ../contract/src/subscription.trpc.ts:104
+// Input: inline, ../contract/src/subscription.trpc.ts:111
 interface Input {
   organizationId: string;
   quantity: number;
@@ -332,8 +335,8 @@ interface Input {
 type Output = z.infer<typeof subscriptionItemsUpdatedSchema>; // ../contract/src/billing-types.ts:234
 
 // subscription.listInvoices
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:20
-// Output: inline, ../contract/src/subscription.trpc.ts:114
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:25
+// Output: inline, ../contract/src/subscription.trpc.ts:121
 type Output = {
   id: string;
   number: string | null;
@@ -344,6 +347,37 @@ type Output = {
   pdfUrl: string | null;
   hostedUrl: string | null;
 }[];
+
+// subscription.paymentRecovery
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:25
+// Output: paymentRecoverySummarySchema, ../contract/src/payment-recovery.ts:18
+interface Output {
+  state: "none" | "failing" | "paused";
+}
+
+// subscription.paymentRecoveryDetails
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:25
+// Output: paymentRecoveryDetailsSchema, ../contract/src/payment-recovery.ts:39
+interface Output {
+  state: "none" | "failing" | "paused";
+  startedAt: string | null;
+  accessStopsAt: string | null;
+  invoiceNumber: string | null;
+  amountDue: number | null;
+  currency: string | null;
+  card: {
+    brand: string;
+    last4: string;
+  } | null;
+}
+
+// subscription.paymentRecoveryPayLink
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:25
+// Output: paymentRecoveryPayLinkSchema, ../contract/src/payment-recovery.ts:52
+interface Output {
+  url: string;
+  isFallback: boolean;
+}
 ```
 
 ## Sockets
@@ -392,6 +426,14 @@ Declared at `src/eventing/connected-billing.pipeline.ts:73`. Events: `connectedC
 | process manager | `connectedBillingTick`             | every 5 min (`CONNECTED_BILLING_FIRST_DELAY_MS = 5 * 60 * 1000`); intents `tick` (outbox) | `src/eventing/connected-billing.pipeline.ts:80` |
 | process manager | `seatInvoicing`                    | every 1 min (`SEAT_INVOICING_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)           | `src/eventing/connected-billing.pipeline.ts:97` |
 
+### Pipeline `billing_payment_recovery` (aggregate `global`)
+
+Declared at `src/eventing/payment-recovery.pipeline.ts:43`.
+
+| Kind            | Name              | Handles                                                                               | Declared at                                    |
+| --------------- | ----------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| process manager | `paymentRecovery` | every 1 h (`PAYMENT_RECOVERY_INTERVAL_MS = 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/payment-recovery.pipeline.ts:49` |
+
 ### Pipeline `billing_seat_line_repair` (aggregate `global`)
 
 Declared at `src/eventing/seat-line-repair.pipeline.ts:40`.
@@ -413,12 +455,12 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                | Environment variable                           | Declared at                            |
 | ------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
-| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:195`           |
-| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:196`           |
-| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:197`           |
-| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:198`           |
-| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:199`           |
-| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:200`           |
+| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:212`           |
+| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:213`           |
+| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:214`           |
+| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:215`           |
+| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:216`           |
+| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:217`           |
 | config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:13` |
 | config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:15` |
 | config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:23` |

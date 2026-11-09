@@ -20,6 +20,9 @@ import {
   type SubscriptionBillingInterval,
   type CurrencyRequest,
   type DetectedCurrency,
+  type PaymentRecoveryDetails,
+  type PaymentRecoveryPayLink,
+  type PaymentRecoverySummary,
   type ConnectedBillingAccountView,
   type ConnectedBillingOverview,
   ConnectedBillingUnavailableError,
@@ -49,6 +52,7 @@ import type { BillingSubscriptionNotifier } from "../channels/billing-subscripti
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { BillingChannels } from "../channels/billing.channels.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
+import type { PaymentRecoveryEmailChannel } from "../channels/payment-recovery-email.channel.ts";
 import { SlackBillingSubscriptionNotifierChannel } from "../channels/slack/slack.billing-subscription-notifier.channel.ts";
 import { SlackBillingWebhookHostChannel } from "../channels/slack/slack.billing-webhook-host.channel.ts";
 import type { BillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
@@ -89,6 +93,10 @@ import { CustomerService } from "../services/customer.service.ts";
 import { DeveloperSeatService } from "../services/developer-seat.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
+import {
+  PaymentRecoveryService,
+  type PaymentRecoverySweepOutcome,
+} from "../services/payment-recovery.service.ts";
 import { PlanLimitAlertService } from "../services/plan-limit-alert.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
@@ -156,6 +164,15 @@ type StripeWebhookComposition = Readonly<{
   licenseRenewal?: Pick<LicensePurchaseService, "mintRenewal" | "sendRenewal">;
   /** Clears a trial's licence once its subscription activates; licensing owns it. */
   licenses: Pick<LicensingApi, "removeLicense" | "getLicenseStatus">;
+  /** Failed payment recovery's mail and links; absent, a failed renewal opens no case. */
+  recovery?: PaymentRecoveryComposition;
+}>;
+
+type PaymentRecoveryComposition = Readonly<{
+  emails: PaymentRecoveryEmailChannel;
+  publicBaseUrl: string;
+  /** Billing role holders are told too; absent, admins only. */
+  billingMembers?: Pick<AuthzApi, "listBillingMembers">;
 }>;
 
 type SubscriptionComposition = Readonly<{
@@ -248,6 +265,11 @@ export class BillingModule
         licenses: setup.dependencies.licensing,
         licensePurchase,
         licenseRenewal: licensePurchase,
+        recovery: {
+          emails: channels.paymentRecoveryEmail,
+          publicBaseUrl: setup.config.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
+          billingMembers: setup.dependencies.authorization,
+        },
       },
       subscription: {
         notifier: SlackBillingSubscriptionNotifierChannel.create({ notices }),
@@ -373,6 +395,7 @@ export class BillingModule
       | "organizations"
       | "gatewaySpend"
       | "projects"
+      | "paymentRecovery"
     >;
     config: Pick<
       BillingServerConfig,
@@ -436,8 +459,24 @@ export class BillingModule
         connected: void 0,
         stripeWebhook: BillingModule.#undispatchedWebhook(),
         subscriptions: void 0,
+        paymentRecovery: void 0,
       });
     }
+
+    const recovery = webhook?.recovery;
+    const paymentRecovery =
+      webhook && recovery && isSaas
+        ? PaymentRecoveryService.create({
+            recoveries: repositories.paymentRecovery,
+            subscriptions: repositories.webhookSubscriptions,
+            organizations: repositories.organizations,
+            ...(recovery.billingMembers ? { billingMembers: recovery.billingMembers } : {}),
+            invoices: stripe.channels.invoices,
+            emails: recovery.emails,
+            alerts: webhook.host,
+            publicBaseUrl: recovery.publicBaseUrl,
+          })
+        : void 0;
 
     const invoicing = stripe.channels.connectedInvoicing;
     const { licensing } = peers;
@@ -469,8 +508,10 @@ export class BillingModule
             connectedBilling: billing,
             announcer: lifecycle,
             billingRoles,
+            paymentRecovery,
           })
         : BillingModule.#undispatchedWebhook(),
+      paymentRecovery,
       subscriptions:
         subscription && isSaas
           ? BillingModule.#composeSubscriptions({
@@ -697,7 +738,9 @@ export class BillingModule
     connectedBilling,
     announcer,
     billingRoles,
+    paymentRecovery,
   }: {
+    paymentRecovery: PaymentRecoveryService | undefined;
     announcer: BillingLifecycleAnnouncerService | undefined;
     /** The Billing role a completed checkout hands its starter. */
     billingRoles: CheckoutBillingRoles | undefined;
@@ -739,6 +782,7 @@ export class BillingModule
       connectedBilling,
       ...(billingRoles ? { billingRoles } : {}),
       ...(announcer ? { announcer } : {}),
+      ...(paymentRecovery ? { recovery: paymentRecovery } : {}),
     });
     return StripeWebhookReceiptService.create({
       dispatchesEvents: () => isSaas,
@@ -777,8 +821,10 @@ export class BillingModule
   readonly #reporting: BillingReportingPipeline;
   readonly #resourceLimitAlerts: ResourceLimitAlertService;
   readonly #lifecycle: BillingLifecycleAnnouncerService | undefined;
+  readonly #paymentRecovery: PaymentRecoveryService | undefined;
 
   private constructor({
+    paymentRecovery,
     stripeWebhook,
     subscriptions,
     connected,
@@ -791,6 +837,7 @@ export class BillingModule
     resourceLimitAlerts,
     lifecycle,
   }: {
+    paymentRecovery: PaymentRecoveryService | undefined;
     lifecycle: BillingLifecycleAnnouncerService | undefined;
     stripeWebhook: StripeWebhookReceiptService;
     subscriptions: SubscriptionDoor | undefined;
@@ -814,6 +861,7 @@ export class BillingModule
     this.#reporting = reporting;
     this.#resourceLimitAlerts = resourceLimitAlerts;
     this.#lifecycle = lifecycle;
+    this.#paymentRecovery = paymentRecovery;
   }
 
   notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void> {
@@ -1114,6 +1162,39 @@ export class BillingModule
   async repairSeatLines(): Promise<SeatLineRepairOutcome> {
     if (!this.#subscriptions) return { repaired: 0, pending: 0, failed: 0, flagged: 0 };
     return this.#subscriptions.seatLines.repairSeatLines();
+  }
+
+  /** Sends each open recovery case's notice that is due; nothing where recovery is not composed. */
+  async sweepPaymentRecovery(): Promise<PaymentRecoverySweepOutcome> {
+    if (!this.#paymentRecovery) return { notified: 0, closed: 0, failed: 0 };
+    return this.#paymentRecovery.sweep();
+  }
+
+  async paymentRecovery(input: { organizationId: string }): Promise<PaymentRecoverySummary> {
+    if (!this.#paymentRecovery) return { state: "none" };
+    return this.#paymentRecovery.summary(input);
+  }
+
+  async paymentRecoveryDetails(input: { organizationId: string }): Promise<PaymentRecoveryDetails> {
+    if (!this.#paymentRecovery) {
+      return {
+        state: "none",
+        startedAt: null,
+        accessStopsAt: null,
+        invoiceNumber: null,
+        amountDue: null,
+        currency: null,
+        card: null,
+      };
+    }
+    return this.#paymentRecovery.details(input);
+  }
+
+  async paymentRecoveryPayLink(input: { organizationId: string }): Promise<PaymentRecoveryPayLink> {
+    if (!this.#paymentRecovery) {
+      return { url: `${DEFAULT_PUBLIC_BASE_URL}/settings/subscription`, isFallback: true };
+    }
+    return this.#paymentRecovery.payLink(input);
   }
 
   /** Every row it reads and every invoice it raises is Cloud's: an install runs nothing. */

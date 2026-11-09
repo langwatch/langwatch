@@ -13,6 +13,11 @@ import {
   developerSeatsSchema,
   subscriptionItemsUpdatedSchema,
 } from "./billing-types.ts";
+import {
+  paymentRecoveryDetailsSchema,
+  paymentRecoveryPayLinkSchema,
+  paymentRecoverySummarySchema,
+} from "./payment-recovery.ts";
 import { SUBSCRIBABLE_PLANS } from "./plan-types.ts";
 import { currencySchema } from "./pricing.ts";
 
@@ -114,6 +119,20 @@ export const subscriptionTrpc = defineTrpcContract("subscription")
   .query("listInvoices")
   .withInput(organizationScopeSchema)
   .withOutput(billingDisplayInvoiceSchema.array())
+
+  // Whether a failed payment has the organization failing or paused; every member reads it.
+  .query("paymentRecovery")
+  .withInput(organizationScopeSchema)
+  .withOutput(paymentRecoverySummarySchema)
+
+  // The open case's invoice, amount, card and stop date, for those who can pay it.
+  .query("paymentRecoveryDetails")
+  .withInput(organizationScopeSchema)
+  .withOutput(paymentRecoveryDetailsSchema)
+
+  .mutation("paymentRecoveryPayLink")
+  .withInput(organizationScopeSchema)
+  .withOutput(paymentRecoveryPayLinkSchema)
   .build();
 
 export const billingCallerEmailSchema = z.string().nullable();

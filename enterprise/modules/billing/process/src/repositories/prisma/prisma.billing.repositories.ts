@@ -14,6 +14,7 @@ import { PrismaConnectedBillingRepository } from "./prisma.connected-billing.rep
 import { PrismaDuplicateSubscriptionsReportRepository } from "./prisma.duplicate-subscriptions-report.repository.ts";
 import { PrismaLicenseRenewalClaimRepository } from "./prisma.license-renewal-claim.repository.ts";
 import { PrismaOrganizationPricingRepository } from "./prisma.organization-pricing.repository.ts";
+import { PrismaPaymentRecoveryRepository } from "./prisma.payment-recovery.repository.ts";
 import { PrismaSeatEventSubscriptionRepository } from "./prisma.seat-event-subscription.repository.ts";
 import { PrismaBillingSubscriptionRepository } from "./prisma.subscription.repository.ts";
 
@@ -39,6 +40,7 @@ export class PostgresBillingRepositories {
       licenseRenewalClaims: PrismaLicenseRenewalClaimRepository.create(prisma),
       organizations: PrismaBillingOrganizationRepository.create(prisma),
       organizationPricing: PrismaOrganizationPricingRepository.create(prisma),
+      paymentRecovery: PrismaPaymentRecoveryRepository.create(prisma),
       projects: PrismaBillingProjectDirectoryRepository.create(prisma),
       reportOrganizations: PrismaBillingReportOrganizationRepository.create(prisma),
       seatEventSubscriptions: PrismaSeatEventSubscriptionRepository.create(prisma),

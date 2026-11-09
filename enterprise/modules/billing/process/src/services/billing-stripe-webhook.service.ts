@@ -22,6 +22,7 @@ import {
   BillingSubscriptionLifecycleService,
   type LicenseClearer,
 } from "./billing-subscription-lifecycle.service.ts";
+import type { PaymentRecoveryService, RecoveryInvoice } from "./payment-recovery.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:webhookService");
@@ -81,6 +82,27 @@ type WebhookService = {
   handleSubscriptionUpdated(params: { subscription: Stripe.Subscription }): Promise<void>;
 };
 
+/** Failed payment recovery's reactions to invoice events (ADR-002). */
+export type PaymentRecoveryHandler = Pick<
+  PaymentRecoveryService,
+  "paymentFailed" | "invoicePaid" | "invoiceClosedUnpaid"
+>;
+
+/** The invoice fields recovery reads, from Stripe's object. */
+function recoveryInvoiceOf(invoice: Stripe.Invoice): RecoveryInvoice {
+  const { subscription } = invoice;
+  return {
+    id: invoice.id,
+    subscriptionId: typeof subscription === "string" ? subscription : (subscription?.id ?? null),
+    collectionMethod: invoice.collection_method ?? null,
+    billingReason: invoice.billing_reason ?? null,
+    amountDue: invoice.amount_due,
+    currency: invoice.currency,
+    number: invoice.number ?? null,
+    created: invoice.created,
+  };
+}
+
 /** A finalized invoice of a connected self-hosted customer completes a waiting renewal. */
 export interface ConnectedBillingInvoiceEvents {
   /** Throws connected_billing_not_onboarded for a LangWatch Cloud customer. */
@@ -98,6 +120,7 @@ export class EEWebhookService implements WebhookService {
   private readonly licenseRenewal?: LicenseRenewalHandler;
   private readonly host: BillingWebhookHost;
   private readonly connectedBilling?: ConnectedBillingInvoiceEvents;
+  private readonly recovery?: PaymentRecoveryHandler;
   private readonly bestEffort = BestEffortService.create();
   private readonly lifecycle: BillingSubscriptionLifecycleService;
   private readonly checkout: BillingCheckoutCompletionService;
@@ -115,7 +138,10 @@ export class EEWebhookService implements WebhookService {
     connectedBilling,
     announcer,
     billingRoles,
+    recovery,
   }: {
+    /** Failed payment recovery; absent where a suite composes none. */
+    recovery?: PaymentRecoveryHandler;
     subscriptionRepository: BillingWebhookSubscriptionRepository;
     organizationRepository: BillingWebhookOrganizationRepository;
     stripeSubscriptions: StripeSubscriptionsChannel;
@@ -141,6 +167,7 @@ export class EEWebhookService implements WebhookService {
     this.licenseRenewal = licenseRenewal;
     this.host = host;
     this.connectedBilling = connectedBilling;
+    this.recovery = recovery;
     this.checkout = BillingCheckoutCompletionService.create({
       subscriptionRepository,
       organizationRepository,
@@ -175,6 +202,7 @@ export class EEWebhookService implements WebhookService {
     connectedBilling?: ConnectedBillingInvoiceEvents;
     announcer?: BillingLifecycleAnnouncerService;
     billingRoles?: CheckoutBillingRoles;
+    recovery?: PaymentRecoveryHandler;
   }): EEWebhookService {
     return new EEWebhookService(options);
   }
@@ -188,12 +216,8 @@ export class EEWebhookService implements WebhookService {
         }
       }
 
-      if (event.type === "invoice.paid" || event.type === "invoice.payment_succeeded") {
-        const renewalResult = await this.tryRouteLicenseRenewal(event);
-        if (renewalResult) {
-          return renewalResult;
-        }
-      }
+      const settled = await this.routeSettledInvoice(event);
+      if (settled) return settled;
 
       if (
         event.type === "checkout.session.completed" ||
@@ -237,6 +261,25 @@ export class EEWebhookService implements WebhookService {
         message: "Webhook processing error",
       };
     }
+  }
+
+  /**
+   * A paid, voided or written-off invoice: licence renewal first, then failed payment recovery.
+   * Null lets `invoice.payment_succeeded` go on to the subscription sync.
+   */
+  private async routeSettledInvoice(event: Stripe.Event): Promise<HandleEventResult | null> {
+    if (event.type === "invoice.paid" || event.type === "invoice.payment_succeeded") {
+      const renewalResult = await this.tryRouteLicenseRenewal(event);
+      if (renewalResult) return renewalResult;
+      // Both paid events of one invoice arrive; only the write that closes the case mails.
+      await this.recovery?.invoicePaid({ invoice: recoveryInvoiceOf(event.data.object) });
+      return event.type === "invoice.paid" ? { status: "ok" } : null;
+    }
+    if (event.type === "invoice.voided" || event.type === "invoice.marked_uncollectible") {
+      await this.recovery?.invoiceClosedUnpaid({ invoice: recoveryInvoiceOf(event.data.object) });
+      return { status: "ok" };
+    }
+    return null;
   }
 
   /**
@@ -387,6 +430,9 @@ export class EEWebhookService implements WebhookService {
 
       case "invoice.payment_failed":
         await this.handleInvoicePaymentFailed({ subscriptionId });
+        await this.recovery?.paymentFailed({
+          invoice: recoveryInvoiceOf(event.data.object as Stripe.Invoice),
+        });
         return { status: "ok" };
     }
   }

@@ -13,6 +13,7 @@ import type { ConnectedBillingRepository } from "./connected-billing.repository.
 import type { DuplicateSubscriptionsReportRepository } from "./duplicate-subscriptions-report.repository.ts";
 import type { LicenseRenewalClaimRepository } from "./license-renewal-claim.repository.ts";
 import type { OrganizationPricingRepository } from "./organization-pricing.repository.ts";
+import type { PaymentRecoveryRepository } from "./payment-recovery.repository.ts";
 import type { SeatEventSubscriptionRepository } from "./seat-event-subscription.repository.ts";
 import type { BillingSubscriptionRepository } from "./subscription.repository.ts";
 
@@ -32,6 +33,8 @@ export interface BillingRepositories {
   readonly organizations: BillingAccountFactsRepository;
   readonly organizationCache: BillingOrganizationCacheRepository;
   readonly organizationPricing: OrganizationPricingRepository;
+  /** The failed payment recovery columns on the Subscription row. */
+  readonly paymentRecovery: PaymentRecoveryRepository;
   /** Project's projects, through project's share (round 37 D5, R40). */
   readonly projects: BillingProjectDirectoryRepository;
   readonly reportOrganizations: BillingReportOrganizationRepository;

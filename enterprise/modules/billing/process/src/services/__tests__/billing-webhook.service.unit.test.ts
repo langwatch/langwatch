@@ -27,6 +27,7 @@ const createMockHost = (): {
 } => ({
   sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
   sendSlackBillingThresholdFailureAlert: mockSendSlackBillingThresholdFailureAlert,
+  sendSlackAccountPaymentFailed: vi.fn().mockResolvedValue(undefined),
 });
 
 const createMockBillingSubscription = (): {

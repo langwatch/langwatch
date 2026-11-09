@@ -2241,6 +2241,9 @@ export const prismaModelFieldCatalogue = {
     "seatRepairFlaggedAt",
     "seatLineLeaseToken",
     "seatLineLeaseUntil",
+    "paymentRecoveryInvoiceId",
+    "paymentRecoveryStartedAt",
+    "paymentRecoveryNoticeDay",
     "organization",
     "invoices"
   ],

@@ -73,6 +73,26 @@ export class MemoryBillingOrganizationRepository extends BillingAccountFactsRepo
     };
   }
 
+  async findMemberEmails({
+    organizationId,
+    userIds,
+  }: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; email: string }[]> {
+    return this.store.members
+      .filter(
+        (member) =>
+          member.organizationId === organizationId &&
+          userIds.includes(member.userId) &&
+          !member.disabled,
+      )
+      .flatMap(({ userId }) => {
+        const user = this.store.users.get(userId);
+        return user && !user.deactivated && user.email ? [{ userId, email: user.email }] : [];
+      });
+  }
+
   async findActiveMemberIds(organizationId: string): Promise<string[]> {
     return this.store.members
       .filter(

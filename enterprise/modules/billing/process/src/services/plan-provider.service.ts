@@ -8,6 +8,7 @@ import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { BillingSubscriptionRepository } from "../repositories/subscription.repository.ts";
+import { isPlanPausedForRecovery } from "../rules/payment-recovery.rules.ts";
 import { effectiveMaxMembers } from "../rules/seat-kept.rules.ts";
 
 // Fields that exist on both PlanInfo (as number) and Subscription (as Int?)
@@ -76,6 +77,17 @@ export class SaaSPlanProviderService extends BillingService {
         ...getFreePlanLimits(),
         overrideAddingLimitations,
       };
+    }
+
+    // Unpaid past day 21: Free limits refuse new additions; nothing is removed or deleted.
+    if (
+      isPlanPausedForRecovery({
+        startedAt: activeSubscription.paymentRecoveryStartedAt,
+        plan: activeSubscription.plan,
+        now: nowInstant(),
+      })
+    ) {
+      return { ...getFreePlanLimits(), overrideAddingLimitations };
     }
 
     const subscriptionPlan = activeSubscription.plan as string | undefined;

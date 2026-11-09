@@ -1783,6 +1783,9 @@ export interface LwqlPrismaRows {
     readonly seatRepairFlaggedAt: "DateTime?";
     readonly seatLineLeaseToken: "String?";
     readonly seatLineLeaseUntil: "DateTime?";
+    readonly paymentRecoveryInvoiceId: "String?";
+    readonly paymentRecoveryStartedAt: "DateTime?";
+    readonly paymentRecoveryNoticeDay: "Int?";
   };
   readonly Invoice: {
     readonly id: "String";

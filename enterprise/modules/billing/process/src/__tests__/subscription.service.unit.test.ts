@@ -116,6 +116,7 @@ const createMockOrganizationRepository = (): {
   claimStripeCustomerId: vi.fn(),
   findWithAdministrators: vi.fn(),
   findActiveMemberIds: vi.fn(),
+  findMemberEmails: vi.fn(),
   findSelfHostedCustomers: vi.fn(),
   listIds: vi.fn(),
 });

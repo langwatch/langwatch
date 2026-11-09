@@ -156,8 +156,19 @@ export class BillingSubscriptionLifecycleService {
       return;
     }
 
-    if (subscription.status !== "active" || subscription.ended_at) {
+    // Past due and unpaid keep the paid plan while payment recovery runs (ADR-002).
+    const isInRecovery = subscription.status === "past_due" || subscription.status === "unpaid";
+    if ((subscription.status !== "active" && !isInRecovery) || subscription.ended_at) {
       await this.cancelSubscriptionRecord(existingSubForUpdate);
+
+      return;
+    }
+
+    if (isInRecovery) {
+      logger.info(
+        { stripeSubscriptionId: subscription.id, status: subscription.status },
+        "[stripeWebhook] Subscription in payment recovery; plan kept",
+      );
 
       return;
     }
