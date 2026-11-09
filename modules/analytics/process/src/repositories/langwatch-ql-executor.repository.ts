@@ -55,8 +55,14 @@ export interface LangWatchQLRoute {
   readonly database?: string;
 }
 
-/** The narrow seam the LangWatchQL service depends on. */
-export abstract class LangWatchQLExecutorRepository {
+/** The narrow seam the LangWatchQL service depends on: where a run goes, then what runs it. */
+export interface LangWatchQLRouter {
+  resolveRoute(input: { tenantIds: readonly string[] }): Promise<LangWatchQLRoute>;
+  close(): Promise<void>;
+}
+
+/** Runs a statement on one server; a single-server deployment routes every run to it. */
+export abstract class LangWatchQLExecutorRepository implements LangWatchQLRouter {
   abstract execute(request: LangWatchQLExecutionRequest): Promise<LangWatchQLExecutionResult>;
 
   /**

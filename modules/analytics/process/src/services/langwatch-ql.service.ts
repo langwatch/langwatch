@@ -28,6 +28,7 @@ import type {
   LangWatchQLExecutorRepository,
   LangWatchQLResultLimits,
   LangWatchQLRoute,
+  LangWatchQLRouter,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import { assertNoUnsupportedTableModifiers } from "../rules/langwatch-ql-query-scope.rules.ts";
@@ -65,7 +66,7 @@ export interface LangWatchQLServiceDependencies {
    * identity provisioned — in which case every query is refused rather than run
    * with weaker guarantees.
    */
-  readonly executor: LangWatchQLExecutorRepository | null;
+  readonly executor: LangWatchQLRouter | null;
   /** Database the LangWatchQL views live in, and what unqualified names resolve to. */
   readonly database: string;
   readonly views?: readonly LangWatchQLViewDefinition[];

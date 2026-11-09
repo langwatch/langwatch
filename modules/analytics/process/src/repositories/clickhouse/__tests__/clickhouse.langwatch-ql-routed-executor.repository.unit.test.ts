@@ -11,7 +11,11 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LangWatchQLConnection } from "../../langwatch-ql-executor.repository.ts";
+import {
+  type LangWatchQLConnection,
+  type LangWatchQLExecutionResult,
+  LangWatchQLExecutorRepository,
+} from "../../langwatch-ql-executor.repository.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../clickhouse.langwatch-ql-executor.repository.ts";
 import { RoutedLangWatchQLExecutorRepository } from "../clickhouse.langwatch-ql-routed-executor.repository.ts";
 
@@ -229,6 +233,62 @@ describe("given more private organizations than the executor keeps open", () => 
     await executor.close();
     expect(second?.close).toHaveBeenCalledTimes(1);
     expect(first?.close).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("given a private executor evicted while a statement runs on it", () => {
+  /** Answers once the gate opens, so a statement can be held mid-run. */
+  class GatedExecutor extends LangWatchQLExecutorRepository {
+    readonly closed = vi.fn(async () => undefined);
+
+    constructor(private readonly gate: Promise<void>) {
+      super();
+    }
+
+    async execute(): Promise<LangWatchQLExecutionResult> {
+      await this.gate;
+      return {
+        columns: [{ name: "n", type: "UInt64" }],
+        rows: [{ n: 1 }],
+        statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 1 },
+      };
+    }
+
+    override close(): Promise<void> {
+      return this.closed();
+    }
+  }
+
+  it("lets the statement finish, and closes the executor only afterwards", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const built: GatedExecutor[] = [];
+    const executor = RoutedLangWatchQLExecutorRepository.create({
+      connection: SHARED,
+      route: routeOf,
+      createExecutor: () => {
+        const gated = new GatedExecutor(gate);
+        built.push(gated);
+        return gated;
+      },
+      maxPrivateExecutors: 1,
+    });
+
+    const running = runOn({ executor, tenantIds: ["project-private"] });
+    await vi.waitFor(() => expect(built).toHaveLength(2));
+    const evicting = runOn({ executor, tenantIds: ["project-second-private"] });
+    await vi.waitFor(() => expect(built).toHaveLength(3));
+    const [, evicted, kept] = built;
+    expect(evicted?.closed).not.toHaveBeenCalled();
+
+    release();
+
+    await expect(running).resolves.toMatchObject({ rows: [{ n: 1 }] });
+    expect(evicted?.closed).toHaveBeenCalledTimes(1);
+    await evicting;
+    expect(kept?.closed).not.toHaveBeenCalled();
   });
 });
 
