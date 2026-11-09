@@ -667,6 +667,8 @@ export class TraceAnalyticsFoldProjection
     const logCount = parseInt(mergedAttributes["langwatch.reserved.log_record_count"] ?? "0", 10);
     mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
     for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
+      // A log's origin only fills a gap: one a span or resolution already set stands.
+      if (key === TRACE_ANALYTICS_ATTR_KEYS.ORIGIN && mergedAttributes[key]) continue;
       mergedAttributes[key] = String(value);
     }
 

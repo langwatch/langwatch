@@ -111,6 +111,30 @@ describe("LogRequestCollectionService", () => {
     });
   });
 
+  describe("given a log-only coding agent's record, its origin stamped by the receiver", () => {
+    /** @scenario "A Grok trace's origin is Coding Agent" */
+    it("carries the resource's origin to the trace, which has no span to carry it", async () => {
+      const { result, contributed } = collect({
+        accepted: [
+          preparedLog({
+            correlationSource: "grok_synthesized",
+            resourceAttributes: { "service.name": "grok-cli", "langwatch.origin": "coding_agent" },
+          }),
+        ],
+      });
+
+      await result;
+      expect(contributed[0]?.[0]?.liftedAttributes["langwatch.origin"]).toBe("coding_agent");
+    });
+
+    it("adds no origin when the resource names none", async () => {
+      const { result, contributed } = collect({ accepted: [preparedLog({})] });
+
+      await result;
+      expect(contributed[0]?.[0]?.liftedAttributes).not.toHaveProperty("langwatch.origin");
+    });
+  });
+
   describe("when the canonical batch cannot be recorded", () => {
     it("answers unavailable without naming the storage, and contributes nothing", async () => {
       const { result, contributed } = collect({ accepted: [preparedLog({})], recordFails: true });

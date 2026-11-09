@@ -216,6 +216,25 @@ describe("TerminalView", () => {
       expect(screen.queryByText(/Claude Code/)).toBeNull();
     });
 
+    it("names a pi session pi, not the generic coding agent", () => {
+      renderView({
+        banner: { agent: "pi", version: "0.84.2", model: "claude-sonnet-5", repo: null },
+      });
+      expect(screen.getByText("pi v0.84.2")).toBeInTheDocument();
+      expect(screen.queryByText(/Coding agent/)).toBeNull();
+    });
+
+    /** @scenario "The Grok banner draws Grok's own startup mark" */
+    it("names a Grok session Grok and draws its dotted ring, not a placeholder", () => {
+      renderView({
+        banner: { agent: "grok", version: "1.0.70", model: "grok-4.7", repo: null },
+      });
+      expect(screen.getByText("Grok v1.0.70")).toBeInTheDocument();
+      expect(screen.getByText("grok-4.7")).toBeInTheDocument();
+      expect(document.body.textContent).toContain("⠀⠀⠀⣠⣾⠿⠛⠛⠛⠛⢀⡴⠁⠀");
+      expect(document.body.textContent).toContain("⠐⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀");
+    });
+
     it("falls back to a generic identity when the agent is unknown", () => {
       renderView({
         banner: { agent: "unknown", version: "1.0.0", model: null, repo: null },
@@ -226,7 +245,7 @@ describe("TerminalView", () => {
 
   describe("given a session name", () => {
     it("shows it in the bottom bar", () => {
-      renderView({ sessionName: "Fix the flaky CI job" });
+      renderView({ promptLine: "Fix the flaky CI job" });
       expect(screen.getByText("Fix the flaky CI job")).toBeInTheDocument();
     });
 

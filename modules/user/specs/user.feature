@@ -388,6 +388,20 @@ Feature: Canonical user lifecycle
       And the issue action is disabled with a "Setting up your workspace" hint
       And the personal workspace is read again
 
+    # /me renders before its organisation resolves; a placeholder id would be answered FORBIDDEN.
+    @integration
+    Scenario: The trace ingest section waits for the organisation before reading
+      Given /me has rendered and its organisation has not resolved yet
+      When the trace ingest section renders
+      Then it sends no ingestion template or key read
+      And no read names a placeholder organisation
+
+    @integration
+    Scenario: The trace ingest section reads for the organisation once it resolves
+      Given /me whose organisation has resolved
+      When the trace ingest section renders
+      Then it reads the ingestion templates and keys for that organisation
+
     @unit
     Scenario: Uploading an avatar while the personal project is still being created
       Given a first visit whose personal workspace is still being created
