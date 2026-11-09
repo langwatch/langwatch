@@ -172,8 +172,7 @@ export function releaseIdentityRefusal({
 /**
  * The release's manifest over a whole tree, code steps included: every step no earlier manifest
  * and no baseline names, so a release after one cut without its manifest also carries that one's
- * steps. Since `earlier` holds only older releases, the result always names the tree this
- * release; whether a cut tree does is checked by scripts/check-release-manifest.ts.
+ * steps. The identity gate is scripts/check-release-manifest.ts.
  */
 export function stampTreeRelease({
   release,
