@@ -21,7 +21,7 @@ export type ModelProviderScopeGraphOrganization = {
 export type ModelProviderInstantEvalAccess = {
   /** LangWatch's own model may judge for this project. */
   hostedReleased: boolean;
-  /** What a refused reader is offered: the switch, an admin, a word with us, or a self-hosted reason. */
+  /** What a refused reader is offered: the switch, an admin, us, or a self-hosted reason. */
   offer: string;
 };
 

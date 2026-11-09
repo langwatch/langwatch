@@ -116,10 +116,9 @@ function ownDecisionOptions({
 }
 
 /**
- * The decision model picker: LangWatch's models first, then the own-key catalogue in order. Only
- * what the server says would run can be picked; with own models on, the rest say which key to
- * add. `pickable` undefined means not loaded (or no scope picked), so no own models yet. With
- * LangWatch's own model neither released nor one switch away, only the own-key catalogue shows.
+ * The decision model picker: LangWatch's models (when offered) first, then the own-key catalogue.
+ * Only what the server says would run can be picked; with own models on, the rest say which key
+ * to add. `pickable` undefined means not loaded (or no scope picked), so no own models yet.
  */
 export function decisionModelPickerOptions({
   pickable,

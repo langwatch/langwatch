@@ -425,10 +425,9 @@ function ConfigCell({
 }
 
 /**
- * The Instant Evals cell: unset, or an id the catalogue no longer offers, reads as the
- * LangWatch Evals Preview default (faded), never "Not configured" (ADR-182 decision 1).
- * Where Evals Preview is not offered, it is never shown: unset, or pinned to it, reads "Not set".
- * Only an own model can need an update: the hosted default has no provider row.
+ * The Instant Evals cell: unset, or an id the catalogue dropped, reads as the faded Evals Preview
+ * default, never "Not configured" (ADR-182 decision 1). Where Evals Preview is not offered, unset
+ * or pinned to it reads "Not set". Only an own model can need an update: no hosted provider row.
  */
 function DecisionModelChip({
   model,

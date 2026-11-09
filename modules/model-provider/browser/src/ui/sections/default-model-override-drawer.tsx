@@ -837,10 +837,9 @@ export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | un
 }
 
 /**
- * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With no cascade
- * hit it reads "Not configured" with no model attached, so an edit can clear a pinned key
- * back to inherit; the Instant Evals column instead falls back to LangWatch Evals Preview,
- * or reads "Not set" where Evals Preview is not offered.
+ * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With no cascade hit it
+ * reads "Not configured" with no model attached, so an edit can clear a pinned key back to
+ * inherit; Instant Evals falls back to Evals Preview, or "Not set" where it is not offered.
  */
 export function buildInheritOption(
   entry: InheritedEntry,
