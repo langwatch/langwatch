@@ -347,6 +347,29 @@ describe("PiiRedactionModelService", () => {
 
       expect(scopeReads).toEqual([PROJECT_ID, PROJECT_ID]);
     });
+
+    describe("when the organization lookup is a minute old", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("reads the project's organization again", async () => {
+        vi.useFakeTimers();
+        const { analysis, memoryModel, scopeReads } = setup();
+        memoryModel.answerWith(anonymized("call <PERSON>"));
+        memoryModel.answerWith(anonymized("call <PERSON>"));
+        memoryModel.answerWith(anonymized("call <PERSON>"));
+
+        await analysis.clearPresidio(strictBatch());
+        await vi.advanceTimersByTimeAsync(59_999);
+        await analysis.clearPresidio(strictBatch());
+        expect(scopeReads).toEqual([PROJECT_ID]);
+
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(analysis.clearPresidio(strictBatch())).resolves.toEqual(["call [PERSON]"]);
+        expect(scopeReads).toEqual([PROJECT_ID, PROJECT_ID]);
+      });
+    });
   });
 
   describe("when a batch is routed to the model", () => {
