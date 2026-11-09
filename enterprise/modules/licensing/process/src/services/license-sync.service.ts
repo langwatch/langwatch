@@ -30,7 +30,10 @@ import type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "../repositories/issued-license.repository.ts";
-import type { ConnectCredentialOutcome } from "./connect-credential.service.ts";
+import type {
+  ConnectCredentialOutcome,
+  RenewalCollectOutcome,
+} from "./connect-credential.service.ts";
 import type { ConnectManagedKeys } from "./license-registry.service.ts";
 
 /** The credential service, as the sync uses it. It binds the instance on first use. */
@@ -39,6 +42,10 @@ interface ConnectCredentialResolver {
     token: string;
     instanceId: string | null | undefined;
   }): Promise<ConnectCredentialOutcome>;
+  resolveRenewalCollect(input: {
+    token: string;
+    instanceId: string | null | undefined;
+  }): Promise<RenewalCollectOutcome>;
 }
 
 interface LicenseSyncOptions {
@@ -78,12 +85,27 @@ export class LicenseSyncService {
       instanceId: input.instanceId,
     });
     if (!resolution.ok) throw SYNC_REFUSALS[resolution.code]();
-    const { license, virtualKeyId } = resolution;
+    return callerOf(resolution);
+  }
+
+  /**
+   * The sync door's check: `verify`, except that an expired license with a renewal
+   * waiting for it is admitted to collect that renewal and nothing more.
+   */
+  async verifyForSync(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller> {
+    const presented = { token: input.bearer ?? "", instanceId: input.instanceId };
+    const resolution = await this.options.credentials.resolve(presented);
+    if (resolution.ok) return callerOf(resolution);
+    if (resolution.code !== "connect_license_expired") throw SYNC_REFUSALS[resolution.code]();
+
+    const renewal = await this.options.credentials.resolveRenewalCollect(presented);
+    if (!renewal.ok) throw SYNC_REFUSALS[renewal.code]();
     return {
-      licenseRowId: license.id,
-      organizationId: license.organizationId,
-      instanceId: license.instanceId,
-      virtualKeyId,
+      licenseRowId: renewal.license.id,
+      organizationId: renewal.license.organizationId,
+      instanceId: renewal.license.instanceId,
+      virtualKeyId: null,
+      renewalOnly: true,
     };
   }
 
@@ -105,6 +127,11 @@ export class LicenseSyncService {
     if (!row?.organizationId) return { ok: false, code: "connect_license_not_registered" };
     if (!(await this.options.rateLimit.allow({ licenseRowId: row.id }))) {
       return { ok: false, code: "rate_limited" };
+    }
+    if (input.caller.renewalOnly || input.caller.virtualKeyId === null) {
+      const license = await this.pendingDelivery(row);
+      if (!license) return { ok: false, code: "connect_license_expired" };
+      return { ok: true, services: [], license };
     }
 
     await this.record({ row, seats: parsed.data.seats, version: parsed.data.version });
@@ -167,6 +194,18 @@ export class LicenseSyncService {
     if (!replacement?.pendingDeliveryLicense) return undefined;
     return replacement.pendingDeliveryLicense;
   }
+}
+
+function callerOf(
+  resolution: Extract<ConnectCredentialOutcome, { ok: true }>,
+): ConnectLicenceCaller {
+  const { license, virtualKeyId } = resolution;
+  return {
+    licenseRowId: license.id,
+    organizationId: license.organizationId,
+    instanceId: license.instanceId,
+    virtualKeyId,
+  };
 }
 
 /** Whether this license may sync again now (48 calls per license per day). */

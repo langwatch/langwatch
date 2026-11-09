@@ -17,6 +17,7 @@ import {
 
 import type { WorkflowStudioStream } from "../channels/nlp-lambda.channel.ts";
 import { WorkflowNlpExecutionService } from "./workflow-nlp-execution.service.ts";
+import type { WorkflowProviderSpendService } from "./workflow-provider-spend.service.ts";
 
 const logger = createLogger("langwatch:workflows:studio-dispatch");
 
@@ -44,6 +45,8 @@ export class WorkflowStudioDispatchService {
   static create(options: {
     stream: WorkflowStudioStream;
     modelProviders: ModelProviderApi;
+    /** Writes each LLM node's usage to the spend ledger; absent writes none. */
+    spend?: WorkflowProviderSpendService;
   }): WorkflowStudioDispatchService {
     return new WorkflowStudioDispatchService(options);
   }
@@ -52,6 +55,7 @@ export class WorkflowStudioDispatchService {
     private readonly options: {
       stream: WorkflowStudioStream;
       modelProviders: ModelProviderApi;
+      spend?: WorkflowProviderSpendService;
     },
   ) {}
 
@@ -69,9 +73,14 @@ export class WorkflowStudioDispatchService {
     }
 
     const consumerFailures = new WeakSet<object>();
+    const meter = this.options.spend?.meterStream({
+      projectId: input.projectId,
+      event: input.event,
+    });
     const watched: WorkflowStudioDispatchInput = {
       ...input,
       onEvent(event) {
+        meter?.observe(event);
         try {
           input.onEvent(event);
         } catch (error) {
@@ -90,6 +99,7 @@ export class WorkflowStudioDispatchService {
       reportAsStudioEvent(error, input);
     } finally {
       reader.releaseLock();
+      await meter?.settle();
     }
   }
 

@@ -6,13 +6,17 @@
 //	go run ./cmd/ecrtag published -repository R -tag T -source label|annotation -revision SHA [-custom] [-refuse-retag] [-built-from TAG]
 //	go run ./cmd/ecrtag lambda -repository R -tag T -revision SHA [-built] [-custom]
 //	go run ./cmd/ecrtag diffbase -repositories "R1 R2" -tag T -revision SHA -custom=false
+//	go run ./cmd/ecrtag lwql-access -repository R -tag T -custom=BOOL (-image IMAGE | -from "T1 T2")
 //
 // published prints "true" when the tag is already there for this commit (skip
 // the push) and "false" when it is not there (push it); any other state fails.
 // lambda gives a Lambda image the tag (see tools/ecrtag.Lambda). diffbase
 // prints {"base": tag, "rebuild": [repository]} (tools/ecrtag.DiffBase): where
 // a push run's change set starts, "" when no repository has an image to
-// re-tag, and the repositories it must rebuild whatever the diff says. -registry is
+// re-tag, and the repositories it must rebuild whatever the diff says.
+// lwql-access tags T lwql-access-<fingerprint>-T and prints the fingerprint:
+// rendered from -image, or copied from the first -from tag whose image has one
+// (tools/ecrtag.LwqlAccessTag). -registry is
 // the registry host; -refuse-retag, lambda and diffbase read the first-parent
 // git history from the working directory. -refuse-retag fails on a tag naming the image a push
 // run's re-tag would copy; -built-from is the per-arch tag an index must name.
@@ -36,9 +40,9 @@ import (
 const ancestorScript = ".github/scripts/nearest-ancestor-tag.sh"
 
 type options struct {
-	repository, tag, source, revision, host, head, builtFrom string
-	repositories                                             []string
-	custom, built, refuseRetag                               bool
+	repository, tag, source, revision, host, head, builtFrom, image string
+	repositories, from                                              []string
+	custom, built, refuseRetag                                      bool
 }
 
 func main() {
@@ -60,7 +64,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: ecrtag published|lambda|diffbase -repository R -tag T -revision SHA [flags]")
+	fmt.Fprintln(os.Stderr, "usage: ecrtag published|lambda|diffbase|lwql-access -repository R -tag T [flags]")
 	os.Exit(2)
 }
 
@@ -78,12 +82,18 @@ func parse(command string, args []string) (options, error) {
 	fs.BoolVar(&o.refuseRetag, "refuse-retag", false, "published: fail on a tag naming the image a re-tag would copy")
 	fs.StringVar(&o.builtFrom, "built-from", "", "published: the per-arch tag this run built, which an index tag must name")
 	repositories := fs.String("repositories", "", "diffbase: every repository the run re-tags, space separated")
+	fs.StringVar(&o.image, "image", "", "lwql-access: the image to render the access model in")
+	from := fs.String("from", "", "lwql-access: tags whose image's fingerprint to copy, space separated")
 	if err := fs.Parse(args); err != nil {
 		return o, err
 	}
 	o.repositories = strings.Fields(*repositories)
-	if command == "diffbase" {
+	o.from = strings.Fields(*from)
+	switch command {
+	case "diffbase":
 		return o, diffBaseOptions(o)
+	case "lwql-access":
+		return o, lwqlAccessOptions(o)
 	}
 	if o.repository == "" || o.tag == "" || o.revision == "" {
 		return o, fmt.Errorf("%s: -repository, -tag and -revision are required", command)
@@ -103,9 +113,11 @@ func run(ctx context.Context, command string, o options) error {
 		return lambda(ctx, o)
 	case "diffbase":
 		return diffBase(ctx, o)
+	case "lwql-access":
+		return lwqlAccess(ctx, o)
 	}
 
-	return fmt.Errorf("unknown command %q; use published, lambda or diffbase", command)
+	return fmt.Errorf("unknown command %q; use published, lambda, diffbase or lwql-access", command)
 }
 
 func (o options) ref() ecrtag.Ref { return ecrtag.Ref{Repository: o.repository, Tag: o.tag} }
@@ -186,6 +198,34 @@ func diffBase(ctx context.Context, o options) error {
 		return err
 	}
 	fmt.Println(string(out))
+
+	return nil
+}
+
+// lwqlAccessOptions: the fingerprint comes from exactly one place.
+func lwqlAccessOptions(o options) error {
+	if o.repository == "" || o.tag == "" {
+		return errors.New("lwql-access: -repository and -tag are required")
+	}
+	if (o.image == "") == (len(o.from) == 0) {
+		return errors.New("lwql-access: give -image or -from, not both")
+	}
+
+	return nil
+}
+
+func lwqlAccess(ctx context.Context, o options) error {
+	l := ecrtag.LwqlAccessTag{Registry: o.registry(), Ref: o.ref(), Sources: o.from}
+	if o.image != "" {
+		l.Render = func(ctx context.Context) (string, error) {
+			return ecrtag.LwqlAccessFingerprint(ctx, ecrtag.Run, o.image)
+		}
+	}
+	fingerprint, err := l.Write(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Println(fingerprint)
 
 	return nil
 }

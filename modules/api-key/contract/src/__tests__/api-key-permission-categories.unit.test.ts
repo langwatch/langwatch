@@ -102,6 +102,8 @@ describe("PERMISSION_CATEGORIES", () => {
       { category: "Project", accessLevels: "read, write" },
       { category: "Organization", accessLevels: "read, write" },
       { category: "Subscription", accessLevels: "write" },
+      { category: "Seat requests", accessLevels: "read, write" },
+      { category: "Members", accessLevels: "read" },
       {
         category: "Single sign-on and directory sync",
         accessLevels: "read, write",

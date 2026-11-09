@@ -13,7 +13,7 @@ import {
   Text,
 } from "@langwatch/design-system/primitives";
 import { isProviderKey, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
-import { Select } from "@langwatch/design-system/select";
+import { scrollToListItem, Select } from "@langwatch/design-system/select";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
@@ -248,14 +248,31 @@ function ModelOptionItem({
   return (
     <>
       {showDivider && <Box borderBottom="1px solid" borderColor="border" marginX={2} marginY={1} />}
-      <Select.Item item={item}>
-        <HStack gap={2}>
+      <Select.Item item={item} flexShrink={0}>
+        <HStack gap={2} minWidth={0}>
           {isProviderKey(provider) && (
             <ProviderIconGlyph provider={provider} size={MODEL_ICON_SIZE} />
           )}
-          <Box textStyle={isSmall ? "monoSm" : "mono"} paddingY={isSmall ? 0 : "2px"}>
-            {item.label}
-          </Box>
+          {item.subtitle ? (
+            // A named entry, such as a decision model: its title, then what it is.
+            <Box minWidth={0}>
+              <Text textStyle={isSmall ? "caption" : "body"} fontWeight="medium" truncate>
+                {item.label}
+              </Text>
+              <Text
+                textStyle="caption"
+                color="fg.muted"
+                truncate
+                data-testid="model-option-subtitle"
+              >
+                {item.subtitle}
+              </Text>
+            </Box>
+          ) : (
+            <Box textStyle={isSmall ? "monoSm" : "mono"} paddingY={isSmall ? 0 : "2px"}>
+              {item.label}
+            </Box>
+          )}
         </HStack>
       </Select.Item>
     </>
@@ -296,14 +313,7 @@ function ModelOptionGroup({
 
 function ConfigureModelsAction({ size }: { size: SelectorSize }) {
   return (
-    <Box
-      position="sticky"
-      bottom={0}
-      bg="bg.panel"
-      borderTop="1px solid"
-      borderColor="border"
-      zIndex="1"
-    >
+    <Box flexShrink={0} bg="bg.panel" borderTop="1px solid" borderColor="border" zIndex="1">
       <Button
         width="full"
         fontWeight="500"
@@ -450,6 +460,7 @@ export function ModelSelector({
       {...(open !== undefined ? { open } : {})}
       {...(onOpenChange ? { onOpenChange: (e) => onOpenChange(e.open) } : {})}
       loopFocus={true}
+      scrollToIndexFn={scrollToListItem}
       highlightedValue={highlightedValue}
       onHighlightChange={(details) => {
         setHighlightedValue(details.highlightedValue);
@@ -467,9 +478,10 @@ export function ModelSelector({
       >
         <Select.ValueText placeholder={selectValueText}>{() => selectValueText}</Select.ValueText>
       </Select.Trigger>
-      <Select.Content>
+      {/* Only the rows scroll, below the search, so none passes behind it. */}
+      <Select.Content overflow="hidden">
         <Field.Root asChild>
-          <Box position="sticky" top={0} zIndex="1">
+          <Box flexShrink={0}>
             <InputGroup
               startElement={<Search size={16} />}
               startOffset="-4px"
@@ -494,9 +506,11 @@ export function ModelSelector({
             </InputGroup>
           </Box>
         </Field.Root>
-        {filteredGroups.map((group) => (
-          <ModelOptionGroup key={group.provider} group={group} size={size} />
-        ))}
+        <Select.List data-testid="model-selector-list">
+          {filteredGroups.map((group) => (
+            <ModelOptionGroup key={group.provider} group={group} size={size} />
+          ))}
+        </Select.List>
         {showConfigureAction && <ConfigureModelsAction size={size} />}
       </Select.Content>
     </Select.Root>

@@ -240,12 +240,27 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     writePermissions: allActionsOf("organization"),
   },
   {
-    // Write only: starting a paid plan has nothing to read. Every member holds it.
+    // Write only: starting or changing a paid plan has nothing to read. Every member may start one.
     key: "subscription",
     label: "Subscription",
     accessLevels: ["write"],
     readPermissions: [],
     writePermissions: allActionsOf("subscription"),
+  },
+  {
+    key: "seatRequests",
+    label: "Seat requests",
+    accessLevels: ["read", "write"],
+    readPermissions: viewsOf("seatRequests"),
+    writePermissions: allActionsOf("seatRequests"),
+  },
+  {
+    // Read only: the directory of members and their roles; changing them is Organization.
+    key: "members",
+    label: "Members",
+    accessLevels: ["read"],
+    readPermissions: viewsOf("members"),
+    writePermissions: [],
   },
   {
     key: "sso",

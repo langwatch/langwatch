@@ -9,6 +9,7 @@ import (
 	"io"
 	mathrand "math/rand"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -413,7 +414,9 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 				// recordEntry uses; reading the field directly across
 				// goroutines is a data race (CodeRabbit critical on
 				// PR #3607).
-				emit(ctx, out, evaluationProgressEvent(req, traceID, reporter.progressCount(), total, started))
+				progress := evaluationProgressEvent(req, traceID, reporter.progressCount(), total, started)
+				addRowUsage(progress, entryRes)
+				emit(ctx, out, progress)
 			}
 		}()
 	}
@@ -630,4 +633,44 @@ func evaluationProgressEvent(req ExecuteRequest, traceID string, progress, total
 			},
 		},
 	}
+}
+
+// addRowUsage puts the provider usage of one evaluated row's LLM nodes on the
+// progress event that row produced. The evaluation stream carries no per-node
+// events, so this is the only place the control plane sees those tokens and
+// writes them to the spend ledger (ADR-193). One row, one progress event, so
+// each row's usage crosses the wire once.
+func addRowUsage(ev StreamEvent, res *ExecuteResult) {
+	usage := nodeUsages(res)
+	if len(usage) > 0 {
+		ev.Payload["usage"] = usage
+	}
+}
+
+// nodeUsages lists every node of a finished run that reported token metrics,
+// sorted by node id, each with the run's trace id.
+func nodeUsages(res *ExecuteResult) []map[string]any {
+	if res == nil {
+		return nil
+	}
+	ids := make([]string, 0, len(res.Nodes))
+	for id, ns := range res.Nodes {
+		if ns != nil && ns.Metrics != nil {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+	usage := make([]map[string]any, 0, len(ids))
+	for _, id := range ids {
+		entry := map[string]any{
+			"node_id":  id,
+			"trace_id": res.TraceID,
+			"metrics":  res.Nodes[id].Metrics,
+		}
+		if d := res.Nodes[id].DurationMS; d > 0 {
+			entry["duration_ms"] = d
+		}
+		usage = append(usage, entry)
+	}
+	return usage
 }

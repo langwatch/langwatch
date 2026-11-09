@@ -4,7 +4,10 @@
  * row IS the widget, so the dashboard's list query already has it live.
  */
 
-import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
+import type {
+  LangWatchQLAcceptedGranularityStep,
+  LangWatchQLRunTelemetryRequest,
+} from "@langwatch/analytics-contract";
 import type {
   ChartFrameDashboardContext,
   NavigableTarget,
@@ -51,6 +54,7 @@ import { useDashboardRefreshedAt } from "../../../../ui/sections/use-dashboard-a
 import { useDashboardWidgetChartNavigate } from "../../behavior/use-dashboard-widget-chart-navigate.ts";
 import { useDashboardWidgetExecutor } from "../../behavior/use-dashboard-widget-executor.ts";
 import { useSlowLoading } from "../../behavior/use-slow-loading.ts";
+import { type ParsedDefinition, placedWidgetTelemetry } from "../../model/widget-run-telemetry.ts";
 import { FrameDiagnosticBadge } from "./frame-diagnostic-badge.tsx";
 import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";
 
@@ -66,6 +70,11 @@ export interface DashboardWidgetFrameProps {
   readonly dashboardId?: string;
   /** The widget's own name, for LW.dashboardContext.widgetName. */
   readonly widgetName?: string;
+  /**
+   * What the widget's runs say they are for, on their log line. Absent, a placed widget sends
+   * its board and its id; a frame on no board, such as the editor's preview, sends nothing.
+   */
+  readonly telemetry?: LangWatchQLRunTelemetryRequest;
 }
 
 /** A widget over the page's period selector, as the analytics dashboard draws it. */
@@ -129,9 +138,6 @@ export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWi
   return <WidgetFrameOverWindow key={key} {...props} parsed={parsed} />;
 }
 
-/** The outcome of reading a row's graph, parsed once by the caller. */
-type ParsedDefinition = ReturnType<typeof dashboardWidgetDefinitionSchema.safeParse>;
-
 /**
  * `granularitySeconds`, when given, is the step the reserved parameters carry.
  * What its queries report decides its face (features/dashboards/WIDGET_STANDARD.md).
@@ -143,6 +149,7 @@ function WidgetFrameOverWindow({
   maxHeight,
   dashboardId,
   widgetName,
+  telemetry: given,
   timeWindow,
   granularitySeconds,
   onAskLangyToSetUp,
@@ -163,6 +170,9 @@ function WidgetFrameOverWindow({
   // crashing the grid.
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
 
+  // A new object each render is fine: the executor reads it by its ids, so a re-render with the
+  // same ids does not start the queries over.
+  const telemetry = given ?? placedWidgetTelemetry({ dashboardId, widgetId: id, parsed });
   const {
     executeQuery: runQuery,
     params: hostParams,
@@ -170,6 +180,7 @@ function WidgetFrameOverWindow({
   } = useDashboardWidgetExecutor(projectId, definition.queries, {
     timeWindow,
     ...(granularitySeconds === void 0 ? {} : { granularitySeconds }),
+    ...(telemetry ? { telemetry } : {}),
   });
   const { executeQuery, records, results, reset } = useWidgetQueryRecords({
     executeQuery: runQuery,

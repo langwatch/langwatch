@@ -35,6 +35,7 @@ const bootIdentity = () =>
           NO_PROXY: undefined,
           no_proxy: undefined,
         },
+        nodeEnvProxy: { NODE_USE_ENV_PROXY: false, NODE_OPTIONS: undefined },
         isSaas: false,
         publicBaseUrl: undefined,
         passkeysEnabled: false,

@@ -156,6 +156,8 @@ const spendUsageSchemaDefinition = z.object({
   output_image_tokens: z.number().int().min(0).default(0),
   /** Images the response carried. Observability only, never priced. */
   image_count: z.number().int().min(0).default(0),
+  /** Web search tool calls the provider ran, each priced at the model's per-query rate. */
+  web_search_requests: z.number().int().min(0).default(0),
 });
 export interface SpendUsageSchema extends Named<typeof spendUsageSchemaDefinition> {}
 export const spendUsageSchema: SpendUsageSchema = spendUsageSchemaDefinition;
@@ -187,6 +189,33 @@ export interface GatewayPricedSpend {
   /** Epoch milliseconds. */
   readonly occurredAt: number;
 }
+
+/**
+ * One provider call LangWatch itself made with an organization's stored model provider
+ * credentials (an evaluator, topic clustering, a decision model). Quantities only: the spine
+ * rates them against the model registry like any drained outcome. @see ADR-193
+ */
+export interface GatewayProviderUsage {
+  /** Addresses the call; a repeat under the same id is one ledger row. */
+  readonly requestId: string;
+  readonly projectId: string;
+  /** The registry model id the call ran, provider prefixed (`openai/text-embedding-3-large`). */
+  readonly model: string;
+  /** The stored provider row; absent resolves the row serving `model` for the project. */
+  readonly modelProviderId?: string;
+  /** What made the call: `evaluation`, `topic_clustering`, ... */
+  readonly requestType: string;
+  readonly usage: z.input<typeof spendUsageSchema>;
+  readonly durationMs?: number;
+  /** Epoch milliseconds. */
+  readonly occurredAt: number;
+}
+
+/** Recorded, or why not: no spend pipeline, or a project with no team to bill. */
+export type GatewayProviderUsageResult =
+  | { status: "recorded" }
+  | { status: "unavailable" }
+  | { status: "unattributed" };
 
 /** Whether the outcome reached the spine. Unavailable on a deployment with no
  *  spend pipeline registered, which is a fact about the process, not a fault. */

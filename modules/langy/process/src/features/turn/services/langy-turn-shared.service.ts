@@ -66,6 +66,11 @@ export abstract class LangyGithubPermit {
   abstract check(input: { userId: string }): Promise<{ allowed: boolean }>;
 }
 
+/** Ends what a turn left open on the developer's machine: its local calls and its cards. */
+export abstract class LangyTurnLocalWork {
+  abstract cancelTurn(input: { conversationId: string; turnId: string }): Promise<void>;
+}
+
 export const LANGY_OVERRIDE = LANGY_TURN_OVERRIDE_FALLBACK;
 
 interface LangyChatMessageInput {
@@ -114,6 +119,7 @@ export interface LangyTurnServiceDeps {
   admission: LangyTurnAdmissionRepository;
   accessStore: LangyTurnAccessRepository;
   handoffStore: LangyTurnHandoffRepository;
+  localWork: LangyTurnLocalWork;
   messages: LangyMessageRepository | null;
 }
 
@@ -141,6 +147,7 @@ export type LangyTurnTechnicalMembers = {
   metrics: LangyTurnMetrics;
   accessStore: LangyTurnAccessRepository;
   handoffStore: LangyTurnHandoffRepository;
+  localWork: LangyTurnLocalWork;
 };
 
 export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";

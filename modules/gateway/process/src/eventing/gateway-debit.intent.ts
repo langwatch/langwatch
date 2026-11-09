@@ -30,6 +30,7 @@ export const writeGatewayDebitsSchema = z.object({
       input_image_tokens: z.number().int().min(0).default(0),
       output_image_tokens: z.number().int().min(0).default(0),
       image_count: z.number().int().min(0).default(0),
+      web_search_requests: z.number().int().min(0).default(0),
     })
     .nullable(),
   cost_nano_usd: z.number().int().min(0),

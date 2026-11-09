@@ -55,6 +55,19 @@ describe("given the plan a signed licence entitles an organization to", () => {
     });
   });
 
+  describe("when only the deployment's LANGWATCH_LICENSE_KEY holds a licence", () => {
+    it("leaves the Cloud reading on the stored licence and applies the key on the self-hosted one", async () => {
+      const plans = LicensePlanSourceService.create({
+        licenses: StoredLicense.of(null),
+        cryptography,
+        instanceLicenseKey: ENTERPRISE_LICENSE_KEY,
+      });
+
+      await expect(plans.getActivePlan("org-1")).resolves.toBe(UNLIMITED_PLAN);
+      await expect(plans.getSelfHostedPlan("org-1")).resolves.not.toBe(UNLIMITED_PLAN);
+    });
+  });
+
   describe("when the organization no longer exists", () => {
     it("answers the unlimited baseline and lets any other failure through", async () => {
       const missing = LicensePlanSourceService.create({

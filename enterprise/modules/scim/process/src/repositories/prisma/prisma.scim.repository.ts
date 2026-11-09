@@ -346,6 +346,8 @@ export class PrismaScimRepository extends ScimRepository {
         userId: input.userId,
         role: organizationUserRole(input.role),
         disabledAt: input.pending ? toDate(nowInstant()) : null,
+        // Held for want of a seat: the person waits for one (seat-rotation.feature).
+        seatPendingSince: input.pending ? toDate(nowInstant()) : null,
       },
     });
   };

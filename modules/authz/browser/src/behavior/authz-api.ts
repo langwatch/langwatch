@@ -6,6 +6,7 @@
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { AuthzPermission } from "@langwatch/authorization";
 import type {
+  AuthzBillingMember,
   AuthzChangeGrantRoleInput,
   AuthzCreateGrantInput,
   AuthzListGrantsInput,
@@ -26,11 +27,7 @@ type RoleScope = { roleId: string };
 
 export type AuthzApiMap = {
   role: {
-    /**
-     * Every custom role defined in the organization. Gated at
-     * `organization:manage` rather than `organization:view`: reading role
-     * definitions is a privilege-escalation surface (they show what's worth acquiring).
-     */
+    /** Every custom role defined in the organization; every role reads it at `members:view`. */
     getAll: { query: { input: OrganizationScope; output: Role[] } };
 
     /**
@@ -82,12 +79,13 @@ export type AuthzApiMap = {
         output: GrantRevoked;
       };
     };
-    /**
-     * Every grant in the organization, principals and scopes named: audit-grade
-     * data, which is why the procedure is gated at `organization:manage`.
-     */
+    /** Every grant in the organization, principals and scopes named; read at `members:view`. */
     listManagedGrants: {
       query: { input: OrganizationScope; output: AuthzManagedOrganizationBinding[] };
+    };
+    /** Who holds the Billing role; read by every role. */
+    listBillingMembers: {
+      query: { input: OrganizationScope; output: AuthzBillingMember[] };
     };
   };
 

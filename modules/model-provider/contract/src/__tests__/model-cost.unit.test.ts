@@ -850,3 +850,27 @@ describe("deriveCacheWrite1hRate", () => {
     });
   });
 });
+
+describe("computeCost web search pricing", () => {
+  /** @scenario "the cost arithmetic prices each web search call" */
+  it("adds each web search call at the per-query rate to the token cost", () => {
+    const cost = estimateCostUnderOneRate({
+      rate: {
+        model: "test/search",
+        regex: "^test/search$",
+        inputCostPerToken: 1e-6,
+        outputCostPerToken: 2e-6,
+        webSearchCostPerQuery: 0.01,
+      },
+      inputTokens: 100,
+      outputTokens: 50,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+      cacheCreation1hTokens: 0,
+      inputAudioTokens: 0,
+      outputAudioTokens: 0,
+      webSearchRequests: 2,
+    });
+    expect(cost).toBeCloseTo(100 * 1e-6 + 50 * 2e-6 + 2 * 0.01, 12);
+  });
+});
