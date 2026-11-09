@@ -401,13 +401,16 @@ describe("given traces of each source carrying the metadata the widgets read", (
   it("keeps a trace that began before the period out of it", async () => {
     // app_before and chat_before start on days -2 and -1. Day 0.5 is past the period start, so
     // the rows would count each trace in in_previous and in_period, and in the period's buckets.
-    // Only the split queries are checked: the others still count the inside row (window edge).
+    // The split queries keep the trace out; the others still count the inside row (window edge).
     await moveAnchor({ trace: "app_before", days: 2.5 });
     await moveAnchor({ trace: "chat_before", days: 1.5 });
 
     for (const { list } of LISTS) {
       expect(await differing({ list, only: SPLITS }), list.join()).toEqual([]);
     }
+    // Under langy nothing differed before this move, so any difference here is the inside row.
+    const unguarded = BASELINE.map(({ label }) => label).filter((label) => !SPLITS.includes(label));
+    expect(await differing({ list: ["langy"], only: unguarded })).not.toEqual([]);
   });
 
   /** @scenario "A conversation in two units counts once in each unit's share" */
