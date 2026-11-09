@@ -172,11 +172,8 @@ function buildWhereClause({
 }
 
 /**
- * The guard on every sidebar facet read. These reads scan a tenant's whole
- * window and share the per-process statement slots with every other tenant's
- * reads, which wait 20 s for one. A scan past these limits is stopped on the
- * server, so it hands its slot back and cannot fill a replica's memory; the
- * sidebar omits that facet instead (`collectDiscoverOutcomes`).
+ * Caps every sidebar facet read: a scan past these limits is stopped on the
+ * server, freeing its shared slot; the sidebar omits that facet instead.
  */
 export const FACET_READ_SETTINGS: Record<string, string> = {
   // ClickHouse settings are string-typed over the wire.

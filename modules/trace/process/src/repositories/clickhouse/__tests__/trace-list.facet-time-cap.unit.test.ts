@@ -1,11 +1,7 @@
 // The sidebar's facet reads scan a tenant's whole window. Each one carries a
 // server-side time cap, so one tenant's slow scan cannot hold the shared
 // statement slots that every other tenant's reads queue for.
-import {
-  AuthorizedClickHouse,
-  type QueryRequest,
-  tenantScope,
-} from "@langwatch/clickhouse-client";
+import { AuthorizedClickHouse, type QueryRequest, tenantScope } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
 
@@ -56,7 +52,9 @@ describe("the facet reads' time and memory cap", () => {
         timeRange,
         table: "stored_spans",
         timeColumn: "StartTime",
-        categoricalSpecs: [{ key: "spanType", expression: "SpanAttributes['langwatch.span.type']" }],
+        categoricalSpecs: [
+          { key: "spanType", expression: "SpanAttributes['langwatch.span.type']" },
+        ],
         rangeSpecs: [{ key: "duration", expression: "DurationMs" }],
         topN: 50,
       });

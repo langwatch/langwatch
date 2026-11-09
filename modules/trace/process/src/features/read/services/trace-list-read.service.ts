@@ -1,8 +1,4 @@
-import {
-  type Authorization,
-  ownProjectIdReadBy,
-  readScopeKeyOf,
-} from "@langwatch/authorization";
+import { type Authorization, ownProjectIdReadBy, readScopeKeyOf } from "@langwatch/authorization";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,

@@ -325,10 +325,7 @@ describe("the sidebar's facet counts", () => {
       const scansPerRun = once.calls.batched.length;
 
       const { request, calls } = sharedService();
-      const [first, second] = await Promise.all([
-        request("status:error"),
-        request("status:error"),
-      ]);
+      const [first, second] = await Promise.all([request("status:error"), request("status:error")]);
 
       expect(second).toBe(first);
       expect(calls.batched).toHaveLength(scansPerRun);
