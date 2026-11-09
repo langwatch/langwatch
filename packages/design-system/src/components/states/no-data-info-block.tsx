@@ -151,11 +151,19 @@ export function EmptyNextSteps({ next }: { next: EmptyNext }) {
 function NoDataLine({ title, action, next, testId }: NoDataInfoBlockLineProps) {
   return (
     <HStack gap={2} paddingY={2} data-testid={testId} data-size="line">
-      <Text textStyle="sm" color="fg.muted">
+      {/* A sentence quoting a search can be one unbroken word: it wraps, the action stays. */}
+      <Text textStyle="sm" color="fg.muted" minWidth={0} overflowWrap="anywhere">
         {title}
       </Text>
       {action && (
-        <Button type="button" variant="plain" size="sm" color="fg" onClick={action.onClick}>
+        <Button
+          type="button"
+          variant="plain"
+          size="sm"
+          color="fg"
+          flexShrink={0}
+          onClick={action.onClick}
+        >
           {action.label}
         </Button>
       )}
