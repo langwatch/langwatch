@@ -35,6 +35,12 @@ class IndexlessTable extends TraceIndexMaterialisationRepository {
   async materialiseUpdatedAtIndex() {
     this.started += 1;
   }
+  async findAnalyticsMetadataColumnMutations() {
+    return [];
+  }
+  async materialiseAnalyticsMetadataColumns() {
+    this.started += 1;
+  }
 }
 
 describe("TraceIndexMaterialisationService", () => {

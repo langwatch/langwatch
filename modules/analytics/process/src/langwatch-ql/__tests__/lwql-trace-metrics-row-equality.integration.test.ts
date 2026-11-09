@@ -1,7 +1,8 @@
 /**
  * The stock queries moved from `traces` to `trace_metrics` (tasks#1117) return, on a real
  * ClickHouse, the rows their `traces` form returns under the application and the langy lists.
- * Tables shaped as the catalogue's views stand in for them; both forms come from committed fixtures.
+ * Tables shaped as the catalogue's views stand in for them; both forms come from committed
+ * fixtures.
  * @see specs/lwql/stock-widgets-on-trace-metrics.feature
  * @vitest-environment node
  */
