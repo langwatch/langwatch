@@ -38,4 +38,3 @@ export * from "./catalog/tier-targets.ts";
 export * from "./model-provider.config.ts";
 export * from "./model-selection.ts";
 export * from "./model-options.ts";
-export * from "./own-decision-model-options.ts";

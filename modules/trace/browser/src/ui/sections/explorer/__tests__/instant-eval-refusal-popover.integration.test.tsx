@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { DECISION_MODEL_PICKER_PLACEHOLDER } from "../decision-model-picker.tsx";
 import {
   CONNECT_SETTINGS_HREF,
   CONTACT_US_HREF,
@@ -22,7 +23,6 @@ import {
   UPGRADE_HREF,
   WHERE_THE_TEXT_GOES_HREF,
 } from "../instant-eval-refusal-popover.tsx";
-import { DECISION_MODEL_PICKER_PLACEHOLDER } from "../decision-model-picker.tsx";
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
