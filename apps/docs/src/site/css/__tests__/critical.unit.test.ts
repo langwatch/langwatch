@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { criticalCss, markupNames, scriptedNames } from "../critical.ts";
-import { inlinePageStyles, styleHead } from "../page-styles.ts";
+import { inlinePageStyles } from "../page-styles.ts";
 import { parseStylesheet, serializeStylesheet } from "../stylesheet.ts";
 
 const SHEET = [
@@ -109,7 +109,10 @@ describe("inlinePageStyles", () => {
     const clientLink = '<link rel="stylesheet" crossorigin href="/assets/index-a.css">';
     const page = `<html><head>${placeholder}${clientLink}</head><body><main class="css-here"></main></body></html>`;
     const result = inlinePageStyles({
-      rules: ["@layer recipes{.css-here{color:red}.css-there{color:blue}}"],
+      rules: [
+        "@font-face{font-family:Inter;font-display:optional;src:url(/inter.woff2)}",
+        "@layer recipes{.css-here{color:red}.css-there{color:blue}}",
+      ],
       clientCss: [".docs-shell{display:grid}"],
       clientLinks: [clientLink],
       scripts: [],
@@ -123,11 +126,14 @@ describe("inlinePageStyles", () => {
     const home = result.pages.get("index.html") ?? "";
 
     /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
-    it("inlines the page's rules and links the shared sheet without blocking", () => {
+    it("inlines the page's rules and asks for the shared sheet only after load", () => {
+      expect(home).toContain("@font-face{font-family:Inter");
+      expect(home).toContain("@layer recipes{.css-here{color:red}}");
       expect(home).toContain(
-        styleHead({ css: "@layer recipes{.css-here{color:red}}", href: `/docs/${result.file}` }),
+        `<link data-docs-style rel="stylesheet" data-href="/docs/${result.file}">`,
       );
-      expect(home).toContain('media="print" onload="this.media=\'all\'"');
+      expect(home).not.toMatch(/<link[^>]*data-docs-style[^>]*\shref=/);
+      expect(home).toContain('addEventListener("load"');
       expect(home).not.toContain(placeholder);
       expect(home).not.toContain(clientLink);
     });
@@ -138,6 +144,11 @@ describe("inlinePageStyles", () => {
       const css = result.files.get(result.file) ?? "";
       expect(css).toContain(".css-there");
       expect(css).toContain(".docs-shell");
+    });
+
+    /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
+    it("leaves the font faces to each page, so the late sheet cannot swap a font in", () => {
+      expect(result.files.get(result.file)).not.toContain("@font-face");
     });
   });
 });

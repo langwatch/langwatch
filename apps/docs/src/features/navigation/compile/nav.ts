@@ -345,6 +345,7 @@ export function buildNav({ docsRoot }: { docsRoot: string }): Nav {
       href: links.find((link) => /llms/i.test(link.label))?.href ?? docsUrl({ path: "/llms.txt" }),
     }),
     stars: null,
+    starsReadAt: null,
     notFound: {
       title: config.errors?.["404"]?.title ?? "Page not found",
       description: config.errors?.["404"]?.description ?? "",
