@@ -3,7 +3,7 @@
  * Dataset versions over the memory twins: saving, reading, comparing,
  * restoring, experiment runs, retention, deletion and the first-version step.
  */
-import type { DatasetVersionAuthor } from "@langwatch/dataset-contract";
+import { DatasetNotFoundError, type DatasetVersionAuthor } from "@langwatch/dataset-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
@@ -143,6 +143,23 @@ describe("given a dataset created with columns and no rows", () => {
       const versions = await versionsOf(datasetId);
       expect(versions).toHaveLength(1);
       expect(versions[0]).toMatchObject({ version: 1, trigger: "autosave", rowCount: 2 });
+    });
+  });
+
+  describe("when the autosave runs before any row is added", () => {
+    /** @scenario "The autosave of a dataset still empty saves nothing" */
+    it("saves nothing, and the first autosave with rows is version 1", async () => {
+      const datasetId = await createDataset([]);
+
+      await app.autosaveVersion({ projectId: PROJECT, datasetId, editedBy: ALICE });
+      expect(await versionsOf(datasetId)).toEqual([]);
+
+      await edit(datasetId, "a", "first");
+      await app.autosaveVersion({ projectId: PROJECT, datasetId, editedBy: ALICE });
+
+      const versions = await versionsOf(datasetId);
+      expect(versions).toHaveLength(1);
+      expect(versions[0]).toMatchObject({ version: 1, trigger: "autosave", rowCount: 1 });
     });
   });
 });
@@ -952,6 +969,40 @@ describe("given datasets created before versioning", () => {
     ).rejects.toThrow("datasets got no first version");
 
     expect(saved).toEqual([]);
+  });
+
+  /** @scenario "The first-version step retries a dataset whose rows it could not read" */
+  it("fails and saves no checkpoint when a dataset's rows fail to read", async () => {
+    await app.upsertDataset({
+      projectId: "project-0",
+      name: "unreadable-once",
+      columnTypes: [{ name: "input", type: "string" }],
+      datasetRecords: [{ id: "a", input: "x" }],
+    });
+    vi.spyOn(repositories.records, "findPage").mockRejectedValueOnce(new Error("connection reset"));
+
+    const { saved, checkpoint } = checkpointOf(null);
+    await expect(
+      app.firstVersionsRun()({
+        checkpoint,
+        dryRun: false,
+        signal: new AbortController().signal,
+        log: { info: () => undefined, warn: () => undefined },
+      }),
+    ).rejects.toThrow("datasets got no first version");
+
+    expect(saved).toEqual([]);
+  });
+
+  /** @scenario "The first-version step retries a dataset whose rows it could not read" */
+  it("skips a dataset that is gone by the time its rows are read", async () => {
+    const datasetId = await createDataset();
+    vi.spyOn(repositories.records, "findPage").mockRejectedValueOnce(new DatasetNotFoundError());
+
+    const { report } = await run();
+
+    expect(report).toMatchObject({ created: 0, skipped: 1, failed: 0 });
+    expect(await versionsOf(datasetId)).toEqual([]);
   });
 
   /** @scenario "The first-version step resumes from its checkpoint" */

@@ -111,7 +111,10 @@ export class DatasetVersionService {
     return this.#writeVersion({ dataset, latest, input });
   }
 
-  /** Whether the dataset holds any row now; reads at most its first page. */
+  /**
+   * Whether the dataset holds any row now. Stops at the first row: one record page
+   * or one chunk, except a legacy single-file dataset, whose file is read whole.
+   */
   async hasRows(input: { projectId: string; datasetId: string }): Promise<boolean> {
     const dataset = await this.#readyDataset(input);
     for await (const _row of this.#currentRows(dataset)) return true;

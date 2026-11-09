@@ -7,8 +7,10 @@ Feature: Dataset version history
   storage: a DatasetVersion row in Postgres, and the rows as JSONL chunks in the object storage
   the dataset module already writes (local disk or a bucket, so every self-hosted install has it).
   Versions are numbered per dataset from 1. A version is never edited; restoring writes a new one.
-  The system saves no version of a dataset that has no rows: there is nothing to restore, so a
-  dataset created empty gets version 1 from its first save with rows.
+  The system's own saves (the "initial" save before a first edit, the autosave and the
+  first-version background step) skip a dataset that has no rows and no versions yet: there is
+  nothing to restore, so a dataset created empty gets version 1 from its first save with rows.
+  A save by hand, an experiment run or a restore still saves, rows or not.
   A snapshot whose content hash equals the latest version's creates nothing new.
 
   # --- Saving versions ---
@@ -30,7 +32,13 @@ Feature: Dataset version history
     Given a dataset created with columns and no rows
     When a user adds rows and the edits go quiet
     Then version 1 is the autosave holding those rows
-    And no version holds zero rows
+
+  @unit
+  Scenario: The autosave of a dataset still empty saves nothing
+    Given a dataset created with columns and no rows
+    When the dataset has been quiet for the whole period and the autosave runs
+    Then the dataset has no versions
+    And the first autosave after rows are added is version 1
 
   @unit
   Scenario: Edits inside the quiet period save one version
@@ -325,6 +333,13 @@ Feature: Dataset version history
     And a dataset with no rows gets no version
     And running the step again creates nothing
     And a dry run creates nothing and saves no checkpoint
+
+  @unit
+  Scenario: The first-version step retries a dataset whose rows it could not read
+    Given a dataset whose rows fail to read during the first-version step
+    When the step runs
+    Then the step fails, saves no checkpoint past that project, and retries it
+    And a dataset that is gone by the time its rows are read is skipped
 
   @unit
   Scenario: The first-version step resumes from its checkpoint
