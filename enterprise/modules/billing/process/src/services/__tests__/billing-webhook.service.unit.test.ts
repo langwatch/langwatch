@@ -1012,6 +1012,7 @@ describe("EEWebhookService", () => {
 
     describe("when subscription is ACTIVE", () => {
       /** @scenario "A failed invoice payment does not immediately remove the plan" */
+      /** @scenario "The day a renewal payment fails, the organization keeps its paid plan" */
       /** @scenario Payment failure on an active subscription records the failure */
       it("keeps status as ACTIVE with failed payment date", async () => {
         subRepo.findByStripeId.mockResolvedValue(
