@@ -71,8 +71,6 @@ export function modelPickerOption({
   };
 }
 
-/** Own-key decision models as picker rows, shared by Default models and the eval chip popover. */
-
 /** The line on a decision model whose provider has no key at the picked scopes. */
 function addKeyHint(provider: string): string {
   const name = findModelProviderDefinition(provider)?.name ?? provider;
@@ -93,9 +91,9 @@ function ownModelOption({
 }
 
 /**
- * The own-key catalogue: what the server says would run (`pickable`) comes first and can be
- * picked, the rest follow in catalogue order and say which key to add. Unpickable rows keep full
- * opacity, so without the order one usable model hides at the bottom of a long list.
+ * Own-key decision models as picker rows, shared by Default models and the eval chip popover.
+ * What the server says would run (`pickable`) comes first; the rest follow in catalogue order and
+ * say which key to add. Unpickable rows keep full opacity, so order is what surfaces a usable one.
  */
 export function ownDecisionModelPickerOptions(
   pickable: readonly { value: string }[],
