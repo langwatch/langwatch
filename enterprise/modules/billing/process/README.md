@@ -312,10 +312,11 @@ interface Input {
   organizationId: string;
   quantity: number;
 }
-// Output: developerSeatQuoteSchema, ../contract/src/billing-types.ts:309
+// Output: developerSeatQuoteSchema, ../contract/src/billing-types.ts:312
 interface Output {
   amountDueCents: number;
   formattedAmountDue: string;
+  taxCents: number;
   formattedRecurringTotal: string;
   billingInterval: string;
   quotedAt: number;
