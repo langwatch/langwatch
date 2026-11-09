@@ -5,35 +5,41 @@ sidebarTitle: People
 keywords: departments, people, spend attribution, cost center, scim, langwatch
 ---
 
-A department is an accounting label for AI spend. You create departments on the **People** page, assign people, teams and projects to them on the members and teams pages, and the governance overview shows spend by department for the whole organization.
+Open **AI Governance > People** (`/governance/people`) to review people named by connected sources, match provider identities and manage departments for spend accounting. Departments change where spend is counted. They never grant or restrict access.
 
-A department never grants or restricts access. Assigning a person to Engineering changes only where their spend is counted. For access, see [Access Control (RBAC)](/platform/rbac).
+For access control, use [Access Control (RBAC)](/platform/rbac).
 
-## Manage departments
+## What the People tab shows
 
-Open **AI Governance > People** (`/governance/people`). The page has:
+The **People** tab lists people LangWatch knows about from directory data, connected providers and usage. Rows can include identity evidence, department assignment, source, spend and recent activity when those reads are available.
 
-- **Create a department**: type a name and click **Create**.
-- The department list, with **Edit** to rename and **Archive** in the row menu.
-- **Assigning departments**: links to the members and teams pages, where you assign each person, team and project.
+Use filters to narrow the list by department, source and match state. A missing value means LangWatch has not measured that value for the person yet, not that the value is zero.
 
-<Frame caption="The People page with two departments and the assignment guide below the list.">
+<Frame caption="The People page lists people and departments used for spend attribution.">
   ![The People page](/images/ai-governance/governance-people.png)
 </Frame>
 
-Reading the list needs `governance:view`. Creating, renaming, archiving and assigning need `governance:manage`. Without it the page shows the list only.
+## What the Departments tab shows
 
-## Assign people, teams and projects
+The **Departments** tab lists the active departments used for accounting. Create, rename and archive departments from this tab when you have `governance:manage`.
 
-The People page does not list assignments per person, so it stays usable in a large organization. Assign on the pages that already list the people and teams:
+Archiving removes a department from pickers. It does not delete historical rows. Spend that no longer matches an active department is counted under **Unassigned**.
+
+## How identity matching works
+
+**Run match pass** asks LangWatch to review provider identities against known people. The pass creates suggestions where the evidence is strong enough to review, and it leaves uncertain identities unmatched instead of guessing.
+
+Confirming a suggestion links the provider identity to the person for governance reporting. It does not create a login, change a role or grant access to anything.
+
+## Assign departments
+
+Assign departments from the People page, or from the organization settings pages that already list people, teams and projects.
 
 | What | Where | Effect |
-|------|-------|--------|
-| A person | **Settings > Members**, the **Department** column | The person's spend, including their personal AI use, rolls up to this department |
-| A team | **Settings > Teams & Projects**, the picker on the team row | The default for the team's members and projects that have no department of their own |
-| A project | **Settings > Teams & Projects**, the picker on the project row | Spend of agents that run in the project with no person behind the request |
-
-The Department column and the pickers appear once the organization has at least one department, for a viewer with `organization:manage`.
+|---|---|---|
+| A person | **AI Governance > People**, or **Settings > Members** | The person's spend, including personal AI use, rolls up to this department |
+| A team | **Settings > Teams & Projects** | Members and projects inherit this department when they have no department of their own |
+| A project | **Settings > Teams & Projects** | Agent spend with no human principal rolls up to this department |
 
 <Frame caption="The Department column on Settings > Members, with each person assigned to Engineering or Marketing.">
   ![The Department column on Settings > Members](/images/ai-governance/governance-people-member-assignment.png)
@@ -43,34 +49,30 @@ The Department column and the pickers appear once the organization has at least 
   ![The department pickers on Settings > Teams & Projects](/images/ai-governance/governance-people-team-assignment.png)
 </Frame>
 
-## How spend is attributed
+## How spend rolls up
 
 Each request counts once, in exactly one department.
 
-For a request made by a person, LangWatch uses the first of these that is set: the person's own department, the department of their team, the department of the project the request ran in. For a request with no person behind it, for example an autonomous agent, LangWatch uses the department of the project. A project's department is its own, or the one inherited from its team.
+For a request made by a person, LangWatch uses the first department it can prove in this order: the person's department, the person's team department, then the project department. For a request with no person behind it, such as an autonomous agent, LangWatch uses the project department.
 
-A request that matches none of these is counted under **Unassigned**.
-
-The person always wins over the project, so a developer's personal AI use and the agents their team runs can land in the same department. The **Spend by department** card on the [overview](/ai-governance/overview) shows the result for the last 30 days, across every project in the organization.
-
-## Archive a department
-
-Archive removes the department from the pickers. Spend already attributed to it is counted under **Unassigned** from then on. The assignments stay stored; archive deletes no data. You can create a new department with the same name as an archived one.
+A request that matches none of these is counted under **Unassigned**. Read the department breakdown on [Costs](/ai-governance/costs).
 
 ## Assign departments through SCIM
 
-When your identity provider provisions users through SCIM, LangWatch reads the `costCenter` attribute of the SCIM Enterprise User extension:
+When your identity provider provisions users through SCIM, LangWatch reads the `costCenter` attribute of the SCIM Enterprise User extension.
 
 | The identity provider sends | LangWatch |
-|-----------------------------|-----------|
+|---|---|
 | A `costCenter` that matches an active department | Assigns the user to it |
 | A `costCenter` that matches no active department | Creates the department and assigns the user |
 | A new `costCenter` value on an update | Replaces the assignment |
-| An empty `costCenter`, or removes the attribute | Clears the assignment; the user's spend counts under Unassigned |
+| An empty `costCenter`, or removes the attribute | Clears the assignment |
 | No `costCenter` in the request | Leaves the assignment as it is |
 
-## Where else a department applies
+## Permissions
 
-A [data privacy](/platform/data-privacy) rule can be written at department scope, and a tile in the [tool catalog](/ai-governance/personal-portal/admin-catalog) can be scoped to departments.
+Reading People needs `governance:view`. Running a match pass, confirming a suggestion and changing departments need `governance:manage`.
 
-**Also check:** [SCIM](/platform/scim) for provisioning setup, and [Members and Teams](/platform/members-and-teams) for the pages where you assign departments.
+Department assignment in **Settings > Members** and **Settings > Teams & Projects** needs the organization management permissions for those settings pages.
+
+**Also check:** [Costs](/ai-governance/costs) for department spend, [SCIM](/platform/scim) for provisioning setup, and [Members and Teams](/platform/members-and-teams) for organization membership settings.
