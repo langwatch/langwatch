@@ -16,7 +16,6 @@ import {
   type StoreLicenseResult,
   DENIED_SSO_GATE_TTL_MS,
 } from "@langwatch/enterprise-licensing-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { licenseResourceCounts } from "@langwatch/plans";
 import { nowInstant, Temporal, toEpochMs, type Instant } from "@langwatch/time";
 
@@ -26,13 +25,6 @@ import type {
 } from "../repositories/organization-license.repository.ts";
 import { connectServicesNamedBy } from "../rules/connect-entitlement.rules.ts";
 import { LicensePlanSourceService } from "./license-plan-source.service.ts";
-
-/** An organization that no longer exists holds no licence: the status read answers unlicensed. */
-const unlicensedWhenMissing = (error: unknown): { licenseKey: null } => {
-  if (HandledError.isHandled(error) && error.code === "organization_not_found")
-    return { licenseKey: null };
-  throw error;
-};
 
 export type LicenseRetentionConfiguration = {
   categories: readonly string[];
@@ -127,6 +119,7 @@ export class LicenseService extends LicensingServiceContract {
     this.plans = LicensePlanSourceService.create({
       licenses: options.repository,
       cryptography: options.cryptography,
+      instanceLicenseKey: options.instanceLicenseKey,
     });
     this.usage = options.usage;
     this.retention = options.retention;
@@ -297,9 +290,7 @@ export class LicenseService extends LicensingServiceContract {
   }
 
   async getLicenseStatus(organizationId: string): Promise<LicenseStatus> {
-    const { licenseKey } = await this.repository
-      .getOrganizationLicense(organizationId)
-      .catch(unlicensedWhenMissing);
+    const { licenseKey, source } = await this.plans.resolveLicenseKey(organizationId);
     if (!licenseKey) {
       return { hasLicense: false, valid: false };
     }
@@ -313,6 +304,7 @@ export class LicenseService extends LicensingServiceContract {
         planName: validation.licenseData.plan.name,
         expiresAt: validation.licenseData.expiresAt,
         organizationName: validation.licenseData.organizationName,
+        source,
         connected: connectServicesNamedBy(validation.licenseData.connectServices).length > 0,
         ...(await this.getResourceCounts(organizationId, validation.licenseData.plan)),
       };
@@ -324,17 +316,20 @@ export class LicenseService extends LicensingServiceContract {
     }
 
     const { data } = signedLicense;
+    const expired =
+      this.cryptography.verifySignature(signedLicense) &&
+      this.cryptography.isExpired(data.expiresAt);
 
     return {
       hasLicense: true,
       valid: false,
-      expired:
-        this.cryptography.verifySignature(signedLicense) &&
-        this.cryptography.isExpired(data.expiresAt),
+      expired,
+      connected: expired && connectServicesNamedBy(data.connectServices).length > 0,
       plan: data.plan.type,
       planName: data.plan.name,
       expiresAt: data.expiresAt,
       organizationName: data.organizationName,
+      source,
       ...(await this.getResourceCounts(organizationId, data.plan)),
     };
   }
@@ -348,6 +343,11 @@ export class LicenseService extends LicensingServiceContract {
     this.storedRevision += 1;
 
     return { removed: true };
+  }
+
+  /** Full member seats in use now, the same count the seat limit is enforced on. */
+  countFullSeatsInUse(organizationId: string): Promise<number> {
+    return this.repository.getMemberCount(organizationId);
   }
 
   private async getResourceCounts(

@@ -3,7 +3,7 @@
  * once the words have had a beat to themselves.
  */
 import { Box } from "@langwatch/design-system/primitives";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 
 import { helloSegments, NEXT_AFTER_TYPING_MS } from "../../model/copy.ts";
@@ -16,7 +16,8 @@ export function HelloScreen({
   fading,
   onNext,
 }: {
-  firstName: string;
+  /** Absent when the account has no name: the greeting then leaves it out. */
+  firstName: string | undefined;
   fading: boolean;
   onNext: () => void;
 }) {
@@ -36,7 +37,7 @@ export function HelloScreen({
     return () => clearTimeout(t);
   }, [done]);
 
-  const segments = useMemo(() => helloSegments(firstName), [firstName]);
+  const segments = helloSegments({ name: firstName });
 
   return (
     <TakeoverRow fading={fading} maxWidth={640}>

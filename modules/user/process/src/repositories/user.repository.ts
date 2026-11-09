@@ -138,6 +138,8 @@ export interface UserRepository {
   countUsage(): Promise<UserUsageCount>;
   /** The same count, among these people only. */
   countUsageAmong(input: { userIds: readonly string[] }): Promise<UserUsageCount>;
+  /** Which of these people last signed in at or after `since` (epoch ms). */
+  findSignedInSince(input: { userIds: readonly string[]; since: number }): Promise<string[]>;
   /** Whether any account's address is on this domain, install-wide, case aside. */
   hasAccountOnDomain(domain: string): Promise<boolean>;
   /** Whether any account exists, install-wide. */

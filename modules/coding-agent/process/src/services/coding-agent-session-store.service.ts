@@ -1,4 +1,7 @@
-import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
+import type {
+  CodingAgentProjectionPersistence,
+  CodingTerminal,
+} from "@langwatch/coding-agent-contract";
 import type {
   FoldProjectionStore,
   ProjectionStoreContext,
@@ -11,8 +14,10 @@ import {
   type CodingAgentSessionRow,
   type CodingAgentSessionState,
 } from "../eventing/coding-agent-session.projection.ts";
+import type { RepositoryKeyOf } from "../rules/coding-agent-repository-key.rules.ts";
 import { toCodingAgentSessionRow } from "../rules/coding-agent-session-row-mapper.rules.ts";
 import { codingAgentSessionStateFromRow } from "../rules/coding-agent-session-state-mapper.rules.ts";
+import { classifyCodingTerminal } from "../rules/coding-agent-terminal-type.rules.ts";
 
 /**
  * Whether a committed row's read-back columns can be trusted. Projection
@@ -39,6 +44,10 @@ export interface StoredSession {
   /** When the session was first folded (set at fold init, kept on read-back), epoch ms. */
   firstStoredAt: number;
   auxiliary: boolean;
+  /** The closed name of what a log event reported; null until one names it. */
+  terminalType: CodingTerminal | null;
+  /** An HMAC standing for the session's repo; null until the session declares one. */
+  repositoryKey: string | null;
 }
 
 /** Store adapter; no agent gate (dispatchers gate upstream), read-back decoding per ADR-066. */
@@ -53,6 +62,8 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
        * errors, never blocking the committed row.
        */
       onSessionsStored?: (sessions: StoredSession[]) => Promise<void>;
+      /** Absent, no stored session names a repo. */
+      repositoryKeyOf?: RepositoryKeyOf;
     },
   ) {}
 
@@ -60,10 +71,12 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
     persistence: CodingAgentProjectionPersistence;
     defaultRetentionDays: () => number;
     onSessionsStored?: (sessions: StoredSession[]) => Promise<void>;
+    repositoryKeyOf?: RepositoryKeyOf;
   }): EventingCodingAgentSessionStoreService {
     return new EventingCodingAgentSessionStoreService(input.persistence, {
       defaultRetentionDays: input.defaultRetentionDays,
       onSessionsStored: input.onSessionsStored,
+      repositoryKeyOf: input.repositoryKeyOf,
     });
   }
 
@@ -71,7 +84,7 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
     if (!hasPersistableSignal(state)) return;
     const entry = this.toRow(state, context);
     await this.persistence.storeSession(entry);
-    this.reportSessionsStored([toStoredSession(state, context)]);
+    this.reportSessionsStored([toStoredSession(state, context, this.hooks.repositoryKeyOf)]);
   }
 
   async storeBatch(
@@ -86,7 +99,9 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
 
     await this.persistence.storeSessionBatch(rows);
     this.reportSessionsStored(
-      persistable.map(({ state, context }) => toStoredSession(state, context)),
+      persistable.map(({ state, context }) =>
+        toStoredSession(state, context, this.hooks.repositoryKeyOf),
+      ),
     );
   }
 
@@ -164,6 +179,7 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
 function toStoredSession(
   state: CodingAgentSessionState,
   context: ProjectionStoreContext,
+  repositoryKeyOf: RepositoryKeyOf | undefined,
 ): StoredSession {
   return {
     tenantId: String(context.tenantId),
@@ -172,6 +188,16 @@ function toStoredSession(
     occurredAt: state.LastEventOccurredAt,
     firstStoredAt: state.createdAt,
     auxiliary: state.auxiliary,
+    terminalType: classifyCodingTerminal(state.terminalType) ?? null,
+    // The same bar extractWorkingContext sets for naming a repo: owner and name.
+    repositoryKey:
+      state.repositoryOwner && state.repositoryName
+        ? (repositoryKeyOf?.({
+            repositoryHost: state.repositoryHost,
+            repositoryOwner: state.repositoryOwner,
+            repositoryName: state.repositoryName,
+          }) ?? null)
+        : null,
   };
 }
 

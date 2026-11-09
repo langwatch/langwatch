@@ -93,4 +93,8 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
         requestedBy: actor.id,
       });
     })
+
+    .procedure("findSeatSharingChecks")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app }) => app.findSeatSharingChecks())
     .build();

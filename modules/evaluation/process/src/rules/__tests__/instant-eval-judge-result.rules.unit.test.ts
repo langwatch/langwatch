@@ -166,3 +166,41 @@ describe("instantEvalJudgeResult", () => {
     });
   });
 });
+
+describe("instantEvalJudgeResult on a routed judgement", () => {
+  /** @scenario "A routed result says who answered it" */
+  it("names the LangWatch Judge, the backends that answered and how many escalated", () => {
+    const result = instantEvalJudgeResult({
+      judge: booleanJudge,
+      judgement: {
+        ...answered({ probability: 0.92 }),
+        costNanoUsd: 1_200,
+        routing: {
+          answeredBy: { anthropic: 1 },
+          escalated: 1,
+          mode: "instant",
+          slot: "short",
+          inputView: "full",
+          flags: [],
+        },
+      },
+      priceUsd: 0.0001,
+    });
+
+    expect(result).toMatchObject({
+      status: "processed",
+      details:
+        "Instant Evals: true, 92% confident. LangWatch Judge: answered by anthropic, 1 escalated",
+    });
+  });
+
+  it("reads exactly as before when the judgement was not routed", () => {
+    const result = instantEvalJudgeResult({
+      judge: booleanJudge,
+      judgement: answered({ probability: 0.92 }),
+      priceUsd: 0.0001,
+    });
+
+    expect(result).toMatchObject({ details: "Instant Evals: true, 92% confident" });
+  });
+});

@@ -6,6 +6,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature AC200
  */
 
+import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { act, cleanup, screen, within } from "@testing-library/react";
@@ -39,6 +40,7 @@ import {
 } from "../../../testing.tsx";
 import type { SandboxedChartFrameProps } from "../../dashboard-widget/ui/sections/sandboxed-chart-frame.tsx";
 import { curatedBoardById } from "../model/curated-boards.ts";
+import { catalogueSource } from "../model/widget-source.ts";
 import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
@@ -67,7 +69,12 @@ type StoredQuery = {
   projects?: string[] | null;
 };
 /** A stored widget's definition; its query stores no sources, as one saved before them. */
-const GRAPH: { version: 1; code: string; queries: StoredQuery[] } = {
+const GRAPH: {
+  version: 1;
+  code: string;
+  queries: StoredQuery[];
+  source?: DashboardWidgetSource;
+} = {
   version: 1,
   code: "export default function Widget() { return null; }",
   queries: [
@@ -193,6 +200,7 @@ function boardServer({ widgets = [WIDGET] }: { widgets?: readonly (typeof WIDGET
               sources?: unknown;
               projects?: unknown;
               excludeOrigins?: unknown;
+              telemetry?: unknown;
               granularitySeconds?: number;
               timeWindow?: { start: string; end: string };
             },
@@ -351,6 +359,34 @@ function openBoard({
 
 const sourcesOf = (runs: ReturnType<ReturnType<typeof boardServer>["runs"]>) =>
   runs.map((run) => run.sources);
+
+describe("given a widget placed on a board", () => {
+  /** @scenario "Telemetry: the query log line says who ran it and how it ended" */
+  it("sends the board and the widget with the card's run, for its log line", async () => {
+    const server = openBoard();
+    await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+
+    expect(server.runs()[0]?.telemetry).toEqual({ dashboardId: BOARD.id, widgetId: WIDGET.id });
+  });
+
+  describe("when the widget was built from a catalogue widget", () => {
+    /** @scenario "Telemetry: the query log line says who ran it and how it ended" */
+    it("also sends the catalogue widget it came from as the template", async () => {
+      const fromCatalogue = {
+        ...WIDGET,
+        graph: { ...GRAPH, source: catalogueSource("traffic") },
+      };
+      const server = openBoard({ widgets: [fromCatalogue] });
+      await frameRuns({ frame: await screen.findByTestId("sandboxed-frame"), queryName: "main" });
+
+      expect(server.runs()[0]?.telemetry).toEqual({
+        dashboardId: BOARD.id,
+        widgetId: WIDGET.id,
+        templateId: "traffic",
+      });
+    });
+  });
+});
 
 describe("given a stored widget whose query stores no sources", () => {
   /** @scenario "AC200f Sources: a query that stores none counts application traces" */
@@ -561,6 +597,32 @@ describe("given a From LangWatch board", () => {
       ).toBe(true);
       cleanup();
     }
+  });
+});
+
+describe("given a From LangWatch board's widget card", () => {
+  /** @scenario "Telemetry: a From LangWatch board's widgets count as dashboard widgets" */
+  it("sends the curated board and the widget's key with its run, so it counts as a widget's", async () => {
+    const server = boardServer();
+    const host = new StubAnalyticsHost({
+      flags: FLAGS,
+      permissions: MEMBER,
+      project: PROJECT,
+      route: { params: { templateId: "release" }, query: {} },
+    });
+    const widgets = curatedBoardById("release")?.widgets ?? [];
+    renderDashboards({ element: <CuratedBoardScreen />, host, answer: server.answer });
+    await screen.findByRole("heading", { name: "Release check" });
+    const frame = screen.getAllByTestId("sandboxed-frame")[0]!;
+    const widget = widgets.find(({ definition }) => definition.code === frames.get(frame)?.code)!;
+
+    await frameRuns({ frame, queryName: widget.definition.queries[0]!.name });
+
+    expect(server.runs()[0]?.telemetry).toEqual({
+      dashboardId: "curated/release",
+      widgetId: widget.key,
+      templateId: widget.key,
+    });
   });
 });
 

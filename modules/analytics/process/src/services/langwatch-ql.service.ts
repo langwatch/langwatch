@@ -48,6 +48,7 @@ import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.serv
 import { LangWatchQLExecutionService } from "./langwatch-ql-execution.service.ts";
 import { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
 import { LangWatchQLPolicyValidationService } from "./langwatch-ql-policy-validation.service.ts";
+import type { LangWatchQLRunTelemetryService } from "./langwatch-ql-run-telemetry.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import { LangWatchQLTimeWindowService } from "./langwatch-ql-time-window.service.ts";
 
@@ -85,6 +86,8 @@ export interface LangWatchQLServiceDependencies {
   readonly judging?: Pick<InstantEvalApi, "judgeQuery" | "getJudgeLimits">;
   /** Milliseconds on a monotonic clock, for the elapsed time hydration and judging add. */
   readonly stopwatch?: () => number;
+  /** Counts each answered run: the instance the app's doors count refused runs on. */
+  readonly runTelemetry: Pick<LangWatchQLRunTelemetryService, "recordAnswered" | "fieldsFor">;
 }
 
 export class LangWatchQLService {
@@ -114,6 +117,7 @@ export class LangWatchQLService {
         hydration: deps.hydration,
         judging: deps.judging,
       }),
+      runTelemetry: deps.runTelemetry,
     });
   }
 
@@ -389,6 +393,7 @@ export class LangWatchQLService {
     memberWindows,
     isInstantEvalsEnabled,
     signal,
+    telemetry,
   }: LangWatchQLProjectSetExecuteInput &
     LangWatchQLEvalGate &
     LangWatchQLMemberScope): Promise<LangWatchQLQueryResult> {
@@ -437,6 +442,7 @@ export class LangWatchQLService {
       ...(memberWindows ? { memberWindows } : {}),
       ...(followedWindow ? { timeWindow: followedWindow } : {}),
       ...(signal ? { signal } : {}),
+      telemetry,
     });
     // After the main query, never beside it: a refused or failed query costs no second read.
     const completeness = await lwqlCompleteness.assess({

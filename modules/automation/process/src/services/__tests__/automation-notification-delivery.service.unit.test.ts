@@ -275,6 +275,35 @@ describe("AutomationNotificationDeliveryService", () => {
       expect(sent.html).toContain(`${BASE_HOST}/acme/traces/trace-1?t=${startedAt}`);
     });
 
+    /** @scenario "Digest email links carry the marker" */
+    it("marks the digest's row link with the alert marker the app counts", async () => {
+      const { adapter, mailer } = composeDelivery();
+      const claimed = new Set<string>();
+
+      await adapter.sendLegacyEmail({
+        recipients: ["ada@example.com"],
+        triggerData: [
+          {
+            traceId: "trace-1",
+            input: "",
+            output: "",
+            projectId: "project-1",
+            fullTrace: { timestamps: {} } as never,
+          },
+        ],
+        triggerName: "Error rate",
+        triggerId: "trigger-1",
+        projectId: "project-1",
+        projectSlug: "acme",
+        triggerType: null,
+        triggerMessage: "",
+        isRecipientSent: async (hash) => claimed.has(hash),
+        recordRecipientSent: async (hash) => void claimed.add(hash),
+      });
+
+      expect(mailer.sent[0]!.html).toContain(`${BASE_HOST}/acme/traces/trace-1?lw_from=alert`);
+    });
+
     /** @scenario "The settlement digest renders and sends from this process" */
     it("sends the same digest to Slack through the packaged renderer", async () => {
       const posted: unknown[] = [];

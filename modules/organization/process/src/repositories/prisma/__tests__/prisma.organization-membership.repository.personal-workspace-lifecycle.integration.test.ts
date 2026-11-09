@@ -94,6 +94,8 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
         slug: `personal-${testNamespace}`,
         apiKey: `sk-lw-${testNamespace}`,
         teamId: personalTeamId,
+        isPersonal: true,
+        ownerUserId: leaverUserId,
         language: "other",
         framework: "other",
       },

@@ -27,6 +27,12 @@ import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 /** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
 const openSeats = {
   countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+  findLiveHoldUserIds: async () => [],
+  withSeatLock: <T>({
+    work,
+  }: {
+    work: (lease: { assertHeld(): Promise<void> }) => Promise<T>;
+  }): Promise<T> => work({ assertHeld: async () => {} }),
 };
 
 const ACME = "org_acme";
@@ -101,6 +107,9 @@ function world() {
         );
         if (at !== -1) store.memberships.splice(at, 1);
       }),
+      holdSeatOfDepartingMember: vi.fn(async () => undefined),
+      takeBackHeldSeat: vi.fn(async () => undefined),
+      openSeatRequestForAdmission: vi.fn(async () => undefined),
     },
     connections,
     prisma: store,

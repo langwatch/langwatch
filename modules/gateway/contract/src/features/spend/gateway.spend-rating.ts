@@ -48,7 +48,18 @@ function pricesAnything(rule: ModelCostRate): boolean {
     rule.outputImageCostPerToken,
     rule.inputCostPerCharacter,
     rule.inputCostPerSecond,
+    rule.webSearchCostPerQuery,
   ].some((rate) => (rate ?? 0) > 0);
+}
+
+/**
+ * Prefix on the rate version of a row that burned something and rated at zero because of a
+ * catalog fault, so the ledger can be filtered for spend nobody was charged for.
+ */
+export const UNPRICED_RATE_VERSION_PREFIX = "unpriced:";
+
+export function isUnpricedRateVersion(rateVersion: string): boolean {
+  return rateVersion.startsWith(UNPRICED_RATE_VERSION_PREFIX);
 }
 
 /** Rate identity stamped when the caller carried none: the registry's regeneration date. */
@@ -82,11 +93,22 @@ export function rateSpendNanoUsd({
         inputCharacters: usage.input_chars,
         // The one conversion of the duration quantity: integer milliseconds everywhere else.
         audioSeconds: usage.audio_ms / 1000,
+        webSearchRequests: usage.web_search_requests,
       })
     : 0;
+  const costNanoUsd = Math.round((usd ?? 0) * NANO_USD_PER_USD);
+  const version =
+    rateVersion && rateVersion.length > 0 ? rateVersion : currentRegistryRateVersion();
+  const unpriced =
+    costNanoUsd === 0 &&
+    Object.keys(measuredQuantities(usage)).length > 0 &&
+    findSpendRatingFaults({ model, usage }).some((fault) => Object.keys(fault.measured).length > 0);
   return {
-    costNanoUsd: Math.round((usd ?? 0) * NANO_USD_PER_USD),
-    rateVersion: rateVersion && rateVersion.length > 0 ? rateVersion : currentRegistryRateVersion(),
+    costNanoUsd,
+    rateVersion:
+      unpriced && !isUnpricedRateVersion(version)
+        ? `${UNPRICED_RATE_VERSION_PREFIX}${version}`
+        : version,
   };
 }
 

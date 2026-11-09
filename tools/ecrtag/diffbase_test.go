@@ -33,6 +33,10 @@ func (r registries) Label(ctx context.Context, ref ecrtag.Ref, key string) (stri
 	return r[ref.Repository].Label(ctx, ref, key)
 }
 
+func (r registries) ImageTags(ctx context.Context, ref ecrtag.Ref) ([]string, error) {
+	return r[ref.Repository].ImageTags(ctx, ref)
+}
+
 // C is the commit being published; B, whose run was replaced while it waited,
 // is its parent, and A, the last published commit, is B's parent.
 const (

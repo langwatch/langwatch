@@ -122,5 +122,5 @@ export abstract class AuthzLedgerReadRepository {
     organizationId: string;
     revoke: (grantIds: string[]) => Promise<void>;
     prove: (reader: AuthzReadRepository) => Promise<void>;
-  }): Promise<Omit<OffboardCounts, "bindings">>;
+  }): Promise<Omit<OffboardCounts, "bindings"> & { heldFullSeat: boolean }>;
 }

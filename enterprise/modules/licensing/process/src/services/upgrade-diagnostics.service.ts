@@ -5,6 +5,7 @@
  * Plan: dev/docs/plans/upgrade-diagnostics-via-connect.md
  */
 import {
+  ConnectLicenseExpiredError,
   UPGRADE_DIAGNOSTICS_RETENTION_DAYS,
   UpgradeDiagnosticsNotFoundError,
   UpgradeDiagnosticsRateLimitedError,
@@ -59,6 +60,7 @@ export class UpgradeDiagnosticsService {
     caller: ConnectLicenceCaller;
     submission: UpgradeDiagnosticsSubmission;
   }): Promise<UpgradeDiagnosticsReceipt> {
+    if (caller.renewalOnly) throw new ConnectLicenseExpiredError();
     const { repository, bundles, rateLimit } = this.collaborators;
     const { instanceId } = caller;
     if (!(await rateLimit.allow({ instanceId }))) throw new UpgradeDiagnosticsRateLimitedError();

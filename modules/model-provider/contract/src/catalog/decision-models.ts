@@ -1,11 +1,44 @@
 /**
  * The decision models the Instant Evals column may hold (ADR-182 decision 2): the hosted, metered
- * LangWatch Instant Preview, then own-key models behind the own-decision-model flag. Ids read
+ * LangWatch Evals Preview, then own-key models behind the own-decision-model flag. Ids read
  * `<provider>/decisions:<model>` so none collides with a chat model of the same name.
  */
 
+import type { ModelRole } from "./model-feature-registry.ts";
+
 /** Same id as `INSTANT_EVAL_JUDGE_MODEL_ID`; a contract never imports another module's contract. */
 export const LANGWATCH_DECISION_MODEL_ID = "langwatch/instant-evals";
+
+const EVALS_PREVIEW = { label: "Evals Preview", description: "Optimized for evals" } as const;
+
+/** One of LangWatch's own decision models, named for what it is optimized for. */
+export type LangWatchDecisionPreview = Readonly<{
+  id: string;
+  label: string;
+  description: string;
+  /** The Default models columns it can fill; empty while it is not hosted yet. */
+  fills: readonly ModelRole[];
+}>;
+
+/**
+ * LangWatch's decision models, first in the Instant Evals picker. Only Evals Preview is hosted;
+ * the others are listed as coming soon. Making one pickable is adding its column here.
+ */
+export const LANGWATCH_DECISION_PREVIEWS: readonly LangWatchDecisionPreview[] = [
+  { id: LANGWATCH_DECISION_MODEL_ID, ...EVALS_PREVIEW, fills: ["INSTANT_EVALS"] },
+  {
+    id: "langwatch/scenario-judge-preview",
+    label: "Scenario Judge Preview",
+    description: "Optimized for scenario judge",
+    fills: [],
+  },
+  {
+    id: "langwatch/search-preview",
+    label: "Search Preview",
+    description: "Optimized for search",
+    fills: [],
+  },
+];
 
 /** The one feature the `INSTANT_EVALS` role carries. */
 export const INSTANT_EVAL_DECISION_FEATURE_KEY = "instant_eval.judge";
@@ -33,7 +66,13 @@ export type DecisionModelEntry = Readonly<{
   id: string;
   /** The registry provider whose row holds the key; `langwatch` is the hosted classifier. */
   provider: string;
+  /** The full name: provider, then model or API, so one model on two providers reads apart. */
   label: string;
+  /**
+   * A picker row's title when it differs from `label`; the row's provider icon names the
+   * provider.
+   */
+  pickerLabel?: string;
   description: string;
   /** Absent for the hosted classifier, which the judge reaches through its own client. */
   wire?: DecisionModelWire;
@@ -61,14 +100,14 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: LANGWATCH_DECISION_MODEL_ID,
     provider: "langwatch",
-    label: "LangWatch Instant Preview",
-    description: "Hosted by LangWatch and billed with your plan.",
+    ...EVALS_PREVIEW,
   },
   {
     id: "openai/decisions:gpt-6-luna",
     provider: "openai",
-    label: "OpenAI Decisions API",
-    description: "gpt-6-luna, on your OpenAI key.",
+    label: "OpenAI Decisions",
+    pickerLabel: "Decisions API",
+    description: "OpenAI's Decisions API, on your OpenAI key.",
     wire: "openai_decisions",
     providerModel: "gpt-6-luna",
     endpoint: "https://api.openai.com/v1/decisions",
@@ -134,8 +173,9 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "azure/decisions:gpt-6-luna",
     provider: "azure",
-    label: "Azure OpenAI Decisions API",
-    description: "gpt-6-luna, on your own Azure OpenAI resource.",
+    label: "Azure OpenAI Decisions",
+    pickerLabel: "Decisions API",
+    description: "Azure OpenAI Decisions API, on your own Azure OpenAI resource.",
     wire: "openai_decisions",
     providerModel: "gpt-6-luna",
     providerModelField: "AZURE_OPENAI_DECISIONS_DEPLOYMENT",
@@ -146,7 +186,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "azure/decisions:microsoft-decision-1",
     provider: "azure",
-    label: "Microsoft Decision 1 (Azure)",
+    label: "Azure Microsoft Decision 1",
     description: "Microsoft's decision model on your own Azure AI Foundry resource.",
     wire: "jev",
     providerModel: "Microsoft-Decision-1",
@@ -158,7 +198,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "openrouter/decisions:typesafe/jev-1.14",
     provider: "openrouter",
-    label: "Jev 1.14 (OpenRouter)",
+    label: "OpenRouter Jev 1.14",
     description: "TypeSafe's Jev through OpenRouter, on your OpenRouter key.",
     wire: "jev",
     providerModel: "typesafe/jev-1.14",
@@ -167,7 +207,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "openrouter/decisions:microsoft/microsoft-decision-1",
     provider: "openrouter",
-    label: "Microsoft Decision 1 (OpenRouter)",
+    label: "OpenRouter Microsoft Decision 1",
     description: "Microsoft's decision model through OpenRouter, on your OpenRouter key.",
     wire: "jev",
     providerModel: "microsoft/microsoft-decision-1",
@@ -176,7 +216,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "openrouter/decisions:liquid/d1.1",
     provider: "openrouter",
-    label: "Liquid d1.1 (OpenRouter)",
+    label: "OpenRouter Liquid d1.1",
     description: "Liquid AI's decision model through OpenRouter, on your OpenRouter key.",
     wire: "jev",
     providerModel: "liquid/d1.1",
@@ -212,6 +252,11 @@ export function azureResourceOf(endpoint: string): AzureEndpointRead {
 
 export function findDecisionModel(id: string): DecisionModelEntry | undefined {
   return DECISION_MODELS.find((entry) => entry.id === id);
+}
+
+/** A decision model's title in a picker row or chip, beside its provider icon. */
+export function decisionModelPickerTitle(entry: DecisionModelEntry): string {
+  return entry.pickerLabel ?? entry.label;
 }
 
 export function isDecisionModelId(id: string): boolean {

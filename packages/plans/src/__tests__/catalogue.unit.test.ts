@@ -103,16 +103,17 @@ describe("given the self-serve ladder", () => {
 describe("given the disputes the catalogue records", () => {
   describe("when they are listed", () => {
     /** @scenario "The catalogue lists exactly the disputes found in the census" */
-    it("lists exactly the four the census found", () => {
+    it("lists exactly the five recorded disputes", () => {
       const listed = planCatalogue.disputes().map((dispute) => dispute.id);
 
       expect(listed.toSorted()).toEqual([
         "automation-ceiling-three-ways",
         "free-plan-two-definitions",
         "growth-copy-volume",
+        "growth-seat-member-ceiling",
         "pro-volume-below-free",
       ]);
-      expect(PLAN_DISPUTE_IDS.length).toBe(4);
+      expect(PLAN_DISPUTE_IDS.length).toBe(5);
     });
   });
 

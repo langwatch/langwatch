@@ -63,7 +63,7 @@ overview.mdx  (docs rules, 5 sections, threshold 0.7)
 cost: 21,063 input tokens over 8 requests = USD 0.0009 (0.042 USD per million)
 ```
 
-One block per section. Each line is the probability that the rule is broken in that section, the rule id (`set/id`) and its name, then the sentence Jev picked as the clearest instance. `!` marks findings at or above the threshold of 0.7; they make the exit code 1. Regex and local rules report probability 1.00 and the first matching sentence, with a hit count when there are several. Findings between `--min` and the threshold are shown as a softer signal and do not fail the run.
+One block per section. Each line is the probability that the rule is broken in that section, the rule id (`set/id`) and its name, then the sentence Jev picked as the clearest instance. `!` marks findings at or above the threshold of 0.7; they make the exit code 1. `w` marks a rule with `"severity": "warning"`, which prints but never fails the run: today only `writing/question-opener`, an opening question the author keeps only with a reason. Regex and local rules report probability 1.00 and the first matching sentence, with a hit count when there are several. Findings between `--min` and the threshold are shown as a softer signal and do not fail the run.
 
 Read a finding as "the judge thinks this section breaks rule X with probability P". A 0.9 on a rule with a literal example in the guide (release flag, "rides", em dash) is close to certain. A 0.7 on a shape rule (artifact as subject, filler sentence, statement stack) is worth a look, and the located sentence tells you whether the judge understood the rule the way the guide meant it. The judge sees only the section, so rules about the whole page (title, description, opener) run only on the first section with content and receive the frontmatter.
 
@@ -72,7 +72,7 @@ Read a finding as "the judge thinks this section breaks rule X with probability 
 `rules/docs.json` holds the 29 numbered rules from docs-writing-rules plus the "less bs" and changelog rules; `rules/writing.json` holds the voice rules, the banned constructions, the technical-audience rules and the founder word bans from writing-rules. Each entry has an `id`, the rule's `name`, and one of three `kind`s:
 
 - `regex`: `pattern` and `flags`, run per sentence on prose, list items, table cells and headings; code blocks, inline code and paragraphs carrying a `Founder decision` MDX comment are skipped. `documentMax` makes a rule fire only past a count over the whole file (exclamation marks). `target: "headings"` or `"raw"` changes what the pattern runs over.
-- `local`: a structural check in `lint.mjs` (`paragraph-words` for the 80-word limit, `one-sentence-paragraph-run` for the barrage, `title-repeated-as-heading`, `title-how-to`).
+- `local`: a structural check in `lint.mjs` (`paragraph-words` for the 80-word limit, `one-sentence-paragraph-run` for the barrage, `title-repeated-as-heading`, `title-how-to`, `question-opener`).
 - `judge`: `instruction` written as a question about `text`, and `yes` / `no` criteria taken from the rule's own examples. `scope: "first-section"` limits it to the page opener. `locate: "heading"` or `"first-sentence"` reports that instead of asking Jev which sentence.
 
 The instruction wording is what the calibration tuned; the criteria matter as much as the question. When a rule misfires, rewrite the instruction with the guide's own example on each side and re-run `calibrate.mjs` before changing anything else. Do not quote sentences from the page you are about to lint as examples in a rule; the judge will match them and the report stops meaning anything.
@@ -109,7 +109,7 @@ Jev charges 0.042 USD per million input tokens and nothing for output. Every jud
 | a 7-section page             | both  | 7        | 13       | 59,244       | 0.0025 |
 | a 10-section page            | both  | 10       | 16       | 86,023       | 0.0036 |
 
-So a docs page costs a tenth of a cent with the docs rules and a quarter to a third of a cent with both rule sets. The full calibration run over 15 fixtures is 0.006 USD. The request cap is 32k tokens for text and questions together; the tool keeps a 30k budget and splits the questions across requests when a section is long. It never splits the text: a section over the budget is reported as an error, and `--section-level 3` is the way to make sections smaller.
+So a docs page costs a tenth of a cent with the docs rules and a quarter to a third of a cent with both rule sets. The full calibration run over 17 fixtures is 0.0063 USD. The request cap is 32k tokens for text and questions together; the tool keeps a 30k budget and splits the questions across requests when a section is long. It never splits the text: a section over the budget is reported as an error, and `--section-level 3` is the way to make sections smaller.
 
 ## Calibrate
 

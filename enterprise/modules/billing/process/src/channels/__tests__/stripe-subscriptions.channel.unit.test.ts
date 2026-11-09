@@ -20,6 +20,8 @@ const ACTIVE = {
   status: "active",
   canceled_at: null,
   billing_thresholds: null,
+  current_period_end: 1_701_388_800,
+  currency: "eur",
   items: {
     data: [
       {
@@ -37,7 +39,11 @@ const ACTIVE_HELD: BillingSubscription = {
   status: "active",
   canceledAt: null,
   billingThreshold: null,
-  items: [{ id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month" }],
+  items: [
+    { id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month", quantity: 2 },
+  ],
+  currentPeriodEnd: 1_701_388_800,
+  currency: "eur",
 };
 
 const PREVIEW = {
@@ -292,13 +298,21 @@ describe("Billing's subscription shapes over the provider", () => {
       canceledAt: 1_699_000_000,
       billingThreshold: { amountGte: 75_000, resetBillingCycleAnchor: false },
       items: [
-        { id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month" },
-        { id: "si_events", priceId: "price_events", unitAmount: null, interval: null },
+        { id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month", quantity: 2 },
+        {
+          id: "si_events",
+          priceId: "price_events",
+          unitAmount: null,
+          interval: null,
+          quantity: null,
+        },
       ],
+      currentPeriodEnd: 1_701_388_800,
+      currency: "eur",
     });
   });
 
-  it("sends a seat change and a billing threshold as Stripe's update parameters", async () => {
+  it("sends a seat change and a billing threshold as Stripe's update parameters and timeout", async () => {
     const { calls, subscriptions } = recordingProvider();
 
     await subscriptions.updateSubscription({
@@ -309,6 +323,7 @@ describe("Billing's subscription shapes over the provider", () => {
         prorationDate: 1_700_000_000,
         cancelAtPeriodEnd: false,
       },
+      timeoutMs: 60_000,
     });
     await subscriptions.updateSubscription({
       subscriptionId: "sub_1",
@@ -326,6 +341,7 @@ describe("Billing's subscription shapes over the provider", () => {
             proration_date: 1_700_000_000,
             cancel_at_period_end: false,
           },
+          { timeout: 60_000 },
         ],
       },
       {
@@ -333,6 +349,7 @@ describe("Billing's subscription shapes over the provider", () => {
         args: [
           "sub_1",
           { billing_thresholds: { amount_gte: 75_000, reset_billing_cycle_anchor: false } },
+          undefined,
         ],
       },
     ]);

@@ -180,6 +180,21 @@ export class PrismaUserRepository
     return { emailDomains: domainCounts(rows.map((row) => row.email ?? "")) };
   }
 
+  async findSignedInSince({
+    userIds,
+    since,
+  }: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<string[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.prisma.user.findMany({
+      where: { id: { in: [...userIds] }, lastLoginAt: { gte: new Date(since) } },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
   /** Install-wide on purpose, like the report: one row at most, and only a yes or no leaves. */
   async hasAccountOnDomain(domain: string): Promise<boolean> {
     const row = await this.prisma.user.findFirst({

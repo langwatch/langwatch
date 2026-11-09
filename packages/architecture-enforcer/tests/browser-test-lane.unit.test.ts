@@ -137,6 +137,7 @@ describe("the real-browser test lane", () => {
       // declaring the script IS being in CI. This asserts the packages that
       // declare it today are visible to that rule rather than to a list.
       expect(BROWSER_LANE.map((m) => m.dir)).toEqual([
+        "enterprise/modules/billing/browser",
         "modules/analytics/browser",
         "modules/experiment/browser",
         "modules/model-provider/browser",

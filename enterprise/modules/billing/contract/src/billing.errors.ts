@@ -52,6 +52,20 @@ export class InvalidPlanError extends HandledError {
   }
 }
 
+/** A seat count below the minimum: the full seats in use, and never below one. */
+export class SeatQuantityBelowInUseError extends HandledError {
+  declare readonly code: "seat_quantity_below_in_use";
+
+  constructor({ requested, minimum }: { requested: number; minimum: number }) {
+    super("seat_quantity_below_in_use", `Seats can't go below ${minimum}`, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { requested, minimum },
+    });
+    this.name = "SeatQuantityBelowInUseError";
+  }
+}
+
 /** Seat billing not configured; platform fault, not provider. */
 export class SeatBillingUnavailableError extends HandledError {
   declare readonly code: "seat_billing_unavailable";
@@ -62,6 +76,35 @@ export class SeatBillingUnavailableError extends HandledError {
       fault: "platform",
     });
     this.name = "SeatBillingUnavailableError";
+  }
+}
+
+/** No Developer seat price is configured for this subscription's currency and interval. */
+export class DeveloperSeatsUnavailableError extends HandledError {
+  declare readonly code: "developer_seats_unavailable";
+
+  constructor() {
+    super("developer_seats_unavailable", "Developer seats are not sold on this plan yet", {
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "DeveloperSeatsUnavailableError";
+  }
+}
+
+/**
+ * Another seat change or a seat line repair held the subscription's seat line for the whole wait:
+ * the same code and copy as organization's seat lease.
+ */
+export class SeatChangeBusyError extends HandledError {
+  declare readonly code: "seat_change_busy";
+
+  constructor() {
+    super("seat_change_busy", "Another seat change is in progress. Try again in a moment.", {
+      httpStatus: 409,
+      retryable: true,
+    });
+    this.name = "SeatChangeBusyError";
   }
 }
 
@@ -167,6 +210,20 @@ export class SubscriptionCreationFailedError extends HandledError {
       { httpStatus: 500, fault: "platform" },
     );
     this.name = "SubscriptionCreationFailedError";
+  }
+}
+
+/** A checkout asked for on a live subscription: changing that one is the billing portal's. */
+export class SubscriptionAlreadyActiveError extends HandledError {
+  declare readonly code: "subscription_already_active";
+
+  constructor() {
+    super(
+      "subscription_already_active",
+      "This organization already has an active subscription; nothing was charged",
+      { httpStatus: 409, fault: "customer" },
+    );
+    this.name = "SubscriptionAlreadyActiveError";
   }
 }
 

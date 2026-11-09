@@ -206,6 +206,14 @@ The `licence_token` door's check on a sync bearer; a refusal throws its code.
 verifyLicenceToken(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller>;
 ```
 
+#### `verifyLicenceTokenForSync`
+
+The sync door's check: as above, but an expired license may collect its waiting renewal.
+
+```typescript
+verifyLicenceTokenForSync(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller>;
+```
+
 #### `verifyActivationCode`
 
 The door's check on an activation bearer: looked up, never claimed (W02-ACTIVATE-DOOR).
@@ -354,6 +362,14 @@ What a customer's licenses add up to commercially, right now.
 
 ```typescript
 getContractTerms(input: { organizationId: string }): Promise<ContractTerms>;
+```
+
+#### `countFullSeatsInUse`
+
+Full member seats an organization uses now: active members and live invitations.
+
+```typescript
+countFullSeatsInUse(input: { organizationId: string }): Promise<number>;
 ```
 
 #### `getConnectedSeats`
@@ -536,14 +552,14 @@ findPublishedSelfHostedNotices(): Promise<SelfHostedNotice[]>;
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/connect-host.rest.ts:51` |
+| Declared at | `src/transport/connect-host.rest.ts:57` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | licence_token                           |
 
 #### `POST /api/connect/v1/license/sync` · `recordLicenseSync`
 
-Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:57`.
+Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:63`.
 
 Answers at `/api/connect/v1/license/sync`.
 
@@ -565,7 +581,7 @@ interface Response {
 
 #### `POST /api/connect/v1/license/activate` · `redeemActivationCode`
 
-Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:68`.
+Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:74`.
 
 Answers at `/api/connect/v1/license/activate`.
 
@@ -584,7 +600,7 @@ interface Response {
 
 #### `POST /api/connect/v1/upgrade-diagnostics` · `recordUpgradeDiagnostics`
 
-Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:79`.
+Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:85`.
 
 Answers at `/api/connect/v1/upgrade-diagnostics`.
 
@@ -661,12 +677,12 @@ Contract `../contract/src/licensing.trpc.ts:27`, router `src/transport/licensing
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof licenseStatusSchema>; // ../contract/src/license.ts:244
+type Output = z.infer<typeof licenseStatusSchema>; // ../contract/src/license.ts:252
 
 // license.getSsoGateStatus
 // Input: inline, ../contract/src/licensing.trpc.ts:36
 type Input = Record<string, unknown>;
-// Output: ssoGateStatusSchema, ../contract/src/license.ts:283
+// Output: ssoGateStatusSchema, ../contract/src/license.ts:292
 interface Output {
   configuredProvider: string | null;
   licensed: boolean;
@@ -679,7 +695,7 @@ interface Input {
   organizationId: string;
   licenseKey: string;
 }
-type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:297
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:306
 
 // license.activate
 // Input: inline, ../contract/src/licensing.trpc.ts:45
@@ -687,11 +703,11 @@ interface Input {
   organizationId: string;
   code: string;
 }
-type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:297
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:306
 
 // license.remove
 type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:24
-// Output: licenseRemovedSchema, ../contract/src/license.ts:304
+// Output: licenseRemovedSchema, ../contract/src/license.ts:313
 interface Output {
   success: true;
   removed: true;

@@ -12,6 +12,7 @@ import {
 } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -48,7 +49,11 @@ async function postRun({ repositories }: { repositories: WorkflowRepositories })
     config,
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets,
-    channels: await HttpWorkflowChannels.create({ config, secrets }),
+    channels: await HttpWorkflowChannels.create({
+      config,
+      secrets,
+      bound: { spend: createApiFixture<GatewayApi>() },
+    }),
     repositories,
   });
   const runtime = createRestRuntime({

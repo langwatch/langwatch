@@ -78,6 +78,19 @@ export const langWatchQLKeyReach = defineMiddlewareContext(
   langWatchQLKeyReachSchema,
 );
 
+/**
+ * The client a key's query came from, named by its identity headers: the CLI, an MCP server
+ * (local or hosted), or anything else, which stays `rest_api` so the label stays bounded.
+ */
+export const LWQL_KEY_DOORS = ["rest_api", "cli", "mcp"] as const;
+/** One client a key's query can come from. */
+export type LangWatchQLKeyDoor = (typeof LWQL_KEY_DOORS)[number];
+/** The key door's client, resolved by the process from the request rather than by the handler. */
+export const langWatchQLKeyDoor = defineMiddlewareContext(
+  "langWatchQLKeyDoor",
+  z.enum(LWQL_KEY_DOORS),
+);
+
 export { MAX_LWQL_LENGTH };
 
 /**

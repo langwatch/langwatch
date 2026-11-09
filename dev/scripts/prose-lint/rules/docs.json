@@ -179,7 +179,7 @@
     },
     {
       "id": "vague-boundary",
-      "name": "Rule 5: state the limits and the boundaries, exactly",
+      "name": "Rule 5: state the boundaries and limits exactly",
       "kind": "judge",
       "instruction": "On anything touching data, sandboxing, credentials, permissions, limits or cost, does `text` stay vague (\"runs securely\", \"handles large volumes\", \"affordable\", \"scales with you\") instead of stating exactly what goes where, what is reachable, and what the constraint is (\"runs in a gVisor sandbox with no outbound network except the LangWatch API and the model provider you configure\")?",
       "yes": "a data, security, permission, limit or cost claim is made in vague terms",
