@@ -19,7 +19,7 @@ Abandoned reads ran 100 to 800 s and held replica memory and concurrency.
 
 The retry policy makes it worse. It retries a client `Timeout error.` up to
 five times, and each attempt starts a new server query while the earlier ones
-still run. A test against 25.10 shows three attempts running at once.
+still run. Without the fix, a test shows three attempts running at once.
 
 ClickHouse 25.10 and 26.8 behave the same here: with `readonly=2` and the
 cancel setting, the server stops the query within about 30 ms of the close.
@@ -35,13 +35,19 @@ read's own settings. Commands and inserts are sent as before.
   `readonly=1` is kept, since it is stricter.
 - `readonly=2` still allows per-query settings, query parameters, `SHOW`,
   `DESCRIBE`, `EXISTS`, `EXPLAIN`, `system.*` reads and table functions. It
-  refuses `INSERT`, `INSERT … SELECT`, `ALTER`, `OPTIMIZE`, DDL and `SYSTEM`
-  with READONLY (164).
-- A user whose profile already pins `readonly=1` refuses any setting change,
-  `readonly=2` included. The driver detects that refusal by its code and
-  message, sends the read again with the caller's settings only, and skips
-  the two settings for that client from then on. Such a read is read-only
-  already, so the user's profile decides whether a close cancels it.
+  refuses writes to tables, `ALTER`, `OPTIMIZE`, DDL and `SYSTEM` with
+  READONLY (164). It is not a write firewall: `INSERT INTO FUNCTION null(…)
+SELECT` still runs under it.
+- A READONLY (164) refusal is an error like any other. The driver never
+  resends the read without the two settings. Statement text carrying its own
+  `SETTINGS readonly=0` draws the same code and message as a `readonly=1`
+  user, so a resend could write and would strip cancellation from a shared
+  client.
+- No routed client may connect as a `readonly=1` user. Such a user refuses
+  every setting change: `readonly=2`, the cancel setting, any caller setting,
+  and the `date_time_input_format` default the vendor client always sends.
+  Readers pinned at `readonly=1`, the LWQL executor and the ops `EXPLAIN`
+  user, have clients of their own.
 - The retry policy is unchanged. A retried read no longer overlaps the attempt
   it replaces, because the server stopped that attempt when its socket closed.
 
@@ -52,11 +58,13 @@ and the id-index reads included, so no repository has to remember the
 settings. Setting them per statement, as facet discovery does, leaves every
 other read exposed.
 
-An audit of every statement on the read path found only `SELECT`/`WITH`
-reads, `system.*` reads and `EXPLAIN`. Every mutation, DDL, `KILL`,
-`OPTIMIZE` and `INSERT … SELECT` already goes through `command`. Migrations,
-the LWQL executor, the ops `EXPLAIN` endpoint, the admin seam and the upgrade
-runner use clients of their own and never reach this driver.
+The read path stays read-only because of what is sent on it, not because of
+`readonly`. An audit of every statement on the read path found only
+`SELECT`/`WITH` reads, `system.*` reads and `EXPLAIN`. Every write is carried
+by `command` or `insert`: mutations, DDL, `KILL`, `OPTIMIZE` and
+`INSERT … SELECT`. Migrations, the LWQL executor, the ops `EXPLAIN` endpoint,
+the admin seam and the upgrade runner use clients of their own and never reach
+this driver.
 
 Not retrying client timeouts was the fallback if cancellation could not be
 shown. It would turn a slow-but-recoverable read into a failure, and the test
@@ -64,8 +72,8 @@ shows cancellation holds, so the retries stay.
 
 ## Consequences
 
-- A statement that writes through `query` now fails with READONLY (164)
-  instead of writing. It belongs on `command`.
+- A statement that writes to a table through `query` now fails with READONLY
+  (164) instead of writing. It belongs on `command`.
 - Cancellation needs the close to reach ClickHouse. A proxy that keeps the
   upstream connection open after the client leaves would defeat it.
 - `command` still retries a client timeout without cancelling the earlier

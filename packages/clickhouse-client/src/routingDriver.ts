@@ -111,35 +111,16 @@ export function readSettings(
   return { ...settings, ...CANCELLED_ON_CLIENT_CLOSE, ...(stricter ? { readonly: own } : {}) };
 }
 
-/** READONLY (164) for a setting this driver adds: the server's user is already `readonly=1`. */
-function refusesReadSettings(error: unknown): boolean {
-  if (!(error instanceof Error) || (error as { code?: unknown }).code !== "164") return false;
-  return Object.keys(CANCELLED_ON_CLIENT_CLOSE).some((name) =>
-    error.message.includes(`Cannot modify '${name}' setting in readonly mode`),
-  );
-}
-
-type ReadResult = Awaited<ReturnType<RoutableStatementClient["query"]>>;
-
-/**
- * Sends one read with the cancellation settings. A `readonly=1` user refuses any setting change,
- * so its client is remembered and its reads go with the caller's settings only; such a read is
- * already read-only, and its profile decides whether a close cancels it.
- */
-async function sendRead<Client extends RoutableStatementClient>(
+/** One read, sent with the cancellation settings over the caller's own. */
+function sendRead<Client extends RoutableStatementClient>(
   vendor: Client,
   request: QueryRequest,
-  readonlyUsers: WeakSet<Client>,
-): Promise<ReadResult> {
-  const plain = { ...queryParams(request), format: "JSONEachRow" };
-  if (readonlyUsers.has(vendor)) return vendor.query(plain);
-  try {
-    return await vendor.query({ ...plain, clickhouse_settings: readSettings(request.settings) });
-  } catch (error) {
-    if (!refusesReadSettings(error)) throw error;
-    readonlyUsers.add(vendor);
-    return vendor.query(plain);
-  }
+): ReturnType<RoutableStatementClient["query"]> {
+  return vendor.query({
+    ...queryParams(request),
+    clickhouse_settings: readSettings(request.settings),
+    format: "JSONEachRow",
+  });
 }
 
 /**
@@ -213,7 +194,6 @@ function targetTagged<Client extends RoutableStatementClient>(
 export function routingDriver<Client extends RoutableStatementClient>(
   connection: ClickHouseConnection<Client>,
 ): QueryDriver {
-  const readonlyUsers = new WeakSet<Client>();
   return {
     async insert(request: InsertRequest): Promise<void> {
       const vendor = await serverFor(connection, request);
@@ -230,7 +210,7 @@ export function routingDriver<Client extends RoutableStatementClient>(
 
       const started = nowInstant().epochMilliseconds;
       const rows = await onTarget(connection, vendor, async () => {
-        const resultSet = await sendRead(vendor, request, readonlyUsers);
+        const resultSet = await sendRead(vendor, request);
         const read = (await resultSet.json()) as Row[];
         refuseInbandException(read);
         return read;
@@ -241,7 +221,7 @@ export function routingDriver<Client extends RoutableStatementClient>(
     async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
       const vendor = await serverFor(connection, request);
       try {
-        const resultSet = await sendRead(vendor, request, readonlyUsers);
+        const resultSet = await sendRead(vendor, request);
         for await (const batch of resultSet.stream<Row>()) {
           const rows = batch.map((row) => row.json());
           refuseInbandException(rows);

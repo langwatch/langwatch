@@ -2,14 +2,14 @@
 
 /**
  * A read the app abandons must stop on the server, read back from `system.processes`.
- * Its own container: the readonly=1 user is a users.d profile, which a shared endpoint lacks.
+ * Its own container, on prod's ClickHouse version rather than the suites' shared image.
  * Spec: specs/clickhouse/single-client-access.feature; ADR-196.
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { TEST_CLICKHOUSE_IMAGE, TEST_CLICKHOUSE_TUNING } from "../clickhouse-test-endpoints.ts";
+import { TEST_CLICKHOUSE_TUNING } from "../clickhouse-test-endpoints.ts";
 import { ClickHouseQueryClient } from "../client.ts";
 import { ClickHouseConfigService } from "../config.ts";
 import {
@@ -25,28 +25,7 @@ import { TenantGuard } from "../tenantGuard.ts";
 
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-/** A user whose profile pins readonly=1 and, as prod's default profile does, cancels on close. */
-const READONLY_READER = { user: "readonly_reader", password: "reader" };
-const READONLY_READER_XML = {
-  target: "/etc/clickhouse-server/users.d/zz-readonly-reader.xml",
-  content: `<clickhouse>
-    <profiles>
-        <readonly_reader>
-            <readonly>1</readonly>
-            <cancel_http_readonly_queries_on_client_close>1</cancel_http_readonly_queries_on_client_close>
-        </readonly_reader>
-    </profiles>
-    <users>
-        <${READONLY_READER.user}>
-            <password>${READONLY_READER.password}</password>
-            <networks><ip>::/0</ip></networks>
-            <profile>readonly_reader</profile>
-            <quota>default</quota>
-        </${READONLY_READER.user}>
-    </users>
-</clickhouse>
-`,
-} as const;
+const PROD_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:26.8.36.3";
 
 const REQUEST_TIMEOUT_MS = 1_500;
 const STOP_DEADLINE_MS = 10_000;
@@ -167,13 +146,13 @@ async function watched(marker: string, task: () => Promise<unknown>) {
 
 describe("a routed read the app abandons", () => {
   beforeAll(async () => {
-    container = await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
+    container = await new ClickHouseContainer(PROD_CLICKHOUSE_IMAGE)
       .withLabels({
         "langwatch.test": "true",
-        "langwatch.test.read-cancellation": "v1",
+        "langwatch.test.read-cancellation": "v2",
       })
       .withReuse()
-      .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING, READONLY_READER_XML])
+      .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING])
       .withStartupTimeout(120_000)
       .start();
     probe = createClient({
@@ -268,37 +247,6 @@ describe("a routed read the app abandons", () => {
       expect(retried).toEqual([0, 1]);
       expect(seen.size).toBe(3);
       expect(mostAtOnce).toBe(1);
-      expect(await untilStopped(marker)).toEqual([]);
-    });
-  });
-
-  describe("when the server's user is already readonly=1", () => {
-    /** @scenario "A server user already at readonly=1 still answers routed reads" */
-    it("answers the read", async () => {
-      const client = routed({ url: serverUrl(READONLY_READER) });
-
-      const result = await client.query<{ answer: number }>({
-        tenantId: "",
-        sql: `SELECT 42 AS answer, '${RUN}' AS run`,
-        // A constant: no table, so no tenant.
-        SKIP_TENANT_CHECK: true,
-      });
-
-      expect(result.rows).toEqual([{ answer: 42, run: RUN }]);
-    });
-
-    /** @scenario "A server user already at readonly=1 still answers routed reads" */
-    it("stops an abandoned read through the user's own profile", async () => {
-      const marker = `${RUN}-readonly-user`;
-      const client = routed({ url: serverUrl(READONLY_READER) });
-      const read = slowRead(marker);
-
-      const { outcome, seen } = await watched(marker, () =>
-        client.query({ ...read, settings: undefined }),
-      );
-
-      expect(outcome).toMatchObject({ failed: true, error: { message: "Timeout error." } });
-      expect(seen.size).toBe(1);
       expect(await untilStopped(marker)).toEqual([]);
     });
   });

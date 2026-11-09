@@ -15,7 +15,8 @@ const CANCELLED_ON_CLOSE = {
   cancel_http_readonly_queries_on_client_close: "1",
 };
 
-const READONLY_USER_REFUSAL = Object.assign(
+/** What a readonly=1 user, or SQL carrying its own `SETTINGS readonly=0`, answers. */
+const READONLY_REFUSAL = Object.assign(
   new Error("Cannot modify 'readonly' setting in readonly mode. (READONLY)"),
   { code: "164", type: "READONLY" },
 );
@@ -189,43 +190,38 @@ describe("routingDriver read cancellation", () => {
     });
   });
 
-  describe("when the server's user is already readonly=1", () => {
-    /** @scenario "A server user already at readonly=1 still answers routed reads" */
-    it("resends the refused read with the caller's settings only, and skips the refused settings after", async () => {
-      const { client, connection, server } = routed({
-        refuse: (params) =>
-          (settingsOf(params) as Record<string, unknown> | undefined)?.readonly === "2"
-            ? READONLY_USER_REFUSAL
-            : undefined,
-      });
+  describe("when the server refuses a read for readonly", () => {
+    /** @scenario "A read the server refuses for readonly fails and is not resent" */
+    it("fails a read refused for its own readonly change, without resending it", async () => {
+      const { client, connection, server } = routed({ refuse: () => READONLY_REFUSAL });
 
       try {
-        const first = await client.query({ ...tenantRead, settings: undefined });
-        const second = await client.query({ ...tenantRead, settings: undefined });
-
-        expect(first.rows).toEqual([{ TraceId: "t1" }]);
-        expect(second.rows).toEqual([{ TraceId: "t1" }]);
-        expect(server.query.mock.calls.map(([params]) => settingsOf(params))).toEqual([
-          CANCELLED_ON_CLOSE,
-          undefined,
-          undefined,
-        ]);
+        await expect(client.query(tenantRead)).rejects.toBe(READONLY_REFUSAL);
+        expect(server.query).toHaveBeenCalledTimes(1);
       } finally {
         await connection.closeOnce();
       }
     });
 
-    /** @scenario "A server user already at readonly=1 still answers routed reads" */
-    it("fails a read the server refuses for a write, without resending it", async () => {
-      const writeRefusal = Object.assign(
-        new Error("Cannot execute query in readonly mode. (READONLY)"),
-        { code: "164", type: "READONLY" },
-      );
-      const { client, connection, server } = routed({ refuse: () => writeRefusal });
+    /** @scenario "A read the server refuses for readonly fails and is not resent" */
+    it("still sends the next read with readonly=2 and cancel-on-close", async () => {
+      let refused = false;
+      const { client, connection, server } = routed({
+        refuse: () => {
+          if (refused) return undefined;
+          refused = true;
+          return READONLY_REFUSAL;
+        },
+      });
 
       try {
-        await expect(client.query(tenantRead)).rejects.toBe(writeRefusal);
-        expect(server.query).toHaveBeenCalledTimes(1);
+        await expect(client.query(tenantRead)).rejects.toBe(READONLY_REFUSAL);
+        await client.query(tenantRead);
+
+        expect(settingsOf(server.query.mock.calls[1]?.[0])).toEqual({
+          ...tenantRead.settings,
+          ...CANCELLED_ON_CLOSE,
+        });
       } finally {
         await connection.closeOnce();
       }

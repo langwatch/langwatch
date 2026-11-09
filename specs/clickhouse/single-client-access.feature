@@ -359,13 +359,15 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
       Then the server runs three queries, one at a time
       And none is still running after the last attempt fails
 
-    @integration
-    Scenario: A server user already at readonly=1 still answers routed reads
-      Given the routed client connects as a user whose profile pins readonly=1
-      When a repository reads through it
-      Then the refused read is sent again with the read's own settings only
-      And later reads to that server skip the refused settings
-      And an abandoned read stops through the user's own profile
+    # A readonly=1 user refuses every setting change, so no routed client may connect as one; the
+    # vendor client's own defaults already fail there. ADR-196.
+    @unit
+    Scenario: A read the server refuses for readonly fails and is not resent
+      Given the server refuses a read with READONLY (164)
+      When a repository runs the read
+      Then the read fails with the server's error
+      And the read is not sent again without the read-only settings
+      And the next read still carries readonly=2 and cancel_http_readonly_queries_on_client_close=1
 
   @unit
   Scenario: ClickHouse is reached through a repository, from the application object
