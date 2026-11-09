@@ -5,7 +5,7 @@ import {
   type FoldEventHandlers,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { ATTR_KEYS, NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
+import { NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import { nowInstant } from "@langwatch/time";
 import {
   anchorStorageTime,
@@ -47,6 +47,7 @@ import {
   UNSTORABLE_SPAN_SKIPPED,
 } from "@langwatch/trace-contract";
 
+import { LOG_FILL_ONLY_KEYS } from "../features/derivation/services/trace-attribute-accumulation.service.ts";
 import type { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 
 const logger = createLogger("langwatch:trace-processing:trace-analytics-fold");
@@ -269,12 +270,6 @@ interface LogContribution {
   liftedAttributes: Record<string, unknown>;
   nonBillable: boolean;
 }
-
-/** A log's service and origin only fill a gap: a value a span or resolution set stands. */
-const LOG_FILL_ONLY_KEYS: ReadonlySet<string> = new Set([
-  ATTR_KEYS.SERVICE_NAME,
-  TRACE_ANALYTICS_ATTR_KEYS.ORIGIN,
-]);
 
 /** Merges a log's lifted attributes into the trace's, leaving fill-only keys already set. */
 function mergeLogAttributes({

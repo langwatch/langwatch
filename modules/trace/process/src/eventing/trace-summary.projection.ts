@@ -39,6 +39,7 @@ import {
   UNSTORABLE_SPAN_SKIPPED,
 } from "@langwatch/trace-contract";
 
+import { LOG_FILL_ONLY_KEYS } from "../features/derivation/services/trace-attribute-accumulation.service.ts";
 import {
   OUTPUT_SOURCE,
   TraceIOAccumulationService,
@@ -83,7 +84,6 @@ const RESERVED_CACHE_CREATION_1H_TOKENS = "langwatch.reserved.cache_creation_1h_
  */
 const RESERVED_CONTEXT_SIZE_TOKENS = "langwatch.reserved.context_size_tokens";
 const RESERVED_CONTEXT_SIZE_AT_MS = "langwatch.reserved.context_size_at_ms";
-const ORIGIN_ATTR = "langwatch.origin";
 
 /**
  * A single log record's normalized contribution to the trace summary fold.
@@ -531,9 +531,7 @@ export class TraceSummaryFoldProjection
       if (perCallKeys.has(key)) {
         continue;
       }
-      // A log's service and origin only fill a gap: a value a span or resolution set stands.
-      const fillOnly = key === ATTR_KEYS.SERVICE_NAME || key === ORIGIN_ATTR;
-      if (fillOnly && mergedAttributes[key]) continue;
+      if (LOG_FILL_ONLY_KEYS.has(key) && mergedAttributes[key]) continue;
 
       mergedAttributes[key] = String(value);
     }
