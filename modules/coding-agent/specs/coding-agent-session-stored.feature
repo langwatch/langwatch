@@ -172,6 +172,13 @@ Feature: Coding-agent records a session-stored fact
     Then the fact says firstForProject is false
 
   @unit
+  Scenario: A stamped project outside the session's first fact window reads no history
+    Given a project stamped after the session was first stored, or a session past its first fact window
+    When its session is reported
+    Then the project's session history is not read
+    And the fact says firstForProject is false
+
+  @unit
   Scenario: A failing session-stored recorder never fails the stored row
     Given the recorder rejects
     When a session is stored
