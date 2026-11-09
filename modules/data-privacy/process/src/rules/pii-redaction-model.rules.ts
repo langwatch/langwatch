@@ -2,10 +2,18 @@
 export const PII_REDACTION_MODEL_FLAG = "release_pii_redaction_model_enabled";
 
 /**
- * How long one model call may take: the Lambda's own 110 s timeout plus a margin, so the
- * caller never gives up on a cold start the function would still have answered.
+ * When a model call is aborted and its batch goes to Presidio. The two calls share no budget:
+ * Presidio then gets its own 60 s timer, so a batch can wait up to 110 s before Google DLP.
+ * A cold start falls back.
  */
-export const PII_REDACTION_MODEL_TIMEOUT_MS = 115_000;
+export const PII_REDACTION_MODEL_TIMEOUT_MS = 50_000;
+
+/**
+ * After a model call times out or is throttled, this process sends every routed batch straight
+ * to Presidio for this long; then one batch tries the model again. Without it a slow model costs
+ * every batch the full time cap, one after another.
+ */
+export const PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS = 2 * 60_000;
 
 /** AWS's ceiling for a synchronous invoke request; a larger batch stays on Presidio. */
 export const LAMBDA_SYNC_INVOKE_PAYLOAD_LIMIT_BYTES = 6 * 1024 * 1024;
@@ -45,4 +53,21 @@ export function piiRedactionModelTargetOf({
   if (address) return { kind: "http", endpoint: address.replace(/\/+$/, "") };
 
   return { kind: "none" };
+}
+
+/** All the characters one batch would send. */
+export function batchCharactersOf(texts: readonly string[]): number {
+  return texts.reduce((total, text) => total + text.length, 0);
+}
+
+/**
+ * Above this many characters in all of a batch's texts, the batch goes to Presidio. Per batch,
+ * not per text: one batch is one invoke and its time grows with every character in it (about
+ * 4 s for 2k, 40 to 56 s for 20k). A batch is never split across two services.
+ */
+export const PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS = 8_000;
+
+/** Whether a batch is too long for the model to answer inside its time cap. */
+export function isBatchTooLongForModel(texts: readonly string[]): boolean {
+  return batchCharactersOf(texts) > PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS;
 }

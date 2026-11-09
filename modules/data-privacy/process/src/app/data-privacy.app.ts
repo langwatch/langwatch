@@ -157,12 +157,19 @@ export class DataPrivacyModule implements DataPrivacyApi {
       model: PiiRedactionModelService.create({
         model: PresidioRedactionService.create({
           presidio: channels.piiRedactionModel,
-          metrics,
+          // Its calls count under their own method; its duration and outcome go to its usage
+          // log, so Presidio's duration and status series stay Presidio's.
+          metrics: {
+            analysisCalled: (method) => metrics.analysisCalled(method),
+            analysisObserved: () => undefined,
+            analysisFinished: () => undefined,
+          },
           timeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
           method: "pii_redaction_model",
         }),
         featureFlags: dependencies.featureFlags,
         scopes: projectScopes,
+        metrics,
       }),
       dlp: GoogleDlpRedactionService.create({
         dlp: channels.dlp,

@@ -7,6 +7,7 @@ import {
   PII_ANALYSIS_EVALUATOR_TYPE,
   PII_ANALYSIS_STATUS_METRIC_NAME,
   PII_CHECKS_METRIC_NAME,
+  PII_REDACTION_MODEL_FALLBACKS_METRIC_NAME,
 } from "../pii-analysis-metrics-otel.service.ts";
 
 /**
@@ -71,5 +72,18 @@ describe("given the PII analysis metrics pushed over OTLP", () => {
         status: "processed",
       }),
     ).toBe(1);
+  });
+
+  /** @scenario "Each PII redaction model call leaves one usage log line" */
+  it("counts PII redaction model fallbacks by reason", () => {
+    const adapter = PiiAnalysisMetricsOtelService.create();
+
+    adapter.modelFellBack("timeout");
+    adapter.modelFellBack("timeout");
+    adapter.modelFellBack("error");
+
+    expect(PII_REDACTION_MODEL_FALLBACKS_METRIC_NAME).toBe("pii_redaction_model_fallbacks");
+    expect(metrics.valueOf("pii_redaction_model_fallbacks", { reason: "timeout" })).toBe(2);
+    expect(metrics.valueOf("pii_redaction_model_fallbacks", { reason: "error" })).toBe(1);
   });
 });

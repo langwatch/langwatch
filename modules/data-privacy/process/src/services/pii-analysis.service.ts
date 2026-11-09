@@ -1,3 +1,4 @@
+import type { PiiLevel } from "@langwatch/data-privacy-contract";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
 import type { PiiClearing } from "../rules/pii-analysis.rules.ts";
@@ -30,12 +31,16 @@ export class PiiAnalysisService {
     return this.dlp.clear(input);
   }
 
-  /** The model first for an allowlisted organization; Presidio for everyone else and on failure. */
+  /**
+   * The model first for an allowlisted organization whose resolved policy is strict; Presidio
+   * for everyone else and on failure.
+   */
   async clearPresidio(input: {
     texts: string[];
     piiRedactionLevel: PIIRedactionLevel;
     entities?: readonly string[] | undefined;
     projectId?: string | undefined;
+    resolvedPiiLevel?: PiiLevel | undefined;
     spareNamesAndPlaces?: readonly boolean[] | undefined;
   }): Promise<(string | null)[]> {
     const cleared = await this.model.findClearing(input);

@@ -259,11 +259,22 @@ Feature: Redacting personal data out of a span at ingestion
     Then the model answers it and Presidio is not called
 
   @unit
+  Scenario: Only a resolved strict policy reaches the PII redaction model
+    Given a deployment that names the PII redaction model
+    And the project's organization is allowlisted for it
+    When a batch whose request level is STRICT is analysed
+    Then the model answers it when the project's resolved policy is strict, for spans and log records alike
+    And Presidio answers it when the resolved policy is custom, even with every analysis-service entity selected
+    And Presidio answers it when the project's policy could not be loaded
+    And in both of those cases the model is not called and the flag is not read
+
+  @unit
   Scenario: An organization not allowlisted keeps the Presidio path
     Given a deployment that names the PII redaction model
     And the project's organization is not allowlisted for it
     When a strict batch is analysed
     Then Presidio answers it and the model is not called
+    And a span redacted through the whole module never invokes the model's Lambda
 
   @unit
   Scenario: A model failure falls back to Presidio, never to unredacted text
@@ -273,11 +284,32 @@ Feature: Redacting personal data out of a span at ingestion
     And when Presidio fails too, the Google DLP fallback is reached as today
 
   @unit
+  Scenario: A slow model call is aborted at 50 seconds
+    Given an organization allowlisted for the PII redaction model
+    When the model has not answered after 50 seconds
+    Then the model invoke is aborted, not just left running in the background
+    And the batch is sent to Presidio, which gets its own full 60 second timeout
+    And a batch that neither answers reaches Google DLP after 110 seconds at most
+
+  @unit
+  Scenario: A model that times out is skipped for two minutes
+    Given an organization allowlisted for the PII redaction model
+    When a model call in this process times out or is throttled
+    Then for the next two minutes every routed batch goes straight to Presidio without calling the model
+    And each such batch logs its usage line and is counted with the reason breaker_open
+    And after two minutes one batch tries the model while the others still go to Presidio
+    And when that try answers, every batch goes to the model again
+    And when that try times out too, the model is skipped for another two minutes
+    And a refusal or a bad answer does not skip the model
+    And a batch that set off before the timeout and answers late does not end the cool-down
+
+  @unit
   Scenario: A deployment that names no model behaves exactly as today
     Given neither PII_REDACTION_MODEL_LAMBDA_ARN nor PII_REDACTION_MODEL_ENDPOINT is set
     When a strict batch is analysed
     Then Presidio answers it
     And neither the flag nor the project's organization is read
+    And a span redacted through the whole module sends no request to any model
 
   @unit
   Scenario: The model's Lambda answer is read through the Web Adapter prelude
@@ -294,7 +326,26 @@ Feature: Redacting personal data out of a span at ingestion
     Then it is refused without invoking the function
 
   @unit
+  Scenario: A long batch skips the model and goes to Presidio
+    Given an organization allowlisted for the PII redaction model
+    When a strict batch holds more than 8,000 characters in all its texts
+    Then Presidio answers it and the model is not called
+    And a batch of many short texts counts the same as one long text
+    And its usage line records the outcome too_long
+
+  @unit
   Scenario: The model's Lambda alias wins over its address
     Given the deployment settings for the PII redaction model
     Then a Lambda alias ARN wins over an HTTP endpoint
     And an ARN that is not a Lambda function ARN leaves the model unconfigured
+
+  @unit
+  Scenario: Each PII redaction model call leaves one usage log line
+    Given an organization allowlisted for the PII redaction model
+    When a strict batch is routed to the model
+    Then one log line records the organization, the project, the number of texts, the total characters, the spans found, the outcome and the duration
+    And the outcome is ok, or the fallback reason such as timeout or error
+    And the line holds no text, no finding value and no error message
+    And each fallback is counted by reason, as is a routing that cannot be decided
+    And a model call is counted under its own method, never in Presidio's duration or status series
+    And an organization not allowlisted leaves no line
