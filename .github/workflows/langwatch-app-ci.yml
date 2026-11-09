@@ -702,6 +702,8 @@ jobs:
       LANGWATCH_NLP_SERVICE: "http://localhost:5561"
       LANGWATCH_ENDPOINT: "http://localhost:3000"
       VITEST_ISOLATE_WORKER_REDIS: "1"
+      # Vitest's transform cache is one per user (ADR-196); keep it where the job restores it.
+      VITEST_FS_MODULE_CACHE_DIR: ${{ github.workspace }}/node_modules/.vitest-cache
       CI: "true"
     runs-on: ubuntu-latest
     # Read the checkout; write only to prune this pull request's older suite results.
