@@ -3,7 +3,9 @@ import {
   type AlertType,
   type SlackPayload,
 } from "@langwatch/automation-contract";
+import { ALERT_LINK_MARKER } from "@langwatch/automation-contract/alert-link";
 import { DispatchError, toDispatchError } from "@langwatch/eventing";
+import { withLinkMarker } from "@langwatch/mail";
 import type { TraceRecord } from "@langwatch/trace-contract";
 import { z } from "zod";
 
@@ -26,10 +28,16 @@ function linkFor({
   trace: LinkedTrace;
 }): string {
   if (trace.graphId) {
-    return `${baseHost}/${projectSlug}/analytics/custom/${trace.graphId}`;
+    const url = `${baseHost}/${projectSlug}/analytics/custom/${trace.graphId}`;
+    return withLinkMarker({ url, appBaseUrl: baseHost, marker: ALERT_LINK_MARKER });
   }
   if (trace.traceId) {
-    return `${baseHost}/${projectSlug}${tracePath({ traceId: trace.traceId, occurredAtMs: trace.occurredAtMs })}`;
+    const path = tracePath({ traceId: trace.traceId, occurredAtMs: trace.occurredAtMs });
+    return withLinkMarker({
+      url: `${baseHost}/${projectSlug}${path}`,
+      appBaseUrl: baseHost,
+      marker: ALERT_LINK_MARKER,
+    });
   }
   return "#";
 }

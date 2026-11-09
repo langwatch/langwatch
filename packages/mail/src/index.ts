@@ -9,6 +9,7 @@ export {
   type MailSender,
 } from "./email-sender.ts";
 export { MailRender } from "./mail-render.ts";
+export { withLinkMarker, type LinkMarker } from "./link-marker.ts";
 export { mailTemplates } from "./templates/index.ts";
 export { digestUpdateSchema } from "./templates/digest-parts.tsx";
 export type { DigestUpdate } from "./templates/digest-parts.tsx";

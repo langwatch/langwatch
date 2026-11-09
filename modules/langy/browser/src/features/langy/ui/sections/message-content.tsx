@@ -99,7 +99,7 @@ type MessageContentProps = {
   discardedProposals: Set<string>;
   applyingProposals: Set<string>;
   onApply: (proposalId: string, proposal: LangyProposal) => Promise<void>;
-  onDiscard: (proposalId: string) => void;
+  onDiscard: (proposalId: string, proposal: LangyProposal) => void;
   /** True for the in-flight assistant turn — streams tokens with blur reveal. */
   isStreaming?: boolean;
   /**
@@ -569,7 +569,7 @@ function ProposalCardOfPart({
         isDiscarded={props.discardedProposals.has(id)}
         isApplying={props.applyingProposals.has(id)}
         onApply={() => void props.onApply(id, proposal)}
-        onDiscard={() => props.onDiscard(id)}
+        onDiscard={() => props.onDiscard(id, proposal)}
       />
     </LangyCardBoundary>
   );

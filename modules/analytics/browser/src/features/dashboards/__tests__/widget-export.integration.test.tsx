@@ -35,7 +35,21 @@ import type { BoardPeriod } from "../model/board-period.ts";
 import type { BoardWidget } from "../model/board-widgets.ts";
 import { BoardWidgetCard } from "../ui/sections/board-widget-card.tsx";
 import { CuratedWidgetCard } from "../ui/sections/curated-widget-card.tsx";
-import { renderDashboards } from "./render-dashboards.test-helpers.tsx";
+import {
+  RecordingUiAnalytics,
+  renderDashboards,
+  withAnalytics,
+} from "./render-dashboards.test-helpers.tsx";
+
+const tracked = new RecordingUiAnalytics();
+
+/** Renders like the shell, with the recording analytics installed through the host services. */
+function renderTracked({
+  element,
+  ...rest
+}: Parameters<typeof renderDashboards>[0]): ReturnType<typeof renderDashboards> {
+  return renderDashboards({ ...rest, element: withAnalytics(element, tracked) });
+}
 
 /** 2026-10-01T00:00:00Z to 2026-10-08T00:00:00Z: seven whole UTC days. */
 const PERIOD: BoardPeriod = {
@@ -105,7 +119,7 @@ async function frameRunsItsQuery() {
 
 function storedCard({ answer }: { answer: UiProcedureAnswer }) {
   const host = new StubAnalyticsHost();
-  renderDashboards({
+  renderTracked({
     element: (
       <BoardWidgetCard
         widget={WIDGET}
@@ -129,7 +143,7 @@ function storedCard({ answer }: { answer: UiProcedureAnswer }) {
 
 function curatedCard({ answer }: { answer: UiProcedureAnswer }) {
   const host = new StubAnalyticsHost();
-  renderDashboards({
+  renderTracked({
     element: (
       <CuratedWidgetCard
         widget={{
@@ -139,6 +153,7 @@ function curatedCard({ answer }: { answer: UiProcedureAnswer }) {
           layout: { gridColumn: 0, gridRow: 0, colSpan: 4, rowSpan: 4 },
         }}
         frameId="costs-spend"
+        templateId="costs"
         boardName="Running costs"
         projectId="proj-1"
         projectSlug="test-project"
@@ -160,6 +175,7 @@ let lastBlob: Blob | undefined;
 
 beforeEach(() => {
   downloads.length = 0;
+  tracked.events.length = 0;
   window.URL.createObjectURL = vi.fn((blob: Blob) => {
     lastBlob = blob;
     return "blob:test";
@@ -221,6 +237,27 @@ describe("given a stored board's widget whose query answered with rows", () => {
       ]);
       expect(server.calls).toHaveLength(queriesRun);
       expect(host.successes).toEqual([{ title: "CSV downloaded" }]);
+    });
+  });
+
+  describe("when the reader downloads the CSV", () => {
+    /** @scenario "Telemetry: exporting a widget sends dashboards.exported.widget" */
+    it("sends one export event with its format", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      storedCard({ answer: answering({ rows: ROWS }).answer });
+      await frameRunsItsQuery();
+
+      await openMenu(user);
+      await user.click(exportItem());
+
+      expect(tracked.events.filter(({ action }) => action === "exported")).toEqual([
+        {
+          boundary: "dashboards",
+          name: "widget",
+          action: "exported",
+          attributes: { format: "csv" },
+        },
+      ]);
     });
   });
 
