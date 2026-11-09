@@ -131,26 +131,61 @@ export const isGrowthInstantEvalPriceProvisioned = ({
   prices: StripePriceMap;
 }): boolean => Boolean(prices.GROWTH_INSTANT_EVAL_USD);
 
+/** The retention Growth includes at no extra cost, in stored days: 90 days kept as 13 weeks. */
+export const GROWTH_INCLUDED_STORAGE_RETENTION_DAYS = 91;
+
+const RETENTION_STORAGE_PRICE_NAMES = [
+  "RETENTION_STORAGE_EUR_MONTHLY",
+  "RETENTION_STORAGE_EUR_ANNUAL",
+  "RETENTION_STORAGE_USD_MONTHLY",
+  "RETENTION_STORAGE_USD_ANNUAL",
+] as const satisfies readonly StripePriceName[];
+
+/** The metered price for storage above 90 days in this currency and interval, when provisioned. */
+export const pickRetentionStoragePriceId = ({
+  currency,
+  interval,
+  prices,
+}: {
+  currency: Currency;
+  interval: BillingInterval;
+  prices: StripePriceMap;
+}): string | undefined =>
+  prices[`RETENTION_STORAGE_${currency}_${interval.toUpperCase()}` as StripePriceName];
+
+/** Whether a subscription line bills storage above the included retention. */
+export const isRetentionStoragePrice = (priceId: string, prices: StripePriceMap): boolean =>
+  RETENTION_STORAGE_PRICE_NAMES.some((name) => prices[name] === priceId);
+
+/** A retention above what Growth includes bills the storage it keeps beyond 90 days. */
+export const retentionBillsStorage = (retentionDays: number | undefined): boolean =>
+  retentionDays !== undefined && retentionDays > GROWTH_INCLUDED_STORAGE_RETENTION_DAYS;
+
 /**
- * Stripe checkout line items for a Growth subscription: a seat item (quantity
- * = coreMembers), a metered events item, and where provisioned a metered
- * Instant Evals one. Neither metered item carries a quantity.
+ * Stripe checkout line items for Growth: a seat item (quantity = coreMembers), metered events,
+ * metered Instant Evals where provisioned, and metered storage above 90 days of retention.
+ * No metered item carries a quantity.
  */
 export const createCheckoutLineItems = ({
   coreMembers,
   currency,
   interval,
   prices,
+  retentionDays,
 }: {
   coreMembers: number;
   currency: Currency;
   interval: BillingInterval;
   prices: StripePriceMap;
+  retentionDays?: number;
 }): { price: string; quantity?: number }[] => {
   if (coreMembers < 1) {
     throw new InvalidSeatCountError(coreMembers);
   }
   const instantEvalPriceId = pickGrowthInstantEvalPriceId({ currency, prices });
+  const storagePriceId = retentionBillsStorage(retentionDays)
+    ? pickRetentionStoragePriceId({ currency, interval, prices })
+    : undefined;
 
   return [
     {
@@ -161,6 +196,7 @@ export const createCheckoutLineItems = ({
       price: resolveGrowthEventsPriceId({ currency, interval, prices }),
     },
     ...(instantEvalPriceId ? [{ price: instantEvalPriceId }] : []),
+    ...(storagePriceId ? [{ price: storagePriceId }] : []),
   ];
 };
 

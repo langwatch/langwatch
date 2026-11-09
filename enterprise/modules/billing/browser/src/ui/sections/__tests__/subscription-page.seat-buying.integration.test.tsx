@@ -143,6 +143,7 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
     billingApi: {
       dataRetention: {
         getOrganizationStorageEstimate: { useQuery: () => ({ data: undefined, isError: false }) },
+        getOrganizationRetention: { useQuery: () => ({ data: undefined, isError: false }) },
       },
       limits: { getUsage: { useQuery: () => setup.mockGetUsage() } },
       plan: { getActivePlan: { useQuery: () => setup.mockGetActivePlan() } },

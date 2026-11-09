@@ -105,3 +105,14 @@ export interface OrganizationStorageEstimateSchema extends Named<
 export const organizationStorageEstimateSchema: OrganizationStorageEstimateSchema =
   organizationStorageEstimateSchemaDefinition;
 export type OrganizationStorageEstimate = z.infer<typeof organizationStorageEstimateSchema>;
+
+/** The traces retention the organization keeps, as the plan card names it; 0 keeps it forever. */
+const organizationRetentionSchemaDefinition = z.object({
+  retentionDays: z.number().int().nonnegative(),
+});
+export interface OrganizationRetentionSchema extends Named<
+  typeof organizationRetentionSchemaDefinition
+> {}
+export const organizationRetentionSchema: OrganizationRetentionSchema =
+  organizationRetentionSchemaDefinition;
+export type OrganizationRetention = z.infer<typeof organizationRetentionSchema>;

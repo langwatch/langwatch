@@ -45,8 +45,9 @@ async function pickRetention(label: string) {
 
 beforeAll(() => {
   // jsdom has no scrolling; the select scrolls its list when it opens.
-  if (!("scrollTo" in Element.prototype)) Element.prototype.scrollTo = () => undefined;
-  if (!("scrollIntoView" in Element.prototype)) Element.prototype.scrollIntoView = () => undefined;
+  const element: { scrollTo?: unknown; scrollIntoView?: unknown } = Element.prototype;
+  element.scrollTo ??= () => undefined;
+  element.scrollIntoView ??= () => undefined;
 });
 
 afterEach(() => cleanup());
@@ -71,7 +72,7 @@ describe("<UpgradeSeatsDialog/> data retention", () => {
     it("shows the storage line with a loading estimate", async () => {
       renderDialog();
 
-      await pickRetention("365 days");
+      await pickRetention("1 year");
 
       expect(screen.getByTestId("upgrade-retention-storage")).toHaveTextContent(
         "€3 per GB a month",
@@ -82,7 +83,7 @@ describe("<UpgradeSeatsDialog/> data retention", () => {
     it("keeps the checkout available when the storage read failed", async () => {
       renderDialog({ retentionEstimate: { status: "failed" } });
 
-      await pickRetention("365 days");
+      await pickRetention("1 year");
 
       expect(screen.queryByTestId("upgrade-retention-estimate")).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Continue to checkout" })).toBeEnabled();

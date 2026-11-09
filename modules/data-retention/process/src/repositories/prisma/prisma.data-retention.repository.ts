@@ -57,6 +57,16 @@ export class PrismaDataRetentionRepository
     return rows.map((row) => retentionPolicySchema.parse(row));
   }
 
+  async findOrganizationIdsWithRules(): Promise<string[]> {
+    const rows = await this.prisma.retentionPolicy.findMany({
+      distinct: ["organizationId"],
+      select: { organizationId: true },
+      orderBy: { organizationId: "asc" },
+    });
+
+    return rows.map((row) => row.organizationId);
+  }
+
   async upsertForScope(input: {
     organizationId: string;
     scope: ScopeAssignment;

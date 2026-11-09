@@ -8,6 +8,7 @@ import {
   type DataRetentionServerConfig,
   type IdIndexRetentionRaiseInput,
   type KillRetroactiveMutationInput,
+  type OrganizationRetention,
   type OrganizationStorageEstimate,
   type PinTraceInput,
   type PinnedTrace,
@@ -24,7 +25,9 @@ import {
   type StorageMeterTenantsInput,
   type UnpinTraceInput,
 } from "@langwatch/data-retention-contract";
+import { BillingApi, type RetentionStorageOutcome } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import type { Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
@@ -43,9 +46,15 @@ import { DataRetentionService } from "../services/data-retention.service.ts";
 import { OrganizationStorageEstimateService } from "../services/organization-storage-estimate.service.ts";
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
 import { RetentionPlanService } from "../services/retention-plan.service.ts";
+import {
+  RetentionStorageReportService,
+  type RetentionStorageReportOutcome,
+} from "../services/retention-storage-report.service.ts";
 import { SeatRetentionPolicyService } from "../services/seat-retention-policy.service.ts";
 import { StorageMeterScopeService } from "../services/storage-meter-scope.service.ts";
 import { StorageMeterService } from "../services/storage-meter.service.ts";
+
+const logger = createLogger("langwatch:data-retention:retention-storage");
 
 /** A project's place in the organization chain, plus the name it renders under. */
 export type RetentionProjectLineage = Readonly<{
@@ -106,6 +115,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     permissions: AuthzApi,
     users: UserApi,
     entitlement: EntitlementApi,
+    billing: BillingApi,
   };
   static readonly config = dataRetentionConfig;
 
@@ -115,6 +125,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
   readonly #scopeMeter: StorageMeterScopeService;
   readonly #seatPolicies: SeatRetentionPolicyService;
   readonly #storageEstimates: OrganizationStorageEstimateService;
+  readonly #storageReport: RetentionStorageReportService;
   readonly #users: UserApi;
 
   private constructor(services: {
@@ -124,6 +135,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     scopeMeter: StorageMeterScopeService;
     seatPolicies: SeatRetentionPolicyService;
     storageEstimates: OrganizationStorageEstimateService;
+    storageReport: RetentionStorageReportService;
     users: UserApi;
   }) {
     this.#retention = services.retention;
@@ -132,6 +144,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     this.#scopeMeter = services.scopeMeter;
     this.#seatPolicies = services.seatPolicies;
     this.#storageEstimates = services.storageEstimates;
+    this.#storageReport = services.storageReport;
     this.#users = services.users;
   }
 
@@ -182,6 +195,12 @@ export class DataRetentionModule implements DataRetentionApiContract {
         directory: repositories.directory,
         retention,
       }),
+      storageReport: RetentionStorageReportService.create({
+        policies: repositories.policies,
+        directory: repositories.directory,
+        meter: repositories.storageMeter,
+        billing: dependencies.billing,
+      }),
       users: dependencies.users,
     });
   }
@@ -189,6 +208,18 @@ export class DataRetentionModule implements DataRetentionApiContract {
   /** The pipeline `data_retention_seat_policy` registers, over billing's activation fact. */
   seatPolicyPipeline(): DataRetentionSeatPolicyPipeline {
     return buildDataRetentionSeatPolicyPipeline({ seatPolicies: this.#seatPolicies });
+  }
+
+  /** The daily `data_retention_storage_report` pass: each organization's storage past 90 days. */
+  reportRetentionStorage(): Promise<RetentionStorageReportOutcome> {
+    return this.#storageReport.reportAll();
+  }
+
+  /** One organization's report now, as the hand-run task asks it. */
+  reportOrganizationRetentionStorage(input: {
+    organizationId: string;
+  }): Promise<RetentionStorageOutcome> {
+    return this.#storageReport.reportOrganization(input);
   }
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {
@@ -291,6 +322,10 @@ export class DataRetentionModule implements DataRetentionApiContract {
     return this.#storageEstimates.getEstimate(input);
   }
 
+  getOrganizationRetention(input: { organizationId: string }): Promise<OrganizationRetention> {
+    return this.#storageEstimates.getRetention(input);
+  }
+
   /**
    * The door has asked the target's permission; this refuses a target outside the named
    * organization, so the preview never leaks another organization's resolved default.
@@ -327,12 +362,14 @@ export class DataRetentionModule implements DataRetentionApiContract {
       await this.#policy.assertCanDisableRetention({ actor });
     }
 
-    return this.#retention.setForScope({
+    const saved = await this.#retention.setForScope({
       organizationId,
       scope,
       category: input.category,
       retentionDays: input.retentionDays,
     });
+    await this.#syncStorageLine(organizationId);
+    return saved;
   }
 
   async removeForScope(
@@ -351,6 +388,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
       scope,
       category: input.category,
     });
+    await this.#syncStorageLine(organizationId);
   }
 
   /**
@@ -383,6 +421,21 @@ export class DataRetentionModule implements DataRetentionApiContract {
       projectId: input.projectId,
       mutationId: input.mutationId,
     });
+  }
+
+  /**
+   * Adds or removes the storage line after a rule change. The rule is already saved, so a billing
+   * failure is logged rather than undoing it; the daily report aligns the line again.
+   */
+  async #syncStorageLine(organizationId: string): Promise<void> {
+    try {
+      await this.#storageReport.syncLine({ organizationId });
+    } catch (error) {
+      logger.error(
+        { organizationId, error: error instanceof Error ? error.message : String(error) },
+        "Retention storage line could not follow the rule change",
+      );
+    }
   }
 
   /**

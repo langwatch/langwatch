@@ -1,6 +1,7 @@
 import { moduleApi } from "@langwatch/module";
 
 import type {
+  OrganizationRetention,
   OrganizationStorageEstimate,
   RetentionPolicySnapshot,
   RetentionStorageUsage,
@@ -81,6 +82,8 @@ export interface DataRetentionApi {
   getOrganizationStorageEstimate(input: {
     organizationId: string;
   }): Promise<OrganizationStorageEstimate>;
+  /** Asked `organization:view` at the door: the organization rule's traces days, or the default. */
+  getOrganizationRetention(input: { organizationId: string }): Promise<OrganizationRetention>;
   previewScopeRemoval(
     input: { organizationId?: string; scope: ScopeAssignment } & RetentionCallerInput,
   ): Promise<ResolvedRetention>;

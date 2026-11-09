@@ -6,8 +6,8 @@ Feature: Plan-gated data-retention menu
 
   # Retention length is gated by plan:
   #   - Free      cannot configure retention at all (unchanged).
-  #   - Paid      may pick only the Growth options offered at upgrade: "1 month",
-  #               "2 months", "3 months", "6 months" or "1 year", no custom.
+  #   - Paid      may pick only the Growth options offered at upgrade: "30 days",
+  #               "60 days", "90 days", "180 days" or "1 year", no custom.
   #   - Enterprise (and self-hosted) get the full menu plus a custom value.
   # The server enforces the rule at the write boundary; the menu only mirrors it.
   # Existing out-of-menu values are grandfathered — never auto-changed or deleted.
@@ -16,7 +16,7 @@ Feature: Plan-gated data-retention menu
   Scenario: A paid organization sees only the fixed Growth options
     Given an organization on a paid, non-enterprise plan
     When a manager opens the retention policy editor
-    Then the only retention choices are "1 month", "2 months", "3 months", "6 months" and "1 year"
+    Then the only retention choices are "30 days", "60 days", "90 days", "180 days" and "1 year"
     And there is no custom option
     And there is no keep-forever option
 
@@ -38,7 +38,7 @@ Feature: Plan-gated data-retention menu
   Scenario: An enterprise organization gets the full menu and a custom value
     Given an organization on an enterprise plan
     When a manager opens the retention policy editor
-    Then the choices include "1 month", "2 months", "3 months", "6 months", "1 year", and "5 years"
+    Then the choices include "30 days", "60 days", "90 days", "180 days", "1 year", and "5 years"
     And a custom value is available
     When the manager enters a custom retention shorter than the recovery floor
     Then the change is rejected as below the minimum for their plan

@@ -6,7 +6,7 @@ describe("formatDays", () => {
   /** @scenario "A stored preset reads as the option that was picked" */
   it("shows a preset's label for its stored value", () => {
     expect(formatDays(371)).toBe("1 year");
-    expect(formatDays(91)).toBe("3 months");
+    expect(formatDays(91)).toBe("90 days");
     expect(formatDays(1827)).toBe("5 years");
   });
 

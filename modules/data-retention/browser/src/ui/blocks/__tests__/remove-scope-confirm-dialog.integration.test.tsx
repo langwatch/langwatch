@@ -64,7 +64,7 @@ describe("RemoveScopeConfirmDialog", () => {
           </Wrapper>,
         );
         // current 3 months (stored 91) → fallback 49 days
-        expect(screen.getByText("3 months")).toBeTruthy();
+        expect(screen.getByText("90 days")).toBeTruthy();
         expect(screen.getByText("49 days")).toBeTruthy();
       });
     });

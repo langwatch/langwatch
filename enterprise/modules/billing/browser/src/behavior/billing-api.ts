@@ -4,7 +4,10 @@
  */
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
-import type { OrganizationStorageEstimate } from "@langwatch/data-retention-contract";
+import type {
+  OrganizationRetention,
+  OrganizationStorageEstimate,
+} from "@langwatch/data-retention-contract";
 import type {
   Currency,
   currencyTrpc,
@@ -65,6 +68,10 @@ type BorrowedProcedures = {
     /** The organization's stored bytes, for the upgrade dialog's storage estimate. */
     getOrganizationStorageEstimate: {
       query: { input: OrganizationScope; output: OrganizationStorageEstimate };
+    };
+    /** The organization's traces retention, for the current plan card. */
+    getOrganizationRetention: {
+      query: { input: OrganizationScope; output: OrganizationRetention };
     };
   };
 

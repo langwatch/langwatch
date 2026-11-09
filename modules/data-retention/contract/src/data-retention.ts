@@ -123,8 +123,14 @@ export const GROWTH_RETENTION_OPTIONS = [
   { label: "60 days", days: 63 },
   { label: "90 days", days: GROWTH_INCLUDED_RETENTION_DAYS },
   { label: "180 days", days: 182 },
-  { label: "365 days", days: 371 },
+  { label: "1 year", days: 371 },
 ] as const;
+
+/** The label a stored retention shows everywhere: its Growth option's, else its days. */
+export function getGrowthRetentionLabel(days: number): string {
+  const option = GROWTH_RETENTION_OPTIONS.find((candidate) => candidate.days === days);
+  return option ? option.label : `${days} days`;
+}
 
 export const growthRetentionDaysSchema = z
   .number()

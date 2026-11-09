@@ -33,6 +33,8 @@ import {
   type RenewalCompletion,
   type ReportUsageForMonthCommandData,
   type ResourceLimitNotifierInput,
+  type RetentionStorageOutcome,
+  type RetentionStorageReport,
   type SubscriptionPlanInput,
   type BillingPricingModel,
 } from "@langwatch/enterprise-billing-contract";
@@ -100,6 +102,7 @@ import {
 import { PlanLimitAlertService } from "../services/plan-limit-alert.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
+import { RetentionStorageBillingService } from "../services/retention-storage-billing.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import {
   type SeatLineRepairOutcome,
@@ -186,6 +189,7 @@ type SubscriptionDoor = Readonly<{
   subscriptions: BillingSubscriptionService;
   seatLines: SeatLineRepairService;
   developerSeats: DeveloperSeatService;
+  retentionStorage: RetentionStorageBillingService;
 }>;
 
 type ConnectedBilling = Readonly<{
@@ -571,9 +575,10 @@ export class BillingModule
       "subscriptions" | "organizations" | "seatEventSubscriptions"
     >;
   }): SubscriptionDoor {
-    const prices = BillingPriceCatalogue.create(
+    const catalogue = BillingPriceCatalogue.create(
       getStripeEnvironmentFromNodeEnv(nodeEnvironment),
-    ).prices;
+    );
+    const { prices } = catalogue;
     const stripeErrors = StripeErrorTranslatorService.create();
     const { customers, subscriptions: stripeSubscriptions } = stripe.channels;
     return {
@@ -605,6 +610,13 @@ export class BillingModule
         subscriptions: repositories.seatEventSubscriptions,
         prices,
         unitAmountOf: (priceId) => stripePricesFile.prices[priceId]?.unitAmount ?? null,
+      }),
+      retentionStorage: RetentionStorageBillingService.create({
+        subscriptions: repositories.seatEventSubscriptions,
+        stripeSubscriptions,
+        meters: stripe.channels.meters,
+        prices,
+        isMeterProvisioned: catalogue.meters.RETENTION_STORAGE_GB !== undefined,
       }),
     };
   }
@@ -721,6 +733,12 @@ export class BillingModule
       organizationId: input.organizationId,
     });
     return this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId });
+  }
+
+  /** Off Cloud, or where no payment provider is composed, nothing is billed for storage. */
+  async recordRetentionStorage(input: RetentionStorageReport): Promise<RetentionStorageOutcome> {
+    if (!this.#subscriptions) return { line: "skipped", reportedGbMonths: null };
+    return this.#subscriptions.retentionStorage.record(input);
   }
 
   async listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]> {

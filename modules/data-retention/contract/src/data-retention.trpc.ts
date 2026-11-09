@@ -8,6 +8,7 @@ import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  organizationRetentionSchema,
   organizationStorageEstimateSchema,
   retentionPolicySnapshotSchema,
   retentionStorageUsageSchema,
@@ -142,4 +143,9 @@ export const dataRetentionTrpc = defineTrpcContract("dataRetention")
   .query("getOrganizationStorageEstimate")
   .withInput(z.object({ organizationId: z.string().min(1) }))
   .withOutput(organizationStorageEstimateSchema)
+
+  /** The organization's traces retention, for the plan card. */
+  .query("getOrganizationRetention")
+  .withInput(z.object({ organizationId: z.string().min(1) }))
+  .withOutput(organizationRetentionSchema)
   .build();

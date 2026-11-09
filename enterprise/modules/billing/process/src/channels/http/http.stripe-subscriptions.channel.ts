@@ -178,7 +178,15 @@ function subscriptionOf(subscription: Stripe.Subscription): BillingSubscription 
     })),
     currentPeriodEnd: subscription.current_period_end,
     currency: subscription.currency,
+    ...customerOf(subscription),
   };
+}
+
+/** The billed customer, when the provider's answer names one. */
+function customerOf(subscription: Stripe.Subscription): { customerId?: string } {
+  const customer: Stripe.Subscription["customer"] | undefined = subscription.customer;
+  if (!customer) return {};
+  return { customerId: typeof customer === "string" ? customer : customer.id };
 }
 
 function previewDetailsOf(

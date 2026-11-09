@@ -34,6 +34,10 @@ export const STRIPE_PRICE_NAMES = [
   "DEVELOPER_SEAT_EUR_ANNUAL",
   "DEVELOPER_SEAT_USD_MONTHLY",
   "DEVELOPER_SEAT_USD_ANNUAL",
+  "RETENTION_STORAGE_EUR_MONTHLY",
+  "RETENTION_STORAGE_EUR_ANNUAL",
+  "RETENTION_STORAGE_USD_MONTHLY",
+  "RETENTION_STORAGE_USD_ANNUAL",
 ] as const;
 
 export type StripePriceName = (typeof STRIPE_PRICE_NAMES)[number];
@@ -50,6 +54,10 @@ export const OPTIONAL_STRIPE_PRICE_NAMES: readonly StripePriceName[] = [
   "DEVELOPER_SEAT_EUR_ANNUAL",
   "DEVELOPER_SEAT_USD_MONTHLY",
   "DEVELOPER_SEAT_USD_ANNUAL",
+  "RETENTION_STORAGE_EUR_MONTHLY",
+  "RETENTION_STORAGE_EUR_ANNUAL",
+  "RETENTION_STORAGE_USD_MONTHLY",
+  "RETENTION_STORAGE_USD_ANNUAL",
 ];
 
 /** Prices that are optional: absent until an operator provisions them in a mode. */
@@ -59,7 +67,11 @@ type OptionalStripePriceName =
   | "DEVELOPER_SEAT_EUR_MONTHLY"
   | "DEVELOPER_SEAT_EUR_ANNUAL"
   | "DEVELOPER_SEAT_USD_MONTHLY"
-  | "DEVELOPER_SEAT_USD_ANNUAL";
+  | "DEVELOPER_SEAT_USD_ANNUAL"
+  | "RETENTION_STORAGE_EUR_MONTHLY"
+  | "RETENTION_STORAGE_EUR_ANNUAL"
+  | "RETENTION_STORAGE_USD_MONTHLY"
+  | "RETENTION_STORAGE_USD_ANNUAL";
 
 export type StripeEnvironment = "test" | "live";
 
@@ -68,18 +80,25 @@ export type StripePriceMapping = Record<
   Partial<Record<StripeEnvironment, string>> | undefined
 >;
 
-export const STRIPE_METER_NAMES = ["BILLABLE_EVENTS", "INSTANT_EVAL_USD"] as const;
+export const STRIPE_METER_NAMES = [
+  "BILLABLE_EVENTS",
+  "INSTANT_EVAL_USD",
+  "RETENTION_STORAGE_GB",
+] as const;
 export type StripeMeterName = (typeof STRIPE_METER_NAMES)[number];
 
 /** Meters that may be absent from the catalog in a given Stripe mode. */
-export const OPTIONAL_STRIPE_METER_NAMES: readonly StripeMeterName[] = ["INSTANT_EVAL_USD"];
+export const OPTIONAL_STRIPE_METER_NAMES: readonly StripeMeterName[] = [
+  "INSTANT_EVAL_USD",
+  "RETENTION_STORAGE_GB",
+];
 
 export type StripeMeterMapping = Record<
   StripeMeterName,
   Record<StripeEnvironment, string> | undefined
 >;
 export type StripeMeterMap = Partial<Record<StripeMeterName, string>> &
-  Record<Exclude<StripeMeterName, "INSTANT_EVAL_USD">, string>;
+  Record<Exclude<StripeMeterName, "INSTANT_EVAL_USD" | "RETENTION_STORAGE_GB">, string>;
 
 export type StripePricesFile = {
   schemaVersion: number;

@@ -220,6 +220,23 @@ function contractCases(backend: Backend): void {
       expect(named).toEqual([expect.objectContaining({ organizationId: other(), ...team() })]);
       expect(unnamed).toEqual([]);
     });
+
+    it("names each organization holding a rule once, for the daily storage report", async () => {
+      const repository = backend.repository();
+      for (const category of ["traces", "scenarios"] as const) {
+        await repository.upsertForScope({
+          organizationId: other(),
+          scope: team(),
+          category,
+          retentionDays: 182,
+        });
+      }
+
+      const ids = await repository.findOrganizationIdsWithRules();
+
+      expect(ids.filter((id) => id === other())).toEqual([other()]);
+      expect(ids).not.toContain(acme());
+    });
   });
 }
 

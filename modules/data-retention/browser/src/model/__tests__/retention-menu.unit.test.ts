@@ -10,7 +10,7 @@ import {
 const labels = (items: { label: string }[]) => items.map((i) => i.label);
 const values = (items: { value: string }[]) => items.map((i) => i.value);
 
-const PAID_LABELS = ["1 month", "2 months", "3 months", "6 months", "1 year"];
+const PAID_LABELS = ["30 days", "60 days", "90 days", "180 days", "1 year"];
 
 describe("buildRetentionMenuItems", () => {
   describe("given a paid (non-enterprise) org", () => {

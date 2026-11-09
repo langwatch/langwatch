@@ -1,4 +1,5 @@
 import {
+  GROWTH_RETENTION_OPTIONS,
   INDEFINITE_RETENTION_DAYS,
   type RetentionCategory,
   type RetentionScopeType,
@@ -46,13 +47,11 @@ export type RetentionPreset = { value: string; label: string; days: number };
 // the mutation boundary; these lists only shape the UI.
 
 /** Paid (non-enterprise) menu: the Growth options offered at upgrade, up to 1 year. */
-export const PAID_RETENTION_PRESETS: RetentionPreset[] = [
-  { value: "35", label: "1 month", days: 35 },
-  { value: "63", label: "2 months", days: 63 },
-  { value: "91", label: "3 months", days: 91 },
-  { value: "182", label: "6 months", days: 182 },
-  { value: "371", label: "1 year", days: 371 },
-];
+export const PAID_RETENTION_PRESETS: RetentionPreset[] = GROWTH_RETENTION_OPTIONS.map((option) => ({
+  value: String(option.days),
+  label: option.label,
+  days: option.days,
+}));
 
 /** Enterprise / self-hosted menu: the paid options plus longer windows. */
 export const ENTERPRISE_RETENTION_PRESETS: RetentionPreset[] = [

@@ -217,6 +217,7 @@ export class SeatEventSubscriptionService {
       currency: checkoutCurrency,
       interval: billingInterval,
       prices: this.prices,
+      ...(retentionDays === undefined ? {} : { retentionDays }),
     });
 
     const subscription = await this.createPendingSubscription({

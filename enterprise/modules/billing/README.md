@@ -11,7 +11,7 @@ Billing: subscriptions, invoices and invoice billing for connected self-hosted c
 | Classification | enterprise (`modules/catalogue.json`)                                                                  |
 | Subjects       | billing                                                                                                |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)            |
-| Api token      | `BillingApi` = `moduleApi<BillingApi>()("billing")`, `contract/src/billing.api.ts:111` (13 operations) |
+| Api token      | `BillingApi` = `moduleApi<BillingApi>()("billing")`, `contract/src/billing.api.ts:118` (14 operations) |
 | Other token    | `BillingStripeWebhookApi`, `process/src/transport/billing-stripe-webhook.rest.ts:25`                   |
 | Other token    | `BillingCurrencyApi`, `process/src/transport/currency.trpc.ts:26`                                      |
 | Other token    | `BillingSubscriptionApi`, `process/src/transport/subscription.trpc.ts:96`                              |
@@ -25,7 +25,7 @@ Billing: subscriptions, invoices and invoice billing for connected self-hosted c
 | Stores required                |                                                                                                                                                                                                                                                                                                                                                                                                                         | `process/src/channels/http/http.billing.channels.ts:21`                      |
 | Stores required                | prisma, redis, clickhouse                                                                                                                                                                                                                                                                                                                                                                                               | `process/src/repositories/live/live.billing.repositories.ts:15`              |
 | Stores required                | prisma                                                                                                                                                                                                                                                                                                                                                                                                                  | `process/src/repositories/prisma/prisma.billing.repositories.ts:26`          |
-| Secrets                        | `stripeSecretKey` (STRIPE_SECRET_KEY), `stripeWebhookSecret` (STRIPE_WEBHOOK_SECRET), `internalSlackPlanLimitWebhook` (SLACK_PLAN_LIMIT_CHANNEL), `internalSlackSubscriptionsWebhook` (SLACK_CHANNEL_SUBSCRIPTIONS), `internalSlackSelfHostedWebhook` (SLACK_CHANNEL_SELF_HOSTED), `internalSlackSignupsWebhook` (≈ `billingSecrets.internalSlackSignupsWebhook`)                                                       | `process/src/app/billing.app.ts:212`                                         |
+| Secrets                        | `stripeSecretKey` (STRIPE_SECRET_KEY), `stripeWebhookSecret` (STRIPE_WEBHOOK_SECRET), `internalSlackPlanLimitWebhook` (SLACK_PLAN_LIMIT_CHANNEL), `internalSlackSubscriptionsWebhook` (SLACK_CHANNEL_SUBSCRIPTIONS), `internalSlackSelfHostedWebhook` (SLACK_CHANNEL_SELF_HOSTED), `internalSlackSignupsWebhook` (≈ `billingSecrets.internalSlackSignupsWebhook`)                                                       | `process/src/app/billing.app.ts:216`                                         |
 | Config                         | `licensePaymentLinkId` (STRIPE_LICENSE_PAYMENT_LINK_ID), `licensePaymentUrl` (STRIPE_LICENSE_PAYMENT_LINK_URL), `hubspotPortalId` (HUBSPOT_PORTAL_ID), `hubspotFormId` (HUBSPOT_FORM_ID), `hubspotReachedLimitFormId` (HUBSPOT_REACHED_LIMIT_FORM_ID), `bankDetails` (LANGWATCH_BILLING_BANK_DETAILS), `stripeApiBase` (STRIPE_API_BASE), `isSaas` (IS_SAAS), `publicBaseUrl` (BASE_HOST), `nodeEnvironment` (NODE_ENV) | `contract/src/billing.config.ts:13`                                          |
 
 Anything else billing needs belongs to another module and is reached through its `*Api`.
@@ -40,6 +40,6 @@ Anything else billing needs belongs to another module and is reached through its
 
 ## Who depends on billing
 
-[entitlement](../../../modules/entitlement/README.md), [organization](../../../modules/organization/README.md) (as a peer).
+[data-retention](../../../modules/data-retention/README.md), [entitlement](../../../modules/entitlement/README.md), [organization](../../../modules/organization/README.md) (as a peer).
 
 <!-- readme:generated:end -->

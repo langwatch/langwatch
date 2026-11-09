@@ -9,4 +9,6 @@ export interface StorageMeterRepository {
   getTenantBytes(input: { tenantId: string }): Promise<number>;
   /** One metered table's bytes for the tenant. */
   getTableBytes(input: { tenantId: string; table: StorageMeterTable }): Promise<number>;
+  /** Every metered table's bytes for the tenant in rows whose time is before `beforeMs`. */
+  getTenantBytesBefore(input: { tenantId: string; beforeMs: number }): Promise<number>;
 }

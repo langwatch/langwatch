@@ -104,12 +104,15 @@ function currentPlanFeaturesFor({
   isEnterprisePlan,
   isHeldCapabilityPlan,
   isDeveloperPlan,
+  retentionDays,
 }: {
   plan: PlanInfo;
   currency: Currency;
   isEnterprisePlan: boolean;
   isHeldCapabilityPlan: boolean;
   isDeveloperPlan: boolean;
+  /** The traces retention the organization keeps; the card says 90 days until it loads. */
+  retentionDays?: number;
 }): string[] | undefined {
   if (isEnterprisePlan) return buildEnterprisePlanFeatures(plan);
   if (isHeldCapabilityPlan) {
@@ -123,7 +126,7 @@ function currentPlanFeaturesFor({
   }
   // The Growth offer below the card lists what the upgrade adds; the Free card shows usage instead.
   if (isDeveloperPlan) return undefined;
-  return getGrowthFeatures(currency);
+  return getGrowthFeatures(currency, retentionDays);
 }
 
 /**
@@ -374,6 +377,10 @@ export function SubscriptionPage() {
     { enabled: isUpgradeDialogOpen && !!organization?.id, retry: false, staleTime: 300_000 },
   );
   const retentionEstimate = retentionEstimateOf(storageEstimate);
+  const organizationRetention = billingApi.dataRetention.getOrganizationRetention.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization?.id, retry: false },
+  );
 
   const isPlanLoading = !organization || activePlan.isLoading || isCurrencyLoading;
   const { isUpgradePlanRequired, updateRequired } = subscriptionChangesRequired({
@@ -429,6 +436,9 @@ export function SubscriptionPage() {
     isEnterprisePlan,
     isHeldCapabilityPlan: isLicenseOverride || isTieredLegacyPaidPlan,
     isDeveloperPlan,
+    ...(organizationRetention.data
+      ? { retentionDays: organizationRetention.data.retentionDays }
+      : {}),
   });
 
   const isSelfManagedPaidPlan = !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride;

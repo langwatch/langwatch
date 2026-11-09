@@ -11,7 +11,7 @@ Data retention: the retention policy per scope, the pins that keep data past it,
 | Classification | core (`modules/catalogue.json`)                                                                                                  |
 | Subjects       | data-retention                                                                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                                         |
-| Api token      | `DataRetentionApi` = `moduleApi<DataRetentionApi>()("data-retention")`, `contract/src/data-retention.api.ts:115` (25 operations) |
+| Api token      | `DataRetentionApi` = `moduleApi<DataRetentionApi>()("data-retention")`, `contract/src/data-retention.api.ts:118` (26 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                                       |
 
 ## What data-retention owns
@@ -28,11 +28,12 @@ Anything else data-retention needs belongs to another module and is reached thro
 
 ## Peers (static dependencies)
 
-| Name          | Token            | Module                                  |
-| ------------- | ---------------- | --------------------------------------- |
-| `entitlement` | `EntitlementApi` | [entitlement](../entitlement/README.md) |
-| `permissions` | `AuthzApi`       | [authz](../authz/README.md)             |
-| `users`       | `UserApi`        | [user](../user/README.md)               |
+| Name          | Token            | Module                                                |
+| ------------- | ---------------- | ----------------------------------------------------- |
+| `billing`     | `BillingApi`     | [billing](../../enterprise/modules/billing/README.md) |
+| `entitlement` | `EntitlementApi` | [entitlement](../entitlement/README.md)               |
+| `permissions` | `AuthzApi`       | [authz](../authz/README.md)                           |
+| `users`       | `UserApi`        | [user](../user/README.md)                             |
 
 ## Who depends on data-retention
 

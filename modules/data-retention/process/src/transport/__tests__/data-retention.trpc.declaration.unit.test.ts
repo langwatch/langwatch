@@ -57,6 +57,7 @@ describe("the data retention tRPC declaration", () => {
         ["killMutation", "mutation", "permission:project:update"],
         ["getScopeStorageUsage", "query", "permission:traces:view"],
         ["getOrganizationStorageEstimate", "query", "permission:subscription:upgrade"],
+        ["getOrganizationRetention", "query", "permission:organization:view"],
       ]);
     });
 

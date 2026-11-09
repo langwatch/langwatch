@@ -5,7 +5,8 @@ Feature: Data retention choice in the Growth upgrade dialog
   that storage above 90 days is paid per GB (EUR 3 or USD 4 per GB a month).
   Tables drop data in whole weekly partitions, so each option is a round
   number of days kept up to one week longer: 30 days is 35, 60 is 63, 90 is
-  91, 180 is 182 and 365 is 371.
+  91, 180 is 182 and 1 year is 371. The dialog, the settings page and the
+  plan card name each option the same way.
 
   Background:
     Given an organization on the Free plan
@@ -25,7 +26,7 @@ Feature: Data retention choice in the Growth upgrade dialog
   @unit
   Scenario: A longer retention shows the storage line while the estimate loads
     Given the organization's storage read has not answered yet
-    When the administrator picks "365 days"
+    When the administrator picks "1 year"
     Then the dialog shows "Storage above 90 days" at "€3 per GB a month"
     And the estimate shows a loading placeholder
 
@@ -38,14 +39,14 @@ Feature: Data retention choice in the Growth upgrade dialog
   @unit
   Scenario: A failed storage read still shows the unit price
     Given the organization's storage read fails
-    When the administrator picks "365 days"
+    When the administrator picks "1 year"
     Then the dialog shows "€3 per GB a month" without an estimate
     And "Continue to checkout" is still available
 
   @unit
   Scenario: Dollar customers see the dollar price
     Given the organization is billed in dollars
-    When the administrator picks "365 days"
+    When the administrator picks "1 year"
     Then the dialog shows "$4 per GB a month"
 
   @unit
@@ -86,4 +87,16 @@ Feature: Data retention choice in the Growth upgrade dialog
   Scenario: Growth administrators can pick the same options later in settings
     Given an organization on Growth
     When an administrator opens the data retention settings
-    Then the presets are 1 month, 2 months, 3 months, 6 months and 1 year
+    Then the presets are 30 days, 60 days, 90 days, 180 days and 1 year
+
+  @unit
+  Scenario: The plan card names the retention the organization keeps
+    Given an organization on Growth that keeps traces for 371 days
+    When an administrator opens the subscription page
+    Then the current plan card lists "1 year retention"
+
+  @unit
+  Scenario: The plan card says 90 days until the retention is known
+    Given an organization on Growth whose retention has not loaded yet
+    When an administrator opens the subscription page
+    Then the current plan card lists "90 days retention"

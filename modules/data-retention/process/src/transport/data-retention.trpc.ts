@@ -106,4 +106,10 @@ export const dataRetentionTrpcTransport: TrpcRouterDeclaration<
   .handle(async ({ app, input }) =>
     app.getOrganizationStorageEstimate({ organizationId: input.organizationId }),
   )
+
+  .procedure("getOrganizationRetention")
+  .withPermission("organization:view")
+  .handle(async ({ app, input }) =>
+    app.getOrganizationRetention({ organizationId: input.organizationId }),
+  )
   .build();

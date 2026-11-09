@@ -13,6 +13,7 @@ export * from "./payment-recovery.ts";
 export * from "./plan-limits.ts";
 export * from "./plan-types.ts";
 export * from "./pricing.ts";
+export * from "./retention-storage.ts";
 export * from "./stripe-price-catalog.ts";
 export * from "./stripe-prices.ts";
 export * from "./subscription.trpc.ts";

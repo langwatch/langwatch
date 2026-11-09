@@ -1,5 +1,6 @@
 /** Billing plan constants; pricing from Stripe catalog. */
 
+import { getGrowthRetentionLabel } from "@langwatch/data-retention-contract";
 import {
   Currency,
   formatPrice,
@@ -46,16 +47,23 @@ const growthRetentionPricingString = (currency: Currency): string =>
     ? "90 days retention (+ custom at \u20AC3/GB)"
     : "90 days retention (+ custom at $4/GB)";
 
+/** The retention line: what the organization keeps when known, else the 90 days Growth includes. */
+export const growthRetentionFeature = (retentionDays?: number): string => {
+  if (retentionDays === undefined) return "90 days retention";
+  if (retentionDays === 0) return "Unlimited retention";
+  return `${getGrowthRetentionLabel(retentionDays)} retention`;
+};
+
 /**
  * Growth plan features for upgrade block.
  * Accepts a currency so the events pricing line is accurate.
  */
-export const getGrowthFeatures = (currency: Currency): string[] => [
+export const getGrowthFeatures = (currency: Currency, retentionDays?: number): string[] => [
   "Volume discounts above 20 users",
   `${formatNumber(GROWTH_INCLUDED_EVENTS)} events included`,
   growthEventsPricingString(currency),
   "Unlimited lite users",
-  "90 days retention",
+  growthRetentionFeature(retentionDays),
   "Unlimited evals",
   "Private Slack support",
 ];
