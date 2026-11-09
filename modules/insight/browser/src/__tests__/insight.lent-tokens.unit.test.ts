@@ -35,7 +35,7 @@ describe("the insight browser declaration", () => {
 
       const value = lend && "value" in lend ? lend.value : undefined;
 
-      expect(value?.useIsShown).toBe(useInsightsShown);
+      expect(value).toEqual({ useIsShown: useInsightsShown });
     });
   });
 
