@@ -18,7 +18,7 @@ import {
   useModelProvidersSettings,
 } from "@langwatch/model-provider-client";
 import {
-  deploymentForModel,
+  lookUpMappedDeployment,
   skipListToInput,
   type ModelProviderEditorValue,
   modelProviders as modelProvidersRegistry,
@@ -109,13 +109,13 @@ function mappedDeployment({
   model,
 }: {
   provider: ModelProviderEditorValue;
-  model: string | undefined;
-}): string | undefined {
-  if (!model) return model;
-  const qualifiedModel = `${provider.provider}/${model}`;
-  return (
-    deploymentForModel({ deploymentMapping: provider.deploymentMapping, qualifiedModel }) ?? model
-  );
+  model: string;
+}): string {
+  const mapped = lookUpMappedDeployment({
+    deploymentMapping: provider.deploymentMapping,
+    qualifiedModel: `${provider.provider}/${model}`,
+  });
+  return mapped.kind === "mapped" ? mapped.deployment : model;
 }
 
 function readsCredentialsFromEnvironment(provider: ModelProviderEditorValue): boolean {
@@ -832,9 +832,9 @@ export const EditModelProviderForm = ({
     storedRow: provider,
   });
   // Only the guided panel names the model up front; the drawer probes without one.
-  const probedModel = guided
-    ? mappedDeployment({ provider, model: guidedSave.chatModel })
-    : undefined;
+  const chatModel = guidedSave.chatModel;
+  const probedModel =
+    guided && chatModel ? mappedDeployment({ provider, model: chatModel }) : undefined;
 
   // Same answer the credential fields render their required markers from.
   const requiredKeys = useRequiredCredentialKeys({

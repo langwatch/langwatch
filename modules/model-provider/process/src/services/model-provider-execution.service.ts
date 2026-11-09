@@ -5,7 +5,7 @@ import {
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
   ModelRestrictedForExecutionError,
-  deploymentForModel,
+  lookUpMappedDeployment,
   modelProviderExecutionParametersSchema,
   modelProviderExecutionPrepareInputSchema,
   translateModelIdForLitellm,
@@ -255,12 +255,12 @@ export class ModelProviderExecutionService {
       throw new ModelProviderInvalidError("Execution parameters are missing a model.");
     }
 
-    const deployment = deploymentForModel({
+    const mapped = lookUpMappedDeployment({
       deploymentMapping: provider.deploymentMapping,
       qualifiedModel: model,
     });
-    if (deployment) {
-      parameters.deployment = deployment;
+    if (mapped.kind === "mapped") {
+      parameters.deployment = mapped.deployment;
     }
 
     if (provider.extraHeaders.length > 0) {
