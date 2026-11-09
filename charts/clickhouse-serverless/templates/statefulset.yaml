@@ -190,6 +190,10 @@ spec:
             - name: BACKUP_ENABLED
               value: "true"
             {{- end }}
+            {{- if .Values.lwqlAccess.secretName }}
+            - name: LWQL_ACCESS_DIR
+              value: /etc/clickhouse-server/lwql
+            {{- end }}
 
             # Advanced overrides (applied last — override any derived value above)
             {{- range $key, $value := .Values.env }}
@@ -280,15 +284,12 @@ spec:
             {{- if .Values.lwqlAccess.secretName }}
             # LangWatchQL access model — mounted unconditionally on EVERY pod, on
             # its own value (not extraVolumeMounts, which an operator's list could
-            # replace). Nested single-file subPath mounts, so they coexist with
-            # the files ch-config renders into users.d / config.d at startup.
+            # replace). A directory mount, which kubelet updates in place when the
+            # render Job patches the Secret; ch-config links its two files into
+            # users.d / config.d (LWQL_ACCESS_DIR), and ClickHouse reloads them
+            # with no restart. A subPath mount would never see the update.
             - name: lwql-access
-              mountPath: /etc/clickhouse-server/users.d/lwql-access.yaml
-              subPath: lwql-access.yaml
-              readOnly: true
-            - name: lwql-access
-              mountPath: /etc/clickhouse-server/config.d/lwql-named-collection.yaml
-              subPath: lwql-named-collection.yaml
+              mountPath: /etc/clickhouse-server/lwql
               readOnly: true
             {{- end }}
             {{- if .Values.access.enabled }}

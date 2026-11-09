@@ -98,3 +98,31 @@ Feature: The clickhouse-serverless image renders every server setting from env
     And it receives the password in CLICKHOUSE_PASSWORD, so its initialisation client can log in
     And CLICKHOUSE_PASSWORD_FILE is unset
     And with neither initialisation input present CLICKHOUSE_PASSWORD is unset too
+
+  @unit
+  Scenario: The LangWatchQL access model is linked from a directory mount
+    Given LWQL_ACCESS_DIR names a directory holding lwql-access.yaml and lwql-named-collection.yaml
+    When the renderer writes the server configuration
+    Then users.d/lwql-access.yaml and config.d/lwql-named-collection.yaml are links into that directory
+    And a file updated in that directory is read through its link with nothing rendered again
+
+  @unit
+  Scenario: A missing LangWatchQL access file stops the server starting
+    Given LWQL_ACCESS_DIR names a directory missing one of the two files
+    When the renderer writes the server configuration
+    Then rendering fails naming LWQL_ACCESS_DIR
+
+  @unit
+  Scenario: Without LWQL_ACCESS_DIR a mounted access file is left alone
+    Given LWQL_ACCESS_DIR is not set
+    And users.d holds a mounted lwql-access.yaml and config.d a link an earlier boot made
+    When the renderer writes the server configuration
+    Then the mounted file is unchanged and the stale link is removed
+
+  @unit
+  Scenario: Every default system log can be given the system log TTL
+    Given SYSTEM_LOG_TTL_ALL is true
+    When the renderer writes the server configuration
+    Then error_log, crash_log and the query detail logs it keeps expire after SYSTEM_LOG_TTL_DAYS
+    And backup_log gets no TTL, because the backup sidecar finds a backup's base there
+    And without SYSTEM_LOG_TTL_ALL none of them gets a TTL

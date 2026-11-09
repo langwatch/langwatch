@@ -25,13 +25,14 @@ func (i *Input) Validate() error {
 		errs = append(errs, "CLICKHOUSE_PASSWORD or CLICKHOUSE_PASSWORD_FILE must set a password for the default user")
 	}
 
-	// TieredMoveFactor must be a float in (0, 1]
+	// TieredMoveFactor must be a float in [0, 1]. Zero turns off moves by free space,
+	// so only TTL moves parts to cold storage.
 	if i.TieredMoveFactor != "" {
 		f, err := strconv.ParseFloat(i.TieredMoveFactor, 64)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("TIERED_MOVE_FACTOR: invalid float %q", i.TieredMoveFactor))
-		} else if math.IsNaN(f) || math.IsInf(f, 0) || f <= 0 || f > 1 {
-			errs = append(errs, fmt.Sprintf("TIERED_MOVE_FACTOR: must be in (0, 1] (got %v)", f))
+		} else if math.IsNaN(f) || math.IsInf(f, 0) || f < 0 || f > 1 {
+			errs = append(errs, fmt.Sprintf("TIERED_MOVE_FACTOR: must be in [0, 1] (got %v)", f))
 		}
 	}
 

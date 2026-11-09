@@ -217,6 +217,7 @@ jobs:
             langwatch-app langwatch-nlp-service langwatch-langevals langwatch-gateway langwatch-langy-agent
             langwatch-nlp-lambda langwatch-eval-azure langwatch-eval-langevals langwatch-eval-lingua
             langwatch-eval-openai langwatch-eval-presidio langwatch-eval-ragas langwatch-eval-topic_clustering
+            langwatch-clickhouse-serverless
         run: |
           set -euo pipefail
           BASE=$(go run ./cmd/ecrtag diffbase -repositories "${REPOSITORIES}" -tag "${IMAGE_TAG}" \

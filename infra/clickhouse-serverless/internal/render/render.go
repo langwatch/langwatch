@@ -107,6 +107,10 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		}
 	}
 
+	if err := linkLWQLAccess(input.LWQLAccessDir, usersD, configD); err != nil {
+		return fmt.Errorf("lwql-access: %w", err)
+	}
+
 	if input.DynamicOnly {
 		if err := refuseStaticCredentials(outputDir); err != nil {
 			return err

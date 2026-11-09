@@ -52,6 +52,11 @@ type Input struct {
 	// for operator-written users that GRANT a tier. Off, no tier_* name exists.
 	AccessTiers bool `env:"CLICKHOUSE_ACCESS_TIERS"`
 
+	// A directory holding the app-rendered LangWatchQL access model (a mounted
+	// Secret). Its two files are linked into users.d and config.d, so an update
+	// to the Secret reaches the running server with no restart.
+	LWQLAccessDir string `env:"LWQL_ACCESS_DIR"`
+
 	// nil means true: default gets access_management and named_collection_control.
 	DefaultUserAccessManagement *bool `env:"DEFAULT_USER_ACCESS_MANAGEMENT"`
 
@@ -81,6 +86,8 @@ type Input struct {
 	LogFormat        string `env:"LOG_FORMAT" default:"json"   validate:"oneof=json plain"`
 	LogToFile        bool   `env:"LOG_TO_FILE" default:"true"` // false: console only, no server log files
 	SystemLogTTLDays int    `env:"SYSTEM_LOG_TTL_DAYS" default:"30"`
+	// true: error_log, crash_log and the query detail logs get SYSTEM_LOG_TTL_DAYS too.
+	SystemLogTTLAll bool `env:"SYSTEM_LOG_TTL_ALL"`
 
 	// System logs — each log has enable + TTL + optional flush settings
 	EnableQueryLog        bool   `env:"ENABLE_QUERY_LOG" default:"true"`

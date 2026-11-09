@@ -140,7 +140,7 @@ func TestValidate_TieredMoveFactor(t *testing.T) {
 		{"valid 0.9", "0.9", false},
 		{"valid 1.0 (upper bound)", "1", false},
 		{"empty (skipped)", "", false},
-		{"zero (out of range)", "0", true},
+		{"zero (TTL moves only)", "0", false},
 		{"negative", "-0.5", true},
 		{"above 1", "1.1", true},
 		{"not a number", "abc", true},

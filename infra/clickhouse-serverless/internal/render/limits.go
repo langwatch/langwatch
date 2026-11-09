@@ -2,10 +2,16 @@ package render
 
 import (
 	"fmt"
+	"maps"
 	"path/filepath"
+	"slices"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
+
+// queryDetailLogs are the per-query and per-insert detail logs ClickHouse
+// writes by default and nothing in LangWatch reads.
+var queryDetailLogs = []string{"query_metric_log", "query_thread_log", "query_views_log", "asynchronous_insert_log"}
 
 // mergeTreeConfig maps to the ClickHouse merge_tree section in limits.yaml.
 type mergeTreeConfig struct {
@@ -179,8 +185,26 @@ func renderLimits(input *config.Input, c *config.Computed, configD string) error
 	}
 	// Per-query and per-insert detail logs nothing in LangWatch reads.
 	if c.RemoveQueryDetailLogs {
-		for _, key := range []string{"query_metric_log", "query_thread_log", "query_views_log", "asynchronous_insert_log"} {
+		for _, key := range queryDetailLogs {
 			cfg[key] = map[string]string{"@remove": "1"}
+		}
+	}
+	// Opt-in: the logs ClickHouse writes by default get SYSTEM_LOG_TTL_DAYS too,
+	// so none grows without bound. backup_log keeps no TTL: the backup sidecar
+	// finds a backup's base there.
+	if input.SystemLogTTLAll {
+		for _, key := range append([]string{"error_log", "crash_log"}, queryDetailLogs...) {
+			if c.RemoveQueryDetailLogs && slices.Contains(queryDetailLogs, key) {
+				continue
+			}
+			entry := map[string]any{
+				"partition_by": "event_date",
+				"ttl":          fmt.Sprintf("event_date + INTERVAL %d DAY DELETE", defaultTTL),
+			}
+			if prev, ok := cfg[key].(map[string]any); ok {
+				maps.Copy(entry, prev)
+			}
+			cfg[key] = entry
 		}
 	}
 
