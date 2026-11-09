@@ -8,7 +8,7 @@ import type { BoardHeaderActionProps } from "@langwatch/analytics-client";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, Button, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
-import { type InsightDailyRunSetting, type InsightRunSettings } from "@langwatch/insight-contract";
+import type { InsightDailyRunSetting, InsightRunSettings } from "@langwatch/insight-contract";
 import { nowInstant } from "@langwatch/time";
 import { ChevronDown, Inbox, Settings2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
