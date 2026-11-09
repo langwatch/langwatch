@@ -19,13 +19,14 @@ its own schedule, and before this change:
 
 ## Decision
 
-Billing owns recovery. The state is four nullable columns on `Subscription`:
-`paymentRecoveryInvoiceId`, `paymentRecoveryStartedAt` (day 0), `paymentRecoveryNoticeDay` (the last
-notice sent: 0, 3, 7, 14 or 21) and `paymentRecoveryClosedAt`.
+Billing owns recovery. The state is three nullable columns on `Subscription`:
+`paymentRecoveryInvoiceId`, `paymentRecoveryStartedAt` (day 0) and `paymentRecoveryNoticeDay` (the
+last notice sent: 0, 3, 7, 14 or 21). A closed case clears all three; the case is open while
+`paymentRecoveryStartedAt` is set.
 
 ```
-none --charge fails--> failing(day 0) --day 3/7/14 notices--> failing --day 21--> paused
-failing|paused --invoice paid--> none (received or restored email)
+none --charge fails--> failing(day 0) --day 3/7 reminders, day 14 final--> failing --day 21--> paused
+failing|paused --invoice paid--> none (restored email)
 failing|paused --voided, uncollectible, deleted--> none (no email)
 ```
 
@@ -40,10 +41,18 @@ failing|paused --voided, uncollectible, deleted--> none (no email)
   sweeps or a missed day send one notice.
 - **Closing.** `invoice.paid` for the case's invoice clears it with a conditional write; the write
   that clears it sends one email. `past_due` and `unpaid` updates no longer cancel the row.
-- **Mail.** The four emails are transactional and go through notification's sender as the usage
-  limit email does, to members holding `subscription:manage`. Nurturing and Customer.io are not used:
-  the mail must go regardless of marketing consent and carry the exact stop date.
+- **Mail.** Five transactional emails (failed on day 0, reminder on days 3 and 7, final on day 14,
+  paused on day 21, restored on payment) go through billing's own mail channel over
+  `@langwatch/mail`, to the organization's admins and Billing role holders (authz
+  `listBillingMembers`). Nurturing and Customer.io are not used: the mail must go regardless of
+  marketing consent and carry the exact stop date. One refused address does not stop the others;
+  a notice with no recipients still counts as sent.
+- **Enterprise.** A failed charge on an Enterprise subscription opens no case and alerts the account
+  team in Slack instead.
 - **Pay.** The button opens the open invoice's Stripe hosted page, falling back to the billing page.
+- **Reads.** `subscription.paymentRecovery` (`organization:view`) answers only the state;
+  `subscription.paymentRecoveryDetails` and `subscription.paymentRecoveryPayLink`
+  (`subscription:manage`) answer the invoice, amount, card and pay link.
 
 ## Consequences
 
