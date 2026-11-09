@@ -274,11 +274,12 @@ Feature: Redacting personal data out of a span at ingestion
     And when Presidio fails too, the Google DLP fallback is reached as today
 
   @unit
-  Scenario: A slow model call is aborted well before the redaction budget
+  Scenario: A slow model call is aborted at 50 seconds
     Given an organization allowlisted for the PII redaction model
     When the model has not answered after 50 seconds
     Then the model invoke is aborted, not just left running in the background
-    And the batch is sent to Presidio with time left for Presidio to answer
+    And the batch is sent to Presidio, which gets its own full 60 second timeout
+    And a batch that neither answers reaches Google DLP after 110 seconds at most
 
   @unit
   Scenario: A deployment that names no model behaves exactly as today

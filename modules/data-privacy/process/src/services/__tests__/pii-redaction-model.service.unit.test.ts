@@ -50,6 +50,20 @@ const hangingModel: PresidioChannel = {
         }),
 };
 
+/** A Presidio that never answers until its abort signal fires, keeping each signal it is sent. */
+function hangingPresidio() {
+  const signals: AbortSignal[] = [];
+  const channel: PresidioChannel = {
+    detect: (input: PiiDetectionRequest) => {
+      signals.push(input.signal);
+      return new Promise((_resolve, reject) => {
+        input.signal.addEventListener("abort", () => reject(new Error("aborted")));
+      });
+    },
+  };
+  return { signals, channel };
+}
+
 /** A Lambda client whose invoke never answers until its abort signal fires, as the SDK does. */
 function hangingLambda() {
   const signals: AbortSignal[] = [];
@@ -82,12 +96,14 @@ function setup({
   flagFails = false,
   model,
   modelTimeoutMs = 60_000,
+  presidioChannel,
 }: {
   modelConfigured?: boolean;
   allowlisted?: boolean;
   flagFails?: boolean;
   model?: PresidioChannel;
   modelTimeoutMs?: number;
+  presidioChannel?: PresidioChannel;
 } = {}) {
   const presidio = MemoryPresidioChannel.create({ endpoint: "http://langevals:5562" });
   const memoryModel = MemoryPresidioChannel.create(
@@ -119,7 +135,11 @@ function setup({
   const usage: { level: "info" | "warn"; fields: PiiRedactionModelUsage; message: string }[] = [];
 
   const analysis = PiiAnalysisService.create({
-    presidio: PresidioRedactionService.create({ presidio, metrics, timeoutMs: 60_000 }),
+    presidio: PresidioRedactionService.create({
+      presidio: presidioChannel ?? presidio,
+      metrics,
+      timeoutMs: DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
+    }),
     model: PiiRedactionModelService.create({
       model: PresidioRedactionService.create({
         presidio: model ?? memoryModel,
@@ -358,7 +378,7 @@ describe("PiiRedactionModelService", () => {
         vi.useRealTimers();
       });
 
-      /** @scenario "A slow model call is aborted well before the redaction budget" */
+      /** @scenario "A slow model call is aborted at 50 seconds" */
       it("aborts the Lambda invoke at 50 seconds and sends the batch to Presidio", async () => {
         vi.useFakeTimers();
         const lambda = hangingLambda();
@@ -381,9 +401,45 @@ describe("PiiRedactionModelService", () => {
         expect(sent(presidio)).toHaveLength(1);
       });
 
-      it("caps the model call at 50 seconds, under the 60 second Presidio budget", () => {
+      /** @scenario "A slow model call is aborted at 50 seconds" */
+      it("gives Presidio its own full timeout, so DLP is reached after 110 seconds at most", async () => {
+        vi.useFakeTimers();
         expect(PII_REDACTION_MODEL_TIMEOUT_MS).toBe(50_000);
-        expect(PII_REDACTION_MODEL_TIMEOUT_MS).toBeLessThan(DATA_PRIVACY_PRESIDIO_TIMEOUT_MS);
+        expect(DATA_PRIVACY_PRESIDIO_TIMEOUT_MS).toBe(60_000);
+        const lambda = hangingLambda();
+        const slowPresidio = hangingPresidio();
+        const { analysis, dlp } = setup({
+          model: lambda.channel,
+          modelTimeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
+          presidioChannel: slowPresidio.channel,
+        });
+        dlp.answerWith([{ start: 5, end: 8, quote: "Ana", infoType: "PERSON_NAME" }]);
+        const policy = PiiRedactionPolicyService.create({
+          transport: analysis,
+          isLangevalsConfigured: async () => true,
+          isProduction: true,
+          nativePolicyEnforced: true,
+          piiRedactionMaxAttributeLength: 400_000,
+          dataPrivacy: { getResolvedForProject: () => Promise.reject(new Error("unused")) },
+        });
+
+        const cleared = policy.clearBatch([{ text: "call Ana", isNameExempt: false }], {
+          piiRedactionLevel: "STRICT",
+          mainMethod: "presidio",
+          projectId: PROJECT_ID,
+        });
+        await vi.advanceTimersByTimeAsync(PII_REDACTION_MODEL_TIMEOUT_MS);
+        expect(lambda.signals[0]!.aborted).toBe(true);
+        expect(slowPresidio.signals).toHaveLength(1);
+
+        await vi.advanceTimersByTimeAsync(DATA_PRIVACY_PRESIDIO_TIMEOUT_MS - 1);
+        expect(slowPresidio.signals[0]!.aborted).toBe(false);
+        expect(dlp.inspections).toHaveLength(0);
+
+        await vi.advanceTimersByTimeAsync(1);
+        expect(slowPresidio.signals[0]!.aborted).toBe(true);
+        await expect(cleared).resolves.toEqual(["call [REDACTED]"]);
+        expect(dlp.inspections).toHaveLength(1);
       });
     });
 

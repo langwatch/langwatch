@@ -2,8 +2,9 @@
 export const PII_REDACTION_MODEL_FLAG = "release_pii_redaction_model_enabled";
 
 /**
- * When a model call is aborted and its batch goes to Presidio: well under the 60 s Presidio
- * timeout, so a slow call leaves Presidio time to answer. A cold start falls back.
+ * When a model call is aborted and its batch goes to Presidio. The two calls share no budget:
+ * Presidio then gets its own 60 s timer, so a batch can wait up to 110 s before Google DLP.
+ * A cold start falls back.
  */
 export const PII_REDACTION_MODEL_TIMEOUT_MS = 50_000;
 

@@ -48,7 +48,8 @@ Any problem with the model sends the batch to Presidio, then Google DLP, as for 
 organization.
 
 - **Time cap.** A model call is aborted after 50 s (`PII_REDACTION_MODEL_TIMEOUT_MS`) and the batch
-  goes to Presidio. That is under the 60 s Presidio timeout, so Presidio still has time to answer.
+  goes to Presidio. Presidio then gets its own 60 s timeout: the two timers are separate, so a
+  batch can wait up to 110 s (50 + 60) before it reaches Google DLP.
   The abort cancels the invoke request; the function itself may run on until its own timeout.
 - **Usage log.** Each batch routed to the model leaves one `PII redaction model call` log line
   with `organizationId`, `projectId`, `texts`, `characters`, `spansFound`, `outcome` (`ok`, or the
