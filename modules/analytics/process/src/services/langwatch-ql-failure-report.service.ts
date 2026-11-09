@@ -1,11 +1,7 @@
 import type { Logger } from "@langwatch/observability";
 import type { CounterHandle } from "@langwatch/observability/metrics";
 
-import {
-  hashStatement,
-  originOfStatement,
-  type LangWatchQLOrigin,
-} from "../rules/lwql-statement-origin.rules.ts";
+import { hashStatement, originOfStatement } from "../rules/lwql-statement-origin.rules.ts";
 import { langWatchQLAccessRefusals } from "./langwatch-ql-access-refusal.service.ts";
 
 /** One message for every built-in failure, so the log pipeline keys them all to one signature. */
@@ -22,27 +18,21 @@ function errorCodeOf(error: unknown): string {
 
 /**
  * Reports a failed LangWatchQL query by who wrote it: a built-in statement is one error line
- * (never the text or parameter values), a user-written one only a count; the code never decides
- * the origin. A caller's own access refusal is neither reported nor counted, on either path.
+ * (never its text or values), a user-written one a count; the error code never sets the origin.
+ * The caller's own access refused is skipped on both paths, their sent values on the workbench.
  * @see specs/lwql/query-origin.feature
  */
 export class LangWatchQLFailureReportService {
   private constructor(
     private readonly logger: Pick<Logger, "error">,
     private readonly failures: CounterHandle,
-    private readonly originOf: (input: { sql: string }) => LangWatchQLOrigin,
   ) {}
 
   static create(options: {
     logger: Pick<Logger, "error">;
     failures: CounterHandle;
-    originOf?: (input: { sql: string }) => LangWatchQLOrigin;
   }): LangWatchQLFailureReportService {
-    return new LangWatchQLFailureReportService(
-      options.logger,
-      options.failures,
-      options.originOf ?? originOfStatement,
-    );
+    return new LangWatchQLFailureReportService(options.logger, options.failures);
   }
 
   /** Runs a workbench statement; a failure is reported by its text as sent, then rethrown as is. */
@@ -73,8 +63,8 @@ export class LangWatchQLFailureReportService {
     sql: string;
     error: unknown;
   }): void {
-    if (langWatchQLAccessRefusals.isCallerAccessRefusal({ error })) return;
-    const origin = this.originOf({ sql });
+    if (langWatchQLAccessRefusals.isCallerOwnRefusal({ error })) return;
+    const origin = originOfStatement({ sql });
     this.failures.inc({ origin }, 1);
     if (origin === "user_written") return;
 

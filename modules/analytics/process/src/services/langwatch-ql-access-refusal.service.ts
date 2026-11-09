@@ -5,6 +5,7 @@ import {
   fullGrantProtections,
   hiddenViewTables,
   isCallerAccessRejection,
+  isCallerParameterRefusal,
   isGatedAccessRefusal,
 } from "../rules/lwql-caller-access-refusal.rules.ts";
 import type { LwqlCatalogue } from "../rules/lwql-catalogue.rules.ts";
@@ -23,6 +24,8 @@ const catalogShapes = LangWatchQLCatalogShapesService.create();
 export class LangWatchQLAccessRefusalService {
   /** Held off the error, so the member's response cannot carry the verdict. */
   readonly #marked = new WeakSet<object>();
+  /** A full grant depends on the catalogue alone, so each catalogue derives it once. */
+  readonly #fullGrants = new WeakMap<LwqlCatalogue, LangWatchQLProtections>();
 
   static create(): LangWatchQLAccessRefusalService {
     return new LangWatchQLAccessRefusalService();
@@ -49,20 +52,50 @@ export class LangWatchQLAccessRefusalService {
     views: readonly LangWatchQLViewDefinition[];
     catalog: LwqlCatalogue;
   }): void {
+    const hiddenTables =
+      (rejection.refusedViews ?? []).length === 0
+        ? new Set<string>()
+        : this.#hiddenTables({ database, protections, views, catalog });
+    if (isCallerAccessRejection({ rejection, hiddenTables })) this.#marked.add(error);
+  }
+
+  #hiddenTables({
+    database,
+    protections,
+    views,
+    catalog,
+  }: {
+    database: string;
+    protections: LangWatchQLProtections;
+    views: readonly LangWatchQLViewDefinition[];
+    catalog: LwqlCatalogue;
+  }): ReadonlySet<string> {
     const visibleTo = (held: LangWatchQLProtections) =>
       catalogShapes.visibleViews({ protections: held, views, catalog });
-    const hiddenTables = hiddenViewTables({
+    return hiddenViewTables({
       database,
-      showable: visibleTo(fullGrantProtections({ catalog })),
+      showable: visibleTo(this.#fullGrantOf(catalog)),
       visible: visibleTo(protections),
     });
-    if (isCallerAccessRejection({ rejection, hiddenTables })) this.#marked.add(error);
+  }
+
+  #fullGrantOf(catalog: LwqlCatalogue): LangWatchQLProtections {
+    const known = this.#fullGrants.get(catalog);
+    if (known) return known;
+    const derived = fullGrantProtections({ catalog });
+    this.#fullGrants.set(catalog, derived);
+    return derived;
   }
 
   /** Whether `error` is the caller's own access refused: marked at the throw site, or gated. */
   isCallerAccessRefusal({ error }: { error: unknown }): boolean {
     if (typeof error === "object" && error !== null && this.#marked.has(error)) return true;
     return isGatedAccessRefusal({ error });
+  }
+
+  /** Whether a workbench failure is the caller's own doing: their access or the values sent. */
+  isCallerOwnRefusal({ error }: { error: unknown }): boolean {
+    return isCallerParameterRefusal({ error }) || this.isCallerAccessRefusal({ error });
   }
 }
 

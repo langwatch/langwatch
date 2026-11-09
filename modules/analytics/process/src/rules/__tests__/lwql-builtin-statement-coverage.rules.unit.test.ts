@@ -8,10 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  hashesMissingFromList,
-  mergeCoverageCommits,
-} from "../lwql-builtin-statement-coverage.rules.ts";
+import { mergeCoverageCommits } from "../lwql-builtin-statement-coverage.rules.ts";
 import { LWQL_BUILTIN_STATEMENT_HASHES } from "../lwql-builtin-statements.generated.ts";
 
 const PINNED: readonly string[] = JSON.parse(
@@ -22,6 +19,18 @@ const PINNED: readonly string[] = JSON.parse(
     "utf8",
   ),
 );
+
+/** The pinned hashes the list no longer holds: grow-only means this is always empty. */
+function hashesMissingFromList({
+  pinned,
+  list,
+}: {
+  pinned: readonly string[];
+  list: readonly string[];
+}): string[] {
+  const held = new Set(list);
+  return pinned.filter((hash) => !held.has(hash));
+}
 
 describe("given the covered commits, newest first", () => {
   /** @scenario "A new stock version is named newest and the oldest stays oldest" */

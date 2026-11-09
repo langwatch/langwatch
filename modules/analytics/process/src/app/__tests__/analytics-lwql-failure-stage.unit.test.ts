@@ -32,6 +32,11 @@ import { AnalyticsModule } from "../analytics.app.ts";
 const AGGREGATE = "project_aggregate";
 const MEMBERS = ["project_a", "project_b"];
 const FAILURE_METRIC = "lwql_query_failure_total";
+/** The window and step a dashboard hands a stock widget, so only the statement itself can fail. */
+const DASHBOARD_PERIOD = {
+  timeWindow: { start: "2026-03-10T00:00:00.000Z", end: "2026-03-11T00:00:00.000Z" },
+  granularitySeconds: 3600,
+};
 const STOCK_SQL: string = (
   JSON.parse(
     readFileSync(
@@ -101,10 +106,16 @@ async function harness({ keyless = [] }: { keyless?: readonly string[] } = {}) {
   const runStock = ({
     sql = STOCK_SQL,
     parameters,
-  }: { sql?: string; parameters?: Record<string, unknown> } = {}) =>
+    period,
+  }: {
+    sql?: string;
+    parameters?: Record<string, unknown>;
+    period?: typeof DASHBOARD_PERIOD;
+  } = {}) =>
     outcome(
       app.executeWorkbenchQuery({
         ...(parameters ? { parameters } : {}),
+        ...period,
         project: { id: AGGREGATE, lwqlKey: "lwql-aggregate" },
         protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
         sql,
@@ -131,8 +142,16 @@ describe("given a stock statement on the workbench door", () => {
   it("reports the failure once the scope is accepted and the statement fails", async () => {
     const { runStock } = await harness();
 
-    expect(await runStock()).not.toBe("executed");
+    expect(await runStock({ period: DASHBOARD_PERIOD })).not.toBe("executed");
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(1);
+  });
+
+  /** @scenario "A refusal of the caller's own parameter values is neither reported nor counted" */
+  it("reports nothing when the stock statement is sent without its time window", async () => {
+    const { runStock } = await harness();
+
+    expect(await runStock()).toBe("lwql_parameter_missing");
+    expect(meter.valueOf(FAILURE_METRIC)).toBe(0);
   });
 
   /** @scenario "A reserved parameter name supplied writes no built-in failure" */

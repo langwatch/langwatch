@@ -30,8 +30,6 @@ import {
   type LangWatchQLQueryResult,
   type LangWatchQLRunTelemetry,
   LangWatchQLProjectNotFoundError,
-  LangWatchQLReservedParameterSuppliedError,
-  isLangWatchQLSurfaceParameter,
   type LangWatchQLRunCaller,
   type LangWatchQLAcceptedStatement,
   type LangWatchQLAppFunctionCall,
@@ -112,6 +110,7 @@ import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } fro
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { keyRunTelemetry } from "../rules/langwatch-ql-key-caller.rules.ts";
+import { assertNoReservedNameSupplied } from "../rules/langwatch-ql-reserved-names.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { langWatchQLQueryHashKey } from "../rules/langwatch-ql-run-telemetry.rules.ts";
 import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
@@ -1023,7 +1022,7 @@ export class AnalyticsModule
     return this.#countingFailures(input, async () => {
       // The scope and the reserved names are the request's own input: refusing them is not the
       // statement failing.
-      this.#assertNoReservedNameSupplied(input.parameters);
+      assertNoReservedNameSupplied({ parameters: input.parameters });
       const scope = await this.#resolveRunScope(input);
       return this.#failureReport.reportingFailures({
         projectId: input.project.id,
@@ -1031,13 +1030,6 @@ export class AnalyticsModule
         run: () => this.#runInScope({ input, scope }),
       });
     });
-  }
-
-  #assertNoReservedNameSupplied(parameters: Readonly<Record<string, unknown>> | undefined): void {
-    const supplied = Object.keys(parameters ?? {})
-      .filter(isLangWatchQLSurfaceParameter)
-      .toSorted();
-    if (supplied.length > 0) throw new LangWatchQLReservedParameterSuppliedError(supplied);
   }
 
   reportBuiltInQueryFailure(input: { projectId: string; source: string; error: unknown }): void {

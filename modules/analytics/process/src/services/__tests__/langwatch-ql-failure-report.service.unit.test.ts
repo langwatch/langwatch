@@ -4,9 +4,16 @@
  * @see specs/lwql/query-origin.feature
  * @vitest-environment node
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import {
+  LangWatchQLGranularityTooFineError,
   LangWatchQLInvalidQueryError,
   LangWatchQLNotPermittedError,
+  LangWatchQLParameterMissingError,
+  LangWatchQLReservedParameterSuppliedError,
+  LangWatchQLUnknownIdentifierError,
 } from "@langwatch/analytics-contract";
 import { counter } from "@langwatch/observability/metrics";
 import {
@@ -22,8 +29,21 @@ const FAILURE_METRIC = "lwql_query_failure_total";
 const SQL_MARKER = "SQL_MARKER_7f3a91";
 const PARAM_MARKER = "PARAM_MARKER_c40d27";
 const FAILURE_MESSAGE = "built-in LangWatchQL statement failed";
+const WINDOW_PARAMETERS = ["dashboard_context_period_end", "dashboard_context_period_start"];
 const PINO_BASE_FIELDS = new Set(["level", "time", "pid", "hostname", "msg"]);
-const STATEMENT = `SELECT '${SQL_MARKER}' AS marker FROM trace_metrics WHERE TraceId = {trace:String}`;
+/** A statement no stock widget holds, so the server reads it as user-written. */
+const USER_SQL = `SELECT '${SQL_MARKER}' AS marker FROM trace_metrics WHERE TraceId = {trace:String}`;
+/** A stock widget statement as a saved widget sends it, so the server reads it as built in. */
+const STOCK_SQL: string = (
+  JSON.parse(
+    readFileSync(
+      fileURLToPath(
+        new URL("../../langwatch-ql/__tests__/fixtures/stock-widget-queries.json", import.meta.url),
+      ),
+      "utf8",
+    ),
+  ) as { sql: string }[]
+)[0]!.sql;
 
 let meter: RecordingMeterProvider;
 
@@ -34,11 +54,11 @@ beforeEach(() => {
 afterEach(() => meter.uninstall());
 
 /** A ClickHouse-shaped error: the code is a string and the message echoes the whole request. */
-function clickhouseError({ code }: { code: string }) {
-  const echo = `Code: ${code}. while executing ${STATEMENT} with trace=${PARAM_MARKER}`;
+function clickhouseError({ code, sql = STOCK_SQL }: { code: string; sql?: string }) {
+  const echo = `Code: ${code}. while executing ${sql} with trace=${PARAM_MARKER}`;
   return Object.assign(new Error(echo), {
     code,
-    cause: { message: echo, query: STATEMENT, params: { trace: PARAM_MARKER } },
+    cause: { message: echo, query: sql, params: { trace: PARAM_MARKER } },
   });
 }
 
@@ -49,7 +69,7 @@ function payloadOf(line: TestLogLine | undefined): Record<string, unknown> {
   );
 }
 
-function reporter(origin: "built_in" | "user_written") {
+function reporter() {
   const { logger, lines } = createTestLogger();
   const service = LangWatchQLFailureReportService.create({
     logger,
@@ -57,7 +77,6 @@ function reporter(origin: "built_in" | "user_written") {
       name: FAILURE_METRIC,
       description: "Failed LangWatchQL queries by origin",
     }),
-    originOf: () => origin,
   });
   return { lines, service };
 }
@@ -67,11 +86,11 @@ describe("given a built-in statement fails", () => {
   it.each(["47", "215", "999"])(
     "writes one error record with only origin, code, project and hash for code %s",
     (code) => {
-      const { lines, service } = reporter("built_in");
+      const { lines, service } = reporter();
 
       service.reportFailure({
         projectId: "project-1",
-        sql: STATEMENT,
+        sql: STOCK_SQL,
         error: clickhouseError({ code }),
       });
 
@@ -94,24 +113,24 @@ describe("given a built-in statement fails", () => {
 
   /** @scenario "The error line carries neither the statement nor its parameter values" */
   it("carries neither the statement text nor the parameter value anywhere in the record", () => {
-    const { lines, service } = reporter("built_in");
+    const { lines, service } = reporter();
 
     service.reportFailure({
       projectId: "project-1",
-      sql: STATEMENT,
+      sql: STOCK_SQL,
       error: clickhouseError({ code: "47" }),
     });
 
     expect(lines.findLine("error", FAILURE_MESSAGE)).toBeDefined();
     const serialized = JSON.stringify(lines);
-    expect(serialized).not.toContain(SQL_MARKER);
-    expect(serialized).not.toContain(PARAM_MARKER);
+    expect(serialized).not.toContain("dashboard_context_period_start");
     expect(serialized).not.toContain("trace_metrics");
+    expect(serialized).not.toContain(PARAM_MARKER);
   });
 
   /** @scenario "A built-in failure outside the workbench carries no hash" */
   it("reports a server-written statement as built in without a statement hash", () => {
-    const { lines, service } = reporter("built_in");
+    const { lines, service } = reporter();
 
     service.reportBuiltInFailure({
       projectId: "project-1",
@@ -135,16 +154,16 @@ describe("given a built-in statement fails", () => {
 describe("given the engine failure reaches the door as a handled error", () => {
   /** @scenario "The error line carries neither the statement nor its parameter values" */
   it("records the handled code and keeps the echoed statement in reasons out of the record", () => {
-    const { lines, service } = reporter("built_in");
+    const { lines, service } = reporter();
     const error = new LangWatchQLInvalidQueryError({ reasons: [clickhouseError({ code: "215" })] });
 
-    service.reportFailure({ projectId: "project-1", sql: STATEMENT, error });
+    service.reportFailure({ projectId: "project-1", sql: STOCK_SQL, error });
 
     expect(payloadOf(lines.findLine("error", FAILURE_MESSAGE))).toMatchObject({
       errorCode: "lwql_invalid_query",
     });
     const serialized = JSON.stringify(lines);
-    expect(serialized).not.toContain(SQL_MARKER);
+    expect(serialized).not.toContain("trace_metrics");
     expect(serialized).not.toContain(PARAM_MARKER);
   });
 });
@@ -152,13 +171,13 @@ describe("given the engine failure reaches the door as a handled error", () => {
 describe("given a workbench statement runs through the report", () => {
   /** @scenario "A failed query on the tRPC door is reported with the statement exactly as sent" */
   it("reports the failure and rethrows the very same error object", async () => {
-    const { lines, service } = reporter("built_in");
+    const { lines, service } = reporter();
     const failure = clickhouseError({ code: "47" });
 
     const rejection = await service
       .reportingFailures({
         projectId: "project-1",
-        sql: STATEMENT,
+        sql: STOCK_SQL,
         run: async () => {
           throw failure;
         },
@@ -174,11 +193,11 @@ describe("given a workbench statement runs through the report", () => {
 
   /** @scenario "A successful query is not reported" */
   it("returns the result and reports nothing when the statement succeeds", async () => {
-    const { lines, service } = reporter("built_in");
+    const { lines, service } = reporter();
 
     const result = await service.reportingFailures({
       projectId: "project-1",
-      sql: STATEMENT,
+      sql: STOCK_SQL,
       run: async () => "rows",
     });
 
@@ -191,12 +210,12 @@ describe("given a workbench statement runs through the report", () => {
 describe("given a user-written statement fails", () => {
   /** @scenario "A user-written failure increments the failure count for its origin" */
   it("counts one failure for origin user_written and writes no error record", () => {
-    const { lines, service } = reporter("user_written");
+    const { lines, service } = reporter();
 
     service.reportFailure({
       projectId: "project-1",
-      sql: STATEMENT,
-      error: clickhouseError({ code: "47" }),
+      sql: USER_SQL,
+      error: clickhouseError({ code: "47", sql: USER_SQL }),
     });
 
     expect(meter.valueOf(FAILURE_METRIC, { origin: "user_written" })).toBe(1);
@@ -206,20 +225,14 @@ describe("given a user-written statement fails", () => {
 
 describe("given the service decides the origin itself", () => {
   /** @scenario "A statement edited by one character is user-written" */
-  it("treats a statement that is not on the list as user-written, whatever the error code", () => {
-    const { logger, lines } = createTestLogger();
-    const service = LangWatchQLFailureReportService.create({
-      logger,
-      failures: counter({
-        name: FAILURE_METRIC,
-        description: "Failed LangWatchQL queries by origin",
-      }),
-    });
+  it("treats a stock statement with one character added as user-written", () => {
+    const { lines, service } = reporter();
+    const sql = `${STOCK_SQL} `;
 
     service.reportFailure({
       projectId: "project-1",
-      sql: STATEMENT,
-      error: clickhouseError({ code: "47" }),
+      sql,
+      error: clickhouseError({ code: "47", sql }),
     });
 
     expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
@@ -242,14 +255,17 @@ function accessRefusal({ missingGates }: { missingGates?: string[] }) {
 
 describe("given the caller's own access is refused", () => {
   /** @scenario "A caller's own access refusal is neither reported nor counted" */
-  it.each(["built_in", "user_written"] as const)(
+  it.each([
+    ["built_in", STOCK_SQL],
+    ["user_written", USER_SQL],
+  ] as const)(
     "writes no line and raises no count for a %s statement on the workbench path",
-    (origin) => {
-      const { lines, service } = reporter(origin);
+    (origin, sql) => {
+      const { lines, service } = reporter();
 
       service.reportFailure({
         projectId: "project-1",
-        sql: STATEMENT,
+        sql,
         error: accessRefusal({ missingGates: ["cost:view"] }),
       });
 
@@ -260,7 +276,7 @@ describe("given the caller's own access is refused", () => {
 
   /** @scenario "A caller's own access refusal is neither reported nor counted" */
   it("writes no line and raises no count on the server-written path", () => {
-    const { lines, service } = reporter("built_in");
+    const { lines, service } = reporter();
 
     service.reportBuiltInFailure({
       projectId: "project-1",
@@ -274,10 +290,10 @@ describe("given the caller's own access is refused", () => {
 
   /** @scenario "A built-in failure that is not an access refusal is still reported" */
   it("still reports a refusal that names no gate, on both paths", () => {
-    const { lines, service } = reporter("built_in");
+    const { lines, service } = reporter();
     const error = accessRefusal({});
 
-    service.reportFailure({ projectId: "project-1", sql: STATEMENT, error });
+    service.reportFailure({ projectId: "project-1", sql: STOCK_SQL, error });
     service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
 
     expect(lines.filter((line) => line.level === 50)).toHaveLength(2);
@@ -286,13 +302,13 @@ describe("given the caller's own access is refused", () => {
 
   /** @scenario "A caller's own access refusal is neither reported nor counted" */
   it("rethrows the very same refusal from the workbench path", async () => {
-    const { service } = reporter("built_in");
+    const { service } = reporter();
     const refusal = accessRefusal({ missingGates: ["cost:view"] });
 
     const rejection = await service
       .reportingFailures({
         projectId: "project-1",
-        sql: STATEMENT,
+        sql: STOCK_SQL,
         run: async () => {
           throw refusal;
         },
@@ -300,5 +316,75 @@ describe("given the caller's own access is refused", () => {
       .catch((error: unknown) => error);
 
     expect(rejection).toBe(refusal);
+  });
+});
+
+/** Refusals a caller earns with the values they send, whatever statement they send them with. */
+const PARAMETER_REFUSALS = [
+  {
+    name: "a time window left out",
+    refusal: () => new LangWatchQLParameterMissingError([...WINDOW_PARAMETERS]),
+  },
+  {
+    name: "a step too fine for the window",
+    refusal: () =>
+      new LangWatchQLGranularityTooFineError({
+        requestedGranularitySeconds: 60,
+        windowSeconds: 31_536_000,
+        maxBuckets: 1_000,
+      }),
+  },
+  {
+    name: "a reserved name supplied",
+    refusal: () =>
+      new LangWatchQLReservedParameterSuppliedError(["dashboard_context_granularity_seconds"]),
+  },
+];
+
+describe("given the caller's own parameter values are refused on the workbench path", () => {
+  /** @scenario "A refusal of the caller's own parameter values is neither reported nor counted" */
+  it.each(PARAMETER_REFUSALS)(
+    "writes no line and raises no count of any origin for $name",
+    ({ refusal }) => {
+      const { lines, service } = reporter();
+
+      service.reportFailure({ projectId: "project-1", sql: STOCK_SQL, error: refusal() });
+      service.reportFailure({ projectId: "project-1", sql: USER_SQL, error: refusal() });
+
+      expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
+      expect(meter.valueOf(FAILURE_METRIC)).toBe(0);
+    },
+  );
+
+  /** @scenario "A statement failure still writes the built-in failure" */
+  it("still reports a stock statement that names a column the view lacks", () => {
+    const { lines, service } = reporter();
+
+    service.reportFailure({
+      projectId: "project-1",
+      sql: STOCK_SQL,
+      error: new LangWatchQLUnknownIdentifierError({ identifier: "Source" }),
+    });
+
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(1);
+    expect(payloadOf(lines.findLine("error", FAILURE_MESSAGE))).toMatchObject({
+      origin: "built_in",
+      errorCode: "lwql_unknown_identifier",
+    });
+    expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(1);
+  });
+
+  /** @scenario "A refusal of the caller's own parameter values is neither reported nor counted" */
+  it("still reports a parameter refusal on the server-written path, whose values it sent", () => {
+    const { lines, service } = reporter();
+
+    service.reportBuiltInFailure({
+      projectId: "project-1",
+      source: "traces",
+      error: new LangWatchQLParameterMissingError([...WINDOW_PARAMETERS]),
+    });
+
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(1);
+    expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(1);
   });
 });

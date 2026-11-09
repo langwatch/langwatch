@@ -7,8 +7,9 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
   A statement is built in when its sha256 hash is on the generated, grow-only list of stock
   statements. The origin is never sent by a caller and never decided by the error code.
   The one thing that is decided apart from the text is whether a statement failed at all: a
-  refusal of the caller's own access is not a failure of the statement (see its rule below).
-  That is read from the violations and the view lists, never from the error code alone.
+  refusal of the caller's own access, or of the parameter values the caller sent, is not a
+  failure of the statement (see its rule below). Access is read from the violations and the view
+  lists, never from the error code alone; parameter values from the refusal's code.
 
   Rule: The built-in list is generated from the stock statements and only ever grows
 
@@ -89,9 +90,13 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
     is reported and counted.
     A refusal of the request's own projects, or of a reserved parameter name it supplies, is
     not the statement failing: it is refused before the report, writes no built-in line and is
-    not counted. The statement's own failures (parse, policy, execution, busy, timeout) are
-    reported, and so are the time window and missing-parameter refusals, which are decided
-    from the parsed statement and stay inside.
+    not counted. A refusal of the parameter values the caller sent (a parameter or time window
+    left out, a step too fine for the window, a reserved name supplied) is not either, though it
+    is decided inside: on the workbench path it writes no built-in line and is not counted, for
+    a built-in and a user-written statement alike. Otherwise anyone could paste stock text, leave
+    out the window and page on-call. The server-written path sends its own values, so a parameter
+    refusal there is still reported. The statement's own failures (parse, policy, execution,
+    busy, timeout) are reported.
 
     @unit
     Scenario: A refused project scope writes no built-in failure
@@ -153,9 +158,18 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
       And the unwrapped refusal is still skipped
 
     @unit
+    Scenario: A refusal of the caller's own parameter values is neither reported nor counted
+      Given a stock statement is sent on the workbench door without its time window, with a step
+        too fine for its window, or with a reserved parameter name supplied
+      When the request is refused for those values
+      Then no error-level record is written
+      And the failure count does not rise, for a built-in and for a user-written statement alike
+      And the server-written path, whose values the server sent, still reports such a refusal
+
+    @unit
     Scenario: A statement failure still writes the built-in failure
-      Given a stock statement is sent with an accepted project scope
-      When the statement fails
+      Given a stock statement is sent with an accepted project scope and its time window
+      When the statement fails for a reason of its own, such as a column the view lacks
       Then one built-in failure is reported
 
   Rule: A reserved parameter name is refused before the report

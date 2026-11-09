@@ -76,3 +76,15 @@ export function isGatedAccessRefusal({ error }: { error: unknown }): boolean {
     findLangWatchQLMissingGates(violations).length > 0
   );
 }
+
+/** The refusals of the values a caller sent rather than of the statement they sent them with. */
+const CALLER_PARAMETER_REFUSAL_CODES: ReadonlySet<unknown> = new Set<unknown>([
+  "lwql_parameter_missing",
+  "lwql_granularity_too_fine",
+  "lwql_reserved_parameter_supplied",
+]);
+
+/** Whether a handled error refuses the caller's own parameters: a window left out, a fine step. */
+export function isCallerParameterRefusal({ error }: { error: unknown }): boolean {
+  return CALLER_PARAMETER_REFUSAL_CODES.has((error as { code?: unknown } | null)?.code);
+}
