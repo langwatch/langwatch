@@ -239,7 +239,7 @@ function makeTraceContribution({
   }
 
   // A logs-only coding agent (Grok) has no span to name the trace's service, so its log does.
-  // Trace keeps a span's service over this one (trace-summary.projection.ts).
+  // Trace keeps the first service named; an agent's log and spans carry the same one.
   const serviceName = normalized.resourceAttributes["service.name"];
   if (record.providerKind !== "generic" && typeof serviceName === "string" && serviceName) {
     liftedAttributes["service.name"] = serviceName;
