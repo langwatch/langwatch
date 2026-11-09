@@ -79,6 +79,22 @@ describe("given an organization open to requests from the domain", () => {
       // Spelled out, not abbreviated, and no member of Acme is named.
       expect(join).toHaveTextContent("Join Acme (10+ colleagues)");
     });
+
+    /** @scenario Sign-up offers the team before offering a workspace */
+    it("keeps the count outside the part a long name truncates", async () => {
+      const name = "Acme Engineering Platform and Developer Productivity Group Worldwide";
+      renderStep({
+        lookup: {
+          outcome: "ask",
+          organizations: [{ organizationId: "org_long", name, colleagueCount: 20 }],
+        },
+      });
+
+      const join = await screen.findByRole("button", { name: `Join ${name} (20+ colleagues)` });
+      const truncated = join.querySelector(`[title="${name}"]`);
+      expect(truncated).toHaveTextContent(`Join ${name}`);
+      expect(truncated).not.toHaveTextContent("colleagues");
+    });
   });
 });
 
@@ -159,6 +175,12 @@ describe("given many organizations open to requests from the domain", () => {
       await user.click(screen.getByRole("button", { name: "Clear search" }));
       expect(screen.getByRole("textbox", { name: "Search organizations" })).toHaveValue("");
       expect(screen.getByRole("button", { name: "Join Acme team 11" })).toBeInTheDocument();
+    });
+
+    it("puts the caret back in the search after clearing it", async () => {
+      await user.click(screen.getByRole("button", { name: "Clear search" }));
+
+      expect(screen.getByRole("textbox", { name: "Search organizations" })).toHaveFocus();
     });
 
     it("folds back to three rows and clears the query on Show fewer", async () => {
