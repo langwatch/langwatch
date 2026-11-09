@@ -283,7 +283,10 @@ export const SearchBar: React.FC = () => {
   // slow read never hides a feature the project actually has. The server's read also names a
   // refused reader's offer.
   const instantEvalAccess = useInstantEvalAccess({ projectId: project?.id });
-  const canActivateLicense = useOptionalTraceHost()?.hasPermission("organization:manage") ?? false;
+  const traceHost = useOptionalTraceHost();
+  const canActivateLicense = traceHost?.hasPermission("organization:manage") ?? false;
+  // The in-place pick writes the project's default models, so only a project admin gets it.
+  const canPickDecisionModel = traceHost?.hasPermission("project:manage") ?? false;
   // Asked of the organization only, as Default models asks it (ADR-182 decision 4).
   const { enabled: offersOwnModel } = useFeatureFlag(
     FrontendFlags.release_instant_evals_own_decision_model,
@@ -297,7 +300,7 @@ export const SearchBar: React.FC = () => {
   // The in-place picker lists what the project would run on; asked only while it shows.
   const decisionModels = useOwnDecisionModels({
     projectId: project?.id,
-    enabled: offersOwnModel && instantEval.refusal?.kind === "unreleased",
+    enabled: offersOwnModel && canPickDecisionModel && instantEval.refusal?.kind === "unreleased",
   });
   // Langy's explorer.runInstantEval reaches the same route, and so the same cost rule.
   const { onInstantEvalRoute } = instantEval;
@@ -386,6 +389,7 @@ export const SearchBar: React.FC = () => {
         viaConnect={instantEvalAccess.viaConnect}
         canActivateLicense={canActivateLicense}
         offersOwnModel={offersOwnModel}
+        canPickDecisionModel={canPickDecisionModel}
         decisionModels={decisionModels}
         onPickDecisionModel={instantEval.pickDecisionModel}
         pickingDecisionModel={instantEval.pickingDecisionModel}

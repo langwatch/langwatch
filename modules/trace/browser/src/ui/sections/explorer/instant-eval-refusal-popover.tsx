@@ -85,6 +85,8 @@ interface InstantEvalRefusalPopoverProps {
   canActivateLicense?: boolean;
   /** The own-decision-model kill switch is on, so Default models can pick one: offer it. */
   offersOwnModel?: boolean;
+  /** The reader may set the project's default models, so the decision model is picked in place. */
+  canPickDecisionModel?: boolean;
   /** The project's runnable decision models, for the in-place picker; undefined while loading. */
   decisionModels?: readonly { value: string; label: string }[] | undefined;
   /** Saves the picked model as the project's Instant Evals default, then runs the eval. */
@@ -111,7 +113,7 @@ interface InstantEvalRefusalCopy {
 interface InstantEvalLicenseLockCopy {
   lock: "license";
   more: { label: string; href: string };
-  ownModel: { label: string; href: string };
+  ownModel?: { label: string; href: string };
   dismiss: string;
 }
 
@@ -164,16 +166,30 @@ export function isSelfHostedRefusal(
   return kind !== undefined && Object.hasOwn(SELF_HOSTED_REFUSAL_COPY, kind);
 }
 
+type RefusalCopyOptions = {
+  viaConnect?: boolean;
+  offersOwnModel?: boolean;
+  canPickDecisionModel?: boolean;
+};
+
 /**
  * The popover's words, exported so the copy is pinned by a test. An action with an `href` is a
- * link; one without is the organization's switch; no action leaves only the quieter link.
+ * link; one without is the organization's switch; no action leaves only the quieter link. The
+ * own-model link is left out while the own-model switch is off.
  */
 export function instantEvalRefusalCopy(
   refusal: InstantEvalRefusal,
-  {
-    viaConnect = false,
-    offersOwnModel = false,
-  }: { viaConnect?: boolean; offersOwnModel?: boolean } = {},
+  options: RefusalCopyOptions = {},
+): InstantEvalRefusalCopy | InstantEvalLicenseLockCopy {
+  const copy = refusalCopyFor(refusal, options);
+  if (options.offersOwnModel || !copy.ownModel) return copy;
+  const { ownModel: _hidden, ...withoutOwnModel } = copy;
+  return withoutOwnModel;
+}
+
+function refusalCopyFor(
+  refusal: InstantEvalRefusal,
+  { viaConnect = false, offersOwnModel = false, canPickDecisionModel = false }: RefusalCopyOptions,
 ): InstantEvalRefusalCopy | InstantEvalLicenseLockCopy {
   const what =
     "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do.";
@@ -227,11 +243,20 @@ export function instantEvalRefusalCopy(
   const powerful =
     "Instant Evals are a powerful new tool that turns plain language questions into native filters.";
   // Without LangWatch's own model, the project's own decision model is the way in: no word with us.
-  if (offersOwnModel) {
+  if (offersOwnModel && canPickDecisionModel) {
     return {
       title: "Pick a decision model",
       body: "Instant Evals run on a decision model of your own.",
       picker: true,
+      dismiss: "Not now",
+    };
+  }
+  // Picking one writes the project's default models, which only a project admin may do.
+  if (offersOwnModel) {
+    return {
+      title: "Instant Evals need a decision model",
+      body: "Instant Evals run on a decision model of your own. Ask a project admin to pick one in Default models.",
+      ownModel: OWN_MODEL_LINK,
       dismiss: "Not now",
     };
   }
@@ -253,13 +278,14 @@ export function InstantEvalRefusalPopover({
   viaConnect,
   canActivateLicense = false,
   offersOwnModel = false,
+  canPickDecisionModel = false,
   decisionModels,
   onPickDecisionModel,
   pickingDecisionModel = null,
   children,
 }: InstantEvalRefusalPopoverProps) {
   const refusalCopy = refusal
-    ? instantEvalRefusalCopy(refusal, { viaConnect, offersOwnModel })
+    ? instantEvalRefusalCopy(refusal, { viaConnect, offersOwnModel, canPickDecisionModel })
     : null;
   const lockCopy = refusalCopy && "lock" in refusalCopy ? refusalCopy : null;
   const copy = refusalCopy && !("lock" in refusalCopy) ? refusalCopy : null;
@@ -282,7 +308,7 @@ export function InstantEvalRefusalPopover({
           <RoutedLink href={lockCopy.more.href} target="_blank" rel="noopener noreferrer">
             {lockCopy.more.label}
           </RoutedLink>
-          <OwnModelLink link={offersOwnModel ? lockCopy.ownModel : undefined} />
+          <OwnModelLink link={lockCopy.ownModel} />
         </>
       }
     />
@@ -322,7 +348,7 @@ export function InstantEvalRefusalPopover({
                         {copy.more.label}
                       </RoutedLink>
                     )}
-                    <OwnModelLink link={offersOwnModel ? copy.ownModel : undefined} />
+                    <OwnModelLink link={copy.ownModel} />
                   </>
                 }
               />
@@ -349,7 +375,7 @@ export function InstantEvalRefusalPopover({
                   <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
                     {copy.body}
                   </Text>
-                  <OwnModelLink link={offersOwnModel ? copy.ownModel : undefined} />
+                  <OwnModelLink link={copy.ownModel} />
                   {copy.picker && onPickDecisionModel && (
                     <DecisionModelPicker
                       pickable={decisionModels}

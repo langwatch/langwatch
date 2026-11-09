@@ -139,7 +139,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
 
     @integration
     Scenario: Every refusal of LangWatch's own model offers the project's own decision model
-      Given an eval chip refused for the plan, the release, the organization's switch, a license or an install
+      Given an eval chip refused for the plan, the organization's switch, a license or an install
       When the refusal popover opens
       Then it links to Default models, in a new tab, to run Instant Evals on the project's own decision model
       And a judge that can't run right now offers no such link
@@ -227,6 +227,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     Scenario: Instant Evals off for an enterprise organization ask for a decision model of its own
       Given an organization that is offered a word with us
       And the own decision model is switched on for the organization
+      And the reader may manage the project
       When the reader submits an eval chip
       Then a closable popover anchored under the search bar asks the reader to pick a decision model
       And it says in one line that Instant Evals run on a decision model of their own
@@ -240,6 +241,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Given an organization that is offered a word with us
       And the own decision model is switched on for the organization
       And the project holds an Azure OpenAI key
+      And the reader may manage the project
       When the reader submits an eval chip
       Then the picker is the one Default models shows for Instant Evals
       And the decision models the project's keys would run can be picked
@@ -253,6 +255,16 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Then a warning says why and the popover stays
 
     @integration
+    Scenario: A reader who can't set the project's default models is sent to an admin
+      Given an organization that is offered a word with us
+      And the own decision model is switched on for the organization
+      And the reader may not manage the project
+      When the reader submits an eval chip
+      Then the popover says Instant Evals need a decision model and asks a project admin to pick one
+      And it links to Default models in a new tab and shows no picker
+      And it neither offers to contact us nor names Evals Preview
+
+    @integration
     Scenario: Instant Evals off for an enterprise organization open the contact-us popover
       Given an organization that is offered a word with us
       And the own decision model is switched off for the organization
@@ -260,6 +272,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Then a closable popover anchored under the search bar says Instant Evals aren't enabled for this project and offers to contact us
       And it never mentions the project's own decision model
       And no estimate is requested and the typed query stays in the bar
+      And closing it, by Escape or a click outside, keeps the typed query and searches nothing
 
     @unit
     Scenario: The server refuses a switch the popover did not offer

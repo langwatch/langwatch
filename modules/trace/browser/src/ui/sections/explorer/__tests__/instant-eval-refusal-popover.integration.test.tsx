@@ -103,6 +103,7 @@ describe("given the Instant Evals flag is off for the project", () => {
         onEnable={vi.fn()}
         isEnabling={false}
         offersOwnModel
+        canPickDecisionModel
         decisionModels={[]}
         onPickDecisionModel={vi.fn()}
       >
@@ -134,6 +135,7 @@ describe("given the Instant Evals flag is off for the project", () => {
         onEnable={vi.fn()}
         isEnabling={false}
         offersOwnModel
+        canPickDecisionModel
         decisionModels={[
           { value: "langwatch/instant-evals", label: "Evals Preview" },
           { value: "azure/decisions:microsoft-decision-1", label: "Azure Microsoft Decision 1" },
@@ -163,8 +165,36 @@ describe("given the Instant Evals flag is off for the project", () => {
     expect(onPickDecisionModel).toHaveBeenCalledWith("azure/decisions:microsoft-decision-1");
   });
 
+  /** @scenario "A reader who can't set the project's default models is sent to an admin" */
+  it("sends a reader who can't manage the project to an admin, with no picker", () => {
+    render(
+      <InstantEvalRefusalPopover
+        refusal={{ kind: "unreleased" }}
+        onClose={vi.fn()}
+        onSkip={vi.fn()}
+        onEnable={vi.fn()}
+        isEnabling={false}
+        offersOwnModel
+        decisionModels={[]}
+        onPickDecisionModel={vi.fn()}
+      >
+        <span>anchor</span>
+      </InstantEvalRefusalPopover>,
+      { wrapper },
+    );
+
+    expect(screen.getByText("Instant Evals need a decision model")).toBeTruthy();
+    expect(screen.getByText(/Ask a project admin to pick one in Default models\./)).toBeTruthy();
+    expect(screen.queryByTestId("decision-model-picker")).toBeNull();
+    const link = screen.getByTestId("instant-eval-own-model-link");
+    expect(link.getAttribute("href")).toBe(MODEL_PROVIDERS_HREF);
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(screen.queryByRole("link", { name: "Contact us" })).toBeNull();
+    expect(screen.queryByText(/Evals Preview/)).toBeNull();
+  });
+
   /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
-  it("offers Contact us and leaves the own model out of the words when the own-model switch is off", () => {
+  it("offers Contact us, never the own model, and only closes when the switch is off", () => {
     const copy = instantEvalRefusalCopy({ kind: "unreleased" });
 
     expect(copy).toMatchObject({
@@ -172,6 +202,28 @@ describe("given the Instant Evals flag is off for the project", () => {
       body: "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate Evals Preview, our hosted model, for you.",
       action: { label: "Contact us", href: CONTACT_US_HREF },
     });
+    expect(copy.ownModel).toBeUndefined();
+
+    const onClose = vi.fn();
+    const onSkip = vi.fn();
+    render(
+      <InstantEvalRefusalPopover
+        refusal={{ kind: "unreleased" }}
+        onClose={onClose}
+        onSkip={onSkip}
+        onEnable={vi.fn()}
+        isEnabling={false}
+      >
+        <span>anchor</span>
+      </InstantEvalRefusalPopover>,
+      { wrapper },
+    );
+    expect(screen.queryByTestId("instant-eval-own-model-link")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSkip).not.toHaveBeenCalled();
   });
 
   it("renders nothing while there is no refusal", () => {
@@ -403,7 +455,9 @@ describe("given an eval chip refused by a gate on LangWatch's own model", () => 
   it.each(linked)(
     "links $kind to Default models for the project's own decision model",
     (refusal) => {
-      expect(instantEvalRefusalCopy(refusal).ownModel).toEqual(OWN_MODEL_LINK);
+      expect(instantEvalRefusalCopy(refusal, { offersOwnModel: true }).ownModel).toEqual(
+        OWN_MODEL_LINK,
+      );
 
       render(
         <InstantEvalRefusalPopover
