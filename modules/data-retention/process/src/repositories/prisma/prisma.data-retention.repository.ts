@@ -6,7 +6,13 @@ import {
   type RetentionRow,
   type ScopeAssignment,
 } from "@langwatch/data-retention-contract";
-import { PrismaRepository } from "@langwatch/prisma-client";
+import {
+  PrismaRepository,
+  skipTenantCheck,
+  type PrismaRepositoryClient,
+} from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 
 import type { DataRetentionRepository } from "../data-retention.repository.ts";
 
@@ -17,11 +23,25 @@ const retentionRowSelect = {
   retentionDays: true,
 } as const;
 
+const organizationIdRowsSchema = z.array(z.object({ organizationId: z.string() }));
+
+type DataRetentionDatabase = PrismaRepositoryClient<readonly ["RetentionPolicy"]> &
+  Pick<PrismaClient, "$queryRaw">;
+
 export class PrismaDataRetentionRepository
   extends PrismaRepository.for("RetentionPolicy")
   implements DataRetentionRepository
 {
-  static readonly create = this.factory((prisma) => new PrismaDataRetentionRepository(prisma));
+  static create({ prisma }: { prisma: DataRetentionDatabase }): PrismaDataRetentionRepository {
+    return new PrismaDataRetentionRepository(prisma);
+  }
+
+  private readonly raw: Pick<PrismaClient, "$queryRaw">;
+
+  private constructor(prisma: DataRetentionDatabase) {
+    super(prisma);
+    this.raw = prisma;
+  }
 
   async findForProjectChain(input: {
     organizationId: string;
@@ -58,13 +78,15 @@ export class PrismaDataRetentionRepository
   }
 
   async findOrganizationIdsWithRules(): Promise<string[]> {
-    const rows = await this.prisma.retentionPolicy.findMany({
-      distinct: ["organizationId"],
-      select: { organizationId: true },
-      orderBy: { organizationId: "asc" },
-    });
+    const rows = await this.raw.$queryRaw`
+      ${skipTenantCheck({
+        // The daily storage report walks every organization holding a rule; it reads ids only.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT DISTINCT "organizationId" FROM "RetentionPolicy" ORDER BY "organizationId" ASC
+    `;
 
-    return rows.map((row) => row.organizationId);
+    return organizationIdRowsSchema.parse(rows).map((row) => row.organizationId);
   }
 
   async upsertForScope(input: {
