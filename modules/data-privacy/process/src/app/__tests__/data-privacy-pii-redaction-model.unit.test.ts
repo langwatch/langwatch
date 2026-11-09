@@ -1,18 +1,22 @@
 /**
  * The whole module, from `redactSpan` down to the channels, for the two cases that must see no
- * change at all: an organization without the flag, and a deployment that names no model.
+ * change at all: an organization without the flag, and a deployment that names no model; and for
+ * the metrics a model call must leave out of Presidio's series.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { LangevalsPiiDetectionError } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AwsPiiRedactionModelChannel } from "../../channels/aws.pii-redaction-model.channel.ts";
 import { HttpDataPrivacyChannels } from "../../channels/http/http.data-privacy.channels.ts";
 import { MemoryGoogleDlpChannel } from "../../channels/memory/memory.google-dlp.channel.ts";
 import { MemoryPresidioChannel } from "../../channels/memory/memory.presidio.channel.ts";
+import type { PresidioChannel } from "../../channels/presidio.channel.ts";
 import { PII_REDACTION_MODEL_FLAG } from "../../rules/pii-redaction-model.rules.ts";
 import { createDataPrivacyTestApp, dataPrivacyTestGraph } from "./data-privacy.fixture.ts";
 
@@ -112,6 +116,49 @@ describe("given the PII redaction model wired into the module", () => {
         expect(invokes).toHaveLength(0);
         expect(reads).toContain(PII_REDACTION_MODEL_FLAG);
       });
+    });
+  });
+
+  describe("when an allowlisted organization's batch is refused by the model", () => {
+    const meters = createRecordingMeterProvider();
+
+    beforeEach(() => meters.install());
+    afterEach(() => meters.uninstall());
+
+    /** @scenario "Each PII redaction model call leaves one usage log line" */
+    it("counts the model call under its own method and leaves Presidio's series to Presidio", async () => {
+      // Answers the configured probe, then refuses every batch as an HTTP 500 would.
+      const refusingModel: PresidioChannel = {
+        detect: async (input) => {
+          if (input.texts.length === 0) return { kind: "detected", results: [] };
+          throw new LangevalsPiiDetectionError("PII redaction model answered 500");
+        },
+      };
+      const presidio = presidioAnswering();
+      const app = await createDataPrivacyTestApp({
+        dependencies: {
+          featureFlags: createApiFixture<FeatureFlagApi>({
+            isEnabled: async (key) => key === PII_REDACTION_MODEL_FLAG,
+          }),
+          permissions,
+        },
+        settings: { langevalsEndpoint: LANGEVALS },
+        channels: async () => ({
+          presidio,
+          piiRedactionModel: refusingModel,
+          dlp: MemoryGoogleDlpChannel.create(),
+        }),
+      });
+
+      const redacted = await redactStrict(app);
+
+      expect(redacted).toBe("call [PERSON]");
+      expect(meters.valueOf("pii_checks", { method: "pii_redaction_model" })).toBe(1);
+      expect(meters.valueOf("pii_checks", { method: "presidio" })).toBe(1);
+      expect(meters.valuesOf("evaluation_duration_milliseconds")).toHaveLength(1);
+      expect(meters.valueOf("evaluation_status_counter", { status: "processed" })).toBe(1);
+      expect(meters.valueOf("evaluation_status_counter", { status: "error" })).toBe(0);
+      expect(meters.valueOf("pii_redaction_model_fallbacks", { reason: "error" })).toBe(1);
     });
   });
 

@@ -347,4 +347,5 @@ Feature: Redacting personal data out of a span at ingestion
     And the outcome is ok, or the fallback reason such as timeout or error
     And the line holds no text, no finding value and no error message
     And each fallback is counted by reason, as is a routing that cannot be decided
+    And a model call is counted under its own method, never in Presidio's duration or status series
     And an organization not allowlisted leaves no line
