@@ -496,3 +496,35 @@ func TestVerifier_Ready(t *testing.T) {
 		}
 	})
 }
+
+// @scenario "A sidecar whose issuer is down at start becomes ready when the issuer returns"
+func TestVerifier_WarmRetriesUntilTheIssuerAnswers(t *testing.T) {
+	up := newTestIssuer(t)
+	up.publish(newECKey(t, "k1"))
+	var failures atomic.Int32
+	failures.Store(3)
+	flaky := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if failures.Add(-1) >= 0 {
+			http.Error(w, "down", http.StatusServiceUnavailable)
+			return
+		}
+		up.server.Config.Handler.ServeHTTP(w, r)
+	}))
+	t.Cleanup(flaky.Close)
+
+	v := &Verifier{Now: func() time.Time { return now }, Log: zap.NewNop(), retryFirst: 5 * time.Millisecond, retryMax: 20 * time.Millisecond}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	v.SetFile(ctx, mustParse(t, "issuers: [{name: staff, url: '"+up.server.URL+"', jwks_url: '"+flaky.URL+"/keys'}]\n"+
+		"users: [{name: alice, tier: inspect, login: {token: {issuer: staff}}}]\n"))
+	deadline := time.Now().Add(5 * time.Second)
+	for v.Ready() != nil && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if err := v.Ready(); err != nil {
+		t.Fatalf("not ready after the issuer came back: %v", err)
+	}
+	if failures.Load() >= 0 {
+		t.Error("ready without getting past the issuer's failures")
+	}
+}

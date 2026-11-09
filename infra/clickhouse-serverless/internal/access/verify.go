@@ -47,12 +47,20 @@ func refuse(code string, format string, args ...any) error {
 	return &VerifyError{Code: code, Err: fmt.Errorf(format, args...)}
 }
 
+// Warm-up retries for an issuer whose keys could not be fetched at load.
+const (
+	warmRetryFirst = 5 * time.Second
+	warmRetryMax   = 30 * time.Second
+)
+
 // Verifier decides token logins for the users of the current access file.
 type Verifier struct {
 	Now func() time.Time
 	Log *zap.Logger
 
 	state atomic.Pointer[verifierState]
+	// retryFirst and retryMax override the warm-up backoff in tests.
+	retryFirst, retryMax time.Duration
 }
 
 type verifierState struct {
@@ -77,13 +85,51 @@ func (v *Verifier) SetFile(ctx context.Context, f *File) {
 		st.keys[is.Name] = newKeySource(is)
 	}
 	v.state.Store(st)
+	retry := backoff{next: orDuration(v.retryFirst, warmRetryFirst), max: orDuration(v.retryMax, warmRetryMax)}
 	for name, ks := range st.keys {
-		go func() {
-			if err := ks.warm(ctx, v.Now()); err != nil {
-				v.Log.Warn("issuer keys not fetched yet", zap.String("issuer", name), zap.Error(err))
-			}
-		}()
+		go v.warm(ctx, st, name, ks, v.Now, retry)
 	}
+}
+
+// warm fetches an issuer's keys, retrying with backoff until it has them,
+// ctx ends, or a newer SetFile replaces st. Without it, an issuer down at
+// pod start keeps the pod unready: no login arrives to trigger a refetch.
+func (v *Verifier) warm(ctx context.Context, st *verifierState, name string, ks *keySource, now func() time.Time, retry backoff) {
+	for failed := false; ; failed = true {
+		err := ks.warm(ctx, now())
+		if err == nil {
+			if failed {
+				v.Log.Info("issuer keys fetched", zap.String("issuer", name))
+			}
+			return
+		}
+		wait := retry.step()
+		v.Log.Warn("issuer keys not fetched yet, retrying", zap.String("issuer", name), zap.Duration("retry_in", wait), zap.Error(err))
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
+		if v.state.Load() != st {
+			return
+		}
+	}
+}
+
+// backoff doubles from next up to max.
+type backoff struct{ next, max time.Duration }
+
+func (b *backoff) step() time.Duration {
+	d := b.next
+	b.next = min(2*b.next, b.max)
+	return d
+}
+
+func orDuration(a, b time.Duration) time.Duration {
+	if a > 0 {
+		return a
+	}
+	return b
 }
 
 func sameIssuer(a, b Issuer) bool {

@@ -302,7 +302,7 @@ func TestConfig(t *testing.T) {
 	env := func(kv map[string]string) func(string) string { return func(k string) string { return kv[k] } }
 
 	c, err := LoadConfig(env(map[string]string{"CLICKHOUSE_USER": "default", "CLICKHOUSE_PASSWORD": "pw"}))
-	if err != nil || c.Database != "langwatch" || c.RetentionDays != 7 || c.StaleHours != 3 || c.HTTPPort != 8123 || c.Sidecar != SidecarOff {
+	if err != nil || c.Database != "langwatch" || c.RetentionDays != 7 || c.StaleHours != 12 || c.HTTPPort != 8123 || c.Sidecar != SidecarOff {
 		t.Errorf("defaults: %+v %v", c, err)
 	}
 	if _, err := c.Credentials(false); err == nil {
@@ -379,5 +379,34 @@ func TestCredentialsPreferTheLocalAdmin(t *testing.T) {
 	creds, _ = c.Credentials(false)
 	if _, ok := creds.(chclient.PasswordFile); !ok {
 		t.Errorf("remote host: %T, want the password file", creds)
+	}
+}
+
+// @scenario "A dynamic-only backup runner waits for the server's password file"
+func TestCredentialsWaitForTheLocalAdmin(t *testing.T) {
+	dir := t.TempDir()
+	env := map[string]string{"CLICKHOUSE_ACCESS_BOOTSTRAP_DIR": dir, "BACKUP_SIDECAR": "run"}
+	c, err := LoadConfig(func(k string) string { return env[k] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	creds, err := c.Credentials(false)
+	if err != nil {
+		t.Fatalf("the sidecar gave up before the server wrote its password: %v", err)
+	}
+	if _, _, err := creds.Login(); err == nil {
+		t.Error("a login succeeded with no password file")
+	}
+	want, err := bootstrap.Generate(dir) // the server starts
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user, pw, err := creds.Login(); err != nil || user != bootstrap.User || pw != want.Password {
+		t.Errorf("login after the file appeared = %s/%v, want the local admin", user, err)
+	}
+
+	// A one-shot command still asks for a user rather than wait.
+	if _, err := (Config{Host: "localhost", BootstrapDir: t.TempDir()}).Credentials(true); err == nil {
+		t.Error("a one-shot command without a user or password file was accepted")
 	}
 }

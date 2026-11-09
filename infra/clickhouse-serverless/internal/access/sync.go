@@ -34,7 +34,9 @@ func Render(f *File, in Inputs, now time.Time, usersD string) (Planned, bool, er
 }
 
 // Syncer keeps users.d/access-users.yaml current with the access file and the
-// password directories. An input that cannot be read keeps the last good file.
+// password directories. An access file that cannot be read keeps the last
+// good users file. A password directory that cannot be read keeps the last
+// good passwords, re-planned each pass so valid_until still applies.
 type Syncer struct {
 	AccessFile string
 	UsersD     string
@@ -45,6 +47,9 @@ type Syncer struct {
 
 	lastRaw      []byte
 	lastWarnings string
+	// lastIn holds the last passwords read, and lastDirs where each came from.
+	lastIn   Inputs
+	lastDirs map[string]string
 }
 
 // Sync runs one pass and returns how long to wait before the next.
@@ -72,8 +77,15 @@ func (s *Syncer) Sync() time.Duration {
 	}
 	in, err := Gather(f)
 	if err != nil {
-		s.Log.Error("password files not applied, keeping the last rendered users", zap.Error(err))
-		return SyncInterval
+		if s.lastDirs == nil {
+			s.Log.Error("password files not applied, keeping the last rendered users", zap.Error(err))
+			return SyncInterval
+		}
+		// Re-plan from the last good passwords, so expiry still applies.
+		s.Log.Error("password files not applied, keeping the last good passwords", zap.Error(err))
+		in = s.lastGood(f)
+	} else {
+		s.lastIn, s.lastDirs = in, rollingDirs(f)
 	}
 	p, changed, err := Render(f, in, now, s.UsersD)
 	if err != nil {
@@ -90,6 +102,28 @@ func (s *Syncer) Sync() time.Duration {
 		s.Log.Info("access users updated", zap.Strings("users", p.UserNames()))
 	}
 	return nextDelay(p, now)
+}
+
+// lastGood is the last passwords read for each of f's rolling users whose
+// directory has not moved since. A user with none is left out of the plan.
+func (s *Syncer) lastGood(f *File) Inputs {
+	in := Inputs{Passwords: map[string][]Password{}}
+	for name, dir := range rollingDirs(f) {
+		if s.lastDirs[name] == dir {
+			in.Passwords[name] = s.lastIn.Passwords[name]
+		}
+	}
+	return in
+}
+
+func rollingDirs(f *File) map[string]string {
+	dirs := map[string]string{}
+	for _, u := range f.Users {
+		if u.Login.Rolling != nil {
+			dirs[u.Name] = u.Login.Rolling.Dir
+		}
+	}
+	return dirs
 }
 
 // serverDynamicOnly reports whether the server started in dynamic-only mode:

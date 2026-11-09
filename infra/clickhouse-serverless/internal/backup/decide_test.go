@@ -60,6 +60,20 @@ func TestDecide_StaleInFlightIsAnOrphan(t *testing.T) {
 	if d := Decide(Incremental, st, policy, now, false); d.Action != Start {
 		t.Errorf("incremental behind orphans: %+v, want start", d)
 	}
+
+	// The default cutoff outlasts the 8h full deadline: a slow full is live.
+	slow := State{
+		InFlight:  []Backup{inFlight(Full, "langwatch_full_20261023T000000Z", ago(7*time.Hour))},
+		Created:   st.Created,
+		FullsEver: 1,
+	}
+	def := Policy{Database: "langwatch", RetentionDays: 7, StaleHours: DefaultStaleHours}
+	if d := Decide(Full, slow, def, now, false); d.Action != Fail {
+		t.Errorf("full behind a 7h full: %+v, want fail", d)
+	}
+	if d := Decide(Incremental, slow, def, now, false); d.Action != StandDown {
+		t.Errorf("incremental behind a 7h full: %+v, want stand-down", d)
+	}
 }
 
 // @scenario "A base older than retention less a day is never used"

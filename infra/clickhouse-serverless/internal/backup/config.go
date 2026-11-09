@@ -54,9 +54,12 @@ type Config struct {
 
 // Defaults that keep the earlier scripts' meaning.
 const (
-	DefaultDatabase            = "langwatch"
-	DefaultRetentionDays       = 7
-	DefaultStaleHours          = 3
+	DefaultDatabase      = "langwatch"
+	DefaultRetentionDays = 7
+	// DefaultStaleHours sits above the chart's 8h full CronJob deadline, so
+	// a slow full is never taken for an orphan and doubled. A server restart
+	// clears system.backups, so crash orphans do not need a short cutoff.
+	DefaultStaleHours          = 12
 	DefaultFullSchedule        = "0 */12 * * *"
 	DefaultIncrementalSchedule = "0 * * * *"
 	DefaultMetricsListen       = "127.0.0.1:8125"
@@ -148,6 +151,12 @@ func (c Config) Credentials(allowEnvPassword bool) (chclient.Credentials, error)
 	// changes at every server start. It logs in from loopback only.
 	if c.isLoopback() {
 		if _, err := os.Stat(filepath.Join(c.BootstrapDir, bootstrap.PasswordFile)); err == nil {
+			return bootstrapLogin{dir: c.BootstrapDir}, nil
+		}
+		// The server writes the file as it starts, alongside the sidecar.
+		// With no other login, take the local admin now: early requests
+		// fail and the sidecar retries them until the file appears.
+		if c.User == "" && !allowEnvPassword {
 			return bootstrapLogin{dir: c.BootstrapDir}, nil
 		}
 	}

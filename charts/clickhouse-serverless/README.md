@@ -173,6 +173,7 @@ per-boot local admin.
 | `backup.passwordSecret.name` / `.key` | Sidecar modes: Secret key with `backup.user`'s password, mounted as a file                   | chart Secret's password                        |
 | `backup.retentionDays`                | Sidecar modes: lifecycle expiry of the backups prefix; bounds a base's age                   | `7`                                            |
 | `backup.maxBandwidth`                 | Sidecar modes: `max_backup_bandwidth`, bytes per second                                      | `0` (unlimited)                                |
+| `backup.staleHours`                   | In-flight backups older than this are orphans; keep it above the full's 8h deadline          | `12`                                           |
 | `backup.sidecar.runnerOrdinal`        | Pod ordinal that runs backups while it answers; else the next that does                      | `0`                                            |
 | `backup.sidecar.metricsPort`          | `/metrics`, `/status`, `/healthz` on the pod IP                                              | `8125`                                         |
 | `backup.sidecar.resources`            | The `backup` container, when access is off (with access on it shares the `access` container) | `10m`/`32Mi`, limits `200m`/`128Mi`            |

@@ -81,6 +81,13 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
     And once the input is readable again the next sync applies it
 
   @unit
+  Scenario: A password past its valid_until expires while another user's directory is malformed
+    Given the sidecar has rendered a password with a valid_until, and another user's password
+    When the other user's directory becomes malformed and the valid_until passes
+    Then the next sync drops the expired password
+    And the other user keeps its last good password
+
+  @unit
   Scenario: A token login is accepted for the user its claim names
     Given a token user bound to an issuer and a subject
     When ClickHouse asks the sidecar about a token signed by that issuer for that subject and audience
@@ -121,6 +128,13 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
     Then it answers 503 naming what is missing
     And once every issuer's keys were fetched it answers 200
     And it stays ready, and keeps accepting tokens, while an issuer is unreachable later
+
+  @unit
+  Scenario: A sidecar whose issuer is down at start becomes ready when the issuer returns
+    Given an issuer that fails its key fetches when the access file loads
+    When the issuer starts answering again
+    Then the sidecar refetches the keys on its own, backing off between attempts
+    And it becomes ready without a login or a change to the access file
 
   @unit
   Scenario: The sidecar listens on loopback only

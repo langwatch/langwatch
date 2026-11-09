@@ -347,6 +347,8 @@ spec:
               value: {{ .Values.backup.incremental.schedule | quote }}
             - name: BACKUP_RETENTION_DAYS
               value: {{ .Values.backup.retentionDays | quote }}
+            - name: STALE_BACKUP_HOURS
+              value: {{ .Values.backup.staleHours | quote }}
             - name: BACKUP_MAX_BANDWIDTH
               value: {{ .Values.backup.maxBandwidth | int64 | quote }}
             - name: BACKUP_RUNNER_ORDINAL

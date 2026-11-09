@@ -24,6 +24,7 @@ template: lint
 	@bash tests/backup-alerts.sh
 	@bash tests/backup-sidecar.sh
 	@bash tests/access.sh
+	@bash tests/keeper.sh
 
 ## Deploy to Kind and run functional tests (requires: kind, helm, kubectl)
 test-e2e:

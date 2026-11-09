@@ -75,7 +75,7 @@ func TestSyncer_KeepsTheLastGoodFile(t *testing.T) {
 		if fx.rendered() != good {
 			t.Error("the rendered users changed although an input could not be read")
 		}
-		if fx.logs.FilterMessage("password files not applied, keeping the last rendered users").Len() == 0 {
+		if fx.logs.FilterMessage("password files not applied, keeping the last good passwords").Len() == 0 {
 			t.Error("the failure was not logged")
 		}
 	})
@@ -103,6 +103,36 @@ func TestSyncer_KeepsTheLastGoodFile(t *testing.T) {
 			t.Errorf("the next sync did not apply the new password set:\n%s", got)
 		}
 	})
+}
+
+// @scenario "A password past its valid_until expires while another user's directory is malformed"
+func TestSyncer_ExpiresPasswordsPastABadDirectory(t *testing.T) {
+	fx := newSyncFixture(t)
+	other := filepath.Join(filepath.Dir(fx.secrets), "app")
+	writeFiles(t, other, map[string]string{"current": "app-password-0123456"})
+	writeFiles(t, fx.secrets, map[string]string{"current.valid_until": now.Add(time.Minute).Format(time.RFC3339)})
+	fx.writeAccess("users:\n" +
+		"  - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n" +
+		"  - {name: app, tier: read, databases: [analytics], login: {rolling: {dir: " + other + "}}}\n")
+	fx.syncer.Sync()
+	if got := fx.rendered(); !strings.Contains(got, sha("current-password-0123")) {
+		t.Fatalf("first sync did not render the expiring password:\n%s", got)
+	}
+
+	writeFiles(t, other, map[string]string{"current": "short"}) // malformed
+	later := now.Add(2 * time.Minute)
+	fx.syncer.Now = func() time.Time { return later }
+	fx.syncer.Sync()
+	got := fx.rendered()
+	if strings.Contains(got, sha("current-password-0123")) {
+		t.Errorf("a password past its valid_until survived a malformed directory:\n%s", got)
+	}
+	if !strings.Contains(got, sha("app-password-0123456")) {
+		t.Errorf("the malformed user lost its last good password:\n%s", got)
+	}
+	if fx.logs.FilterMessage("password files not applied, keeping the last good passwords").Len() == 0 {
+		t.Error("the failure was not logged")
+	}
 }
 
 func TestSyncer_WritesOnlyOnChange(t *testing.T) {

@@ -256,7 +256,7 @@ A run exits 0 only when it wrote a backup, or when an incremental stands down: f
 | `BACKUP_PASSWORD_FILE`        | `CLICKHOUSE_PASSWORD_FILE` | Password file. One-shot commands also take `CLICKHOUSE_PASSWORD`; the sidecar never does     |
 | `BACKUP_DATABASE`             | `langwatch`                | Database to back up and restore                                                              |
 | `BACKUP_RETENTION_DAYS`       | `7`                        | The lifecycle rule on the backups prefix; a base is at most this less a day old (12h floor)  |
-| `STALE_BACKUP_HOURS`          | `3`                        | In-flight entries older than this are orphans                                                |
+| `STALE_BACKUP_HOURS`          | `12`                       | In-flight entries older than this are orphans                                                |
 | `BACKUP_CLUSTER`              | unset                      | Look up bases and in-flight backups on every replica of this cluster                         |
 | `BACKUP_MAX_BANDWIDTH`        | `0`                        | `max_backup_bandwidth`, bytes per second (0: unlimited)                                      |
 | `BACKUP_SIDECAR`              | `off`                      | `run`: the sidecar schedules backups. `observe`: it decides and reports, never backs up      |

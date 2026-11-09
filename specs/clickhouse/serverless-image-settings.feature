@@ -18,6 +18,12 @@ Feature: The clickhouse-serverless image renders every server setting from env
     And a bare integer into DateTime64 still reads as epoch milliseconds
 
   @unit
+  Scenario: The chart's Keeper writes snapshots that 25.10 reads
+    Given a replicated chart whose Keeper runs this image on ClickHouse 26.8
+    When the Keeper configuration is rendered
+    Then it holds write_snapshot_version at 6, so a rollback to 25.10 still loads its snapshots
+
+  @unit
   Scenario: A deployment that still sets CACHE_MAX_SIZE is told it is no longer read
     Given CACHE_MAX_SIZE is set
     When the renderer writes the server configuration

@@ -22,6 +22,8 @@ test_cronjob_default() {
     || fail "default mode should run no sidecar"
   ! grep -q 'BACKUP_SIDECAR' <<<"$out" || fail "default mode should not configure the sidecar"
   ! grep -q 'kind: PodMonitor' <<<"$out" || fail "default mode should render no PodMonitor"
+  [ "$(grep -A1 'name: STALE_BACKUP_HOURS' <<<"$out" | grep -c 'value: "12"')" = "2" ] \
+    || fail "both backup CronJobs need STALE_BACKUP_HOURS"
   echo "PASS: CronJob mode is the default and unchanged"
 }
 
@@ -37,7 +39,7 @@ test_sidecar_mode() {
   sidecar="$(sed -n '/^        - name: backup$/,/^      volumes:/p' <<<"$sts")"
   for want in 'value: run' 'value: "backup_runner"' 'value: /etc/clickhouse-backup/credentials/password' \
     'value: "0 5 \*/3 \* \*"' 'value: "30 \* \* \* \*"' 'value: "104857600"' 'name: BACKUP_CLUSTER' \
-    'value: "0.0.0.0:8125"' 'name: backup-metrics' 'containerPort: 8125'; do
+    'value: "0.0.0.0:8125"' 'name: backup-metrics' 'containerPort: 8125' 'name: STALE_BACKUP_HOURS'; do
     grep -q -- "$want" <<<"$sidecar" || fail "sidecar lacks $want"
   done
   grep -A1 'name: BACKUP_RUNNER_ORDINAL' <<<"$sidecar" | grep -q 'value: "1"' || fail "runner ordinal not passed"

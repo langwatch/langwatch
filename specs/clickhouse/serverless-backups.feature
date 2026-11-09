@@ -154,6 +154,13 @@ Feature: clickhouse-serverless takes chained native backups from CronJobs or its
     And against a remote host, or without the directory, it uses the password file
 
   @unit
+  Scenario: A dynamic-only backup runner waits for the server's password file
+    Given no backup user is set, the server is on loopback, and its password file is not written yet
+    When the backup runner resolves its login
+    Then it takes the local admin and does not park
+    And its logins fail until the file appears, then succeed
+
+  @unit
   Scenario: Dynamic-only mode refuses backup CronJobs and runs sidecar backups as the local admin
     Given access.dynamicOnly.enabled and backups enabled
     When the chart is rendered in cronjob or cronjob-observe mode

@@ -167,7 +167,7 @@ func (k *keySource) hasKeys() bool {
 }
 
 // warm fetches the keys once if none are held, so the first login does not
-// wait for discovery. A failure is left for the first login to retry.
+// wait for discovery. The Verifier retries a failure until keys arrive.
 func (k *keySource) warm(ctx context.Context, now time.Time) error {
 	k.mu.Lock()
 	defer k.mu.Unlock()

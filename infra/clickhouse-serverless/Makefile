@@ -22,6 +22,7 @@ lint: ## Run go vet + helm lint + helm template
 	helm template test-backup $(HELM_DIR) -f $(HELM_DIR)/tests/values-backup-sidecar.yaml > /dev/null
 	bash $(HELM_DIR)/tests/backup-alerts.sh
 	bash $(HELM_DIR)/tests/backup-sidecar.sh
+	bash $(HELM_DIR)/tests/keeper.sh
 
 build: ## Build Docker image
 	docker build -t $(IMAGE):$(TAG) --platform=$(PLATFORM) .

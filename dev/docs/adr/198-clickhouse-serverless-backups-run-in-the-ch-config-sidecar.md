@@ -24,7 +24,7 @@ The image is public. Whatever replaces the scripts must stay generic (no cloud-s
 
 - Only a backup the server reports `BACKUP_CREATED` is a success. A failed read is a failure, never an absent conflict.
 - A same-mode backup in flight blocks the run. An incremental stands down for a full in flight; a full never yields. Standing down is the one success that writes nothing, because the full covers it and reports its own result.
-- `CREATING_BACKUP` entries older than `STALE_BACKUP_HOURS` are orphans.
+- `CREATING_BACKUP` entries older than `STALE_BACKUP_HOURS` (default 12, chart `backup.staleHours`) are orphans. The cutoff sits above the full CronJob's 8h deadline, so a slow full never gets a second one beside it. A server restart clears `system.backups`, so crash orphans need no shorter cutoff.
 - The base comes from `system.backup_log`, which survives restarts. With `BACKUP_CLUSTER`, it is read from every replica with `clusterAllReplicas(...)` and `skip_unavailable_shards = 1`, since all replicas share the backups disk.
 - A base is at most `BACKUP_RETENTION_DAYS` less one day old, with a 12 hour floor. Fulls that all expired fail the run; no full ever is a clean no-op.
 - Each incremental chains on the newest backup since the newest valid full. Only an incremental started after that full ended counts, so one that overlapped the full, and roots in the previous full, never becomes a base.
