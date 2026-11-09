@@ -4,10 +4,7 @@
  * The daily storage share billing reports for a retention above 90 days.
  * Spec: specs/billing/retention-storage-billing.feature
  */
-import {
-  dailyGbMonthShare,
-  retentionStorageMeterIdentifier,
-} from "@langwatch/enterprise-billing-contract";
+import { dailyGbMonthShare } from "@langwatch/enterprise-billing-contract";
 import { Temporal } from "@langwatch/time";
 
 /** Decimal places a share is sent with: a millionth of a GB-month is a fraction of a cent. */
@@ -36,15 +33,4 @@ export function retentionStorageShare({
   const { day, daysInMonth } = utcDayOf(measuredAtMs);
   const share = dailyGbMonthShare({ bytes, daysInMonth });
   return { share, value: share.toFixed(SHARE_DECIMALS), day };
-}
-
-/** One identifier per organization and day, so a rerun of the same day reports nothing twice. */
-export function retentionStorageEventIdentifier({
-  organizationId,
-  day,
-}: {
-  organizationId: string;
-  day: string;
-}): string {
-  return retentionStorageMeterIdentifier({ organizationId, day });
 }

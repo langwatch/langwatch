@@ -14,6 +14,7 @@ import {
   type RetentionStorageOutcome,
   type RetentionStorageReport,
   retentionBillsStorage,
+  retentionStorageMeterIdentifier,
   retentionStorageReportSchema,
   type StripePriceMap,
   SubscriptionStatus,
@@ -24,10 +25,7 @@ import type { StripeMetersChannel } from "../channels/stripe-meters.channel.ts";
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { SeatEventSubscriptionRepository } from "../repositories/seat-event-subscription.repository.ts";
 import type { BillingSubscription } from "../rules/billing-stripe-shapes.rules.ts";
-import {
-  retentionStorageEventIdentifier,
-  retentionStorageShare,
-} from "../rules/retention-storage.rules.ts";
+import { retentionStorageShare } from "../rules/retention-storage.rules.ts";
 
 const logger = createLogger("langwatch:billing:retention-storage");
 
@@ -159,7 +157,7 @@ export class RetentionStorageBillingService {
         eventName: RETENTION_STORAGE_METER_EVENT_NAME,
         customerId,
         value,
-        identifier: retentionStorageEventIdentifier({ organizationId: report.organizationId, day }),
+        identifier: retentionStorageMeterIdentifier({ organizationId: report.organizationId, day }),
         timestamp: Math.floor(measuredAtMs / 1000),
       });
     } catch (error) {
