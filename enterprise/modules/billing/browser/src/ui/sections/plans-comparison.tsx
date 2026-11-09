@@ -248,7 +248,7 @@ export function PlansComparisonPage({
         <Spacer />
         <Link unstyled href="/settings/subscription">
           <HStack gap={1} color="fg.muted" textStyle="bodySm">
-            <ArrowLeft size={14} aria-hidden /> Subscription
+            <ArrowLeft size={14} aria-hidden /> Plan & billing
           </HStack>
         </Link>
       </PageLayout.Header>

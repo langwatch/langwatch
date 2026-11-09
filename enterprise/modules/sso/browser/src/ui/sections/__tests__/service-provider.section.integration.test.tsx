@@ -17,6 +17,7 @@ const ADDRESSES: ServiceProviderAddresses = {
   assertionConsumerServiceUrl: "https://app.langwatch.ai/api/auth/sso/saml2/sp/acs/{connection}",
   entityId: "https://app.langwatch.ai/api/auth/sso/saml2/sp/entity/{connection}",
   metadataUrl: "https://app.langwatch.ai/api/auth/sso/saml2/sp/metadata/{connection}",
+  refusalPageUrl: "https://app.test/api/auth/sso/refused/ssoc_1",
 };
 
 const DEPLOYMENT_SIGN_IN = {
@@ -52,10 +53,21 @@ describe("given an administrator setting up OpenID Connect", () => {
     expect(screen.getByRole("button", { name: "Copy Redirect address" })).toBeTruthy();
   });
 
-  it("says the addresses are ours and do not change, in the singular", () => {
+  it("says the addresses are ours and do not change", () => {
     const { container } = renderSection({ protocol: "oidc" });
 
-    expect(container.textContent).toContain("give it this address");
+    expect(container.textContent).toContain("give it these values");
+  });
+
+  /** @scenario "The access error page address is shown for either protocol" */
+  it.each(["oidc", "saml"] as const)("offers the access error page for %s", (protocol) => {
+    renderSection({ protocol });
+
+    expect(screen.getByText(ADDRESSES.refusalPageUrl)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy Access error page" })).toBeTruthy();
+    expect(
+      screen.getByText("In Okta: General > App Embed Link > Edit > Application access error page"),
+    ).toBeTruthy();
   });
 });
 

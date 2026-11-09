@@ -1931,6 +1931,9 @@ importers:
       '@langwatch/automation-browser':
         specifier: workspace:*
         version: link:../../modules/automation/browser
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../../modules/automation/contract
       '@langwatch/browser':
         specifier: workspace:*
         version: link:../../packages/browser
@@ -3965,6 +3968,9 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../../../modules/experiment/contract
+      '@langwatch/insight-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/insight/contract
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../../../modules/langy/contract
@@ -6275,6 +6281,9 @@ importers:
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/role-contract':
         specifier: workspace:*
         version: link:../../role/contract
@@ -6379,6 +6388,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
@@ -7888,6 +7900,9 @@ importers:
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../packages/process
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
@@ -12356,6 +12371,9 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
@@ -12704,6 +12722,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../../identity/contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -16229,6 +16250,9 @@ importers:
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing

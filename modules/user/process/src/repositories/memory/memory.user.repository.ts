@@ -69,6 +69,25 @@ export class MemoryUserRepository implements UserRepository {
     return { emailDomains: domainCounts(this.#database.rows().filter((row) => among.has(row.id))) };
   }
 
+  async findSignedInSince({
+    userIds,
+    since,
+  }: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<string[]> {
+    const among = new Set(userIds);
+    return this.#database
+      .rows()
+      .filter(
+        (row) =>
+          among.has(row.id) &&
+          row.lastLoginAt !== null &&
+          row.lastLoginAt.epochMilliseconds >= since,
+      )
+      .map((row) => row.id);
+  }
+
   async hasAccountOnDomain(domain: string): Promise<boolean> {
     return this.#database
       .rows()

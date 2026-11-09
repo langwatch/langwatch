@@ -8,6 +8,7 @@ import {
   type PlanTypes as PlanType,
   PlanTypes,
   SeatBillingUnavailableError,
+  SeatQuantityBelowInUseError,
   stripePricesFile,
   type StripePriceName,
   SubscriptionAlreadyActiveError,
@@ -16,6 +17,7 @@ import {
   SubscriptionStatus,
   type BillingInterval,
 } from "@langwatch/enterprise-billing-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
@@ -34,6 +36,9 @@ import type { SubscriptionItemCalculatorService } from "./subscription-item-calc
 
 const logger = createLogger("langwatch:billing:subscriptionService");
 
+/** Where the full seats in use are counted; the seat limit is enforced on the same count. */
+export type SeatsInUseCounter = Pick<LicensingApi, "countFullSeatsInUse">;
+
 /**
  * Enterprise Stripe subscription lifecycle. Provider, persistence, and
  * application notification delivery are all injected; importing this module
@@ -47,6 +52,7 @@ export class BillingSubscriptionService {
   private readonly seatEventService: SeatEventSubscriptionService | undefined;
   private readonly notifier: BillingSubscriptionNotifier;
   private readonly stripeErrors: StripeErrorTranslator;
+  private readonly seatsInUse: SeatsInUseCounter;
   private readonly invoices: BillingInvoicesService;
 
   private constructor({
@@ -58,6 +64,7 @@ export class BillingSubscriptionService {
     seatEventService,
     notifier,
     stripeErrors,
+    seatsInUse,
   }: {
     repository: BillingSubscriptionRepository;
     organizationRepository: BillingAccountFactsRepository;
@@ -67,6 +74,7 @@ export class BillingSubscriptionService {
     seatEventService: SeatEventSubscriptionService | undefined;
     notifier: BillingSubscriptionNotifier;
     stripeErrors: StripeErrorTranslator;
+    seatsInUse: SeatsInUseCounter;
   }) {
     this.repository = repository;
     this.organizationRepository = organizationRepository;
@@ -75,6 +83,7 @@ export class BillingSubscriptionService {
     this.seatEventService = seatEventService;
     this.notifier = notifier;
     this.stripeErrors = stripeErrors;
+    this.seatsInUse = seatsInUse;
     this.invoices = BillingInvoicesService.create({
       organizationRepository,
       stripeInvoices,
@@ -92,6 +101,8 @@ export class BillingSubscriptionService {
     notifier: BillingSubscriptionNotifier;
     /** Classifies a payment-provider failure; the process supplies Stripe's. */
     stripeErrors: StripeErrorTranslator;
+    /** Counts the full seats in use, so a seat change never goes below them. */
+    seatsInUse: SeatsInUseCounter;
   }): BillingSubscriptionService {
     return new BillingSubscriptionService({
       repository: options.repository,
@@ -102,6 +113,7 @@ export class BillingSubscriptionService {
       seatEventService: options.seatEventService,
       notifier: options.notifier,
       stripeErrors: options.stripeErrors,
+      seatsInUse: options.seatsInUse,
     });
   }
 
@@ -130,6 +142,7 @@ export class BillingSubscriptionService {
   }): Promise<{ success: boolean }> {
     const effectiveMembers = upgradeMembers ? totalMembers : 0;
     const effectiveTraces = upgradeTraces ? totalTraces : 0;
+    await this.assertSeatsCoverUse({ organizationId, requested: effectiveMembers });
 
     if (this.seatEventService) {
       const pricingModel = await this.organizationRepository.findPricingModel(organizationId);
@@ -157,15 +170,34 @@ export class BillingSubscriptionService {
         tracesToAdd: effectiveTraces,
         membersToAdd: effectiveMembers,
       });
+      // Added seats are invoiced now, prorated, as on the seat plans.
+      const addsSeats = effectiveMembers > (lastSubscription.maxMembers ?? 0);
       await this.stripeSubscriptions.updateSubscription({
         subscriptionId: lastSubscription.stripeSubscriptionId,
-        change: { items: itemsToUpdate },
+        change: addsSeats
+          ? { items: itemsToUpdate, prorationBehavior: "always_invoice" }
+          : { items: itemsToUpdate },
       });
 
       return { success: true };
     }
 
     return { success: false };
+  }
+
+  /** Refuses a seat count below the full seats in use, and below one, before any charge. */
+  private async assertSeatsCoverUse({
+    organizationId,
+    requested,
+  }: {
+    organizationId: string;
+    requested: number;
+  }): Promise<void> {
+    const inUse = await this.seatsInUse.countFullSeatsInUse({ organizationId });
+    const minimum = Math.max(1, inUse);
+    if (requested < minimum) {
+      throw new SeatQuantityBelowInUseError({ requested, minimum });
+    }
   }
 
   async createOrUpdateSubscription({
@@ -177,6 +209,7 @@ export class BillingSubscriptionService {
     customerId,
     currency,
     billingInterval,
+    startedByUserId,
   }: {
     organizationId: string;
     baseUrl: string;
@@ -186,6 +219,8 @@ export class BillingSubscriptionService {
     customerId: string;
     currency?: Currency;
     billingInterval?: BillingInterval;
+    /** Carried on the checkout so its completion can give this person the Billing role. */
+    startedByUserId?: string;
   }): Promise<{ url: string | null }> {
     if (isGrowthSeatEventPlan(plan) && this.seatEventService) {
       const pricingModel = await this.organizationRepository.findPricingModel(organizationId);
@@ -199,6 +234,7 @@ export class BillingSubscriptionService {
         billingInterval: billingInterval ?? "monthly",
         membersToAdd,
         isUpgradeFromTiered: pricingModel === "TIERED",
+        ...(startedByUserId ? { startedByUserId } : {}),
       });
       return { url };
     }
@@ -224,6 +260,7 @@ export class BillingSubscriptionService {
       membersToAdd,
       customerId,
       baseUrl,
+      ...(startedByUserId ? { startedByUserId } : {}),
     });
   }
 
@@ -356,6 +393,7 @@ export class BillingSubscriptionService {
     membersToAdd,
     customerId,
     baseUrl,
+    startedByUserId,
   }: {
     organizationId: string;
     plan: PlanType;
@@ -363,6 +401,7 @@ export class BillingSubscriptionService {
     membersToAdd: number;
     customerId: string;
     baseUrl: string;
+    startedByUserId?: string;
   }): Promise<{ url: string | null }> {
     if (!isStripePriceName(plan as StripePriceName)) {
       logger.error(
@@ -403,6 +442,7 @@ export class BillingSubscriptionService {
       cancelUrl: `${baseUrl}/settings/subscription`,
       clientReferenceId: `subscription_setup_${subscription.id}`,
       allowPromotionCodes: true,
+      ...(startedByUserId ? { metadata: { startedByUserId } } : {}),
     });
 
     return { url: session.url };

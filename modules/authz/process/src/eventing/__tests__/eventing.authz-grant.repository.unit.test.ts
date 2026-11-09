@@ -272,7 +272,10 @@ function buildRepository({
     roleBinding: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     groupMembership: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     teamUser: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
-    organizationUser: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    organizationUser: {
+      findFirst: vi.fn().mockResolvedValue({ role: "MEMBER" }),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     user: {
       findUnique: vi.fn().mockResolvedValue({ email: "gone@example.com" }),
     },

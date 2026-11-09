@@ -66,7 +66,7 @@ export type DecisionModelEntry = Readonly<{
   id: string;
   /** The registry provider whose row holds the key; `langwatch` is the hosted classifier. */
   provider: string;
-  /** The full name: provider and model, so one model on two providers reads apart in text. */
+  /** The full name: provider, then model or API, so one model on two providers reads apart. */
   label: string;
   /**
    * A picker row's title when it differs from `label`; the row's provider icon names the
@@ -105,7 +105,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "openai/decisions:gpt-6-luna",
     provider: "openai",
-    label: "OpenAI Decisions (gpt-6-luna)",
+    label: "OpenAI Decisions",
     pickerLabel: "Decisions API",
     description: "OpenAI's Decisions API, on your OpenAI key.",
     wire: "openai_decisions",
@@ -173,7 +173,7 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: "azure/decisions:gpt-6-luna",
     provider: "azure",
-    label: "Azure OpenAI Decisions (gpt-6-luna)",
+    label: "Azure OpenAI Decisions",
     pickerLabel: "Decisions API",
     description: "Azure OpenAI Decisions API, on your own Azure OpenAI resource.",
     wire: "openai_decisions",

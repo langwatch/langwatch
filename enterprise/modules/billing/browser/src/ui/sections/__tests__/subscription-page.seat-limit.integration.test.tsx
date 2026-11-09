@@ -53,6 +53,13 @@ class TestBillingHost extends BillingHostApi {
     return true;
   }
 
+  canReadMonthBreakdown(): boolean {
+    return true;
+  }
+  canReadHeldSeats(): boolean {
+    return true;
+  }
+
   routeQuery(): Readonly<Record<string, string | undefined>> {
     return {};
   }
@@ -133,6 +140,7 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         getOrganizationWithMembersAndTheirTeams: {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
+        listHeldSeats: { useQuery: () => setup.mockListHeldSeats() },
       },
       invite: {
         upgradeWithInvites: {
@@ -171,7 +179,25 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
           useQuery: () => setup.mockListInvoices(),
         },
         getLastSubscription: {
-          useQuery: () => setup.mockGetLastSubscription(),
+          useQuery: () => ({ ...setup.mockGetLastSubscription(), refetch: vi.fn() }),
+        },
+        developerSeats: {
+          useQuery: (_input: unknown, opts: { enabled: boolean }) => ({
+            ...(opts.enabled ? setup.mockDeveloperSeats() : { data: undefined }),
+            refetch: setup.mockDeveloperSeatsRefetch,
+          }),
+        },
+        previewDeveloperSeats: {
+          useQuery: (input: { quantity: number }, opts: { enabled: boolean }) =>
+            opts.enabled
+              ? setup.mockPreviewDeveloperSeats(input)
+              : { data: undefined, isLoading: false, isError: false },
+        },
+        setDeveloperSeats: {
+          useMutation: () => ({ mutateAsync: setup.mockSetDeveloperSeats, isPending: false }),
+        },
+        previewProration: {
+          useQuery: () => ({ data: undefined, isLoading: false, isError: false }),
         },
       },
       useUtils: vi.fn(() => ({
@@ -345,6 +371,7 @@ describe("<SubscriptionPage/> seat limit", () => {
       expect(screen.queryByText(/doesn't cover these seats/)).toBeNull();
       expect(screen.queryByText("Upgrade required")).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: /Upgrade now/i }));
+      fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
       await waitFor(() => {
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 1 }));
@@ -408,6 +435,7 @@ describe("<SubscriptionPage/> seat limit", () => {
         expect(screen.getByText("3 / 2")).toBeInTheDocument();
       });
       fireEvent.click(screen.getByRole("button", { name: /Upgrade now/i }));
+      fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
       await waitFor(() => {
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 3 }));
@@ -511,6 +539,7 @@ describe("<SubscriptionPage/> seat limit", () => {
       renderSubscriptionPage();
 
       fireEvent.click(await screen.findByRole("button", { name: /Upgrade now/i }));
+      fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
       await waitFor(() => {
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 3 }));
@@ -556,6 +585,7 @@ describe("<SubscriptionPage/> seat limit", () => {
       renderSubscriptionPage();
 
       fireEvent.click(await screen.findByRole("button", { name: /Upgrade now/i }));
+      fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
       await waitFor(() => {
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 3 }));

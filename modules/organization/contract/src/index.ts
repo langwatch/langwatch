@@ -36,3 +36,6 @@ export * from "./seat-fit.ts";
 export * from "./member-provenance.ts";
 export * from "./scope-graph.ts";
 export * from "./organization-drawers.ts";
+export * from "./features/seat-request/seat-request.ts";
+export * from "./features/seat-request/seat-request.errors.ts";
+export * from "./features/seat-request/seat-request.trpc.ts";

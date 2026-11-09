@@ -144,6 +144,12 @@ export const opsWeb = defineBrowserModule("ops")
         default: (await import("./ui/sections/ops/admin-screens.tsx")).CloudBugReportsScreen,
       }),
     },
+    "pages/ops/cloud/seat-use": {
+      requires: "ops:manage",
+      load: async () => ({
+        default: (await import("./ui/sections/ops/admin-screens.tsx")).CloudSeatUseScreen,
+      }),
+    },
   })
   .withDrawers({
     opsGroupDetail: {

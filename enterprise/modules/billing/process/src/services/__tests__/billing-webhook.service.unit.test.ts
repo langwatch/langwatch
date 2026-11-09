@@ -150,6 +150,8 @@ const makeSubscription = (
   startDate: Temporal.Now.instant(),
   endDate: null,
   lastPaymentFailedDate: null,
+  seatsKept: null,
+  seatsKeptUntil: null,
   maxMembers: null,
   maxMembersLite: null,
   maxMessagesPerMonth: null,

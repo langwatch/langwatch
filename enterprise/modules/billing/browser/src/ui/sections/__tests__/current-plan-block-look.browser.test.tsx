@@ -9,7 +9,11 @@ import { page } from "vitest/browser";
 
 import { CurrentPlanBlock } from "../current-plan-block.tsx";
 
-const GROWTH_FEATURES = ["Up to 20 core users", "200,000 events included", "Unlimited evals"];
+const GROWTH_FEATURES = [
+  "Volume discounts above 20 users",
+  "200,000 events included",
+  "Unlimited evals",
+];
 const ORANGE_SOLID = "rgb(237, 137, 38)";
 
 beforeEach(async () => {

@@ -155,21 +155,25 @@ describe("<SeatProrationPreview/>", () => {
   });
 
   describe("given a seat update that lowers the seat count", () => {
-    /** @scenario "Seats mode modal presents a seat reduction as a credit" */
-    it("calls a negative amount a credit rather than something due", () => {
+    /** @scenario "Seats mode modal presents a seat reduction as applying from the next cycle" */
+    it("charges nothing today and dates the new billing amount", () => {
       previewQuery.mockReturnValue(
         quote({
-          amountDueCents: -12_000,
-          formattedAmountDue: "-€120",
-          formattedRecurringTotal: "€1,600",
-          billingInterval: "year",
+          amountDueCents: 0,
+          formattedAmountDue: "€0",
+          formattedRecurringTotal: "€87",
+          billingInterval: "month",
+          appliesAt: Date.UTC(2026, 11, 1),
+          keptSeats: 5,
+          formattedKeptRecurringTotal: "€145",
         }),
       );
 
       renderPreview({ ...seatUpdate(), newSeats: 3 });
 
-      expect(screen.getAllByText("Credit applied today").length).toBeGreaterThan(0);
-      expect(screen.queryByText("Due today")).toBeNull();
+      expect(screen.getAllByText("Due today").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("€0").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("New billing amount from 1 Dec").length).toBeGreaterThan(0);
     });
   });
 
