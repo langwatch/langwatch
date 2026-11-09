@@ -244,6 +244,12 @@ Feature: Guided welcome flow and takeover screens
     And the recommended model is not saved
 
   @integration
+  Scenario: A stored Azure deployment mapping names the deployment checked
+    Given an Azure row is already stored with a deployment mapping for the picked model
+    When I type a new key and connect
+    Then the key is checked against the mapped deployment, the one the model runs on
+
+  @integration
   Scenario: A typed Azure deployment name wins over the picked model
     Given I selected Azure and typed an endpoint and a key
     When I type a deployment name

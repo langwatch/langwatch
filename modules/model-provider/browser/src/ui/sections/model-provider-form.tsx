@@ -816,7 +816,10 @@ export const EditModelProviderForm = ({
     storedRow: provider,
   });
   // Only the guided panel names the model up front; the drawer probes without one.
-  const probedModel = guided ? guidedSave.chatModel : undefined;
+  // A stored deployment mapping wins, as it does when the model runs.
+  const probedModel = guided
+    ? (provider.deploymentMapping?.[guidedSave.chatModel ?? ""] ?? guidedSave.chatModel)
+    : undefined;
 
   // Same answer the credential fields render their required markers from.
   const requiredKeys = useRequiredCredentialKeys({

@@ -29,7 +29,7 @@ function GuidedTypedModelInput({
   placeholder: string | undefined;
   locked: boolean;
   hint: string;
-  error: string | undefined;
+  error?: string;
 }) {
   return (
     <chakra.label display="block">
@@ -102,7 +102,6 @@ export function GuidedChatModelField({
         placeholder={modelPlaceholder}
         locked={locked}
         hint={`Type it exactly as deployed: ${providerName} has no model list we can read for you.`}
-        error={error}
       />
     );
   }
@@ -115,7 +114,7 @@ export function GuidedChatModelField({
         onPick={onPick}
         locked={locked}
       />
-      {deploymentField ? (
+      {deploymentField && (
         <GuidedTypedModelInput
           label={deploymentField.label}
           value={typedModel}
@@ -125,8 +124,6 @@ export function GuidedChatModelField({
           hint={deploymentField.hint}
           error={error}
         />
-      ) : (
-        error && <GuidedModelError error={error} />
       )}
     </VStack>
   );

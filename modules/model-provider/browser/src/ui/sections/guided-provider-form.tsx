@@ -91,7 +91,7 @@ export function GuidedProviderForm({
   }
 
   const locked = isBusy || guidedSave.connected;
-  const typedModel = guidedSave.models.length > 0 || Boolean(guidedSave.chatModel);
+  const modelChosen = guidedSave.models.length > 0 || Boolean(guidedSave.chatModel);
   const credentialsReady =
     isUsingEnvVars || areGuidedFieldsFilled({ fields: spec.fields, values: state.customKeys });
   const showServerKeyHint = isUsingEnvVars && !hasUserEnteredNewApiKey(state.customKeys);
@@ -145,7 +145,7 @@ export function GuidedProviderForm({
           error={modelRefusal}
         />
         <GuidedConnectButton
-          ready={canResolveTarget && credentialsReady && typedModel}
+          ready={canResolveTarget && credentialsReady && modelChosen}
           busy={isBusy}
           connected={guidedSave.connected}
           label={connectLabel}

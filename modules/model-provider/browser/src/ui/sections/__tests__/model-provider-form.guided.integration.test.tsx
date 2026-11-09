@@ -281,6 +281,31 @@ describe("the shared provider form in its guided presentation", () => {
       };
       expect(saved.customModels.map((entry) => entry.modelId)).toEqual(["acme-older", other]);
     });
+
+    /** @scenario "A stored Azure deployment mapping names the deployment checked" */
+    it("checks the deployment the row maps the picked model to", async () => {
+      const [recommended] = findRecommendedChatModels({ provider: "openai", limit: 1 });
+      if (!recommended) throw new Error("OpenAI offers no chat models");
+      listing.rows = [
+        {
+          ...keyedRow({
+            providerKey: "azure",
+            apiKey: "AZURE_OPENAI_API_KEY",
+            baseUrl: "AZURE_OPENAI_ENDPOINT",
+            storedBaseUrl: "https://acme.openai.azure.com",
+          }),
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+          deploymentMapping: { [recommended]: "acme-prod" },
+        },
+      ];
+      renderGuided("azure");
+      const user = userEvent.setup();
+      await user.type(screen.getByLabelText(/API key/i), "acme-new-key");
+      await user.click(screen.getByRole("button", { name: "Connect" }));
+
+      await screen.findByRole("button", { name: "Connected" });
+      expect(validateApiKey).toHaveBeenCalledWith(expect.objectContaining({ model: "acme-prod" }));
+    });
   });
 
   describe("when Azure has no deployment by the typed name", () => {
