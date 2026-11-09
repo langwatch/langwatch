@@ -64,8 +64,12 @@ export function useTraceFacets() {
       // the sidebar doesn't flicker. Project switches are gated below by
       // remembering which project the cached response belongs to.
       placeholderData: keepPreviousData,
+      // A failed read keeps its last data, which still says pending; stop, and let focus and
+      // the push recover it.
       refetchInterval: (query) =>
-        query.state.data?.pending === true ? DISCOVER_PENDING_POLL_MS : false,
+        query.state.status !== "error" && query.state.data?.pending === true
+          ? DISCOVER_PENDING_POLL_MS
+          : false,
       // needs a read hint: discover computed (a cold miss returns pending: true)
     },
   );

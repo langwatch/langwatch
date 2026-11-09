@@ -1144,6 +1144,14 @@ Rule: Facet count updates
     Given the sidebar's last discover answer was pending
     Then it asks again every few seconds
     And it stops asking once the facets have landed
+    And it stops asking when a read fails, until focus or the push asks again
+
+  # The lock only keeps two refreshes of one key apart; its TTL is crash safety.
+  @unit
+  Scenario: A finished discover refresh releases its key
+    Given a discover refresh has ended, with its pass done or thrown
+    When the next read finds the payload stale or missing
+    Then it starts a refresh at once rather than waiting out the lock's TTL
 
   Scenario: Facet counts leave out the hidden origin and the traces outside the window
     Given the project has a trace from Langy's own origin in the window

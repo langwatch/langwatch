@@ -24,7 +24,6 @@ import { nowInstant } from "@langwatch/time";
 
 import type { ClickHouseQueryClient } from "./client.ts";
 import type { IdBoundOptions } from "./idBound.ts";
-import type { AbortSignalLike } from "./query.ts";
 import { StatementScopeError, TENANT_SCOPE_PARAM_PREFIX } from "./statementScopeError.ts";
 
 /** Resolves the routed client a project's reads are sent through. */
@@ -248,8 +247,8 @@ type ScopedQueryParams = {
   SKIP_COLD_SCAN_CHECK?: true | undefined;
   /** For a statement carrying `{{idBound}}`: a time the caller has, and today's fallback. */
   idBound?: IdBoundOptions | undefined;
-  /** Abandons the statement: the driver closes its connection and stops retrying it. */
-  abort_signal?: AbortSignalLike | undefined;
+  /** False when the statement's own time cap is its answer; see `QueryRequest`. */
+  retryOnTimeout?: false | undefined;
 };
 
 /**
@@ -300,7 +299,7 @@ export class TenantScopedReader {
       ...(params.clickhouse_settings ? { settings: params.clickhouse_settings } : {}),
       ...(params.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
       ...(params.idBound === undefined ? {} : { idBound: params.idBound }),
-      ...(params.abort_signal === undefined ? {} : { signal: params.abort_signal }),
+      ...(params.retryOnTimeout === false ? { retryOnTimeout: false } : {}),
     });
     return { json: async () => result.rows };
   }

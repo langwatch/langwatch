@@ -63,70 +63,6 @@ export interface FacetFilters {
   slotKeyOf: (def: FacetDefinition) => string;
 }
 
-/** One `settle` run: the statements it holds, the task it starts next, and its results. */
-class CappedRun {
-  private readonly settled: PromiseSettledResult<Outcome>[];
-  private held = 0;
-  private next = 0;
-  private open: number;
-
-  constructor(
-    private readonly run: {
-      tasks: readonly DiscoverTask[];
-      limit: number;
-      signal: AbortSignal | undefined;
-      resolve: (settled: PromiseSettledResult<Outcome>[]) => void;
-    },
-  ) {
-    this.settled = Array.from({ length: run.tasks.length });
-    this.open = run.tasks.length;
-  }
-
-  start(): void {
-    if (this.open === 0) return this.run.resolve(this.settled);
-    this.run.signal?.addEventListener("abort", () => this.pump(), { once: true });
-    this.pump();
-  }
-
-  /** Starts every task the held statements leave room for; settles the rest once aborted. */
-  private pump(): void {
-    while (this.next < this.run.tasks.length) {
-      if (!this.startNext()) return;
-    }
-  }
-
-  /** False when the next task must wait for a running one to give its statements back. */
-  private startNext(): boolean {
-    const index = this.next;
-    const task = this.run.tasks[index]!;
-    if (this.run.signal?.aborted === true) {
-      this.next += 1;
-      this.finish(index, { status: "rejected", reason: this.run.signal.reason });
-      return true;
-    }
-    const weight = Math.min(task.statements, this.run.limit);
-    if (this.held > 0 && this.held + weight > this.run.limit) return false;
-    this.next += 1;
-    this.held += weight;
-    void (async () => task.run())()
-      .then(
-        (value) => this.finish(index, { status: "fulfilled", value }),
-        (reason: unknown) => this.finish(index, { status: "rejected", reason }),
-      )
-      .finally(() => {
-        this.held -= weight;
-        this.pump();
-      });
-    return true;
-  }
-
-  private finish(index: number, result: PromiseSettledResult<Outcome>): void {
-    this.settled[index] = result;
-    this.open -= 1;
-    if (this.open === 0) this.run.resolve(this.settled);
-  }
-}
-
 export class TraceDiscoverTaskService {
   private readonly repository: TraceListRead;
   private readonly descriptors: TraceFacetDescriptorService;
@@ -148,23 +84,6 @@ export class TraceDiscoverTaskService {
     facets: FacetCatalog;
   }): TraceDiscoverTaskService {
     return new TraceDiscoverTaskService(deps);
-  }
-
-  /**
-   * Runs `tasks` holding at most `limit` statements at once, settled in input order. A task
-   * not started when `signal` aborts is never started; it settles rejected with the reason.
-   */
-  settle({
-    tasks,
-    limit,
-    signal,
-  }: {
-    tasks: readonly DiscoverTask[];
-    limit: number;
-    /** The caller's abandonment, when it has one. */
-    signal?: AbortSignal;
-  }): Promise<PromiseSettledResult<Outcome>[]> {
-    return new Promise((resolve) => new CappedRun({ tasks, limit, signal, resolve }).start());
   }
 
   /** Simple-expression facets per table share one batched ClickHouse scan. */
@@ -190,7 +109,6 @@ export class TraceDiscoverTaskService {
             rangeSpecs: slot.ranges.map((d) => ({ key: d.key, expression: d.expression })),
             topN: DISCOVER_TOP_N,
             ...(slot.filterWhere ? { filterWhere: slot.filterWhere } : {}),
-            ...(params.signal ? { signal: params.signal } : {}),
           })
           .then((result): Outcome => ({ kind: "batch", slotKey, result })),
     }));
@@ -262,7 +180,6 @@ export class TraceDiscoverTaskService {
               column: def.expression,
               limit: DISCRETE_VALUE_LIMIT,
               ...(filters.of(def) ? { filterWhere: filters.of(def) } : {}),
-              ...(params.signal ? { signal: params.signal } : {}),
             })
             .then((result): Outcome => ({ kind: "discrete", key: def.key, result })),
       }));

@@ -194,12 +194,10 @@ export class RetryPolicy {
     // reading only the explicit one would silently retry work nobody is
     // waiting for, which is the exact failure this option exists to prevent.
     const abortSignal = signal ?? request?.signal;
-    const ownTimeCap = request?.settings?.max_execution_time !== undefined;
     return runWithRetry(task, {
       ...this.options,
       isAborted: () => abortSignal?.aborted === true,
-      // A statement that set its own time cap and hit it would hit it again.
-      isFinal: (error) => ownTimeCap && isServerTimeout(error),
+      isFinal: (error) => request?.retryOnTimeout === false && isServerTimeout(error),
       ...(onRetry === undefined
         ? {}
         : {

@@ -117,18 +117,17 @@ describe("AuthorizedClickHouse", () => {
         expect(sent().SKIP_COLD_SCAN_CHECK).toBe(true);
       });
 
-      it("hands the caller's abort signal to the routed client", async () => {
+      it("carries a read's timeout opt-out through to the routed client", async () => {
         const { sent, clickhouse } = clientWith();
         const reader = clickhouse.as(proof(), { reads: "traces" });
-        const abandon = new AbortController();
 
         await reader.query({
           query: `SELECT TraceId FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
           format: "JSONEachRow",
-          abort_signal: abandon.signal,
+          retryOnTimeout: false,
         });
 
-        expect(sent().signal).toBe(abandon.signal);
+        expect(sent().retryOnTimeout).toBe(false);
       });
 
       // @scenario "The client adds the tenant set from the proof"

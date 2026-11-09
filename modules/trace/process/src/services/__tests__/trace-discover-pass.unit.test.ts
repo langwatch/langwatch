@@ -1,12 +1,13 @@
 /**
- * A facet discovery pass is bounded: one per tenant window in a process, a few
- * statements at a time, and abandoned at its deadline with its reads stopped.
+ * A facet discovery pass is bounded: one per tenant window in a process, at most
+ * four statements at once, and no deadline of its own, so every read takes its
+ * turn. A refresh releases its key when its pass ends, however it ended.
  * @see specs/traces-v2/search.feature
  */
 import type { Authorization } from "@langwatch/authorization";
 import type { PresenceProjectEvent } from "@langwatch/presence-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceListRead } from "@langwatch/trace-contract";
+import type { BatchedFacetResult, TraceListRead } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
@@ -27,15 +28,14 @@ interface HeldRead {
   answer: () => void;
 }
 
-/**
- * The list repository as the pass sees it: every read is held until the test
- * answers it, and an abort rejects it the way the driver does.
- */
+/** The list repository as the pass sees it: every read is held until the test answers it. */
 function heldRepository({
   answerAfterMs,
+  batchValue = () => ({ categoricals: {}, ranges: {} }),
 }: {
   /** Each read answers by itself after this long, as a slow statement would. */
   answerAfterMs?: number;
+  batchValue?: () => BatchedFacetResult;
 } = {}) {
   const reads: HeldRead[] = [];
   let running = 0;
@@ -46,20 +46,18 @@ function heldRepository({
     method,
     statements,
     window,
-    signal,
     value,
   }: {
     method: string;
     statements: number;
     window: unknown;
-    signal: AbortSignal | undefined;
     value: T;
   }): Promise<T> {
     if (answerAtOnce) {
       reads.push({ method, statements, window, answer: () => {} });
       return Promise.resolve(value);
     }
-    return new Promise<T>((resolve, reject) => {
+    return new Promise<T>((resolve) => {
       let open = true;
       const close = () => {
         if (!open) return false;
@@ -69,7 +67,6 @@ function heldRepository({
       };
       running += statements;
       mostRunning = Math.max(mostRunning, running);
-      signal?.addEventListener("abort", () => close() && reject(signal.reason), { once: true });
       const answer = () => close() && resolve(value);
       reads.push({ method, statements, window, answer });
       if (answerAfterMs !== undefined) setTimeout(answer, answerAfterMs);
@@ -83,23 +80,20 @@ function heldRepository({
         statements:
           Number(params.categoricalSpecs.length > 0) + Number(params.rangeSpecs.length > 0),
         window: params.timeRange,
-        signal: params.signal,
-        value: { categoricals: {}, ranges: {} },
+        value: batchValue(),
       }),
     findCategoricalFacet: async (params) =>
       hold({
         method: "categorical",
         statements: 1,
         window: params.timeRange,
-        signal: params.signal,
         value: { values: [], totalDistinct: 0 },
       }),
-    findCategoricalFacetRaw: async (params) =>
+    findCategoricalFacetRaw: async () =>
       hold({
         method: "raw",
         statements: 1,
         window: undefined,
-        signal: params.signal,
         value: { values: [], totalDistinct: 0 },
       }),
     findRangeStatsForTable: async (params) =>
@@ -107,7 +101,6 @@ function heldRepository({
         method: "range",
         statements: 1,
         window: params.timeRange,
-        signal: params.signal,
         value: { min: 0, max: 0 },
       }),
     findDiscreteValues: async (params) =>
@@ -115,7 +108,6 @@ function heldRepository({
         method: "discrete",
         statements: 1,
         window: params.timeRange,
-        signal: params.signal,
         value: { values: [], distinctCount: 0 },
       }),
   });
@@ -145,12 +137,18 @@ const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 function listService(
   repository: TraceListRead,
-  { published = [] }: { published?: PresenceProjectEvent[] } = {},
+  {
+    published = [],
+    findNamesByIds = async () => new Map(),
+  }: {
+    published?: PresenceProjectEvent[];
+    findNamesByIds?: () => Promise<Map<string, string>>;
+  } = {},
 ) {
   return TraceListService.create({
     repository,
     evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
-    topicNames: { findNamesByIds: async () => new Map() },
+    topicNames: { findNamesByIds },
     facets: CLICKHOUSE_FACET_CATALOG,
     discoverUpdates: {
       publishProjectEvent: async (event) => {
@@ -285,6 +283,57 @@ describe("the facet discovery pass", () => {
       );
       expect(await service.getDiscover({ authorization, timeRange: window })).toEqual(expected);
       expect(held.passes()).toBe(1);
+    });
+  });
+
+  describe("given a discover refresh that has finished", () => {
+    /** @scenario "A finished discover refresh releases its key" */
+    it("does not hold back the next refresh once the payload goes stale", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(T);
+      const published: PresenceProjectEvent[] = [];
+      const held = heldRepository();
+      held.answerEverythingAtOnce();
+      const service = listService(held.repository, { published });
+      const authorization = ownProof({ projectId: "tenant-discover-lock-released" });
+      const window = { from: T - HOUR, to: T };
+
+      await service.getDiscover({ authorization, timeRange: window });
+      await vi.waitFor(() => expect(published).toHaveLength(1));
+      await settle();
+      vi.setSystemTime(T + 2 * MINUTE);
+      const stale = await service.getDiscover({ authorization, timeRange: window });
+      await vi.waitFor(() => expect(published).toHaveLength(2));
+
+      expect(stale.pending).toBe(false);
+      expect(held.passes()).toBe(2);
+    });
+
+    /** @scenario "A finished discover refresh releases its key" */
+    it("lets the next read retry at once after a pass that threw", async () => {
+      const held = heldRepository({
+        batchValue: () => ({
+          categoricals: { topic: { values: [{ value: "topic-1", count: 1 }], totalDistinct: 1 } },
+          ranges: {},
+        }),
+      });
+      held.answerEverythingAtOnce();
+      const service = listService(held.repository, {
+        findNamesByIds: async () => {
+          throw new Error("topic names unavailable");
+        },
+      });
+      const authorization = ownProof({ projectId: "tenant-discover-lock-after-throw" });
+      const window = { from: T - HOUR, to: T };
+
+      await service.getDiscover({ authorization, timeRange: window });
+      await settle();
+      await settle();
+      const retry = await service.getDiscover({ authorization, timeRange: window });
+      await settle();
+
+      expect(retry.pending).toBe(true);
+      expect(held.passes()).toBe(2);
     });
   });
 

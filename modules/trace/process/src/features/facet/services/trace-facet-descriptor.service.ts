@@ -159,7 +159,6 @@ export class TraceFacetDescriptorService {
         limit,
         offset: 0,
         ...(filterWhere ? { filterWhere } : {}),
-        ...(params.signal ? { signal: params.signal } : {}),
       });
     } else {
       const query = def.queryBuilder({
@@ -171,7 +170,6 @@ export class TraceFacetDescriptorService {
       result = await this.repository.findCategoricalFacetRaw({
         authorization: params.authorization,
         query,
-        ...(params.signal ? { signal: params.signal } : {}),
       });
     }
 
@@ -205,7 +203,6 @@ export class TraceFacetDescriptorService {
       timeColumn: this.facets.timeColumns[def.table],
       column: def.expression,
       ...(filterWhere ? { filterWhere } : {}),
-      ...(params.signal ? { signal: params.signal } : {}),
     });
 
     return {
@@ -235,7 +232,6 @@ export class TraceFacetDescriptorService {
     const result = await this.repository.findCategoricalFacetRaw({
       authorization: params.authorization,
       query,
-      ...(params.signal ? { signal: params.signal } : {}),
     });
 
     return {

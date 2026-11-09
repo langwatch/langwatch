@@ -32,6 +32,7 @@ import {
   snapToWindowPreset,
   type DiscoverParams,
 } from "../rules/trace-list-cache-key.rules.ts";
+import { TraceDiscoverSchedulerService } from "./trace-discover-scheduler.service.ts";
 import {
   TraceDiscoverTaskService,
   type BatchedRegistrySlots,
@@ -65,8 +66,9 @@ const DISCOVER_CACHE = TraceTtlCacheService.create<CachedDiscover>(DISCOVER_TTL_
 const DISCOVER_PASS_MAX_CONCURRENT_STATEMENTS = 4;
 
 /**
- * How long a refresh holds its key. Generous: a pass runs about 16 statements, 4 at a time,
- * and ClickHouse stops each at its 20 s cap, so a pass ends well inside it.
+ * Crash safety only: a refresh releases its key when its pass ends, and this TTL frees a key
+ * whose refresher died first. Generous, since a pass of ~16 statements, 4 at a time, each
+ * stopped at its 20 s cap, ends well inside it.
  */
 const DISCOVER_REFRESH_LEASE_MS = 3 * 60_000;
 
@@ -186,6 +188,7 @@ function collectDiscoverOutcomes(settled: PromiseSettledResult<Outcome>[]): {
 export class TraceDiscoverService {
   private readonly descriptors: TraceFacetDescriptorService;
   private readonly tasks: TraceDiscoverTaskService;
+  private readonly scheduler = TraceDiscoverSchedulerService.create();
   private readonly facets: FacetCatalog;
   private readonly updates: Pick<PresenceApi, "publishProjectEvent">;
 
@@ -297,13 +300,10 @@ export class TraceDiscoverService {
     DISCOVER_PASSES_IN_FLIGHT.add(lineage);
 
     void (async () => {
+      let claimed = false;
       try {
-        // The lease outlasts a pass, whose statements each stop at their cap. A lost claim
-        // means this key refreshed within the lease and its write hydrates the cache.
-        const claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(
-          cacheKey,
-          nowInstant().epochMilliseconds,
-        );
+        // A lost claim means another refresh of this key holds it; its write hydrates the cache.
+        claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(cacheKey, nowInstant().epochMilliseconds);
         if (!claimed) {
           return;
         }
@@ -346,6 +346,8 @@ export class TraceDiscoverService {
           "Background discover refresh failed; cached value still served",
         );
       } finally {
+        // Released however the pass ended, so the next stale read or retry is never held back.
+        if (claimed) await DISCOVER_REFRESH_LOCK_CACHE.delete(cacheKey);
         DISCOVER_PASSES_IN_FLIGHT.delete(lineage);
       }
     })();
@@ -394,10 +396,9 @@ export class TraceDiscoverService {
       ...this.tasks.discreteTasks(params, filters),
     ].map(timed);
 
-    const settled = await this.tasks.settle({
+    const settled = await this.scheduler.settle({
       tasks,
       limit: DISCOVER_PASS_MAX_CONCURRENT_STATEMENTS,
-      ...(params.signal ? { signal: params.signal } : {}),
     });
     this.logSlowDiscover({
       params,

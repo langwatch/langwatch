@@ -38,12 +38,12 @@ vi.mock("../../../../behavior/explorer/onboarding/use-preview-traces-active.ts",
 import type * as actualModule from "../../../../behavior/explorer.store.ts";
 import { useTraceFacets } from "../use-trace-facets.ts";
 
-type RefetchInterval = (query: { state: { data: unknown } }) => number | false;
+type RefetchInterval = (query: { state: { data: unknown; status: string } }) => number | false;
 
-/** The poll the hook asked TanStack Query for, read against a last answer. */
-function pollAfter(data: unknown): number | false {
+/** The poll the hook asked TanStack Query for, read against a last answer and its status. */
+function pollAfter(data: unknown, status = "success"): number | false {
   const options = harness.useQuery.mock.calls.at(-1)?.[1] as { refetchInterval: RefetchInterval };
-  return options.refetchInterval({ state: { data } });
+  return options.refetchInterval({ state: { data, status } });
 }
 
 beforeEach(() => {
@@ -65,6 +65,15 @@ describe("useTraceFacets", () => {
       renderHook(() => useTraceFacets());
 
       expect(pollAfter({ facets: [], pending: true })).toBe(5_000);
+    });
+  });
+
+  describe("given the last read failed while its kept answer still says pending", () => {
+    /** @scenario "A viewer answered pending asks again until the facets land" */
+    it("stops polling", () => {
+      renderHook(() => useTraceFacets());
+
+      expect(pollAfter({ facets: [], pending: true }, "error")).toBe(false);
     });
   });
 

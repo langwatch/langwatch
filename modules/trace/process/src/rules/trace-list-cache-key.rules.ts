@@ -9,8 +9,6 @@ import { type Authorization, readScopeKeyOf } from "@langwatch/authorization";
 export interface DiscoverParams {
   authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
-  /** Abandons the pass's reads; never part of a cache key. */
-  signal?: AbortSignal;
 }
 
 export interface FacetValuesParams {

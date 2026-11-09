@@ -144,12 +144,11 @@ describe("the facet reads' time and memory cap", () => {
     });
   });
 
-  describe("when the pass that asked for a facet read abandons it", () => {
+  describe("when a facet read hits its time cap", () => {
     /** @scenario "A facet read stops on the server once the app abandons it" */
-    it("hands every facet statement the pass's abort signal", async () => {
+    it("asks the client not to run any facet statement again", async () => {
       const { repo, requests } = makeRepo();
-      const signal = new AbortController().signal;
-      const base = { authorization, timeRange, signal };
+      const base = { authorization, timeRange };
 
       await repo.findBatchedFacets({
         ...base,
@@ -184,7 +183,6 @@ describe("the facet reads' time and memory cap", () => {
       });
       await repo.findCategoricalFacetRaw({
         authorization,
-        signal,
         query: {
           sql: `SELECT '' AS facet_value, 0 AS cnt, 0 AS total_distinct FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
           params: {},
@@ -192,7 +190,7 @@ describe("the facet reads' time and memory cap", () => {
       });
 
       expect(requests).toHaveLength(6);
-      for (const request of requests) expect(request.signal).toBe(signal);
+      for (const request of requests) expect(request.retryOnTimeout).toBe(false);
     });
   });
 });
