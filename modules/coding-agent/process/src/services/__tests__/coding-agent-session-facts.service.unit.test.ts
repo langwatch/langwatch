@@ -8,7 +8,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { projectRow } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import type { OtherSessionKind } from "../../repositories/coding-agent-session.repository.ts";
+import {
+  type OtherSessionKind,
+  SessionIdIndexNotReadyError,
+} from "../../repositories/coding-agent-session.repository.ts";
 import {
   CODING_AGENT_SESSION_SEEN_WINDOW_MS,
   HOLD_SWEEP_THRESHOLD,
@@ -336,6 +339,19 @@ describe("CodingAgentSessionFactsService", () => {
       const { service, recorded } = factsOver({
         findOtherSessionKind: async () => {
           throw new Error("clickhouse down");
+        },
+      });
+
+      await service.record([stored()]);
+
+      expect(recorded[0]?.firstForProject).toBe(false);
+    });
+
+    /** @scenario "A history check fails closed while the session id index is not ready" */
+    it("does not flag it when the session id index is not ready", async () => {
+      const { service, recorded } = factsOver({
+        findOtherSessionKind: async () => {
+          throw new SessionIdIndexNotReadyError({ read: "other_session_kind" });
         },
       });
 

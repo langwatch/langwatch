@@ -4,6 +4,8 @@ import type { Authorization } from "@langwatch/authorization";
 import {
   AuthorizedClickHouse,
   type ClickHouseQueryClient,
+  idIndexName,
+  indexWindow,
   type TenantScopedReader,
 } from "@langwatch/clickhouse-client";
 import { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
@@ -19,11 +21,13 @@ import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import type { CodingAgentClock } from "../../services/coding-agent-clock.service.ts";
-import type {
-  CodingAgentReadMetrics,
-  CodingAgentSessionListReadOutcome,
-  CodingAgentSessionRepository as SessionRepository,
-  OtherSessionKind,
+import {
+  type CodingAgentReadMetrics,
+  type CodingAgentSessionListReadOutcome,
+  type CodingAgentSessionRepository as SessionRepository,
+  type OtherSessionKind,
+  type SessionIdIndexRead,
+  SessionIdIndexNotReadyError,
 } from "../coding-agent-session.repository.ts";
 import {
   clickHouseMomentOf,
@@ -35,9 +39,27 @@ import {
 } from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
+const SESSION_ID_KEY = ["SessionId"] as const;
+const SESSION_ID_INDEX = idIndexName({ source: TABLE_NAME, key: SESSION_ID_KEY });
 
 /** A time predicate spliced into a statement, with the parameters it names. */
 type TimeBound = { sql: string; params: Record<string, number> };
+
+/** No bound: the statement as it read before the id index. */
+const UNBOUNDED: TimeBound = { sql: "", params: {} };
+
+/** The sessions a read can reach, per the id index: how many, and all their versions' span. */
+type SessionSpan = { n: number; fromMs: number; toMs: number };
+
+const sessionSpanRowsSchema = z.array(
+  z.object({ n: z.coerce.number(), fromMs: z.coerce.number(), toMs: z.coerce.number() }),
+);
+
+/** Which tenants a span read covers: one tenant, or an organization's declared set. */
+type SpanTenants = { tenantId: string; tenantIds?: string[] };
+
+/** Reads already warned about a not-ready index; the counter carries every later one. */
+const warnedNotReady = new Set<SessionIdIndexRead>();
 
 /** The newest version first; ties keep the one that folded the most (ADR-071). */
 const LATEST_SESSION_ORDER = `ORDER BY
@@ -425,6 +447,113 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     return this.authorized.as(authorization, { reads: "traces" });
   }
 
+  /**
+   * A `StartedAt` bound holding every version of the sessions a read can reach, from the id
+   * index: those overlapping `overlapping`, less `excludeSessionIds`. `null` when there are none.
+   * Not ready, a read either runs as before the index (counted) or is refused (ADR-071).
+   */
+  private async spanBound({
+    read,
+    tenants,
+    overlapping,
+    excludeSessionIds,
+    whenNotReady,
+  }: {
+    read: SessionIdIndexRead;
+    tenants: SpanTenants;
+    overlapping?: { fromMs: number; toMs?: number };
+    excludeSessionIds?: string[];
+    whenNotReady: "unbounded" | "refuse";
+  }): Promise<TimeBound | null> {
+    const target = await this.clickhouse.targetOf({ tenantId: tenants.tenantId });
+    const ready = this.clickhouse
+      .idIndexes()
+      .isReady({ source: TABLE_NAME, key: SESSION_ID_KEY, target });
+    if (!ready) {
+      this.reportIndexNotReady({ read, tenantId: tenants.tenantId, whenNotReady });
+      if (whenNotReady === "refuse") throw new SessionIdIndexNotReadyError({ read });
+      return UNBOUNDED;
+    }
+    const span = await this.sessionSpan({ tenants, overlapping, excludeSessionIds });
+    return span.n === 0 ? null : startedAtWithin(span);
+  }
+
+  /** Counts every not-ready read, and warns once per read kind per process. */
+  private reportIndexNotReady({
+    read,
+    tenantId,
+    whenNotReady,
+  }: {
+    read: SessionIdIndexRead;
+    tenantId: string;
+    whenNotReady: "unbounded" | "refuse";
+  }): void {
+    this.metrics.countSessionIdIndexNotReady({ read });
+    if (warnedNotReady.has(read)) return;
+    warnedNotReady.add(read);
+    logger.warn(
+      { read, tenantId, whenNotReady },
+      "coding-agent session id index not ready, the read ran without its bound or was refused",
+    );
+  }
+
+  /** One read of the id index: the sessions' count and the span of all their versions. */
+  private async sessionSpan({
+    tenants,
+    overlapping,
+    excludeSessionIds,
+  }: {
+    tenants: SpanTenants;
+    overlapping?: { fromMs: number; toMs?: number };
+    excludeSessionIds?: string[];
+  }): Promise<SessionSpan> {
+    const { tenantId, tenantIds } = tenants;
+    const tenantPredicate =
+      tenantIds === undefined
+        ? "TenantId = {tenantId:String}"
+        : "TenantId IN ({tenantIds:Array(String)})";
+    const exclude =
+      excludeSessionIds === undefined
+        ? ""
+        : "AND SessionId NOT IN {excludeSessionIds:Array(String)}";
+    const meets = [
+      overlapping === undefined
+        ? undefined
+        : "SessionToAt >= fromUnixTimestamp64Milli({overlapFrom:Int64})",
+      overlapping?.toMs === undefined
+        ? undefined
+        : "SessionFromAt <= fromUnixTimestamp64Milli({overlapTo:Int64})",
+    ].filter((condition) => condition !== undefined);
+    const having = meets.length === 0 ? "" : `HAVING ${meets.join(" AND ")}`;
+    const { rows } = await this.clickhouse.query<unknown>({
+      tenantId,
+      ...(tenantIds === undefined ? {} : { tenantIds }),
+      table: SESSION_ID_INDEX,
+      kind: "read",
+      sql: `
+        SELECT count() AS n,
+               toUnixTimestamp64Milli(min(SessionFromAt)) AS fromMs,
+               toUnixTimestamp64Milli(max(SessionToAt)) AS toMs
+        FROM (
+          SELECT TenantId, SessionId, min(FromAt) AS SessionFromAt, max(ToAt) AS SessionToAt
+          FROM ${SESSION_ID_INDEX}
+          WHERE ${tenantPredicate}
+            ${exclude}
+          GROUP BY TenantId, SessionId
+          ${having}
+        )
+      `,
+      params: {
+        tenantId,
+        ...(tenantIds === undefined ? {} : { tenantIds }),
+        ...(excludeSessionIds === undefined ? {} : { excludeSessionIds }),
+        ...(overlapping === undefined ? {} : { overlapFrom: overlapping.fromMs }),
+        ...(overlapping?.toMs === undefined ? {} : { overlapTo: overlapping.toMs }),
+      },
+    });
+    return sessionSpanRowsSchema.parse(rows)[0] ?? { n: 0, fromMs: 0, toMs: 0 };
+  }
+
   static create(deps: {
     clickhouse: ClickHouseQueryClient;
     defaultTraceRetentionDays: number;
@@ -485,7 +614,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   /**
    * Reads the latest raw session record without `FINAL`: late signals can move `StartedAt`.
    * A caller's window bounds the outer scan only, since a newer version may sit outside it;
-   * with none, the id index (once ready) bounds both scans to the range all versions span.
+   * the id index (once ready) bounds every dedup scan to the range all versions span.
    */
   private async findLatestRecord({
     tenantId,
@@ -509,7 +638,6 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
           sql: "AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})",
           params: { from: window.fromMs, to: window.toMs },
         },
-        inner: { sql: "", params: {} },
       });
     }
     return this.readLatestRecordById({ tenantId, sessionId });
@@ -554,18 +682,16 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     tenantId,
     sessionId,
     outer,
-    inner,
   }: {
     tenantId: string;
     sessionId: string;
     outer: TimeBound;
-    inner: TimeBound;
   }): Promise<Record<string, unknown> | null> {
     const { rows } = await this.clickhouse.query<Record<string, unknown>>({
       tenantId,
       table: TABLE_NAME,
       kind: "read",
-      // ID_BOUND_SKIP: a caller's own window on the outer scan, never by the index (ADR-071).
+      // The caller's window bounds the outer scan; the id index bounds the dedup (ADR-071).
       sql: `
         SELECT *
         FROM ${TABLE_NAME}
@@ -577,13 +703,14 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               AND SessionId = {sessionId:String}
-              ${inner.sql}
+              {{idBound:coding_agent_sessions.SessionId:sessionId}}
             GROUP BY TenantId, SessionId
           )
         ${LATEST_SESSION_ORDER}
         LIMIT 1
       `,
-      params: { tenantId, sessionId, ...outer.params, ...inner.params },
+      params: { tenantId, sessionId, ...outer.params },
+      idBound: { fallback: "unbounded" },
     });
 
     return rows[0] ?? null;
@@ -621,8 +748,9 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   }
 
   /**
-   * Two `LIMIT 1` existence probes. A row-level match can only mistake a helper for main,
-   * which reads as "not first": the safe side.
+   * The id index names the other sessions' span, so "none" needs no source read; then two
+   * `LIMIT 1` probes inside it. A row-level match can only mistake a helper for main, which
+   * reads as "not first": the safe side. Refused, never unbounded, while the index is not ready.
    */
   async findOtherSessionKind({
     tenantId,
@@ -635,6 +763,13 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       { tenantId },
       "CodingAgentSessionClickHouseRepository.findOtherSessionKind",
     );
+    const within = await this.spanBound({
+      read: "other_session_kind",
+      tenants: { tenantId },
+      excludeSessionIds,
+      whenNotReady: "refuse",
+    });
+    if (within === null) return "none";
     const probe = async (extraCondition: string): Promise<boolean> => {
       const { rows } = await this.clickhouse.query<Record<string, unknown>>({
         tenantId,
@@ -644,11 +779,12 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
           SELECT SessionId
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
+            ${within.sql}
             AND SessionId NOT IN {excludeSessionIds:Array(String)}
             ${extraCondition}
           LIMIT 1
         `,
-        params: { tenantId, excludeSessionIds },
+        params: { tenantId, excludeSessionIds, ...within.params },
       });
       return rows.length > 0;
     };
@@ -657,9 +793,8 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   }
 
   /**
-   * Read newest sessions after tenant-wide deduplication: the inner scan reads
-   * only key columns across the tenant, while the outer range prunes returned
-   * rows (ADR-071 records the cost).
+   * Read newest sessions after deduplication: the outer range prunes returned rows, and the
+   * dedup scope is bounded to the span every version of the window's sessions lies in (ADR-071).
    */
   async findManyRecent({
     tenantId,
@@ -690,6 +825,16 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
 
     let rows: Record<string, unknown>[];
     try {
+      const dedup = await this.spanBound({
+        read: "recent_list",
+        tenants: { tenantId },
+        overlapping: { fromMs, toMs },
+        whenNotReady: "unbounded",
+      });
+      if (dedup === null) {
+        observe("empty");
+        return [];
+      }
       ({ rows } = await this.clickhouse.query<Record<string, unknown>>({
         tenantId,
         table: TABLE_NAME,
@@ -704,6 +849,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
               SELECT TenantId, SessionId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
+                ${dedup.sql}
               GROUP BY TenantId, SessionId
               HAVING max(toUInt8(Auxiliary)) = 0
             )
@@ -712,6 +858,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
         `,
         params: {
           tenantId,
+          ...dedup.params,
           from: fromMs,
           to: toMs,
           // Over-fetched because the collapse happens in TypeScript, below. Two versions of one
@@ -766,7 +913,13 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
 
     let rows: Record<string, unknown>[];
     try {
-      const result = await this.reader(authorization).query<Record<string, unknown>>({
+      const reader = this.reader(authorization);
+      const dedup = await this.fencedDedupBound({ reader, fromMs, toMs });
+      if (dedup === null) {
+        observe("empty");
+        return [];
+      }
+      const result = await reader.query<Record<string, unknown>>({
         query: `
           SELECT *
           FROM ${TABLE_NAME}
@@ -776,6 +929,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
               SELECT TenantId, SessionId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE ${tenantSet()}
+                ${dedup.sql}
               GROUP BY TenantId, SessionId
               HAVING max(toUInt8(Auxiliary)) = 0
             )
@@ -783,6 +937,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
           LIMIT {limit:UInt32}
         `,
         query_params: {
+          ...dedup.params,
           from: fromMs,
           to: toMs,
           // Over-fetched for the same tie `findManyRecent` collapses below.
@@ -802,6 +957,28 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       .filter((row) => !row.auxiliary)
       .toSorted((a, b) => b.startedAtMs - a.startedAtMs)
       .slice(0, limit);
+  }
+
+  /** The fenced page's dedup bound, read from the id index under the fence's tenants. */
+  private async fencedDedupBound({
+    reader,
+    fromMs,
+    toMs,
+  }: {
+    reader: TenantScopedReader;
+    fromMs: number;
+    toMs: number;
+  }): Promise<TimeBound | null> {
+    const { fence } = reader;
+    const tenantIds = [...fence.own, ...fence.shared.map((window) => window.projectId)];
+    const [tenantId] = tenantIds;
+    if (tenantId === undefined) return null;
+    return this.spanBound({
+      read: "recent_list_fenced",
+      tenants: { tenantId, tenantIds },
+      overlapping: { fromMs, toMs },
+      whenNotReady: "unbounded",
+    });
   }
 
   /**
@@ -856,6 +1033,13 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     branches: string[];
     startedAtFromMs: number;
   }): Promise<CodingAgentBranchSessionRow[]> {
+    const dedup = await this.spanBound({
+      read: "branch_list",
+      tenants: { tenantId: routingTenantOf(tenantIds), tenantIds },
+      overlapping: { fromMs: startedAtFromMs },
+      whenNotReady: "unbounded",
+    });
+    if (dedup === null) return [];
     const { rows } = await this.clickhouse.query<Record<string, unknown>>({
       tenantId: routingTenantOf(tenantIds),
       table: TABLE_NAME,
@@ -877,12 +1061,14 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
             SELECT TenantId, SessionId, max(UpdatedAt)
             FROM ${TABLE_NAME}
             WHERE TenantId IN ({tenantIds:Array(String)})
+              ${dedup.sql}
             GROUP BY TenantId, SessionId
           )
         ORDER BY StartedAt ASC
       `,
       params: {
         tenantIds,
+        ...dedup.params,
         // Case-folded on both sides. A session stores the remote's casing verbatim, while the
         // pull-request mapping stores its host and repository lowercased, so an exact match here
         // would silently drop every remote whose host, owner or name is not already lower case.
@@ -941,7 +1127,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       table: TABLE_NAME,
       kind: "read",
       tenantIds,
-      // ID_BOUND_SKIP: a page of sessions, bounded from below by the caller's own time.
+      // The caller's time bounds the outer scan; the id index bounds the dedup (ADR-071).
       sql: `
           SELECT ${BRANCH_SESSION_COLUMNS}
           FROM ${TABLE_NAME}
@@ -952,6 +1138,8 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
               SELECT TenantId, SessionId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE TenantId IN ({tenantIds:Array(String)})
+                AND SessionId IN {sessionIds:Array(String)}
+                {{idBound:coding_agent_sessions.SessionId:sessionIds}}
               GROUP BY TenantId, SessionId
             )
           ORDER BY StartedAt ASC
@@ -961,6 +1149,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
         sessionIds,
         from: startedAtFromMs,
       },
+      idBound: { fallback: "unbounded" },
     });
 
     const byTenant = new Map<string, Record<string, unknown>[]>();
@@ -1034,6 +1223,12 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       since === undefined ? "" : "AND StartedAt >= fromUnixTimestamp64Milli({since:Int64})";
     const perProject = await Promise.all(
       [...new Set(projectIds)].map(async (tenantId) => {
+        const lifetime = await this.spanBound({
+          read: "usage_count",
+          tenants: { tenantId },
+          whenNotReady: "unbounded",
+        });
+        if (lifetime === null) return { sessions: 0, first: [] };
         const read = async (sql: string) =>
           usageRowsSchema.parse(
             (
@@ -1042,7 +1237,11 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
                 table: TABLE_NAME,
                 kind: "read",
                 sql,
-                params: since === undefined ? { tenantId } : { tenantId, since },
+                params: {
+                  tenantId,
+                  ...lifetime.params,
+                  ...(since === undefined ? {} : { since }),
+                },
               })
             ).rows,
           )[0];
@@ -1051,12 +1250,14 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
             SELECT toString(uniqExact(SessionId)) AS Total, '0' AS FirstMs
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
+              ${lifetime.sql}
               ${window}`),
           read(`
             SELECT toString(count()) AS Total,
                    toString(toUnixTimestamp64Milli(min(StartedAt))) AS FirstMs
             FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}`),
+            WHERE TenantId = {tenantId:String}
+              ${lifetime.sql}`),
         ]);
         return {
           sessions: Number.parseInt(counted?.Total ?? "0", 10),
@@ -1073,6 +1274,15 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       ...(firsts.length === 0 ? {} : { firstSessionAt: Math.min(...firsts) }),
     };
   }
+}
+
+/** `StartedAt` inside an index span, widened a day each side as an `{{idBound}}` read widens. */
+function startedAtWithin(span: SessionSpan): TimeBound {
+  const window = indexWindow(span);
+  return {
+    sql: "AND StartedAt BETWEEN fromUnixTimestamp64Milli({spanFrom:Int64}) AND fromUnixTimestamp64Milli({spanTo:Int64})",
+    params: { spanFrom: window.fromMs, spanTo: window.toMs },
+  };
 }
 
 const usageRowsSchema = z.array(z.object({ Total: z.string(), FirstMs: z.string() }));

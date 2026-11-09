@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { NoopCodingAgentReadMetricsService } from "../../../__tests__/support/coding-agent-read-metrics-noop.service.ts";
+import { sessionIdIndexNotReady } from "../../../__tests__/support/session-id-index-not-ready.fixture.ts";
 import type { CodingAgentReadMetrics } from "../../coding-agent-session.repository.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 
@@ -38,6 +39,7 @@ function recordingClient(rows: Record<string, unknown>[]): {
   const named: string[] = [];
   const scopedTo: string[][] = [];
   const client = clickHouseQueryClientDouble({
+    ...sessionIdIndexNotReady,
     query: async (request: { tenantId: string; params?: Record<string, unknown> }) => {
       named.push(request.tenantId);
       scopedTo.push((request.params?.tenantIds ?? []) as string[]);
@@ -141,6 +143,8 @@ class CountingReadMetrics implements CodingAgentReadMetrics {
   observeSessionListRead(input: { outcome: "hit" | "empty" | "error" }): void {
     this.counts[input.outcome] += 1;
   }
+
+  countSessionIdIndexNotReady(): void {}
 }
 
 function version({
@@ -164,6 +168,7 @@ function version({
 
 function listClient(rows: Record<string, unknown>[]): ClickHouseQueryClient {
   return clickHouseQueryClientDouble({
+    ...sessionIdIndexNotReady,
     query: async () => ({ rows }),
   });
 }

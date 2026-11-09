@@ -2,7 +2,10 @@ import type { CodingAgentSessionStoredEventData } from "@langwatch/coding-agent-
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
+import {
+  type CodingAgentSessionRepository,
+  SessionIdIndexNotReadyError,
+} from "../repositories/coding-agent-session.repository.ts";
 import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
 import {
   CODING_AGENT_SESSION_SEEN_WINDOW_MS,
@@ -168,6 +171,8 @@ export class CodingAgentSessionFactsService {
       if (projectState.kind === "unstamped") return kind !== "main";
       return kind === "helpers_only";
     } catch (error) {
+      // The repository counted and warned once; a warning per fold would flood the log.
+      if (error instanceof SessionIdIndexNotReadyError) return false;
       logger.warn(
         { error, tenantId: session.tenantId },
         "deciding the project's first session failed, treated as not first",

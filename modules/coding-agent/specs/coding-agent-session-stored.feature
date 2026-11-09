@@ -179,6 +179,13 @@ Feature: Coding-agent records a session-stored fact
     And the fact says firstForProject is false
 
   @unit
+  Scenario: A history check fails closed while the session id index is not ready
+    Given an unstamped project and a session id index whose fill has not finished
+    When its session is reported
+    Then the session table is not read
+    And the fact says firstForProject is false
+
+  @unit
   Scenario: A failing session-stored recorder never fails the stored row
     Given the recorder rejects
     When a session is stored

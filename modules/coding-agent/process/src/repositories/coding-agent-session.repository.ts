@@ -10,6 +10,14 @@ export type CodingAgentSessionListReadOutcome = "hit" | "empty" | "error";
 /** The other sessions a tenant holds: a main-thread one, only helper threads, or none. */
 export type OtherSessionKind = "none" | "helpers_only" | "main";
 
+/** A read that consults the session id index for its `StartedAt` bound (ADR-071 amendment). */
+export type SessionIdIndexRead =
+  | "other_session_kind"
+  | "recent_list"
+  | "recent_list_fenced"
+  | "branch_list"
+  | "usage_count";
+
 /** Observes the bounded session-list storage read without coupling the feature to app metrics. */
 export interface CodingAgentReadMetrics {
   observeSessionListRead(input: {
@@ -17,6 +25,16 @@ export interface CodingAgentReadMetrics {
     outcome: CodingAgentSessionListReadOutcome;
     durationMs: number;
   }): void;
+  /** One read that found the session id index not ready on its target. */
+  countSessionIdIndexNotReady(input: { read: SessionIdIndexRead }): void;
+}
+
+/** The session id index is not ready, so a read that may not scan unbounded refused to run. */
+export class SessionIdIndexNotReadyError extends Error {
+  constructor({ read }: { read: SessionIdIndexRead }) {
+    super(`the coding-agent session id index is not ready for ${read}`);
+    this.name = "SessionIdIndexNotReadyError";
+  }
 }
 
 /** Private persistence port for the session aggregate read model. */
@@ -52,7 +70,8 @@ export abstract class CodingAgentSessionRepository {
 
   /**
    * What kind of other session the tenant holds besides those named: a main-thread one, only
-   * helper threads, or none. "none" means nothing in retention, not "no history ever".
+   * helper threads, or none. "none" means nothing in retention, not "no history ever". Throws
+   * `SessionIdIndexNotReadyError` rather than scan the tenant's history unbounded.
    */
   abstract findOtherSessionKind(input: {
     tenantId: string;

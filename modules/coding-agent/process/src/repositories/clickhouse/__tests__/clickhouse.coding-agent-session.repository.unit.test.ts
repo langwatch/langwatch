@@ -7,6 +7,11 @@ import {
   session,
 } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 import { NoopCodingAgentReadMetricsService } from "../../../__tests__/support/coding-agent-read-metrics-noop.service.ts";
+import {
+  type CodingAgentReadMetrics,
+  type SessionIdIndexRead,
+  SessionIdIndexNotReadyError,
+} from "../../coding-agent-session.repository.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 
 const endpoints: TestClickHouseEndpoint[] = [];
@@ -15,19 +20,46 @@ afterEach(async () => {
   await Promise.all(endpoints.splice(0).map((endpoint) => endpoint.close()));
 });
 
-async function createRepository() {
-  const endpoint = await TestClickHouseEndpoint.create();
+const DAY_MS = 86_400_000;
+const SPAN_FROM_MS = Date.parse("2026-08-03T10:00:00Z");
+const SPAN_TO_MS = Date.parse("2026-08-05T10:00:00Z");
+
+/** Counts the reads that found the session id index not ready. */
+class NotReadyCounter implements CodingAgentReadMetrics {
+  readonly notReady: SessionIdIndexRead[] = [];
+
+  observeSessionListRead(): void {}
+
+  countSessionIdIndexNotReady({ read }: { read: SessionIdIndexRead }): void {
+    this.notReady.push(read);
+  }
+}
+
+async function createRepository({
+  idIndexReady = false,
+  metrics = NoopCodingAgentReadMetricsService.create(),
+}: { idIndexReady?: boolean; metrics?: CodingAgentReadMetrics } = {}) {
+  const endpoint = await TestClickHouseEndpoint.create({ idIndexReady });
   endpoints.push(endpoint);
   return {
     endpoint,
     repository: CodingAgentSessionClickHouseRepository.create({
       clickhouse: endpoint.clickhouse,
       defaultTraceRetentionDays: 30,
-      metrics: NoopCodingAgentReadMetricsService.create(),
+      metrics,
       clock: new TestClock(),
     }),
   };
 }
+
+/** The id index's answer for the sessions a read reaches: how many, over the test's span. */
+const spanRow = (n: number) => [{ n, fromMs: SPAN_FROM_MS, toMs: SPAN_TO_MS }];
+
+const paramOf = (request: { url: string } | undefined, name: string) =>
+  new URL(request?.url ?? "", "http://x").searchParams.get(`param_${name}`);
+
+const dedupScopeOf = (body: string | undefined) =>
+  body?.split("SELECT TenantId, SessionId, max(UpdatedAt)")[1] ?? "";
 
 describe("Coding Agent session ClickHouse repository", () => {
   it("writes the complete session row, retention, and durable watermark", async () => {
@@ -263,6 +295,233 @@ describe("Coding Agent session ClickHouse repository", () => {
 
         expect(found?.row.lastEventOccurredAt).toBe(0);
       });
+    });
+  });
+
+  describe("given the session id index is ready", () => {
+    describe("when asked what other session a project holds", () => {
+      const kindOf = (repository: CodingAgentSessionClickHouseRepository) =>
+        repository.findOtherSessionKind({ tenantId: "project-1", excludeSessionIds: ["s-1"] });
+
+      it("answers none from the index alone when it names no other session", async () => {
+        const { endpoint, repository } = await createRepository({ idIndexReady: true });
+        endpoint.queryRows.push(spanRow(0));
+
+        await expect(kindOf(repository)).resolves.toBe("none");
+
+        expect(endpoint.requests).toHaveLength(1);
+        expect(endpoint.requests[0]?.body).toContain("FROM coding_agent_sessions_id_index");
+        expect(endpoint.requests[0]?.body).toContain("SessionId NOT IN {excludeSessionIds");
+        expect(endpoint.requests[0]?.body).not.toMatch(/FROM coding_agent_sessions\s/);
+      });
+
+      it("probes the sessions table only inside the other sessions' span, a day each side", async () => {
+        const { endpoint, repository } = await createRepository({ idIndexReady: true });
+        endpoint.queryRows.push(spanRow(2), [{ SessionId: "s-2" }]);
+
+        await expect(kindOf(repository)).resolves.toBe("main");
+
+        const [, probe] = endpoint.requests;
+        expect(endpoint.requests).toHaveLength(2);
+        expect(probe?.body).toContain(
+          "StartedAt BETWEEN fromUnixTimestamp64Milli({spanFrom:Int64})",
+        );
+        expect(probe?.body).toContain("AND Auxiliary = 0");
+        expect(paramOf(probe, "spanFrom")).toBe(String(SPAN_FROM_MS - DAY_MS));
+        expect(paramOf(probe, "spanTo")).toBe(String(SPAN_TO_MS + DAY_MS));
+      });
+
+      it("answers helpers_only when only a helper row sits inside the span", async () => {
+        const { endpoint, repository } = await createRepository({ idIndexReady: true });
+        endpoint.queryRows.push(spanRow(1), [], [{ SessionId: "h-1" }]);
+
+        await expect(kindOf(repository)).resolves.toBe("helpers_only");
+
+        const [, , anyProbe] = endpoint.requests;
+        expect(anyProbe?.body).toContain("{spanFrom:Int64}");
+        expect(anyProbe?.body).not.toContain("Auxiliary = 0");
+      });
+
+      it("answers none when the index names sessions whose rows have expired", async () => {
+        const { endpoint, repository } = await createRepository({ idIndexReady: true });
+        endpoint.queryRows.push(spanRow(1), [], []);
+
+        await expect(kindOf(repository)).resolves.toBe("none");
+      });
+    });
+
+    describe("when a window of recent sessions is listed", () => {
+      it("bounds the dedup scope to the span of the window's sessions", async () => {
+        const { endpoint, repository } = await createRepository({ idIndexReady: true });
+        endpoint.queryRows.push(spanRow(3), []);
+
+        await repository.findManyRecent({
+          tenantId: "project-1",
+          fromMs: 100,
+          toMs: 200,
+          limit: 5,
+        });
+
+        const [span, list] = endpoint.requests;
+        expect(span?.body).toContain("HAVING SessionToAt >= fromUnixTimestamp64Milli({overlapFrom");
+        expect(span?.body).toContain("SessionFromAt <= fromUnixTimestamp64Milli({overlapTo");
+        expect(paramOf(span, "overlapFrom")).toBe("100");
+        expect(paramOf(span, "overlapTo")).toBe("200");
+        expect(dedupScopeOf(list?.body)).toContain("{spanFrom:Int64}");
+        expect(dedupScopeOf(list?.body)).not.toContain("{from:Int64}");
+        expect(paramOf(list, "spanFrom")).toBe(String(SPAN_FROM_MS - DAY_MS));
+      });
+
+      it("reads no session rows when the index names no session in the window", async () => {
+        const { endpoint, repository } = await createRepository({ idIndexReady: true });
+        endpoint.queryRows.push(spanRow(0));
+
+        await expect(
+          repository.findManyRecent({ tenantId: "project-1", fromMs: 100, toMs: 200, limit: 5 }),
+        ).resolves.toEqual([]);
+
+        expect(endpoint.requests).toHaveLength(1);
+      });
+
+      it("bounds a fenced page's dedup scope from the index under the fence's tenants", async () => {
+        const { endpoint, repository } = await createRepository({ idIndexReady: true });
+        endpoint.queryRows.push(spanRow(1), []);
+
+        await repository.findManyRecentFenced({
+          authorization: aggregateProof({
+            projectId: "aggregate",
+            members: [{ projectId: "member-a", from: 1_000 }],
+          }),
+          fromMs: 100,
+          toMs: 200,
+          limit: 25,
+        });
+
+        const [span, page] = endpoint.requests;
+        expect(span?.body).toContain("TenantId IN ({tenantIds:Array(String)})");
+        expect(paramOf(span, "tenantIds")).toBe("['aggregate','member-a']");
+        expect(dedupScopeOf(page?.body)).toContain("{spanFrom:Int64}");
+      });
+    });
+
+    describe("when a repository branch's sessions are listed", () => {
+      it("bounds the dedup scope to the span of the sessions since the caller's time", async () => {
+        const { endpoint, repository } = await createRepository({ idIndexReady: true });
+        endpoint.queryRows.push(spanRow(1), []);
+
+        await repository.findByRepositoryBranch({
+          tenantIds: ["project-1", "project-2"],
+          repositoryHost: "github.com",
+          repositoryOwner: "acme",
+          repositoryName: "app",
+          branches: ["main"],
+          startedAtFromMs: 100,
+        });
+
+        const [span, list] = endpoint.requests;
+        expect(span?.body).toContain("HAVING SessionToAt >=");
+        expect(span?.body).not.toContain("SessionFromAt <=");
+        expect(dedupScopeOf(list?.body)).toContain("{spanFrom:Int64}");
+      });
+    });
+
+    describe("when sessions are fetched by id", () => {
+      it("bounds the dedup scope to the index range of those ids", async () => {
+        const { endpoint, repository } = await createRepository({ idIndexReady: true });
+        endpoint.queryRows.push(spanRow(1), []);
+
+        await repository.findBySessionIds({
+          tenantIds: ["project-1"],
+          sessionIds: ["s-1", "s-2"],
+          startedAtFromMs: 100,
+        });
+
+        const [, read] = endpoint.requests;
+        expect(dedupScopeOf(read?.body)).toContain("StartedAt >= fromUnixTimestamp64Milli");
+        expect(dedupScopeOf(read?.body)).toContain("SessionId IN {sessionIds");
+        expect(paramOf(read, "idBound_fromMs")).toBe(String(SPAN_FROM_MS - DAY_MS));
+      });
+    });
+
+    describe("when one session is read inside the caller's window", () => {
+      it("bounds the dedup scope by the index and the outer scan by the window", async () => {
+        const { endpoint, repository } = await createRepository({ idIndexReady: true });
+        endpoint.queryRows.push(spanRow(1), []);
+
+        await repository.findBySessionId({
+          tenantId: "project-1",
+          sessionId: "s-1",
+          window: { fromMs: 100, toMs: 200 },
+        });
+
+        const [, read] = endpoint.requests;
+        expect(dedupScopeOf(read?.body)).toContain("StartedAt >= fromUnixTimestamp64Milli");
+        expect(dedupScopeOf(read?.body)).not.toContain("{from:Int64}");
+        expect(paramOf(read, "from")).toBe("100");
+      });
+    });
+
+    describe("when the usage report counts a project's sessions", () => {
+      it("bounds both counts to the span of the project's sessions", async () => {
+        const { endpoint, repository } = await createRepository({ idIndexReady: true });
+        endpoint.queryRows.push(
+          spanRow(2),
+          [{ Total: "2", FirstMs: "0" }],
+          [{ Total: "3", FirstMs: String(SPAN_FROM_MS) }],
+        );
+
+        await expect(repository.countUsage({ projectIds: ["project-1"] })).resolves.toEqual({
+          sessions: 2,
+          firstSessionAt: SPAN_FROM_MS,
+        });
+
+        const counts = endpoint.requests.slice(1);
+        expect(counts).toHaveLength(2);
+        for (const count of counts) {
+          expect(count.body).toContain("StartedAt BETWEEN fromUnixTimestamp64Milli({spanFrom");
+        }
+      });
+
+      it("counts nothing without reading the sessions table when the index names no session", async () => {
+        const { endpoint, repository } = await createRepository({ idIndexReady: true });
+        endpoint.queryRows.push(spanRow(0));
+
+        await expect(repository.countUsage({ projectIds: ["project-1"] })).resolves.toEqual({
+          sessions: 0,
+        });
+        expect(endpoint.requests).toHaveLength(1);
+      });
+    });
+  });
+
+  describe("given the session id index is not ready", () => {
+    /**
+     * @see modules/coding-agent/specs/coding-agent-session-stored.feature
+     * @scenario "A history check fails closed while the session id index is not ready"
+     */
+    it("refuses the other-session check rather than scan the project's history", async () => {
+      const metrics = new NotReadyCounter();
+      const { endpoint, repository } = await createRepository({ metrics });
+
+      await expect(
+        repository.findOtherSessionKind({ tenantId: "project-1", excludeSessionIds: ["s-1"] }),
+      ).rejects.toBeInstanceOf(SessionIdIndexNotReadyError);
+
+      expect(endpoint.requests).toHaveLength(0);
+      expect(metrics.notReady).toEqual(["other_session_kind"]);
+    });
+
+    it("lists recent sessions as before the index, and counts the unbounded read", async () => {
+      const metrics = new NotReadyCounter();
+      const { endpoint, repository } = await createRepository({ metrics });
+      endpoint.queryRows.push([]);
+
+      await repository.findManyRecent({ tenantId: "project-1", fromMs: 100, toMs: 200, limit: 5 });
+
+      expect(endpoint.requests).toHaveLength(1);
+      expect(dedupScopeOf(endpoint.requests[0]?.body)).not.toContain("{spanFrom");
+      expect(endpoint.requests[0]?.body).not.toContain("_id_index");
+      expect(metrics.notReady).toEqual(["recent_list"]);
     });
   });
 });
