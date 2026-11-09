@@ -115,7 +115,7 @@ describe("given a dataset with version 1", () => {
 
 describe("given a dataset that was never versioned", () => {
   describe("when the first edit arrives", () => {
-    /** @scenario "Edits that go quiet save a version" */
+    /** @scenario "The first edit of a dataset with rows keeps its content as version 1" */
     it("keeps the content before the edit as version 1", async () => {
       const datasetId = await createDataset();
       await edit(datasetId, "a", "changed");
@@ -125,6 +125,24 @@ describe("given a dataset that was never versioned", () => {
       const page = await app.getVersionPage({ projectId: PROJECT, datasetId, version: 1 });
       expect(page.version.trigger).toBe("initial");
       expect(page.rows.find((row) => row.id === "a")?.entry).toEqual({ input: "first" });
+    });
+  });
+});
+
+describe("given a dataset created with columns and no rows", () => {
+  describe("when a user adds rows and the edits go quiet", () => {
+    /** @scenario "A dataset created empty gets no empty version 1" */
+    it("saves version 1 as the autosave holding those rows", async () => {
+      const datasetId = await createDataset([]);
+      await edit(datasetId, "a", "first");
+      expect(await versionsOf(datasetId)).toEqual([]);
+      await edit(datasetId, "b", "second");
+
+      await app.autosaveVersion({ projectId: PROJECT, datasetId, editedBy: ALICE });
+
+      const versions = await versionsOf(datasetId);
+      expect(versions).toHaveLength(1);
+      expect(versions[0]).toMatchObject({ version: 1, trigger: "autosave", rowCount: 2 });
     });
   });
 });
@@ -883,13 +901,15 @@ describe("given datasets created before versioning", () => {
 
   /** @scenario "Existing datasets get version 1 in the background" */
   it("gives each ready dataset version 1, once", async () => {
-    const first = await createDataset();
-    const second = await createDataset();
+    const first = await createDataset([{ id: "first-a", input: "one" }]);
+    const second = await createDataset([{ id: "second-a", input: "two" }]);
+    const empty = await createDataset([]);
 
     const { report } = await run();
     const again = await run();
 
     expect(report).toMatchObject({ created: 2, failed: 0 });
+    expect(await versionsOf(empty)).toEqual([]);
     expect(again.report).toMatchObject({ created: 0 });
     for (const datasetId of [first, second]) {
       const versions = await versionsOf(datasetId);
@@ -901,6 +921,7 @@ describe("given datasets created before versioning", () => {
   /** @scenario "Existing datasets get version 1 in the background" */
   it("creates nothing and saves no checkpoint on a dry run", async () => {
     const datasetId = await createDataset();
+    await createDataset([]);
 
     const { report, saved } = await run(null, true);
 

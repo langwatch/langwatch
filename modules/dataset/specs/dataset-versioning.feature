@@ -7,6 +7,8 @@ Feature: Dataset version history
   storage: a DatasetVersion row in Postgres, and the rows as JSONL chunks in the object storage
   the dataset module already writes (local disk or a bucket, so every self-hosted install has it).
   Versions are numbered per dataset from 1. A version is never edited; restoring writes a new one.
+  The system saves no version of a dataset that has no rows: there is nothing to restore, so a
+  dataset created empty gets version 1 from its first save with rows.
   A snapshot whose content hash equals the latest version's creates nothing new.
 
   # --- Saving versions ---
@@ -16,6 +18,19 @@ Feature: Dataset version history
     Given a dataset with version 1
     When a user edits a row and nobody edits the dataset for the quiet period
     Then the dataset has version 2 saved automatically, authored by that user
+
+  @unit
+  Scenario: The first edit of a dataset with rows keeps its content as version 1
+    Given a dataset with rows and no versions
+    When a user edits a row
+    Then version 1 holds the rows from before the edit, with the trigger "initial"
+
+  @unit
+  Scenario: A dataset created empty gets no empty version 1
+    Given a dataset created with columns and no rows
+    When a user adds rows and the edits go quiet
+    Then version 1 is the autosave holding those rows
+    And no version holds zero rows
 
   @unit
   Scenario: Edits inside the quiet period save one version
@@ -306,7 +321,8 @@ Feature: Dataset version history
   Scenario: Existing datasets get version 1 in the background
     Given datasets created before versioning, with no versions
     When the background step "dataset:create-first-versions" runs
-    Then each ready dataset has version 1 with the trigger "initial"
+    Then each ready dataset with rows has version 1 with the trigger "initial"
+    And a dataset with no rows gets no version
     And running the step again creates nothing
     And a dry run creates nothing and saves no checkpoint
 

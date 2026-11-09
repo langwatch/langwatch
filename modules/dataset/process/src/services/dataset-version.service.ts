@@ -111,6 +111,13 @@ export class DatasetVersionService {
     return this.#writeVersion({ dataset, latest, input });
   }
 
+  /** Whether the dataset holds any row now; reads at most its first page. */
+  async hasRows(input: { projectId: string; datasetId: string }): Promise<boolean> {
+    const dataset = await this.#readyDataset(input);
+    for await (const _row of this.#currentRows(dataset)) return true;
+    return false;
+  }
+
   /** The versions, newest first, and whether the dataset's layout lets one be restored. */
   async history(input: {
     projectId: string;

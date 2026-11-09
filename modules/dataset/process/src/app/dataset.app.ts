@@ -848,8 +848,8 @@ export class DatasetModule implements DatasetApi {
   }
 
   /**
-   * Runs an edit: first gives a dataset with no history its version 1 of the
-   * content before the edit, then records the edit for the autosave.
+   * Runs an edit: first gives a dataset with no history and some rows its
+   * version 1 of the content before the edit, then records the edit for the autosave.
    */
   async #edited<T>(
     input: { projectId: string; slugOrId: string } & EditedBy,
@@ -872,7 +872,11 @@ export class DatasetModule implements DatasetApi {
         projectId: dataset.projectId,
         datasetId: dataset.id,
       });
-      if (!has) {
+      // An empty dataset has nothing to restore, so its first real save becomes version 1.
+      const keep =
+        !has &&
+        (await this.#versions.hasRows({ projectId: dataset.projectId, datasetId: dataset.id }));
+      if (keep) {
         await this.#versions.snapshot({
           projectId: dataset.projectId,
           datasetId: dataset.id,
