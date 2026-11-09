@@ -53,3 +53,7 @@ organization.
   finding's value or an error message. Fallbacks are also counted by `reason` on
   `pii_redaction_model_fallbacks` (`timeout`, `error`, and `routing_error` when the flag or the
   project could not be read).
+- **No change without the flag or the settings.** With neither setting, the model channel answers
+  "not configured" and nothing new is read: no flag, no project, no request. With a setting but
+  without the flag, the only new work is one flag read per batch and one project read per project
+  per minute; the batch goes to Presidio as before and the model is never called.

@@ -264,6 +264,7 @@ Feature: Redacting personal data out of a span at ingestion
     And the project's organization is not allowlisted for it
     When a strict batch is analysed
     Then Presidio answers it and the model is not called
+    And a span redacted through the whole module never invokes the model's Lambda
 
   @unit
   Scenario: A model failure falls back to Presidio, never to unredacted text
@@ -278,6 +279,7 @@ Feature: Redacting personal data out of a span at ingestion
     When a strict batch is analysed
     Then Presidio answers it
     And neither the flag nor the project's organization is read
+    And a span redacted through the whole module sends no request to any model
 
   @unit
   Scenario: The model's Lambda answer is read through the Web Adapter prelude
