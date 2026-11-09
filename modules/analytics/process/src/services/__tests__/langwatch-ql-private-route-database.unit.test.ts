@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
 import { RoutedLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-routed-executor.repository.ts";
 import {
   type LangWatchQLConnection,
@@ -64,7 +65,11 @@ function privateRun(input: {
       return executor;
     },
   });
-  const service = LangWatchQLService.create({ executor: routed, database: SHARED.database });
+  const service = LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
+    executor: routed,
+    database: SHARED.database,
+  });
   const done = service.executeForProjects({
     projects: [{ id: "project-1", lwqlKey: "key-1" }],
     protections: {

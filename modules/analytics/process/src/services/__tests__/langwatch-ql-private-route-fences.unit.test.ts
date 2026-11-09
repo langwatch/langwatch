@@ -11,6 +11,7 @@ import type { TenantRoute } from "@langwatch/clickhouse-client";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
+import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
 import { RoutedLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-routed-executor.repository.ts";
 import {
   type LangWatchQLConnection,
@@ -106,7 +107,11 @@ function run({
       return executor;
     },
   });
-  const service = LangWatchQLService.create({ executor: routed, database: SHARED.database });
+  const service = LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
+    executor: routed,
+    database: SHARED.database,
+  });
   const done = pass
     ? service.executePass({
         project: PROJECT,
@@ -390,7 +395,11 @@ describe("given a statement saved without a run", () => {
 });
 
 describe("given a deployment with no LangWatchQL identity", () => {
-  const bare = LangWatchQLService.create({ executor: null, database: SHARED.database });
+  const bare = LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
+    executor: null,
+    database: SHARED.database,
+  });
   // A viewer: everything but cost, so a cost statement is a refusal the policy owns.
   const viewer = { ...PROTECTIONS, canSeeCosts: false, catalogue: catalogueWithout("cost:view") };
   const unreadable = "SELECT sum(TotalCost) AS cost FROM analytics.traces";
@@ -454,7 +463,11 @@ describe("given a run validated at its start", () => {
         return executor;
       },
     });
-    const service = LangWatchQLService.create({ executor: routed, database: SHARED.database });
+    const service = LangWatchQLService.create({
+      runTelemetry: TEST_RUN_TELEMETRY,
+      executor: routed,
+      database: SHARED.database,
+    });
 
     return {
       routeCalls: () => routeCalls,
