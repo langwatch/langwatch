@@ -59,10 +59,15 @@ const ROUTES: Readonly<Record<string, () => TenantRoute>> = {
   "project-shared": () => ({ kind: "shared" }),
   "project-private": privateRoute,
   "project-private-2": privateRoute,
-  "project-no-path": () => ({
+  "project-second-private": () => ({
     kind: "private",
-    organizationId: "org-no-path",
-    url: "http://route-user:route-password@nopath.invalid:8123",
+    organizationId: "org-second",
+    url: "http://route-user:route-password@second.invalid:8123/second_db",
+  }),
+  "project-no-database": () => ({
+    kind: "private",
+    organizationId: "org-no-database",
+    url: "http://route-user:route-password@nodb.invalid:8123",
   }),
   "project-labelled": () => {
     throw new PrivateRouteUnavailableError({
@@ -72,6 +77,18 @@ const ROUTES: Readonly<Record<string, () => TenantRoute>> = {
     });
   },
 };
+
+/** Routes as the service does, then runs on the executor the route names. */
+const runOn = ({
+  executor,
+  tenantIds,
+}: {
+  executor: RoutedLangWatchQLExecutorRepository;
+  tenantIds: readonly string[];
+}) =>
+  executor
+    .resolveRoute({ tenantIds })
+    .then((route) => route.executor.execute({ sql: "SELECT 1", tenantCapability: "capability" }));
 
 function routeOf({ tenantIds }: { tenantIds: readonly string[] }): Promise<TenantRoute> {
   const routes = new Set(tenantIds.map((tenantId) => ROUTES[tenantId]));
@@ -98,7 +115,7 @@ function fixture() {
   });
   const [shared] = drivers;
   const run = (tenantIds: readonly string[]) =>
-    executor.execute({ sql: "SELECT 1", tenantCapability: "capability", tenantIds });
+    runOn({ executor, tenantIds });
   return { executor, createExecutor, shared: shared!, run };
 }
 
@@ -135,7 +152,7 @@ describe("given a statement over no projects", () => {
     });
     const [shared] = drivers;
 
-    await executor.execute({ sql: "SELECT 1", tenantCapability: "capability", tenantIds: [] });
+    await runOn({ executor, tenantIds: [] });
 
     expect(shared?.query).toHaveBeenCalledTimes(1);
     expect(route).not.toHaveBeenCalled();
@@ -166,15 +183,17 @@ describe("given a statement over an organization with a private ClickHouse", () 
     expect(shared.query).not.toHaveBeenCalled();
   });
 
-  it("falls back to the shared database when the route names none", async () => {
-    const { run } = fixture();
+  /** @scenario "A private route whose database is not a plain ClickHouse name is refused" */
+  it("refuses a route that names no database, never adopting the shared one", async () => {
+    const { shared, run } = fixture();
 
-    await run(["project-no-path"]);
+    const refusal = (await run(["project-no-database"]).catch((error: unknown) => error)) as
+      HandledError;
 
-    expect(privateDrivers()[0]?.config).toMatchObject({
-      url: "http://nopath.invalid:8123",
-      database: SHARED.database,
-    });
+    expect(refusal).toMatchObject({ code: "lwql_unavailable" });
+    expect(refusal.reasons.map((r) => r.message)).toEqual(["no database"]);
+    expect(shared.query).not.toHaveBeenCalled();
+    expect(privateDrivers()).toEqual([]);
   });
 
   it("builds one executor per organization and reuses it", async () => {
@@ -187,6 +206,29 @@ describe("given a statement over an organization with a private ClickHouse", () 
     expect(createExecutor.mock.calls.map(([input]) => input.target)).toEqual(["shared", "private"]);
     expect(privateDrivers()).toHaveLength(1);
     expect(privateDrivers()[0]?.query).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("given more private organizations than the executor keeps open", () => {
+  it("closes the least recently used private executor and keeps the rest", async () => {
+    const executor = RoutedLangWatchQLExecutorRepository.create({
+      connection: SHARED,
+      route: routeOf,
+      createExecutor: (input) => ClickHouseLangWatchQLExecutorRepository.create(input),
+      maxPrivateExecutors: 1,
+    });
+    const run = (tenantIds: readonly string[]) => runOn({ executor, tenantIds });
+
+    await run(["project-private"]);
+    await run(["project-second-private"]);
+
+    const [, first, second] = drivers;
+    expect(first?.close).toHaveBeenCalledTimes(1);
+    expect(second?.close).not.toHaveBeenCalled();
+
+    await executor.close();
+    expect(second?.close).toHaveBeenCalledTimes(1);
+    expect(first?.close).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -258,7 +300,7 @@ describe("when the executor closes", () => {
   it("closes the shared executor and every private one", async () => {
     const { executor, run } = fixture();
     await run(["project-private"]);
-    await run(["project-no-path"]);
+    await run(["project-second-private"]);
 
     await executor.close();
 
@@ -267,7 +309,7 @@ describe("when the executor closes", () => {
   });
 });
 
-// Finding 2: a handled private_dataplane_unavailable keeps its own code and message.
+// A handled private_dataplane_unavailable keeps its own code and message.
 describe("given the router refuses an organization with private_dataplane_unavailable", () => {
   class RouteMissingError extends HandledError {
     constructor() {
@@ -298,9 +340,9 @@ describe("given the router refuses an organization with private_dataplane_unavai
     });
     const [shared] = drivers;
 
-    const thrown = await executor
-      .execute({ sql: "SELECT 1", tenantCapability: "capability", tenantIds: ["project-x"] })
-      .catch((error: unknown) => error);
+    const thrown = await runOn({ executor, tenantIds: ["project-x"] }).catch(
+      (error: unknown) => error,
+    );
 
     expect(thrown).toBe(refusal);
     expect(thrown).toMatchObject({ code: "private_dataplane_unavailable" });
@@ -308,7 +350,7 @@ describe("given the router refuses an organization with private_dataplane_unavai
   });
 });
 
-// Finding 3: a route URL with no usable origin is refused, never dialled as "null".
+// A route URL with no usable origin is refused, never dialled as "null".
 describe("given a private route whose URL has no usable origin", () => {
   it("refuses with lwql_unavailable, names no URL or credential, and builds no executor", async () => {
     const createExecutor = vi.fn(
@@ -326,9 +368,9 @@ describe("given a private route whose URL has no usable origin", () => {
       createExecutor,
     });
 
-    const refusal = await executor
-      .execute({ sql: "SELECT 1", tenantCapability: "capability", tenantIds: ["project-x"] })
-      .catch((error: unknown) => error);
+    const refusal = await runOn({ executor, tenantIds: ["project-x"] }).catch(
+      (error: unknown) => error,
+    );
 
     expect(refusal).toMatchObject({
       code: "lwql_unavailable",
@@ -358,9 +400,7 @@ describe("given a private route whose path is not a plain ClickHouse database na
       createExecutor,
     });
     const run = () =>
-      executor
-        .execute({ sql: "SELECT 1", tenantCapability: "capability", tenantIds: ["project-x"] })
-        .catch((error: unknown) => error);
+      runOn({ executor, tenantIds: ["project-x"] }).catch((error: unknown) => error);
 
     return { createExecutor, run };
   };

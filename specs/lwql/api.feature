@@ -761,7 +761,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given an organization recorded as keeping its data on its own ClickHouse
     And this deployment has no route to that ClickHouse
     When a LangWatchQL query reads that organization's projects
-    Then the query layer refuses it with error code private_dataplane_unavailable, the router's own refusal, unchanged
+    Then the query layer refuses it with the route's refusal, lwql_unavailable or private_dataplane_unavailable (the router's own handled refusal, passed through unchanged)
     And the REST API answers 503 private_dataplane_unavailable, saying the organization keeps its data on its own ClickHouse, which this deployment cannot reach
     And the refusal names the variable that is missing or malformed, never its value; the label inside the variable is shown to that organization's caller
     And no statement runs on the shared ClickHouse
@@ -837,7 +837,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 
   @unit
   Scenario: A private route whose database is not a plain ClickHouse name is refused
-    Given an organization routed to a URL whose path is not a plain lower-case identifier, carries SQL once decoded, names a reserved database such as system, or cannot be parsed at all
+    Given an organization routed to a URL whose path is not a plain lower-case identifier, carries SQL once decoded, names no database, names a reserved database such as system, or cannot be parsed at all
     When a LangWatchQL query reads that organization's projects
     Then the query layer refuses it with error code lwql_unavailable before any statement runs
     And the refusal names no part of the route URL

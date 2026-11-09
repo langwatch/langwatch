@@ -14,8 +14,6 @@ export interface LangWatchQLExecutionRequest {
   readonly parameters?: Readonly<Record<string, unknown>>;
   /** The caller's tenant capability, sent as the one changeable setting. */
   readonly tenantCapability: string;
-  /** The projects the statement reads: they decide which ClickHouse answers it. */
-  readonly tenantIds: readonly string[];
 }
 
 /** The two bounds the service applies to a result; neither is enforced by the executor. */

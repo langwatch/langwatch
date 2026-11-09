@@ -367,7 +367,6 @@ export class LangWatchQLService {
       sql: composed.sql,
       ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
       tenantCapability: lwqlCapability.tenantCapability({ secret: project.lwqlKey }),
-      tenantIds: [project.id],
     });
 
     return {
@@ -448,7 +447,6 @@ export class LangWatchQLService {
     const completeness = await lwqlCompleteness.assess({
       executor,
       tenantCapability,
-      tenantIds: projectIds,
       validation,
       database,
       views: this.views,

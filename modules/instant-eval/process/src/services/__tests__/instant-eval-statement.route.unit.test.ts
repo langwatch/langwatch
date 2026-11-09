@@ -21,7 +21,10 @@ import {
   InstantEvalRowSourceService,
   type InstantEvalStatementRunner,
 } from "../instant-eval-row-source.service.ts";
-import { InstantEvalStatementService } from "../instant-eval-statement.service.ts";
+import {
+  InstantEvalStatementService,
+  type InstantEvalStatementValidator,
+} from "../instant-eval-statement.service.ts";
 
 const CALLER = { id: "project-1", lwqlKey: "lwql-secret" };
 const PROTECTIONS = { catalogue: { permissions: [] } };
@@ -49,7 +52,7 @@ class Refusal extends HandledError {
 }
 
 /** Answers the run-time validation as the suite states. */
-class RouteAwareAnalytics {
+class RouteAwareAnalytics implements InstantEvalStatementValidator {
   constructor(private readonly runVerdict: Error | undefined) {}
 
   validateLangWatchQLForRun(
@@ -88,7 +91,7 @@ class ProbeOnlyRunner implements InstantEvalStatementRunner {
 
 const accept = (runVerdict?: Error) => {
   const statements = InstantEvalStatementService.create({
-    analytics: new RouteAwareAnalytics(runVerdict) as never,
+    analytics: new RouteAwareAnalytics(runVerdict),
     rowSource: InstantEvalRowSourceService.create({
       analytics: new ProbeOnlyRunner(),
       access: { isEnabled: () => Promise.resolve(true) },

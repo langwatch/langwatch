@@ -105,7 +105,6 @@ describe("LangWatchQLService.executePass", () => {
               ? { parameters: composed.parameters }
               : {}),
             tenantCapability: CAPABILITY,
-            tenantIds: [PROJECT.id],
           };
         }),
       );

@@ -29,6 +29,9 @@ export type LangWatchQLExecutorFactory = (input: {
 
 const PLAIN_DATABASE_NAME = /^[a-z_][a-z0-9_]*$/;
 
+/** Private executors kept open at once; the least recently used is closed past this. */
+const DEFAULT_MAX_PRIVATE_EXECUTORS = 100;
+
 const NOT_AVAILABLE = "LangWatchQL is not available for this organization's ClickHouse.";
 
 /**
@@ -47,8 +50,8 @@ function refused(reason: string): LangWatchQLUnavailableError {
 
 /**
  * The route's server as the LangWatchQL identity: its origin and database, never the route's
- * user or password. A URL that is not http(s), or names a reserved or non-lower-case-identifier
- * database, is refused without its text, which may carry those credentials.
+ * user or password. A URL that is not http(s), or names no database, a reserved one or a
+ * non-lower-case-identifier one, is refused without its text, which may carry those credentials.
  */
 function privateConnectionOf({
   shared,
@@ -68,10 +71,12 @@ function privateConnectionOf({
   }
   // Any other scheme parses to the origin "null", which no driver can dial.
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw refused("bad scheme");
+  // Failing closed: a route naming no database must not adopt the shared deployment's.
+  if (database === "") throw refused("no database");
   // Written unquoted into generated SQL: only a lower-case identifier, never a reserved one.
-  if (database !== "" && !PLAIN_DATABASE_NAME.test(database)) throw refused("bad name shape");
+  if (!PLAIN_DATABASE_NAME.test(database)) throw refused("bad name shape");
   if (RESERVED_DATABASES.includes(database)) throw refused("reserved database");
-  return { ...shared, url: parsed.origin, database: database === "" ? shared.database : database };
+  return { ...shared, url: parsed.origin, database };
 }
 
 /** Routes each statement by its projects, with one executor per private organization. */
@@ -82,15 +87,18 @@ export class RoutedLangWatchQLExecutorRepository extends LangWatchQLExecutorRepo
     connection,
     route,
     createExecutor,
+    maxPrivateExecutors = DEFAULT_MAX_PRIVATE_EXECUTORS,
   }: {
     connection: LangWatchQLConnection;
     route: LangWatchQLTenantRouting;
     createExecutor: LangWatchQLExecutorFactory;
+    maxPrivateExecutors?: number;
   }): RoutedLangWatchQLExecutorRepository {
     return new RoutedLangWatchQLExecutorRepository({
       connection,
       route,
       createExecutor,
+      maxPrivateExecutors,
       sharedExecutor: createExecutor({ connection, target: "shared" }),
     });
   }
@@ -99,28 +107,35 @@ export class RoutedLangWatchQLExecutorRepository extends LangWatchQLExecutorRepo
   private readonly route: LangWatchQLTenantRouting;
   private readonly createExecutor: LangWatchQLExecutorFactory;
   private readonly sharedExecutor: LangWatchQLExecutorRepository;
+  private readonly maxPrivateExecutors: number;
 
   private constructor({
     connection,
     route,
     createExecutor,
     sharedExecutor,
+    maxPrivateExecutors,
   }: {
     connection: LangWatchQLConnection;
     route: LangWatchQLTenantRouting;
     createExecutor: LangWatchQLExecutorFactory;
     sharedExecutor: LangWatchQLExecutorRepository;
+    maxPrivateExecutors: number;
   }) {
     super();
     this.connection = connection;
     this.route = route;
     this.createExecutor = createExecutor;
     this.sharedExecutor = sharedExecutor;
+    if (!Number.isInteger(maxPrivateExecutors) || maxPrivateExecutors < 1) {
+      throw new RangeError("maxPrivateExecutors must be a positive integer");
+    }
+    this.maxPrivateExecutors = maxPrivateExecutors;
   }
 
-  async execute(request: LangWatchQLExecutionRequest): Promise<LangWatchQLExecutionResult> {
-    const { executor } = await this.resolveRoute({ tenantIds: request.tenantIds });
-    return executor.execute(request);
+  /** A run without its projects has no route: ask `resolveRoute`, then run on its executor. */
+  async execute(_request: LangWatchQLExecutionRequest): Promise<LangWatchQLExecutionResult> {
+    throw new Error("Resolve the route with resolveRoute before executing.");
   }
 
   /** Asks the route once; the executor returned never asks again, and names its own database. */
@@ -136,10 +151,26 @@ export class RoutedLangWatchQLExecutorRepository extends LangWatchQLExecutorRepo
 
     const connection = privateConnectionOf({ shared: this.connection, url: route.url });
     const cached = this.privateExecutors.get(route.organizationId);
-    if (cached !== undefined) return { executor: cached, database: connection.database };
+    if (cached !== undefined) {
+      // Re-inserted so the map's first key stays the least recently used.
+      this.privateExecutors.delete(route.organizationId);
+      this.privateExecutors.set(route.organizationId, cached);
+      return { executor: cached, database: connection.database };
+    }
     const executor = this.createExecutor({ connection, target: "private" });
+    this.evictOldestPastBound();
     this.privateExecutors.set(route.organizationId, executor);
     return { executor, database: connection.database };
+  }
+
+  private evictOldestPastBound(): void {
+    if (this.privateExecutors.size < this.maxPrivateExecutors) return;
+    const oldest = this.privateExecutors.entries().next();
+    if (oldest.done) return;
+    const [organizationId, evicted] = oldest.value;
+    this.privateExecutors.delete(organizationId);
+    // A close failure of an executor nobody now holds has no caller to tell.
+    void evicted.close().catch(() => undefined);
   }
 
   override async close(): Promise<void> {
