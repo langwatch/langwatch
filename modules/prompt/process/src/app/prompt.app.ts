@@ -182,6 +182,7 @@ export class PromptModule implements PromptApi {
         logger.error(
           {
             error,
+            tenantId: input.projectId,
             projectId: input.projectId,
             promptId: input.promptId,
             versionId: input.versionId,
@@ -195,7 +196,12 @@ export class PromptModule implements PromptApi {
       if (!app) return;
       void app.#recordDeleted(input).catch((error: unknown) =>
         logger.error(
-          { error, projectId: input.projectId, promptId: input.promptId },
+          {
+            error,
+            tenantId: input.projectId,
+            projectId: input.projectId,
+            promptId: input.promptId,
+          },
           "prompt deleted was not recorded",
         ),
       );

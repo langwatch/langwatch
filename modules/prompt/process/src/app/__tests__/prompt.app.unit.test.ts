@@ -575,6 +575,7 @@ describe("PromptModule lifecycle facts", () => {
     expect(lostFacts("version_saved")).toEqual([
       {
         fields: expect.objectContaining({
+          tenantId: "project-1",
           projectId: "project-1",
           promptId: created.id,
           versionId: saved.versionId,
@@ -584,7 +585,11 @@ describe("PromptModule lifecycle facts", () => {
     ]);
     expect(lostFacts("deleted")).toEqual([
       {
-        fields: expect.objectContaining({ projectId: "project-1", promptId: created.id }),
+        fields: expect.objectContaining({
+          tenantId: "project-1",
+          projectId: "project-1",
+          promptId: created.id,
+        }),
         message: "prompt deleted was not recorded",
       },
     ]);
