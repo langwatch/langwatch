@@ -94,8 +94,7 @@ Modes: `blocking` (in `upgrade`, before serving; only `data` may block, frozen S
 (`releaseManifestSchema`). CI stamps it on the release PR with `packages/upgrade/scripts/stamp-release.ts`
 (`stamp-release-manifest` job, `.github/workflows/release-please-sdks.yml`); never hand-write one.
 The stamp names every tree step no earlier manifest or the baseline names, code steps from
-`releases/image/code-steps.json` included, and refuses when the tree would still not name itself
-the release. `packages/upgrade/scripts/check-release-manifest.ts` (`releaseIdentityRefusal`) fails
+`releases/image/code-steps.json` included. `packages/upgrade/scripts/check-release-manifest.ts` (`releaseIdentityRefusal`) fails
 the release PR (`release-manifest-check.yml`) and the image publish (`publish-docker-app.yml`)
 while the manifest is missing: release-please rewrites the branch on each merge to main and drops
 the stamp commit until the job pushes it again. Make the `Release manifest` check required on `main`.
