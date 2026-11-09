@@ -76,3 +76,21 @@ Feature: An experiment run shows the agent version and the concurrency it ran wi
     When the results page lists that run
     Then its run list entry reads "Concurrency 1"
     And a run with no recorded concurrency shows no concurrency
+
+  @unit
+  Scenario: A run's state read before the concurrency column exists answers no concurrency
+    Given a ClickHouse target without the experiment_runs Concurrency column
+    When a run's state is read
+    Then the read selects a null concurrency under the column name
+
+  @unit
+  Scenario: A run's state read once the concurrency column exists answers the stored concurrency
+    Given a ClickHouse target with the experiment_runs Concurrency column
+    When a run's state is read
+    Then the read selects the stored concurrency
+
+  @integration
+  Scenario: The selected run's title shows the concurrency it used
+    Given the results page shows a run that recorded concurrency 1
+    Then the title reads "Concurrency 1"
+    And a selected run with no recorded concurrency shows no concurrency in the title
