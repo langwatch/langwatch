@@ -187,6 +187,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "  route /ops/cloud/licenses -> pages/ops/cloud/licenses",
   "  route /ops/cloud/self-hosted-instances -> pages/ops/cloud/self-hosted-instances",
   "  route /ops/cloud/bug-reports -> pages/ops/cloud/bug-reports",
+  "  route /ops/cloud/seat-use -> pages/ops/cloud/seat-use",
   "  redirect /ops/backoffice -> /ops/cloud (from /ops/backoffice)",
   "  redirect /ops/backoffice/* -> /ops (from /ops/backoffice) [map user=users users=users organization=organizations organizations=organizations project=projects projects=projects sso-connections=sso-connections identity-lookup=identity-lookup directory-sync=directory-sync subscription=cloud/subscriptions subscriptions=cloud/subscriptions licenses=cloud/licenses self-hosted-instances=cloud/self-hosted-instances bug-reports=cloud/bug-reports]",
   "  route /@project/* -> pages/@project/[...path]/index",

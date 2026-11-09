@@ -32,7 +32,10 @@ import {
   definePipeline,
   type EventingSetup,
 } from "@langwatch/eventing";
-import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import {
+  ORGANIZATION_AGGREGATE_TYPE,
+  OrganizationNotFoundError,
+} from "@langwatch/organization-contract";
 import { Temporal } from "@langwatch/time";
 import { USER_ERASED_EVENT_TYPE, userErasedEventDataSchema } from "@langwatch/user-contract";
 
@@ -60,7 +63,6 @@ import {
   integrationMethodChosenEventSchema,
   inviteAcceptedEventSchema,
   membersInvitedEventSchema,
-  ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_LIFECYCLE_PIPELINE_NAME,
   organizationCreatedEventSchema,
   organizationMemberDisabledEventSchema,
@@ -258,23 +260,26 @@ export function buildOrganizationLifecyclePipeline({
     .withPeerSubscriber("organizationAuthzMemberOffboarded", {
       eventType: AUTHZ_MEMBER_OFFBOARDED_EVENT_TYPE,
       data: authzMemberOffboardedEventDataSchema,
-      handle: ({ organizationId, userId, offboardedByUserId, occurredAt }) =>
+      handle: ({ organizationId, userId, offboardedByUserId, occurredAt, heldFullSeat }) =>
         onLiveOrganization(() =>
           memberFacts.recordMemberOffboarded({
             organizationId,
             userId,
             offboardedByUserId,
             occurredAt,
+            heldFullSeat,
           }),
         ),
     })
     .withPeerSubscriber("organizationUserErased", {
       eventType: USER_ERASED_EVENT_TYPE,
       data: userErasedEventDataSchema,
-      handle: async ({ userId, organizationIds, occurredAt }) => {
+      handle: async ({ userId, organizationIds, fullSeatOrganizationIds, occurredAt }) => {
         for (const organizationId of organizationIds ?? []) {
+          // Facts from before the seat type was read carry no list and count as full seats.
+          const heldFullSeat = fullSeatOrganizationIds?.includes(organizationId);
           await onLiveOrganization(() =>
-            memberFacts.recordMemberErased({ organizationId, userId, occurredAt }),
+            memberFacts.recordMemberErased({ organizationId, userId, occurredAt, heldFullSeat }),
           );
         }
       },

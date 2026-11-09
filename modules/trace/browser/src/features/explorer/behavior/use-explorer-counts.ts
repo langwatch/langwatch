@@ -18,7 +18,7 @@ interface ActiveInstantEval {
   total: number | null;
   matched: number;
   /** Judging, asked to stop, or ended with its last verdicts still landing. */
-  phase: Exclude<InstantEvalRunPhase, "settled">;
+  phase: Exclude<InstantEvalRunPhase, "settled" | "failed">;
 }
 
 interface ExplorerCounts {
@@ -118,7 +118,8 @@ function firstUnsettledInstantEval({
     const run = runId === null ? undefined : state.runs[runId];
     if (!run) continue;
     const phase = selectInstantEvalRunPhase(state, run.id);
-    if (phase === null || phase === "settled") continue;
+    // A failed run has no counters left to wait for: the counts read the list.
+    if (phase === null || phase === "settled" || phase === "failed") continue;
     return {
       runId: run.id,
       judged: run.progress,

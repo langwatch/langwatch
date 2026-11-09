@@ -17,9 +17,10 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 /**
  * 1,540 with `pnpm ensure:built` (#8795); 1,561 with ADR-185 (docs consent reads api-key config).
  * 1,562 with ADR-190 (instant-eval-judge route contract); 1,565 with ADR-192 (Grok OTLP walk).
- * 1,567 with agent and evaluator versions; 1,569 with ADR-188 (pi definition, canonicaliser).
- * 1,570 with `dataset-version.ts`; 1,571 with the Grok canonicaliser. A ceiling, not a target. */
-const CEILING = 1_571;
+ * 1,567 agent and evaluator versions; 1,569 ADR-188 (pi); 1,570 `dataset-version.ts`.
+ * 1,576 seat requests; 1,577 Langy's `langy-call-stopped.ts`; 1,578 the Grok canonicaliser.
+ * A ceiling: lower it when earned. */
+const CEILING = 1_578;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {

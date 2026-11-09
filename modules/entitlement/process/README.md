@@ -28,6 +28,14 @@ getActivePlan(input: ResolvePlanInput): Promise<Plan>;
 getUsage(input: GetUsageInput): Promise<UsageStats>;
 ```
 
+#### `getUsageMonthBreakdown`
+
+This month day by day and project by project, for the usage page.
+
+```typescript
+getUsageMonthBreakdown(input: { organizationId: string }): Promise<UsageMonthBreakdown>;
+```
+
 #### `assertWithinUsageLimit`
 
 Throws `ERR_PLAN_LIMIT` (402) once the organization spent its monthly allowance.
@@ -72,7 +80,7 @@ None: this module declares no REST family.
 
 ### `costs`
 
-Contract `../contract/src/entitlement.trpc.ts:45`, router `src/transport/organization-spend.trpc.ts:12`.
+Contract `../contract/src/entitlement.trpc.ts:49`, router `src/transport/organization-spend.trpc.ts:12`.
 
 | Procedure                                 | Kind  | Gate                           | Input                        | Output |
 | ----------------------------------------- | ----- | ------------------------------ | ---------------------------- | ------ |
@@ -80,13 +88,13 @@ Contract `../contract/src/entitlement.trpc.ts:45`, router `src/transport/organiz
 
 ```typescript
 // costs.getAggregatedCostsForOrganization
-// Input: aggregatedCostsInputSchema, ../contract/src/entitlement.trpc.ts:43
+// Input: aggregatedCostsInputSchema, ../contract/src/entitlement.trpc.ts:47
 interface Input {
   organizationId: string;
   startDate: number;
   endDate: number;
 }
-// Output: projectSpendRollupSchema.array() (inline, ../contract/src/entitlement.trpc.ts:48)
+// Output: projectSpendRollupSchema.array() (inline, ../contract/src/entitlement.trpc.ts:52)
 ```
 
 ### `plan`
@@ -110,15 +118,20 @@ type Output = z.infer<typeof planSchema>; // ../contract/src/plan.ts:38
 
 Contract `../contract/src/entitlement.trpc.ts:23`, router `src/transport/usage-limits.trpc.ts:12`.
 
-| Procedure                                   | Kind     | Gate                             | Input                                | Output                    |
-| ------------------------------------------- | -------- | -------------------------------- | ------------------------------------ | ------------------------- |
-| `limits.getUsage`                           | query    | Permission `organization:view`   | `entitlementOrganizationScopeSchema` | `usageStatsSchema`        |
-| `limits.checkAndSendUsageLimitNotification` | mutation | Permission `organization:manage` | `sendUsageLimitWarningInputSchema`   | `usageLimitWarningSchema` |
+| Procedure                                   | Kind     | Gate                             | Input                                | Output                      |
+| ------------------------------------------- | -------- | -------------------------------- | ------------------------------------ | --------------------------- |
+| `limits.getUsage`                           | query    | Permission `organization:view`   | `entitlementOrganizationScopeSchema` | `usageStatsSchema`          |
+| `limits.getMonthBreakdown`                  | query    | Permission `organization:manage` | `entitlementOrganizationScopeSchema` | `usageMonthBreakdownSchema` |
+| `limits.checkAndSendUsageLimitNotification` | mutation | Permission `organization:manage` | `sendUsageLimitWarningInputSchema`   | `usageLimitWarningSchema`   |
 
 ```typescript
 // limits.getUsage
 type Input = z.infer<typeof entitlementOrganizationScopeSchema>; // ../contract/src/entitlement.schemas.ts:17
 type Output = z.infer<typeof usageStatsSchema>; // ../contract/src/usage.ts:89
+
+// limits.getMonthBreakdown
+type Input = z.infer<typeof entitlementOrganizationScopeSchema>; // ../contract/src/entitlement.schemas.ts:17
+type Output = z.infer<typeof usageMonthBreakdownSchema>; // ../contract/src/usage.ts:125
 
 // limits.checkAndSendUsageLimitNotification
 // Input: sendUsageLimitWarningInputSchema, ../contract/src/entitlement.schemas.ts:43

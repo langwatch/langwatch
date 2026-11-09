@@ -10,6 +10,7 @@ import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
 import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
 import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import {
@@ -669,6 +670,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
 
   const shippedService = () =>
     LangWatchQLService.create({
+      runTelemetry: TEST_RUN_TELEMETRY,
       executor: ClickHouseLangWatchQLExecutorRepository.create({
         connection: {
           ...harness.restrictedConnection(),
@@ -1316,6 +1318,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       // for: the claim is about the relationship between the result and the
       // instant, and a wall clock would make it true only once.
       service = LangWatchQLService.create({
+        runTelemetry: TEST_RUN_TELEMETRY,
         executor: ClickHouseLangWatchQLExecutorRepository.create({
           connection: {
             ...harness.restrictedConnection(),

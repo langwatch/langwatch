@@ -15,7 +15,7 @@ Feature: Plan Management Navigation
 
   # Usage page plan change redirect
   @e2e @unimplemented
-  Scenario: Usage page change plan redirects to Subscription in SaaS mode
+  Scenario: Usage page change plan redirects to Plan & billing in SaaS mode
     Given the platform is deployed in SaaS mode (IS_SAAS=true)
     And I am on the usage settings page at /settings/usage
     When I click the "Change plan" button
@@ -31,7 +31,7 @@ Feature: Plan Management Navigation
 
   # Message limit reached redirects
   @e2e @unimplemented
-  Scenario: Message limit banner redirects to Subscription in SaaS mode
+  Scenario: Message limit banner redirects to Plan & billing in SaaS mode
     Given the platform is deployed in SaaS mode
     And the organization has reached the maximum messages for the month
     When I see the limit warning banner
@@ -56,11 +56,11 @@ Feature: Plan Management Navigation
     When I view the settings menu
     Then in SaaS mode:
       | Menu Item    | Visible |
-      | Subscription | true    |
+      | Plan & billing | true    |
       | License      | false   |
     And in self-hosted mode:
       | Menu Item    | Visible |
-      | Subscription | false   |
+      | Plan & billing | false   |
       | License      | true    |
 
   @e2e @unimplemented

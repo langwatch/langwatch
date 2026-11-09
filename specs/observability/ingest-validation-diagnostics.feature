@@ -123,3 +123,15 @@ Feature: Ingest validation diagnostics
     When a span fails schema validation
     Then the rejection is logged at warning level
     And the response status is 400
+
+  @unit @regression
+  Scenario: A refused payload never raises an error signature
+    When the collector reports a payload it refused for failing validation
+    Then the report is logged at warning level
+    And nothing about the refusal is logged at error level
+
+  @unit @regression
+  Scenario: Every collector refusal logs at warning level
+    When the collector refuses a body for an evaluation with no verdict, a missing or mixed trace id, or timestamps in seconds
+    Then the refusal is logged at warning level
+    And the response status is 400

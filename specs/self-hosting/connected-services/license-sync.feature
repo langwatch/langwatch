@@ -191,6 +191,33 @@ Feature: License sync
     When an admin opens Settings, Connect
     Then the page shows when sync last succeeded and why it is failing
 
+  @integration
+  Scenario: The sync line uses the same words on the Connect and License pages
+    Given a license that names a hosted service
+    When the last sync succeeded, the Connect page reads "Last synced" and how long ago
+    And when no sync has run yet, it reads "Not synced yet"
+    And the License page shows the same line from the same reading
+
+  @unit
+  Scenario: A sync time that cannot be read reads as not synced
+    Given the last sync time is missing or cannot be parsed
+    When the sync line is written
+    Then it reads "Not synced yet"
+    And a failed last sync still leads with "Last sync failed."
+
+  @integration
+  Scenario: The sync line follows a refresh once its outcome is recorded
+    Given a license that names a hosted service
+    When an admin refreshes the license on the License page
+    Then the page re-reads the sync line until the refresh's outcome is recorded
+    And it stops re-reading once the line changed
+
+  @integration
+  Scenario: A failure that is already the page's refusal is not shown twice
+    Given the last sync was refused for the same reason the hosted services refuse the license
+    When an admin opens Settings, Connect
+    Then the reason is shown once
+
   # ============================================================================
   # Refresh on demand
   # ============================================================================

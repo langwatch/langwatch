@@ -41,8 +41,9 @@ export type IdempotencyReceiptUpdate = Partial<
 >;
 
 /**
- * Minimal durable receipt store used by the idempotency protocol. Each fenced write is one
- * conditional `updateMany`, so a transaction client fits too.
+ * Minimal durable receipt store used by the idempotency protocol. `updateMany` is a fenced
+ * write: its conditions must hold against the row a parked write re-checks, which Prisma's own
+ * `updateMany` does not (its subquery re-checks an old snapshot).
  */
 export interface IdempotencyReceiptPersistence {
   readonly idempotencyReceipt: {
