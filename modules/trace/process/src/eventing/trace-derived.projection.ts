@@ -5,7 +5,7 @@ import {
   type FoldEventHandlers,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
+import { ATTR_KEYS, NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import { nowInstant } from "@langwatch/time";
 import {
   anchorStorageTime,
@@ -668,7 +668,7 @@ export class TraceAnalyticsFoldProjection
     mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
     for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
       // A log's service and origin only fill a gap: a value a span or resolution set stands.
-      const fillOnly = key === "service.name" || key === TRACE_ANALYTICS_ATTR_KEYS.ORIGIN;
+      const fillOnly = key === ATTR_KEYS.SERVICE_NAME || key === TRACE_ANALYTICS_ATTR_KEYS.ORIGIN;
       if (fillOnly && mergedAttributes[key]) continue;
       mergedAttributes[key] = String(value);
     }

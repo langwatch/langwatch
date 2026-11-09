@@ -532,7 +532,7 @@ export class TraceSummaryFoldProjection
         continue;
       }
       // A log's service and origin only fill a gap: a value a span or resolution set stands.
-      const fillOnly = key === "service.name" || key === ORIGIN_ATTR;
+      const fillOnly = key === ATTR_KEYS.SERVICE_NAME || key === ORIGIN_ATTR;
       if (fillOnly && mergedAttributes[key]) continue;
 
       mergedAttributes[key] = String(value);

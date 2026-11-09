@@ -127,7 +127,10 @@ describe("LogRequestCollectionService", () => {
     it("leaves an application log's service to its spans", async () => {
       const { result, contributed } = collect({
         accepted: [
-          preparedLog({ providerKind: "generic", resourceAttributes: { "service.name": "checkout" } }),
+          preparedLog({
+            providerKind: "generic",
+            resourceAttributes: { "service.name": "checkout" },
+          }),
         ],
       });
 
