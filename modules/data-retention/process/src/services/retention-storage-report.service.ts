@@ -3,8 +3,8 @@
  * billing. Rows older than 90 days, not total x (R - 90) / R, so a young organization pays for
  * nothing. Spec: specs/billing/retention-storage-billing.feature
  */
+import type { RetentionStorageMeasuredEventData } from "@langwatch/data-retention-contract";
 import type { BillingApi, RetentionStorageOutcome } from "@langwatch/enterprise-billing-contract";
-import { createLogger } from "@langwatch/observability";
 
 import type { DataRetentionDirectoryReader } from "../app/data-retention.app.ts";
 import type { DataRetentionRepository } from "../repositories/data-retention.repository.ts";
@@ -12,23 +12,15 @@ import type { StorageMeterRepository } from "../repositories/storage-meter.repos
 import {
   includedRetentionCutoffMs,
   longestRetentionDays,
+  retentionStorageDayOf,
+  retentionStorageMeasurement,
 } from "../rules/retention-storage.rules.ts";
-
-const logger = createLogger("langwatch:data-retention:retention-storage");
-
-/** What one daily pass did, organization by organization. */
-export type RetentionStorageReportOutcome = Readonly<{
-  measured: number;
-  unbilled: number;
-  failed: number;
-}>;
 
 type Options = Readonly<{
   policies: Pick<DataRetentionRepository, "findAllInOrganization" | "findOrganizationIdsWithRules">;
   directory: Pick<DataRetentionDirectoryReader, "findScopeProjects">;
   meter: Pick<StorageMeterRepository, "getTenantBytesBefore">;
   billing: Pick<BillingApi, "recordRetentionStorage">;
-  now?: () => number;
 }>;
 
 export class RetentionStorageReportService {
@@ -38,6 +30,11 @@ export class RetentionStorageReportService {
 
   private constructor(private readonly options: Options) {}
 
+  /** Every organization with a retention rule: the ones the daily report asks about. */
+  findOrganizationIds(): Promise<readonly string[]> {
+    return this.options.policies.findOrganizationIdsWithRules();
+  }
+
   /** Aligns the storage line with the organization's rules, without measuring. */
   async syncLine({ organizationId }: { organizationId: string }): Promise<RetentionStorageOutcome> {
     return this.options.billing.recordRetentionStorage({
@@ -46,49 +43,58 @@ export class RetentionStorageReportService {
     });
   }
 
-  /** Aligns the line, then measures and reports only when the organization pays for storage. */
-  async reportOrganization({
+  /**
+   * Aligns the line, then measures only when the organization pays for storage: one
+   * measurement for the day, or none when billing has no storage line for it.
+   */
+  async measure({
     organizationId,
+    day,
+    measuredAt,
   }: {
     organizationId: string;
-  }): Promise<RetentionStorageOutcome> {
+    day: string;
+    measuredAt: number;
+  }): Promise<readonly RetentionStorageMeasuredEventData[]> {
+    const measuredDay = retentionStorageDayOf(measuredAt).day;
+    if (measuredDay !== day) {
+      throw new Error(`A measurement taken on ${measuredDay} cannot stand for ${day}`);
+    }
     const longest = await this.longest(organizationId);
     const aligned = await this.options.billing.recordRetentionStorage({
       organizationId,
       longestRetentionDays: longest,
     });
-    if (aligned.line !== "added" && aligned.line !== "kept") return aligned;
+    if (aligned.line !== "added" && aligned.line !== "kept") return [];
 
-    const measuredAt = (this.options.now ?? Date.now)();
-    const bytes = await this.bytesPastIncluded({ organizationId, measuredAt });
-    return this.options.billing.recordRetentionStorage({
+    const bytesAboveIncluded = await this.bytesPastIncluded({ organizationId, measuredAt });
+    const measurement = retentionStorageMeasurement({
       organizationId,
-      longestRetentionDays: longest,
-      bytesAboveIncluded: bytes,
+      bytesAboveIncluded,
       measuredAt,
     });
+    return [
+      {
+        organizationId,
+        day: measurement.day,
+        longestRetentionDays: longest,
+        bytesAboveIncluded,
+        gbBeyondIncluded: measurement.gbBeyondIncluded,
+        dailyShareGb: measurement.dailyShareGb,
+        identifier: measurement.identifier,
+        measuredAt,
+      },
+    ];
   }
 
-  /** One pass over every organization with rules; a failure is counted and retried tomorrow. */
-  async reportAll(): Promise<RetentionStorageReportOutcome> {
-    const organizationIds = await this.options.policies.findOrganizationIdsWithRules();
-    let measured = 0;
-    let unbilled = 0;
-    let failed = 0;
-    for (const organizationId of organizationIds) {
-      try {
-        const outcome = await this.reportOrganization({ organizationId });
-        if (outcome.reportedGbMonths === null) unbilled += 1;
-        else measured += 1;
-      } catch (error) {
-        failed += 1;
-        logger.error(
-          { organizationId, error: error instanceof Error ? error.message : String(error) },
-          "Retention storage report failed for an organization",
-        );
-      }
-    }
-    return { measured, unbilled, failed };
+  /** Sends a recorded measurement to billing's meter; the day's identifier makes it once. */
+  bill(measured: RetentionStorageMeasuredEventData): Promise<RetentionStorageOutcome> {
+    return this.options.billing.recordRetentionStorage({
+      organizationId: measured.organizationId,
+      longestRetentionDays: measured.longestRetentionDays,
+      bytesAboveIncluded: measured.bytesAboveIncluded,
+      measuredAt: measured.measuredAt,
+    });
   }
 
   private async longest(organizationId: string): Promise<number> {

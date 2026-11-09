@@ -25,8 +25,9 @@ import {
   type StorageMeterTenantsInput,
   type UnpinTraceInput,
 } from "@langwatch/data-retention-contract";
-import { BillingApi, type RetentionStorageOutcome } from "@langwatch/enterprise-billing-contract";
+import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import type { Instant } from "@langwatch/time";
@@ -36,6 +37,11 @@ import {
   buildDataRetentionSeatPolicyPipeline,
   type DataRetentionSeatPolicyPipeline,
 } from "../eventing/data-retention-seat-policy.pipeline.ts";
+import { ReportRetentionStorageCommand } from "../eventing/retention-storage-report.commands.ts";
+import {
+  buildRetentionStorageReportPipeline,
+  type RetentionStorageReportPipelineDefinition,
+} from "../eventing/retention-storage-report.pipeline.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
 import {
   DataRetentionPolicyService,
@@ -47,9 +53,10 @@ import { OrganizationStorageEstimateService } from "../services/organization-sto
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
 import { RetentionPlanService } from "../services/retention-plan.service.ts";
 import {
-  RetentionStorageReportService,
-  type RetentionStorageReportOutcome,
-} from "../services/retention-storage-report.service.ts";
+  RetentionStorageReportRequestService,
+  type RetentionStorageRequestOutcome,
+} from "../services/retention-storage-report-request.service.ts";
+import { RetentionStorageReportService } from "../services/retention-storage-report.service.ts";
 import { SeatRetentionPolicyService } from "../services/seat-retention-policy.service.ts";
 import { StorageMeterScopeService } from "../services/storage-meter-scope.service.ts";
 import { StorageMeterService } from "../services/storage-meter.service.ts";
@@ -126,6 +133,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
   readonly #seatPolicies: SeatRetentionPolicyService;
   readonly #storageEstimates: OrganizationStorageEstimateService;
   readonly #storageReport: RetentionStorageReportService;
+  readonly #storageRequests: RetentionStorageReportRequestService;
   readonly #users: UserApi;
 
   private constructor(services: {
@@ -136,6 +144,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     seatPolicies: SeatRetentionPolicyService;
     storageEstimates: OrganizationStorageEstimateService;
     storageReport: RetentionStorageReportService;
+    storageRequests: RetentionStorageReportRequestService;
     users: UserApi;
   }) {
     this.#retention = services.retention;
@@ -145,6 +154,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     this.#seatPolicies = services.seatPolicies;
     this.#storageEstimates = services.storageEstimates;
     this.#storageReport = services.storageReport;
+    this.#storageRequests = services.storageRequests;
     this.#users = services.users;
   }
 
@@ -175,6 +185,13 @@ export class DataRetentionModule implements DataRetentionApiContract {
       }),
     });
 
+    const storageReport = RetentionStorageReportService.create({
+      policies: repositories.policies,
+      directory: repositories.directory,
+      meter: repositories.storageMeter,
+      billing: dependencies.billing,
+    });
+
     return new DataRetentionModule({
       retention,
       policy,
@@ -195,11 +212,9 @@ export class DataRetentionModule implements DataRetentionApiContract {
         directory: repositories.directory,
         retention,
       }),
-      storageReport: RetentionStorageReportService.create({
-        policies: repositories.policies,
-        directory: repositories.directory,
-        meter: repositories.storageMeter,
-        billing: dependencies.billing,
+      storageReport,
+      storageRequests: RetentionStorageReportRequestService.create({
+        organizations: storageReport,
       }),
       users: dependencies.users,
     });
@@ -210,16 +225,33 @@ export class DataRetentionModule implements DataRetentionApiContract {
     return buildDataRetentionSeatPolicyPipeline({ seatPolicies: this.#seatPolicies });
   }
 
-  /** The daily `data_retention_storage_report` pass: each organization's storage past 90 days. */
-  reportRetentionStorage(): Promise<RetentionStorageReportOutcome> {
-    return this.#storageReport.reportAll();
+  /** The `data_retention_storage_report` pipeline: daily clock, measure command and bill. */
+  storageReportPipeline(deps: {
+    deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
+  }): RetentionStorageReportPipelineDefinition {
+    return buildRetentionStorageReportPipeline({
+      reportCommand: ReportRetentionStorageCommand.create({ measurer: this.#storageReport }),
+      sweep: {
+        request: ({ at }) => this.#storageRequests.requestAll({ at }),
+        deleteDispatchedBefore: deps.deleteDispatchedBefore,
+      },
+      bill: (measured) => this.#storageReport.bill(measured),
+    });
   }
 
-  /** One organization's report now, as the hand-run task asks it. */
-  reportOrganizationRetentionStorage(input: {
-    organizationId: string;
-  }): Promise<RetentionStorageOutcome> {
-    return this.#storageReport.reportOrganization(input);
+  connectStorageReportCommands(
+    commands: EventingCommands<RetentionStorageReportPipelineDefinition>,
+  ): void {
+    this.#storageRequests.connect((data) => commands.reportRetentionStorage.send(data));
+  }
+
+  /** Sends today's measure command for one organization, or for every one with rules. */
+  requestRetentionStorageReport(input: {
+    organizationId?: string;
+  }): Promise<RetentionStorageRequestOutcome> {
+    return input.organizationId
+      ? this.#storageRequests.requestOrganization({ organizationId: input.organizationId })
+      : this.#storageRequests.requestAll();
   }
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {

@@ -355,13 +355,15 @@ Declared at `src/eventing/data-retention-seat-policy.pipeline.ts:32`.
 | --------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | peer subscriber | `dataRetentionSeatActivation` | `lw.billing.subscription_started` from [billing](../../../enterprise/modules/billing/README.md) | `src/eventing/data-retention-seat-policy.pipeline.ts:38` |
 
-### Pipeline `data_retention_storage_report` (aggregate `global`)
+### Pipeline `data_retention_storage_report` (aggregate `data_retention_storage`)
 
-Declared at `src/eventing/retention-storage-report.pipeline.ts:42`.
+Declared at `src/eventing/retention-storage-report.pipeline.ts:55`. Events: `retentionStorageMeasuredEventSchema`.
 
-| Kind            | Name                     | Handles                                                                                            | Declared at                                            |
-| --------------- | ------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| process manager | `retentionStorageReport` | every 1 d (`RETENTION_STORAGE_REPORT_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/retention-storage-report.pipeline.ts:48` |
+| Kind            | Name                      | Handles                                                                                            | Declared at                                            |
+| --------------- | ------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| command         | –                         | –                                                                                                  | `src/eventing/retention-storage-report.pipeline.ts:60` |
+| process manager | `retentionStorageReport`  | every 1 d (`RETENTION_STORAGE_REPORT_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/retention-storage-report.pipeline.ts:65` |
+| process manager | `retentionStorageBilling` | intents `bill` (outbox)                                                                            | `src/eventing/retention-storage-report.pipeline.ts:78` |
 
 ### Tasks
 
@@ -369,7 +371,7 @@ Run by the tasks process, before serve.
 
 | Task                       | Class                        | Declared at                                     |
 | -------------------------- | ---------------------------- | ----------------------------------------------- |
-| `retention-storage-report` | `RetentionStorageReportTask` | `src/tasks/retention-storage-report.task.ts:17` |
+| `retention-storage-report` | `RetentionStorageReportTask` | `src/tasks/retention-storage-report.task.ts:15` |
 
 ## Configuration
 

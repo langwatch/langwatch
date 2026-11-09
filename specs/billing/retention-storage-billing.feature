@@ -10,6 +10,14 @@ Feature: Billing storage kept past the 90 days Growth includes
   every day bills the average GB kept that month, and a day that was missed
   bills nothing rather than a guess.
 
+  The report is event-sourced. Once a day the worker sends one measure
+  command per organization. The command records one measurement event for
+  that organization and day, keyed by the meter identifier
+  retention-storage:<organization>:<day>. A billing process reads each
+  measurement and sends it to the meter through its own outbox, so a failed
+  send is retried without measuring again. The hand-run task sends the same
+  command.
+
   @unit
   Scenario: A checkout with a retention above 90 days adds the storage line
     When a Growth seat checkout is opened with a retention of 182 days
@@ -80,6 +88,39 @@ Feature: Billing storage kept past the 90 days Growth includes
     Given two organizations with long retention, one whose measurement fails
     When the daily report runs
     Then the other organization is still reported and one failure is counted
+
+  @unit
+  Scenario: The daily wake asks for one measurement per organization
+    Given two organizations with long retention
+    When the daily report wakes
+    Then one measure command is sent for each organization, for that UTC day
+
+  @integration
+  Scenario: Each organization is measured once a day as one event
+    Given an organization with a Growth subscription and the storage line
+    And it keeps rows older than 91 days
+    When the measure command runs for that day
+    Then one measurement event is recorded for that organization and day
+    And it carries the GB past 91 days, the day's share and the meter identifier
+    And the meter receives that day's share once
+
+  @integration
+  Scenario: A rerun on the same day bills nothing twice
+    Given the storage of an organization was measured and billed today
+    When the measure command runs again the same day
+    Then the meter is not sent a second share for that day
+
+  @integration
+  Scenario: A failed meter send retries without a second measurement
+    Given billing fails the first time a day's measurement is sent
+    When the measure command runs for that day
+    Then the storage is measured once
+    And the send is retried until the meter receives the day's share
+
+  @unit
+  Scenario: The hand-run report sends the same measure command
+    When an operator runs the retention storage report for one organization
+    Then one measure command is sent for that organization, for today
 
   @integration
   Scenario: The storage read filters every metered table on its partition column

@@ -18,7 +18,7 @@ Data retention: the retention policy per scope, the pins that keep data past it,
 
 | Kind                           | Name                                                                                                       | Declared at                                                                        |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Postgres table                 | `RetentionPolicy`                                                                                          | `process/src/repositories/prisma/prisma.data-retention.repository.ts:21`           |
+| Postgres table                 | `RetentionPolicy`                                                                                          | `process/src/repositories/prisma/prisma.data-retention.repository.ts:32`           |
 | Postgres table                 | `PinnedTrace`                                                                                              | `process/src/repositories/prisma/prisma.pinned-trace.repository.ts:13`             |
 | Postgres, accessed not claimed | `Organization`, `Project`, `Team`                                                                          | `process/src/repositories/prisma/prisma.data-retention-directory.repository.ts:17` |
 | Stores required                | prisma, clickhouse, redis                                                                                  | `process/src/repositories/live/live.data-retention.repositories.ts:24`             |

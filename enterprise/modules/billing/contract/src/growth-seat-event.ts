@@ -263,6 +263,17 @@ export type RetentionStorageOutcome = Readonly<{
   reportedGbMonths: number | null;
 }>;
 
+/** The storage meter's identifier: one per organization and UTC day, so a day bills once. */
+export function retentionStorageMeterIdentifier({
+  organizationId,
+  day,
+}: {
+  organizationId: string;
+  day: string;
+}): string {
+  return `retention-storage:${organizationId}:${day}`;
+}
+
 /** Bytes in one GB, as storage is priced. */
 export const BYTES_PER_GB = 1_000_000_000;
 

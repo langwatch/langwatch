@@ -23,7 +23,7 @@ export const dataRetentionProcessModule: PublishedProcessModule<
   .withTransports(dataRetentionTrpcTransport)
   .withEventing(dataRetentionSeatPolicyEventing)
   .withEventing(retentionStorageReportEventing)
-  .withTasks(({ app }) => [RetentionStorageReportTask.create({ reporter: app })])
+  .withTasks(({ app }) => [RetentionStorageReportTask.create({ requests: app })])
   .withMigrations(({ repositories }) => [
     defineMigrationStep({
       id: "data-retention:keep-control-plane-events-forever",
