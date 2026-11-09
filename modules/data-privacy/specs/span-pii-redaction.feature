@@ -303,6 +303,14 @@ Feature: Redacting personal data out of a span at ingestion
     Then it is refused without invoking the function
 
   @unit
+  Scenario: A long batch skips the model and goes to Presidio
+    Given an organization allowlisted for the PII redaction model
+    When a strict batch holds more than 8,000 characters in all its texts
+    Then Presidio answers it and the model is not called
+    And a batch of many short texts counts the same as one long text
+    And its usage line records the outcome too_long
+
+  @unit
   Scenario: The model's Lambda alias wins over its address
     Given the deployment settings for the PII redaction model
     Then a Lambda alias ARN wins over an HTTP endpoint

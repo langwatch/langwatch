@@ -60,3 +60,7 @@ organization.
   "not configured" and nothing new is read: no flag, no project, no request. With a setting but
   without the flag, the only new work is one flag read per batch and one project read per project
   per minute; the batch goes to Presidio as before and the model is never called.
+- **Long batches.** A batch with more than 8,000 characters in all its texts
+  (`PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS`) skips the model and goes to Presidio, logged and
+  counted as `too_long`. The limit is per batch, not per text: one batch is one invoke, and the
+  model's time grows with every character in it, so many short texts are as slow as one long one.

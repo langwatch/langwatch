@@ -3,7 +3,11 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
-import { batchCharactersOf, PII_REDACTION_MODEL_FLAG } from "../rules/pii-redaction-model.rules.ts";
+import {
+  batchCharactersOf,
+  isBatchTooLongForModel,
+  PII_REDACTION_MODEL_FLAG,
+} from "../rules/pii-redaction-model.rules.ts";
 import type { DataPrivacyProjectScopeService } from "./data-privacy-project-scope.service.ts";
 import type {
   PiiAnalysisMetricsOtelService,
@@ -107,6 +111,11 @@ export class PiiRedactionModelService {
       texts: input.texts.length,
       characters: batchCharactersOf(input.texts),
     };
+    if (isBatchTooLongForModel(input.texts)) {
+      this.metrics.modelFellBack("too_long");
+      this.log.info({ ...call, spansFound: 0, outcome: "too_long", durationMs: 0 }, USAGE_MESSAGE);
+      return null;
+    }
 
     const startedAt = performance.now();
     try {

@@ -19,7 +19,7 @@ export const PII_ANALYSIS_EVALUATOR_TYPE = "presidio/pii_detection";
 export const PII_REDACTION_MODEL_FALLBACKS_METRIC_NAME = "pii_redaction_model_fallbacks";
 
 /** Why a batch routed to the PII redaction model went to Presidio instead. */
-export type PiiRedactionModelFallbackReason = "timeout" | "error" | "routing_error";
+export type PiiRedactionModelFallbackReason = "too_long" | "timeout" | "error" | "routing_error";
 
 /** External PII analysis counts and durations, pushed over OTLP. */
 export class PiiAnalysisMetricsOtelService {

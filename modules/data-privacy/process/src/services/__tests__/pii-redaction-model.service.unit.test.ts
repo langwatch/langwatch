@@ -436,4 +436,67 @@ describe("PiiRedactionModelService", () => {
       expect(scopeReads).toHaveLength(0);
     });
   });
+
+  describe("given an allowlisted organization and a long batch", () => {
+    /** @scenario "A long batch skips the model and goes to Presidio" */
+    it("sends a batch over 8,000 characters to Presidio and nothing to the model", async () => {
+      const { analysis, presidio, memoryModel, sent } = setup();
+      presidio.answerWith({
+        kind: "detected",
+        results: [
+          { status: "processed", raw_response: { anonymized: "<PERSON>" } },
+          { status: "skipped" },
+        ],
+      });
+
+      const cleared = await analysis.clearPresidio({
+        texts: ["a".repeat(5_000), "b".repeat(3_001)],
+        piiRedactionLevel: "STRICT",
+        projectId: PROJECT_ID,
+      });
+
+      expect(cleared).toEqual(["[PERSON]", null]);
+      expect(sent(memoryModel)).toHaveLength(0);
+      expect(sent(presidio)).toHaveLength(1);
+    });
+
+    it("still sends a batch of exactly 8,000 characters to the model", async () => {
+      const { analysis, presidio, memoryModel, sent } = setup();
+      memoryModel.answerWith(anonymized("<PERSON>"));
+
+      await analysis.clearPresidio({
+        texts: ["a".repeat(8_000)],
+        piiRedactionLevel: "STRICT",
+        projectId: PROJECT_ID,
+      });
+
+      expect(sent(memoryModel)).toHaveLength(1);
+      expect(sent(presidio)).toHaveLength(0);
+    });
+
+    /** @scenario "Each PII redaction model call leaves one usage log line" */
+    it("logs a long batch as too_long and counts it", async () => {
+      const { analysis, presidio, fallbacks, usage } = setup();
+      presidio.answerWith(anonymized("<PERSON>"));
+
+      await analysis.clearPresidio({
+        texts: ["a".repeat(8_001)],
+        piiRedactionLevel: "STRICT",
+        projectId: PROJECT_ID,
+      });
+
+      expect(fallbacks).toEqual(["too_long"]);
+      expect(usage.map((line) => line.fields)).toEqual([
+        {
+          organizationId: ORGANIZATION_ID,
+          projectId: PROJECT_ID,
+          texts: 1,
+          characters: 8_001,
+          spansFound: 0,
+          outcome: "too_long",
+          durationMs: 0,
+        },
+      ]);
+    });
+  });
 });

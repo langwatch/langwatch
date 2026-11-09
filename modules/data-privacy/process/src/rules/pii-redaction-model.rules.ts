@@ -51,3 +51,15 @@ export function piiRedactionModelTargetOf({
 export function batchCharactersOf(texts: readonly string[]): number {
   return texts.reduce((total, text) => total + text.length, 0);
 }
+
+/**
+ * Above this many characters in all of a batch's texts, the batch goes to Presidio. Per batch,
+ * not per text: one batch is one invoke and its time grows with every character in it (about
+ * 4 s for 2k, 40 to 56 s for 20k). A batch is never split across two services.
+ */
+export const PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS = 8_000;
+
+/** Whether a batch is too long for the model to answer inside its time cap. */
+export function isBatchTooLongForModel(texts: readonly string[]): boolean {
+  return batchCharactersOf(texts) > PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS;
+}
