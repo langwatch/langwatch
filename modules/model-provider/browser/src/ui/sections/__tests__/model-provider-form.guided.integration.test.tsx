@@ -283,7 +283,10 @@ describe("the shared provider form in its guided presentation", () => {
     });
 
     /** @scenario "A stored Azure deployment mapping names the deployment checked" */
-    it("checks the deployment the row maps the picked model to", async () => {
+    it.each([
+      ["bare", (model: string) => model],
+      ["provider-prefixed", (model: string) => `azure/${model}`],
+    ])("checks the deployment a %s mapping key names", async (_shape, keyFor) => {
       const [recommended] = findRecommendedChatModels({ provider: "openai", limit: 1 });
       if (!recommended) throw new Error("OpenAI offers no chat models");
       listing.rows = [
@@ -295,7 +298,7 @@ describe("the shared provider form in its guided presentation", () => {
             storedBaseUrl: "https://acme.openai.azure.com",
           }),
           scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
-          deploymentMapping: { [recommended]: "acme-prod" },
+          deploymentMapping: { [keyFor(recommended)]: "acme-prod" },
         },
       ];
       renderGuided("azure");

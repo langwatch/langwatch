@@ -18,6 +18,7 @@ import {
   useModelProvidersSettings,
 } from "@langwatch/model-provider-client";
 import {
+  deploymentForModel,
   skipListToInput,
   type ModelProviderEditorValue,
   modelProviders as modelProvidersRegistry,
@@ -102,6 +103,21 @@ function countEnabledProviders({
 }
 
 /** Enabled with no stored credentials means the environment supplies them. */
+/** A stored deployment mapping wins, read the same way execution reads it. */
+function mappedDeployment({
+  provider,
+  model,
+}: {
+  provider: ModelProviderEditorValue;
+  model: string | undefined;
+}): string | undefined {
+  if (!model) return model;
+  const qualifiedModel = `${provider.provider}/${model}`;
+  return (
+    deploymentForModel({ deploymentMapping: provider.deploymentMapping, qualifiedModel }) ?? model
+  );
+}
+
 function readsCredentialsFromEnvironment(provider: ModelProviderEditorValue): boolean {
   if (!provider.enabled) return false;
 
@@ -816,9 +832,8 @@ export const EditModelProviderForm = ({
     storedRow: provider,
   });
   // Only the guided panel names the model up front; the drawer probes without one.
-  // A stored deployment mapping wins, as it does when the model runs.
   const probedModel = guided
-    ? (provider.deploymentMapping?.[guidedSave.chatModel ?? ""] ?? guidedSave.chatModel)
+    ? mappedDeployment({ provider, model: guidedSave.chatModel })
     : undefined;
 
   // Same answer the credential fields render their required markers from.
