@@ -50,10 +50,12 @@ import { toolResultBodyToString } from "../../../../model/coding-agent/trace/too
 import {
   CLAUDE_MARK_GRADIENT,
   GEMINI_MARK_GRADIENT,
+  GROK_MARK_GREY,
   OPENCODE_GRAY,
   OPENCODE_GRAY_FILL,
   OPENCODE_WHITE,
   OPENCODE_WHITE_FILL,
+  PI_MARK_COLORS,
 } from "../../../../model/explorer/ai/ai-brand-palette.ts";
 import { TerminalDiff } from "./terminal-diff.tsx";
 import { TerminalOutput } from "./terminal-output.tsx";
@@ -317,8 +319,8 @@ interface TerminalViewProps {
   toolSpans?: ToolSpanIndex;
   /** Claude Code's own version, model, and repo — shown above the first prompt. */
   banner?: SessionBanner;
-  /** The trace's name, shown in the bottom bar where Claude Code shows its input. */
-  sessionName?: string | null;
+  /** The trace's name or the session's first prompt, shown in the bottom bar's input line. */
+  promptLine?: string | null;
   /**
    * A stable identity per entry, parallel to `entries`. Without it rows are
    * keyed by position, which is only safe while nothing is ever prepended.
@@ -632,7 +634,7 @@ export const TerminalView = memo(function TerminalView({
   entries,
   toolSpans = NO_TOOL_SPANS,
   banner,
-  sessionName,
+  promptLine,
   rowKeys,
   turnDividers,
   scrollback,
@@ -773,7 +775,7 @@ export const TerminalView = memo(function TerminalView({
         sessionCostUsd={sessionCostUsd ?? null}
         elapsedMs={point?.elapsedMs ?? 0}
         model={modelAtScroll}
-        sessionName={sessionName}
+        promptLine={promptLine}
       />
     </VStack>
   );
@@ -889,6 +891,25 @@ function claudeGradientMark(rows: readonly string[]): MarkSpec {
  */
 const GEMINI_MARK = columnColoredMark(["▝▜▄  ", "  ▝▜▄", " ▗▟▀ ", "▝▀   "], GEMINI_MARK_GRADIENT);
 
+/** pi's logo, its 4x4 grid of squares drawn two block glyphs to a square, colour for colour. */
+const PI_MARK: MarkSpec = {
+  rows: [
+    [{ text: "██████", color: PI_MARK_COLORS.coral }],
+    [
+      { text: "██  ", color: PI_MARK_COLORS.blue },
+      { text: "██", color: PI_MARK_COLORS.coral },
+    ],
+    [
+      { text: "████  ", color: PI_MARK_COLORS.blue },
+      { text: "██", color: PI_MARK_COLORS.yellow },
+    ],
+    [
+      { text: "██    ", color: PI_MARK_COLORS.blue },
+      { text: "██", color: PI_MARK_COLORS.yellow },
+    ],
+  ],
+};
+
 /**
  * opencode's block wordmark, segment-for-segment from the real TUI (tmux capture-pane -e of
  * `opencode` v1.18): "open" in gray, "code" in near-white, letter counters filled with a
@@ -970,14 +991,27 @@ const AGENT_BANNERS: Record<SessionBanner["agent"], { name: string; mark: MarkSp
   opencode: { name: "opencode", mark: OPENCODE_MARK },
   codex: { name: "Codex", mark: CODEX_MARK },
   gemini_cli: { name: "Gemini CLI", mark: GEMINI_MARK },
+  pi: { name: "pi", mark: PI_MARK },
   copilot: {
     name: "GitHub Copilot",
     mark: flatMark(["▗▛▀▀▀▜▖", "▐ ▐▌▐▌▌", "▝▙▄▄▄▟▘"], TERMINAL_TOKENS.blue),
   },
-  // A plain mark, not Grok's own startup art, which no capture has recorded.
+  // Grok's dotted ring and slash, glyph for glyph from `grok` 1.0.70's welcome screen
+  // (tmux capture-pane -e), in the xterm-256 grey 242 it draws it in.
   grok: {
     name: "Grok",
-    mark: flatMark(["▗▄▄▄▖", "▐ ▞ ▌", "▝▀▀▀▘"], TERMINAL_TOKENS.screenFg),
+    mark: flatMark(
+      [
+        "⠀⠀⠀⠀⠀⠀⣀⣀⡀⠀⠀⠀⢀⠄",
+        "⠀⠀⠀⣠⣾⠿⠛⠛⠛⠛⢀⡴⠁⠀",
+        "⠀⠀⣼⡟⠁⠀⠀⠀⢀⡴⠻⣿⡀⠀",
+        "⠀⠀⣿⡇⠀⠀⠀⠔⠁⠀⠀⣿⡇⠀",
+        "⠀⠀⢹⣷⠀⠀⠀⠀⠀⢀⣴⡿⠀⠀",
+        "⠀⢀⠞⠁⠠⢶⣶⣶⣶⠿⠋⠀⠀⠀",
+        "⠐⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
+      ],
+      GROK_MARK_GREY,
+    ),
   },
   unknown: {
     name: "Coding agent",
@@ -1651,7 +1685,7 @@ function StatusLine({
   sessionCostUsd,
   elapsedMs,
   model,
-  sessionName,
+  promptLine,
 }: {
   stepCount: number;
   currentStep: number;
@@ -1662,7 +1696,7 @@ function StatusLine({
   sessionCostUsd: number | null;
   elapsedMs: number;
   model?: string | null;
-  sessionName?: string | null;
+  promptLine?: string | null;
 }) {
   const costLabel = statusLineCostLabel({ costUsd, sessionCostUsd });
   return (
@@ -1688,7 +1722,7 @@ function StatusLine({
             ❯
           </Text>
           <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate minWidth={0} flex={1}>
-            {sessionName ?? "Untitled session"}
+            {promptLine ?? "Untitled session"}
           </Text>
         </HStack>
       </AsciiBox>

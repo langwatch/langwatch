@@ -203,6 +203,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "governance:record-coding-assistant-ingest-source-billing",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Records each organisation's billed facts again, so every ingest source type has one.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "governance:migrate-anomaly-webhook-destinations",
     "kind": "data",
     "mode": "background",

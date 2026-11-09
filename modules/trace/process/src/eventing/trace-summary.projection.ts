@@ -6,6 +6,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { ATTR_KEYS, NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import {
+  accumulateLogTiming,
   type AnnotationAddedEvent,
   type AnnotationRemovedEvent,
   type AnnotationsBulkSyncedEvent,
@@ -82,6 +83,7 @@ const RESERVED_CACHE_CREATION_1H_TOKENS = "langwatch.reserved.cache_creation_1h_
  */
 const RESERVED_CONTEXT_SIZE_TOKENS = "langwatch.reserved.context_size_tokens";
 const RESERVED_CONTEXT_SIZE_AT_MS = "langwatch.reserved.context_size_at_ms";
+const ORIGIN_ATTR = "langwatch.origin";
 
 /**
  * A single log record's normalized contribution to the trace summary fold.
@@ -93,6 +95,9 @@ interface LogContribution {
   input: string | null;
   output: string | null;
   timeUnixMs: number;
+  correlationSource: LogContributedEvent["data"]["correlationSource"];
+  /** When the platform accepted the record: what its own time is checked against. */
+  acceptedAtMs: number;
   liftedAttributes: Record<string, unknown>;
   nonBillable: boolean;
 }
@@ -301,6 +306,9 @@ export class TraceSummaryFoldProjection
         input: logIO.input,
         output: logIO.output,
         timeUnixMs: event.data.timeUnixMs,
+        // Only a record carrying its own trace context reaches this fold here.
+        correlationSource: "wire",
+        acceptedAtMs: event.occurredAt,
         liftedAttributes,
         // A log-only emitter has no per-span markers; the receiver stamps the
         // bundled flag on the log record's resource, so classify the whole
@@ -319,6 +327,8 @@ export class TraceSummaryFoldProjection
         input: event.data.input,
         output: event.data.output,
         timeUnixMs: event.data.timeUnixMs,
+        correlationSource: event.data.correlationSource,
+        acceptedAtMs: event.occurredAt,
         liftedAttributes: event.data.liftedAttributes,
         nonBillable: event.data.nonBillable,
       },
@@ -521,8 +531,9 @@ export class TraceSummaryFoldProjection
       if (perCallKeys.has(key)) {
         continue;
       }
-      // The first service named wins: a log never replaces one, so it names a spanless trace.
-      if (key === "service.name" && mergedAttributes[key]) continue;
+      // A log's service and origin only fill a gap: a value a span or resolution set stands.
+      const fillOnly = key === "service.name" || key === ORIGIN_ATTR;
+      if (fillOnly && mergedAttributes[key]) continue;
 
       mergedAttributes[key] = String(value);
     }
@@ -603,10 +614,24 @@ export class TraceSummaryFoldProjection
       models: totals.models,
     });
 
+    // Frozen before the log timing seeds `occurredAt`, so the anchor is the accept time the
+    // analytics fold freezes too: one partition and TTL address for the trace (ADR-071).
+    const { storageAnchorMs } = anchorStorageTime({
+      state,
+      eventOccurredAtMs: contribution.acceptedAtMs,
+    });
+
     return {
       ...state,
+      storageAnchorMs,
       traceId: state.traceId || contribution.traceId,
       ...io,
+      ...accumulateLogTiming({
+        state,
+        correlationSource: contribution.correlationSource,
+        timeUnixMs: contribution.timeUnixMs,
+        acceptedAtMs: contribution.acceptedAtMs,
+      }),
       attributes: mergedAttributes,
       ...totals,
     };

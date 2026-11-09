@@ -8,7 +8,11 @@
 #   modules/coding-agent/process/src/eventing/coding-agent-session-state.projection.ts (withIdentity, the lineage)
 #   modules/coding-agent/browser/src/model/assistant-presets.ts           (and the governance and user copies)
 #   modules/trace/browser/src/model/coding-agent/trace/terminal-session-banner.ts
+#   modules/trace/browser/src/ui/elements/coding-agent/trace/terminal-view.tsx (AGENT_BANNERS.grok)
 #   modules/trace/browser/src/model/terminal-origin.ts
+#   packages/span-normalisation/src/grokCanonicaliser.ts                 (the model off log records)
+#   modules/log/process/src/services/log-request-collection.service.ts   (the origin to the trace)
+#   modules/trace/contract/src/features/span/span-timing-fold.ts         (accumulateLogTiming)
 #
 # Related specs:
 #   specs/coding-agent/session-aggregate.feature         , the generic fold Grok joins
@@ -155,13 +159,26 @@ Rule: The session reads back as Grok's
     When the sessions list is read
     Then its row's assistant is shown as Grok
 
-  # The banner reads its model off model-call spans and Grok sends none, so a
-  # Grok banner carries no model, as Cowork's does without its beta spans.
+  # Grok sends no spans, so the trace has no span resource and no model-call span:
+  # the banner reads both off the turn's log records instead. Grok's welcome
+  # screen prints "Grok Build  1.0.70"; its build hash is not part of the version.
   @unit
   Scenario: The terminal banner names Grok and its version
-    Given a Grok session whose resource carries service.name "grok-cli" and service.version "1.0.70 (f50904eaee6c)"
+    Given a Grok turn whose log records' resource carries service.name "grok-cli" and service.version "1.0.70 (f50904eaee6c)"
     When the terminal view opens it
-    Then the banner names Grok and that version
+    Then the banner reads "Grok v1.0.70"
+
+  @unit
+  Scenario: The terminal banner shows the model Grok's records name
+    Given a Grok turn whose user_prompt record names model "grok-4.7" and whose later api_request names "grok-4.7-fast"
+    When the terminal view opens it
+    Then the banner shows the model "grok-4.7-fast"
+
+  @integration
+  Scenario: The Grok banner draws Grok's own startup mark
+    Given a terminal banner for a Grok session
+    When it renders
+    Then the mark is Grok's dotted ring and slash, glyph for glyph from its welcome screen
 
   # Grok wraps every top-level prompt in <user_query> tags; a subagent's prompt
   # is bare. deriveSessionTitleFromPrompt returns null for any prompt opening
@@ -179,6 +196,38 @@ Rule: The session reads back as Grok's
     Then the row carries the repository, branch and worktree from the record
 
 Rule: A Grok turn reads back in the Trace Explorer
+
+  # The receiver stamps langwatch.origin=coding_agent on the resource of every record a
+  # grok_cli ingest key sends. A span carries that to its trace; a log-only trace takes it
+  # off its records, and never over an origin the trace already has.
+  @unit
+  Scenario: A Grok trace's origin is Coding Agent
+    Given Grok log records whose resource carries the receiver's origin "coding_agent"
+    When the records contribute to their turn's trace
+    Then the trace's origin is "coding_agent"
+
+  # A synthesized correlation shares its trace id with no span, so nothing else times it.
+  @unit
+  Scenario: A Grok trace lasts from its first record to its last
+    Given a Grok turn's user_prompt at 0ms, api_request at 3783ms and assistant_response at 4120ms
+    When they contribute to the trace in any order
+    Then the trace starts at the user_prompt and lasts 4120ms
+
+  # Claude and Codex keep a valid wire trace id when only the span id is missing, so their
+  # synthesized records can land on a trace whose spans already time it.
+  @unit
+  Scenario: Only Grok's synthesized records time a trace
+    Given a Claude or Codex record correlated by its session, not by trace context
+    When it contributes to the trace
+    Then the trace's start and duration are left to its spans
+
+  # Every Grok turn record names the model as `model` (captured: "grok-4.7" on
+  # session_start, user_prompt, api_request, turn_completed and session_end).
+  @unit
+  Scenario: A Grok trace names the model its log records carry
+    Given a Grok api_request record naming model "grok-4.7"
+    When it contributes to the trace
+    Then the trace's models are "grok-4.7"
 
   # Grok sends no spans: each turn is a log-only trace, its prompt and reply lifted from events.
   @unit

@@ -16,6 +16,8 @@ import {
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
+const ORIGIN_ATTR = "langwatch.origin";
+
 /** Trace's share of a log: its canonical names, its I/O preview and its contribution command. */
 type LogTraceSlice = Pick<
   TraceApi,
@@ -243,6 +245,13 @@ function makeTraceContribution({
   const serviceName = normalized.resourceAttributes["service.name"];
   if (record.providerKind !== "generic" && typeof serviceName === "string" && serviceName) {
     liftedAttributes["service.name"] = serviceName;
+  }
+
+  // The receiver stamps the ingest key's origin on the resource; a log-only trace (Grok) has no
+  // span to carry it to the trace, so its records do. The trace folds never let it override.
+  const origin = normalized.resourceAttributes[ORIGIN_ATTR];
+  if (origin) {
+    liftedAttributes[ORIGIN_ATTR] = origin;
   }
 
   const { input, output, truncated } = traces.extractLogRecordIO(legacyView);

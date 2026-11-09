@@ -115,7 +115,9 @@ describe("LogRequestCollectionService", () => {
   describe("given a coding agent's log correlated to a trace", () => {
     it("names the agent's service on the contribution", async () => {
       const { result, contributed } = collect({
-        accepted: [preparedLog({ providerKind: "grok", serviceName: "grok-cli" })],
+        accepted: [
+          preparedLog({ providerKind: "grok", resourceAttributes: { "service.name": "grok-cli" } }),
+        ],
       });
 
       await result;
@@ -124,11 +126,37 @@ describe("LogRequestCollectionService", () => {
 
     it("leaves an application log's service to its spans", async () => {
       const { result, contributed } = collect({
-        accepted: [preparedLog({ providerKind: "generic", serviceName: "checkout" })],
+        accepted: [
+          preparedLog({ providerKind: "generic", resourceAttributes: { "service.name": "checkout" } }),
+        ],
       });
 
       await result;
       expect(contributed[0]?.[0]?.liftedAttributes).not.toHaveProperty("service.name");
+    });
+  });
+
+  describe("given a log-only coding agent's record, its origin stamped by the receiver", () => {
+    /** @scenario "A Grok trace's origin is Coding Agent" */
+    it("carries the resource's origin to the trace, which has no span to carry it", async () => {
+      const { result, contributed } = collect({
+        accepted: [
+          preparedLog({
+            correlationSource: "grok_synthesized",
+            resourceAttributes: { "service.name": "grok-cli", "langwatch.origin": "coding_agent" },
+          }),
+        ],
+      });
+
+      await result;
+      expect(contributed[0]?.[0]?.liftedAttributes["langwatch.origin"]).toBe("coding_agent");
+    });
+
+    it("adds no origin when the resource names none", async () => {
+      const { result, contributed } = collect({ accepted: [preparedLog({})] });
+
+      await result;
+      expect(contributed[0]?.[0]?.liftedAttributes).not.toHaveProperty("langwatch.origin");
     });
   });
 
