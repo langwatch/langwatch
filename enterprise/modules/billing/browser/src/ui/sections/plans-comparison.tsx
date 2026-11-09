@@ -26,6 +26,7 @@ import {
   type Currency,
   currencySymbol,
   ENTERPRISE_PLAN_FEATURES,
+  EXCLUDING_VAT,
   formatPrice,
   FREE_PLAN_FEATURES,
   getGrowthPlanFeatures,
@@ -194,6 +195,11 @@ function PlanCard({
           </HStack>
           <Text color="fg" fontSize="md" fontWeight="medium">
             {getPlanPrice({ planId: plan.id, currency, billingPeriod, growthSeatPriceCents })}
+            {plan.id === "growth" && (
+              <Text as="span" fontSize="sm" fontWeight="normal" color="fg.muted">
+                {` ${EXCLUDING_VAT}`}
+              </Text>
+            )}
           </Text>
           <Text color="fg.muted" fontSize="sm">
             {plan.subtitle}

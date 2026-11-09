@@ -28,7 +28,7 @@ Feature: Usage page
   Scenario: A Growth organization sees its price and manages its subscription
     Given the organization is on Growth with 3 full seats billed monthly in euros
     When I open the Usage page
-    Then the plan strip reads "Growth plan" and the monthly price for 3 full seats
+    Then the plan strip reads "Growth plan" and the monthly price for 3 full seats, excl. VAT
     And "Manage subscription" opens Plan & billing
 
   # The month

@@ -72,6 +72,21 @@ Feature: Proration Preview Before Seat Update
     When I preview a seat increase
     Then the amount due is the taxed total the customer will be charged
 
+  # Cloud prices exclude VAT, so a buyer owing VAT pays more today than the
+  # price beside it. The quote names that VAT so the dialog can show the split.
+  @unit
+  Scenario: The quote names the tax inside the amount due
+    Given the organization owes VAT on top of the price
+    When I preview a seat increase
+    Then the quote reports the VAT inside the amount due
+    And the amount due before VAT
+
+  @unit
+  Scenario: A quote with no tax names none
+    Given the organization owes no VAT on the change
+    When I preview a seat increase
+    Then the quote reports no VAT
+
   @unit
   Scenario: Amount due survives an invoice whose lines span more than one page
     Given the previewed invoice has more lines than fit on one page
@@ -218,6 +233,13 @@ Feature: Proration Preview Before Seat Update
     When the proration preview modal opens
     Then nothing is due today
     And the new billing amount is labelled with the date it applies
+
+  @integration
+  Scenario: Seats mode modal splits VAT out of the amount charged today
+    Given I have triggered a seat update whose charge today is €25.07, €4.35 of it VAT
+    When the proration preview modal opens
+    Then "Due today" reads "€25.07" with "€20.72 + €4.35 VAT" under it
+    And the new billing amount says it excludes VAT
 
   # A per-line breakdown (the unused-time credit and the remaining-time charge
   # as separate rows) is still not rendered — the modal shows the net amount.

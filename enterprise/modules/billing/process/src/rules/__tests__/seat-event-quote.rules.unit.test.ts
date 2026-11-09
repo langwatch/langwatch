@@ -7,6 +7,7 @@ import { QuoteExpiredError } from "@langwatch/enterprise-billing-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  chargedAmounts,
   QUOTE_VALIDITY_SECONDS,
   quotedAmounts,
   resolveProrationDate,
@@ -23,6 +24,7 @@ describe("quotedAmounts", () => {
       expect(quotedAmounts({ total: 5000, amountDue: 3000 })).toEqual({
         prorationCents: 3000,
         creditAppliedCents: 2000,
+        taxCents: 0,
       });
     });
 
@@ -30,16 +32,47 @@ describe("quotedAmounts", () => {
       expect(quotedAmounts({ total: 5000, amountDue: 5000 })).toEqual({
         prorationCents: 5000,
         creditAppliedCents: 0,
+        taxCents: 0,
       });
+    });
+  });
+
+  describe("when VAT is added on top of the price", () => {
+    /** @scenario "The quote names the tax inside the amount due" */
+    it("reports the tax inside the amount due", () => {
+      expect(quotedAmounts({ total: 2507, amountDue: 2507, tax: 435 })).toEqual({
+        prorationCents: 2507,
+        creditAppliedCents: 0,
+        taxCents: 435,
+      });
+    });
+
+    it("never reports more tax than the credit left to pay", () => {
+      expect(quotedAmounts({ total: 2507, amountDue: 300, tax: 435 }).taxCents).toBe(300);
     });
   });
 
   describe("when the change credits the customer", () => {
     it("reports the signed total and draws no credit down", () => {
-      expect(quotedAmounts({ total: -2500, amountDue: 0 })).toEqual({
+      expect(quotedAmounts({ total: -2500, amountDue: 0, tax: -434 })).toEqual({
         prorationCents: -2500,
         creditAppliedCents: 0,
+        taxCents: 0,
       });
+    });
+  });
+});
+
+describe("chargedAmounts", () => {
+  describe("when a lift back to kept seats carries part of the move", () => {
+    it("takes the lifted seats' share off the tax as well as the total", () => {
+      const amounts = chargedAmounts({
+        preview: { total: 7260, amountDue: 7260, tax: 1260 },
+        lifted: { total: 2420, amountDue: 2420, tax: 420 },
+        share: { added: 3, moved: 4 },
+      });
+
+      expect(amounts).toEqual({ prorationCents: 5647, creditAppliedCents: 0, taxCents: 980 });
     });
   });
 });

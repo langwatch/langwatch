@@ -11,6 +11,11 @@ export const seatQuoteSchema = z.object({
   amountDueCents: z.number(),
   formattedAmountDue: z.string(),
   formattedCreditApplied: z.string().nullable(),
+  /** Of `amountDueCents`, the tax; absent or zero when none is charged. */
+  taxCents: z.number().optional(),
+  formattedAmountDueExcludingTax: z.string().nullable().optional(),
+  formattedTax: z.string().nullable().optional(),
+  /** Seats times the seat price, before any tax. */
   formattedRecurringTotal: z.string(),
   billingInterval: z.string(),
   quotedAt: z.number(),

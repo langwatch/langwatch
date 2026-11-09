@@ -296,6 +296,44 @@ describe("seatEventSubscription", () => {
         expect(result.formattedAmountDue).toBe("$29.74");
       });
 
+      /** @scenario "The quote names the tax inside the amount due" */
+      it("splits the VAT out of the amount due", async () => {
+        stripeSubscriptions.seedPreview({
+          preview: previewOf({ currency: "eur", total: 2507, amountDue: 2507, tax: 435 }),
+        });
+
+        const result = await service.previewProration({
+          organizationId: "org_1",
+          newTotalSeats: 3,
+        });
+
+        expect(result).toMatchObject({
+          amountDueCents: 2507,
+          formattedAmountDue: "€25.07",
+          taxCents: 435,
+          formattedAmountDueExcludingTax: "€20.72",
+          formattedTax: "€4.35",
+        });
+      });
+
+      /** @scenario "A quote with no tax names none" */
+      it("reports no tax when the provider added none", async () => {
+        stripeSubscriptions.seedPreview({
+          preview: previewOf({ currency: "usd", total: 1500, amountDue: 1500 }),
+        });
+
+        const result = await service.previewProration({
+          organizationId: "org_1",
+          newTotalSeats: 4,
+        });
+
+        expect(result).toMatchObject({
+          taxCents: 0,
+          formattedAmountDueExcludingTax: null,
+          formattedTax: null,
+        });
+      });
+
       /** @scenario "Amount due survives an invoice whose lines span more than one page" */
       it("quotes the whole invoice even when its lines are paginated", async () => {
         // `lines` is a paginated sublist, so a subscription carrying enough

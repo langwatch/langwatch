@@ -151,6 +151,7 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
     return {
       total: invoice.total,
       amountDue: invoice.amount_due,
+      tax: invoice.total - (invoice.total_excluding_tax ?? invoice.total),
       currency: invoice.currency ?? null,
     };
   }

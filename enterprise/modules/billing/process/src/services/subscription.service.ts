@@ -299,6 +299,9 @@ export class BillingSubscriptionService {
     amountDueCents: number;
     formattedAmountDue: string;
     formattedCreditApplied: string | null;
+    taxCents: number;
+    formattedAmountDueExcludingTax: string | null;
+    formattedTax: string | null;
     formattedRecurringTotal: string;
     billingInterval: string;
     quotedAt: number;

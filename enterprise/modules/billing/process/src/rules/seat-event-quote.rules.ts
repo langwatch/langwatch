@@ -17,14 +17,24 @@ import type {
  * on: an `always_invoice` preview, where the invoice IS the immediate one — only the
  * proration lines, not next cycle's recurring and metered usage.
  */
-type AlwaysInvoicePreview = Pick<BillingInvoicePreview, "total" | "amountDue">;
+type AlwaysInvoicePreview = Pick<BillingInvoicePreview, "total" | "amountDue" | "tax">;
+
+/** What a seat quote charges: the amount due, the credit drawn to it and the tax inside it. */
+export type QuotedAmounts = {
+  prorationCents: number;
+  creditAppliedCents: number;
+  /** Of `prorationCents`, the tax; zero for a credit or an untaxed charge. */
+  taxCents: number;
+};
+
+/** The tax inside a charge, never more than the charge itself nor below zero. */
+const taxWithin = ({ taxCents, dueCents }: { taxCents: number; dueCents: number }): number =>
+  Math.max(0, Math.min(taxCents, dueCents));
 
 /**
- * The two money figures a seat quote reports, read off a previewed invoice.
+ * The money figures a seat quote reports, read off a previewed invoice.
  */
-export const quotedAmounts = (
-  preview: AlwaysInvoicePreview,
-): { prorationCents: number; creditAppliedCents: number } => {
+export const quotedAmounts = (preview: AlwaysInvoicePreview): QuotedAmounts => {
   const invoiceTotalCents = preview.total;
   const isCredit = invoiceTotalCents < 0;
 
@@ -34,6 +44,7 @@ export const quotedAmounts = (
     // smaller than the change itself. Zero on a clean account, and never
     // reported for a credit — nothing is drawn down by one.
     creditAppliedCents: isCredit ? 0 : invoiceTotalCents - preview.amountDue,
+    taxCents: isCredit ? 0 : taxWithin({ taxCents: preview.tax ?? 0, dueCents: preview.amountDue }),
   };
 };
 
@@ -50,16 +61,22 @@ export const chargedAmounts = ({
   preview: AlwaysInvoicePreview;
   lifted: AlwaysInvoicePreview | null;
   share: { added: number; moved: number } | null;
-}): { prorationCents: number; creditAppliedCents: number } => {
+}): QuotedAmounts => {
   const whole = quotedAmounts(preview);
   if (!share || !lifted || share.added <= 0 || share.moved <= share.added) return whole;
   const liftedSeats = share.moved - share.added;
-  // Proration is linear in quantity: take the lifted seats' share off the whole move.
-  const totalCents = Math.round(
-    preview.total - ((preview.total - lifted.total) * liftedSeats) / share.added,
-  );
+  // Proration and the tax on it are linear in quantity: take the lifted seats' share off.
+  const aboveLifted = (full: number, toLifted: number) =>
+    Math.round(full - ((full - toLifted) * liftedSeats) / share.added);
+  const totalCents = aboveLifted(preview.total, lifted.total);
   const creditAppliedCents = Math.max(0, Math.min(whole.creditAppliedCents, totalCents));
-  return { prorationCents: totalCents - creditAppliedCents, creditAppliedCents };
+  const prorationCents = totalCents - creditAppliedCents;
+  const taxCents = aboveLifted(preview.tax ?? 0, lifted.tax ?? 0);
+  return {
+    prorationCents,
+    creditAppliedCents,
+    taxCents: totalCents < 0 ? 0 : taxWithin({ taxCents, dueCents: prorationCents }),
+  };
 };
 
 type SeatChange = {
@@ -133,6 +150,12 @@ export type SeatEventProrationQuote = {
   formattedAmountDue: string;
   /** Null rather than a formatted zero, so an account with no credit says nothing. */
   formattedCreditApplied: string | null;
+  /** Of `amountDueCents`, the tax (VAT added on top); zero when none is charged. */
+  taxCents: number;
+  /** `formattedAmountDue` less its tax, and the tax; both null when no tax is charged. */
+  formattedAmountDueExcludingTax: string | null;
+  formattedTax: string | null;
+  /** Seats times the seat price, before any tax. */
   formattedRecurringTotal: string;
   billingInterval: string;
   /** The instant this quote priced, in epoch seconds, sent back on confirm. */

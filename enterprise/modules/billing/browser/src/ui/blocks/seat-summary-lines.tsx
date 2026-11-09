@@ -20,13 +20,20 @@ export function SeatSummaryLines({ lines }: { lines: SeatSummaryLine[] }) {
           {line.ruled && <Separator />}
           <HStack justify="space-between" color={line.muted ? "fg.muted" : undefined}>
             <Text fontWeight={line.emphasis ? "semibold" : undefined}>{line.label}</Text>
-            <Text
-              fontWeight={line.muted ? "normal" : "semibold"}
-              color={line.emphasis ? "blue.fg" : undefined}
-              fontVariantNumeric="tabular-nums"
-            >
-              {line.value}
-            </Text>
+            <HStack gap={1.5} align="baseline">
+              {line.note && (
+                <Text fontSize="xs" color="fg.muted" fontVariantNumeric="tabular-nums">
+                  {line.note}
+                </Text>
+              )}
+              <Text
+                fontWeight={line.muted ? "normal" : "semibold"}
+                color={line.emphasis ? "blue.fg" : undefined}
+                fontVariantNumeric="tabular-nums"
+              >
+                {line.value}
+              </Text>
+            </HStack>
           </HStack>
         </VStack>
       ))}

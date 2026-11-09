@@ -50,9 +50,16 @@ export function SeatConfirmDialog({
                       {line.detail}
                     </Text>
                   </VStack>
-                  <Text fontWeight="semibold" fontVariantNumeric="tabular-nums" flexShrink={0}>
-                    {line.value}
-                  </Text>
+                  <VStack align="end" gap={0.5} flexShrink={0}>
+                    <Text fontWeight="semibold" fontVariantNumeric="tabular-nums">
+                      {line.value}
+                    </Text>
+                    {line.note && (
+                      <Text textStyle="bodySm" color="fg.muted" fontVariantNumeric="tabular-nums">
+                        {line.note}
+                      </Text>
+                    )}
+                  </VStack>
                 </HStack>
               </VStack>
             ))}
