@@ -224,13 +224,24 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
   Rule: An enterprise organization is never switched on by a click
 
     @integration
-    Scenario: Instant Evals off for an enterprise organization open the contact-us popover
+    Scenario: Instant Evals off for an enterprise organization ask for a decision model of its own
       Given an organization that is offered a word with us
+      And the own decision model is switched on for the organization
       When the reader submits an eval chip
-      Then a closable popover anchored under the search bar says Instant Evals aren't enabled for this project and offers to contact us
-      And it offers to run them now on the project's own decision model, in Default models
+      Then a closable popover anchored under the search bar asks the reader to pick their decision model
+      And it links to Default models, where the project's own decision model is picked
+      And it neither says Instant Evals aren't enabled nor offers to contact us nor names Evals Preview
       And no estimate is requested and the typed query stays in the bar
       And closing it, by Escape or a click outside, keeps the typed query and searches nothing
+
+    @integration
+    Scenario: Instant Evals off for an enterprise organization open the contact-us popover
+      Given an organization that is offered a word with us
+      And the own decision model is switched off for the organization
+      When the reader submits an eval chip
+      Then a closable popover anchored under the search bar says Instant Evals aren't enabled for this project and offers to contact us
+      And it never mentions the project's own decision model
+      And no estimate is requested and the typed query stays in the bar
 
     @unit
     Scenario: The server refuses a switch the popover did not offer

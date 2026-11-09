@@ -216,12 +216,18 @@ export function instantEvalRefusalCopy(
   }
   const powerful =
     "Instant Evals are a powerful new tool that turns plain language questions into native filters.";
+  // Without LangWatch's own model, the project's own decision model is the way in: no word with us.
+  if (offersOwnModel) {
+    return {
+      title: "Pick your decision model",
+      body: `${powerful} They run on a decision model of your own: add its provider key, then pick it for Instant Evals in Default models.`,
+      ownModel: OWN_MODEL_LINK,
+      dismiss: "Not now",
+    };
+  }
   return {
     title: "Instant Evals aren't enabled for this project yet",
-    // The own-model offer is spoken only where its link is shown, so the copy never offers a dead end.
-    body: offersOwnModel
-      ? `${powerful} Run them now on your own decision model, or contact us so we can activate Evals Preview, our hosted model, for you.`
-      : `${powerful} Contact us so we can activate Evals Preview, our hosted model, for you.`,
+    body: `${powerful} Contact us so we can activate Evals Preview, our hosted model, for you.`,
     action: { label: "Contact us", href: CONTACT_US_HREF },
     ownModel: OWN_MODEL_LINK,
     dismiss: "Not now",

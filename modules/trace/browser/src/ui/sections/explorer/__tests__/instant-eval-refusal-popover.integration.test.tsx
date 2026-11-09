@@ -76,8 +76,8 @@ describe("given the deployment has no classifier", () => {
 });
 
 describe("given the Instant Evals flag is off for the project", () => {
-  /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
-  it("says Instant Evals aren't enabled yet, offers Contact us and the own model, and dismisses on Not now", () => {
+  /** @scenario "Instant Evals off for an enterprise organization ask for a decision model of its own" */
+  it("asks for a decision model of the project's own, offers no Contact us, and dismisses on Not now", () => {
     const onClose = vi.fn();
     const onSkip = vi.fn();
     render(
@@ -94,15 +94,10 @@ describe("given the Instant Evals flag is off for the project", () => {
       { wrapper },
     );
 
-    expect(screen.getByText("Instant Evals aren't enabled for this project yet")).toBeTruthy();
-    expect(
-      screen.getByText(
-        "Instant Evals are a powerful new tool that turns plain language questions into native filters. Run them now on your own decision model, or contact us so we can activate Evals Preview, our hosted model, for you.",
-      ),
-    ).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Contact us" }).getAttribute("href")).toBe(
-      CONTACT_US_HREF,
-    );
+    expect(screen.getByText("Pick your decision model")).toBeTruthy();
+    expect(screen.queryByText("Instant Evals aren't enabled for this project yet")).toBeNull();
+    expect(screen.queryByRole("link", { name: "Contact us" })).toBeNull();
+    expect(screen.queryByText(/Evals Preview/)).toBeNull();
     expect(
       screen
         .getByRole("link", { name: "Run them on your own decision model" })
@@ -115,11 +110,14 @@ describe("given the Instant Evals flag is off for the project", () => {
     expect(onSkip).not.toHaveBeenCalled();
   });
 
-  it("leaves the own model out of the words when the own-model switch is off", () => {
+  /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
+  it("offers Contact us and leaves the own model out of the words when the own-model switch is off", () => {
     const copy = instantEvalRefusalCopy({ kind: "unreleased" });
 
     expect(copy).toMatchObject({
+      title: "Instant Evals aren't enabled for this project yet",
       body: "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate Evals Preview, our hosted model, for you.",
+      action: { label: "Contact us", href: CONTACT_US_HREF },
     });
   });
 
