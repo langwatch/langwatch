@@ -13,7 +13,7 @@ import type {
 } from "./billing-stripe-shapes.rules.ts";
 
 /**
- * The two fields a seat quote is allowed to read, and the only invoice they mean anything
+ * The three fields a seat quote is allowed to read, and the only invoice they mean anything
  * on: an `always_invoice` preview, where the invoice IS the immediate one — only the
  * proration lines, not next cycle's recurring and metered usage.
  */
