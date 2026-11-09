@@ -5,8 +5,6 @@
 
 /** How one agent reads a hook file of ours, and how we tell the file is still ours alone. */
 export interface OwnedHookFileFormat {
-  /** The events the file hooks, in the agent's own spelling. */
-  events: readonly string[];
   /** The top-level keys a file of ours carries. */
   fileKeys: ReadonlySet<string>;
   /** The whole file, running `command` on every event. */
@@ -34,7 +32,6 @@ const COPILOT_ENTRY_KEYS: ReadonlySet<string> = new Set([
  * `powershell` for Windows. The command is the same in both shells.
  */
 export const COPILOT_HOOK_FILE_FORMAT: OwnedHookFileFormat = {
-  events: COPILOT_HOOK_EVENTS,
   fileKeys: new Set(["version", "hooks"]),
   document: ({ command, timeoutSeconds }) => {
     const entry = {
@@ -67,7 +64,6 @@ const CLAUDE_SHAPE_HANDLER_KEYS: ReadonlySet<string> = new Set(["type", "command
 
 /** Claude Code's format, as Grok reads it: one matcher-less group per event, no version. */
 export const CLAUDE_SHAPE_HOOK_FILE_FORMAT: OwnedHookFileFormat = {
-  events: CLAUDE_SHAPE_HOOK_EVENTS,
   fileKeys: new Set(["hooks"]),
   document: ({ command, timeoutSeconds }) => {
     const group = { hooks: [{ type: "command", command, timeout: timeoutSeconds }] };

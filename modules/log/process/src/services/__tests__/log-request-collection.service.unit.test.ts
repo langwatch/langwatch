@@ -111,7 +111,7 @@ describe("LogRequestCollectionService", () => {
     });
   });
 
-  // A logs-only agent's trace has no span to name its service; without it the drawer hides Terminal.
+  // A logs-only agent's trace has no span to name its service, so the drawer would hide Terminal.
   describe("given a coding agent's log correlated to a trace", () => {
     it("names the agent's service on the contribution", async () => {
       const { result, contributed } = collect({

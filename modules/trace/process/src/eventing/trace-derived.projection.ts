@@ -667,6 +667,8 @@ export class TraceAnalyticsFoldProjection
     const logCount = parseInt(mergedAttributes["langwatch.reserved.log_record_count"] ?? "0", 10);
     mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
     for (const [key, value] of Object.entries(contribution.liftedAttributes)) {
+      // A log names the service only of a trace no span has named (a logs-only agent's).
+      if (key === "service.name" && mergedAttributes[key]) continue;
       mergedAttributes[key] = String(value);
     }
 

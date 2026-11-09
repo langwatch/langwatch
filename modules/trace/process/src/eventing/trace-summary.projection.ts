@@ -521,6 +521,8 @@ export class TraceSummaryFoldProjection
       if (perCallKeys.has(key)) {
         continue;
       }
+      // A log names the service only of a trace no span has named (a logs-only agent's).
+      if (key === "service.name" && mergedAttributes[key]) continue;
 
       mergedAttributes[key] = String(value);
     }
