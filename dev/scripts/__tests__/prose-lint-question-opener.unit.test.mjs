@@ -1,4 +1,5 @@
-// The question-opener check of dev/scripts/prose-lint (specs/tooling/prose-lint-question-opener.feature).
+// The question-opener check of dev/scripts/prose-lint
+// (specs/tooling/prose-lint-question-opener.feature).
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
