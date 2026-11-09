@@ -1,10 +1,12 @@
 import type { ContractTerms, LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { billingProcessModule } from "../../billing.module.ts";
+import type { BillingSubscriptionNotifier } from "../../channels/billing-subscription-notifier.channel.ts";
 import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.billing-webhook-host.channel.ts";
 import { MemoryConnectedInvoicingChannel } from "../../channels/memory/memory.connected-invoicing.channel.ts";
 import { MemoryStripeCustomersChannel } from "../../channels/memory/memory.stripe-customers.channel.ts";
@@ -17,6 +19,7 @@ import type { RecordBillingAuditCommandData } from "../../eventing/billing-lifec
 import { MemoryBillingOrganizationRepository } from "../../repositories/memory/memory.billing-account-facts.repository.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
 import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
+import { BILLING_CHECKOUT_TOTAL_METRIC_NAME } from "../../services/billing-checkout-meter.service.ts";
 import { BillingLifecycleAnnouncerService } from "../../services/billing-lifecycle-announcer.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
 import type { UsageReportingService } from "../../services/usage-reporting.service.ts";
@@ -128,11 +131,14 @@ function billingApp({
   withStripe,
   commitUsdCents = 100_00,
   webhookSecret,
+  withSubscriptions = false,
 }: {
   isSaas: boolean;
   withStripe: boolean;
   commitUsdCents?: number;
   webhookSecret?: string;
+  /** Composes the subscription door; nothing it notifies or records is expected to be read. */
+  withSubscriptions?: boolean;
 }) {
   const registry = licensedAt(commitUsdCents);
   // Acme is a connected self-hosted customer on organization's shared table (C2 B).
@@ -171,6 +177,16 @@ function billingApp({
       host: MemoryBillingWebhookHostChannel.create(),
       licenses: createApiFixture<LicensingApi>({}),
     },
+    ...(withSubscriptions
+      ? {
+          subscription: {
+            notifier: createApiFixture<BillingSubscriptionNotifier>({}, "subscription notifier"),
+            facts: createApiFixture<
+              Pick<BillingLifecycleAnnouncerService, "seatCheckoutsAbandoned">
+            >({}, "lifecycle facts"),
+          },
+        }
+      : {}),
   });
   return { app, asked: registry.asked, audited, repositories, stripe };
 }
@@ -502,6 +518,111 @@ describe("the subscription door BillingModule serves", () => {
         code: "not_found",
         httpStatus: 404,
       });
+    });
+  });
+});
+
+describe("the checkouts BillingModule counts", () => {
+  let metrics = createRecordingMeterProvider();
+  const writes = () =>
+    metrics.recorded.filter((write) => write.instrument === BILLING_CHECKOUT_TOTAL_METRIC_NAME);
+  const counted = () =>
+    writes()
+      .filter(({ value }) => value > 0)
+      .map(({ attributes }) => attributes);
+
+  beforeEach(() => {
+    metrics = createRecordingMeterProvider();
+    metrics.install();
+  });
+  afterEach(() => metrics.uninstall());
+
+  describe("when billing starts on LangWatch Cloud", () => {
+    /** @scenario "Both checkout doors export a started series before anyone checks out" */
+    it("writes zero starts for each door", () => {
+      billingApp({ isSaas: true, withStripe: true, withSubscriptions: true });
+
+      expect(writes().map(({ value, attributes }) => ({ value, attributes }))).toEqual([
+        { value: 0, attributes: { stage: "started", flow: "subscription" } },
+        { value: 0, attributes: { stage: "started", flow: "seat_checkout" } },
+      ]);
+    });
+  });
+
+  describe("when billing starts on a self-hosted deployment", () => {
+    /** @scenario "A self-hosted deployment exports no checkout series" */
+    it("writes nothing", () => {
+      billingApp({ isSaas: false, withStripe: false });
+
+      expect(writes()).toEqual([]);
+    });
+  });
+
+  describe("given LangWatch Cloud with a payment provider", () => {
+    /** @scenario "Both checkout doors and the completion webhook are counted" */
+    it("counts a started, a refused and a completed checkout at the app's doors", async () => {
+      const { app } = billingApp({
+        isSaas: true,
+        withStripe: true,
+        webhookSecret: "whsec_fixture",
+        withSubscriptions: true,
+      });
+      const completed = JSON.stringify({
+        id: "evt_checkout",
+        object: "event",
+        type: "checkout.session.completed",
+        data: {
+          object: {
+            id: "cs_1",
+            object: "checkout.session",
+            client_reference_id: null,
+            subscription: "sub_checkout",
+            payment_link: null,
+          },
+        },
+      });
+
+      await app.createSeatCheckout({
+        organizationId: ACME,
+        baseUrl: "https://app.langwatch.example",
+        membersToAdd: 2,
+        customerEmail: CUSTOMER_ADMIN.email,
+      });
+      await expect(
+        app.createOrUpdateSubscription({
+          organizationId: ACME,
+          baseUrl: "https://app.langwatch.example",
+          plan: "NOT_A_PLAN" as never,
+          customerId: "cus_acme",
+        }),
+      ).rejects.toMatchObject({ code: "billing_plan_price_missing" });
+      await app.receiveStripeWebhook({
+        rawBody: new TextEncoder().encode(completed),
+        signature: MemoryStripeWebhooksChannel.sign({
+          payload: completed,
+          secret: "whsec_fixture",
+        }),
+      });
+
+      expect(counted()).toEqual([
+        { stage: "started", flow: "seat_checkout" },
+        { stage: "failed", flow: "subscription", reason: "billing_plan_price_missing" },
+        { stage: "completed" },
+      ]);
+    });
+
+    /** @scenario "Choosing the Free plan is not counted as a checkout" */
+    it("counts nothing when the Free plan is chosen", async () => {
+      const { app } = billingApp({ isSaas: true, withStripe: true, withSubscriptions: true });
+
+      await app.createOrUpdateSubscription({
+        organizationId: ACME,
+        baseUrl: "https://app.langwatch.example",
+        plan: "FREE",
+        customerId: "cus_acme",
+      });
+
+      expect(counted()).toEqual([]);
     });
   });
 });

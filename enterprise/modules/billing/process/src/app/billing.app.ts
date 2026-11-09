@@ -27,6 +27,7 @@ import {
   type ConnectedOnboardRequest,
   type ConnectedRenewRequest,
   getStripeEnvironmentFromNodeEnv,
+  PlanTypes,
   type RenewalCompletion,
   type ReportUsageForMonthCommandData,
   type ResourceLimitNotifierInput,
@@ -75,6 +76,7 @@ import {
   planLimitInFlight,
   resourceLimitCooldown,
 } from "../services/billing-alert-cooldown.service.ts";
+import { BillingCheckoutMeterService } from "../services/billing-checkout-meter.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
 import { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
 import type { CheckoutBillingRoles } from "../services/billing-starter-role.service.ts";
@@ -609,7 +611,10 @@ export class BillingModule
     billingInterval?: SubscriptionBillingInterval;
     startedByUserId?: string;
   }): Promise<{ url: string | null }> {
-    return this.#subscriptionDoor.subscriptions.createOrUpdateSubscription(input);
+    const subscribe = () => this.#subscriptionDoor.subscriptions.createOrUpdateSubscription(input);
+    // Choosing Free answers the subscription page back; no payment page opens, so no checkout.
+    if (input.plan === PlanTypes.FREE) return subscribe();
+    return BillingModule.#checkouts.track("subscription", subscribe);
   }
 
   async createBillingPortalSession(input: {
@@ -673,11 +678,13 @@ export class BillingModule
     customerEmail: string | null;
   }): Promise<{ url: string | null; subscriptionId: string }> {
     const { customerEmail, ...checkout } = input;
-    const customerId = await this.getOrCreateCustomerId({
-      user: { email: customerEmail },
-      organizationId: input.organizationId,
+    return BillingModule.#checkouts.track("seat_checkout", async () => {
+      const customerId = await this.getOrCreateCustomerId({
+        user: { email: customerEmail },
+        organizationId: input.organizationId,
+      });
+      return this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId });
     });
-    return this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId });
   }
 
   async listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]> {
@@ -742,7 +749,13 @@ export class BillingModule
       dispatchesEvents: () => isSaas,
       hasSigningSecret: () => stripe.channels.webhooks.isConfigured(),
       constructEvent: (input) => stripe.channels.webhooks.constructEvent(input),
-      handleEvent: (event) => events.handleEvent(event),
+      handleEvent: async (event) => {
+        const result = await events.handleEvent(event);
+        if (event.type === "checkout.session.completed" && result.status === "ok") {
+          BillingModule.#checkouts.completed({ session: event.data.object, licensePaymentLinkId });
+        }
+        return result;
+      },
     });
   }
 
@@ -764,6 +777,8 @@ export class BillingModule
     return this.#stripeWebhook.receiveStripeWebhook(input);
   }
 
+  /** Checkout starts, refusals and completions; the series the checkout-volume alert reads. */
+  static readonly #checkouts = BillingCheckoutMeterService.create();
   readonly #stripeWebhook: StripeWebhookReceiptService;
   readonly #subscriptions: SubscriptionDoor | undefined;
   readonly #connected: ConnectedBilling | undefined;
@@ -812,6 +827,7 @@ export class BillingModule
     this.#reporting = reporting;
     this.#resourceLimitAlerts = resourceLimitAlerts;
     this.#lifecycle = lifecycle;
+    if (isSaas && subscriptions) BillingModule.#checkouts.seedStarts();
   }
 
   notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void> {
