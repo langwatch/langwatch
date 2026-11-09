@@ -29,10 +29,9 @@ type Materialisation = Readonly<{
 }>;
 
 /**
- * Waits on the ClickHouse mutations goose starts over the trace module's tables (00103's
- * `idx_updated_at` on `trace_summaries`, 00125's metadata columns on `trace_analytics`), so their
- * progress and failure reach the upgrade ledger. Starts one once when no mutation is recorded
- * and the table does not already hold what it builds.
+ * Waits on the mutations goose starts (00103's `idx_updated_at`, 00125's metadata columns), so
+ * their progress and failure reach the upgrade ledger. Starts one once when none is recorded and
+ * the table does not already hold what it builds.
  */
 export class TraceIndexMaterialisationService {
   private constructor(
@@ -84,9 +83,9 @@ export class TraceIndexMaterialisationService {
     while (!signal.aborted) {
       const [latest] = await materialisation.find();
       if (!latest) {
-        // Started and still unrecorded: the table has nothing to build, so nothing is left.
-        if (dryRun || started) return { mutationId: null, partsToDo: 0 };
-        if (await materialisation.built?.()) return { mutationId: null, partsToDo: 0 };
+        if (await nothingToStart({ dryRun, started, materialisation })) {
+          return { mutationId: null, partsToDo: 0 };
+        }
         await materialisation.start();
         started = true;
         continue;
@@ -102,6 +101,20 @@ export class TraceIndexMaterialisationService {
     }
     return progress;
   }
+}
+
+/** Started and still unrecorded: the table had nothing to build, so nothing is left. */
+async function nothingToStart({
+  dryRun,
+  started,
+  materialisation,
+}: {
+  dryRun: boolean;
+  started: boolean;
+  materialisation: Materialisation;
+}): Promise<boolean> {
+  if (dryRun || started) return true;
+  return (await materialisation.built?.()) ?? false;
 }
 
 function failedMaterialisation({

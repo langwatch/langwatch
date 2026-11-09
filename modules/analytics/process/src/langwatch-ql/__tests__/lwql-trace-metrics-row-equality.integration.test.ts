@@ -419,7 +419,13 @@ describe("given traces of each source carrying the metadata the widgets read", (
       table: `${harness.factDatabase}.trace_analytics`,
       format: "JSONEachRow",
       values: [
-        analyticsRow({ ...first, trace: "app_globex_thread", customer: "globex", day: 3, labels: [] }),
+        analyticsRow({
+          ...first,
+          trace: "app_globex_thread",
+          customer: "globex",
+          day: 3,
+          labels: [],
+        }),
       ],
     });
 
