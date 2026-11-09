@@ -241,9 +241,10 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       And the own decision model is switched on for the organization
       And the project holds an Azure OpenAI key
       When the reader submits an eval chip
-      Then the picker suggests the decision models the project's keys would run
+      Then the picker is the one Default models shows for Instant Evals
+      And the decision models the project's keys would run can be picked
       And it never lists Evals Preview
-      And "More models" lists the rest of the catalogue greyed out, each saying "Add key"
+      And the rest of the catalogue is greyed out, each saying which key to add
       And "Configure available models" opens Model Providers in a new tab
       When the reader picks Azure Microsoft Decision 1
       Then it is saved as the project's Instant Evals default model

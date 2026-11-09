@@ -298,7 +298,7 @@ function useInstantEvalStarter({
   return { isStarting: start.isPending, applyChip, startRun };
 }
 
-/** A switch or a pick landed: drop the popover and route the held submit, unless dismissed since. */
+/** A switch or a pick landed: drop the popover and route the held submit, unless dismissed. */
 function resumeHeld({
   seq,
   seqRef,

@@ -8,12 +8,10 @@ import {
   DECISION_MODELS,
   decisionModelPickerTitle,
   findDecisionModel,
-  findModelProviderDefinition,
-  isOwnDecisionModelId,
   LANGWATCH_DECISION_MODEL_ID,
   LANGWATCH_DECISION_PREVIEWS,
+  ownDecisionModelPickerOptions,
   type BuiltInModel,
-  type DecisionModelEntry,
   type LangWatchDecisionPreview,
   type ModelPickerOption,
   type ModelRole,
@@ -44,30 +42,6 @@ export function isHostedDecisionModelOffered(
 /** Whether the column can show a stored id; an id the catalogue dropped reads as unset. */
 export function isShownDecisionModel(id: string | null | undefined): id is string {
   return !!id && !!findDecisionModel(id);
-}
-
-/** The line on a decision model whose provider has no key at the picked scopes. */
-function addKeyHint(provider: string): string {
-  const name = findModelProviderDefinition(provider)?.name ?? provider;
-  const article = /^[aeiou]/i.test(name) ? "an" : "a";
-  return `Add ${article} ${name} key in Model Providers to use it.`;
-}
-
-function ownModelOption({
-  entry,
-  offered,
-}: {
-  entry: DecisionModelEntry;
-  offered: ReadonlySet<string>;
-}): ModelPickerOption {
-  const label = decisionModelPickerTitle(entry);
-  if (offered.has(entry.id)) return { label, value: entry.id, subtitle: entry.description };
-  return {
-    label,
-    value: entry.id,
-    subtitle: addKeyHint(entry.provider),
-    disabled: true,
-  };
 }
 
 /** The tag on a LangWatch decision model that has no model behind it yet. */
@@ -109,10 +83,7 @@ function ownDecisionOptions({
   isOwnModelEnabled: boolean;
 }): ModelPickerOption[] {
   if (!isOwnModelEnabled || pickable === undefined) return [];
-  const offered = new Set(pickable.map((model) => model.value));
-  return DECISION_MODELS.filter((entry) => isOwnDecisionModelId(entry.id)).map((entry) =>
-    ownModelOption({ entry, offered }),
-  );
+  return ownDecisionModelPickerOptions(pickable);
 }
 
 /**

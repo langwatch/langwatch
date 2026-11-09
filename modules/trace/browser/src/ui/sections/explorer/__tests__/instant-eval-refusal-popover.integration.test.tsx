@@ -5,7 +5,8 @@
  * @see specs/traces-v2/instant-eval-search.feature ("A refusal is a popover, never an error state")
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -21,12 +22,26 @@ import {
   UPGRADE_HREF,
   WHERE_THE_TEXT_GOES_HREF,
 } from "../instant-eval-refusal-popover.tsx";
+import { DECISION_MODEL_PICKER_PLACEHOLDER } from "../decision-model-picker.tsx";
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 afterEach(() => cleanup());
+
+/** The rows of the listbox a picker's trigger controls. */
+function pickerOptions(trigger: HTMLElement): HTMLElement[] {
+  const listbox = document.getElementById(trigger.getAttribute("aria-controls") ?? "");
+  if (!listbox) throw new Error("no listbox for the decision model picker");
+  return within(listbox).getAllByRole("option", { hidden: true });
+}
+
+function optionFor(options: HTMLElement[], value: string): HTMLElement {
+  const option = options.find((row) => row.dataset.value === value);
+  if (!option) throw new Error(`no option for ${value}`);
+  return option;
+}
 
 describe("given the organization has spent its free Instant Evals budget", () => {
   /** @scenario "A spent free budget opens the budget popover and keeps the eval chip" */
@@ -109,7 +124,7 @@ describe("given the Instant Evals flag is off for the project", () => {
   });
 
   /** @scenario "The eval popover picks the project's own decision model in place" */
-  it("suggests the runnable own models, greys the rest, and hands the picked one back", () => {
+  it("lists the own models as Default models does, greys the keyless, and hands the pick back", async () => {
     const onPickDecisionModel = vi.fn();
     render(
       <InstantEvalRefusalPopover
@@ -130,19 +145,22 @@ describe("given the Instant Evals flag is off for the project", () => {
       { wrapper },
     );
 
-    expect(screen.getByText("Suggested")).toBeTruthy();
-    expect(screen.queryByTestId("decision-model-option-langwatch/instant-evals")).toBeNull();
-    const own = screen.getByTestId("decision-model-option-azure/decisions:microsoft-decision-1");
-    fireEvent.click(own);
-    expect(onPickDecisionModel).toHaveBeenCalledWith("azure/decisions:microsoft-decision-1");
-
-    fireEvent.click(screen.getByRole("button", { name: /More models/ }));
-    const keyless = screen.getByTestId("decision-model-option-openai/decisions:gpt-6-luna");
-    expect(keyless.hasAttribute("disabled")).toBe(true);
-    expect(keyless.textContent).toContain("Add key");
+    const trigger = within(screen.getByTestId("decision-model-picker")).getByRole("combobox");
+    expect(trigger.textContent).toContain(DECISION_MODEL_PICKER_PLACEHOLDER);
+    const user = userEvent.setup();
+    await user.click(trigger);
+    const options = pickerOptions(trigger);
+    expect(options.some((row) => row.dataset.value === "langwatch/instant-evals")).toBe(false);
+    const keyless = optionFor(options, "openai/decisions:gpt-6-luna");
+    expect(keyless.getAttribute("aria-disabled")).toBe("true");
+    expect(keyless.textContent).toContain("Add an OpenAI key in Model Providers to use it.");
     expect(screen.getByTestId("decision-model-picker-configure").getAttribute("href")).toBe(
       MODEL_PROVIDERS_HREF,
     );
+
+    await user.click(optionFor(options, "azure/decisions:microsoft-decision-1"));
+
+    expect(onPickDecisionModel).toHaveBeenCalledWith("azure/decisions:microsoft-decision-1");
   });
 
   /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
