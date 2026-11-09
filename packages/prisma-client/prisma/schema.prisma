@@ -177,6 +177,17 @@ model Session {
   @@index([identifierId])
 }
 
+/// One row per erased account, holding only its creation time: no id, name or address. It keeps
+/// the install's first-created account knowable after an erasure deletes that row.
+/// Spec: modules/user/specs/user.feature
+model UserErasure {
+  id               String   @id @default(nanoid())
+  accountCreatedAt DateTime
+  erasedAt         DateTime @default(now())
+
+  @@index([accountCreatedAt])
+}
+
 model User {
   id                            String                   @id @default(nanoid())
   name                          String?

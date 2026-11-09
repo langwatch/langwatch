@@ -1043,6 +1043,7 @@ export class BillingModule
     input: { organizationId: string },
     staff: BillingStaff,
   ): Promise<ConnectedBillingOverview> {
+    if (!this.#isSaas) throw new ConnectedBillingUnavailableError();
     await this.#record({
       staff,
       action: "connectedBilling.get",

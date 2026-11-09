@@ -7,10 +7,12 @@ const SPRING_AI_PROMPT_SCOPE =
 export function preparedLog({
   correlationSource = "wire",
   prompt,
+  providerKind = "generic",
   resourceAttributes = {},
 }: {
   correlationSource?: LogCorrelationSource;
   prompt?: string;
+  providerKind?: PreparedCanonicalLogRecord["record"]["providerKind"];
   resourceAttributes?: Record<string, string>;
 }): PreparedCanonicalLogRecord {
   const scopeName = prompt === undefined ? "app.logger" : SPRING_AI_PROMPT_SCOPE;
@@ -52,7 +54,7 @@ export function preparedLog({
       droppedAttributesCount: 0,
       flags: 0,
       eventName: "",
-      providerKind: "generic",
+      providerKind,
       providerEventKind: "",
       providerEventSequence: "",
       providerSessionId: "",
