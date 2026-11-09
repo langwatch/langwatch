@@ -4,6 +4,7 @@
  * validation, workflow/archive rules, and per-project filtering. These
  * moved out of the tRPC class, so assertions target stable error codes.
  * @see modules/evaluator/specs/evaluator-deleted-fact.feature
+ * @see modules/evaluator/specs/evaluator-created-fact.feature
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -129,6 +130,7 @@ describe("when an evaluator is cascade archived", () => {
     const sent: unknown[] = [];
     app.connectLifecycle({
       recordEvaluatorDeleted: { send: async (data) => void sent.push(data) },
+      recordEvaluatorCreated: { send: async () => undefined },
     });
     await repository.create({
       id: "evaluator-1",
@@ -362,5 +364,118 @@ describe("when copying an evaluator into another project", () => {
       workflowId: "workflow-2",
       projectId: "target",
     });
+  });
+});
+
+describe("when an evaluator is created", () => {
+  /** @scenario "creating an evaluator records that it was created" */
+  it("records one created fact of ids only, after the row exists", async () => {
+    const { app, repository } = anApp();
+    const sent: unknown[] = [];
+    let rowExisted = false;
+    app.connectLifecycle({
+      recordEvaluatorDeleted: { send: async () => undefined },
+      recordEvaluatorCreated: {
+        send: async (data) => {
+          rowExisted =
+            (await repository.findById({ id: "evaluator-1", projectId: "project-1" })) !==
+            undefined;
+          sent.push(data);
+        },
+      },
+    });
+
+    await app.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: {},
+    });
+
+    expect(rowExisted).toBe(true);
+    expect(sent).toEqual([
+      {
+        tenantId: "project-1",
+        projectId: "project-1",
+        evaluatorId: "evaluator-1",
+        occurredAt: expect.any(Number),
+      },
+    ]);
+  });
+
+  /** @scenario "a lost created fact never fails the create" */
+  it("creates the evaluator when evaluator_lifecycle is not registered", async () => {
+    const { app } = anApp();
+
+    const created = await app.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: {},
+    });
+
+    expect(created.id).toBe("evaluator-1");
+  });
+
+  /** @scenario "a lost created fact never fails the create" */
+  it("creates the evaluator when the record fails", async () => {
+    const { app } = anApp();
+    app.connectLifecycle({
+      recordEvaluatorDeleted: { send: async () => undefined },
+      recordEvaluatorCreated: {
+        send: async () => {
+          throw new Error("queue down");
+        },
+      },
+    });
+
+    const created = await app.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: {},
+    });
+
+    expect(created.id).toBe("evaluator-1");
+  });
+});
+
+describe("when an evaluator is copied into another project", () => {
+  /** @scenario "copying an evaluator into another project records the copy as created" */
+  it("records one created fact for the copy, keyed to the target project", async () => {
+    const { app, repository } = anApp();
+    const sent: unknown[] = [];
+    app.connectLifecycle({
+      recordEvaluatorDeleted: { send: async () => undefined },
+      recordEvaluatorCreated: { send: async (data) => void sent.push(data) },
+    });
+    await repository.create({
+      id: "evaluator-1",
+      projectId: "project-1",
+      name: "Exact match",
+      type: "evaluator",
+      config: {},
+    });
+
+    await app.copy({
+      evaluatorId: "evaluator-1",
+      projectId: "project-2",
+      sourceProjectId: "project-1",
+      newEvaluatorId: "evaluator-copy",
+      actorId: "user-1",
+      shouldCheckEvaluatorCap: false,
+    });
+
+    expect(sent).toEqual([
+      {
+        tenantId: "project-2",
+        projectId: "project-2",
+        evaluatorId: "evaluator-copy",
+        occurredAt: expect.any(Number),
+      },
+    ]);
   });
 });

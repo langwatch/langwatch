@@ -177,6 +177,8 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       evaluators: repositories.evaluators,
     });
 
+    const deletionFacts = EvaluatorDeletionFactsService.create();
+
     return new EvaluatorModule({
       evaluators,
       versions,
@@ -184,12 +186,13 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       modelProviders: dependencies.modelProviders,
       permissions: dependencies.permissions,
       graph,
-      deletionFacts: EvaluatorDeletionFactsService.create(),
+      deletionFacts,
       publications: EvaluatorWorkflowPublicationService.create({
         workflows: dependencies.workflows,
         evaluators,
         creationCaps,
         versions,
+        facts: deletionFacts,
       }),
       publicBaseUrl: config.publicBaseUrl,
     });
@@ -487,7 +490,16 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       }
     }
 
-    return this.#dependencies.evaluators.create(input);
+    return this.#recordCreated(await this.#dependencies.evaluators.create(input));
+  }
+
+  /** Records `lw.evaluator.created` after the row's own transaction has committed. */
+  async #recordCreated(evaluator: Evaluator): Promise<Evaluator> {
+    await this.#dependencies.deletionFacts.recordEvaluatorCreated({
+      projectId: evaluator.projectId,
+      evaluatorId: evaluator.id,
+    });
+    return evaluator;
   }
 
   /**
@@ -511,7 +523,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       this.#resolveEmbeddingsModel(input.projectId, input.config),
     ]);
 
-    return this.#dependencies.evaluators.createWithDefaults({
+    const created = await this.#dependencies.evaluators.createWithDefaults({
       id: input.id ?? newEvaluatorId(),
       projectId: input.projectId,
       name: input.name,
@@ -523,12 +535,13 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
         embeddingsModel: resolvedEmbedding?.model ?? null,
       },
     });
+    return this.#recordCreated(created);
   }
 
   /** Creates an evaluator against models already resolved by the caller. */
   async createWithDefaults(input: EvaluatorCreateInput): Promise<Evaluator> {
     await this.#dependencies.creationCaps.assertCreationAllowed({ projectId: input.projectId });
-    return this.#dependencies.evaluators.createWithDefaults(input);
+    return this.#recordCreated(await this.#dependencies.evaluators.createWithDefaults(input));
   }
 
   /** Updates an evaluator, refusing a code evaluator that carries no program. */

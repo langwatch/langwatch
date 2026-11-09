@@ -192,3 +192,15 @@ export interface EvaluatorDeletedEventDataSchema extends Named<
 export const evaluatorDeletedEventDataSchema: EvaluatorDeletedEventDataSchema =
   evaluatorDeletedEventDataSchemaDefinition;
 export type EvaluatorDeletedEventData = z.infer<typeof evaluatorDeletedEventDataSchema>;
+
+export const EVALUATOR_CREATED_EVENT_TYPE = "lw.evaluator.created" as const;
+export const EVALUATOR_CREATED_EVENT_VERSION = "2026-11-09" as const;
+
+/** Ids only, as for deleted: a peer reads the evaluator itself through `EvaluatorApi`. */
+const evaluatorCreatedEventDataSchemaDefinition = evaluatorDeletedEventDataSchemaDefinition;
+export interface EvaluatorCreatedEventDataSchema extends Named<
+  typeof evaluatorCreatedEventDataSchemaDefinition
+> {}
+export const evaluatorCreatedEventDataSchema: EvaluatorCreatedEventDataSchema =
+  evaluatorCreatedEventDataSchemaDefinition;
+export type EvaluatorCreatedEventData = z.infer<typeof evaluatorCreatedEventDataSchema>;

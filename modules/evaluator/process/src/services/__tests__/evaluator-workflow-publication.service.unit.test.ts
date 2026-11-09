@@ -5,6 +5,7 @@ import {
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { EvaluatorDeletionFactsService } from "../evaluator-deletion-facts.service.ts";
 import { EvaluatorWorkflowPublicationService } from "../evaluator-workflow-publication.service.ts";
 import type { EvaluatorService } from "../evaluator.service.ts";
 
@@ -50,13 +51,21 @@ function serviceWith({
     archive: vi.fn<EvaluatorService["archive"]>(async () => existingEvaluator),
   };
 
+  const facts = {
+    recordEvaluatorCreated: vi.fn<EvaluatorDeletionFactsService["recordEvaluatorCreated"]>(
+      async () => undefined,
+    ),
+  };
+
   return {
     workflows,
     evaluators,
+    facts,
     service: EvaluatorWorkflowPublicationService.create({
       workflows,
       evaluators,
       creationCaps: { assertCreationAllowed: async () => void 0 },
+      facts,
       versions: {
         assertDeletable: async ({ evaluatorId }) => {
           if (deployed) {
@@ -118,6 +127,41 @@ describe("the studio's evaluator switch", () => {
           workflowId: "workflow_archived",
         }),
       );
+    });
+  });
+
+  describe("when the workflow is saved as an evaluator", () => {
+    /** @scenario "publishing a workflow as an evaluator records the new evaluator as created" */
+    it("records the new evaluator as created", async () => {
+      const { facts, service } = serviceWith({ flags: archivedFlags, linked: [] });
+
+      await service.toggleSaveAsEvaluator({
+        workflowId: "workflow_archived",
+        projectId: "project_1",
+        isEvaluator: true,
+      });
+
+      expect(facts.recordEvaluatorCreated).toHaveBeenCalledTimes(1);
+      expect(facts.recordEvaluatorCreated).toHaveBeenCalledWith({
+        projectId: "project_1",
+        evaluatorId: "evaluator_1",
+      });
+    });
+
+    /** @scenario "renaming an already published workflow records nothing new" */
+    it("records nothing when an evaluator already wraps the workflow", async () => {
+      const { facts, service } = serviceWith({
+        flags: archivedFlags,
+        linked: [existingEvaluator],
+      });
+
+      await service.toggleSaveAsEvaluator({
+        workflowId: "workflow_archived",
+        projectId: "project_1",
+        isEvaluator: true,
+      });
+
+      expect(facts.recordEvaluatorCreated).not.toHaveBeenCalled();
     });
   });
 
