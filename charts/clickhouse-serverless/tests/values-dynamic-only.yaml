@@ -1,0 +1,26 @@
+autogen:
+  enabled: true
+access:
+  enabled: true
+  dynamicOnly:
+    enabled: true
+  config:
+    issuers:
+      # The cluster's service-account issuer; on EKS, GKE or AKS a public URL.
+      - name: cluster
+        url: https://oidc.example.com/cluster
+    users:
+      - name: langwatch
+        tier: write
+        databases: [langwatch]
+        login:
+          token:
+            issuer: cluster
+            subject: system:serviceaccount:langwatch:langwatch-app
+      - name: grafana
+        tier: read
+        databases: [langwatch]
+        login:
+          token:
+            issuer: cluster
+            subject: system:serviceaccount:monitoring:grafana

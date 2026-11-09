@@ -110,6 +110,8 @@ Reusable framework decisions live with their packages:
 | [192](./192-grok-as-a-natively-instrumented-coding-agent.md)                   | Grok is a natively instrumented coding agent, read from its own OTLP logs and metrics                                      | Proposed                  |
 | [193](./193-platform-calls-on-stored-credentials-report-usage.md)              | Platform calls on stored credentials report their usage to the spend ledger                                                | Accepted                  |
 | [195](./195-outbound-proxy-in-the-egress-fence.md)                             | The egress fence carries a request through the outbound proxy                                                              | Proposed                  |
+| [197](./197-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md) | clickhouse-serverless access: tiers, rolling passwords and OIDC token logins, rendered as files                            | Accepted                  |
+| [198](./198-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md)            | clickhouse-serverless backups run in the ch-config sidecar, decided by pure functions                                      | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

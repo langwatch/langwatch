@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/access"
 )
 
 // Input holds all user-provided configuration, loaded from env vars via struct tags.
@@ -22,8 +24,36 @@ type Input struct {
 	DataNodePort int    `env:"CH_DATA_NODE_PORT" default:"9000"`
 
 	// Auth
-	Password          string `env:"CLICKHOUSE_PASSWORD" validate:"required"`
+	Password          string `env:"CLICKHOUSE_PASSWORD"`            // Validate refuses an empty one
 	ClusterSecretFile string `env:"CLICKHOUSE_CLUSTER_SECRET_FILE"` // path to mounted cluster secret
+
+	// Opt-in: render the real cluster secret (read from ClusterSecretFile by
+	// Load). Off keeps the old from_file attribute ClickHouse ignores, so the
+	// cluster runs with no secret; see the README before enabling it.
+	ClusterSecretEnabled bool `env:"CLICKHOUSE_CLUSTER_SECRET_ENABLED"`
+	ClusterSecret        string
+
+	// Interserver HTTP credentials (replica part fetches); rendered only when
+	// the password file is set. InterserverPassword is read from it by Load.
+	InterserverUser         string `env:"CLICKHOUSE_INTERSERVER_USER" default:"interserver"`
+	InterserverPasswordFile string `env:"CLICKHOUSE_INTERSERVER_PASSWORD_FILE"`
+	InterserverPassword     string
+
+	// Optional access.yaml (ADR-197): users, their tiers and logins. The
+	// sidecar answers token logins on AccessListen and re-renders the users.
+	AccessFile    string `env:"CLICKHOUSE_ACCESS_FILE"`
+	AccessListen  string `env:"CLICKHOUSE_ACCESS_LISTEN" default:"127.0.0.1:8124"`
+	AccessSidecar string `env:"CLICKHOUSE_ACCESS_SIDECAR" default:"embedded" validate:"oneof=embedded external"`
+	// Where dynamic-only mode writes the local admin's per-boot password; a
+	// tmpfs shared with the sidecar. DynamicOnly is read from the access file.
+	AccessBootstrapDir string `env:"CLICKHOUSE_ACCESS_BOOTSTRAP_DIR" default:"/run/clickhouse-access"`
+	DynamicOnly        bool
+	// The tier roles and profiles render with an access file, or with this
+	// for operator-written users that GRANT a tier. Off, no tier_* name exists.
+	AccessTiers bool `env:"CLICKHOUSE_ACCESS_TIERS"`
+
+	// nil means true: default gets access_management and named_collection_control.
+	DefaultUserAccessManagement *bool `env:"DEFAULT_USER_ACCESS_MANAGEMENT"`
 
 	// Backups — independent of cold storage, uses same S3-compatible credentials
 	BackupEnabled bool `env:"BACKUP_ENABLED"`
@@ -42,9 +72,14 @@ type Input struct {
 	LocalDiskKeepFreeBytes    int64  `env:"LOCAL_DISK_KEEP_FREE_BYTES" default:"1073741824"`
 	MaxDataPartSizeBytes      int64  `env:"MAX_DATA_PART_SIZE_BYTES"`
 
+	// No longer read: ClickHouse built no cache from it on the s3 disk. Kept
+	// only so the renderer can warn a deployment that still sets it.
+	RetiredCacheMaxSize string `env:"CACHE_MAX_SIZE"`
+
 	// Logging
 	LogLevel         string `env:"LOG_LEVEL" default:"warning" validate:"oneof=trace debug information warning error"`
 	LogFormat        string `env:"LOG_FORMAT" default:"json"   validate:"oneof=json plain"`
+	LogToFile        bool   `env:"LOG_TO_FILE" default:"true"` // false: console only, no server log files
 	SystemLogTTLDays int    `env:"SYSTEM_LOG_TTL_DAYS" default:"30"`
 
 	// System logs — each log has enable + TTL + optional flush settings
@@ -71,6 +106,9 @@ type Input struct {
 	EnableProfileLog      bool   `env:"ENABLE_PROCESSORS_PROFILE_LOG"`
 	EnableBlobLog         bool   `env:"ENABLE_BLOB_STORAGE_LOG"`
 	EnablePrometheus      bool   `env:"ENABLE_PROMETHEUS_METRICS"`
+
+	// Execution-time cap of the inspect and read tiers' profiles (ADR-197).
+	ReadTierMaxExecutionTime int `env:"READ_TIER_MAX_EXECUTION_TIME" default:"300" validate:"gte=1"`
 
 	// Query limits (0 = unlimited)
 	MaxExecutionTime    int    `env:"MAX_EXECUTION_TIME"`
@@ -144,5 +182,57 @@ func Load() (*Input, error) {
 		i.Password = strings.TrimSpace(string(data))
 	}
 
+	// The mode decides which passwords are required and which refused.
+	if i.AccessFile != "" {
+		f, err := access.Load(i.AccessFile)
+		if err != nil {
+			return nil, fmt.Errorf("CLICKHOUSE_ACCESS_FILE: %w", err)
+		}
+		i.DynamicOnly = f.DynamicOnly()
+	}
+
+	for _, f := range []struct {
+		env, path string
+		read      bool
+		dst       *string
+	}{
+		{"CLICKHOUSE_CLUSTER_SECRET_FILE", i.ClusterSecretFile, i.ClusterSecretEnabled, &i.ClusterSecret},
+		{"CLICKHOUSE_INTERSERVER_PASSWORD_FILE", i.InterserverPasswordFile, true, &i.InterserverPassword},
+	} {
+		if f.path == "" || !f.read {
+			continue
+		}
+		secret, err := readSecretFile(f.path)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", f.env, err)
+		}
+		*f.dst = secret
+	}
+
 	return i, nil
+}
+
+// RendersTiers reports whether ch-config writes the tier roles and profiles.
+func (i *Input) RendersTiers() bool {
+	return i.AccessFile != "" || i.AccessTiers
+}
+
+// GrantsDefaultAccessManagement reports whether ch-config grants the default
+// user access_management and named_collection_control (unset means yes).
+func (i *Input) GrantsDefaultAccessManagement() bool {
+	return i.DefaultUserAccessManagement == nil || *i.DefaultUserAccessManagement
+}
+
+// readSecretFile returns the trimmed content of a mounted secret, refusing an
+// empty one: an empty credential would render as no credential at all.
+func readSecretFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	secret := strings.TrimSpace(string(data))
+	if secret == "" {
+		return "", fmt.Errorf("%s is empty", path)
+	}
+	return secret, nil
 }

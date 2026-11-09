@@ -6,7 +6,7 @@ import (
 )
 
 func validInput() *Input {
-	return &Input{
+	i := &Input{
 		CPU:                 2,
 		RAMBytes:            4 << 30,
 		Password:            "testpass",
@@ -14,6 +14,9 @@ func validInput() *Input {
 		LogFormat:           "json",
 		GroupByOverflowMode: "throw",
 	}
+	i.ReadTierMaxExecutionTime = 300
+	i.AccessSidecar = "embedded"
+	return i
 }
 
 func TestValidate_ValidInput(t *testing.T) {
@@ -40,12 +43,32 @@ func TestValidate_RAMTooLow(t *testing.T) {
 	}
 }
 
+// @scenario "The server refuses to start without a password for the default user"
 func TestValidate_PasswordRequired(t *testing.T) {
 	i := validInput()
 	i.Password = ""
 	err := i.Validate()
-	if err == nil || !strings.Contains(err.Error(), "CLICKHOUSE_PASSWORD") {
-		t.Errorf("expected password error, got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "CLICKHOUSE_PASSWORD or CLICKHOUSE_PASSWORD_FILE") {
+		t.Errorf("expected an error naming both variables, got: %v", err)
+	}
+}
+
+// @scenario "A published or blank-looking default password starts with a warning"
+func TestWeakPasswordWarning(t *testing.T) {
+	for _, pw := range []string{"langwatch", "ClickHouse", "password", "default", "   ", "\t\n"} {
+		i := validInput()
+		i.Password = pw
+		if err := i.Validate(); err != nil {
+			t.Errorf("password %q: should still start, got: %v", pw, err)
+		}
+		if w := i.WeakPasswordWarning(); !strings.Contains(w, "openssl rand -hex 24") {
+			t.Errorf("password %q: warning = %q, want one saying how to set a password", pw, w)
+		}
+	}
+	i := validInput()
+	i.Password = strings.Repeat("generated", 4)
+	if w := i.WeakPasswordWarning(); w != "" {
+		t.Errorf("a generated password should not warn, got %q", w)
 	}
 }
 
@@ -89,7 +112,6 @@ func TestValidate_PartialS3CredentialsWithCold(t *testing.T) {
 		t.Errorf("expected S3 credential error, got: %v", err)
 	}
 }
-
 
 func TestValidate_MultipleErrors(t *testing.T) {
 	i := &Input{
@@ -141,3 +163,66 @@ func TestValidate_TieredMoveFactor(t *testing.T) {
 	}
 }
 
+// @scenario "The sidecar listens on loopback only"
+func TestValidate_AccessListenMustBeLoopback(t *testing.T) {
+	i := validInput()
+	i.AccessFile = "/etc/clickhouse-access/access.yaml"
+	i.AccessListen = "0.0.0.0:8124"
+	i.AccessSidecar = "embedded"
+	if err := i.Validate(); err == nil || !strings.Contains(err.Error(), "CLICKHOUSE_ACCESS_LISTEN") {
+		t.Errorf("expected a loopback error, got: %v", err)
+	}
+	i.AccessListen = "127.0.0.1:8124"
+	if err := i.Validate(); err != nil {
+		t.Errorf("loopback listen refused: %v", err)
+	}
+}
+
+func dynamicOnlyInput() *Input {
+	i := validInput()
+	i.Password = ""
+	i.DynamicOnly = true
+	i.AccessFile = "/etc/clickhouse-access/config/access.yaml"
+	i.AccessListen = "127.0.0.1:8124"
+	i.AccessBootstrapDir = "/run/clickhouse-access"
+	return i
+}
+
+// @scenario "Dynamic-only mode starts without any password for the default user"
+func TestValidate_DynamicOnlyNeedsNoPassword(t *testing.T) {
+	if err := dynamicOnlyInput().Validate(); err != nil {
+		t.Errorf("dynamic-only without a password refused: %v", err)
+	}
+	i := dynamicOnlyInput()
+	i.Replicated, i.KeeperNodes, i.Replica, i.DataNodes = true, "k", "r", "d"
+	i.ClusterSecretEnabled, i.ClusterSecretFile = true, "/mnt/secrets/cluster-secret"
+	if err := i.Validate(); err != nil {
+		t.Errorf("replicated dynamic-only with the cluster secret refused: %v", err)
+	}
+}
+
+// @scenario "Dynamic-only mode refuses a long-lived password for the default user"
+func TestValidate_DynamicOnlyRefusals(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(*Input)
+		want string
+	}{
+		{"a default password", func(i *Input) { i.Password = "from-env-or-file-0123" },
+			"unset CLICKHOUSE_PASSWORD and CLICKHOUSE_PASSWORD_FILE"},
+		{"a relative bootstrap directory", func(i *Input) { i.AccessBootstrapDir = "run/access" },
+			"CLICKHOUSE_ACCESS_BOOTSTRAP_DIR must be an absolute path"},
+		{"replicas without the cluster secret", func(i *Input) {
+			i.Replicated, i.KeeperNodes, i.Replica, i.DataNodes = true, "k", "r", "d"
+		}, "set CLICKHOUSE_CLUSTER_SECRET_ENABLED=true"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			i := dynamicOnlyInput()
+			tc.edit(i)
+			err := i.Validate()
+			if err == nil || !strings.Contains(err.Error(), "dynamic-only mode") || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("Validate = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}

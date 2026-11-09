@@ -23,6 +23,27 @@ type mergeTreeConfig struct {
 	FreeEntriesMutation               int   `yaml:"number_of_free_entries_in_pool_to_execute_mutation"`
 	FreeEntriesLowerMerge             int   `yaml:"number_of_free_entries_in_pool_to_lower_max_size_of_merge"`
 	FreeEntriesOptimize               int   `yaml:"number_of_free_entries_in_pool_to_execute_optimize_entire_partition"`
+	MergeMaxBlockSizeBytes            int64 `yaml:"merge_max_block_size_bytes,omitempty"`
+
+	// On-disk format pins that keep parts readable by 25.x, so an install
+	// that upgraded to 26.8 can still roll back to an older image. Lifting
+	// them is the moment rollback closes. 26.3 turned on the newer String
+	// serialization inside Array/Map/Nested (ClickHouse #94859), which is
+	// exactly the span event and link attribute columns; 26.8 writes
+	// lightweight-UPDATE patch parts in a v2 format (#103182). 25.10
+	// refuses to start on some of these settings, which is safe only
+	// because they are rendered by the same image as the 26.8 binary.
+	PropagateTypesSerializationVersionsToNestedTypes int    `yaml:"propagate_types_serialization_versions_to_nested_types"`
+	EscapeIndexFilenames                             int    `yaml:"escape_index_filenames"`
+	SerializationInfoVersion                         string `yaml:"serialization_info_version"`
+	StringSerializationVersion                       string `yaml:"string_serialization_version"`
+	PatchPartsVersion                                string `yaml:"patch_parts_version"`
+	// 26.8 packs skip indices into one file per part (#111816); versions
+	// before 26.6 then skip them when pruning, so a rollback reads slower.
+	PackedSkipIndexMaxBytes int `yaml:"packed_skip_index_max_bytes"`
+	// 26.4 builds column statistics in every merge (26.7: basic, uniq_v2).
+	// A table setting, so compatibility leaves it on; keep merges as they were.
+	AutoStatisticsTypes string `yaml:"auto_statistics_types"`
 }
 
 // systemLogDef defines a ClickHouse system log table with its configuration knobs.
@@ -52,13 +73,32 @@ func renderLimits(input *config.Input, c *config.Computed, configD string) error
 			FreeEntriesMutation:               c.PoolFreeEntryMutation,
 			FreeEntriesLowerMerge:             c.PoolFreeEntryLowerMerge,
 			FreeEntriesOptimize:               c.PoolFreeEntryOptimizePartition,
+			MergeMaxBlockSizeBytes:            c.MergeMaxBlockSizeBytes,
+
+			PropagateTypesSerializationVersionsToNestedTypes: 0,
+			EscapeIndexFilenames:                             0,
+			SerializationInfoVersion:                         "basic",
+			StringSerializationVersion:                       "single_stream",
+			PatchPartsVersion:                                "v1",
+			PackedSkipIndexMaxBytes:                          0,
+			AutoStatisticsTypes:                              "",
 		},
+		// 26.8 folds per-disk, per-device and per-CPU asynchronous metrics
+		// into one labelled metric (#115333). legacy_names keeps the names
+		// dashboards and alerts read, such as DiskUsed_default.
+		"asynchronous_metrics_key_values_mode":          "legacy_names",
 		"max_server_memory_usage":                       c.MaxServerMemoryUsage,
 		"max_server_memory_usage_to_ram_ratio":          c.MaxServerMemoryRatio,
 		"max_concurrent_queries":                        c.MaxConcurrentQueries,
+		"max_concurrent_select_queries":                 c.MaxConcurrentSelectQueries,
 		"uncompressed_cache_size":                       c.UncompressedCacheSize,
 		"background_pool_size":                          c.BackgroundPoolSize,
 		"background_merges_mutations_concurrency_ratio": c.ConcurrencyRatio,
+		// Hold the hard memory limit at the static cap. Otherwise MemoryWorker
+		// re-derives it each tick from (RSS + MemAvailable) times
+		// max_server_memory_usage_to_ram_ratio, which can shrink it below
+		// max_server_memory_usage.
+		"memory_worker_dynamic_hard_limit": 0,
 	}
 
 	if c.MaxTempDataOnDisk != 0 {
