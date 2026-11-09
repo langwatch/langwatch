@@ -654,6 +654,7 @@ export const APP_ERROR_CODES = [
   "prompt_tag_conflict",
   "prompt_version_conflict",
   "protocol_invalid",
+  "provider_deployment_not_found",
   "provider_endpoint_redirected",
   "provider_key_invalid",
   "provider_key_missing",

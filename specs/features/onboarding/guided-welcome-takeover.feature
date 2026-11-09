@@ -209,14 +209,62 @@ Feature: Guided welcome flow and takeover screens
     # The catalog is synced weekly; a typed default went stale next to it.
 
   @integration
-  Scenario: Azure, Bedrock and Custom take credentials and a typed model name
-    When I select Azure
-    Then the connect panel asks for the credentials and a chat model
-    And the hint reads "Type it exactly as deployed: Azure OpenAI has no model list we can read for you."
+  Scenario: Bedrock and Custom take credentials and a typed model name
     When I select Bedrock
-    Then the hint names Bedrock
+    Then the connect panel asks for the credentials and a chat model
+    And the hint reads "Type it exactly as deployed: Bedrock has no model list we can read for you."
     When I select Custom
     Then the hint names Custom
+    When I type a model and connect
+    Then the connection saves the typed model as the provider's model and Langy runs on it
+
+  # Azure OpenAI hosts OpenAI's models, so its card borrows OpenAI's pills.
+  # No deployment mapping is written: the deployment name is the model id.
+  @integration
+  Scenario: Azure offers OpenAI's chat models and an optional deployment name
+    When I select Azure
+    Then the connect panel asks for the endpoint and the key
+    And the default chat model pills show OpenAI's recommended model first, picked
+    And a "Deployment name" field is empty
+    And the hint reads "Pick the model you deployed. If your deployment has a different name, type it instead."
+
+  @integration
+  Scenario: Azure connects with the picked model as the deployment
+    Given I selected Azure and typed an endpoint and a key
+    When I pick a model pill and connect
+    Then the key is checked against a deployment of that name
+    And the connection saves that model as the provider's model and Langy runs on it
+
+  @integration
+  Scenario: Connecting a stored Azure row keeps its own models
+    Given an Azure row is already stored with models of its own
+    And the recommended model pill is picked
+    When I pick another model pill and connect
+    Then the saved models are the stored ones plus that pick
+    And the recommended model is not saved
+
+  @integration
+  Scenario: A stored Azure deployment mapping names the deployment checked
+    Given an Azure row is already stored with a deployment mapping for the picked model
+    When I type a new key and connect
+    Then the key is checked against the mapped deployment, the one the model runs on
+
+  @integration
+  Scenario: A typed Azure deployment name wins over the picked model
+    Given I selected Azure and typed an endpoint and a key
+    When I type a deployment name
+    Then no model pill is picked
+    And connecting checks and saves the typed deployment name as the model
+
+  @integration
+  Scenario: A missing Azure deployment is named and checked again once corrected
+    Given I selected Azure and typed a deployment name the resource does not have
+    When I click Connect
+    Then I read that there is no deployment by that name
+    And the message sits under the deployment name, not under the endpoint it says works
+    And nothing is saved
+    When I correct the deployment name and click Connect
+    Then the key is checked again against the corrected deployment
 
   @integration
   Scenario: Connecting with a key checks it and then reports Connected
