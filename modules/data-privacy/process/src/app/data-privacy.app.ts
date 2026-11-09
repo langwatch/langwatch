@@ -163,6 +163,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
         }),
         featureFlags: dependencies.featureFlags,
         scopes: projectScopes,
+        metrics,
       }),
       dlp: GoogleDlpRedactionService.create({
         dlp: channels.dlp,

@@ -38,3 +38,18 @@ Anything else data-privacy needs belongs to another module and is reached throug
 [analytics](../analytics/README.md), [log](../log/README.md), [metric](../metric/README.md), [model-provider](../model-provider/README.md), [project](../project/README.md), [trace](../trace/README.md) (as a peer).
 
 <!-- readme:generated:end -->
+
+## PII redaction model
+
+Strict PII analysis can go to the PII redaction model instead of Presidio, for organizations with
+the `release_pii_redaction_model_enabled` flag only, on a deployment that sets
+`PII_REDACTION_MODEL_LAMBDA_ARN` (the alias ARN, `...:live`) or `PII_REDACTION_MODEL_ENDPOINT`.
+Any problem with the model sends the batch to Presidio, then Google DLP, as for every other
+organization.
+
+- **Usage log.** Each batch routed to the model leaves one `PII redaction model call` log line
+  with `organizationId`, `projectId`, `texts`, `characters`, `spansFound`, `outcome` (`ok`, or the
+  fallback reason) and `durationMs`; an error adds its class name only. It never holds a text, a
+  finding's value or an error message. Fallbacks are also counted by `reason` on
+  `pii_redaction_model_fallbacks` (`timeout`, `error`, and `routing_error` when the flag or the
+  project could not be read).

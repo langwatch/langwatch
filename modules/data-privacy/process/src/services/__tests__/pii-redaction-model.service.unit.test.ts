@@ -1,21 +1,27 @@
 import type { PiiDetectionOutcome, PiiDetectionRequest } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   dataPrivacyTestGraph,
   dataPrivacyTestPlacement,
 } from "../../app/__tests__/data-privacy.fixture.ts";
+import { AwsPiiRedactionModelChannel } from "../../channels/aws.pii-redaction-model.channel.ts";
 import { MemoryGoogleDlpChannel } from "../../channels/memory/memory.google-dlp.channel.ts";
 import { MemoryPresidioChannel } from "../../channels/memory/memory.presidio.channel.ts";
 import type { PresidioChannel } from "../../channels/presidio.channel.ts";
 import type { DataPrivacyProjectScopeRepository } from "../../repositories/data-privacy-project-scope.repository.ts";
 import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
+import { PII_REDACTION_MODEL_TIMEOUT_MS } from "../../rules/pii-redaction-model.rules.ts";
 import { DataPrivacyProjectScopeService } from "../data-privacy-project-scope.service.ts";
 import { GoogleDlpRedactionService } from "../google-dlp-redaction.service.ts";
+import type { PiiRedactionModelFallbackReason } from "../pii-analysis-metrics-otel.service.ts";
 import { PiiAnalysisService } from "../pii-analysis.service.ts";
-import { PiiRedactionModelService } from "../pii-redaction-model.service.ts";
+import {
+  type PiiRedactionModelUsage,
+  PiiRedactionModelService,
+} from "../pii-redaction-model.service.ts";
 import { PiiRedactionPolicyService } from "../pii-redaction-policy.service.ts";
 import { PresidioRedactionService } from "../presidio-redaction.service.ts";
 
@@ -42,6 +48,32 @@ const hangingModel: PresidioChannel = {
           input.signal.addEventListener("abort", () => reject(new Error("aborted")));
         }),
 };
+
+/** A Lambda client whose invoke never answers until its abort signal fires, as the SDK does. */
+function hangingLambda() {
+  const signals: AbortSignal[] = [];
+  const lambda = {
+    send: (_command: unknown, options: { abortSignal?: AbortSignal }) =>
+      new Promise((_resolve, reject) => {
+        const signal = options.abortSignal;
+        if (!signal) return reject(new Error("invoke sent without an abort signal"));
+        signals.push(signal);
+        signal.addEventListener("abort", () => {
+          const aborted = new Error("Request aborted");
+          aborted.name = "AbortError";
+          reject(aborted);
+        });
+      }),
+  } as never;
+  return {
+    signals,
+    channel: AwsPiiRedactionModelChannel.create({
+      lambda,
+      functionArn:
+        "arn:aws:lambda:eu-central-1:123456789012:function:langwatch-pii-redaction-model-all:live",
+    }),
+  };
+}
 
 function setup({
   modelConfigured = true,
@@ -82,6 +114,9 @@ function setup({
     },
   };
 
+  const fallbacks: PiiRedactionModelFallbackReason[] = [];
+  const usage: { level: "info" | "warn"; fields: PiiRedactionModelUsage; message: string }[] = [];
+
   const analysis = PiiAnalysisService.create({
     presidio: PresidioRedactionService.create({ presidio, metrics, timeoutMs: 60_000 }),
     model: PiiRedactionModelService.create({
@@ -93,6 +128,11 @@ function setup({
       }),
       featureFlags,
       scopes: DataPrivacyProjectScopeService.create({ repository }),
+      metrics: { modelFellBack: (reason) => fallbacks.push(reason) },
+      log: {
+        info: (fields, message) => usage.push({ level: "info", fields, message }),
+        warn: (fields, message) => usage.push({ level: "warn", fields, message }),
+      },
     }),
     dlp: GoogleDlpRedactionService.create({ dlp, disabled: false, metrics }),
   });
@@ -101,7 +141,17 @@ function setup({
   const sent = (channel: MemoryPresidioChannel) =>
     channel.batches.filter((batch) => batch.texts.length > 0);
 
-  return { analysis, presidio, memoryModel, dlp, flagReads, scopeReads, sent };
+  return {
+    analysis,
+    presidio,
+    memoryModel,
+    dlp,
+    flagReads,
+    scopeReads,
+    sent,
+    fallbacks,
+    usage,
+  };
 }
 
 const strictBatch = (
@@ -144,6 +194,111 @@ describe("PiiRedactionModelService", () => {
     });
   });
 
+  describe("when a batch is routed to the model", () => {
+    /** @scenario "Each PII redaction model call leaves one usage log line" */
+    it("logs one line with counts and ids, and no text or finding value", async () => {
+      const { analysis, memoryModel, fallbacks, usage } = setup();
+      memoryModel.answerWith({
+        kind: "detected",
+        results: [
+          {
+            status: "processed",
+            raw_response: {
+              anonymized: "call <PERSON> at <PHONE_NUMBER>",
+              results: [
+                { entity_type: "PERSON", start: 5, end: 8, score: 0.9 },
+                { entity_type: "PHONE_NUMBER", start: 12, end: 24, score: 0.9 },
+              ],
+            },
+          },
+          { status: "skipped" },
+        ],
+      });
+
+      await analysis.clearPresidio({
+        texts: ["call Ana at +3161234567", "nothing here"],
+        piiRedactionLevel: "STRICT",
+        projectId: PROJECT_ID,
+      });
+
+      expect(usage).toHaveLength(1);
+      const [line] = usage;
+      expect(line!.level).toBe("info");
+      expect(line!.message).toBe("PII redaction model call");
+      expect(line!.fields).toEqual({
+        organizationId: ORGANIZATION_ID,
+        projectId: PROJECT_ID,
+        texts: 2,
+        characters: 35,
+        spansFound: 2,
+        outcome: "ok",
+        durationMs: expect.any(Number),
+      });
+      const written = JSON.stringify(line);
+      expect(written).not.toContain("Ana");
+      expect(written).not.toContain("3161234567");
+      expect(written).not.toContain("nothing here");
+      expect(fallbacks).toEqual([]);
+    });
+
+    /** @scenario "Each PII redaction model call leaves one usage log line" */
+    it("logs a refusal as an error with its class name only, and counts it", async () => {
+      const { analysis, presidio, fallbacks, usage } = setup();
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+
+      expect(fallbacks).toEqual(["error"]);
+      expect(usage).toHaveLength(1);
+      expect(usage[0]!.level).toBe("warn");
+      expect(usage[0]!.fields).toMatchObject({
+        outcome: "error",
+        errorName: "Error",
+        spansFound: 0,
+        texts: 1,
+        characters: 8,
+      });
+      expect(JSON.stringify(usage[0])).not.toContain("Ana");
+    });
+
+    describe("when the model has not answered in time", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      /** @scenario "Each PII redaction model call leaves one usage log line" */
+      it("logs the call as a timeout and counts the fallback", async () => {
+        vi.useFakeTimers();
+        const lambda = hangingLambda();
+        const { analysis, presidio, fallbacks, usage } = setup({
+          model: lambda.channel,
+          modelTimeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
+        });
+        presidio.answerWith(anonymized("call <PERSON>"));
+
+        const cleared = analysis.clearPresidio(strictBatch());
+        await vi.advanceTimersByTimeAsync(PII_REDACTION_MODEL_TIMEOUT_MS);
+        await cleared;
+
+        expect(fallbacks).toEqual(["timeout"]);
+        expect(usage).toHaveLength(1);
+        expect(usage[0]!.level).toBe("warn");
+        expect(usage[0]!.fields).toMatchObject({ outcome: "timeout", errorName: "AbortError" });
+        expect(usage[0]!.fields.durationMs).toBeGreaterThanOrEqual(PII_REDACTION_MODEL_TIMEOUT_MS);
+      });
+    });
+
+    it("counts a routing that cannot be decided as a fallback", async () => {
+      const { analysis, presidio, fallbacks, usage } = setup({ flagFails: true });
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+
+      expect(fallbacks).toEqual(["routing_error"]);
+      expect(usage).toHaveLength(0);
+    });
+  });
+
   describe("given an organization not allowlisted for the model", () => {
     /** @scenario "An organization not allowlisted keeps the Presidio path" */
     it("sends the batch to Presidio and nothing to the model", async () => {
@@ -155,6 +310,16 @@ describe("PiiRedactionModelService", () => {
       expect(cleared).toEqual(["call [PERSON]"]);
       expect(sent(presidio)).toHaveLength(1);
       expect(sent(memoryModel)).toHaveLength(0);
+    });
+
+    it("leaves no usage line and counts no fallback", async () => {
+      const { analysis, presidio, fallbacks, usage } = setup({ allowlisted: false });
+      presidio.answerWith(anonymized("call <PERSON>"));
+
+      await analysis.clearPresidio(strictBatch());
+
+      expect(usage).toHaveLength(0);
+      expect(fallbacks).toHaveLength(0);
     });
 
     it("keeps a batch with no project on Presidio without asking the flag", async () => {

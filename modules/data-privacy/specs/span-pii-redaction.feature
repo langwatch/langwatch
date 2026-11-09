@@ -298,3 +298,13 @@ Feature: Redacting personal data out of a span at ingestion
     Given the deployment settings for the PII redaction model
     Then a Lambda alias ARN wins over an HTTP endpoint
     And an ARN that is not a Lambda function ARN leaves the model unconfigured
+
+  @unit
+  Scenario: Each PII redaction model call leaves one usage log line
+    Given an organization allowlisted for the PII redaction model
+    When a strict batch is routed to the model
+    Then one log line records the organization, the project, the number of texts, the total characters, the spans found, the outcome and the duration
+    And the outcome is ok, or the fallback reason such as timeout or error
+    And the line holds no text, no finding value and no error message
+    And each fallback is counted by reason, as is a routing that cannot be decided
+    And an organization not allowlisted leaves no line

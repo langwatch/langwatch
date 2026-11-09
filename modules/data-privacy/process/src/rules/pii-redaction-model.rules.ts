@@ -46,3 +46,8 @@ export function piiRedactionModelTargetOf({
 
   return { kind: "none" };
 }
+
+/** All the characters one batch would send. */
+export function batchCharactersOf(texts: readonly string[]): number {
+  return texts.reduce((total, text) => total + text.length, 0);
+}

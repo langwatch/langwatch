@@ -3,11 +3,39 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
-import { PII_REDACTION_MODEL_FLAG } from "../rules/pii-redaction-model.rules.ts";
+import { batchCharactersOf, PII_REDACTION_MODEL_FLAG } from "../rules/pii-redaction-model.rules.ts";
 import type { DataPrivacyProjectScopeService } from "./data-privacy-project-scope.service.ts";
+import type {
+  PiiAnalysisMetricsOtelService,
+  PiiRedactionModelFallbackReason,
+} from "./pii-analysis-metrics-otel.service.ts";
 import type { PresidioRedactionService } from "./presidio-redaction.service.ts";
 
 const logger = createLogger("langwatch:data-privacy:pii-redaction-model");
+
+/** Where the usage line goes: the module's logger, or a recorder in a test. */
+type UsageLogger = {
+  info(fields: PiiRedactionModelUsage, message: string): void;
+  warn(fields: PiiRedactionModelUsage, message: string): void;
+};
+
+/**
+ * The one usage line a batch routed to the model leaves. Counts and ids only: never a text,
+ * never a finding's value, never an error message (it may quote the text).
+ */
+export type PiiRedactionModelUsage = Readonly<{
+  organizationId: string;
+  projectId: string;
+  texts: number;
+  characters: number;
+  spansFound: number;
+  outcome: "ok" | PiiRedactionModelFallbackReason;
+  durationMs: number;
+  /** On an error only: the failure's class name. */
+  errorName?: string;
+}>;
+
+const USAGE_MESSAGE = "PII redaction model call";
 
 /** A project's organization is read once per minute, as its privacy policy is. */
 const ORGANIZATION_TTL_MS = 60_000;
@@ -31,10 +59,13 @@ export class PiiRedactionModelService {
     model: PresidioRedactionService;
     featureFlags: FeatureFlagApi;
     scopes: DataPrivacyProjectScopeService;
+    metrics: Pick<PiiAnalysisMetricsOtelService, "modelFellBack">;
+    log?: UsageLogger;
     now?: () => number;
   }): PiiRedactionModelService {
     return new PiiRedactionModelService({
       ...input,
+      log: input.log ?? logger,
       now: input.now ?? (() => nowInstant().epochMilliseconds),
     });
   }
@@ -43,53 +74,87 @@ export class PiiRedactionModelService {
   private readonly model: PresidioRedactionService;
   private readonly featureFlags: FeatureFlagApi;
   private readonly scopes: DataPrivacyProjectScopeService;
+  private readonly metrics: Pick<PiiAnalysisMetricsOtelService, "modelFellBack">;
+  private readonly log: UsageLogger;
   private readonly now: () => number;
 
   private constructor(input: {
     model: PresidioRedactionService;
     featureFlags: FeatureFlagApi;
     scopes: DataPrivacyProjectScopeService;
+    metrics: Pick<PiiAnalysisMetricsOtelService, "modelFellBack">;
+    log: UsageLogger;
     now: () => number;
   }) {
     this.model = input.model;
     this.featureFlags = input.featureFlags;
     this.scopes = input.scopes;
+    this.metrics = input.metrics;
+    this.log = input.log;
     this.now = input.now;
   }
 
   /** The model's clearing of one batch, or null when the batch stays on Presidio. */
   async findClearing(input: ModelClearInput): Promise<(string | null)[] | null> {
     const projectId = input.projectId;
-    if (!projectId || !(await this.#isRoutedToModel({ projectId }))) return null;
+    if (!projectId) return null;
+    const organizationId = await this.#routedOrganizationOf({ projectId });
+    if (!organizationId) return null;
 
+    const call = {
+      organizationId,
+      projectId,
+      texts: input.texts.length,
+      characters: batchCharactersOf(input.texts),
+    };
+
+    const startedAt = performance.now();
     try {
-      return await this.model.clear(input);
+      const { cleared, findings } = await this.model.clearCounting(input);
+      this.log.info(
+        { ...call, spansFound: findings, outcome: "ok", durationMs: elapsedSince(startedAt) },
+        USAGE_MESSAGE,
+      );
+      return cleared;
     } catch (error) {
-      logger.warn(
-        { projectId, reason: failureName(error) },
-        "PII redaction model failed; falling back to Presidio",
+      const outcome = isTimeout(error) ? "timeout" : "error";
+      this.metrics.modelFellBack(outcome);
+      this.log.warn(
+        {
+          ...call,
+          spansFound: 0,
+          outcome,
+          durationMs: elapsedSince(startedAt),
+          errorName: failureName(error),
+        },
+        USAGE_MESSAGE,
       );
       return null;
     }
   }
 
-  /** Configured first, so a deployment naming no model never asks the flag or the database. */
-  async #isRoutedToModel({ projectId }: { projectId: string }): Promise<boolean> {
+  /**
+   * The project's organization when its batches go to the model, else null. Configured first,
+   * so a deployment naming no model never asks the flag or the database.
+   */
+  async #routedOrganizationOf({ projectId }: { projectId: string }): Promise<string | null> {
     try {
-      if (!(await this.model.isConfigured())) return false;
+      if (!(await this.model.isConfigured())) return null;
 
       const organizationId = await this.#organizationOf({ projectId });
-      return await this.featureFlags.isEnabled(PII_REDACTION_MODEL_FLAG, {
+      const routed = await this.featureFlags.isEnabled(PII_REDACTION_MODEL_FLAG, {
         kind: "project",
         projectId,
         organizationId,
       });
+      return routed ? organizationId : null;
     } catch (error) {
+      this.metrics.modelFellBack("routing_error");
       logger.warn(
         { projectId, reason: failureName(error) },
         "PII redaction model routing could not be decided; using Presidio",
       );
-      return false;
+      return null;
     }
   }
 
@@ -109,4 +174,13 @@ export class PiiRedactionModelService {
 /** The failure's class name only: a refusal's message may quote the analysed text. */
 function failureName(error: unknown): string {
   return error instanceof Error ? error.name : typeof error;
+}
+
+/** An abort at the time cap: the Lambda SDK and fetch both name it AbortError. */
+function isTimeout(error: unknown): boolean {
+  return error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
+}
+
+function elapsedSince(startedAt: number): number {
+  return Math.round(performance.now() - startedAt);
 }

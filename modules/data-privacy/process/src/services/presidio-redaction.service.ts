@@ -11,6 +11,16 @@ import {
 } from "../rules/pii-analysis.rules.ts";
 import type { PiiAnalysisMetricsOtelService } from "./pii-analysis-metrics-otel.service.ts";
 
+/** One batch for `clear`, as the redaction pass hands it over. */
+type PresidioClearInput = {
+  texts: readonly string[];
+  piiRedactionLevel: PIIRedactionLevel;
+  entities?: readonly string[] | undefined;
+  projectId?: string | undefined;
+  /** Per text: a model, provider or tool name, spared name and place findings. */
+  spareNamesAndPlaces?: readonly boolean[] | undefined;
+};
+
 /**
  * A batch through langevals' Presidio, reached directly (R5, 2026-10-06): `clearPresidio`.
  * The PII redaction model answers the same exchange, so it runs through a second instance.
@@ -67,15 +77,15 @@ export class PresidioRedactionService {
   }
 
   /** One anonymized text per input, or null where Presidio left it as it was. */
-  async clear(input: {
-    texts: readonly string[];
-    piiRedactionLevel: PIIRedactionLevel;
-    entities?: readonly string[] | undefined;
-    projectId?: string | undefined;
-    /** Per text: a model, provider or tool name, spared name and place findings. */
-    spareNamesAndPlaces?: readonly boolean[] | undefined;
-  }): Promise<(string | null)[]> {
-    if (input.texts.length === 0) return [];
+  async clear(input: PresidioClearInput): Promise<(string | null)[]> {
+    return (await this.clearCounting(input)).cleared;
+  }
+
+  /** As `clear`, plus how many findings the service reported across the batch, for a usage log. */
+  async clearCounting(
+    input: PresidioClearInput,
+  ): Promise<{ cleared: (string | null)[]; findings: number }> {
+    if (input.texts.length === 0) return { cleared: [], findings: 0 };
 
     this.metrics.analysisCalled(this.method);
     const truncated = input.texts.map((text) => ({
@@ -90,12 +100,14 @@ export class PresidioRedactionService {
       throw new Error("LANGEVALS_ENDPOINT is not set, PII check cannot be performed");
     }
 
-    return truncated.map((entry, i) => {
+    let findings = 0;
+    const cleared = truncated.map((entry, i) => {
       const result = outcome.results[i];
       if (!result) throw new Error(`Presidio returned no result for text ${i}`);
       this.metrics.analysisFinished(result.status);
       if (result.status === "error") throw new Error(result.details);
       if (result.status !== "processed") return null;
+      findings += findingsIn(result.raw_response);
       const clearing = clearingOf({
         input: entry.input,
         rawResponse: result.raw_response,
@@ -103,6 +115,7 @@ export class PresidioRedactionService {
       });
       return clearing.kind === "redacted" ? clearing.text + entry.remaining : null;
     });
+    return { cleared, findings };
   }
 
   async #detect(input: {
@@ -158,4 +171,11 @@ function clearingOf({
   return typeof anonymized === "string" && anonymized
     ? { kind: "redacted", text: normalizePresidioMarkers(anonymized) }
     : { kind: "unchanged" };
+}
+
+/** How many findings one answer lists; their values are never read here. */
+function findingsIn(rawResponse: unknown): number {
+  if (typeof rawResponse !== "object" || rawResponse === null) return 0;
+  const results = "results" in rawResponse ? rawResponse.results : undefined;
+  return Array.isArray(results) ? results.length : 0;
 }
