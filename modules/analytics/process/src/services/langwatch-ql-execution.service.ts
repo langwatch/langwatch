@@ -68,7 +68,7 @@ type LangWatchQLExecutionInput = {
 };
 
 export class LangWatchQLExecutionService {
-  /** Builds the runner over the deployment's database, views, limits and clocks. */
+  /** Builds the runner over views, limits, clocks and services; the database comes per run. */
   static create(deps: LangWatchQLExecutionDependencies): LangWatchQLExecutionService {
     return new LangWatchQLExecutionService(deps);
   }
@@ -165,7 +165,10 @@ export class LangWatchQLExecutionService {
     tenantCapability,
     memberWindows,
     timeWindow,
-  }: Omit<LangWatchQLExecutionInput, "projects" | "protections" | "signal">): Promise<LangWatchQLExecutionResult> {
+  }: Omit<
+    LangWatchQLExecutionInput,
+    "projects" | "protections" | "signal"
+  >): Promise<LangWatchQLExecutionResult> {
     const { views, limits } = this.deps;
     // The resolved record plus the step this run was bucketed at, when the
     // statement declares the parameter. Built unconditionally and omitted when

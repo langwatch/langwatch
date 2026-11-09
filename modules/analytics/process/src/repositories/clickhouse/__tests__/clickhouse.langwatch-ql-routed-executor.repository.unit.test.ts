@@ -114,8 +114,7 @@ function fixture() {
     createExecutor,
   });
   const [shared] = drivers;
-  const run = (tenantIds: readonly string[]) =>
-    runOn({ executor, tenantIds });
+  const run = (tenantIds: readonly string[]) => runOn({ executor, tenantIds });
   return { executor, createExecutor, shared: shared!, run };
 }
 
@@ -187,8 +186,9 @@ describe("given a statement over an organization with a private ClickHouse", () 
   it("refuses a route that names no database, never adopting the shared one", async () => {
     const { shared, run } = fixture();
 
-    const refusal = (await run(["project-no-database"]).catch((error: unknown) => error)) as
-      HandledError;
+    const refusal = (await run(["project-no-database"]).catch(
+      (error: unknown) => error,
+    )) as HandledError;
 
     expect(refusal).toMatchObject({ code: "lwql_unavailable" });
     expect(refusal.reasons.map((r) => r.message)).toEqual(["no database"]);
