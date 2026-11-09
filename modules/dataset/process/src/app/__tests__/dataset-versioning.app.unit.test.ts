@@ -3,7 +3,7 @@
  * Dataset versions over the memory twins: saving, reading, comparing,
  * restoring, experiment runs, retention, deletion and the first-version step.
  */
-import { DatasetNotFoundError, type DatasetVersionAuthor } from "@langwatch/dataset-contract";
+import type { DatasetVersionAuthor } from "@langwatch/dataset-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
@@ -995,9 +995,17 @@ describe("given datasets created before versioning", () => {
   });
 
   /** @scenario "The first-version step retries a dataset whose rows it could not read" */
-  it("skips a dataset that is gone by the time its rows are read", async () => {
+  it("skips a dataset that stops being ready by the time its rows are read", async () => {
     const datasetId = await createDataset();
-    vi.spyOn(repositories.records, "findPage").mockRejectedValueOnce(new DatasetNotFoundError());
+    const hasAny = repositories.versions.hasAny.bind(repositories.versions);
+    vi.spyOn(repositories.versions, "hasAny").mockImplementationOnce(async (input) => {
+      await repositories.content.update({
+        id: datasetId,
+        projectId: PROJECT,
+        data: { status: "processing" },
+      });
+      return hasAny(input);
+    });
 
     const { report } = await run();
 

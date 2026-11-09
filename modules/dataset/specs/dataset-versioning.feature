@@ -339,7 +339,7 @@ Feature: Dataset version history
     Given a dataset whose rows fail to read during the first-version step
     When the step runs
     Then the step fails, saves no checkpoint past that project, and retries it
-    And a dataset that is gone by the time its rows are read is skipped
+    And a dataset that is gone or no longer ready by the time its rows are read is skipped
 
   @unit
   Scenario: The first-version step resumes from its checkpoint
