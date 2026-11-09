@@ -132,7 +132,9 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
       startLangWatchQLPostgres(),
     ]);
     names = { ...harness.names, database: harness.factDatabase };
-    collection = collectionBinding.namedCollection({ names, mode: "rendered" });
+    // Per-suite name, never the server-global lwql_postgres: suites share one ClickHouse server,
+    // and the rendered binding takes the per-database name while no lwql_postgres exists.
+    collection = collectionBinding.namedCollection({ names, mode: "sql" });
     // The app's own reader role, which the deploy's PostgreSQL half converges in production.
     for (const statement of selfProvisioning.postgresReaderStatements({
       readerPassword: postgres.readerPassword,

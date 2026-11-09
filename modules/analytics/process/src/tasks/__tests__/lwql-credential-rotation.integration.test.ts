@@ -233,7 +233,9 @@ describe("given a rendered install whose engine tables were built on the reader'
       }),
     );
     names = { ...harness.names, database: harness.factDatabase };
-    collection = collectionBinding.namedCollection({ names, mode: "rendered" });
+    // Per-suite name, never the server-global lwql_postgres: suites share one ClickHouse server,
+    // and the rendered binding takes the per-database name while no lwql_postgres exists.
+    collection = collectionBinding.namedCollection({ names, mode: "sql" });
     // A reused container keeps the facts database, so the app-owned objects go first.
     await harness.applyAsAdmin([
       ...LWQL_VIEW_CATALOG.map((view) => `DROP VIEW IF EXISTS ${names.database}.${view.name}`),
