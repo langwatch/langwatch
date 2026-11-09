@@ -94,3 +94,10 @@ Feature: An experiment run shows the agent version and the concurrency it ran wi
     Given the results page shows a run that recorded concurrency 1
     Then the title reads "Concurrency 1"
     And a selected run with no recorded concurrency shows no concurrency in the title
+
+  @unit
+  Scenario: A release before label versions still reads the targets of a run that recorded one
+    Given a run target pinned to "production" at version 3
+    When the run stores its targets
+    Then the stored target passes the strict target schema of a release before label versions
+    And reading it back answers label "production" at version 3

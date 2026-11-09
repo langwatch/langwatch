@@ -6,6 +6,7 @@ import {
 } from "@langwatch/eventing";
 
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-event-types.rules.ts";
+import { storedRunTargetOf } from "../rules/experiment-run-stored-target.rules.ts";
 import type {
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
@@ -85,7 +86,7 @@ function mergeTargetsJson(
 
   const byId = new Map(existing.map((t) => [t.id, t]));
   for (const t of incoming) {
-    byId.set(t.id, t);
+    byId.set(t.id, storedRunTargetOf(t));
   }
 
   return JSON.stringify(Array.from(byId.values()));

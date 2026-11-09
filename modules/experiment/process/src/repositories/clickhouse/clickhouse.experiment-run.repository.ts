@@ -21,6 +21,7 @@ import type { z } from "zod";
 
 import { deriveRunCompleteness } from "../../rules/experiment-run-completeness.rules.ts";
 import { OCCURRED_AT_BUFFER_MS } from "../../rules/experiment-run-occurred-at.rules.ts";
+import { runTargetFromStored } from "../../rules/experiment-run-stored-target.rules.ts";
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import type { ExperimentWorkflowVersionRepository } from "../experiment-workflow-version.repository.ts";
 import {
@@ -765,7 +766,9 @@ function evaluationOf(item: ItemRow): ExperimentRunWithItems["evaluations"][numb
 function parseTargets(value: string): z.infer<typeof experimentRunTargetSchema>[] | null {
   try {
     const parsed: unknown = JSON.parse(value);
-    const targets = experimentRunTargetSchema.array().safeParse(parsed);
+    const targets = experimentRunTargetSchema
+      .array()
+      .safeParse(Array.isArray(parsed) ? parsed.map(runTargetFromStored) : parsed);
     return targets.success && targets.data.length > 0 ? targets.data : null;
   } catch {
     return null;
