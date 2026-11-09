@@ -15,7 +15,7 @@ import {
   type PaymentRecoverySummary,
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant, Temporal, type Instant } from "@langwatch/time";
+import { format, nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type {
@@ -66,6 +66,12 @@ export type PaymentRecoverySweepOutcome = {
 
 type Recipient = { userId: string; email: string };
 
+type PreparedMail = {
+  organizationId: string;
+  recipients: Recipient[];
+  content: PaymentRecoveryEmail;
+};
+
 type PaymentRecoveryOptions = {
   recoveries: PaymentRecoveryRepository;
   subscriptions: Pick<BillingWebhookSubscriptionRepository, "findByStripeId">;
@@ -115,17 +121,24 @@ export class PaymentRecoveryService {
       return;
     }
 
+    const startedAt = this.now();
     const opened = await this.options.recoveries.open({
       subscriptionId: subscription.id,
       invoiceId: invoice.id,
-      startedAt: this.now(),
+      startedAt,
     });
     if (!opened) return;
 
-    const [open] = await this.options.recoveries.findOpenForOrganization(
-      subscription.organizationId,
-    );
-    if (open) await this.sendNotice({ open, day: 0, fallback: invoice });
+    const open: PaymentRecoveryCase = {
+      subscriptionId: subscription.id,
+      organizationId: subscription.organizationId,
+      plan: subscription.plan,
+      stripeSubscriptionId: invoice.subscriptionId,
+      invoiceId: invoice.id,
+      startedAt,
+      noticeDay: null,
+    };
+    await this.sendNotice({ open, day: 0, fallback: invoice });
   }
 
   /** A paid invoice closes its case; the closing write alone sends the restored email. */
@@ -134,6 +147,9 @@ export class PaymentRecoveryService {
       ? await this.options.subscriptions.findByStripeId(invoice.subscriptionId)
       : null;
     if (!subscription) return;
+    const [open] = await this.options.recoveries.findOpenForSubscription(subscription.id);
+    if (!open || open.invoiceId !== invoice.id) return;
+    const restored = await this.restoredMail({ open, fallback: invoice });
     const result = await this.options.recoveries.close({
       subscriptionId: subscription.id,
       invoiceId: invoice.id,
@@ -143,7 +159,7 @@ export class PaymentRecoveryService {
       { organizationId: result.closed.organizationId, invoiceId: invoice.id },
       "Payment recovery case closed by payment",
     );
-    await this.mailRestored({ closed: result.closed, fallback: invoice });
+    await this.deliver(restored);
   }
 
   /** Voided or marked uncollectible by staff: the case closes, the plan stays, nothing is mailed. */
@@ -239,17 +255,21 @@ export class PaymentRecoveryService {
     return isPlanPausedForRecovery({ ...open, now: this.now() }) ? "paused" : "failing";
   }
 
+  /** Stripe's answer is read on every sweep, so a paused case whose paid event was lost still closes. */
   private async sweepCase(open: PaymentRecoveryCase): Promise<"notified" | "closed" | "none"> {
-    const due = dueNotice({ ...open, now: this.now() });
-    if (due.kind === "none") return "none";
     const invoice = await this.options.invoices.getInvoice({ invoiceId: open.invoiceId });
-    // A paid or written-off invoice whose event never arrived closes here.
     if (invoice.status === "paid") {
+      const restored = await this.restoredMail({ open, invoice });
       const result = await this.options.recoveries.close({
         subscriptionId: open.subscriptionId,
         invoiceId: open.invoiceId,
       });
-      if (result.outcome === "closed") await this.mailRestored({ closed: result.closed, invoice });
+      if (result.outcome !== "closed") return "none";
+      logger.info(
+        { organizationId: open.organizationId, invoiceId: open.invoiceId },
+        "Payment recovery case closed by a sweep that found the invoice paid",
+      );
+      await this.deliver(restored);
       return "closed";
     }
     if (invoice.status === "void" || invoice.status === "uncollectible") {
@@ -259,10 +279,15 @@ export class PaymentRecoveryService {
       });
       return "closed";
     }
+    const due = dueNotice({ ...open, now: this.now() });
+    if (due.kind === "none") return "none";
     return (await this.sendNotice({ open, day: due.day, invoice })) ? "notified" : "none";
   }
 
-  /** Moves the notice day, then mails; false when another sweep already sent this notice. */
+  /**
+   * Reads the invoice and recipients first, so a failed lookup leaves the notice day unmoved for
+   * the next sweep; then moves the notice day and mails. False when another sweep sent it.
+   */
   private async sendNotice({
     open,
     day,
@@ -274,36 +299,38 @@ export class PaymentRecoveryService {
     invoice?: BillingInvoiceDetail;
     fallback?: RecoveryInvoice;
   }): Promise<boolean> {
+    const read = invoice ?? (await this.readInvoice({ invoiceId: open.invoiceId, fallback }));
+    const kind = noticeKindOf(day);
+    const mail = await this.prepareMail({
+      organizationId: open.organizationId,
+      email: (organizationName) => this.emailOf({ kind, organizationName, open, invoice: read }),
+    });
     const advanced = await this.options.recoveries.advanceNotice({
       subscriptionId: open.subscriptionId,
       from: open.noticeDay,
       to: day,
     });
     if (!advanced) return false;
-    const read = invoice ?? (await this.readInvoice({ invoiceId: open.invoiceId, fallback }));
-    const kind = noticeKindOf(day);
-    await this.mail({
-      organizationId: open.organizationId,
-      email: (organizationName) => this.emailOf({ kind, organizationName, open, invoice: read }),
-    });
+    await this.deliver(mail);
     logger.info({ organizationId: open.organizationId, day, kind }, "Payment recovery notice sent");
     return true;
   }
 
-  private async mailRestored({
-    closed,
+  /** The restored email, ready before the case closes so the closing write never loses it. */
+  private async restoredMail({
+    open,
     invoice,
     fallback,
   }: {
-    closed: PaymentRecoveryCase;
+    open: PaymentRecoveryCase;
     invoice?: BillingInvoiceDetail;
     fallback?: RecoveryInvoice;
-  }): Promise<void> {
-    const read = invoice ?? (await this.readInvoice({ invoiceId: closed.invoiceId, fallback }));
-    await this.mail({
-      organizationId: closed.organizationId,
+  }): Promise<PreparedMail> {
+    const read = invoice ?? (await this.readInvoice({ invoiceId: open.invoiceId, fallback }));
+    return this.prepareMail({
+      organizationId: open.organizationId,
       email: (organizationName) =>
-        this.emailOf({ kind: "restored", organizationName, open: closed, invoice: read }),
+        this.emailOf({ kind: "restored", organizationName, open, invoice: read }),
     });
   }
 
@@ -334,15 +361,20 @@ export class PaymentRecoveryService {
     }
   }
 
-  /** Sends to each person who can pay; one refused address does not stop the others. */
-  private async mail({
+  /** Resolves who gets the email and its content; every lookup that can fail happens here. */
+  private async prepareMail({
     organizationId,
     email,
   }: {
     organizationId: string;
     email: (organizationName: string) => PaymentRecoveryEmail;
-  }): Promise<void> {
+  }): Promise<PreparedMail> {
     const { organizationName, recipients } = await this.recipientsOf(organizationId);
+    return { organizationId, recipients, content: email(organizationName) };
+  }
+
+  /** Sends to each person who can pay; one refused address does not stop the others. */
+  private async deliver({ organizationId, recipients, content }: PreparedMail): Promise<void> {
     if (recipients.length === 0) {
       logger.warn(
         { organizationId },
@@ -350,7 +382,6 @@ export class PaymentRecoveryService {
       );
       return;
     }
-    const content = email(organizationName);
     for (const recipient of recipients) {
       try {
         await this.options.emails.send({ to: recipient.email, email: content });
@@ -460,23 +491,7 @@ function formatAmount({ amount, currency }: { amount: number; currency: string }
   }).format(amount / 100);
 }
 
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-] as const;
-
 /** "23 November 2026", in UTC, the way the emails name a date. */
 function readableDate(instant: Instant): string {
-  const date = instant.toZonedDateTimeISO("UTC");
-  return `${date.day} ${MONTHS[date.month - 1]} ${date.year}`;
+  return format(instant.epochMilliseconds, "d MMMM yyyy", { timeZone: "UTC" });
 }

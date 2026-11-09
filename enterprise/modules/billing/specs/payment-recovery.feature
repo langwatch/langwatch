@@ -50,6 +50,13 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     When the past due update arrives before the invoice payment failure
     Then one recovery case is open, dated at the failed charge
 
+  @unit @integration
+  Scenario: The day 0 email belongs to the subscription that failed
+    Given an organization with an older open recovery case on another subscription
+    When Stripe reports a failed renewal charge on its current subscription
+    Then the day 0 email is recorded on the current subscription's case
+    And the older case keeps its own notice day
+
   @integration @unimplemented
   Scenario: Admins and billing members get the day 0 email
     Given an organization with two admins, one billing member and three plain members
@@ -112,6 +119,14 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     When the recovery sweep runs
     Then the other two get the reminder and the reminder counts as sent
     And the refused address is logged by id, not by email
+
+  @unit
+  Scenario: A reminder whose recipients cannot be read goes out on the next sweep
+    Given an open recovery case due its day 3 reminder
+    And the people who can pay cannot be read on the first sweep
+    When the recovery sweep runs twice
+    Then the first sweep leaves the reminder unsent
+    And the second sweep sends it once
 
   @unit
   Scenario: A reminder with nobody to send to is recorded, not retried forever
@@ -213,6 +228,22 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     Given an organization with an open recovery case
     When the customer updates the card in the billing portal and no charge has succeeded yet
     Then the case stays open until Stripe reports the invoice paid
+
+  @unit @integration
+  Scenario: A paused case whose paid event never arrived closes on the next sweep
+    Given an organization paused on day 21 for an unpaid invoice
+    And the invoice was paid but Stripe's paid event never arrived
+    When the recovery sweep runs
+    Then the case closes and the organization is on its paid plan with its limits
+    And the people who can pay get one "Thanks, you're back" email
+
+  @unit
+  Scenario: A paid event whose recipients cannot be read makes Stripe retry
+    Given an organization with an open recovery case
+    And the people who can pay cannot be read
+    When Stripe reports the invoice as paid
+    Then the delivery fails and the case stays open
+    And the redelivery closes the case and sends the restored email
 
   # Cancellation and ending
 

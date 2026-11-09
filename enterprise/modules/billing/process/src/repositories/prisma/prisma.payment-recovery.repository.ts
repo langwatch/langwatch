@@ -136,6 +136,14 @@ export class PrismaPaymentRecoveryRepository extends PaymentRecoveryRepository {
     return openCases(rows);
   }
 
+  async findOpenForSubscription(subscriptionId: string): Promise<PaymentRecoveryCase[]> {
+    const row = await this.prisma.subscription.findFirst({
+      where: { id: subscriptionId, paymentRecoveryStartedAt: { not: null } },
+      select: CASE_COLUMNS,
+    });
+    return row ? openCases([row]) : [];
+  }
+
   async findOpenForOrganization(organizationId: string): Promise<PaymentRecoveryCase[]> {
     const rows = await this.prisma.subscription.findMany({
       where: { organizationId, paymentRecoveryStartedAt: { not: null } },

@@ -46,6 +46,9 @@ export abstract class PaymentRecoveryRepository {
   /** Every open case, oldest first. */
   abstract findOpen(): Promise<PaymentRecoveryCase[]>;
 
+  /** The open case on one subscription row, as a list of none or one. */
+  abstract findOpenForSubscription(subscriptionId: string): Promise<PaymentRecoveryCase[]>;
+
   /** The open cases of one organization, oldest first. */
   abstract findOpenForOrganization(organizationId: string): Promise<PaymentRecoveryCase[]>;
 }

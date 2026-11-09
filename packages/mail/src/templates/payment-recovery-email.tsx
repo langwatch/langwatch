@@ -46,6 +46,7 @@ export const paymentRecoveryEmailProps = z.object({
 
 export type PaymentRecoveryEmailProps = z.infer<typeof paymentRecoveryEmailProps>;
 
+/** The subject line of each recovery email. */
 export const paymentRecoveryEmailSubject = ({
   kind,
   planName,
@@ -62,8 +63,14 @@ export const paymentRecoveryEmailSubject = ({
       return "Your plan is paused";
     case "restored":
       return `Thanks, you're back on ${planName}`;
+    default:
+      return unknownKind(kind);
   }
 };
+
+function unknownKind(kind: never): never {
+  throw new Error(`Unknown payment recovery email kind: ${String(kind)}`);
+}
 
 const headingOf = ({ kind, organizationName, planName }: PaymentRecoveryEmailProps): string => {
   switch (kind) {
@@ -77,6 +84,8 @@ const headingOf = ({ kind, organizationName, planName }: PaymentRecoveryEmailPro
       return `${organizationName} is paused for non-payment`;
     case "restored":
       return "Thanks, you're back";
+    default:
+      return unknownKind(kind);
   }
 };
 
@@ -160,6 +169,8 @@ const Body = (props: PaymentRecoveryEmailProps) => {
           <DetailTable rows={[...invoiceRows(props), { label: "Status", value: "Paid" }]} />
         </>
       );
+    default:
+      return unknownKind(kind);
   }
 };
 
@@ -178,6 +189,7 @@ const NOTE: Partial<Record<PaymentRecoveryEmailProps["kind"], string>> = {
   restored: "Your receipt is with your invoices.",
 };
 
+/** The whole recovery email: heading, the kind's body, its action button and note. */
 export const PaymentRecoveryEmail = (props: PaymentRecoveryEmailProps) => {
   const note = NOTE[props.kind];
   return (
@@ -241,6 +253,7 @@ export const paymentRecoveryEmailTemplate = defineTemplate({
   },
 });
 
+/** Renders the recovery email and sends it to one address. */
 export const sendPaymentRecoveryEmail = async ({
   mailer,
   to,

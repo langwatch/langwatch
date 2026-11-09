@@ -93,6 +93,10 @@ export class MemoryPaymentRecoveryRepository extends PaymentRecoveryRepository {
     return this.openCases(() => true);
   }
 
+  async findOpenForSubscription(subscriptionId: string): Promise<PaymentRecoveryCase[]> {
+    return this.openCases((record) => record.id === subscriptionId);
+  }
+
   async findOpenForOrganization(organizationId: string): Promise<PaymentRecoveryCase[]> {
     return this.openCases((record) => record.organizationId === organizationId);
   }
