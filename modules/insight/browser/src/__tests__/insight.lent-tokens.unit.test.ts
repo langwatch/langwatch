@@ -6,8 +6,10 @@
  */
 import { BoardHeaderActionToken } from "@langwatch/analytics-client";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
+import { InsightsEntryToken } from "@langwatch/insight-contract";
 import { describe, expect, it } from "vitest";
 
+import { useInsightsShown } from "../behavior/use-insights-shown.ts";
 import { insightWeb } from "../insight.web.ts";
 import { BoardDailyInsights } from "../ui/sections/board-daily-insights.tsx";
 
@@ -22,6 +24,18 @@ describe("the insight browser declaration", () => {
       const loaded = lend && "load" in lend ? await lend.load() : undefined;
 
       expect(loaded).toEqual({ default: BoardDailyInsights });
+    });
+  });
+
+  describe("when the shell reads the Insights menu entry", () => {
+    it("lends the rule that decides whether the entry shows", () => {
+      const lend = insightWeb.installation.lends.find(
+        ({ token }) => token.key === InsightsEntryToken.key,
+      );
+
+      const value = lend && "value" in lend ? lend.value : undefined;
+
+      expect(value?.useIsShown).toBe(useInsightsShown);
     });
   });
 

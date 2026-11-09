@@ -21,7 +21,7 @@ export function useInsightsUnavailable(): "aggregate" | "off" | undefined {
   return shown ? undefined : "off";
 }
 
-/** Equals `useInsightsUnavailable() === undefined`. */
+/** Whether the Insights entry and pages show in this project. */
 export function useInsightsShown(): boolean {
   return useInsightsUnavailable() === undefined;
 }

@@ -53,11 +53,5 @@ a new field with a default is the default, not an upcast.
   column beside the window, with no migration.
 - Removed 2026-10-23 (https://github.com/langwatch/langwatch/issues/8998): "Save as
   insight" is gone, and a daily run is the one way the product files an insight.
-  While it lived, an answer that carried an insights card handed that card to
-  "Save as insight" (`LangyAnswerActionProps.insights`), and saving a finding
-  filed its title, body, tone, topic, valid days, board, widget, query and window
-  as typed data; an answer with no card was saved from its text, with no pointer
-  and no window. The query was Langy's own text, checked only when a reader
-  replayed it.
 - An old image that folds a new filed event drops the three fields, because it
   does not know them. Replaying the insight projection restores them.

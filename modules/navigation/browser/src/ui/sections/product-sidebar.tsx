@@ -358,7 +358,7 @@ function InsightsMenuLink({
   // While Governance's flag loads its own Insights item is unknown, so show neither.
   // Other surfaces pass no section items, so they need no flag and are never loading.
   if (!shown || governance.isLoading) return null;
-  if (governance.items.includes(governanceInsightsNavItem)) return null;
+  if (governance.items.some((item) => item.href === governanceInsightsNavItem.href)) return null;
   const destination = projectScopedDestination({
     path: projectNavItems.insights.path,
     label: projectNavItems.insights.title,
