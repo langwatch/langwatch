@@ -441,6 +441,7 @@ describe("PromptModule lifecycle facts", () => {
   function connected(options: { fail?: boolean } = {}) {
     const versions: unknown[] = [];
     const deleted: unknown[] = [];
+    const repositories = MemoryPromptRepositories.create();
     const app = PromptModule.create({
       dependencies: {
         projects: createApiFixture<ProjectApi>({
@@ -455,7 +456,7 @@ describe("PromptModule lifecycle facts", () => {
       config: { publicBaseUrl: "https://app.langwatch.test" },
       resources: { own: () => {}, ownService: () => {} },
       secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
-      repositories: MemoryPromptRepositories.create(),
+      repositories,
     });
     app.connectLifecycleCommands(recordingCommands({ versions, deleted, fail: options.fail }));
     const createOne = () =>
@@ -465,7 +466,7 @@ describe("PromptModule lifecycle facts", () => {
         handle: "support-triage",
         prompt: "You are a support bot.",
       });
-    return { app, versions, deleted, createOne };
+    return { app, versions, deleted, createOne, repositories };
   }
 
   /** @scenario "saving a new version of a prompt records that a version was saved" */
@@ -509,6 +510,91 @@ describe("PromptModule lifecycle facts", () => {
     expect(restored.versionId).not.toBe(created.versionId);
     expect(versions).toEqual([
       expect.objectContaining({ promptId: created.id, versionId: restored.versionId }),
+    ]);
+  });
+
+  /** @scenario "restoring an earlier version records the restored copy as a saved version" */
+  it("records the version the restore wrote even when another save lands right after it", async () => {
+    const { app, versions, createOne, repositories } = connected();
+    const created = await createOne();
+    const store = repositories.configs.versions;
+    const write = store.restoreVersion.bind(store);
+    let restoredRowId = "";
+    let concurrentVersionId = "";
+    vi.spyOn(store, "restoreVersion").mockImplementation(async (params) => {
+      const row = await write(params);
+      restoredRowId = row.id;
+      const concurrent = await app.update(
+        { idOrHandle: created.id, projectId: "project-1", data: { commitMessage: "Meanwhile" } },
+        { id: "user-2" },
+      );
+      concurrentVersionId = concurrent.versionId;
+      return row;
+    });
+
+    const restored = await app.restoreVersion(
+      { versionId: created.versionId, projectId: "project-1" },
+      { id: "user-1" },
+    );
+    await flush();
+
+    expect(restored.versionId).toBe(restoredRowId);
+    expect(restoredRowId).not.toBe(concurrentVersionId);
+    expect(versions).toEqual([
+      expect.objectContaining({ versionId: concurrentVersionId, authorId: "user-2" }),
+      expect.objectContaining({ versionId: restoredRowId, authorId: "user-1" }),
+    ]);
+  });
+
+  /** @scenario "updating a prompt through the REST API records one saved version" */
+  it("records one version saved fact when the REST update writes a version", async () => {
+    const { app, versions, createOne } = connected();
+    const created = await createOne();
+
+    const updated = await app.updateWithTags({
+      idOrHandle: created.id,
+      projectId: "project-1",
+      organizationId: "org-1",
+      data: { commitMessage: "From the SDK", prompt: "You are a calm support bot." },
+    });
+    await flush();
+
+    expect(versions).toEqual([
+      expect.objectContaining({ promptId: created.id, versionId: updated.versionId }),
+    ]);
+  });
+
+  /** @scenario "syncing a prompt from the CLI records a saved version only when it writes one" */
+  it("records one version saved fact for a sync that updates and none for one that is up to date", async () => {
+    const { app, versions, createOne } = connected();
+    const created = await createOne();
+    const localConfigData = {
+      model: "gpt-4",
+      prompt: "You are a synced support bot.",
+      messages: [],
+      inputs: [{ identifier: "input", type: "str" as const }],
+      outputs: [{ identifier: "output", type: "str" as const }],
+    };
+
+    const first = await app.syncAndAnnounce({
+      idOrHandle: created.id,
+      projectId: "project-1",
+      organizationId: "org-1",
+      localConfigData,
+      localVersion: created.version,
+    });
+    const second = await app.syncAndAnnounce({
+      idOrHandle: created.id,
+      projectId: "project-1",
+      organizationId: "org-1",
+      localConfigData,
+      localVersion: first.prompt?.version,
+    });
+    await flush();
+
+    expect([first.action, second.action]).toEqual(["updated", "up_to_date"]);
+    expect(versions).toEqual([
+      expect.objectContaining({ promptId: created.id, versionId: first.prompt?.versionId }),
     ]);
   });
 

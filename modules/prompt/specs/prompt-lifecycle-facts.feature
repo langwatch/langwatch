@@ -15,6 +15,19 @@ Feature: Prompt records when a version is saved and when a prompt is deleted
     Given prompt_lifecycle is connected in the process
     When an earlier version of a prompt is restored
     Then prompt sends one version saved fact for the new version the restore wrote
+    And the fact names that version even when another save lands right after it
+
+  @unit
+  Scenario: updating a prompt through the REST API records one saved version
+    Given prompt_lifecycle is connected in the process
+    When a prompt is updated through the REST API
+    Then prompt sends one version saved fact for the version the update wrote
+
+  @unit
+  Scenario: syncing a prompt from the CLI records a saved version only when it writes one
+    Given prompt_lifecycle is connected in the process
+    When a prompt is synced with new content and then synced again with the same content
+    Then prompt sends one version saved fact for the first sync and none for the second
 
   @unit
   Scenario: pushing or syncing a source onto a copy records a saved version on the copy

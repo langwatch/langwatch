@@ -60,8 +60,6 @@ import { PromptTagService } from "../services/prompt-tag.service.ts";
 import { PromptVersionService } from "../services/prompt-version.service.ts";
 import { PromptService } from "../services/prompt.service.ts";
 
-const factLogger = createLogger("langwatch:prompt:lifecycle");
-
 /** Who a write is attributed to. */
 interface PromptCaller {
   readonly id: string;
@@ -565,33 +563,17 @@ export class PromptModule implements PromptApi {
     return this.#announceVersionSaved(input.projectId, saved);
   }
 
-  /**
-   * Removes a prompt from the project. The id is read first, since the caller
-   * may name a handle; a failed read never blocks the delete, it only leaves
-   * the fact unrecorded and logged.
-   */
+  /** Removes a prompt from the project; the fact carries the id the delete resolved. */
   async delete(input: {
     idOrHandle: string;
     projectId: string;
     organizationId?: string;
   }): Promise<PromptDeleteResult> {
-    const target = await this.#dependencies.prompts.getPromptByIdOrHandle(input).then(
-      (prompt) => prompt.id,
-      () => null,
-    );
-    const result = await this.#dependencies.prompts.deletePrompt(input);
-    if (result.success && target) {
-      this.#dependencies.members.afterPromptDeleted({
-        projectId: input.projectId,
-        promptId: target,
-      });
-    } else if (result.success) {
-      factLogger.error(
-        { projectId: input.projectId, idOrHandle: input.idOrHandle },
-        "prompt deleted was not recorded: its id could not be read",
-      );
+    const { success, promptId } = await this.#dependencies.prompts.deletePrompt(input);
+    if (success) {
+      this.#dependencies.members.afterPromptDeleted({ projectId: input.projectId, promptId });
     }
-    return result;
+    return { success };
   }
 
   deletePrompt(input: {
