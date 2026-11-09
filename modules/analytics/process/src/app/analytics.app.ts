@@ -967,7 +967,7 @@ export class AnalyticsModule
 
     // Resolved before the engine validates, because whether an eval function
     // may be called is part of that verdict — and only for a statement that
-    // names one, since the answer costs a project read and a flag evaluation.
+    // names one, since the answer costs a call into Instant Evals.
     const isInstantEvalsEnabled =
       statementMightCallEvalFunction(input.sql) &&
       (await this.#isInstantEvalsEnabled(input.project.id));

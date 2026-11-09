@@ -87,6 +87,7 @@ describe("given the Instant Evals flag is off for the project", () => {
         onSkip={onSkip}
         onEnable={vi.fn()}
         isEnabling={false}
+        offersOwnModel
       >
         <span>anchor</span>
       </InstantEvalRefusalPopover>,
@@ -349,17 +350,37 @@ describe("given an eval chip refused by a gate on LangWatch's own model", () => 
           onSkip={vi.fn()}
           onEnable={vi.fn()}
           isEnabling={false}
+          offersOwnModel
         >
           <span>anchor</span>
         </InstantEvalRefusalPopover>,
         { wrapper },
       );
 
-      expect(screen.getByTestId("instant-eval-own-model-link").getAttribute("href")).toBe(
-        MODEL_PROVIDERS_HREF,
-      );
+      const link = screen.getByTestId("instant-eval-own-model-link");
+      expect(link.getAttribute("href")).toBe(MODEL_PROVIDERS_HREF);
+      // A new tab, so the typed query the popover keeps survives the detour.
+      expect(link.getAttribute("target")).toBe("_blank");
     },
   );
+
+  /** @scenario "Every refusal of LangWatch's own model offers the project's own decision model" */
+  it.each(gated)("offers no own-model link for $kind when the own-model switch is off", (refusal) => {
+    render(
+      <InstantEvalRefusalPopover
+        refusal={refusal}
+        onClose={vi.fn()}
+        onSkip={vi.fn()}
+        onEnable={vi.fn()}
+        isEnabling={false}
+      >
+        <span>anchor</span>
+      </InstantEvalRefusalPopover>,
+      { wrapper },
+    );
+
+    expect(screen.queryByTestId("instant-eval-own-model-link")).toBeNull();
+  });
 
   /** @scenario "Every refusal of LangWatch's own model offers the project's own decision model" */
   it("offers no own-model link when the judge can't run right now", () => {

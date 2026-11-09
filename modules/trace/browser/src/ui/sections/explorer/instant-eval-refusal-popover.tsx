@@ -81,6 +81,8 @@ interface InstantEvalRefusalPopoverProps {
   viaConnect?: boolean;
   /** The reader may manage the organization, so the license lock offers the License page. */
   canActivateLicense?: boolean;
+  /** The own-decision-model kill switch is on, so Default models can pick one: offer it. */
+  offersOwnModel?: boolean;
   children: React.ReactElement;
 }
 
@@ -226,6 +228,7 @@ export function InstantEvalRefusalPopover({
   isEnabling,
   viaConnect,
   canActivateLicense = false,
+  offersOwnModel = false,
   children,
 }: InstantEvalRefusalPopoverProps) {
   const refusalCopy = refusal ? instantEvalRefusalCopy(refusal, { viaConnect }) : null;
@@ -250,7 +253,7 @@ export function InstantEvalRefusalPopover({
           <RoutedLink href={lockCopy.more.href} target="_blank" rel="noopener noreferrer">
             {lockCopy.more.label}
           </RoutedLink>
-          <OwnModelLink link={lockCopy.ownModel} />
+          <OwnModelLink link={offersOwnModel ? lockCopy.ownModel : undefined} />
         </>
       }
     />
@@ -290,7 +293,7 @@ export function InstantEvalRefusalPopover({
                         {copy.more.label}
                       </RoutedLink>
                     )}
-                    <OwnModelLink link={copy.ownModel} />
+                    <OwnModelLink link={offersOwnModel ? copy.ownModel : undefined} />
                   </>
                 }
               />
@@ -317,7 +320,7 @@ export function InstantEvalRefusalPopover({
                   <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
                     {copy.body}
                   </Text>
-                  <OwnModelLink link={copy.ownModel} />
+                  <OwnModelLink link={offersOwnModel ? copy.ownModel : undefined} />
                   <HStack gap={2}>
                     {action && actionHref === undefined && (
                       <Button
@@ -367,7 +370,12 @@ function OwnModelLink({ link }: { link: { label: string; href: string } | undefi
   if (!link) return null;
   return (
     <Text textStyle="xs">
-      <RoutedLink href={link.href} data-testid="instant-eval-own-model-link">
+      <RoutedLink
+        href={link.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-testid="instant-eval-own-model-link"
+      >
         {link.label}
       </RoutedLink>
     </Text>

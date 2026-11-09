@@ -141,8 +141,9 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     Scenario: Every refusal of LangWatch's own model offers the project's own decision model
       Given an eval chip refused for the plan, the release, the organization's switch, a license or an install
       When the refusal popover opens
-      Then it links to Default models to run Instant Evals on the project's own decision model
+      Then it links to Default models, in a new tab, to run Instant Evals on the project's own decision model
       And a judge that can't run right now offers no such link
+      And with the own decision model switched off for the organization it offers no such link
   Rule: The switch is the organization's, and the first click is the one that counts
 
     @integration

@@ -1,4 +1,6 @@
 import { Kbd } from "@langwatch/design-system/kbd";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   Box,
   chakra,
@@ -163,7 +165,7 @@ export const SearchBar: React.FC = () => {
   // Gate the inline Ask AI composer on having at least one model provider configured.
   // The AI mode submits requests against the user's own keys; with none enabled the
   // request would 4xx.
-  const { project } = useOrganizationTeamProject();
+  const { organization, project } = useOrganizationTeamProject();
   const { hasEnabledProviders, isLoading: isLoadingProviders } = useModelProvidersSettings({
     projectId: project?.id,
   });
@@ -281,6 +283,11 @@ export const SearchBar: React.FC = () => {
   // refused reader's offer.
   const instantEvalAccess = useInstantEvalAccess({ projectId: project?.id });
   const canActivateLicense = useOptionalTraceHost()?.hasPermission("organization:manage") ?? false;
+  // Asked of the organization only, as Default models asks it (ADR-182 decision 4).
+  const { enabled: offersOwnModel } = useFeatureFlag(
+    FrontendFlags.release_instant_evals_own_decision_model,
+    { projectId: NOT_TARGETED, organizationId: organization?.id, enabled: !!organization?.id },
+  );
   const isInstantEvalAvailable = instantEvalAccess.isAvailable;
   const instantEval = useInstantEvalRoute({
     isInstantEvalAvailable,
@@ -372,6 +379,7 @@ export const SearchBar: React.FC = () => {
         isEnabling={instantEval.isEnabling}
         viaConnect={instantEvalAccess.viaConnect}
         canActivateLicense={canActivateLicense}
+        offersOwnModel={offersOwnModel}
       >
         <Box position="absolute" left={3} bottom={0} width="1px" height="1px" aria-hidden="true" />
       </InstantEvalRefusalPopover>
