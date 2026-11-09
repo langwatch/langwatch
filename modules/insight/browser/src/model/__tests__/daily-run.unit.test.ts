@@ -26,8 +26,6 @@ import {
   zoneLabel,
 } from "../daily-run.ts";
 
-/** The reasons a skipped run may carry: today's and the retired ones old runs still hold. */
-
 const DAY_MS = 86_400_000;
 /** 12:34 in Amsterdam, in summer: the same calendar day there as in UTC. */
 const NOW = Date.UTC(2026, 6, 9, 10, 34);

@@ -7,14 +7,14 @@
 
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { HandledError } from "@langwatch/handled-error";
-import {
-  type InsightEntry,
-  type InsightRunBoard,
-  type InsightRunFailureReason,
-  type InsightRunOutcome,
-  type InsightRunReason,
-  type InsightScheduleOffReason,
-  type InsightSource,
+import type {
+  InsightEntry,
+  InsightRunBoard,
+  InsightRunFailureReason,
+  InsightRunOutcome,
+  InsightRunReason,
+  InsightScheduleOffReason,
+  InsightSource,
 } from "@langwatch/insight-contract";
 import type { LangyApi } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
