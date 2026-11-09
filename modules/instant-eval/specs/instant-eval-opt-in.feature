@@ -228,11 +228,28 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Given an organization that is offered a word with us
       And the own decision model is switched on for the organization
       When the reader submits an eval chip
-      Then a closable popover anchored under the search bar asks the reader to pick their decision model
-      And it links to Default models, where the project's own decision model is picked
+      Then a closable popover anchored under the search bar asks the reader to pick a decision model
+      And it says in one line that Instant Evals run on a decision model of their own
+      And it shows the decision model picker in place
       And it neither says Instant Evals aren't enabled nor offers to contact us nor names Evals Preview
       And no estimate is requested and the typed query stays in the bar
       And closing it, by Escape or a click outside, keeps the typed query and searches nothing
+
+    @integration
+    Scenario: The eval popover picks the project's own decision model in place
+      Given an organization that is offered a word with us
+      And the own decision model is switched on for the organization
+      And the project holds an Azure OpenAI key
+      When the reader submits an eval chip
+      Then the picker suggests the decision models the project's keys would run
+      And it never lists Evals Preview
+      And "More models" lists the rest of the catalogue greyed out, each saying "Add key"
+      And "Configure available models" opens Model Providers in a new tab
+      When the reader picks Azure Microsoft Decision 1
+      Then it is saved as the project's Instant Evals default model
+      And the popover closes and the held eval chip is estimated
+      When the save is refused
+      Then a warning says why and the popover stays
 
     @integration
     Scenario: Instant Evals off for an enterprise organization open the contact-us popover

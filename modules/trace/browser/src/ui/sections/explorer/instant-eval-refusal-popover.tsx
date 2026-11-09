@@ -18,6 +18,8 @@ import type { ExplorerSelfHostedInstantEvalOffer } from "@langwatch/trace-contra
 import { Sparkles } from "lucide-react";
 import type React from "react";
 
+import { DecisionModelPicker } from "./decision-model-picker.tsx";
+
 /**
  * Why an Instant Eval did not start. `opt_in`, `ask_admin` and `unreleased` are one refusal told to
  * three readers: the switch, an admin, or (enterprise) a word with us. A self-hosted install is
@@ -83,6 +85,12 @@ interface InstantEvalRefusalPopoverProps {
   canActivateLicense?: boolean;
   /** The own-decision-model kill switch is on, so Default models can pick one: offer it. */
   offersOwnModel?: boolean;
+  /** The project's runnable decision models, for the in-place picker; undefined while loading. */
+  decisionModels?: readonly { value: string; label: string }[] | undefined;
+  /** Saves the picked model as the project's Instant Evals default, then runs the eval. */
+  onPickDecisionModel?: (model: string) => void;
+  /** The model being saved, if any. */
+  pickingDecisionModel?: string | null;
   children: React.ReactElement;
 }
 
@@ -94,6 +102,8 @@ interface InstantEvalRefusalCopy {
   more?: { label: string; href: string };
   /** The way round a gate on LangWatch's own model: the project's own decision model. */
   ownModel?: { label: string; href: string };
+  /** The decision model is picked in place, under the body. */
+  picker?: true;
   dismiss: string;
 }
 
@@ -219,9 +229,9 @@ export function instantEvalRefusalCopy(
   // Without LangWatch's own model, the project's own decision model is the way in: no word with us.
   if (offersOwnModel) {
     return {
-      title: "Pick your decision model",
-      body: `${powerful} They run on a decision model of your own: add its provider key, then pick it for Instant Evals in Default models.`,
-      ownModel: OWN_MODEL_LINK,
+      title: "Pick a decision model",
+      body: "Instant Evals run on a decision model of your own.",
+      picker: true,
       dismiss: "Not now",
     };
   }
@@ -243,6 +253,9 @@ export function InstantEvalRefusalPopover({
   viaConnect,
   canActivateLicense = false,
   offersOwnModel = false,
+  decisionModels,
+  onPickDecisionModel,
+  pickingDecisionModel = null,
   children,
 }: InstantEvalRefusalPopoverProps) {
   const refusalCopy = refusal
@@ -337,6 +350,14 @@ export function InstantEvalRefusalPopover({
                     {copy.body}
                   </Text>
                   <OwnModelLink link={offersOwnModel ? copy.ownModel : undefined} />
+                  {copy.picker && onPickDecisionModel && (
+                    <DecisionModelPicker
+                      pickable={decisionModels}
+                      onPick={onPickDecisionModel}
+                      picking={pickingDecisionModel}
+                      configureHref={MODEL_PROVIDERS_HREF}
+                    />
+                  )}
                   <HStack gap={2}>
                     {action && actionHref === undefined && (
                       <Button

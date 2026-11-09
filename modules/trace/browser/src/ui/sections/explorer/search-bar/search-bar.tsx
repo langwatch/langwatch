@@ -64,6 +64,7 @@ import { TokenValuePicker, type TokenValuePickerAnchor } from "./token-value-pic
 import { useAskLangyFromSearch } from "./use-ask-langy-from-search.ts";
 import type { ValueResolver } from "./use-filter-editor.ts";
 import { useInstantEvalRoute } from "./use-instant-eval-route.ts";
+import { useOwnDecisionModels } from "./use-own-decision-models.ts";
 import { useSubmitSearch } from "./use-submit-search.ts";
 
 /**
@@ -293,6 +294,11 @@ export const SearchBar: React.FC = () => {
     isInstantEvalAvailable,
     optInOffer: instantEvalAccess.optInOffer,
   });
+  // The in-place picker lists what the project would run on; asked only while it shows.
+  const decisionModels = useOwnDecisionModels({
+    projectId: project?.id,
+    enabled: offersOwnModel && instantEval.refusal?.kind === "unreleased",
+  });
   // Langy's explorer.runInstantEval reaches the same route, and so the same cost rule.
   const { onInstantEvalRoute } = instantEval;
   useEffect(() => registerInstantEvalRoute(onInstantEvalRoute), [onInstantEvalRoute]);
@@ -380,6 +386,9 @@ export const SearchBar: React.FC = () => {
         viaConnect={instantEvalAccess.viaConnect}
         canActivateLicense={canActivateLicense}
         offersOwnModel={offersOwnModel}
+        decisionModels={decisionModels}
+        onPickDecisionModel={instantEval.pickDecisionModel}
+        pickingDecisionModel={instantEval.pickingDecisionModel}
       >
         <Box position="absolute" left={3} bottom={0} width="1px" height="1px" aria-hidden="true" />
       </InstantEvalRefusalPopover>

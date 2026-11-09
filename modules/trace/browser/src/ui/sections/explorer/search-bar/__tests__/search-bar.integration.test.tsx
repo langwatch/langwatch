@@ -95,6 +95,7 @@ vi.mock("../use-instant-eval-route.ts", () => ({
 // Enter on a sentence calls `traces.routeSearch`; the hook's own routing is
 // covered by use-submit-search.integration, so the submit is stubbed here
 // rather than mounting a tRPC provider.
+vi.mock("../use-own-decision-models.ts", () => ({ useOwnDecisionModels: () => undefined }));
 vi.mock("../use-submit-search.ts", () => ({
   useSubmitSearch: () => ({ submitSearch: vi.fn(), isRouting: false }),
 }));

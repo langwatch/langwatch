@@ -77,7 +77,7 @@ describe("given the deployment has no classifier", () => {
 
 describe("given the Instant Evals flag is off for the project", () => {
   /** @scenario "Instant Evals off for an enterprise organization ask for a decision model of its own" */
-  it("asks for a decision model of the project's own, offers no Contact us, and dismisses on Not now", () => {
+  it("asks for a decision model in a picker, offers no Contact us, and dismisses on Not now", () => {
     const onClose = vi.fn();
     const onSkip = vi.fn();
     render(
@@ -88,26 +88,61 @@ describe("given the Instant Evals flag is off for the project", () => {
         onEnable={vi.fn()}
         isEnabling={false}
         offersOwnModel
+        decisionModels={[]}
+        onPickDecisionModel={vi.fn()}
       >
         <span>anchor</span>
       </InstantEvalRefusalPopover>,
       { wrapper },
     );
 
-    expect(screen.getByText("Pick your decision model")).toBeTruthy();
-    expect(screen.queryByText("Instant Evals aren't enabled for this project yet")).toBeNull();
+    expect(screen.getByText("Pick a decision model")).toBeTruthy();
+    expect(screen.getByText("Instant Evals run on a decision model of your own.")).toBeTruthy();
+    expect(screen.getByTestId("decision-model-picker")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Contact us" })).toBeNull();
     expect(screen.queryByText(/Evals Preview/)).toBeNull();
-    expect(
-      screen
-        .getByRole("link", { name: "Run them on your own decision model" })
-        .getAttribute("href"),
-    ).toBe(MODEL_PROVIDERS_HREF);
 
     fireEvent.click(screen.getByRole("button", { name: "Not now" }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSkip).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "The eval popover picks the project's own decision model in place" */
+  it("suggests the runnable own models, greys the rest, and hands the picked one back", () => {
+    const onPickDecisionModel = vi.fn();
+    render(
+      <InstantEvalRefusalPopover
+        refusal={{ kind: "unreleased" }}
+        onClose={vi.fn()}
+        onSkip={vi.fn()}
+        onEnable={vi.fn()}
+        isEnabling={false}
+        offersOwnModel
+        decisionModels={[
+          { value: "langwatch/instant-evals", label: "Evals Preview" },
+          { value: "azure/decisions:microsoft-decision-1", label: "Azure Microsoft Decision 1" },
+        ]}
+        onPickDecisionModel={onPickDecisionModel}
+      >
+        <span>anchor</span>
+      </InstantEvalRefusalPopover>,
+      { wrapper },
+    );
+
+    expect(screen.getByText("Suggested")).toBeTruthy();
+    expect(screen.queryByTestId("decision-model-option-langwatch/instant-evals")).toBeNull();
+    const own = screen.getByTestId("decision-model-option-azure/decisions:microsoft-decision-1");
+    fireEvent.click(own);
+    expect(onPickDecisionModel).toHaveBeenCalledWith("azure/decisions:microsoft-decision-1");
+
+    fireEvent.click(screen.getByRole("button", { name: /More models/ }));
+    const keyless = screen.getByTestId("decision-model-option-openai/decisions:gpt-6-luna");
+    expect(keyless.hasAttribute("disabled")).toBe(true);
+    expect(keyless.textContent).toContain("Add key");
+    expect(screen.getByTestId("decision-model-picker-configure").getAttribute("href")).toBe(
+      MODEL_PROVIDERS_HREF,
+    );
   });
 
   /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
@@ -343,8 +378,11 @@ describe("given an eval chip refused by a gate on LangWatch's own model", () => 
     { kind: "ask_operator" },
   ];
 
+  // Unreleased picks the model in place instead; its own test pins the picker.
+  const linked = gated.filter((refusal) => refusal.kind !== "unreleased");
+
   /** @scenario "Every refusal of LangWatch's own model offers the project's own decision model" */
-  it.each(gated)(
+  it.each(linked)(
     "links $kind to Default models for the project's own decision model",
     (refusal) => {
       expect(instantEvalRefusalCopy(refusal).ownModel).toEqual(OWN_MODEL_LINK);
