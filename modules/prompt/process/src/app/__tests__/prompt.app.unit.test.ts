@@ -20,6 +20,36 @@ import { PromptModule } from "../prompt.app.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
+/** A sender that records each payload it is given. */
+function recorder<T>(into: unknown[], fail = false) {
+  return {
+    send: async (payload: T) => {
+      if (fail) throw new Error("event store down");
+      into.push(payload);
+    },
+    sendBatch: async () => {},
+    close: async () => {},
+    waitUntilReady: async () => {},
+  };
+}
+
+/** Lifecycle senders that record what each command was sent. */
+function recordingCommands(input: {
+  created?: unknown[];
+  versions?: unknown[];
+  deleted?: unknown[];
+  fail?: boolean;
+}): EventingCommands<PromptLifecyclePipeline> {
+  return {
+    recordPromptCreated: recorder(input.created ?? [], input.fail),
+    recordPromptVersionSaved: recorder(input.versions ?? [], input.fail),
+    recordPromptDeleted: recorder(input.deleted ?? [], input.fail),
+  };
+}
+
+/** The fire-and-forget senders run on the microtask queue; a flush lets them land. */
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 /**
  * A source prompt as the library reads it back. Only the fields the copy rule
  * looks at carry meaning; the rest are the schema's required ones.
@@ -340,16 +370,7 @@ describe("PromptModule.create", () => {
     /** @scenario "Prompt creation tracked regardless of whether created via platform UI or API" */
     it("resolves the org admin and sends the count when the write carried no user", async () => {
       const sent: unknown[] = [];
-      const commands: EventingCommands<PromptLifecyclePipeline> = {
-        recordPromptCreated: {
-          send: async (payload) => {
-            sent.push(payload);
-          },
-          sendBatch: async () => {},
-          close: async () => {},
-          waitUntilReady: async () => {},
-        },
-      };
+      const commands = recordingCommands({ created: sent });
 
       const app = PromptModule.create({
         dependencies: {
@@ -397,5 +418,145 @@ describe("PromptModule.create", () => {
         }),
       ]);
     });
+  });
+});
+
+describe("PromptModule lifecycle facts", () => {
+  function connected(options: { fail?: boolean } = {}) {
+    const versions: unknown[] = [];
+    const deleted: unknown[] = [];
+    const app = PromptModule.create({
+      dependencies: {
+        projects: createApiFixture<ProjectApi>({
+          getOrganizationId: async () => "org-1",
+          listIdsByOrganization: async () => [],
+        }),
+        permissions: createApiFixture<AuthzApi>(),
+        plans: createApiFixture<EntitlementApi>(),
+        workflow: createApiFixture<WorkflowApi>(),
+        modelProviders: defaultModelFixture(),
+      },
+      config: { publicBaseUrl: "https://app.langwatch.test" },
+      resources: { own: () => {}, ownService: () => {} },
+      secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+      repositories: MemoryPromptRepositories.create(),
+    });
+    app.connectLifecycleCommands(recordingCommands({ versions, deleted, fail: options.fail }));
+    const createOne = () =>
+      app.createPrompt({
+        projectId: "project-1",
+        organizationId: "org-1",
+        handle: "support-triage",
+        prompt: "You are a support bot.",
+      });
+    return { app, versions, deleted, createOne };
+  }
+
+  /** @scenario "saving a new version of a prompt records that a version was saved" */
+  it("records one version saved fact with ids only when a prompt is updated", async () => {
+    const { app, versions, createOne } = connected();
+    const created = await createOne();
+
+    const saved = await app.update(
+      {
+        idOrHandle: created.id,
+        projectId: "project-1",
+        data: { commitMessage: "Tighter tone", prompt: "You are a terse support bot." },
+      },
+      { id: "user-1" },
+    );
+    await flush();
+
+    expect(versions).toEqual([
+      {
+        tenantId: "project-1",
+        occurredAt: expect.any(Number),
+        promptId: created.id,
+        projectId: "project-1",
+        versionId: saved.versionId,
+        authorId: "user-1",
+      },
+    ]);
+  });
+
+  /** @scenario "restoring an earlier version records the restored copy as a saved version" */
+  it("records one version saved fact for the new version a restore writes", async () => {
+    const { app, versions, createOne } = connected();
+    const created = await createOne();
+
+    const restored = await app.restoreVersion(
+      { versionId: created.versionId, projectId: "project-1" },
+      { id: "user-1" },
+    );
+    await flush();
+
+    expect(restored.versionId).not.toBe(created.versionId);
+    expect(versions).toEqual([
+      expect.objectContaining({ promptId: created.id, versionId: restored.versionId }),
+    ]);
+  });
+
+  /** @scenario "pushing or syncing a source onto a copy records a saved version on the copy" */
+  it("records one version saved fact for the copy, in the copy's project", async () => {
+    const { app, apply } = harness();
+    const versions: unknown[] = [];
+    app.connectLifecycleCommands(recordingCommands({ versions }));
+
+    await apply(sourcePrompt());
+    await flush();
+
+    expect(versions).toEqual([
+      expect.objectContaining({
+        tenantId: "project-copy",
+        promptId: "prompt-copy",
+        projectId: "project-copy",
+        versionId: "version-7",
+      }),
+    ]);
+  });
+
+  /** @scenario "creating a prompt records no saved version" */
+  it("records no version saved fact for a prompt's first version", async () => {
+    const { versions, createOne } = connected();
+
+    await createOne();
+    await flush();
+
+    expect(versions).toEqual([]);
+  });
+
+  /** @scenario "deleting a prompt by its handle records that the prompt was deleted" */
+  it("records one deleted fact carrying the prompt id when deleted by handle", async () => {
+    const { app, deleted, createOne } = connected();
+    const created = await createOne();
+
+    await app.delete({ idOrHandle: "support-triage", projectId: "project-1" });
+    await flush();
+
+    expect(deleted).toEqual([
+      {
+        tenantId: "project-1",
+        occurredAt: expect.any(Number),
+        promptId: created.id,
+        projectId: "project-1",
+      },
+    ]);
+  });
+
+  /** @scenario "a lost lifecycle fact never fails the write" */
+  it("saves and deletes even when every send fails", async () => {
+    const { app, versions, deleted, createOne } = connected({ fail: true });
+    const created = await createOne();
+
+    const saved = await app.update(
+      { idOrHandle: created.id, projectId: "project-1", data: { commitMessage: "Edit" } },
+      { id: "user-1" },
+    );
+    const removed = await app.delete({ idOrHandle: created.id, projectId: "project-1" });
+    await flush();
+
+    expect(saved.id).toBe(created.id);
+    expect(removed.success).toBe(true);
+    expect([...versions, ...deleted]).toEqual([]);
   });
 });
