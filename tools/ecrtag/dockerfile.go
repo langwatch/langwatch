@@ -73,7 +73,7 @@ func checkInherited(stages []stage) error {
 	return nil
 }
 
-// ancestors lists, in order, every earlier stage stage i builds on, copies or
+// ancestors lists, in order, every earlier stage that stage i builds on, copies or
 // mounts from, followed through each stage between them.
 func ancestors(stages []stage, i int) []int {
 	seen := make([]bool, i)
