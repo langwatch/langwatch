@@ -1076,6 +1076,15 @@ export interface LwqlClickHouseRows {
     readonly LastEventOccurredAt: "UInt64";
     readonly AppliedEventIds: "Array(String)";
     readonly EarliestSpanStartMs: "UInt64";
+    readonly MetadataOutputAction: "String";
+    readonly MetadataOutcome: "String";
+    readonly MetadataSentToReview: "String";
+    readonly MetadataDocumentType: "String";
+    readonly MetadataFlow: "String";
+    readonly MetadataLanguage: "String";
+    readonly MetadataSegment: "String";
+    readonly MetadataTeam: "String";
+    readonly MetadataTopic: "String";
   };
   readonly trace_analytics_rollup: {
     readonly TenantId: "String";

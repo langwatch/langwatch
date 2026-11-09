@@ -99,6 +99,22 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
           }),
       }),
       defineMigrationStep({
+        id: "trace:track-analytics-metadata-columns-materialisation",
+        kind: "data",
+        mode: "background",
+        description:
+          "Waits for ClickHouse to store the trace analytics metadata columns in existing rows.",
+        needsOldWritersGone: false,
+        run: ({ checkpoint, dryRun, signal }) =>
+          TraceIndexMaterialisationService.create({
+            mutations: repositories.indexMaterialisation,
+          }).waitForAnalyticsMetadataColumns({
+            dryRun,
+            signal,
+            onPoll: (progress) => checkpoint.save({ report: progress }),
+          }),
+      }),
+      defineMigrationStep({
         id: "trace:send-month-trace-ids",
         kind: "data",
         mode: "background",

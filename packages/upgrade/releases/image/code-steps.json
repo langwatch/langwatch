@@ -446,6 +446,14 @@
     "needsOldWritersGone": false
   },
   {
+    "id": "trace:track-analytics-metadata-columns-materialisation",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Waits for ClickHouse to store the trace analytics metadata columns in existing rows.",
+    "needsOldWritersGone": false
+  },
+  {
     "id": "trace:send-month-trace-ids",
     "kind": "data",
     "mode": "background",

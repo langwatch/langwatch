@@ -36,7 +36,12 @@ describe("given the By customer widgets", () => {
       expect(grouped.length, id).toBeGreaterThan(0);
       for (const text of grouped) {
         expect(text, id).toContain("multiIf(");
-        expect(text, id).toContain("JSONExtractString(Attributes['langwatch.labels'], 1)");
+        // The queries that need a prompt version still read `traces`; the rest its typed columns.
+        expect(text, id).toContain(
+          /\bFROM traces\b/.test(text)
+            ? "JSONExtractString(Attributes['langwatch.labels'], 1)"
+            : "unit_key = 'langwatch.labels', Labels[1]",
+        );
       }
     }
   });
@@ -133,8 +138,8 @@ describe("given the Field accuracy widgets", () => {
   /** @scenario "AC88 Field accuracy: share sent to human review" */
   it("reads sent_to_review or a hand-over outcome and names the type sent most", () => {
     const { code, sql } = built("ext-human-review");
-    expect(sql.summary).toContain("Attributes['metadata.sent_to_review'] = 'true'");
-    expect(sql.summary).toContain("Attributes['metadata.outcome'] = 'handover'");
+    expect(sql.summary).toContain("MetadataSentToReview = 'true'");
+    expect(sql.summary).toContain("MetadataOutcome = 'handover'");
     expect(sql.byUnit).toContain("ORDER BY documents >= 30 DESC");
     expect(code).toContain("reports sent_to_review or an outcome");
   });
@@ -144,7 +149,7 @@ describe("given the Outputs users keep widget", () => {
   /** @scenario "AC89 Outputs users keep: drop-off after generation" */
   it("counts outputs by reported action and names the biggest drop", () => {
     const { code, sql } = built("gen-dropoff");
-    expect(sql.main).toContain("Attributes['metadata.output_action'] IN ('accepted', 'edited')");
+    expect(sql.main).toContain("MetadataOutputAction IN ('accepted', 'edited')");
     expect(code).toContain('"biggest drop, at "');
   });
 });

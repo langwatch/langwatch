@@ -2,17 +2,31 @@ import { setTimeout as wait } from "node:timers/promises";
 
 import type {
   TraceIndexMaterialisationRepository,
-  UpdatedAtIndexMutation,
+  MaterialisationMutation,
 } from "../repositories/trace-index-materialisation.repository.ts";
 
 const POLL_INTERVAL_MS = 30_000;
 
-/** What the step saves after each poll and returns when the index is materialised. */
-export type UpdatedAtIndexProgress = Readonly<{ mutationId: string | null; partsToDo: number }>;
+/** What the step saves after each poll and returns when the materialisation is done. */
+export type MaterialisationProgress = Readonly<{ mutationId: string | null; partsToDo: number }>;
+
+type WaitArguments = Readonly<{
+  dryRun: boolean;
+  signal: AbortSignal;
+  onPoll: (progress: MaterialisationProgress) => Promise<void>;
+}>;
+
+/** One materialisation: how to read its mutations, how to start it, and what it builds. */
+type Materialisation = Readonly<{
+  find: () => Promise<MaterialisationMutation[]>;
+  start: () => Promise<void>;
+  builds: string;
+}>;
 
 /**
- * Waits on goose 00103's `idx_updated_at` materialisation over `trace_summaries`, so its
- * progress and failure reach the upgrade ledger. Starts it once when no mutation is recorded.
+ * Waits on the ClickHouse mutations goose starts over the trace module's tables (00103's
+ * `idx_updated_at` on `trace_summaries`, 00125's metadata columns on `trace_analytics`), so their
+ * progress and failure reach the upgrade ledger. Starts one once when no mutation is recorded.
  */
 export class TraceIndexMaterialisationService {
   private constructor(
@@ -30,29 +44,50 @@ export class TraceIndexMaterialisationService {
     return new TraceIndexMaterialisationService(mutations, pollIntervalMs);
   }
 
-  async waitForUpdatedAtIndex({
+  async waitForUpdatedAtIndex(args: WaitArguments): Promise<MaterialisationProgress> {
+    return this.waitFor({
+      ...args,
+      materialisation: {
+        find: () => this.mutations.findUpdatedAtIndexMutations(),
+        start: () => this.mutations.materialiseUpdatedAtIndex(),
+        builds: "the trace_summaries updated-at index",
+      },
+    });
+  }
+
+  async waitForAnalyticsMetadataColumns(args: WaitArguments): Promise<MaterialisationProgress> {
+    return this.waitFor({
+      ...args,
+      materialisation: {
+        find: () => this.mutations.findAnalyticsMetadataColumnMutations(),
+        start: () => this.mutations.materialiseAnalyticsMetadataColumns(),
+        builds: "the trace_analytics metadata columns",
+      },
+    });
+  }
+
+  private async waitFor({
     dryRun,
     signal,
     onPoll,
-  }: {
-    dryRun: boolean;
-    signal: AbortSignal;
-    onPoll: (progress: UpdatedAtIndexProgress) => Promise<void>;
-  }): Promise<UpdatedAtIndexProgress> {
+    materialisation,
+  }: WaitArguments & { materialisation: Materialisation }): Promise<MaterialisationProgress> {
     let started = false;
-    let progress: UpdatedAtIndexProgress = { mutationId: null, partsToDo: 0 };
+    let progress: MaterialisationProgress = { mutationId: null, partsToDo: 0 };
     while (!signal.aborted) {
-      const [latest] = await this.mutations.findUpdatedAtIndexMutations();
+      const [latest] = await materialisation.find();
       if (!latest) {
-        // Started and still unrecorded: the table has no such index, so nothing is left to build.
+        // Started and still unrecorded: the table has nothing to build, so nothing is left.
         if (dryRun || started) return { mutationId: null, partsToDo: 0 };
-        await this.mutations.materialiseUpdatedAtIndex();
+        await materialisation.start();
         started = true;
         continue;
       }
       progress = { mutationId: latest.mutationId, partsToDo: latest.partsToDo };
       if (latest.isDone) return progress;
-      if (latest.latestFailReason) throw failedMaterialisation(latest);
+      if (latest.latestFailReason) {
+        throw failedMaterialisation({ mutation: latest, builds: materialisation.builds });
+      }
       if (dryRun) return progress;
       await onPoll(progress);
       await wait(this.pollIntervalMs, undefined, { signal }).catch(() => undefined);
@@ -61,9 +96,15 @@ export class TraceIndexMaterialisationService {
   }
 }
 
-function failedMaterialisation(mutation: UpdatedAtIndexMutation): Error {
+function failedMaterialisation({
+  mutation,
+  builds,
+}: {
+  mutation: MaterialisationMutation;
+  builds: string;
+}): Error {
   return new Error(
-    `ClickHouse could not build the trace_summaries updated-at index (mutation ${mutation.mutationId}, ` +
+    `ClickHouse could not build ${builds} (mutation ${mutation.mutationId}, ` +
       `${mutation.partsToDo} parts left): ${mutation.latestFailReason}. ` +
       "Fix the cause on the ClickHouse server, then retry this step.",
   );

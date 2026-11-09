@@ -1,0 +1,24 @@
+Feature: The trace analytics metadata columns are stored in existing rows after an upgrade
+  Goose migration 00125 adds nine columns to trace_analytics, each computed from one metadata
+  key of the row's Attributes, and starts one ClickHouse mutation that stores them in the parts
+  written before it. A background upgrade step waits on that mutation so the Upgrades page shows
+  its progress and its failure. Until it finishes, an older part computes the value on read.
+
+  @unit
+  Scenario: The step finishes once ClickHouse has stored the metadata columns
+    Given the columns' mutation is recorded as done
+    When the step runs
+    Then it finishes with that mutation and starts no other
+
+  @unit
+  Scenario: The step starts storing the metadata columns once when no mutation is recorded
+    Given no mutation for the columns is recorded
+    When the step runs
+    Then it starts the columns' mutation once
+    And it waits on the mutation that start recorded
+
+  @unit
+  Scenario: A failed metadata-column mutation fails the step naming the columns
+    Given the columns' mutation reports a failure reason
+    When the step runs
+    Then the step fails naming the trace_analytics metadata columns, the mutation and the reason

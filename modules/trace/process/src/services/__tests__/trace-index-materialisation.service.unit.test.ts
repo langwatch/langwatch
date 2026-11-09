@@ -4,7 +4,7 @@ import { MemoryTraceIndexMaterialisationRepository } from "../../repositories/me
 import { TraceIndexMaterialisationRepository } from "../../repositories/trace-index-materialisation.repository.ts";
 import {
   TraceIndexMaterialisationService,
-  type UpdatedAtIndexProgress,
+  type MaterialisationProgress,
 } from "../trace-index-materialisation.service.ts";
 
 const running = { mutationId: "mutation_7.txt", isDone: false, partsToDo: 3, latestFailReason: "" };
@@ -12,16 +12,16 @@ const running = { mutationId: "mutation_7.txt", isDone: false, partsToDo: 3, lat
 function harness({
   mutations = MemoryTraceIndexMaterialisationRepository.create(),
 }: { mutations?: TraceIndexMaterialisationRepository } = {}) {
-  const saved: UpdatedAtIndexProgress[] = [];
+  const saved: MaterialisationProgress[] = [];
   const service = TraceIndexMaterialisationService.create({ mutations, pollIntervalMs: 0 });
   const run = ({
     dryRun = false,
     signal = new AbortController().signal,
-    onPoll = async (progress: UpdatedAtIndexProgress) => void saved.push(progress),
+    onPoll = async (progress: MaterialisationProgress) => void saved.push(progress),
   }: {
     dryRun?: boolean;
     signal?: AbortSignal;
-    onPoll?: (progress: UpdatedAtIndexProgress) => Promise<void>;
+    onPoll?: (progress: MaterialisationProgress) => Promise<void>;
   } = {}) => service.waitForUpdatedAtIndex({ dryRun, signal, onPoll });
   return { saved, run };
 }
@@ -154,6 +154,67 @@ describe("TraceIndexMaterialisationService", () => {
       partsToDo: 0,
     });
     expect(mutations.issued()).toBe(0);
+    expect(saved).toEqual([]);
+  });
+});
+
+describe("TraceIndexMaterialisationService, for the trace analytics metadata columns", () => {
+  function metadataHarness(mutations: MemoryTraceIndexMaterialisationRepository) {
+    const saved: MaterialisationProgress[] = [];
+    const service = TraceIndexMaterialisationService.create({ mutations, pollIntervalMs: 0 });
+    const run = ({
+      onPoll = async (progress: MaterialisationProgress) => void saved.push(progress),
+    }: { onPoll?: (progress: MaterialisationProgress) => Promise<void> } = {}) =>
+      service.waitForAnalyticsMetadataColumns({
+        dryRun: false,
+        signal: new AbortController().signal,
+        onPoll,
+      });
+    return { saved, run };
+  }
+
+  /** @scenario "The step finishes once ClickHouse has stored the metadata columns" */
+  it("finishes on a done mutation without starting another or touching the index", async () => {
+    const mutations = MemoryTraceIndexMaterialisationRepository.create();
+    mutations.recordAnalyticsMetadataColumns({ ...running, isDone: true, partsToDo: 0 });
+    const { run } = metadataHarness(mutations);
+
+    await expect(run()).resolves.toEqual({ mutationId: "mutation_7.txt", partsToDo: 0 });
+    expect(mutations.issuedAnalyticsMetadataColumns()).toBe(0);
+    expect(mutations.issued()).toBe(0);
+  });
+
+  /** @scenario "The step starts storing the metadata columns once when no mutation is recorded" */
+  it("starts the columns' mutation once and waits on it", async () => {
+    const mutations = MemoryTraceIndexMaterialisationRepository.create();
+    const { saved, run } = metadataHarness(mutations);
+
+    const result = await run({
+      onPoll: async (progress) => {
+        saved.push(progress);
+        mutations.recordAnalyticsMetadataColumns({
+          ...running,
+          mutationId: "mutation_memory_1.txt",
+          isDone: true,
+        });
+      },
+    });
+
+    expect(mutations.issuedAnalyticsMetadataColumns()).toBe(1);
+    expect(mutations.issued()).toBe(0);
+    expect(saved).toEqual([{ mutationId: "mutation_memory_1.txt", partsToDo: 1 }]);
+    expect(result.mutationId).toBe("mutation_memory_1.txt");
+  });
+
+  /** @scenario "A failed metadata-column mutation fails the step naming the columns" */
+  it("throws the mutation's failure reason, naming the metadata columns", async () => {
+    const mutations = MemoryTraceIndexMaterialisationRepository.create();
+    mutations.recordAnalyticsMetadataColumns({ ...running, latestFailReason: "Memory limit" });
+    const { saved, run } = metadataHarness(mutations);
+
+    await expect(run()).rejects.toThrow(
+      /trace_analytics metadata columns \(mutation mutation_7\.txt.*Memory limit/,
+    );
     expect(saved).toEqual([]);
   });
 });
