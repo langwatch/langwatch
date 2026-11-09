@@ -4,6 +4,7 @@
  * @see specs/traces-v2/search.feature
  */
 import type { Authorization } from "@langwatch/authorization";
+import type { PresenceProjectEvent } from "@langwatch/presence-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceListRead } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -21,7 +22,8 @@ const T = 1_700_000_040_000 - (1_700_000_040_000 % MINUTE);
 interface HeldRead {
   method: string;
   statements: number;
-  signal: AbortSignal | undefined;
+  /** The window the pass read; one object per pass, so it tells passes apart. */
+  window: unknown;
   answer: () => void;
 }
 
@@ -29,7 +31,12 @@ interface HeldRead {
  * The list repository as the pass sees it: every read is held until the test
  * answers it, and an abort rejects it the way the driver does.
  */
-function heldRepository() {
+function heldRepository({
+  answerAfterMs,
+}: {
+  /** Each read answers by itself after this long, as a slow statement would. */
+  answerAfterMs?: number;
+} = {}) {
   const reads: HeldRead[] = [];
   let running = 0;
   let mostRunning = 0;
@@ -38,16 +45,18 @@ function heldRepository() {
   function hold<T>({
     method,
     statements,
+    window,
     signal,
     value,
   }: {
     method: string;
     statements: number;
+    window: unknown;
     signal: AbortSignal | undefined;
     value: T;
   }): Promise<T> {
     if (answerAtOnce) {
-      reads.push({ method, statements, signal, answer: () => {} });
+      reads.push({ method, statements, window, answer: () => {} });
       return Promise.resolve(value);
     }
     return new Promise<T>((resolve, reject) => {
@@ -61,7 +70,9 @@ function heldRepository() {
       running += statements;
       mostRunning = Math.max(mostRunning, running);
       signal?.addEventListener("abort", () => close() && reject(signal.reason), { once: true });
-      reads.push({ method, statements, signal, answer: () => close() && resolve(value) });
+      const answer = () => close() && resolve(value);
+      reads.push({ method, statements, window, answer });
+      if (answerAfterMs !== undefined) setTimeout(answer, answerAfterMs);
     });
   }
 
@@ -71,6 +82,7 @@ function heldRepository() {
         method: "batch",
         statements:
           Number(params.categoricalSpecs.length > 0) + Number(params.rangeSpecs.length > 0),
+        window: params.timeRange,
         signal: params.signal,
         value: { categoricals: {}, ranges: {} },
       }),
@@ -78,6 +90,7 @@ function heldRepository() {
       hold({
         method: "categorical",
         statements: 1,
+        window: params.timeRange,
         signal: params.signal,
         value: { values: [], totalDistinct: 0 },
       }),
@@ -85,15 +98,23 @@ function heldRepository() {
       hold({
         method: "raw",
         statements: 1,
+        window: undefined,
         signal: params.signal,
         value: { values: [], totalDistinct: 0 },
       }),
     findRangeStatsForTable: async (params) =>
-      hold({ method: "range", statements: 1, signal: params.signal, value: { min: 0, max: 0 } }),
+      hold({
+        method: "range",
+        statements: 1,
+        window: params.timeRange,
+        signal: params.signal,
+        value: { min: 0, max: 0 },
+      }),
     findDiscreteValues: async (params) =>
       hold({
         method: "discrete",
         statements: 1,
+        window: params.timeRange,
         signal: params.signal,
         value: { values: [], distinctCount: 0 },
       }),
@@ -103,8 +124,9 @@ function heldRepository() {
     repository,
     reads,
     mostRunning: () => mostRunning,
-    /** Every pass that read, told apart by the signal each pass hands its reads. */
-    passes: () => new Set(reads.map((read) => read.signal)).size,
+    /** Every pass that read, told apart by the window object each pass hands its reads. */
+    passes: () =>
+      new Set(reads.filter((read) => read.window !== undefined).map((read) => read.window)).size,
     answerEverythingAtOnce: () => {
       answerAtOnce = true;
     },
@@ -121,13 +143,20 @@ function heldRepository() {
 /** Lets the pass's promise chains move on. */
 const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
 
-function listService(repository: TraceListRead) {
+function listService(
+  repository: TraceListRead,
+  { published = [] }: { published?: PresenceProjectEvent[] } = {},
+) {
   return TraceListService.create({
     repository,
     evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
     topicNames: { findNamesByIds: async () => new Map() },
     facets: CLICKHOUSE_FACET_CATALOG,
-    discoverUpdates: { publishProjectEvent: async () => {} },
+    discoverUpdates: {
+      publishProjectEvent: async (event) => {
+        published.push(event);
+      },
+    },
   });
 }
 
@@ -219,26 +248,43 @@ describe("the facet discovery pass", () => {
     });
   });
 
-  describe("when a pass is still reading at its deadline", () => {
-    /** @scenario "A facet discovery pass past its deadline is abandoned" */
-    it("aborts its running reads, starts none of its waiting ones and omits their facets", async () => {
-      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-      const held = heldRepository();
-      const counting = countsFor({
-        service: listService(held.repository),
-        authorization: ownProof({ projectId: "tenant-pass-deadline" }),
-        timeRange: { from: T - HOUR, to: T },
+  describe("when every statement of a pass is slow but within its cap", () => {
+    /** @scenario "A facet discovery pass gives every read its turn" */
+    it("runs every task to its answer, the last ones included", async () => {
+      const window = { from: T - HOUR, to: T };
+      const reference = heldRepository();
+      reference.answerEverythingAtOnce();
+      const referenceService = listService(reference.repository);
+      const referenceProof = ownProof({ projectId: "tenant-slow-reference" });
+      await referenceService.getDiscover({ authorization: referenceProof, timeRange: window });
+      await vi.waitFor(async () =>
+        expect(
+          (await referenceService.getDiscover({ authorization: referenceProof, timeRange: window }))
+            .pending,
+        ).toBe(false),
+      );
+      const expected = await referenceService.getDiscover({
+        authorization: referenceProof,
+        timeRange: window,
       });
-      await settle();
-      const started = held.reads.length;
-      expect(started).toBeGreaterThan(0);
 
-      vi.advanceTimersByTime(60_000);
-      const facets = await counting;
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const published: PresenceProjectEvent[] = [];
+      const held = heldRepository({ answerAfterMs: 19_000 });
+      const service = listService(held.repository, { published });
+      const authorization = ownProof({ projectId: "tenant-slow-statements" });
+      await service.getDiscover({ authorization, timeRange: window });
+      for (let turn = 0; turn < 40 && published.length === 0; turn++) {
+        await settle();
+        await vi.advanceTimersByTimeAsync(19_000);
+      }
 
-      expect(held.reads).toHaveLength(started);
-      for (const read of held.reads) expect(read.signal?.aborted).toBe(true);
-      expect(facets).toEqual([]);
+      expect(published).toHaveLength(1);
+      expect(held.reads.map((read) => read.method).toSorted()).toEqual(
+        reference.reads.map((read) => read.method).toSorted(),
+      );
+      expect(await service.getDiscover({ authorization, timeRange: window })).toEqual(expected);
+      expect(held.passes()).toBe(1);
     });
   });
 
@@ -264,6 +310,29 @@ describe("the facet discovery pass", () => {
       expect(held.passes()).toBe(1);
       await held.drain();
       expect(await repeat).toBe(await first);
+    });
+
+    /** @scenario "A live repeat shares the count still running though its window rolled" */
+    it("runs its own count for a live window whose end moved to another minute", async () => {
+      const held = heldRepository();
+      const service = listService(held.repository);
+      const authorization = ownProof({ projectId: "tenant-live-next-minute" });
+
+      const first = countsFor({
+        service,
+        authorization,
+        timeRange: { from: T - HOUR, to: T, live: true },
+      });
+      const later = countsFor({
+        service,
+        authorization,
+        timeRange: { from: T - HOUR + MINUTE, to: T + MINUTE, live: true },
+      });
+      await settle();
+
+      expect(held.passes()).toBe(2);
+      await held.drain();
+      await Promise.all([first, later]);
     });
 
     /** @scenario "A live repeat shares the count still running though its window rolled" */

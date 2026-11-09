@@ -74,7 +74,7 @@ class CappedRun {
     private readonly run: {
       tasks: readonly DiscoverTask[];
       limit: number;
-      signal: AbortSignal;
+      signal: AbortSignal | undefined;
       resolve: (settled: PromiseSettledResult<Outcome>[]) => void;
     },
   ) {
@@ -84,7 +84,7 @@ class CappedRun {
 
   start(): void {
     if (this.open === 0) return this.run.resolve(this.settled);
-    this.run.signal.addEventListener("abort", () => this.pump(), { once: true });
+    this.run.signal?.addEventListener("abort", () => this.pump(), { once: true });
     this.pump();
   }
 
@@ -99,7 +99,7 @@ class CappedRun {
   private startNext(): boolean {
     const index = this.next;
     const task = this.run.tasks[index]!;
-    if (this.run.signal.aborted) {
+    if (this.run.signal?.aborted === true) {
       this.next += 1;
       this.finish(index, { status: "rejected", reason: this.run.signal.reason });
       return true;
@@ -161,7 +161,8 @@ export class TraceDiscoverTaskService {
   }: {
     tasks: readonly DiscoverTask[];
     limit: number;
-    signal: AbortSignal;
+    /** The caller's abandonment, when it has one. */
+    signal?: AbortSignal;
   }): Promise<PromiseSettledResult<Outcome>[]> {
     return new Promise((resolve) => new CappedRun({ tasks, limit, signal, resolve }).start());
   }

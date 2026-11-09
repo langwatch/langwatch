@@ -64,15 +64,18 @@ const DISCOVER_CACHE = TraceTtlCacheService.create<CachedDiscover>(DISCOVER_TTL_
 /** ClickHouse statements one pass runs at once; the rest of its reads wait their turn. */
 const DISCOVER_PASS_MAX_CONCURRENT_STATEMENTS = 4;
 
-/** A pass still running after this is abandoned: its reads are stopped, its facets omitted. */
-const DISCOVER_PASS_DEADLINE_MS = 60_000;
+/**
+ * How long a refresh holds its key. Generous: a pass runs about 16 statements, 4 at a time,
+ * and ClickHouse stops each at its 20 s cap, so a pass ends well inside it.
+ */
+const DISCOVER_REFRESH_LEASE_MS = 3 * 60_000;
 
 /**
  * Refresh lock — a separate cache because the lease needs a short TTL so a
  * crashed refresher self-recovers quickly, while the value cache keeps a long one. Reusing the
  * value cache for locks would mean half an hour of stale data after a refresher crash.
  */
-const DISCOVER_REFRESH_LOCK_CACHE = TraceTtlCacheService.create<number>(DISCOVER_PASS_DEADLINE_MS);
+const DISCOVER_REFRESH_LOCK_CACHE = TraceTtlCacheService.create<number>(DISCOVER_REFRESH_LEASE_MS);
 
 /** The discover lineages with a pass running in this process; no second one starts beside it. */
 const DISCOVER_PASSES_IN_FLIGHT = new Set<string>();
@@ -295,8 +298,8 @@ export class TraceDiscoverService {
 
     void (async () => {
       try {
-        // The lease is as long as a pass may run, since a pass is abandoned at that deadline. A
-        // lost claim means this key refreshed within the lease and its write hydrates the cache.
+        // The lease outlasts a pass, whose statements each stop at their cap. A lost claim
+        // means this key refreshed within the lease and its write hydrates the cache.
         const claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(
           cacheKey,
           nowInstant().epochMilliseconds,
@@ -374,16 +377,6 @@ export class TraceDiscoverService {
     });
     const taskTimings: { label: string; durationMs: number }[] = [];
     const startedAt = nowInstant().epochMilliseconds;
-    // Abandoning the pass stops its running reads on the server and starts no more of them.
-    const abandon = new AbortController();
-    const deadline = setTimeout(
-      () => abandon.abort(new Error("Facet discovery pass passed its deadline")),
-      DISCOVER_PASS_DEADLINE_MS,
-    );
-    const signal = params.signal
-      ? AbortSignal.any([abandon.signal, params.signal])
-      : abandon.signal;
-    const passParams: DiscoverParams = { ...params, signal };
     const timed = (task: DiscoverTask): DiscoverTask => ({
       ...task,
       run: () => {
@@ -396,17 +389,16 @@ export class TraceDiscoverService {
     });
 
     const tasks = [
-      ...this.tasks.batchTasks(passParams, batched),
-      ...this.tasks.standaloneTasks({ params: passParams, standalone, filters }),
-      ...this.tasks.discreteTasks(passParams, filters),
+      ...this.tasks.batchTasks(params, batched),
+      ...this.tasks.standaloneTasks({ params, standalone, filters }),
+      ...this.tasks.discreteTasks(params, filters),
     ].map(timed);
 
     const settled = await this.tasks.settle({
       tasks,
       limit: DISCOVER_PASS_MAX_CONCURRENT_STATEMENTS,
-      signal,
+      ...(params.signal ? { signal: params.signal } : {}),
     });
-    clearTimeout(deadline);
     this.logSlowDiscover({
       params,
       totalMs: nowInstant().epochMilliseconds - startedAt,

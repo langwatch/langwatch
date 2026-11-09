@@ -129,8 +129,8 @@ export function discoverLineageKey({
 
 /**
  * The window part of a facet count's in-flight key. A live window's bounds roll
- * forward every request, so it is keyed by its span to the minute: a repeat
- * shares the count still running instead of starting a second one.
+ * forward every request, so it is keyed by its span and its end to the minute:
+ * a repeat within the minute shares the count still running.
  */
 export function facetCountWindowKey(timeRange: {
   from: number;
@@ -139,5 +139,9 @@ export function facetCountWindowKey(timeRange: {
 }): readonly (string | number)[] {
   if (timeRange.live !== true) return [timeRange.from, timeRange.to];
 
-  return ["live", Math.round((timeRange.to - timeRange.from) / CACHE_TIME_BUCKET_MS)];
+  return [
+    "live",
+    Math.round((timeRange.to - timeRange.from) / CACHE_TIME_BUCKET_MS),
+    bucketTime(timeRange.to),
+  ];
 }

@@ -8,6 +8,12 @@ import { api, type RouterOutputs } from "../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 
 const EMPTY: never[] = [];
+
+/**
+ * How often a viewer answered `pending` asks again. The `discover_updated` push is the fast
+ * path; this covers a push that never comes. A pending repeat reads only the server's cache.
+ */
+const DISCOVER_PENDING_POLL_MS = 5_000;
 const EMPTY_RESULT: { facets: never[]; pending: boolean } = {
   facets: EMPTY,
   pending: true,
@@ -58,6 +64,8 @@ export function useTraceFacets() {
       // the sidebar doesn't flicker. Project switches are gated below by
       // remembering which project the cached response belongs to.
       placeholderData: keepPreviousData,
+      refetchInterval: (query) =>
+        query.state.data?.pending === true ? DISCOVER_PENDING_POLL_MS : false,
       // needs a read hint: discover computed (a cold miss returns pending: true)
     },
   );
