@@ -6,8 +6,8 @@
 
 type RunTargetJson = { id: string; [key: string]: unknown };
 
-const LABEL_KEY = "agentLabel";
-const VERSION_KEY = "agentVersion";
+const LABEL_KEY = "_lwAgentLabel";
+const VERSION_KEY = "_lwAgentVersion";
 
 function metadataOf(target: RunTargetJson): Record<string, unknown> {
   const metadata = target.metadata;

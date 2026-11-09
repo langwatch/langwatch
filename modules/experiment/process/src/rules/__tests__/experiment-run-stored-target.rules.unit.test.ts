@@ -26,7 +26,7 @@ describe("a run target's stored shape", () => {
     it("is accepted by the previous release's strict target schema", () => {
       const stored = storedRunTargetOf(pinned);
 
-      expect(previousReleaseTargetSchema.safeParse(stored).success).toBe(true);
+      expect(previousReleaseTargetSchema.validate(stored)).toBe(true);
     });
 
     /** @scenario "A release before label versions still reads the targets of a run that recorded one" */
@@ -40,6 +40,19 @@ describe("a run target's stored shape", () => {
   describe("given a target with metadata of its own and no label", () => {
     it("keeps the target as it was", () => {
       const target = { id: "t", name: "n", type: "prompt", metadata: { temperature: 0.2 } };
+
+      expect(runTargetFromStored(storedRunTargetOf(target))).toEqual(target);
+    });
+  });
+
+  describe("given a target whose own metadata names agentLabel and agentVersion", () => {
+    it("leaves them in metadata, not read as the run's label version", () => {
+      const target = {
+        id: "t",
+        name: "n",
+        type: "agent",
+        metadata: { agentLabel: "caller-tag", agentVersion: 9 },
+      };
 
       expect(runTargetFromStored(storedRunTargetOf(target))).toEqual(target);
     });
