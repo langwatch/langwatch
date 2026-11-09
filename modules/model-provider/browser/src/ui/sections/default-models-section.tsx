@@ -40,6 +40,7 @@ import {
 import type { ReactNode } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { useHostedDecisionModelOffered } from "../../behavior/use-hosted-decision-model.ts";
 import {
   DECISION_MODEL_DISPLAY_NAMES,
   isShownDecisionModel,
@@ -91,6 +92,7 @@ export function DefaultModelsSection({
     { projectId: projectId ?? "" },
     { enabled: !!projectId },
   );
+  const isHostedOffered = useHostedDecisionModelOffered({ projectId });
 
   const utils = modelProviderApi.useUtils();
   const deleteMutation = modelProviderApi.modelProvider.deleteDefaultModelsConfig.useMutation();
@@ -181,6 +183,7 @@ export function DefaultModelsSection({
         onAdd={openAdd}
         enabledProviderKeys={enabledProviderKeys}
         displayNames={displayNames}
+        isHostedOffered={isHostedOffered}
       />
     </VStack>
   );
@@ -208,6 +211,7 @@ function AllConfigsView({
   onAdd,
   enabledProviderKeys,
   displayNames,
+  isHostedOffered,
 }: {
   configs: ConfigRow[];
   /** Full cascade input. `configs` is filter-narrowed for display, but cells
@@ -221,6 +225,7 @@ function AllConfigsView({
   onAdd: () => void;
   enabledProviderKeys: Set<string> | null;
   displayNames: Record<string, string>;
+  isHostedOffered: boolean;
 }) {
   if (configs.length === 0) {
     return (
@@ -277,6 +282,7 @@ function AllConfigsView({
                   onEdit={() => onEdit(config)}
                   enabledProviderKeys={enabledProviderKeys}
                   displayNames={displayNames}
+                  isHostedOffered={isHostedOffered}
                 />
               </ListTable.Cell>
             ))}
@@ -343,6 +349,7 @@ function ConfigCell({
   onEdit,
   enabledProviderKeys,
   displayNames,
+  isHostedOffered,
 }: {
   role: ModelRole;
   config: Record<string, string>;
@@ -357,6 +364,8 @@ function ConfigCell({
   onEdit: () => void;
   enabledProviderKeys: Set<string> | null;
   displayNames: Record<string, string>;
+  /** Whether Evals Preview may be offered; not, an unset Instant Evals cell reads "Not set". */
+  isHostedOffered: boolean;
 }) {
   const isInvalid = (model: string) =>
     !!enabledProviderKeys && !enabledProviderKeys.has(model.split("/")[0] ?? "");
@@ -384,7 +393,11 @@ function ConfigCell({
     <VStack align="start" gap={1}>
       <ChipWithEdit onEdit={onEdit}>
         {role === "INSTANT_EVALS" ? (
-          <DecisionModelChip model={resolvedRoleModel} isInvalid={isInvalid} />
+          <DecisionModelChip
+            model={resolvedRoleModel}
+            isInvalid={isInvalid}
+            isHostedOffered={isHostedOffered}
+          />
         ) : (
           <RoleModelChip
             model={resolvedRoleModel}
@@ -414,16 +427,27 @@ function ConfigCell({
 /**
  * The Instant Evals cell: unset, or an id the catalogue no longer offers, reads as the
  * LangWatch Evals Preview default (faded), never "Not configured" (ADR-182 decision 1).
+ * Where Evals Preview is not offered, it is never shown: unset, or pinned to it, reads "Not set".
  * Only an own model can need an update: the hosted default has no provider row.
  */
 function DecisionModelChip({
   model,
   isInvalid,
+  isHostedOffered,
 }: {
   model: string | null;
   isInvalid: (model: string) => boolean;
+  isHostedOffered: boolean;
 }) {
-  const shown = isShownDecisionModel(model) ? model : null;
+  const shown =
+    isShownDecisionModel(model) && (isHostedOffered || isOwnDecisionModelId(model)) ? model : null;
+  if (!shown && !isHostedOffered) {
+    return (
+      <Badge colorPalette="gray" variant="subtle" data-testid="instant-evals-not-set">
+        Not set
+      </Badge>
+    );
+  }
   return (
     <ModelChip
       model={shown ?? LANGWATCH_DECISION_MODEL_ID}
