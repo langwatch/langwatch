@@ -417,17 +417,12 @@ export class PromptModule implements PromptApi {
     return this.#dependencies.prompts.createPrompt(input);
   }
 
-  async updatePrompt(input: UpdatePromptCommand): Promise<VersionedPrompt> {
-    const saved = await this.#dependencies.prompts.updatePrompt(input);
-    return this.#announceVersionSaved(input.projectId, saved);
+  updatePrompt(input: UpdatePromptCommand): Promise<VersionedPrompt> {
+    return this.#dependencies.prompts.updatePrompt(input);
   }
 
-  async syncPrompt(input: PromptRestSyncInput): Promise<PromptSyncResult> {
-    const result = await this.#dependencies.prompts.syncPrompt(input);
-    if (result.action === "updated" && result.prompt) {
-      this.#announceVersionSaved(input.projectId, result.prompt);
-    }
-    return result;
+  syncPrompt(input: PromptRestSyncInput): Promise<PromptSyncResult> {
+    return this.#dependencies.prompts.syncPrompt(input);
   }
 
   listTags(input: { organizationId: string }): Promise<PromptTag[]> {
