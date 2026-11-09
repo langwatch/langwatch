@@ -60,7 +60,10 @@ type AiToolCatalogCollaborators = {
   diagnostics: { warn(message: string, context: Record<string, unknown>): void };
 };
 
-/** A tile's policy for its tool: on unless the admin turned it off, less what the tool can't do. */
+/**
+ * A tile's policy for its tool: a capability is on only when the tool can do it
+ * (`PLATFORM_TOOL_POLICY_DEFAULTS`) and the admin did not turn it off.
+ */
 function tilePolicy({
   slug,
   config,
@@ -68,13 +71,11 @@ function tilePolicy({
   slug: PlatformToolSlug;
   config: { allowVk?: unknown; allowOtelDirect?: unknown };
 }): PlatformToolPolicy {
-  // A path the platform default turns off is one the tool cannot take; no tile turns it on.
   const capable = PLATFORM_TOOL_POLICY_DEFAULTS[slug];
+  const adminAllows = (value: unknown): boolean => value === undefined || Boolean(value);
   return {
-    allowVk: capable.allowVk && (config.allowVk === undefined || Boolean(config.allowVk)),
-    allowOtelDirect:
-      capable.allowOtelDirect &&
-      (config.allowOtelDirect === undefined || Boolean(config.allowOtelDirect)),
+    allowVk: capable.allowVk && adminAllows(config.allowVk),
+    allowOtelDirect: capable.allowOtelDirect && adminAllows(config.allowOtelDirect),
   };
 }
 

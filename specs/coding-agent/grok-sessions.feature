@@ -101,11 +101,13 @@ Rule: One row per Grok session id
     Then the row counts one failed tool run
 
   # Grok decides with allow, deny, followup or cancelled; Claude says accept or reject.
+  # A followup is the user answering instead of approving: not a refusal, so not a denial.
   @unit
   Scenario: Grok's tool decisions are counted in its own words
     Given a Grok session whose tool_decision records say "allow", "deny", "followup" and "cancelled"
     When the session is folded
-    Then the row counts two denied tool runs and one aborted tool run
+    Then the row counts one denied tool run and one aborted tool run
+    And the followup is counted as neither
 
   # Grok names the server apart, as mcp_server_name, and the tool "<server>__<tool>".
   @unit
@@ -252,6 +254,20 @@ Rule: A Grok turn reads back in the Trace Explorer
     Given Grok tool_decision records for "read_file" saying "allow" and for "run_terminal_command" saying "deny"
     When the trace's transcript is built
     Then it holds one rejected entry, for "run_terminal_command"
+
+  # Captured from Grok 1.0.70: the prompt's reject, typed answer and Ctrl+C send source
+  # "user_reject", "user_followup" and "user_abort"; a --deny rule sends source "config".
+  @unit
+  Scenario: A Grok tool call the user answered instead of approving is its own outcome
+    Given a Grok tool_decision record saying "followup" with source "user_followup"
+    When the trace's transcript is built
+    Then its rejected entry reads as redirected by the user, not denied
+
+  @unit
+  Scenario: A Grok tool call a deny rule refused is not pinned on the user
+    Given Grok tool_decision records saying "deny", one with source "config" and one with source "user_reject"
+    When the trace's transcript is built
+    Then only the "user_reject" denial is marked as the user's decision
 
   @unit
   Scenario: A Grok MCP tool run in the transcript names its server

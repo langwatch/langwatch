@@ -314,7 +314,7 @@ interface Input {
   traceId: string;
   occurredAtMs?: number;
 }
-type Output = z.infer<typeof codingAgentTranscriptSchema>; // ../contract/src/coding-agent-transcript.ts:102
+type Output = z.infer<typeof codingAgentTranscriptSchema>; // ../contract/src/coding-agent-transcript.ts:104
 
 // codingAgents.sessionGroups
 type Input = z.infer<typeof traceSessionGroupsInputSchema>; // ../../trace/contract/src/traces.trpc.ts:153
