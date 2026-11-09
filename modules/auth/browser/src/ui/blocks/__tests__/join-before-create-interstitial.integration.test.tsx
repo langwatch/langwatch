@@ -107,6 +107,9 @@ const openToMany = (count: number): JoinLookupDecision => ({
   })),
 });
 
+/** A row's accessible name: the organization and its rounded count. */
+const row = (name: string) => screen.getByRole("button", { name: `Join ${name} (1+ colleague)` });
+
 describe("given many organizations open to requests from the domain", () => {
   afterEach(() => cleanup());
 
@@ -118,11 +121,33 @@ describe("given many organizations open to requests from the domain", () => {
       expect(
         await screen.findByRole("button", { name: "Join Acme (10+ colleagues)" }),
       ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Join Acme team 1" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Join Acme team 3" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Join Acme team 4" })).toBeNull();
+      expect(row("Acme team 1")).toBeInTheDocument();
+      expect(row("Acme team 3")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Join Acme team 4 / })).toBeNull();
       expect(screen.queryByRole("textbox")).toBeNull();
       expect(screen.getByRole("button", { name: "Create a new organization" })).toBeInTheDocument();
+    });
+
+    /** @scenario Many organizations stay one clear choice and a short list */
+    it("reads each row's rounded count out with its name", async () => {
+      renderStep({
+        lookup: {
+          outcome: "ask",
+          organizations: [
+            { organizationId: "org_acme", name: "Acme", colleagueCount: 20 },
+            { organizationId: "org_data", name: "Acme Data", colleagueCount: 10 },
+            { organizationId: "org_labs", name: "Acme Labs", colleagueCount: 1 },
+          ],
+        },
+      });
+
+      // The count is half of what a row says, so a screen reader hears it too.
+      expect(
+        await screen.findByRole("button", { name: "Join Acme Data (10+ colleagues)" }),
+      ).toHaveTextContent("10+ colleagues");
+      expect(
+        screen.getByRole("button", { name: "Join Acme Labs (1+ colleague)" }),
+      ).toBeInTheDocument();
     });
 
     it("lists and filters every organization once asked to show all", async () => {
@@ -130,13 +155,13 @@ describe("given many organizations open to requests from the domain", () => {
       const { onJoinOrganization } = renderStep({ lookup: openToMany(12) });
 
       await user.click(await screen.findByRole("button", { name: "Show all 11 organizations" }));
-      expect(screen.getByRole("button", { name: "Join Acme team 11" })).toBeInTheDocument();
+      expect(row("Acme team 11")).toBeInTheDocument();
 
       await user.type(screen.getByRole("textbox", { name: "Search organizations" }), "team 11");
-      expect(screen.queryByRole("button", { name: "Join Acme team 1" })).toBeNull();
-      expect(screen.queryByRole("button", { name: "Join Acme team 10" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Join Acme team 1 / })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Join Acme team 10 / })).toBeNull();
 
-      await user.click(screen.getByRole("button", { name: "Join Acme team 11" }));
+      await user.click(row("Acme team 11"));
       expect(onJoinOrganization).toHaveBeenCalledWith(
         expect.objectContaining({ id: "org_11", name: "Acme team 11" }),
       );
@@ -169,12 +194,12 @@ describe("given many organizations open to requests from the domain", () => {
 
     /** @scenario A name filter that matches nothing says so and folds back cleanly */
     it("says no organization matches and offers to clear the search", async () => {
-      expect(screen.getByText('No organization matches "globex".')).toBeInTheDocument();
+      expect(screen.getByText('No other organization matches "globex".')).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /^Join Acme team/ })).toBeNull();
 
       await user.click(screen.getByRole("button", { name: "Clear search" }));
       expect(screen.getByRole("textbox", { name: "Search organizations" })).toHaveValue("");
-      expect(screen.getByRole("button", { name: "Join Acme team 11" })).toBeInTheDocument();
+      expect(row("Acme team 11")).toBeInTheDocument();
     });
 
     it("puts the caret back in the search after clearing it", async () => {
@@ -187,7 +212,7 @@ describe("given many organizations open to requests from the domain", () => {
       await user.click(screen.getByRole("button", { name: "Show fewer" }));
 
       expect(screen.queryByRole("textbox")).toBeNull();
-      expect(screen.queryByText(/No organization matches/)).toBeNull();
+      expect(screen.queryByText(/No other organization matches/)).toBeNull();
       expect(screen.getAllByRole("button", { name: /^Join Acme team/ })).toHaveLength(3);
 
       await user.click(screen.getByRole("button", { name: "Show all 11 organizations" }));

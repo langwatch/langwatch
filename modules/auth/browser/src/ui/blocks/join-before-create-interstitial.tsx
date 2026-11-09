@@ -1,5 +1,6 @@
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Box, Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { SearchInput } from "@langwatch/design-system/search-input";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import { useEffect, useRef, useState } from "react";
 
@@ -144,8 +145,9 @@ function OtherOrganizations({
         Or join another organization
       </Text>
       {searchable ? (
-        <Input
+        <SearchInput
           ref={search}
+          type="text"
           size="sm"
           placeholder="Search organizations"
           aria-label="Search organizations"
@@ -175,10 +177,10 @@ function OtherOrganizations({
               width="full"
               justifyContent="space-between"
               borderRadius="0"
-              aria-label={`Join ${organization.name}`}
+              aria-label={`Join ${organization.name} (${colleagues(organization.colleagueCount)})`}
               onClick={() => onJoinOrganization(organization)}
             >
-              <HStack width="full" justify="space-between" gap={3} minWidth={0}>
+              <HStack as="span" width="full" justify="space-between" gap={3} minWidth={0}>
                 <Text as="span" truncate title={organization.name}>
                   {organization.name}
                 </Text>
@@ -193,7 +195,7 @@ function OtherOrganizations({
           <Box as="li" paddingX={3}>
             <NoDataInfoBlock
               size="line"
-              title={`No organization matches "${query.trim()}".`}
+              title={`No other organization matches "${query.trim()}".`}
               action={{
                 label: "Clear search",
                 onClick: () => {
