@@ -175,7 +175,7 @@ function buildWhereClause({
  * Caps every sidebar facet read: a scan past these limits is stopped on the
  * server, freeing its shared slot; the sidebar omits that facet instead.
  */
-export const FACET_READ_SETTINGS: Record<string, string> = {
+const FACET_READ_SETTINGS: Record<string, string> = {
   // ClickHouse settings are string-typed over the wire.
   max_execution_time: "20",
   max_memory_usage: String(2 * 1024 * 1024 * 1024), // 2 GiB
@@ -731,9 +731,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const result = await client.query({
       query: params.query.sql,
       query_params: params.query.params,
-      // Per-query guard (e.g. the key-discovery facets' memory ceiling); absent
-      // for facets that don't set one.
-      // A ceiling the facet sets itself wins over the shared one.
+      // The shared guard always applies; a facet's own ceiling overrides it.
       clickhouse_settings: { ...FACET_READ_SETTINGS, ...params.query.settings },
       format: "JSONEachRow",
     });

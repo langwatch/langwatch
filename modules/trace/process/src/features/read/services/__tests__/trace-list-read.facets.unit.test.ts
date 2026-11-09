@@ -319,6 +319,7 @@ describe("the sidebar's facet counts", () => {
       return { request, calls };
     }
 
+    /** @scenario "A repeated facet request shares the count still running" */
     it("answers both from one run", async () => {
       const once = sharedService();
       await once.request("status:error");
@@ -331,6 +332,7 @@ describe("the sidebar's facet counts", () => {
       expect(calls.batched).toHaveLength(scansPerRun);
     });
 
+    /** @scenario "A repeated facet request shares the count still running" */
     it("runs a different query on its own", async () => {
       const { request, calls } = sharedService();
       await Promise.all([request("status:error"), request("service:api")]);
@@ -341,6 +343,7 @@ describe("the sidebar's facet counts", () => {
       expect(twoRuns).toBe(2 * single.calls.batched.length);
     });
 
+    /** @scenario "A repeated facet request shares the count still running" */
     it("counts afresh once the first run has answered", async () => {
       const { request, calls } = sharedService();
       await request("status:error");

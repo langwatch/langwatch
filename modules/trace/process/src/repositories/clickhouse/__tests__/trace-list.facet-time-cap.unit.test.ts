@@ -1,6 +1,7 @@
 // The sidebar's facet reads scan a tenant's whole window. Each one carries a
 // server-side time cap, so one tenant's slow scan cannot hold the shared
 // statement slots that every other tenant's reads queue for.
+// @see specs/traces-v2/search.feature
 import { AuthorizedClickHouse, type QueryRequest, tenantScope } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it, vi } from "vitest";
@@ -44,6 +45,7 @@ function expectCapped(settings: QueryRequest["settings"]) {
 
 describe("the facet reads' time and memory cap", () => {
   describe("when the sidebar batches categorical and range facets over spans", () => {
+    /** @scenario "A capped facet read gives its shared slot back" */
     it("caps both scans", async () => {
       const { repo, requests } = makeRepo();
 
@@ -65,6 +67,7 @@ describe("the facet reads' time and memory cap", () => {
   });
 
   describe("when one facet's values are read on their own", () => {
+    /** @scenario "A capped facet read gives its shared slot back" */
     it("caps the categorical, discrete and range-stat scans", async () => {
       const { repo, requests } = makeRepo();
       const base = { authorization, timeRange, table: "trace_summaries" as const };
@@ -94,6 +97,7 @@ describe("the facet reads' time and memory cap", () => {
   });
 
   describe("when a raw facet query brings its own guard", () => {
+    /** @scenario "A capped facet read gives its shared slot back" */
     it("keeps that guard's own memory ceiling and adds the time cap", async () => {
       const { repo, requests } = makeRepo();
 
