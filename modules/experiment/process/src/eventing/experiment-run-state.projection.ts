@@ -52,6 +52,8 @@ export interface ExperimentRunStateData {
   /** Rows and verdicts the reporter counted for the whole run; null when it reported none. */
   ExpectedTargetResults: number | null;
   ExpectedEvaluatorResults: number | null;
+  /** Cells the run kept in flight, from its plan; null for a run started without one. */
+  Concurrency: number | null;
 
   // Raw counters for incremental aggregation
   TotalScoreSum: number;
@@ -150,6 +152,7 @@ export class ExperimentRunStateFoldProjection
       StoppedAt: null,
       ExpectedTargetResults: null,
       ExpectedEvaluatorResults: null,
+      Concurrency: null,
       TotalScoreSum: 0,
       ScoreCount: 0,
       PassedCount: 0,
@@ -170,6 +173,7 @@ export class ExperimentRunStateFoldProjection
       Total: Math.max(state.Total, event.data.total),
       Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
       StartedAt: state.StartedAt ?? event.occurredAt,
+      Concurrency: event.data.plan?.concurrency ?? state.Concurrency,
     };
   }
 
