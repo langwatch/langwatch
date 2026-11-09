@@ -87,7 +87,7 @@ export function isReachableRefusal({
   return provider === "azure" && AZURE_REACHABLE_STATUSES.has(status);
 }
 
-/** One deployment's chat-completions route, at the api-version execution defaults to. */
+/** One deployment's chat-completions route, at the credential's api-version or the default. */
 export function azureChatCompletionsUrl({
   endpoint,
   deployment,
