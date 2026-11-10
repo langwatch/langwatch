@@ -6,12 +6,13 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronRight, Clock, Zap } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
+import { PASS_RATE_AMBER_COLOR } from "../../../../model/scenario-run-status-config.ts";
 import { formatCost, formatLatency } from "../../../../model/suite/formatters.ts";
 import type { RunGroupSummary } from "../../../../model/suite/run-history-transforms.ts";
 
 function getPassRateGradientColor(passRate: number | null): string {
   if (passRate === null) return "fg.subtle";
-  if (passRate <= 50) return "orange.solid";
+  if (passRate <= 50) return PASS_RATE_AMBER_COLOR;
   return "green.fg";
 }
 

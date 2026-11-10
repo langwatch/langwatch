@@ -5,7 +5,10 @@
 
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
+import {
+  PASS_RATE_AMBER_COLOR,
+  SCENARIO_RUN_STATUS_CONFIG,
+} from "../../../../model/scenario-run-status-config.ts";
 
 /** Where amber starts. Under this a pass rate reads red. */
 export const PASS_RATE_AMBER_FLOOR = 40;
@@ -18,8 +21,7 @@ export const PASS_RATE_GREEN_FLOOR = 99.5;
 /** The bands a pass rate can fall in, once thresholds are applied. */
 export type PassRateBand = "green" | "amber" | "red" | "none";
 
-/** The orange of the theme, the one colour of the three no run status reads. */
-export const PASS_RATE_AMBER_COLOR = "orange.solid";
+export { PASS_RATE_AMBER_COLOR };
 
 const BAND_COLORS: Record<PassRateBand, string> = {
   green: SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.SUCCESS].fgColor,
