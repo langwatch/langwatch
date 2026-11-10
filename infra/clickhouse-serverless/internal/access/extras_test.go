@@ -144,12 +144,22 @@ func TestParse_RefusesWhatTheServerWouldReject(t *testing.T) {
 	}
 	r := Policy{}.Rules()
 	r.cat = cat
+	// Stands in for clickhouse local: the server's parser refuses this value.
+	parsed := checkWithServerParser
+	t.Cleanup(func() { checkWithServerParser = parsed })
+	checkWithServerParser = func(name, value string) error {
+		if value == "not_a_mode" {
+			return fmt.Errorf("setting %q = %q is refused by ClickHouse: Unknown load balancing", name, value)
+		}
+		return nil
+	}
 	for _, tc := range []struct {
 		name  string
 		value any
 		want  string
 	}{
 		{"max_treads", 4, "is not a ClickHouse setting"},
+		{"load_balancing", "not_a_mode", "refused by ClickHouse"},
 		{"max_threads", true, "not a boolean"},
 		{"max_execution_time", "30s", "give a number"},
 		{"load_balancing", "random", ""},

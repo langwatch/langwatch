@@ -30,11 +30,12 @@ const container = "ch-e2e-access"
 const monitorPassword = "monitor-password-0123456789"
 
 type harness struct {
-	t        *testing.T
-	secrets  string
-	issuer   *httptest.Server
-	key      *ecdsa.PrivateKey
-	password string
+	t          *testing.T
+	accessFile string
+	secrets    string
+	issuer     *httptest.Server
+	key        *ecdsa.PrivateKey
+	password   string
 }
 
 // @scenario "A real ClickHouse honours tiers, rolling passwords and token logins"
@@ -142,6 +143,34 @@ func TestAccessAgainstRealClickHouse(t *testing.T) {
 		}
 	})
 
+	// @scenario "An access-file edit with a value ClickHouse would refuse is not applied"
+	t.Run("an edit with a value ClickHouse would refuse is not applied", func(t *testing.T) {
+		good, err := os.ReadFile(h.accessFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.WriteFile(h.accessFile, good, 0o644) })
+		bad := string(good) + `  - name: newcomer
+    tier: read
+    databases: [analytics]
+    login: {rolling: {dir: /access/secrets/dashboards}}
+    settings: {join_algorithm: definitely_invalid}
+`
+		if err := os.WriteFile(h.accessFile, []byte(bad), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		h.eventually(func() bool {
+			logs, _ := exec.Command("docker", "logs", container).CombinedOutput()
+			return strings.Contains(string(logs), "refused by ClickHouse")
+		}, "the sidecar never refused the edit")
+		if _, err := h.query("newcomer", "second-password-0123456789", "SELECT 1"); err == nil {
+			t.Error("a user from the refused edit logged in")
+		}
+		if _, err := h.query("dashboards", "second-password-0123456789", "SELECT 1"); err != nil {
+			t.Errorf("the last good users stopped working: %v", err)
+		}
+	})
+
 	t.Run("a fresh token logs in over HTTP and native, others are refused", func(t *testing.T) {
 		token := h.token("alice@example.com", time.Now().Add(10*time.Minute))
 		if len(token) < 500 {
@@ -202,7 +231,8 @@ users:
     login: {rolling: {dir: /access/secrets/monitor}}
     settings: {max_execution_time: 1000000}
 `, h.issuer.URL)
-	if err := os.WriteFile(filepath.Join(root, "access.yaml"), []byte(access), 0o644); err != nil {
+	h.accessFile = filepath.Join(root, "access.yaml")
+	if err := os.WriteFile(h.accessFile, []byte(access), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	// The container runs as uid 101 and must read what this process wrote.

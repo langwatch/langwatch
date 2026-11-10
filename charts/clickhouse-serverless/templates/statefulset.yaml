@@ -404,6 +404,9 @@ spec:
             {{- if .Values.access.enabled }}
             - name: users-d
               mountPath: /etc/clickhouse-server/users.d
+            # clickhouse local checks each access-file setting value here.
+            - name: sidecar-tmp
+              mountPath: /tmp
             {{- include "clickhouse-serverless.accessMounts" . | nindent 12 }}
             {{- end }}
             {{- if and $backupSidecar (not $dynamicOnly) }}
@@ -430,6 +433,11 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: {{ .Values.scratch.tmpSizeLimit }}
+        {{- if .Values.access.enabled }}
+        - name: sidecar-tmp
+          emptyDir:
+            sizeLimit: 16Mi
+        {{- end }}
         {{- if $secretsMounted }}
         - name: secrets
           secret:

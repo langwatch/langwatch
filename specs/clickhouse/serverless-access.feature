@@ -71,6 +71,14 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
     When ch-config loads the access file
     Then it fails with an error naming the offending entry
 
+  @e2e
+  Scenario: An access-file edit with a value ClickHouse would refuse is not applied
+    Given the server runs with a good access file
+    When an edit gives a user a setting value ClickHouse cannot parse, such as an unknown join_algorithm
+    Then the sidecar checks the value with clickhouse local and refuses the whole edit, naming it
+    And the last good users and token bindings stay in force, so who may log in and what they may do never part
+    And ClickHouse never receives a users file it would refuse
+
   @unit @e2e
   Scenario: A user whose own settings break a rendered cap or pin is left out
     Given the default profile and the tiers render caps and pins as constraints

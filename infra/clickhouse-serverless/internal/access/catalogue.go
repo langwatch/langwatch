@@ -3,13 +3,16 @@ package access
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // CatalogueDir holds the server's setting and privilege names, dumped from
@@ -98,10 +101,72 @@ func (c Catalogue) checkSettingValue(name string, value any) error {
 			return fmt.Errorf("setting %q is Bool: give true, false, 0 or 1", name)
 		}
 	}
+	if value == nil {
+		return nil
+	}
+	return checkWithServerParser(name, fmt.Sprint(value))
+}
+
+// checkWithServerParser parses value with the server's own parser, so a value
+// ClickHouse would refuse on loading users.d (an unknown enum, an out-of-range
+// number) refuses the access file instead. Its answer is cached per value.
+var checkWithServerParser = func(name, value string) error {
+	key := name + "\x00" + value
+	if err, ok := parsedValues.Load(key); ok {
+		return errOrNil(err)
+	}
+	err := clickhouseLocalParses(name, value)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		parsedValues.Store(key, err)
+	}
+	return err
+}
+
+var (
+	parsedValues sync.Map
+	localOnce    sync.Once
+	localBinary  string // empty when clickhouse local cannot run here
+)
+
+func errOrNil(v any) error {
+	if err, ok := v.(error); ok {
+		return err
+	}
 	return nil
+}
+
+// clickhouseLocalParses hands the setting to clickhouse local as an argument,
+// never as SQL text. Where it cannot run at all (outside the image, no writable
+// /tmp) it checks nothing, so only the setting itself can refuse a file.
+func clickhouseLocalParses(name, value string) error {
+	localOnce.Do(func() {
+		if bin, err := exec.LookPath("clickhouse"); err == nil && runLocal(bin) == nil {
+			localBinary = bin
+		}
+	})
+	if localBinary == "" {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, localBinary, "local", "--query", "SELECT 1", "--"+name+"="+value).CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	if ctx.Err() != nil {
+		return fmt.Errorf("checking setting %q: %w", name, ctx.Err())
+	}
+	reason, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n")
+	return fmt.Errorf("setting %q = %q is refused by ClickHouse: %s", name, value, reason)
 }
 
 // knowsPrivilege reports whether the server has privilege p (any case).
 func (c Catalogue) knowsPrivilege(p string) bool {
 	return len(c.privileges) == 0 || c.privileges[strings.ToUpper(p)]
+}
+
+func runLocal(bin string, args ...string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	return exec.CommandContext(ctx, bin, append([]string{"local", "--query", "SELECT 1"}, args...)...).Run()
 }
