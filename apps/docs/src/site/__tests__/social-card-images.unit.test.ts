@@ -64,4 +64,13 @@ describe("when the build publishes the social cards", () => {
     expect(drawer.calls.drawn).toBe(1);
     expect((await sharp(files.get(name)).metadata()).format).toBe("webp");
   });
+
+  /** @scenario "A shared link shows the card of the section it points into" */
+  it("draws every card and keeps none when the build runs without its caches", async () => {
+    const drawer = countingDrawer();
+    await renderSocialCards({ cards, cacheDir: null, open: drawer.open });
+    await renderSocialCards({ cards, cacheDir: null, open: drawer.open });
+    expect(drawer.calls.drawn).toBe(2);
+    expect(readdirSync(cacheDir)).toEqual([]);
+  });
 });

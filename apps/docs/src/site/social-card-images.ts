@@ -27,7 +27,7 @@ async function chromiumCapture(): Promise<CardCapture> {
   const page = await browser.newPage({ viewport: SOCIAL_CARD_SIZE, deviceScaleFactor: 1 });
   await page.route("http://cards.local/fonts/*", async (route) => {
     const file = path.basename(new URL(route.request().url()).pathname);
-    if (!SOCIAL_CARD_SOURCES.fontFiles.some((name) => name === file)) return route.abort();
+    if (!SOCIAL_CARD_SOURCES.fontFaces.some((face) => face.file === file)) return route.abort();
     await route.fulfill({
       contentType: "font/woff2",
       body: await readFile(path.join(SOCIAL_CARD_SOURCES.fonts, file)),
@@ -49,7 +49,8 @@ async function chromiumCapture(): Promise<CardCapture> {
 }
 
 /** A cache entry that still decodes as a WebP card, else null so the card is drawn again. */
-async function cached({ file }: { file: string }) {
+async function cached({ file }: { file: string | null }) {
+  if (!file) return null;
   try {
     const bytes = await readFile(file);
     const meta = await sharp(bytes).metadata();
@@ -66,7 +67,8 @@ export async function renderSocialCards({
   open = chromiumCapture,
 }: {
   cards?: readonly SocialCard[];
-  cacheDir?: string;
+  /** Where drawn cards are kept between builds; null draws every card and keeps none. */
+  cacheDir?: string | null;
   open?: () => Promise<CardCapture>;
 } = {}) {
   const files = new Map<string, Uint8Array>();
@@ -74,7 +76,7 @@ export async function renderSocialCards({
   try {
     for (const card of cards) {
       const name = socialCardPath({ card }).slice(1);
-      const file = path.join(cacheDir, path.basename(name));
+      const file = cacheDir ? path.join(cacheDir, path.basename(name)) : null;
       const hit = await cached({ file });
       if (hit) {
         files.set(name, hit);
@@ -83,7 +85,7 @@ export async function renderSocialCards({
       drawer ??= await open();
       const shot = await drawer.capture(socialCardHtml({ card }));
       const image = await sharp(shot).webp(SOCIAL_CARD_WEBP).toBuffer();
-      await writeAtomically({ file, bytes: image });
+      if (file) await writeAtomically({ file, bytes: image });
       files.set(name, image);
     }
   } finally {

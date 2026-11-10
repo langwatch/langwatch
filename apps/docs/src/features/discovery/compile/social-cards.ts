@@ -145,7 +145,10 @@ const escapeHtml = (text: string) =>
 export const SOCIAL_CARD_SOURCES = {
   logo: path.join(docsRoot, "logo/dark.svg"),
   fonts: path.join(appRoot, "src/app/fonts"),
-  fontFiles: ["Inter-Variable-latin.woff2", "Sentient-Medium.woff2"],
+  fontFaces: [
+    { file: "Inter-Variable-latin.woff2", family: "Inter", weight: "100 900" },
+    { file: "Sentient-Medium.woff2", family: "Sentient", weight: "500" },
+  ],
 } as const;
 
 let logo: string | undefined;
@@ -155,7 +158,7 @@ let sourcesDigest: string | undefined;
 export function socialCardSourcesDigest() {
   if (sourcesDigest) return sourcesDigest;
   const hash = createHash("sha256").update(readFileSync(SOCIAL_CARD_SOURCES.logo));
-  for (const file of SOCIAL_CARD_SOURCES.fontFiles)
+  for (const { file } of SOCIAL_CARD_SOURCES.fontFaces)
     hash.update(readFileSync(path.join(SOCIAL_CARD_SOURCES.fonts, file)));
   sourcesDigest = hash.digest("hex");
   return sourcesDigest;
@@ -166,8 +169,7 @@ export function socialCardHtml({ card }: { card: SocialCard }) {
   logo ??= readFileSync(SOCIAL_CARD_SOURCES.logo, "utf8");
   const { width, height } = SOCIAL_CARD_SIZE;
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-@font-face{font-family:Inter;src:url(/fonts/Inter-Variable-latin.woff2);font-weight:100 900}
-@font-face{font-family:Sentient;src:url(/fonts/Sentient-Medium.woff2);font-weight:500}
+${SOCIAL_CARD_SOURCES.fontFaces.map(({ file, family, weight }) => `@font-face{font-family:${family};src:url(/fonts/${file});font-weight:${weight}}`).join("\n")}
 *{margin:0;box-sizing:border-box}
 body{width:${width}px;height:${height}px;padding:72px 80px;display:flex;flex-direction:column;
 background:#fffaf3 linear-gradient(135deg,#fff 0%,#fff4e5 100%);color:#1c1917;font-family:Inter}

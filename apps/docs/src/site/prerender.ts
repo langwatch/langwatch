@@ -401,7 +401,10 @@ async function generate() {
     llmsSectionFiles({ nav: context.nav, exports: markdown }),
   ))
     files.set(name, contents);
-  for (const [name, contents] of await renderSocialCards()) files.set(name, contents);
+  for (const [name, contents] of await renderSocialCards({
+    cacheDir: plan.cacheDir ? path.join(path.dirname(plan.cacheDir), "social") : null,
+  }))
+    files.set(name, contents);
   const searchJson = publishSearchIndex({ entries: searchIndex });
   files.set("search-index.json", searchJson);
   for (const [name, contents] of await compressedSearchIndex({
