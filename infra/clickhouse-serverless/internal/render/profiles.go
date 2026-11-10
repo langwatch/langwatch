@@ -33,7 +33,8 @@ func profilePins() (map[string]any, error) {
 }
 
 // auditedQueryLog is what CLICKHOUSE_AUDIT_QUERY_LOG pins on the default profile:
-// every query, from its start, with its settings and profile events, uncut.
+// every query, from its start, with its profile events, uncut. log_query_settings
+// stays per user, so a user can keep a secret setting out of query_log.Settings.
 var auditedQueryLog = map[string]any{
 	"log_queries":                       1,
 	"log_queries_min_type":              "QUERY_START",
