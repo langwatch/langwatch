@@ -197,28 +197,49 @@ func TestRenderAll_LogToFile(t *testing.T) {
 // @scenario "The default user can be left without access management"
 func TestRenderAll_DefaultUserAccessManagementOff(t *testing.T) {
 	dir := t.TempDir()
-	renderInto(t, testInput(), dir)
-	assertExists(t, filepath.Join(dir, "users.d", "zz-access-management.yaml"), true)
-
 	off := false
 	input := testInput()
 	input.DefaultUserAccessManagement = &off
 	renderInto(t, input, dir)
 
-	entries, err := os.ReadDir(filepath.Join(dir, "users.d"))
-	if err != nil {
-		t.Fatal(err)
+	// The stock users.xml grants both flags, so leaving the file out would keep them.
+	user := section(t, section(t, readYAML(t, dir, "users.d/zz-access-management.yaml"), "users"), "default")
+	for _, flag := range []string{"access_management", "named_collection_control"} {
+		if user[flag] != 0 {
+			t.Errorf("%s = %v with DEFAULT_USER_ACCESS_MANAGEMENT=false, want 0", flag, user[flag])
+		}
 	}
-	for _, e := range entries {
-		data, err := os.ReadFile(filepath.Join(dir, "users.d", e.Name()))
-		if err != nil {
-			t.Fatal(err)
+	if _, ok := user["grants"]; ok {
+		t.Error("an opted-out default user must get no grants list")
+	}
+}
+
+// @scenario "Rendered mode keeps the default user to the LangWatchQL collections"
+func TestRenderAll_RenderedModeGrantsOnlyTheLWQLCollections(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.LWQLAccessDir = lwqlDir(t)
+	renderInto(t, input, dir)
+
+	user := section(t, section(t, readYAML(t, dir, "users.d/zz-access-management.yaml"), "users"), "default")
+	// ClickHouse refuses a grants list beside any access flag, so each is removed.
+	for _, flag := range []string{"access_management", "named_collection_control", "show_named_collections"} {
+		if got := section(t, user, flag)["@remove"]; got != "1" {
+			t.Errorf("%s must be removed in rendered mode, got %v", flag, user[flag])
 		}
-		for _, grant := range []string{"access_management", "named_collection_control"} {
-			if strings.Contains(string(data), grant) {
-				t.Errorf("users.d/%s grants %s with DEFAULT_USER_ACCESS_MANAGEMENT=false", e.Name(), grant)
-			}
-		}
+	}
+	queries, _ := section(t, user, "grants")["query"].([]any)
+	got := make([]string, len(queries))
+	for i, q := range queries {
+		got[i], _ = q.(string)
+	}
+	want := []string{
+		"GRANT ALL ON *.*",
+		"REVOKE ACCESS MANAGEMENT, NAMED COLLECTION ADMIN ON *.*",
+		"GRANT NAMED COLLECTION, SHOW NAMED COLLECTIONS ON lwql_postgres*",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("rendered-mode grants = %q, want %q", got, want)
 	}
 }
 

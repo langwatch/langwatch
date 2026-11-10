@@ -87,7 +87,16 @@ Feature: The clickhouse-serverless image renders every server setting from env
   Scenario: The default user can be left without access management
     Given DEFAULT_USER_ACCESS_MANAGEMENT is false
     When the renderer writes the server configuration
-    Then no file it writes grants the default user access_management or named_collection_control
+    Then the default user's access_management and named_collection_control are set to 0
+    And the stock users.xml grant of both no longer applies
+
+  @unit
+  Scenario: Rendered mode keeps the default user to the LangWatchQL collections
+    Given LWQL_ACCESS_DIR names a mounted LangWatchQL access model
+    When the renderer writes the server configuration
+    Then the default user cannot create users, roles or row policies
+    And it cannot create, alter or drop a named collection
+    And it can use and list only the collections named lwql_postgres or lwql_postgres_<database>
 
   @unit
   Scenario: Files a deployment mounts next to the rendered ones are left alone

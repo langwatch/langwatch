@@ -74,9 +74,10 @@ distinct:
   statement.
 
 Either way this image renders the server-level prerequisites the model needs:
-the `default` user is granted `access_management` and `named_collection_control`
-(the right to create users, profiles, row policies and named collections through
-SQL — exercised by the SQL-DDL path); the `custom_` settings prefix is declared
+in `sql` mode the `default` user is granted `access_management` and
+`named_collection_control` (the right to create users, profiles, row policies and
+named collections through SQL); with `lwqlAccess.secretName` set it gets neither,
+only use of the `lwql_postgres*` collections the rendered model delivers; the `custom_` settings prefix is declared
 so the per-query tenant capability the app's queries rely on is accepted rather
 than rejected with `UNKNOWN_SETTING`; and
 `access_control_improvements.settings_constraints_replace_previous` is set, so

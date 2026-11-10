@@ -58,6 +58,7 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		{"network", func() error { return renderNetwork(computed, configD) }},
 		{"custom-settings-prefixes", func() error { return renderCustomSettingsPrefixes(configD) }},
 		{"access-control", func() error { return renderAccessControl(input, configD) }},
+		{"access-management", func() error { return renderAccessManagement(input, usersD) }},
 	} {
 		if err := s.fn(); err != nil {
 			return fmt.Errorf("%s: %w", s.name, err)
@@ -73,8 +74,6 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		enabled bool
 		fn      func() error
 	}{
-		{"access-management", filepath.Join(usersD, accessManagementFile), input.GrantsDefaultAccessManagement(),
-			func() error { return renderAccessManagement(usersD) }},
 		// No keeper-backed access or named-collection store: the app owns the
 		// LangWatchQL access model (issue #8258).
 		{"keeper", filepath.Join(configD, "keeper.yaml"), input.Replicated,

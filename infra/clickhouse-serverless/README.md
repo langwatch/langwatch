@@ -33,7 +33,7 @@ Settings with a fixed default rather than one computed from CPU + RAM:
 | `CLICKHOUSE_CLUSTER_SECRET_ENABLED`            | `false`                  | Recommended. Applies the cluster secret; see [Cluster secret](#cluster-secret) before turning it on                                   |
 | `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`         | —                        | File holding the interserver HTTP password. When set, `interserver_http_credentials` is rendered                                      |
 | `CLICKHOUSE_INTERSERVER_USER`                  | `interserver`            | Interserver HTTP user, used only with `CLICKHOUSE_INTERSERVER_PASSWORD_FILE`                                                          |
-| `DEFAULT_USER_ACCESS_MANAGEMENT`               | `true`                   | `false` leaves the `default` user without `access_management` and `named_collection_control` from `ch-config`                         |
+| `DEFAULT_USER_ACCESS_MANAGEMENT`               | `true`                   | `false` sets the `default` user's `access_management` and `named_collection_control` to 0, overriding the stock `users.xml`           |
 | `CLICKHOUSE_ACCESS_FILE`                       | —                        | Access file declaring users, tiers and logins; see [Access](#access-tiers-rolling-passwords-and-token-logins)                         |
 | `CLICKHOUSE_ACCESS_LISTEN`                     | `127.0.0.1:8124`         | Loopback address of the access sidecar's token check; anything else is refused                                                        |
 | `CLICKHOUSE_ACCESS_SIDECAR`                    | `embedded`               | `embedded` runs the sidecar inside this container; `external` when it runs in its own (the chart does)                                |
@@ -110,11 +110,13 @@ needs: `custom-settings-prefixes.yaml` declares the `custom_` settings prefix th
 per-query tenant capability rides on, and `access-control.yaml` sets
 `access_control_improvements.settings_constraints_replace_previous` to `true`
 (without it, ClickHouse rejects the `<database>_profile` settings profile's
-`CHANGEABLE_IN_READONLY` constraint on `custom_api_key_hash`). The image also
+`CHANGEABLE_IN_READONLY` constraint on `custom_api_key_hash`). In `sql` mode the image
 grants its `default` user `access_management` + `named_collection_control`
-(unless `DEFAULT_USER_ACCESS_MANAGEMENT=false`) — the
-right to create users, profiles, row policies and named collections through SQL,
-which **only `sql` mode uses**; rendered delivery runs no access DDL. See
+(unless `DEFAULT_USER_ACCESS_MANAGEMENT=false`): the
+right to create users, profiles, row policies and named collections through SQL.
+In rendered mode (`LWQL_ACCESS_DIR` set) no access DDL runs, so `default` gets
+neither; it keeps every other right plus use of the `lwql_postgres*` collections
+the mounted model delivers, which its PostgreSQL engine tables need. See
 `internal/render/access.go`.
 
 ## Access: tiers, rolling passwords and token logins
