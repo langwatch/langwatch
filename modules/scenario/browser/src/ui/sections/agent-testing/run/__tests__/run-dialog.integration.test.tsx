@@ -354,7 +354,6 @@ describe("<RunDialog/>", () => {
       data: {
         httpStatus: 403,
         cause: { limitType: "scenarioRuns", current: 100, max: 100 },
-        error: { code: "limit_exceeded", httpStatus: 403, meta: {} },
       },
     });
     markHandledGlobally(refusal);

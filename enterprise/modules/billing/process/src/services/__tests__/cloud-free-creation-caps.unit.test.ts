@@ -8,7 +8,7 @@ import {
   mapToPlanInfo,
   UNLIMITED_PLAN,
 } from "@langwatch/enterprise-licensing-contract";
-import { planCreationCap } from "@langwatch/entitlement-contract";
+import { planCreationCap, planScenarioRunCap } from "@langwatch/entitlement-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
@@ -58,6 +58,7 @@ describe("cloud Free creation caps", () => {
         for (const limitType of creationLimits) {
           expect(planCreationCap({ plan, limitType })).toEqual({ capped: false });
         }
+        expect(planScenarioRunCap({ plan })).toEqual({ capped: false });
       }
     });
   });
@@ -75,6 +76,8 @@ describe("cloud Free creation caps", () => {
           expect(planCreationCap({ plan, limitType })).toEqual({ capped: false });
           expect(planCreationCap({ plan: UNLIMITED_PLAN, limitType })).toEqual({ capped: false });
         }
+        expect(planScenarioRunCap({ plan })).toEqual({ capped: false });
+        expect(planScenarioRunCap({ plan: UNLIMITED_PLAN })).toEqual({ capped: false });
       });
     });
 
@@ -104,6 +107,7 @@ describe("cloud Free creation caps", () => {
         for (const limitType of creationLimits) {
           expect(planCreationCap({ plan, limitType })).toEqual({ capped: false });
         }
+        expect(planScenarioRunCap({ plan })).toEqual({ capped: false });
       });
     });
   });

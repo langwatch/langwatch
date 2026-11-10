@@ -434,6 +434,7 @@ export class ScenarioModule implements ScenarioApi {
         peers: setup.dependencies,
         scenarios,
         simulations,
+        runCap: creationCaps,
         signingSecret,
         voicePublicBaseUrl: config.voicePublicBaseUrl,
         voiceCallMaxSeconds: config.voiceCallMaxSeconds,

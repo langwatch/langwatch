@@ -51,6 +51,15 @@ export class ScenarioCreationCapService {
     event: { type: string };
   }): Promise<void> {
     if (input.event.type !== ScenarioEventType.RUN_STARTED) return;
+    await this.assertCountedRunAllowed({ projectId: input.projectId });
+  }
+
+  /**
+   * Asks the run cap for a run whose start is written here, not reported (a voice call), and
+   * counts it.
+   * @throws LimitExceededError (`scenarioRuns`)
+   */
+  async assertCountedRunAllowed(input: { projectId: string }): Promise<void> {
     await this.#askRunCap({ projectId: input.projectId, shouldCountRun: true });
   }
 

@@ -97,7 +97,7 @@ Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
     And it ran 10 runs this month
     When a run starts
     Then the run is accepted
-    And the month's count is 10 runs
+    And the month's count before this run is 10 runs
 
   @unit
   Scenario: App runs, agent tests and voice calls count toward the monthly cap
@@ -105,6 +105,15 @@ Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
     And its first scenario run was 20 days ago
     When a run starts from the app, an agent test or a voice call
     Then each run is checked against the monthly cap and counted toward it
+
+  @unit
+  Scenario: A voice call past the run cap is refused before its run is written
+    Given the organization is on the cloud Free plan
+    And its first scenario run was 20 days ago
+    And it ran 100 runs this month
+    When a "Call it myself" voice call under a scenario finishes
+    Then it is refused with limit type "scenarioRuns"
+    And no run is written for it
 
   @unit
   Scenario: A run queued from the app is counted once

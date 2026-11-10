@@ -37,6 +37,7 @@ function composeWithTraceCollector() {
     },
     scenarios: createApiFixture<ScenarioService>({}),
     simulations: createApiFixture<SimulationService>({}),
+    runCap: { assertCountedRunAllowed: async () => {} },
     signingSecret: SECRET,
     voicePublicBaseUrl: undefined,
     voiceCallMaxSeconds: undefined,

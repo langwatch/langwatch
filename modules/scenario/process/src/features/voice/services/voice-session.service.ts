@@ -36,6 +36,7 @@ import {
   signVoiceSessionToken,
   verifyVoiceSessionToken,
 } from "../../../rules/voice-session-token.rules.ts";
+import type { ScenarioCreationCapService } from "../../../services/scenario-creation-cap.service.ts";
 import type { ScenarioService } from "../../../services/scenario.service.ts";
 import { VoiceCallRunService } from "./voice-call-run.service.ts";
 import { VoiceCallTraceService } from "./voice-call-trace.service.ts";
@@ -95,6 +96,7 @@ export class VoiceSessionService {
     };
     scenarios: ScenarioService;
     simulations: SimulationService;
+    runCap: Pick<ScenarioCreationCapService, "assertCountedRunAllowed">;
     signingSecret: string | undefined;
     voicePublicBaseUrl: string | undefined;
     voiceCallMaxSeconds: string | undefined;
@@ -138,6 +140,7 @@ export class VoiceSessionService {
         },
         simulations: input.simulations,
       }).writeCallRun,
+      assertRunAllowed: (run) => input.runCap.assertCountedRunAllowed(run),
       signSessionToken: (payload) =>
         signVoiceSessionToken({ payload, secret: getSigningSecret(signingSecret) }),
       registry: createVoiceTransportRegistry({
