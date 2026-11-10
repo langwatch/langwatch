@@ -34,8 +34,31 @@ function fixture(name: string): readonly StockQuery[] {
   );
 }
 
+/** The stock queries that moved from `traces` to `trace_metrics`, in walk order. */
+const MOVED_LABELS = [
+  "ask-rising/shares",
+  "ask-rising/daily",
+  "cost-by-segment/units",
+  "cost-by-segment/totals",
+  "att-share/units",
+  "att-share/totals",
+  "att-table/units",
+  "ext-human-review/trend",
+  "ext-human-review/summary",
+  "ext-human-review/byUnit",
+  "gen-acceptance/actions",
+  "gen-acceptance/seen",
+  "gen-dropoff/main",
+  "data-health/fields",
+];
+
 // The `traces` form each moved query had on main before tasks#1117, as the catalogue stored it.
-const BASELINE = fixture("stock-widget-queries.traces-baseline.json");
+const BEFORE = new Map(fixture("stock-widget-queries.before.json").map((q) => [q.label, q]));
+const BASELINE = MOVED_LABELS.map((label) => {
+  const query = BEFORE.get(label);
+  if (!query) throw new Error(`no main baseline for ${label}`);
+  return query;
+});
 const STOCK = new Map(fixture("stock-widget-queries.json").map((q) => [q.label, q.sql]));
 
 /** The queries that split the period into halves, windows or buckets by a row's OccurredAt. */
