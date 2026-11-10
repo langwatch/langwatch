@@ -46,6 +46,46 @@ Feature: Seat subscription provisions an organization retention policy
     When the subscription is activated by a successful payment
     Then the activation still completes and the confirmation notification is sent
 
+  # Retention is stamped on every stored row when it is written, so a longer
+  # policy alone would still expire what the organization already holds. The
+  # activation records a retention_extended fact; one command per project and
+  # category then raises the stored rows to the project's resolved retention
+  # and records retention_applied. Raising is non-destructive, so it runs
+  # without asking; a row already kept longer, or kept forever, is never
+  # shortened.
+
+  @unit
+  Scenario: Upgrading extends retention of stored traces
+    Given a Free organization whose two projects hold traces stamped for 14 days
+    When a Growth Seat subscription that keeps traces for 90 days is activated
+    Then a retention extended fact is recorded for the organization
+    And every project's stored data is raised to its resolved retention, one applied fact per project and category
+
+  @integration
+  Scenario: Upgrading re-stamps stored rows to the longer retention
+    Given a project whose stored spans are stamped to expire after 14 days
+    When a Growth Seat subscription that keeps traces for 90 days is activated
+    Then those stored spans are stamped to expire after 90 days
+
+  @integration
+  Scenario: Upgrading never shortens stored rows kept longer
+    Given a project with stored spans stamped for 365 days and spans kept forever
+    When a Growth Seat subscription that keeps traces for 90 days is activated
+    Then the spans stamped for 365 days keep 365 days and the spans kept forever stay kept forever
+
+  @unit
+  Scenario: A failed re-stamp of stored data is retried and never fails the upgrade
+    Given re-stamping a project's stored traces fails the first time
+    When a Growth Seat subscription is activated
+    Then the organization policies are still provisioned
+    And the re-stamp is retried until the applied fact is recorded once
+
+  @unit
+  Scenario: A redelivered activation records the extension once
+    Given a Growth Seat activation that was already applied to stored data
+    When the same activation fact is delivered again
+    Then no second retention extended fact is recorded
+
   # Activating a self-hosted license is the second paid entry point and
   # provisions the same organization-scoped policies — but create-if-absent
   # only: a category that already has an organization-level override is never

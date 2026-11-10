@@ -28,6 +28,7 @@ import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { RetentionExtensionService } from "../../services/retention-extension.service.ts";
 import { SeatRetentionPolicyService } from "../../services/seat-retention-policy.service.ts";
 import { buildDataRetentionSeatPolicyPipeline } from "../data-retention-seat-policy.pipeline.ts";
 
@@ -100,7 +101,13 @@ function harness(existing: PolicyWrite[] = []) {
     processStore: InMemoryProcessStore.createForTesting(),
   });
   const billing = eventing.register(billingStandIn());
-  eventing.register(buildDataRetentionSeatPolicyPipeline({ seatPolicies: { provisionMissing } }));
+  // The extension it records is the extension pipeline's concern, covered beside it.
+  const extensions = RetentionExtensionService.create({
+    seatPolicies: { provisionMissing },
+    projects: { findOrganizationProjectIds: async () => [] },
+  });
+  extensions.connect({ record: async () => undefined, apply: async () => undefined });
+  eventing.register(buildDataRetentionSeatPolicyPipeline({ extensions }));
   const started = (fact: SubscriptionStartedEventData, id: string) =>
     billing.service.storeEvents(
       [

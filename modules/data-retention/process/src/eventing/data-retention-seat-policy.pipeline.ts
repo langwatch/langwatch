@@ -1,7 +1,7 @@
 /**
  * Data-retention stamps a paid Growth Seat organization's policies from billing's activation fact
- * (round 37 D4; record §9), so billing holds no data-retention peer.
- * Spec: specs/billing/seat-subscription-retention-policy.feature
+ * (round 37 D4; record §9) and records the extension `data_retention_extension` carries to the
+ * stored rows. Spec: specs/billing/seat-subscription-retention-policy.feature
  */
 import {
   isGrowthSeatEventPlan,
@@ -18,16 +18,16 @@ import {
 
 import type { DataRetentionModule } from "../app/data-retention.app.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
-import type { SeatRetentionPolicyService } from "../services/seat-retention-policy.service.ts";
+import type { RetentionExtensionService } from "../services/retention-extension.service.ts";
 
 const DATA_RETENTION_SEAT_POLICY_PIPELINE_NAME = "data_retention_seat_policy" as const;
 
 export type DataRetentionSeatPolicyPipeline = StaticPipelineDefinition<never>;
 
 export function buildDataRetentionSeatPolicyPipeline({
-  seatPolicies,
+  extensions,
 }: {
-  seatPolicies: Pick<SeatRetentionPolicyService, "provisionMissing">;
+  extensions: Pick<RetentionExtensionService, "extendFromActivation">;
 }): DataRetentionSeatPolicyPipeline {
   return definePipeline({
     name: DATA_RETENTION_SEAT_POLICY_PIPELINE_NAME,
@@ -39,10 +39,12 @@ export function buildDataRetentionSeatPolicyPipeline({
       eventType: SUBSCRIPTION_STARTED_EVENT_TYPE,
       data: subscriptionStartedEventDataSchema,
       options: { enqueue: { filter: (data) => isGrowthSeatEventPlan(data.plan) } },
-      handle: async (fact) => {
-        await seatPolicies.provisionMissing({
+      handle: async (fact, context) => {
+        await extensions.extendFromActivation({
           organizationId: fact.organizationId,
           ...(fact.retentionDays === undefined ? {} : { retentionDays: fact.retentionDays }),
+          extensionId: context.idempotencyKey ?? context.eventId,
+          at: context.occurredAt,
         });
       },
     })

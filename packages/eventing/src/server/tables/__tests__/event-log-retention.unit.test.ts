@@ -75,6 +75,32 @@ describe("EventLogRetention", () => {
       ]);
     });
 
+    /** @scenario "A category's raise only lengthens its rows" */
+    it("raises only finite rows kept for less, leaving rows kept forever", async () => {
+      const { retention, statements } = retentionOver();
+
+      await retention.raiseCategory({
+        tenantId: "project-1",
+        category: "traces",
+        retentionDays: 91,
+      });
+
+      expect(statements).toEqual([
+        {
+          tenantId: "project-1",
+          table: "event_log",
+          kind: "write",
+          sql:
+            "ALTER TABLE event_log UPDATE _retention_days = {retentionDays:UInt16} " +
+            "WHERE TenantId = {tenantId:String} AND _retention_days != 0 AND " +
+            "({retentionDays:UInt16} = 0 OR _retention_days < {retentionDays:UInt16})" +
+            ` AND (${NEVER_EXPIRING_EVENT_TYPES} AND AggregateType IN ('trace'))` +
+            " AND length('langwatch:event-log-retention-category:traces') > 0",
+          params: { tenantId: "project-1", retentionDays: 91 },
+        },
+      ]);
+    });
+
     /** @scenario "An aggregate type mapped to no category is never rewritten" */
     it("rewrites only the aggregate types the category lists, never an unlisted one", async () => {
       const { retention, statements } = retentionOver();

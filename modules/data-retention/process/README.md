@@ -6,7 +6,7 @@ The server half of [data-retention](../README.md). Data retention: the retention
 
 ## Installation
 
-`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionSeatPolicyEventing).withEventing(retentionStorageReportEventing).withTasks(…).withMigrations(…)`, `src/data-retention.module.ts:20`.
+`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionSeatPolicyEventing).withEventing(retentionExtensionEventing).withEventing(retentionStorageReportEventing).withTasks(…).withMigrations(…)`, `src/data-retention.module.ts:21`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -354,6 +354,16 @@ Declared at `src/eventing/data-retention-seat-policy.pipeline.ts:32`.
 | Kind            | Name                          | Handles                                                                                         | Declared at                                              |
 | --------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | peer subscriber | `dataRetentionSeatActivation` | `lw.billing.subscription_started` from [billing](../../../enterprise/modules/billing/README.md) | `src/eventing/data-retention-seat-policy.pipeline.ts:38` |
+
+### Pipeline `data_retention_extension` (aggregate `data_retention_extension`)
+
+Declared at `src/eventing/retention-extension.pipeline.ts:46`. Events: `retentionExtendedEventSchema`, `retentionAppliedEventSchema`.
+
+| Kind            | Name                       | Handles                            | Declared at                                       |
+| --------------- | -------------------------- | ---------------------------------- | ------------------------------------------------- |
+| command         | `recordRetentionExtension` | –                                  | `src/eventing/retention-extension.pipeline.ts:51` |
+| command         | –                          | –                                  | `src/eventing/retention-extension.pipeline.ts:52` |
+| process manager | `retentionExtensionApply`  | intents `applyToProjects` (outbox) | `src/eventing/retention-extension.pipeline.ts:57` |
 
 ### Pipeline `data_retention_storage_report` (aggregate `data_retention_storage`)
 

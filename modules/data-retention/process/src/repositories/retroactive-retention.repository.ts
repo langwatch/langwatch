@@ -29,6 +29,15 @@ export interface RetroactiveRetentionRepository {
     category: RetentionCategory;
     newRetentionDays: number;
   }): Promise<{ tables: string[] }>;
+  /**
+   * As `triggerUpdate`, but only lengthens: a stored row kept forever or already kept at least
+   * `newRetentionDays` is left as it is. Refuses while a rewrite of the same rows is running.
+   */
+  raiseRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+  }): Promise<{ tables: string[] }>;
   findMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]>;
   killMutation(input: { projectId: string; mutationId: string }): Promise<void>;
   /** The shared target, then each private dataplane this process routes to. */

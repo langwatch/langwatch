@@ -13,7 +13,7 @@ import {
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
 import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
-import { EventLogRetention } from "@langwatch/eventing/server";
+import { EventLogRetention, RETENTION_RAISE_ONLY_ROW_FILTER } from "@langwatch/eventing/server";
 import { z } from "zod";
 
 import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
@@ -105,10 +105,27 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     return this.eventLogRetention.tables.includes(table);
   }
 
-  async triggerUpdate(input: {
+  triggerUpdate(input: {
     projectId: string;
     category: RetentionCategory;
     newRetentionDays: number;
+  }): Promise<{ tables: string[] }> {
+    return this.rewrite({ ...input, raiseOnly: false });
+  }
+
+  raiseRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+  }): Promise<{ tables: string[] }> {
+    return this.rewrite({ ...input, raiseOnly: true });
+  }
+
+  private async rewrite(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+    raiseOnly: boolean;
   }): Promise<{ tables: string[] }> {
     const categoryTables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
       .filter(([, category]) => category === input.category)
@@ -132,11 +149,14 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     }
 
     // Once for both of eventing's tables: it raises its own index where the target holds it.
-    const eventingTables = await this.eventLogRetention.retainCategory({
+    const eventLogRewrite = {
       tenantId: input.projectId,
       category: input.category,
       retentionDays: input.newRetentionDays,
-    });
+    };
+    const eventingTables = input.raiseOnly
+      ? await this.eventLogRetention.raiseCategory(eventLogRewrite)
+      : await this.eventLogRetention.retainCategory(eventLogRewrite);
     // A later migration creates each index, so a target without one yet skips it.
     const heldIndexes = await this.findHeldTables({
       tenantId: input.projectId,
@@ -154,7 +174,9 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
           `ALTER TABLE ${table} ` +
           "UPDATE _retention_days = {retentionDays:UInt16} " +
           "WHERE TenantId = {tenantId:String} " +
-          "AND _retention_days != {retentionDays:UInt16}",
+          (input.raiseOnly
+            ? `AND ${RETENTION_RAISE_ONLY_ROW_FILTER}`
+            : "AND _retention_days != {retentionDays:UInt16}"),
         params: {
           tenantId: input.projectId,
           retentionDays: input.newRetentionDays,

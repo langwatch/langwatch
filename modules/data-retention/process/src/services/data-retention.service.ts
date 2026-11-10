@@ -246,6 +246,31 @@ export class DataRetentionService {
     return this.options.retroactive.triggerUpdate(parsed);
   }
 
+  /**
+   * Raises one project's stored rows in `category` to the retention its cascade resolves to now,
+   * never lowering a row; answers the tables rewritten and the days applied.
+   */
+  async raiseStoredRetention({
+    projectId,
+    category,
+  }: {
+    projectId: string;
+    category: RetentionCategory;
+  }): Promise<{ tables: string[]; retentionDays: number }> {
+    const retentionDays = await this.getRetentionDays({ projectId, category });
+    const { tables } = await this.options.retroactive.raiseRetention({
+      projectId,
+      category,
+      newRetentionDays: retentionDays,
+    });
+    return { tables, retentionDays };
+  }
+
+  /** Every project the organization holds, archived included: their stored rows are still kept. */
+  findOrganizationProjectIds({ organizationId }: { organizationId: string }): Promise<string[]> {
+    return this.options.projectScopes.findProjectIds({ organizationId });
+  }
+
   async getRetroactiveMutationProgress(
     input: RetroactiveMutationProjectInput,
   ): Promise<RetroactiveMutationProgress[]> {

@@ -37,6 +37,11 @@ import {
   buildDataRetentionSeatPolicyPipeline,
   type DataRetentionSeatPolicyPipeline,
 } from "../eventing/data-retention-seat-policy.pipeline.ts";
+import { ApplyRetentionExtensionCommand } from "../eventing/retention-extension.commands.ts";
+import {
+  buildRetentionExtensionPipeline,
+  type RetentionExtensionPipelineDefinition,
+} from "../eventing/retention-extension.pipeline.ts";
 import { ReportRetentionStorageCommand } from "../eventing/retention-storage-report.commands.ts";
 import {
   buildRetentionStorageReportPipeline,
@@ -50,6 +55,7 @@ import {
 import { DataRetentionSnapshotService } from "../services/data-retention-snapshot.service.ts";
 import { DataRetentionService } from "../services/data-retention.service.ts";
 import { OrganizationStorageEstimateService } from "../services/organization-storage-estimate.service.ts";
+import { RetentionExtensionService } from "../services/retention-extension.service.ts";
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
 import { RetentionPlanService } from "../services/retention-plan.service.ts";
 import {
@@ -130,7 +136,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
   readonly #policy: DataRetentionPolicyService;
   readonly #snapshots: DataRetentionSnapshotService;
   readonly #scopeMeter: StorageMeterScopeService;
-  readonly #seatPolicies: SeatRetentionPolicyService;
+  readonly #extensions: RetentionExtensionService;
   readonly #storageEstimates: OrganizationStorageEstimateService;
   readonly #storageReport: RetentionStorageReportService;
   readonly #storageRequests: RetentionStorageReportRequestService;
@@ -141,7 +147,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     policy: DataRetentionPolicyService;
     snapshots: DataRetentionSnapshotService;
     scopeMeter: StorageMeterScopeService;
-    seatPolicies: SeatRetentionPolicyService;
+    extensions: RetentionExtensionService;
     storageEstimates: OrganizationStorageEstimateService;
     storageReport: RetentionStorageReportService;
     storageRequests: RetentionStorageReportRequestService;
@@ -151,7 +157,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     this.#policy = services.policy;
     this.#snapshots = services.snapshots;
     this.#scopeMeter = services.scopeMeter;
-    this.#seatPolicies = services.seatPolicies;
+    this.#extensions = services.extensions;
     this.#storageEstimates = services.storageEstimates;
     this.#storageReport = services.storageReport;
     this.#storageRequests = services.storageRequests;
@@ -206,7 +212,10 @@ export class DataRetentionModule implements DataRetentionApiContract {
         directory: repositories.directory,
         permissions,
       }),
-      seatPolicies: SeatRetentionPolicyService.create({ rules: retention }),
+      extensions: RetentionExtensionService.create({
+        seatPolicies: SeatRetentionPolicyService.create({ rules: retention }),
+        projects: retention,
+      }),
       storageEstimates: OrganizationStorageEstimateService.create({
         meter: storageMeter,
         directory: repositories.directory,
@@ -222,7 +231,27 @@ export class DataRetentionModule implements DataRetentionApiContract {
 
   /** The pipeline `data_retention_seat_policy` registers, over billing's activation fact. */
   seatPolicyPipeline(): DataRetentionSeatPolicyPipeline {
-    return buildDataRetentionSeatPolicyPipeline({ seatPolicies: this.#seatPolicies });
+    return buildDataRetentionSeatPolicyPipeline({ extensions: this.#extensions });
+  }
+
+  /** The `data_retention_extension` pipeline: the activation's extension, raised per project. */
+  retentionExtensionPipeline(
+    deps: { applyRetryDelayMs?: (params: { attempt: number }) => number } = {},
+  ): RetentionExtensionPipelineDefinition {
+    return buildRetentionExtensionPipeline({
+      applyCommand: ApplyRetentionExtensionCommand.create({ retention: this.#retention }),
+      extensions: this.#extensions,
+      ...deps,
+    });
+  }
+
+  connectRetentionExtensionCommands(
+    commands: EventingCommands<RetentionExtensionPipelineDefinition>,
+  ): void {
+    this.#extensions.connect({
+      record: (data) => commands.recordRetentionExtension.send(data),
+      apply: (data) => commands.applyRetentionExtension.send(data),
+    });
   }
 
   /** The `data_retention_storage_report` pipeline: daily clock, measure command and bill. */
