@@ -14,6 +14,7 @@ const TABLE_NAME = "billable_events" as const;
 type TotalRow = { total: string | number };
 type ProjectRow = { projectId: string; total: string | number };
 type DayRow = { day: string; total: string | number };
+type FirstRow = { firstAt: string | null; total: string | number };
 
 /** ClickHouse twin of the meter, moved from billing under the same table and row shape. */
 export class BillableEventsMeterClickHouseRepository extends BillableEventsMeterRepository {
@@ -75,6 +76,54 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
       SKIP_TENANT_CHECK: true,
     });
     return numberOf(result.rows[0]?.total);
+  }
+
+  async countEventType(
+    input: { organizationId: string; eventType: string } & MeterWindow,
+  ): Promise<number> {
+    const result = await this.#clickhouse.query<TotalRow>({
+      tenantId: "",
+      organizationId: input.organizationId,
+      sql: `
+        SELECT countDistinct(DeduplicationKeyHash) as total
+        FROM ${TABLE_NAME}
+        WHERE OrganizationId = {organizationId:String}
+          AND EventType = {eventType:String}
+          AND EventTimestamp >= {startDate:DateTime64(3)}
+          AND EventTimestamp < {endDate:DateTime64(3)}
+      `,
+      params: {
+        organizationId: input.organizationId,
+        eventType: input.eventType,
+        startDate: input.startDate,
+        endDate: input.endDate,
+      },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
+    });
+    return numberOf(result.rows[0]?.total);
+  }
+
+  async findFirstEventAt(input: {
+    organizationId: string;
+    eventType: string;
+  }): Promise<number | null> {
+    const result = await this.#clickhouse.query<FirstRow>({
+      tenantId: "",
+      organizationId: input.organizationId,
+      sql: `
+        SELECT toString(min(EventTimestamp)) as firstAt, count() as total
+        FROM ${TABLE_NAME}
+        WHERE OrganizationId = {organizationId:String}
+          AND EventType = {eventType:String}
+      `,
+      params: { organizationId: input.organizationId, eventType: input.eventType },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
+    });
+    const row = result.rows[0];
+    if (!row || numberOf(row.total) === 0 || !row.firstAt) return null;
+    return Temporal.Instant.from(`${row.firstAt.replace(" ", "T")}Z`).epochMilliseconds;
   }
 
   /** Billing's former `findByProjectApprox`, kept `uniq` so enforcement's numbers do not move. */

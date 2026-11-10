@@ -28,6 +28,15 @@ export abstract class BillableEventsMeterRepository {
     projectIds: readonly string[];
     window: MeterWindow;
   }): Promise<ProjectMeterCount[]>;
+  /** Distinct deduplication keys of one event type the organization was metered for in the window. */
+  abstract countEventType(
+    input: { organizationId: string; eventType: string } & MeterWindow,
+  ): Promise<number>;
+  /** Epoch ms of the organization's earliest metered event of one type; null when it has none. */
+  abstract findFirstEventAt(input: {
+    organizationId: string;
+    eventType: string;
+  }): Promise<number | null>;
   /** Approximate distinct keys per UTC day across the named projects; a day with none is absent. */
   abstract countByDay(input: {
     organizationId: string;

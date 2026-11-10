@@ -33,6 +33,26 @@ export class MemoryBillableEventsMeterRepository extends BillableEventsMeterRepo
     return new Set(keys).size;
   }
 
+  async countEventType(
+    input: { organizationId: string; eventType: string } & MeterWindow,
+  ): Promise<number> {
+    const keys = this.#inWindow({ organizationId: input.organizationId, window: input })
+      .filter((row) => row.eventType === input.eventType)
+      .map((row) => row.deduplicationKey);
+    return new Set(keys).size;
+  }
+
+  async findFirstEventAt(input: {
+    organizationId: string;
+    eventType: string;
+  }): Promise<number | null> {
+    const times = this.rows
+      .filter((row) => row.organizationId === input.organizationId)
+      .filter((row) => row.eventType === input.eventType)
+      .map((row) => row.eventTimestamp);
+    return times.length > 0 ? Math.min(...times) : null;
+  }
+
   /** Exact where ClickHouse's `uniq` is approximate, so small test data stays deterministic. */
   async countByProjects(input: {
     organizationId: string;

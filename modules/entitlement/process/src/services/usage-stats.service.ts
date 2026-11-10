@@ -15,6 +15,7 @@ import type { MemberSeatRepository } from "../repositories/member-seat.repositor
 import type { UsageMembershipRepository } from "../repositories/usage-membership.repository.ts";
 import { buildSeatLimitInfo } from "../rules/seat-limit.rules.ts";
 import { USAGE_UNKNOWN, type UsageCounter } from "./usage-enforcement.service.ts";
+import type { ScenarioRunCapService } from "./scenario-run-cap.service.ts";
 
 /**
  * The message allowance a plan states when it means "we do not cap this". Stated rather than
@@ -57,6 +58,8 @@ type UsageStatsSources = {
   seats: MemberSeatRepository;
   counter: UsageCounter;
   plans: PlanProvider;
+  /** Absent where no plan caps scenario runs (self-hosted). */
+  scenarioRuns?: Pick<ScenarioRunCapService, "usage">;
 };
 
 /**
@@ -71,8 +74,10 @@ export class UsageStatsService {
   private readonly seats: MemberSeatRepository;
   private readonly counter: UsageCounter;
   private readonly planProvider: PlanProvider;
+  private readonly scenarioRuns: Pick<ScenarioRunCapService, "usage"> | undefined;
 
   private constructor(options: UsageStatsSources) {
+    this.scenarioRuns = options.scenarioRuns;
     this.membership = options.membership;
     this.seats = options.seats;
     this.counter = options.counter;
@@ -165,6 +170,10 @@ export class UsageStatsService {
     // rather than crashing on a null. It is not shown as a real figure:
     // `currentMonthMessagesCount` above is null, and that is the field the
     // page reads before deciding whether to show a number at all.
+    const scenarioRuns = this.scenarioRuns
+      ? await this.scenarioRuns.usage({ organizationId, plan: activePlan })
+      : null;
+
     const messageLimitInfo = UsageStatsService.buildMessageLimitInfo(
       resolvedCount ?? 0,
       activePlan.maxMessagesPerMonth,
@@ -185,6 +194,7 @@ export class UsageStatsService {
         membersLiteCount: seats.liteMembers,
       }),
       usageUnit,
+      scenarioRuns,
     };
   }
 

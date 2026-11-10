@@ -1,8 +1,11 @@
-Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
+Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
 
-  The cloud Free plan includes 3 scenarios, 3 simulations (distinct scenario
-  sets) and 3 custom evaluators, as the pricing page says. Paid cloud plans are
-  uncapped. Self-hosted deployments are uncapped with or without a license: the
+  The cloud Free plan includes 3 scenarios and 3 custom evaluators, as the
+  pricing page says. Scenario runs (Scenario SDK and platform simulation runs)
+  have no cap for the first 14 days after the organization's first run; after
+  that, Free allows 100 runs per UTC calendar month, the clock the events meter
+  uses. Scenario sets (test suites) are not capped. Paid cloud plans are
+  uncapped and bill runs as events. Self-hosted deployments are uncapped with or without a license: the
   caps live on the cloud Free plan and are never read from a signed license.
 
   A custom evaluator is any evaluator saved in a project's evaluator library,
@@ -39,49 +42,150 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
     Then the scenario is created
 
   @unit
-  Scenario: Cloud Free refuses a run that starts a fourth new simulation
+  Scenario: Cloud Free allows any number of runs during the grace
     Given the organization is on the cloud Free plan
-    And it has run 3 distinct scenario sets
-    When a run starts for a new scenario set
-    Then the run is refused with limit type "scenarioSets", current 3 and max 3
-
-  @unit
-  Scenario: A simulation the organization already ran keeps running over the cap
-    Given the organization is on the cloud Free plan
-    And it has run 5 distinct scenario sets
-    When a run starts for one of those scenario sets
+    And its first scenario run was 3 days ago
+    And it ran 250 scenarios this month
+    When a run starts
     Then the run is accepted
 
   @unit
-  Scenario: An unknown simulation count does not block runs
+  Scenario: Cloud Free refuses the 101st run of the month after the grace
     Given the organization is on the cloud Free plan
-    And its simulation history cannot be read
+    And its first scenario run was 20 days ago
+    And it ran 100 scenarios this month
+    When a run starts
+    Then the run is refused with limit type "scenarioRuns", current 100 and max 100
+
+  @unit
+  Scenario: Cloud Free allows runs below the monthly cap after the grace
+    Given the organization is on the cloud Free plan
+    And its first scenario run was 20 days ago
+    And it ran 99 scenarios this month
+    When a run starts
+    Then the run is accepted
+
+  @unit
+  Scenario: The monthly run count starts again each UTC calendar month
+    Given the organization is on the cloud Free plan
+    And its first scenario run was 60 days ago
+    And it ran 100 scenarios last month and none this month
+    When a run starts
+    Then the run is accepted
+
+  @unit
+  Scenario: Scenario sets are not capped
+    Given the organization is on the cloud Free plan
+    And its first scenario run was 20 days ago
+    And it ran 10 scenarios this month across 8 distinct scenario sets
     When a run starts for a new scenario set
     Then the run is accepted
 
   @unit
-  Scenario: Platform-owned runs do not count as simulations
+  Scenario: An unknown run count does not block runs
     Given the organization is on the cloud Free plan
-    And it has run 3 distinct scenario sets
-    When a run starts from the platform, an agent test or a voice call
-    Then the run is accepted without counting scenario sets
+    And its scenario run history cannot be read
+    When a run starts
+    Then the run is accepted
+
+  @unit
+  Scenario: A paid cloud plan has no run cap
+    Given the organization is on a paid cloud plan
+    And its first scenario run was 60 days ago
+    And it ran 5000 scenarios this month
+    When a run starts
+    Then the run is accepted without counting runs
+
+  @integration
+  Scenario: The month's runs are counted from the billable events meter
+    Given the organization's projects metered 3 scenario run starts this month, 2 last month and 4 other events
+    When the run usage is read
+    Then it counts 3 runs this month
+    And its first run is the earliest metered run start
+
+  @unit
+  Scenario: The usage page shows the month's runs against the cap
+    Given the organization is on the cloud Free plan
+    And its first scenario run was 20 days ago
+    And it ran 87 scenarios this month
+    When the usage is read
+    Then the scenario runs read "87 of 100 runs this month"
+
+  @unit
+  Scenario: The usage page says when the grace ends
+    Given the organization is on the cloud Free plan
+    And its first scenario run was 3 days ago
+    When the usage is read
+    Then the scenario runs show no cap until the grace ends in 11 days
+
+  @unit
+  Scenario: Reaching 100 runs in a month records the threshold once
+    Given the organization is on the cloud Free plan
+    And its runs were counted at 100 this month
+    When the runs are counted again at 120 the same month
+    Then "scenario_runs_threshold_reached" was recorded once for the month
+
+  @unit
+  Scenario: The threshold is recorded during the grace too
+    Given the organization is on the cloud Free plan
+    And its first scenario run was 3 days ago
+    When its runs are counted at 100 this month
+    Then "scenario_runs_threshold_reached" is recorded with the grace still running
+
+  @unit
+  Scenario: The threshold is recorded again the next month
+    Given "scenario_runs_threshold_reached" was recorded last month
+    When the runs are counted at 100 this month
+    Then "scenario_runs_threshold_reached" is recorded for this month
+
+  @unit
+  Scenario: The grace ends 14 days after the first run
+    Given the organization is on the cloud Free plan
+    And its runs were counted with its first run 14 days ago
+    When the organization's grace wakes
+    Then "scenario_run_grace_ended" is recorded once
+
+  @unit
+  Scenario: A grace that ended long before the count is closed without a notice
+    Given the organization is on the cloud Free plan
+    And its first scenario run was 90 days ago
+    When its runs are counted for the first time
+    Then the grace is closed and "scenario_run_grace_ended" is not recorded
+
+  @unit
+  Scenario: A paid organization records no run notices
+    Given the organization is on a paid cloud plan
+    When its runs are counted at 500 this month
+    Then nothing is recorded
+
+  @unit
+  Scenario: The run refusal tells the caller how to upgrade
+    Given a run was refused with limit type "scenarioRuns" and max 100
+    When the refusal is presented outside the upgrade modal
+    Then it says the plan includes 100 scenario runs a month and names the upgrade
+
+  @unit
+  Scenario: Nurturing forwards the run notices to Customer.io
+    Given "scenario_runs_threshold_reached" or "scenario_run_grace_ended" was recorded for an organization
+    When nurturing receives it
+    Then the organization's admin is tracked the matching Customer.io event once
 
   @unit
   Scenario: Paid cloud plans are not capped
     Given the organization is on a paid cloud plan
-    And it has 50 scenarios, 50 custom evaluators and 50 scenario sets
-    When a member creates another scenario, custom evaluator or simulation
+    And it has 50 scenarios and 50 custom evaluators
+    When a member creates another scenario or custom evaluator
     Then nothing is refused and nothing is counted
 
   @unit
   Scenario: Self-hosted without a license is not capped
     Given a self-hosted deployment with no license
-    Then the active plan sets no scenario, simulation or custom evaluator cap
+    Then the active plan sets no scenario, custom evaluator or scenario run cap
 
   @unit
   Scenario: Self-hosted with a license is not capped
     Given a self-hosted deployment with a license whose signed payload carries maxScenarios
-    Then the active plan sets no scenario, simulation or custom evaluator cap
+    Then the active plan sets no scenario, custom evaluator or scenario run cap
 
   @integration
   Scenario: Creating a fourth scenario in the app is refused with the upgrade shape
@@ -164,4 +268,4 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
   @unit
   Scenario: The Free plan card matches the pricing page
     When the Free plan card is shown
-    Then it lists "3 scenarios, 3 simulations, 3 custom evals"
+    Then it lists "3 scenarios, 3 custom evals, 100 scenario runs a month"

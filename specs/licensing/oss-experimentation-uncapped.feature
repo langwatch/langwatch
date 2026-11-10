@@ -68,7 +68,7 @@ Feature: Experimentation resources are OSS (Apache 2.0) and uncapped
   Scenario: Creation-limit enforcement applies to member seats and the cloud Free caps
     Given the organization is on the free plan
     Then creation limits are still enforced for "members" and "membersLite"
-    And on the cloud Free plan for "scenarios", "scenarioSets" and "evaluators"
+    And on the cloud Free plan for "scenarios", "evaluators" and the monthly "scenarioRuns"
     But creation limits are not enforced for projects, teams, or any other experimentation resource
 
   @unit

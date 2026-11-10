@@ -86,3 +86,64 @@ export interface UsageThresholdCrossedEventDataSchema extends Named<
 export const usageThresholdCrossedEventDataSchema: UsageThresholdCrossedEventDataSchema =
   usageThresholdCrossedEventDataSchemaDefinition;
 export type UsageThresholdCrossedEventData = z.infer<typeof usageThresholdCrossedEventDataSchema>;
+
+export const SCENARIO_RUNS_COUNTED_EVENT_TYPE = "lw.entitlement.scenario_runs_counted" as const;
+export const SCENARIO_RUNS_THRESHOLD_REACHED_EVENT_TYPE =
+  "lw.entitlement.scenario_runs_threshold_reached" as const;
+export const SCENARIO_RUN_GRACE_ENDED_EVENT_TYPE =
+  "lw.entitlement.scenario_run_grace_ended" as const;
+
+/** The plan's scenario run cap as it stood when the runs were counted. */
+const scenarioRunCapSchema = z.object({
+  maxPerMonth: z.number().int().nonnegative(),
+  graceDays: z.number().int().nonnegative(),
+});
+
+/** A capped organization's scenario runs counted for the month, from the billable events meter. */
+const scenarioRunsCountedEventDataSchemaDefinition = z.object({
+  ...envelope,
+  runs: z.number().int().nonnegative(),
+  /** Epoch ms of the organization's first metered run start; null when none is metered yet. */
+  firstRunAt: z.number().int().nonnegative().nullable(),
+  cap: scenarioRunCapSchema,
+});
+export interface ScenarioRunsCountedEventDataSchema extends Named<
+  typeof scenarioRunsCountedEventDataSchemaDefinition
+> {}
+export const scenarioRunsCountedEventDataSchema: ScenarioRunsCountedEventDataSchema =
+  scenarioRunsCountedEventDataSchemaDefinition;
+export type ScenarioRunsCountedEventData = z.infer<typeof scenarioRunsCountedEventDataSchema>;
+
+/** A Free organization reached its monthly scenario run cap; recorded once per month. */
+const scenarioRunsThresholdReachedEventDataSchemaDefinition = z.object({
+  ...envelope,
+  runs: z.number().int().nonnegative(),
+  maxPerMonth: z.number().int().nonnegative(),
+  /** True while the grace after the first run still lets runs past the cap. */
+  inGrace: z.boolean(),
+  /** Epoch ms the grace ends (or ended); null when no first run is metered. */
+  graceEndsAt: z.number().int().nonnegative().nullable(),
+});
+export interface ScenarioRunsThresholdReachedEventDataSchema extends Named<
+  typeof scenarioRunsThresholdReachedEventDataSchemaDefinition
+> {}
+export const scenarioRunsThresholdReachedEventDataSchema: ScenarioRunsThresholdReachedEventDataSchema =
+  scenarioRunsThresholdReachedEventDataSchemaDefinition;
+export type ScenarioRunsThresholdReachedEventData = z.infer<
+  typeof scenarioRunsThresholdReachedEventDataSchema
+>;
+
+/** A Free organization's grace after its first scenario run ended; recorded once. */
+const scenarioRunGraceEndedEventDataSchemaDefinition = z.object({
+  organizationId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  firstRunAt: z.number().int().nonnegative(),
+  graceEndedAt: z.number().int().nonnegative(),
+  maxPerMonth: z.number().int().nonnegative(),
+});
+export interface ScenarioRunGraceEndedEventDataSchema extends Named<
+  typeof scenarioRunGraceEndedEventDataSchemaDefinition
+> {}
+export const scenarioRunGraceEndedEventDataSchema: ScenarioRunGraceEndedEventDataSchema =
+  scenarioRunGraceEndedEventDataSchemaDefinition;
+export type ScenarioRunGraceEndedEventData = z.infer<typeof scenarioRunGraceEndedEventDataSchema>;

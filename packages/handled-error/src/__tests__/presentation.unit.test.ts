@@ -245,16 +245,18 @@ describe("explainHandledError", () => {
       );
     });
 
-    it("names simulations for a scenario set refusal", () => {
+    /** @scenario "The run refusal tells the caller how to upgrade" */
+    it("names the monthly run allowance and the upgrade for a scenario run refusal", () => {
       const { description } = explainHandledError(
         shape({
           code: "resource_limit_exceeded",
           httpStatus: 403,
-          meta: { limitType: "scenarioSets", current: 3, max: 3 },
+          meta: { limitType: "scenarioRuns", current: 100, max: 100 },
         }),
       );
 
-      expect(description).toContain("3 simulations");
+      expect(description).toContain("100 scenario runs a month");
+      expect(description).toContain("Upgrade your plan");
     });
 
     it("keeps the generic plan-limit line for every other allowance", () => {

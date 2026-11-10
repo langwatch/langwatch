@@ -25,6 +25,8 @@ export interface EntitlementApi {
   getUsageMonthBreakdown(input: { organizationId: string }): Promise<UsageMonthBreakdown>;
   /** Throws `ERR_PLAN_LIMIT` (402) once the organization spent its monthly allowance. */
   assertWithinUsageLimit(input: { organizationId: string }): Promise<void>;
+  /** Throws `LimitExceededError` (`scenarioRuns`) once a capped plan's month of runs is spent. */
+  assertScenarioRunAllowed(input: { organizationId: string }): Promise<void>;
   sendUsageLimitWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning>;
   listOrganizationSpend(input: ListOrganizationSpendInput): Promise<ProjectSpendRollup[]>;
   /**
