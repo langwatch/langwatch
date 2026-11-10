@@ -5,9 +5,9 @@ keywords: langwatch, agent testing, simulated user, user simulator, llm as a jud
 description: Scenario, LangWatch's open-source testing library, runs a simulated user against your agent inside pytest or vitest, and a judge grades each conversation.
 ---
 
-To test an agent with simulated users, use [Scenario](https://github.com/langwatch/scenario) (`langwatch-scenario` for Python, `@langwatch/scenario` for TypeScript), LangWatch's open-source testing library: one model plays the user while your agent answers it, and a judge model passes or fails the conversation against criteria you wrote.
+To test an agent with simulated users, use [Scenario](https://github.com/langwatch/scenario), LangWatch's open-source testing library: a simulated user talks to your agent, and a judge model passes or fails the conversation against criteria you wrote.
 
-This page is the pytest and vitest tutorial. The loop is one `scenario.run` call inside a normal test, so it runs in CI with the rest of your suite. For what agent testing covers and the other ways to run it, see the [agent testing overview](/agent-testing/overview). To start now, go to [Install Scenario](#1-install-scenario).
+This page is the pytest and vitest tutorial, with `langwatch-scenario` for Python and `@langwatch/scenario` for TypeScript. The loop is one `scenario.run` call inside a normal test, so it runs in CI with the rest of your suite. For what agent testing covers and the other ways to run it, see the [agent testing overview](/agent-testing/overview). To start now, go to [Install Scenario](#1-install-scenario).
 
 ## Why use a simulated user
 
@@ -129,19 +129,19 @@ Evaluations still fit the steps inside the agent, such as retrieval or one promp
 
 ## Questions about Scenario
 
-### Which model should play the user and the judge in Scenario?
+### Which model should play the user and the judge in Scenario
 
 Start with a small, cheap model: `scenario.configure(default_model=...)` sets it for both roles. Pass a different model to `UserSimulatorAgent` or `JudgeAgent` when one role needs more.
 
-### Does Scenario work with my agent framework?
+### Does Scenario work with my agent framework
 
 The adapter only needs a function that takes the messages and returns a reply, so it works with LangGraph, CrewAI, Pydantic AI, the OpenAI Agents SDK, Mastra, the Vercel AI SDK or your own code.
 
-### Can I test agents in LangWatch without writing code?
+### Can I test agents in LangWatch without writing code
 
 Yes. [Test from the platform](/agent-testing/test-from-the-platform) runs the same simulated user and judge against your agent's endpoint, with scenarios written in the LangWatch interface.
 
-### Can Scenario's simulated user attack my agent?
+### Can Scenario's simulated user attack my agent
 
 [Red teaming](/agent-testing/red-teaming) swaps the simulated user for a multi-turn attacker in the same loop.
 

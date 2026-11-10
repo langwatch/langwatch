@@ -7,7 +7,7 @@ description: Pass the LangWatch callback to your graph's invoke and every node, 
 
 To trace a LangGraph agent with LangWatch's open-source LLM observability, pass `get_langchain_callback()` to the run of the compiled graph. LangGraph hands that callback to every node it runs, so each node is recorded as a span inside one trace per run, and so is each tool and model call made through a LangChain or LangGraph runnable. A call your node makes with a provider SDK directly needs that SDK instrumented as well.
 
-With LangWatch that is one decorator and one callback in Python, or one `withConfig` call in TypeScript. You then see which node ran, in which order, how often the agent looped, and the exact prompt and tool arguments at each step. Both snippets are in [Trace the graph run](#1-trace-the-graph-run).
+With LangWatch that is one decorator and one callback in Python, or one `withConfig` call in TypeScript. You then see which node ran, in which order, how often the agent looped, and the exact prompt and tool arguments at each step. Both snippets are in [Trace the graph run in Python or TypeScript](#1-trace-the-graph-run-in-python-or-typescript).
 
 ## Why trace the graph and not only the model
 
@@ -15,7 +15,7 @@ A graph agent fails between the model calls: a router picks the wrong edge, a to
 
 A trace of the whole run shows each step as a span, nested in the order the graph ran them, with its input, its output, its time and its tokens. You get that only when the callback sits on the graph run, as step 1 shows.
 
-## 1. Trace the graph run
+## 1. Trace the graph run in Python or TypeScript
 
 Install the SDK and set `LANGWATCH_API_KEY`, which you find in your [project settings](https://app.langwatch.ai/settings):
 
@@ -124,15 +124,15 @@ Once the runs are traced, you can check them in the same project:
 
 ## Questions about tracing LangGraph with LangWatch
 
-### Does LangWatch trace LangGraph's prebuilt agents?
+### Does LangWatch trace LangGraph's prebuilt agents
 
 Yes. `create_react_agent` and other prebuilt graphs are compiled graphs, so the callback goes in the same `config`.
 
-### Do I need LangSmith to trace LangGraph with LangWatch?
+### Do I need LangSmith to trace LangGraph with LangWatch
 
 No. The callback is a standard LangChain callback, so it works without a LangSmith account, and it can run next to LangSmith's tracer if you use both.
 
-### Can I self-host LangWatch for LangGraph tracing?
+### Can I self-host LangWatch for LangGraph tracing
 
 Yes. Point `LANGWATCH_ENDPOINT` at your own instance; see [Self-hosting](/self-hosting/overview).
 

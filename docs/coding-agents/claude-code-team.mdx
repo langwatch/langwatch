@@ -91,15 +91,15 @@ Credentials in prompts or tool output are replaced with `[SECRET]` at ingestion 
 
 ## Questions about LangWatch for Claude Code
 
-### Does LangWatch track Claude Code on Max and Pro plans?
+### Does LangWatch track Claude Code on Max and Pro plans
 
 Yes. The subscription path keeps the engineer's plan and login and sends only telemetry. Cost there is Claude Code's own estimate.
 
-### How is LangWatch different from the analytics in my Anthropic account?
+### How is LangWatch different from the analytics in my Anthropic account
 
 LangWatch works per session: it replays what the agent did, shows where the context and the cache cost went, and adds up every session behind a pull request, across Claude Code and the other coding agents your team uses.
 
-### Can we self-host LangWatch for Claude Code telemetry?
+### Can we self-host LangWatch for Claude Code telemetry
 
 Yes, point the OTLP endpoint at your own instance followed by `/api/otel`. See [Self-hosting](/self-hosting/overview).
 

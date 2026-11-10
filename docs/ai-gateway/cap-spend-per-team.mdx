@@ -1,5 +1,5 @@
 ---
-title: "AI gateway budgets: cap LLM spend per team with LangWatch virtual keys"
+title: "AI gateway budgets: cap LLM spend with virtual keys"
 sidebarTitle: Cap spend per team
 keywords: ai gateway, llm gateway, virtual keys, llm budgets, llm cost control, spend limits, budget per team, litellm alternative
 description: The LangWatch AI Gateway gives each app, team or person a virtual key with a USD budget that blocks at the limit.
@@ -88,15 +88,15 @@ Spend can pass a budget before the gateway stops it, so set the limit below what
 
 ## Questions about the LangWatch AI Gateway
 
-### Does the LangWatch AI Gateway work as a LiteLLM alternative?
+### Does the LangWatch AI Gateway work as a LiteLLM alternative
 
 Yes, it works as a LiteLLM alternative. Keys, budgets, team budgets, model lists, end-user ids and fallbacks all have an equivalent, and LiteLLM's `x-litellm-end-user-id` header is accepted as is. [Migrate from LiteLLM](/ai-gateway/cookbooks/migrate-from-litellm) maps each setting and moves an app over with a base URL change.
 
-### Can I self-host the LangWatch AI Gateway?
+### Can I self-host the LangWatch AI Gateway
 
 Yes, it ships in the LangWatch Helm chart next to the app. See [Helm chart](/ai-gateway/self-hosting/helm).
 
-### How does the LangWatch AI Gateway calculate spend?
+### How does the LangWatch AI Gateway calculate spend
 
 From the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected, and requests that failed at the provider, are not charged.
 

@@ -337,7 +337,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### DSPy Optimization
 
 - [DSPy Visualization Quickstart](https://langwatch.ai/docs/dspy-visualization/quickstart.md): Quickly visualize DSPy notebooks and optimization experiments in LangWatch to support debugging and agent evaluation.
-- [Track DSPy optimization (MIPROv2, GEPA) in a UI with LangWatch](https://langwatch.ai/docs/dspy-visualization/follow-optimization-in-a-ui.md): One call to `langwatch.dspy.init` streams every optimizer step to LangWatch, with the score, the instructions, the examples, the LLM calls and the cost.
+- [Track DSPy optimization (MIPROv2, GEPA) in a UI](https://langwatch.ai/docs/dspy-visualization/follow-optimization-in-a-ui.md): One call to `langwatch.dspy.init` streams every optimizer step to LangWatch, with the score, the instructions, the examples, the LLM calls and the cost.
 - [Tracking Custom DSPy Optimizer](https://langwatch.ai/docs/dspy-visualization/custom-optimizer.md): Track custom DSPy optimizer logic in LangWatch to visualize optimization steps and improve AI agent testing workflows.
 - [RAG Visualization](https://langwatch.ai/docs/dspy-visualization/rag-visualization.md): Visualize DSPy RAG optimization steps in LangWatch to better understand performance and support AI agent testing.
 
@@ -425,7 +425,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [LangWatch AI Gateway](https://langwatch.ai/docs/ai-gateway/overview.md): One OpenAI- and Anthropic-compatible endpoint for every LLM call in your company, with provider keys kept in LangWatch, a virtual key per application, team or person, budgets that block or warn, and a trace for every request.
 - [Quickstart](https://langwatch.ai/docs/ai-gateway/quickstart.md): Create a virtual key, send one request through the LangWatch AI Gateway with the OpenAI SDK, open the trace and see the spend on the key.
-- [AI gateway budgets: cap LLM spend per team with LangWatch virtual keys](https://langwatch.ai/docs/ai-gateway/cap-spend-per-team.md): The LangWatch AI Gateway gives each app, team or person a virtual key with a USD budget that blocks at the limit.
+- [AI gateway budgets: cap LLM spend with virtual keys](https://langwatch.ai/docs/ai-gateway/cap-spend-per-team.md): The LangWatch AI Gateway gives each app, team or person a virtual key with a USD budget that blocks at the limit.
 - [Concepts](https://langwatch.ai/docs/ai-gateway/concepts.md): The nouns of the LangWatch AI Gateway, each defined once, virtual key, scope, provider credential, routing policy, budget, spend event and gateway request id.
 
 ## SDK Integration

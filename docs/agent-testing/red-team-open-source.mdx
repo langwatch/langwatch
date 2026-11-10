@@ -5,9 +5,9 @@ keywords: langwatch, scenario, red teaming, garak, pyrit, promptfoo, open source
 description: Scenario, LangWatch's open-source testing library, attacks your agent over dozens of turns inside pytest or vitest and fails the test when it breaks.
 ---
 
-To red team an AI agent, you let an attacker model talk to it over many turns, and then a judge and your own checks decide whether the agent held. The attacker works like a determined user: it plans an approach, builds trust, escalates and tries another angle when it is refused.
+To red team an AI agent, use [Scenario](https://github.com/langwatch/scenario), LangWatch's open-source testing library (Apache 2.0): an attacker model escalates against your agent over many turns, and a judge and your own checks decide whether the agent held. The attacker works like a determined user: it plans an approach, builds trust, escalates and tries another angle when it is refused.
 
-[Scenario](https://github.com/langwatch/scenario), LangWatch's open-source testing library (Apache 2.0), runs that attacker against your own agent and its real tools, inside a pytest or vitest test. The test fails when the agent leaks, calls a tool it shouldn't or leaves its role, so the attack runs in CI with the rest of your suite. To start now, go to [Write the attack](#2-write-the-attack).
+Scenario runs that attacker against your own agent and its real tools, inside a pytest or vitest test. The test fails when the agent leaks, calls a tool it shouldn't or leaves its role, so the attack runs in CI with the rest of your suite. To start now, go to [Write the attack](#2-write-the-attack).
 
 <Warning>Red team only agents you own or have explicit permission to test.</Warning>
 
@@ -121,15 +121,15 @@ Scenario's catalogue of single-prompt jailbreaks is smaller than garak's or prom
 
 ## Questions about red teaming with Scenario
 
-### Can a coding assistant write Scenario red-team attacks for me?
+### Can a coding assistant write Scenario red-team attacks for me
 
 Yes. Install the scenarios skill with `npx skills add langwatch/skills/scenarios`, then ask your assistant to "add red teaming to my agent". It finds your agent in the codebase and writes the test.
 
-### What does a Scenario red-team run cost?
+### What does a Scenario red-team run cost
 
 Every turn calls the attacker model and your agent and scores the reply, so the cost grows with `total_turns`. Run the long attacks before a release, and turn off per-turn scoring with `score_responses=False` for faster runs on every pull request.
 
-### Does Scenario red teaming work with my agent framework?
+### Does Scenario red teaming work with my agent framework
 
 The adapter only needs a function that takes the messages and returns a reply, so it works with LangGraph, CrewAI, Pydantic AI, the OpenAI Agents SDK, Mastra, the Vercel AI SDK or your own code.
 
