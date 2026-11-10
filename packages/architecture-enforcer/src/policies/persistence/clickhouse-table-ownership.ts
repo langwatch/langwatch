@@ -708,9 +708,13 @@ function recordFindings({
           : `${writer.module} writes ${record.table}, recorded as ${record.owner} owned (${record.writer}: ${record.reason}).`,
     }));
 
-    return record.owner === "reserved"
-      ? [...writes, ...reservedReads({ record, context })]
-      : writes;
+    if (record.owner !== "reserved") return writes;
+    const written = new Set(writes.map((finding) => finding.key));
+
+    return [
+      ...writes,
+      ...reservedReads({ record, context }).filter((finding) => !written.has(finding.key)),
+    ];
   });
 }
 

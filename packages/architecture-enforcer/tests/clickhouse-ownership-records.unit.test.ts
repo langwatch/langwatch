@@ -5,6 +5,8 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  clickhouseScanAt,
+  clickhouseTableOwners,
   collectClickhouseOwnershipFindings,
   DECLARED_OWNERSHIP,
   type DeclaredOwnership,
@@ -117,6 +119,7 @@ function fixture(declared: DeclaredOwnership = DECLARED) {
     write,
     messages: () =>
       collectClickhouseOwnershipFindings(root, CATALOGUE, declared).map((item) => item.message),
+    owners: () => clickhouseTableOwners({ scan: clickhouseScanAt(root, CATALOGUE), declared }),
   };
 }
 
@@ -197,6 +200,24 @@ describe("ClickHouse ownership records", () => {
       );
 
       expect(world.messages()).toEqual(["trace reads eval_results, owned by instant-eval."]);
+    });
+
+    /** @scenario "Another module writing and reading a reserved table is reported once" */
+    it("reports another module writing and reading it once", () => {
+      const world = reserved();
+      world.write(
+        "modules/trace/process/src/repositories/clickhouse/clickhouse.eval-results.repository.ts",
+        writer("eval_results") + reader("eval_results"),
+      );
+
+      expect(world.messages()).toEqual([
+        "trace writes eval_results, recorded as reserved owned (instant-eval: step 1).",
+      ]);
+    });
+
+    /** @scenario "A reserved table's owner is its named writer" */
+    it("lists the named writer as its owner", () => {
+      expect(reserved().owners().get("eval_results")).toBe("instant-eval");
     });
   });
 

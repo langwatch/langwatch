@@ -224,6 +224,14 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     envVar: "CLICKHOUSE_COLD_STORAGE_INSTANT_EVAL_JUDGMENTS_TTL_DAYS",
     hardcodedDefault: 49,
   },
+  // The run's own row keeps the same default, so no verdict is left unexplained.
+  {
+    table: "instant_eval_runs",
+    ttlColumn: "CreatedAt",
+    retentionTTLColumn: "CreatedAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_INSTANT_EVAL_RUNS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
   // Every Instant Evals judgment, recalled before judging (ADR-189). Anchored on
   // the trace's time, as trace_summaries, so a result expires with its trace.
   {
@@ -231,14 +239,6 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     ttlColumn: "OccurredAt",
     retentionTTLColumn: "OccurredAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_EVAL_RESULTS_TTL_DAYS",
-    hardcodedDefault: 49,
-  },
-  // The run's own row keeps the same default, so no verdict is left unexplained.
-  {
-    table: "instant_eval_runs",
-    ttlColumn: "CreatedAt",
-    retentionTTLColumn: "CreatedAt",
-    envVar: "CLICKHOUSE_COLD_STORAGE_INSTANT_EVAL_RUNS_TTL_DAYS",
     hardcodedDefault: 49,
   },
 ] as const;
