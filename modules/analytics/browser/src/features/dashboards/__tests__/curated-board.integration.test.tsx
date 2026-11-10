@@ -252,7 +252,6 @@ describe("given a member opens a From LangWatch board", () => {
         storedNames: [widgetName],
         query: PICKER_OPEN,
       });
-      await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
 
       await user.click(
         await screen.findByRole("button", {

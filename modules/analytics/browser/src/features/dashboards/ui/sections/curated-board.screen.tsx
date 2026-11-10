@@ -68,6 +68,9 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
   const { mayCreate } = useBoardReader();
   const { createWithWidget } = useBoardFromTemplate();
   const picker = useBlockPickerAddress();
+  const openPicker = () => {
+    if (!picker.isOpen) picker.open();
+  };
 
   return (
     <BoardPage
@@ -99,7 +102,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
       <BoardLangy
         board={subject}
         period={period}
-        {...(mayCreate ? { onOpenPicker: () => (picker.isOpen ? void 0 : picker.open()) } : {})}
+        {...(mayCreate ? { onOpenPicker: openPicker } : {})}
       />
       <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
         <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
