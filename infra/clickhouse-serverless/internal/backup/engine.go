@@ -212,7 +212,7 @@ func firstLine(s string) string {
 func CheckRestore(path string, confirm bool) error {
 	switch {
 	case !confirm:
-		return errors.New("restore overwrites data: pass --confirm (or CONFIRM_RESTORE=yes) to proceed")
+		return errors.New("restore adds rows to existing tables and does not replace them: pass --confirm (or CONFIRM_RESTORE=yes) to proceed")
 	case path == "":
 		return errors.New("name the backup to restore (--name or BACKUP_NAME); list them with `ch-config backup list`")
 	case strings.EqualFold(strings.TrimRight(path, "/"), "latest"):

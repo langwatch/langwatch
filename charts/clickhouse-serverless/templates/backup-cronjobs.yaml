@@ -221,8 +221,13 @@ spec:
                 - name: CLICKHOUSE_PASSWORD
                   valueFrom:
                     secretKeyRef:
+                      {{- if and (include "clickhouse-serverless.backupSidecar" .) .Values.backup.passwordSecret.name }}
+                      name: {{ .Values.backup.passwordSecret.name }}
+                      key: {{ .Values.backup.passwordSecret.key | default "password" }}
+                      {{- else }}
                       name: {{ include "clickhouse-serverless.secretName" . }}
                       key: {{ include "clickhouse-serverless.secretKey" . }}
+                      {{- end }}
                 - name: BACKUP_DATABASE
                   value: {{ .Values.backup.database | quote }}
                 - name: BACKUP_NAME

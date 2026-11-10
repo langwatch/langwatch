@@ -157,11 +157,22 @@ kubectl exec -n langwatch langwatch-clickhouse-0 -c backup -- \
   ch-config backup restore --name langwatch_full_20261023T050000Z --confirm
 ```
 
-These commands run in sidecar mode. Use `-c access` instead of `-c backup` when ClickHouse access is enabled. In CronJob mode, run the suspended `<release>-clickhouse-restore-template` CronJob as a Job with `BACKUP_NAME` and `CONFIRM_RESTORE=yes` instead.
+These commands run in sidecar mode. Use `-c access` instead of `-c backup` when ClickHouse access is enabled. In CronJob mode there is no sidecar: list the backups from the server's backup log, then run the suspended `<release>-clickhouse-restore-template` CronJob as a Job with `BACKUP_NAME` and `CONFIRM_RESTORE=yes`:
+
+```bash
+# List available backups in CronJob mode (names, newest first)
+kubectl exec -n langwatch langwatch-clickhouse-0 -c clickhouse -- sh -c \
+  'clickhouse-client --password "$(cat /mnt/secrets/password)" -q "
+    SELECT name, end_time FROM clusterAllReplicas(default, system.backup_log)
+    WHERE status = '\''BACKUP_CREATED'\'' ORDER BY end_time DESC"'
+```
+
+The name to restore is the path after `Disk('backups', ...)`. Replace `default` with your `clusterName` if you changed it.
 
 <Warning>
-  Restoring a backup overwrites existing data in the target database. Always verify you're restoring
-  to the correct environment.
+  A restore adds the backup's rows to the tables in the target database; it does not replace what is
+  there. For a clean restore, stop writes and restore into empty tables. Always verify you're
+  restoring to the correct environment.
 </Warning>
 
 ## ClickHouse Cold Storage

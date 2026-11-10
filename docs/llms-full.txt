@@ -65579,11 +65579,22 @@ kubectl exec -n langwatch langwatch-clickhouse-0 -c backup -- \
   ch-config backup restore --name langwatch_full_20261023T050000Z --confirm
 ```
 
-These commands run in sidecar mode. Use `-c access` instead of `-c backup` when ClickHouse access is enabled. In CronJob mode, run the suspended `<release>-clickhouse-restore-template` CronJob as a Job with `BACKUP_NAME` and `CONFIRM_RESTORE=yes` instead.
+These commands run in sidecar mode. Use `-c access` instead of `-c backup` when ClickHouse access is enabled. In CronJob mode there is no sidecar: list the backups from the server's backup log, then run the suspended `<release>-clickhouse-restore-template` CronJob as a Job with `BACKUP_NAME` and `CONFIRM_RESTORE=yes`:
+
+```bash
+# List available backups in CronJob mode (names, newest first)
+kubectl exec -n langwatch langwatch-clickhouse-0 -c clickhouse -- sh -c \
+  'clickhouse-client --password "$(cat /mnt/secrets/password)" -q "
+    SELECT name, end_time FROM clusterAllReplicas(default, system.backup_log)
+    WHERE status = '\''BACKUP_CREATED'\'' ORDER BY end_time DESC"'
+```
+
+The name to restore is the path after `Disk('backups', ...)`. Replace `default` with your `clusterName` if you changed it.
 
 <Warning>
-  Restoring a backup overwrites existing data in the target database. Always verify you're restoring
-  to the correct environment.
+  A restore adds the backup's rows to the tables in the target database; it does not replace what is
+  there. For a clean restore, stop writes and restore into empty tables. Always verify you're
+  restoring to the correct environment.
 </Warning>
 
 ## ClickHouse Cold Storage
@@ -66001,13 +66012,15 @@ access file out of your values, put it in a ConfigMap under the key
 ### Docker
 
 Mount a directory holding the access file and the password directories, and set
-`CLICKHOUSE_ACCESS_FILE`:
+`CLICKHOUSE_ACCESS_FILE`. Mounted at `/etc/clickhouse-access`, the paths in the
+example above work unchanged: put the passwords in
+`access/secrets/metabase-passwords/`.
 
 ```bash
 docker run -d \
   -e CLICKHOUSE_PASSWORD="$(openssl rand -hex 24)" \
-  -e CLICKHOUSE_ACCESS_FILE=/run/access/access.yaml \
-  -v "$PWD/access:/run/access:ro" \
+  -e CLICKHOUSE_ACCESS_FILE=/etc/clickhouse-access/access.yaml \
+  -v "$PWD/access:/etc/clickhouse-access:ro" \
   langwatch/clickhouse-serverless
 ```
 
@@ -73043,7 +73056,8 @@ Set the required environment variables:
 
 ```bash
 export ELASTICSEARCH_NODE_URL="http://localhost:9200"
-export CLICKHOUSE_URL="http://default:${CLICKHOUSE_PASSWORD}@localhost:8123/langwatch"
+# Your shell does not load .env: export CLICKHOUSE_PASSWORD first, or the published default applies.
+export CLICKHOUSE_URL="http://default:${CLICKHOUSE_PASSWORD:-langwatch}@localhost:8123/langwatch"
 
 # If your Elasticsearch requires authentication
 export ELASTICSEARCH_API_KEY="your-api-key"

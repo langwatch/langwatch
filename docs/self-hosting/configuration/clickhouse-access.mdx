@@ -349,13 +349,15 @@ access file out of your values, put it in a ConfigMap under the key
 ### Docker
 
 Mount a directory holding the access file and the password directories, and set
-`CLICKHOUSE_ACCESS_FILE`:
+`CLICKHOUSE_ACCESS_FILE`. Mounted at `/etc/clickhouse-access`, the paths in the
+example above work unchanged: put the passwords in
+`access/secrets/metabase-passwords/`.
 
 ```bash
 docker run -d \
   -e CLICKHOUSE_PASSWORD="$(openssl rand -hex 24)" \
-  -e CLICKHOUSE_ACCESS_FILE=/run/access/access.yaml \
-  -v "$PWD/access:/run/access:ro" \
+  -e CLICKHOUSE_ACCESS_FILE=/etc/clickhouse-access/access.yaml \
+  -v "$PWD/access:/etc/clickhouse-access:ro" \
   langwatch/clickhouse-serverless
 ```
 

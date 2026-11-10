@@ -53,6 +53,8 @@ test_sidecar_mode() {
   ! grep -q 'BACKUP_SIDECAR' <<<"$(sed -n '/^        - name: clickhouse$/,/^        - name: backup$/p' <<<"$sts")" \
     || fail "the server container must not also run an embedded backup sidecar"
   grep -q 'kind: PodMonitor' <<<"$out" || fail "PodMonitor not rendered"
+  grep -A4 'name: CLICKHOUSE_PASSWORD$' <<<"$(helm template t . -f tests/values-backup-sidecar.yaml --show-only templates/backup-cronjobs.yaml)" \
+    | grep -q 'name: clickhouse-backup-login' || fail "the restore template must log in with backup.passwordSecret"
   if helm template t . "${BASE[@]}" --set backup.mode=lambda >/dev/null 2>&1; then
     fail "an unknown backup.mode should be refused"
   fi
@@ -109,6 +111,9 @@ test_dynamic_only() {
   grep -q 'name: CLICKHOUSE_ACCESS_BOOTSTRAP_DIR' <<<"$sidecar" || fail "the runner needs the local admin's directory"
   grep -q 'mountPath: /run/clickhouse-access' <<<"$sidecar" || fail "the local admin's directory is not mounted"
   ! grep -q 'BACKUP_PASSWORD_FILE\|backup-credentials' <<<"$sts" || fail "dynamic-only mounts no static backup password"
+  if helm template t . -f tests/values-dynamic-only.yaml "${BASE[@]}" --set backup.mode=sidecar --set lwqlAccess.secretName=lwql >/dev/null 2>&1; then
+    fail "dynamic-only should refuse the LangWatchQL access model: its user logs in with a static password"
+  fi
   echo "PASS: dynamic-only refuses CronJobs and backs up from the sidecar"
 }
 

@@ -153,7 +153,8 @@ Set the required environment variables:
 
 ```bash
 export ELASTICSEARCH_NODE_URL="http://localhost:9200"
-export CLICKHOUSE_URL="http://default:${CLICKHOUSE_PASSWORD}@localhost:8123/langwatch"
+# Your shell does not load .env: export CLICKHOUSE_PASSWORD first, or the published default applies.
+export CLICKHOUSE_URL="http://default:${CLICKHOUSE_PASSWORD:-langwatch}@localhost:8123/langwatch"
 
 # If your Elasticsearch requires authentication
 export ELASTICSEARCH_API_KEY="your-api-key"

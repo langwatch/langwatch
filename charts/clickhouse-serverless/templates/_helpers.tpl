@@ -105,6 +105,9 @@ app.kubernetes.io/component: keeper
     {{- if .Values.access.passwordSecrets }}
       {{- fail "access.dynamicOnly.enabled refuses access.passwordSecrets: rolling passwords are long-lived, use token logins" }}
     {{- end }}
+    {{- if .Values.lwqlAccess.secretName }}
+      {{- fail "access.dynamicOnly.enabled refuses lwqlAccess.secretName: the LangWatchQL access model logs its user in with a static password" }}
+    {{- end }}
   {{- end }}
 {{- end -}}
 

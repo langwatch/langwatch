@@ -53,7 +53,7 @@ func backupCommand(log *zap.Logger, args []string, stdout io.Writer) int {
 		}
 	case "restore":
 		name := fs.String("name", os.Getenv("BACKUP_NAME"), "exact backup name, as `backup list` prints it")
-		confirm := fs.Bool("confirm", os.Getenv("CONFIRM_RESTORE") == "yes", "confirm the restore, which overwrites data")
+		confirm := fs.Bool("confirm", os.Getenv("CONFIRM_RESTORE") == "yes", "confirm the restore, which adds the backup's rows to any existing ones")
 		if fs.Parse(args[1:]) != nil {
 			return 2
 		}
