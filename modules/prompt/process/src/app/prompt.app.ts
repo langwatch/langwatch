@@ -51,7 +51,10 @@ import type { PromptRepositories } from "../repositories/prompt.repositories.ts"
 import { promptsPlatformUrl } from "../rules/prompt-platform-url.rules.ts";
 import { PromptExecuteBoundsService } from "../services/prompt-execute-bounds.service.ts";
 import { PromptExecutionService } from "../services/prompt-execution.service.ts";
-import { PromptLibraryService } from "../services/prompt-library.service.ts";
+import {
+  PromptLibraryService,
+  type PromptVersionSavedInput,
+} from "../services/prompt-library.service.ts";
 import { PromptTagCatalogueService } from "../services/prompt-tag-catalogue.service.ts";
 import { PromptTagService } from "../services/prompt-tag.service.ts";
 import { PromptVersionService } from "../services/prompt-version.service.ts";
@@ -74,6 +77,10 @@ interface PromptInfrastructure {
    * as attribution when the write carried no user (the REST/CLI door).
    */
   afterPromptCreated(input: { projectId: string; promptId: string; userId?: string | null }): void;
+  /** Fires once a version after the first is written. Fire-and-forget, like the above. */
+  afterPromptVersionSaved(input: PromptVersionSavedInput): void;
+  /** Fires once a prompt is removed. Fire-and-forget, like the above. */
+  afterPromptDeleted(input: { projectId: string; promptId: string }): void;
   /** Read/write engine (temporary bridge; move to repository bundle once memory twins exist). */
   prompts: PromptService;
 }
@@ -159,13 +166,39 @@ export class PromptModule implements PromptApi {
     // Tied the knot: the callback below fires only once a request calls
     // `announceCreated`, by which point `app` is always assigned.
     const appRef: { current?: PromptModule } = {};
-    const afterPromptCreated: PromptInfrastructure["afterPromptCreated"] = (input) => {
+    /** Sends a fact in the background; a failed send is logged with its ids, never thrown. */
+    const fireAndLog = (
+      send: (app: PromptModule) => Promise<unknown>,
+      ids: Record<string, string>,
+      message: string,
+    ): void => {
       const app = appRef.current;
       if (!app) return;
-      void app.#recordPromptCreated(input).catch((error: unknown) =>
-        logger.error({ error, projectId: input.projectId }, "prompt_created was not recorded"),
-      );
+      void send(app).catch((error: unknown) => logger.error({ error, ...ids }, message));
     };
+    const afterPromptCreated: PromptInfrastructure["afterPromptCreated"] = (input) =>
+      fireAndLog(
+        (app) => app.#recordPromptCreated(input),
+        { projectId: input.projectId },
+        "prompt_created was not recorded",
+      );
+    const afterPromptVersionSaved: PromptInfrastructure["afterPromptVersionSaved"] = (input) =>
+      fireAndLog(
+        (app) => app.#recordVersionSaved(input),
+        {
+          tenantId: input.projectId,
+          projectId: input.projectId,
+          promptId: input.promptId,
+          versionId: input.versionId,
+        },
+        "prompt version_saved was not recorded",
+      );
+    const afterPromptDeleted: PromptInfrastructure["afterPromptDeleted"] = (input) =>
+      fireAndLog(
+        (app) => app.#recordDeleted(input),
+        { tenantId: input.projectId, projectId: input.projectId, promptId: input.promptId },
+        "prompt deleted was not recorded",
+      );
     const app = new PromptModule({
       prompts,
       projects: dependencies.projects,
@@ -179,8 +212,12 @@ export class PromptModule implements PromptApi {
           rateLimits: setup.repositories.rateLimits,
         }),
       }),
-      members: { prompts, afterPromptCreated },
-      library: PromptLibraryService.create({ prompts, afterPromptCreated }),
+      members: { prompts, afterPromptCreated, afterPromptVersionSaved, afterPromptDeleted },
+      library: PromptLibraryService.create({
+        prompts,
+        afterPromptCreated,
+        afterPromptVersionSaved,
+      }),
       tagCatalogue: PromptTagCatalogueService.create({ prompts }),
       publicBaseUrl: config.publicBaseUrl,
       lifecycle,
@@ -200,10 +237,16 @@ export class PromptModule implements PromptApi {
       projects: input.projects,
       permissions: null,
       execution: null,
-      members: { prompts: input.prompts, afterPromptCreated: () => undefined },
+      members: {
+        prompts: input.prompts,
+        afterPromptCreated: () => undefined,
+        afterPromptVersionSaved: () => undefined,
+        afterPromptDeleted: () => undefined,
+      },
       library: PromptLibraryService.create({
         prompts: input.prompts,
         afterPromptCreated: () => undefined,
+        afterPromptVersionSaved: () => undefined,
       }),
       tagCatalogue: PromptTagCatalogueService.create({ prompts: input.prompts }),
       publicBaseUrl: undefined,
@@ -280,10 +323,7 @@ export class PromptModule implements PromptApi {
     const orgPromptCount = await this.#dependencies.prompts.countOrganizationVersionedPrompts({
       organizationId,
     });
-    if (!this.#lifecycleCommands) {
-      throw new Error("prompt_lifecycle pipeline senders are not connected yet");
-    }
-    await this.#lifecycleCommands.recordPromptCreated.send({
+    await this.#connectedLifecycle().recordPromptCreated.send({
       tenantId: input.projectId,
       occurredAt: nowInstant().epochMilliseconds,
       promptId: input.promptId,
@@ -291,6 +331,44 @@ export class PromptModule implements PromptApi {
       userId,
       orgPromptCount,
     });
+  }
+
+  async #recordVersionSaved(input: PromptVersionSavedInput): Promise<void> {
+    await this.#connectedLifecycle().recordPromptVersionSaved.send({
+      tenantId: input.projectId,
+      occurredAt: nowInstant().epochMilliseconds,
+      promptId: input.promptId,
+      projectId: input.projectId,
+      versionId: input.versionId,
+      ...(input.authorId ? { authorId: input.authorId } : {}),
+    });
+  }
+
+  async #recordDeleted(input: { projectId: string; promptId: string }): Promise<void> {
+    await this.#connectedLifecycle().recordPromptDeleted.send({
+      tenantId: input.projectId,
+      occurredAt: nowInstant().epochMilliseconds,
+      promptId: input.promptId,
+      projectId: input.projectId,
+    });
+  }
+
+  #connectedLifecycle(): EventingCommands<PromptLifecyclePipeline> {
+    if (!this.#lifecycleCommands) {
+      throw new Error("prompt_lifecycle pipeline senders are not connected yet");
+    }
+    return this.#lifecycleCommands;
+  }
+
+  /** Announces a version written after the prompt's first, once the write returned. */
+  #announceVersionSaved(projectId: string, saved: VersionedPrompt): VersionedPrompt {
+    this.#dependencies.members.afterPromptVersionSaved({
+      projectId,
+      promptId: saved.id,
+      versionId: saved.versionId,
+      authorId: saved.authorId,
+    });
+    return saved;
   }
 
   executePlayground(
@@ -446,16 +524,17 @@ export class PromptModule implements PromptApi {
   }
 
   /** Writes a new version of a prompt, attributed to its caller. */
-  update(
+  async update(
     input: Omit<UpdatePromptCommand, "data"> & {
       data: Omit<UpdatePromptCommand["data"], "authorId">;
     },
     by: PromptCaller,
   ): Promise<VersionedPrompt> {
-    return this.#dependencies.prompts.updatePrompt({
+    const saved = await this.#dependencies.prompts.updatePrompt({
       ...input,
       data: { ...input.data, authorId: by.id },
     });
+    return this.#announceVersionSaved(input.projectId, saved);
   }
 
   /**
@@ -466,20 +545,25 @@ export class PromptModule implements PromptApi {
   }
 
   /** Makes a stored version current again, attributed to its caller. */
-  restoreVersion(
+  async restoreVersion(
     input: { versionId: string; projectId: string; organizationId?: string },
     by?: PromptCaller,
   ): Promise<VersionedPrompt> {
-    return this.#dependencies.prompts.restoreVersion({ ...input, authorId: by?.id });
+    const saved = await this.#dependencies.prompts.restoreVersion({ ...input, authorId: by?.id });
+    return this.#announceVersionSaved(input.projectId, saved);
   }
 
-  /** Removes a prompt from the project. */
-  delete(input: {
+  /** Removes a prompt from the project; the fact carries the id the delete resolved. */
+  async delete(input: {
     idOrHandle: string;
     projectId: string;
     organizationId?: string;
   }): Promise<PromptDeleteResult> {
-    return this.#dependencies.prompts.deletePrompt(input);
+    const { success, promptId } = await this.#dependencies.prompts.deletePrompt(input);
+    if (success) {
+      this.#dependencies.members.afterPromptDeleted({ projectId: input.projectId, promptId });
+    }
+    return { success };
   }
 
   deletePrompt(input: {
@@ -539,7 +623,7 @@ export class PromptModule implements PromptApi {
   /**
    * Writes the source prompt's content onto one of its copies.
    */
-  applySourceToCopy(
+  async applySourceToCopy(
     input: {
       source: VersionedPrompt;
       targetIdOrHandle: string;
@@ -554,7 +638,7 @@ export class PromptModule implements PromptApi {
       messages: source.messages,
     });
 
-    return this.#dependencies.prompts.updatePrompt({
+    const saved = await this.#dependencies.prompts.updatePrompt({
       idOrHandle: input.targetIdOrHandle,
       projectId: input.targetProjectId,
       data: {
@@ -589,6 +673,7 @@ export class PromptModule implements PromptApi {
         authorId: by.id,
       },
     });
+    return this.#announceVersionSaved(input.targetProjectId, saved);
   }
 
   /** How a sync or a push names itself in the copy's version history. */
