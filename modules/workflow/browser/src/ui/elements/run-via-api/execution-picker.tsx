@@ -1,7 +1,7 @@
 /**
- * Execution picker for an experiment's Run via API dialog: sequential (one cell
- * at a time in row order) or parallel with a concurrency. Drives the concurrency
- * every snippet starts the run with.
+ * Execution picker for an experiment's Run via API dialog: auto (the server's
+ * default), sequential (one cell at a time in row order) or parallel with a
+ * concurrency. Drives the concurrency every snippet starts the run with.
  */
 import { HStack, Input, Text } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
@@ -13,6 +13,7 @@ import {
 } from "../../../model/run-via-api/run-execution.ts";
 
 const ITEMS: { value: RunExecution["mode"]; label: string }[] = [
+  { value: "auto", label: "Auto" },
   { value: "sequential", label: "Sequential" },
   { value: "parallel", label: "Parallel" },
 ];

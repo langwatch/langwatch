@@ -77,9 +77,16 @@ within an experiment, and a run without one is keyed by its runId anyway (D3).
 
 ## 5. Concurrency: the manager is the window (D1, ruled (b))
 
-`concurrency = request.concurrency ?? config.runConcurrency ?? 10`. `runConcurrency` is a new leaf on
-`experimentConfig` reading `EVAL_V3_CONCURRENCY`, restoring main's knob (the branch hard-codes 10). It
-is fixed at start and recorded in `started`. The manager sends the first `concurrency` cell intents on
+`concurrency = request.concurrency ?? default`. Without `EVAL_V3_PROJECT_CELL_BUDGET` the default is
+`config.runConcurrency` (`EVAL_V3_CONCURRENCY`, 10 when unset). With it, `ExperimentRunConcurrencyService`
+splits the budget between the runs active in the project, this one included, and the same for the
+optional `EVAL_V3_GLOBAL_CELL_BUDGET` across projects: `clamp(min(floor(project / (projectActive + 1)),
+floor(global / (globalActive + 1))), 1, 24)`. Active runs live in `ExperimentRunActivityRepository`
+(Redis sorted sets `eval_v3_active_runs:project:<id>` and `eval_v3_active_runs:global`, scored by
+expiry): the `experimentRunActivity` subscriber adds a planned run on `started` for a 2 h window and
+removes it on `completed`; expired members are pruned on read. A failed read falls back to
+`runConcurrency`. Scenarios: `experiment-run-dynamic-concurrency.feature`. The value is fixed at start
+and recorded in `started`. The manager sends the first `concurrency` cell intents on
 `started`, then the next unsent ordinal on each `cell_finished`, so at most `concurrency` cells of one
 run are in flight; phase 2 opens only once phase 1 has drained. Each cell is its own
 queue group (`__routing.groupKey = <run key>:cell:<ordinal>:<phase>`, `dedupId =

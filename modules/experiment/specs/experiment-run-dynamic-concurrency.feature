@@ -1,0 +1,103 @@
+Feature: An experiment run's default concurrency shares a cell budget between active runs
+
+  A run takes its concurrency from the run API request or the workbench setting.
+  When neither names one, the server picks a default. With EVAL_V3_PROJECT_CELL_BUDGET
+  set, that default is the project's cell budget split between the runs active in
+  the project, the new run included, and capped by the same split of
+  EVAL_V3_GLOBAL_CELL_BUDGET across every project when that is set. The result is
+  never below 1 or above 24. It is computed once when the run starts and does not
+  change while the run is in flight. Without EVAL_V3_PROJECT_CELL_BUDGET, or when the
+  active runs cannot be read, the default is EVAL_V3_CONCURRENCY.
+
+  @unit
+  Scenario: An idle project gets the full project budget, capped at 24
+    Given a project cell budget of 40 and no other run active
+    When the run's default concurrency is computed
+    Then the run gets concurrency 24
+
+  @unit
+  Scenario: A second active run in the project halves the default
+    Given a project cell budget of 20 and one other run active in the project
+    When the run's default concurrency is computed
+    Then the run gets concurrency 10
+
+  @unit
+  Scenario: The default concurrency is never below 1
+    Given a project cell budget of 4 and nine other runs active in the project
+    When the run's default concurrency is computed
+    Then the run gets concurrency 1
+
+  @unit
+  Scenario: The global budget limits the default when it is tighter
+    Given a project cell budget of 20 with no other run in the project
+    And a global cell budget of 30 with two other runs active across projects
+    When the run's default concurrency is computed
+    Then the run gets concurrency 10
+
+  @integration
+  Scenario: A concurrency named by the request wins over the dynamic default
+    Given a project cell budget of 20 and no other run active
+    When a run is started with concurrency 3
+    Then the run gets concurrency 3
+
+  @integration
+  Scenario: Dynamic mode off keeps the fixed default
+    Given no project cell budget and EVAL_V3_CONCURRENCY of 7
+    And two other runs active in the project
+    When a run is started without a concurrency
+    Then the run gets concurrency 7
+
+  @integration
+  Scenario: A failed read of the active runs falls back to EVAL_V3_CONCURRENCY
+    Given a project cell budget of 20 and EVAL_V3_CONCURRENCY of 7
+    And the active runs cannot be read
+    When a run is started without a concurrency
+    Then the run gets concurrency 7
+    And a warning is logged
+
+  @integration
+  Scenario: An expired activity entry stops counting
+    Given a project cell budget of 20
+    And a run that started longer ago than the activity window and never completed
+    When a run is started without a concurrency
+    Then the run gets concurrency 20
+
+  @integration
+  Scenario: A completed run stops counting
+    Given a project cell budget of 20 and a run that started and then completed
+    When a run is started without a concurrency
+    Then the run gets concurrency 20
+
+  @integration
+  Scenario: The active runs are shared through the deployment's Redis
+    Given two replicas over one Redis
+    When one replica records a run as active
+    Then the other counts it in the project and across projects
+
+  @integration
+  Scenario: The concurrency the default chose is recorded and returned by the run poll
+    Given a project cell budget of 16 and one other run active in the project
+    When a run is started through the API without a concurrency
+    Then the run is planned with concurrency 8
+    And the start answer and the run poll both carry concurrency 8
+
+  @integration
+  Scenario: A workbench run on Auto names no concurrency, so the dynamic default applies
+    Given a new experiment in the workbench, whose concurrency shows "Auto"
+    When I run it
+    Then the run request names no concurrency
+    And the experiment saves no concurrency
+
+  @integration
+  Scenario: A workbench run with a picked concurrency sends it
+    Given an experiment in the workbench
+    When I pick a concurrency of 4 in the run options and run it
+    Then the run request names concurrency 4
+    And the experiment saves concurrency 4
+
+  @integration
+  Scenario: Auto can be picked again after choosing a concurrency
+    Given an experiment in the workbench with a concurrency of 4
+    When I pick "Auto" in the run options
+    Then the concurrency shows "Auto"
+    And the run request names no concurrency

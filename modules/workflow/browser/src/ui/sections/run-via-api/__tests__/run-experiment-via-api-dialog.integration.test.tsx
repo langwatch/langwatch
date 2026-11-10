@@ -122,6 +122,19 @@ describe("RunExperimentViaApiDialog (evaluations-v3)", () => {
     });
   });
 
+  describe("given an experiment saved without a concurrency", () => {
+    /** @scenario An experiment with no saved concurrency starts on Auto and its snippets name none */
+    it("starts on Auto and leaves the concurrency out of the snippet", async () => {
+      renderDialog();
+
+      await screen.findByRole("dialog");
+      await click("CLI");
+
+      expect(dialogText()).not.toContain("--concurrency");
+      expect(screen.queryByLabelText("Concurrency")).toBeNull();
+    });
+  });
+
   describe("given an experiment saved with a concurrency of 6", () => {
     /** @scenario The execution choice sets the concurrency the snippets start the run with */
     it("starts parallel at 6, then follows the sequential and parallel choices", async () => {

@@ -43,6 +43,7 @@ import { ExperimentResultDispatchService } from "../../../services/experiment-re
 import { ExperimentRunDatasetVersionService } from "../../../services/experiment-run-dataset-version.service.ts";
 import type { ExperimentService } from "../../../services/experiment.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "../../run/services/experiment-run-command-dispatcher.service.ts";
+import type { ExperimentRunConcurrencyService } from "../../run/services/experiment-run-concurrency.service.ts";
 import { ExperimentRunPlanService } from "../../run/services/experiment-run-plan.service.ts";
 import type { ExperimentRunErrorReporting } from "../../run/services/experiment-run-results-writer.service.ts";
 
@@ -63,8 +64,7 @@ type WorkflowEvaluationDependencies = {
   workflowSource: ExperimentWorkflowDsl;
   /** The datasets, prompts, agents and evaluators the load reads through. */
   services: ExecutionDataServices;
-  /** Cells in flight at once for a run (`EVAL_V3_CONCURRENCY`). */
-  concurrency: number;
+  concurrency: Pick<ExperimentRunConcurrencyService, "resolve">;
   /** The run's progress fold: a start answers once it holds the run, and a redelivery reads it. */
   folds: ExperimentRunFoldRepository;
   /** What this process refuses of a run, for want of Redis or a public address. */
@@ -200,7 +200,7 @@ export class WorkflowEvaluationService {
           : { type: "full" },
       },
       data: dataResult,
-      concurrency: this.dependencies.concurrency,
+      concurrency: await this.dependencies.concurrency.resolve({ projectId: request.tenantId }),
       origin: "workflow",
       persistResults: false,
       experimentSlug: request.experimentSlug,

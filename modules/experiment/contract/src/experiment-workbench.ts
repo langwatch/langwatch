@@ -483,8 +483,8 @@ export type UIState = {
   hiddenColumns: Set<string>;
   // Autosave status for evaluation state and dataset records
   autosaveStatus: AutosaveStatus;
-  // Concurrency limit for parallel execution (default 10)
-  concurrency: number;
+  // Cells a run executes at once; unset (Auto) leaves the choice to the server default
+  concurrency?: number | undefined;
   // Whether an evaluation has been run this session (enables History button)
   hasRunThisSession: boolean;
 };
@@ -685,7 +685,8 @@ export type EvaluationsV3Actions = {
   setColumnWidth: (columnId: string, width: number) => void;
   setColumnWidths: (widths: Record<string, number>) => void;
   setRowHeightMode: (mode: RowHeightMode) => void;
-  setConcurrency: (concurrency: number) => void;
+  /** Undefined clears the choice back to Auto, the server default. */
+  setConcurrency: (concurrency: number | undefined) => void;
   toggleCellExpanded: (row: number, columnId: string) => void;
   toggleColumnVisibility: (columnName: string) => void;
   setHiddenColumns: (columnNames: Set<string>) => void;
@@ -839,7 +840,6 @@ export const createInitialUIState = (): UIState => ({
     evaluation: "idle",
     dataset: "idle",
   },
-  concurrency: DEFAULT_CONCURRENCY,
   hasRunThisSession: false,
 });
 

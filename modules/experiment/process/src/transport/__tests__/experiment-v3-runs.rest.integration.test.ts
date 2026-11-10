@@ -24,10 +24,12 @@ import { ExperimentModule, type ExperimentAppDependencies } from "../../app/expe
 import type { ExperimentRunProcessingPipeline } from "../../eventing/experiment-run-processing.pipeline.ts";
 import { experimentProcessModule } from "../../experiment.module.ts";
 import { ExperimentRunCommandDispatcherService } from "../../features/run/services/experiment-run-command-dispatcher.service.ts";
+import { ExperimentRunConcurrencyService } from "../../features/run/services/experiment-run-concurrency.service.ts";
 import type { WorkflowEvaluationService } from "../../features/workflow/services/experiment-workflow-evaluation.service.ts";
 import type { ExperimentIdLookupRepository } from "../../repositories/experiment-id-lookup.repository.ts";
 import type { ExperimentRunStreamMessage } from "../../repositories/experiment-run-event-stream.repository.ts";
 import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";
+import { MemoryExperimentRunActivityRepository } from "../../repositories/memory/memory.experiment-run-activity.repository.ts";
 import { MemoryExperimentRunEventStreamRepository } from "../../repositories/memory/memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
 import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment.repositories.ts";
@@ -111,6 +113,8 @@ type Harness = {
   registers?: boolean;
   /** Runs the progress fold already holds. */
   folded?: ExperimentRunProgressState[];
+  /** What a run starts with when it names no concurrency; the fixed default of 10 unless given. */
+  concurrency?: ExperimentRunConcurrencyService;
 };
 
 const processServices: ExecutionDataServices = {
@@ -128,7 +132,8 @@ function runPipeline({
   redis,
   ownership,
   registers,
-}: Required<Pick<Harness, "worker" | "redis" | "ownership" | "registers">>) {
+  concurrency,
+}: Required<Pick<Harness, "worker" | "redis" | "ownership" | "registers" | "concurrency">>) {
   const folds = MemoryExperimentRunFoldRepository.create();
   // The worker folding a run's start, or its refusal, onto the key a poll reads.
   const register = async (run: { tenantId: string; runId: string; experimentId: string }) => {
@@ -176,7 +181,7 @@ function runPipeline({
       publicBaseUrl: "https://app.test",
       services: processServices,
       ownership,
-      concurrency: 10,
+      concurrency,
       refusals: redis
         ? {}
         : runRefusalsOf({
@@ -195,8 +200,12 @@ async function harness({
   worker = () => [],
   registers = true,
   folded: held = [],
+  concurrency = ExperimentRunConcurrencyService.create({
+    activity: MemoryExperimentRunActivityRepository.create(),
+    config: { runConcurrency: 10 },
+  }),
 }: Harness = {}) {
-  const pipeline = runPipeline({ worker, redis, ownership, registers });
+  const pipeline = runPipeline({ worker, redis, ownership, registers, concurrency });
   for (const state of held) await pipeline.folds.writeProgress({ state });
   const experimentService = createApiFixture<ExperimentService>(experiments, "ExperimentService");
   const dependencies: ExperimentAppDependencies = {
@@ -527,6 +536,36 @@ describe("POST /api/experiments/:slug/run", () => {
 
       expect(response.status).toBe(200);
       expect(starts).toMatchObject([{ plan: { concurrency: 10 } }]);
+    });
+  });
+
+  describe("when the body names no concurrency and the project budget is shared", () => {
+    /** @scenario "The concurrency the default chose is recorded and returned by the run poll" */
+    it("plans, answers and polls the run with its share of the budget", async () => {
+      const activity = MemoryExperimentRunActivityRepository.create();
+      const concurrency = ExperimentRunConcurrencyService.create({
+        activity,
+        config: { runConcurrency: 10, projectCellBudget: 16 },
+      });
+      await concurrency.recordStarted({
+        projectId: PROJECT,
+        runId: "other-run",
+        startedAt: Date.now(),
+      });
+      const { request, starts } = await harness({
+        experiments: { ...found(savedState()), isActive: async () => true },
+        redis: true,
+        registers: false,
+        concurrency,
+      });
+
+      const response = await request("/checkout-eval/run", runOf("{}"));
+      const body = await response.json();
+      const poll = await (await request(`/runs/${body.runId}`)).json();
+
+      expect(starts).toMatchObject([{ plan: { concurrency: 8 } }]);
+      expect(body).toMatchObject({ status: "running", concurrency: 8 });
+      expect(poll).toMatchObject({ runId: body.runId, concurrency: 8 });
     });
   });
 
