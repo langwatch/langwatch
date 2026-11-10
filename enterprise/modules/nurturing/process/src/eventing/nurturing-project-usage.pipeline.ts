@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * Nurturing's own per-project usage: a peer fold (§9) over the owners' prompt, evaluator, scenario
- * and trace events, keyed by project. Its subscriber places the project in its organization, sums
- * the organization's projects and sends their traits to Customer.io as one group call.
+ * Nurturing's own per-project usage: peer folds (§9) over the owners' prompt, evaluator, scenario,
+ * simulation-run and trace events, keyed by project. A peer fold re-folds from one owner's event
+ * log, so there is one fold per owner pipeline, each with its own row per project. Each fold's
+ * subscriber places the project in its organization, sums every row of the organization and sends
+ * the traits to Customer.io as one group call.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
 import {
@@ -44,30 +46,35 @@ import {
 } from "../rules/nurturing-project-usage.rules.ts";
 import {
   NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
+  type NurturingProjectUsageOwner,
   type NurturingProjectUsageRepository,
 } from "../repositories/nurturing-project-usage.repository.ts";
 
-/** Hosts nurturing's peer fold over the owners' usage facts; it records no event of its own. */
+/** Hosts nurturing's peer folds over the owners' usage facts; it records no event of its own. */
 export const NURTURING_PROJECT_USAGE_PIPELINE_NAME = "nurturing_project_usage" as const;
 
-/** The fold's name; its global lane is `nurturing_project_usage.projectUsage`. */
-export const NURTURING_PROJECT_USAGE_PROJECTION_NAME = "projectUsage" as const;
-
-/** A burst of a project's facts collapses into one group call per this delay. */
+/** A burst of a project's facts collapses into one group call per owner per this window. */
 const USAGE_SYNC_DELAY_MS = 60_000;
 
-/** Every owner fact the fold takes, each parsed by its owner contract's own schema. */
-export const nurturingProjectUsagePeerEvents = [
-  { type: PROMPT_CREATED_EVENT_TYPE, data: promptCreatedEventDataSchema },
-  { type: PROMPT_DELETED_EVENT_TYPE, data: promptDeletedEventDataSchema },
-  { type: EVALUATOR_CREATED_EVENT_TYPE, data: evaluatorCreatedEventDataSchema },
-  { type: EVALUATOR_DELETED_EVENT_TYPE, data: evaluatorDeletedEventDataSchema },
-  { type: SCENARIO_CREATED_EVENT_TYPE, data: scenarioCreatedEventDataSchema },
-  { type: SIMULATION_RUN_EVENT_TYPES.FINISHED, data: simulationRunFinishedEventDataSchema },
-  { type: TRACE_RECEIVED_EVENT_TYPE, data: traceReceivedEventDataSchema },
-] as const;
+/** Each owner pipeline's facts, each parsed by its owner contract's own schema. */
+export const nurturingProjectUsagePeerEvents = {
+  prompt: [
+    { type: PROMPT_CREATED_EVENT_TYPE, data: promptCreatedEventDataSchema },
+    { type: PROMPT_DELETED_EVENT_TYPE, data: promptDeletedEventDataSchema },
+  ],
+  evaluator: [
+    { type: EVALUATOR_CREATED_EVENT_TYPE, data: evaluatorCreatedEventDataSchema },
+    { type: EVALUATOR_DELETED_EVENT_TYPE, data: evaluatorDeletedEventDataSchema },
+  ],
+  scenario: [{ type: SCENARIO_CREATED_EVENT_TYPE, data: scenarioCreatedEventDataSchema }],
+  simulation: [
+    { type: SIMULATION_RUN_EVENT_TYPES.FINISHED, data: simulationRunFinishedEventDataSchema },
+  ],
+  trace: [{ type: TRACE_RECEIVED_EVENT_TYPE, data: traceReceivedEventDataSchema }],
+} as const satisfies Record<NurturingProjectUsageOwner, readonly unknown[]>;
 
-type ProjectUsagePeerEvent = PeerEvent<typeof nurturingProjectUsagePeerEvents>;
+type AllPeerEvents = (typeof nurturingProjectUsagePeerEvents)[NurturingProjectUsageOwner];
+type ProjectUsagePeerEvent = PeerEvent<AllPeerEvents>;
 
 /** The project a fact is about: its data's project, else its tenant (a project for these owners). */
 export function projectIdOf(event: ProjectUsagePeerEvent): string {
@@ -103,29 +110,57 @@ export function projectUsageFactOf(event: ProjectUsagePeerEvent): NurturingProje
   }
 }
 
-/** The peer fold nurturing hosts on its own pipeline, over its own store, one row per project. */
-export function nurturingProjectUsagePeerFold(
-  store: NurturingProjectUsageRepository,
-): PeerFoldProjectionDeclaration<
+/** One owner's peer fold, over its own store, one row per project; lane `<pipeline>.<owner>Usage`. */
+export function nurturingProjectUsagePeerFold<Owner extends NurturingProjectUsageOwner>({
+  owner,
+  store,
+}: Readonly<{
+  owner: Owner;
+  store: NurturingProjectUsageRepository;
+}>): PeerFoldProjectionDeclaration<
   NurturingProjectUsageState,
-  typeof nurturingProjectUsagePeerEvents
+  (typeof nurturingProjectUsagePeerEvents)[Owner]
 > {
+  const events = nurturingProjectUsagePeerEvents[owner];
   return {
-    events: nurturingProjectUsagePeerEvents,
+    events,
     fold: {
-      name: NURTURING_PROJECT_USAGE_PROJECTION_NAME,
+      name: `${owner}Usage`,
       version: NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
-      eventTypes: nurturingProjectUsagePeerEvents.map(({ type }) => type),
+      eventTypes: events.map(({ type }) => type),
       init: () => emptyProjectUsage(""),
-      apply: (state, event) =>
-        foldProjectUsage(
-          state.projectId === "" ? { ...state, projectId: projectIdOf(event) } : state,
-          projectUsageFactOf(event),
-        ),
-      key: projectIdOf,
-      store,
+      apply: (state, event) => {
+        const parsed = event as ProjectUsagePeerEvent;
+        return foldProjectUsage(
+          state.projectId === "" ? { ...state, projectId: projectIdOf(parsed) } : state,
+          projectUsageFactOf(parsed),
+        );
+      },
+      key: (event) => projectIdOf(event as ProjectUsagePeerEvent),
+      store: store.forOwner(owner),
       LastEventOccurredAtKey: "LastEventOccurredAt",
     },
+  };
+}
+
+/**
+ * Each fold's subscriber: debounced per project, so a burst of one owner's facts sends once. The
+ * framework keeps each subscriber's dedup to its own lane, so facts of several owners in the same
+ * minute send once per owner; each send is the organization's whole sum, so a repeat is harmless.
+ */
+function organizationUsageSubscriber(
+  usageChanged: (state: NurturingProjectUsageState) => Promise<void>,
+): PeerFoldSubscriberSpec<NurturingProjectUsageState> {
+  return {
+    name: "organizationUsage",
+    delay: USAGE_SYNC_DELAY_MS,
+    dedup: {
+      makeId: (event) => `project:${projectIdOf(event as ProjectUsagePeerEvent)}`,
+      ttlMs: USAGE_SYNC_DELAY_MS,
+      extend: true,
+      replace: true,
+    },
+    handler: (_event, { state }) => usageChanged(state),
   };
 }
 
@@ -136,18 +171,20 @@ function nurturingProjectUsageHost({
   store: NurturingProjectUsageRepository;
   usageChanged: (state: NurturingProjectUsageState) => Promise<void>;
 }>) {
-  const subscriber: PeerFoldSubscriberSpec<NurturingProjectUsageState> = {
-    name: "organizationUsage",
-    delay: USAGE_SYNC_DELAY_MS,
-    dedup: "aggregate",
-    handler: (_event, { state }) => usageChanged(state),
-  };
+  const subscribers = [organizationUsageSubscriber(usageChanged)];
   return definePipeline({
     name: NURTURING_PROJECT_USAGE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "nurturing_project_usage_view" }),
   })
     .withEvents([])
-    .withPeerFoldProjection(nurturingProjectUsagePeerFold(store), [subscriber]);
+    .withPeerFoldProjection(nurturingProjectUsagePeerFold({ owner: "prompt", store }), subscribers)
+    .withPeerFoldProjection(nurturingProjectUsagePeerFold({ owner: "evaluator", store }), subscribers)
+    .withPeerFoldProjection(nurturingProjectUsagePeerFold({ owner: "scenario", store }), subscribers)
+    .withPeerFoldProjection(
+      nurturingProjectUsagePeerFold({ owner: "simulation", store }),
+      subscribers,
+    )
+    .withPeerFoldProjection(nurturingProjectUsagePeerFold({ owner: "trace", store }), subscribers);
 }
 
 /** The host pipeline as a TYPE, derived from the builder above. */

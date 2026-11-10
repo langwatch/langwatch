@@ -2424,6 +2424,7 @@ export const prismaModelFieldCatalogue = {
   ],
   "NurturingProjectUsageView": [
     "id",
+    "projectId",
     "organizationId",
     "folded",
     "appliedEventIds",

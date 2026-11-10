@@ -1,7 +1,8 @@
 Feature: Per-email usage reaches Customer.io from nurturing's own project fold
 
-  Nurturing folds the owners' prompt, evaluator, scenario and trace events into one row per
-  project (a peer fold, ARCHITECTURE §9), in its own table. When a project's row changes, it
+  Nurturing folds the owners' prompt, evaluator, scenario, simulation-run and trace events into
+  its own table (peer folds, ARCHITECTURE §9). A peer fold re-folds from one owner's event log, so
+  there are five folds, one per owner pipeline, each keeping its own row per project. When a project's row changes, it
   places the project in its organization through the owners' shares, sums the organization's
   projects and sends their traits to Customer.io as one group call on the admin. It never pulls
   owner state on a schedule. flagged_count and has_habit wait on their definitions.
@@ -40,6 +41,12 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project fold
     Given a project placed in an organization with an admin
     When the project's usage changes
     Then Customer.io receives one group call on the admin with the organization's traits
+
+  @unit
+  Scenario: Each owner's fold keeps its own row, and the organization sums every row
+    Given a project with a row from the prompt fold and a row from the trace fold
+    When the project's usage changes
+    Then the group call's traits sum both rows
 
   @unit
   Scenario: A project placed in no organization sends nothing

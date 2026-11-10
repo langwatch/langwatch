@@ -38,9 +38,10 @@ The rule is now:
 > nurturing may subscribe to and project owner events and read placement through
 > shares; it never pulls owner state on a schedule
 
-So the per-email usage is a peer fold in nurturing over the owners' prompt,
-evaluator, scenario and trace events (`nurturing-project-usage.pipeline.ts`),
-kept in nurturing's own `NurturingProjectUsageView` table. Its subscriber places
+So the per-email usage is five peer folds in nurturing, one per owner pipeline
+(prompt, evaluator, scenario, simulation, trace; a peer fold re-folds from one
+owner's log), in `nurturing-project-usage.pipeline.ts`, kept in nurturing's own
+`NurturingProjectUsageView` table, one row per owner and project. Each fold's subscriber places
 the project through shares and sends the organization's sum. The daily pull from
 the owners' Apis (#9382 before this change) is the thing still refused: "We're
 event driven so we don't do that."

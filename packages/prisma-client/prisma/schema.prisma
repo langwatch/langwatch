@@ -5116,10 +5116,12 @@ model NurturingOrganization {
 }
 
 /// Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario
-/// and trace events (ARCHITECTURE §9), summed per organization for the per-email traits.
+/// and trace events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per organization
+/// for the per-email traits.
 model NurturingProjectUsageView {
-  /// The aggregate: the project id.
+  /// `<owner>:<project id>`: one row per owner pipeline's peer fold and project.
   id                String   @id
+  projectId         String
   /// The organization placement answered; null until the subscriber placed the project.
   organizationId    String?
   /// The project's usage as the fold folded it (NurturingProjectUsageState).
@@ -5131,6 +5133,7 @@ model NurturingProjectUsageView {
   /// Event-derived, so a replayed row equals the row it rebuilds.
   updatedAt         DateTime
 
+  @@index([projectId])
   @@index([organizationId])
 }
 

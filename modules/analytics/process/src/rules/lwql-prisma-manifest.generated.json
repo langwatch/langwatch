@@ -20807,7 +20807,7 @@
     {
       "name": "NurturingProjectUsageView",
       "tableName": "NurturingProjectUsageView",
-      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand trace events (ARCHITECTURE §9), summed per organization for the per-email traits.",
+      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand trace events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per organization\nfor the per-email traits.",
       "primaryKey": [
         "id"
       ],
@@ -20819,7 +20819,16 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": "The aggregate: the project id."
+          "documentation": "`<owner>:<project id>`: one row per owner pipeline's peer fold and project."
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
         },
         {
           "name": "organizationId",

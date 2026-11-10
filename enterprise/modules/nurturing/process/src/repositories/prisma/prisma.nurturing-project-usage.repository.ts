@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { FoldStateRead, ProjectionStoreContext } from "@langwatch/eventing";
+import type {
+  FoldProjectionStore,
+  FoldStateRead,
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -9,15 +13,17 @@ import {
 } from "../../rules/nurturing-project-usage.rules.ts";
 import {
   NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
+  type NurturingProjectUsageOwner,
   type NurturingProjectUsageRepository,
+  projectUsageRowId,
 } from "../nurturing-project-usage.repository.ts";
 
 type NurturingProjectUsageDatabase = Pick<PrismaClient, "nurturingProjectUsageView">;
 
 /**
- * The peer fold's Postgres rows (`NurturingProjectUsageView`): one per project, the folded usage as
- * JSON beside the organization placement answered. A row of another projection version reads as
- * undecodable, so the executor re-folds it from the owners' event logs.
+ * The peer folds' Postgres rows (`NurturingProjectUsageView`): one per owner and project, the
+ * folded usage as JSON beside the project and the organization placement answered. A row of
+ * another projection version reads as undecodable, so the executor re-folds it from the owner's log.
  */
 export class PrismaNurturingProjectUsageRepository
   extends PrismaRepository.for("NurturingProjectUsageView")
@@ -36,44 +42,52 @@ export class PrismaNurturingProjectUsageRepository
     this.#database = prisma;
   }
 
-  async get(aggregateId: string): Promise<FoldStateRead<NurturingProjectUsageState>> {
-    const { state } = await this.getWithApplied(aggregateId);
-    return state ? { kind: "folded", state } : { kind: "empty" };
-  }
-
-  async getWithApplied(aggregateId: string): Promise<{
-    state: NurturingProjectUsageState | null;
-    appliedEventIds: string[];
-    miss?: "absent" | "undecodable";
-  }> {
-    const row = await this.#database.nurturingProjectUsageView.findUnique({
-      where: { id: aggregateId },
-    });
-    if (!row) return { state: null, appliedEventIds: [], miss: "absent" };
-    if (row.projectionVersion !== NURTURING_PROJECT_USAGE_PROJECTION_VERSION) {
-      return { state: null, appliedEventIds: [], miss: "undecodable" };
-    }
+  forOwner(owner: NurturingProjectUsageOwner): FoldProjectionStore<NurturingProjectUsageState> {
+    const database = this.#database;
+    const getWithApplied = async (
+      key: string,
+    ): Promise<{
+      state: NurturingProjectUsageState | null;
+      appliedEventIds: string[];
+      miss?: "absent" | "undecodable";
+    }> => {
+      const row = await database.nurturingProjectUsageView.findUnique({
+        where: { id: projectUsageRowId(owner, key) },
+      });
+      if (!row) return { state: null, appliedEventIds: [], miss: "absent" };
+      if (row.projectionVersion !== NURTURING_PROJECT_USAGE_PROJECTION_VERSION) {
+        return { state: null, appliedEventIds: [], miss: "undecodable" };
+      }
+      return {
+        state: nurturingProjectUsageStateSchema.parse(row.folded),
+        appliedEventIds: row.appliedEventIds,
+      };
+    };
     return {
-      state: nurturingProjectUsageStateSchema.parse(row.folded),
-      appliedEventIds: row.appliedEventIds,
+      getWithApplied,
+      async get(key: string): Promise<FoldStateRead<NurturingProjectUsageState>> {
+        const { state } = await getWithApplied(key);
+        return state ? { kind: "folded", state } : { kind: "empty" };
+      },
+      /** Writes the folded columns only: the placement is the subscriber's, never the fold's. */
+      async store(state: NurturingProjectUsageState, context: ProjectionStoreContext) {
+        const projectId = context.key ?? context.aggregateId;
+        const id = projectUsageRowId(owner, projectId);
+        const columns = {
+          projectId,
+          folded: state,
+          appliedEventIds: [...(context.appliedEventIds ?? [])],
+          projectionVersion: NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
+          // Business time from the facts, so a replayed row equals the row it rebuilds.
+          updatedAt: new Date(state.LastEventOccurredAt),
+        };
+        await database.nurturingProjectUsageView.upsert({
+          where: { id },
+          create: { id, ...columns },
+          update: columns,
+        });
+      },
     };
-  }
-
-  /** Writes the folded columns only: the placement is the subscriber's, never the fold's. */
-  async store(state: NurturingProjectUsageState, context: ProjectionStoreContext): Promise<void> {
-    const id = context.aggregateId;
-    const columns = {
-      folded: state,
-      appliedEventIds: [...(context.appliedEventIds ?? [])],
-      projectionVersion: NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
-      // Business time from the facts, so a replayed row equals the row it rebuilds.
-      updatedAt: new Date(state.LastEventOccurredAt),
-    };
-    await this.#database.nurturingProjectUsageView.upsert({
-      where: { id },
-      create: { id, ...columns },
-      update: columns,
-    });
   }
 
   async placeProject({
@@ -81,7 +95,7 @@ export class PrismaNurturingProjectUsageRepository
     organizationId,
   }: Readonly<{ projectId: string; organizationId: string }>): Promise<void> {
     await this.#database.nurturingProjectUsageView.updateMany({
-      where: { id: projectId },
+      where: { projectId },
       data: { organizationId },
     });
   }

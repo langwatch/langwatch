@@ -1946,6 +1946,7 @@ export interface LwqlPrismaRows {
   };
   readonly NurturingProjectUsageView: {
     readonly id: "String";
+    readonly projectId: "String";
     readonly organizationId: "String?";
     readonly folded: "Json";
     readonly appliedEventIds: "String[]";
