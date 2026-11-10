@@ -1,7 +1,7 @@
 /**
  * The LangWatchQL executor over a real ClickHouse endpoint.
  */
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { type ClickHouseClient, ClickHouseLogLevel, createClient } from "@clickhouse/client";
 import {
   LangWatchQLAppFunctionUnavailableError,
   LangWatchQLBusyError,
@@ -55,16 +55,21 @@ const LWQL_REQUEST_TIMEOUT_MS = (DEFAULT_LWQL_RESOURCE_LIMITS.maxExecutionTimeSe
 const LWQL_MAX_OPEN_CONNECTIONS = 10;
 
 /**
- * The driver's error with the capability taken out of its message and stack, so no refusal's
- * reasons, and no log of them, hold a hash: ClickHouse quotes the failing statement back.
+ * A copy of the driver's error with the capability taken out of its message, stack and text
+ * fields, keeping its code, type, status and cause: ClickHouse quotes the failing statement back,
+ * so no refusal's reasons, and no log of them, may hold the original. The driver's is untouched.
  */
 function withoutCapability({ error, capability }: { error: unknown; capability: string }): unknown {
   if (!(error instanceof Error) || capability === "") return error;
-  error.message = withoutTenantCapability({ text: error.message, capability });
-  if (error.stack !== undefined) {
-    error.stack = withoutTenantCapability({ text: error.stack, capability });
-  }
-  return error;
+  const scrub = (text: string) => withoutTenantCapability({ text, capability });
+  const scrubbed = new Error(scrub(error.message), { cause: error.cause });
+  scrubbed.name = error.name;
+  if (error.stack !== undefined) scrubbed.stack = scrub(error.stack);
+  const fields = Object.entries(error).map(([key, value]) => [
+    key,
+    typeof value === "string" ? scrub(value) : value,
+  ]);
+  return Object.assign(scrubbed, Object.fromEntries(fields));
 }
 
 /** ClickHouse reports elapsed time in seconds; the response speaks milliseconds. */
@@ -156,6 +161,9 @@ export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutor
         database: connection.database,
         request_timeout: LWQL_REQUEST_TIMEOUT_MS,
         max_open_connections: LWQL_MAX_OPEN_CONNECTIONS,
+        // The driver's own logger prints a failed statement's server text, capability included;
+        // a refusal reaches the app only through the scrubbed error.
+        log: { level: ClickHouseLogLevel.OFF },
       }),
     );
   }

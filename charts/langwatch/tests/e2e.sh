@@ -1229,6 +1229,12 @@ lwql_post() {
     -H 'Content-Type: application/json' -H "X-Auth-Token: $key" -d "$body"
 }
 
+# lwql_project_key <pg-pod> <project-id>: the legacy key a live project holds, or nothing.
+lwql_project_key() {
+  printf 'SELECT "apiKey" FROM "Project" WHERE id = %s AND "archivedAt" IS NULL;\n' "'$2'" |
+    kc exec -i "$1" -- sh -c 'PGPASSWORD=e2etest psql -U postgres -d langwatch -tA -q'
+}
+
 # lwql_trace_count <app-pod> <key>: the key's own LangWatchQL count of traces, or "none".
 lwql_trace_count() {
   local reply n
@@ -1259,10 +1265,11 @@ test_lwql_tenant_isolation() {
   app_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-app")
   pg_pod=$(ready_pod "app.kubernetes.io/component=postgresql")
   ch_pod=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||' | head -1)
-  # Generated per run, so no key is ever written into the repository.
+  # Generated per run in the legacy project-key shape (`sk-lw-`, no `_`), so no key is ever
+  # written into the repository.
   local key_a key_b
-  key_a="e2e-lwql-isolation-key-a$(openssl rand -hex 12)"
-  key_b="e2e-lwql-isolation-key-b$(openssl rand -hex 12)"
+  key_a="sk-lw-e2elwqla$(openssl rand -hex 16)"
+  key_b="sk-lw-e2elwqlb$(openssl rand -hex 16)"
 
   info "Seeding organisation A (the static seed)..."
   kc exec "$app_pod" -- \
@@ -1289,6 +1296,17 @@ INSERT INTO "Project" SELECT * FROM e2e_project ON CONFLICT DO NOTHING;
 COMMIT;
 SQL
   pass "Organisation B created with project ${LWQL_E2E_PROJECT_B}"
+
+  # Send with the keys the projects hold: a seed that kept another key must not read as a
+  # collector fault, and an archived or missing project fails here, by name.
+  local held_a held_b
+  held_a=$(lwql_project_key "$pg_pod" "$LWQL_E2E_PROJECT_A")
+  held_b=$(lwql_project_key "$pg_pod" "$LWQL_E2E_PROJECT_B")
+  [[ -n "$held_a" ]] || fail "Project ${LWQL_E2E_PROJECT_A} has no live key"
+  [[ -n "$held_b" ]] || fail "Project ${LWQL_E2E_PROJECT_B} has no live key"
+  [[ "$held_a" == "$key_a" ]] || warn "The seed kept another key on ${LWQL_E2E_PROJECT_A}; using it"
+  [[ "$held_b" == "$key_b" ]] || warn "Organisation B's copy holds another key; using it"
+  key_a="$held_a"; key_b="$held_b"
 
   send_e2e_traces "$app_pod" "$key_a" "e2e-lwql-a" 2
   send_e2e_traces "$app_pod" "$key_b" "e2e-lwql-b" 3

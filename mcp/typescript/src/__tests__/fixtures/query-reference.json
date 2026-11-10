@@ -758,7 +758,7 @@
             },
             {
               "name": "SpanAttributes",
-              "type": "Map(String, String)",
+              "type": "Map(LowCardinality(String), String)",
               "description": "Span attributes, with every captured-content key removed. Content is reachable only through CapturedInput and CapturedOutput.",
               "unit": null,
               "gates": [],
@@ -766,7 +766,7 @@
             },
             {
               "name": "ResourceAttributes",
-              "type": "Map(String, String)",
+              "type": "Map(LowCardinality(String), String)",
               "description": "Resource attributes, with every captured-content key removed.",
               "unit": null,
               "gates": [],
@@ -2190,7 +2190,7 @@
             },
             {
               "name": "ToolCounts",
-              "type": "Map(String, UInt32)",
+              "type": "Map(LowCardinality(String), UInt32)",
               "description": "Calls per tool.",
               "unit": null,
               "gates": [],
@@ -2198,7 +2198,7 @@
             },
             {
               "name": "ToolDurationMs",
-              "type": "Map(String, UInt64)",
+              "type": "Map(LowCardinality(String), UInt64)",
               "description": "Milliseconds spent per tool.",
               "unit": "ms",
               "gates": [],
@@ -2396,7 +2396,7 @@
             },
             {
               "name": "CompactionTriggers",
-              "type": "Map(String, UInt32)",
+              "type": "Map(LowCardinality(String), UInt32)",
               "description": "Compactions by trigger kind.",
               "unit": null,
               "gates": [],
@@ -2452,7 +2452,7 @@
             },
             {
               "name": "ErrorTypes",
-              "type": "Map(String, UInt32)",
+              "type": "Map(LowCardinality(String), UInt32)",
               "description": "Failures by error class.",
               "unit": null,
               "gates": [],
@@ -5956,7 +5956,7 @@
             },
             {
               "name": "Attributes",
-              "type": "Map(String, String)",
+              "type": "Map(LowCardinality(String), String)",
               "description": "Attributes",
               "unit": null,
               "gates": [],
@@ -5964,7 +5964,7 @@
             },
             {
               "name": "ResourceAttributes",
-              "type": "Map(String, String)",
+              "type": "Map(LowCardinality(String), String)",
               "description": "ResourceAttributes",
               "unit": null,
               "gates": [],
@@ -6108,7 +6108,7 @@
             },
             {
               "name": "Attributes",
-              "type": "Map(String, String)",
+              "type": "Map(LowCardinality(String), String)",
               "description": "Attributes",
               "unit": null,
               "gates": [],
@@ -6116,7 +6116,7 @@
             },
             {
               "name": "ResourceAttributes",
-              "type": "Map(String, String)",
+              "type": "Map(LowCardinality(String), String)",
               "description": "ResourceAttributes",
               "unit": null,
               "gates": [],
@@ -7767,7 +7767,7 @@
             },
             {
               "name": "Attributes",
-              "type": "Map(String, String)",
+              "type": "Map(LowCardinality(String), String)",
               "description": "Attributes",
               "unit": null,
               "gates": [],

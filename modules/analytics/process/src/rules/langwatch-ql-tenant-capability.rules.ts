@@ -10,9 +10,12 @@ const TENANT_CAPABILITY = /^[0-9a-f,]*$/;
 const PROJECT_ID = /^[A-Za-z0-9_-]+$/;
 const HIDDEN = "[HIDDEN]";
 
-/** The query log's comment for a run: the projects it is scoped to, never the capability. */
+/**
+ * The query log's comment for a run: the projects it is scoped to, never the capability. A run
+ * scoped to no project is valid and reads zero rows, so it is named `lwql:project=`.
+ */
 export function lwqlLogComment({ projectIds }: { projectIds: readonly string[] }): string {
-  if (projectIds.length === 0 || !projectIds.every((id) => PROJECT_ID.test(id))) {
+  if (!projectIds.every((id) => PROJECT_ID.test(id))) {
     throw new Error("A LangWatchQL project id is not safe to name in the query log");
   }
   return `lwql:project=${projectIds.join(",")}`;

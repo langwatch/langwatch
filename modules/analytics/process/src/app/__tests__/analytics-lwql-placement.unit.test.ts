@@ -222,6 +222,7 @@ async function everyDoorFor({ projectId }: { projectId: string }) {
         protections: PROTECTIONS,
         sql: SQL,
         pass: { kind: "probe" },
+        isInstantEvalsEnabled: false,
       }),
     ),
   };

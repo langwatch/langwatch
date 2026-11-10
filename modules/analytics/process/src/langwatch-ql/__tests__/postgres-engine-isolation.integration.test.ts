@@ -27,7 +27,7 @@ import {
   expectZeroRowsWithControl,
   type LangWatchQLClickHouseHarness,
   type LangWatchQLPostgresHarness,
-  LWQL_ISOLATION_CLICKHOUSE_IMAGE,
+  LWQL_CLICKHOUSE_TEST_IMAGE,
   LWQL_TEST_POSTGRES_CONNECTION_LIMIT,
   lwqlTestNamedCollection,
   mapPostgresIntoClickHouse,
@@ -70,7 +70,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     postgres = await startLangWatchQLPostgres();
     harness = await startLangWatchQLClickHouse({
       suite: "pgengine",
-      image: LWQL_ISOLATION_CLICKHOUSE_IMAGE,
+      image: LWQL_CLICKHOUSE_TEST_IMAGE,
     });
     database = harness.names.database;
     await mapPostgresIntoClickHouse({ harness, postgres });

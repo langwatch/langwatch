@@ -1,6 +1,6 @@
 /**
  * Postgres dates read through LangWatchQL as the dates Postgres holds, against a real Postgres
- * and ClickHouse: before langwatch/tasks#958 every one of them read as a date in the year 2299.
+ * and ClickHouse: before langwatch/tasks#958 each read as the latest date ClickHouse holds.
  * @see specs/lwql/postgres-catalog.feature
  * @vitest-environment node
  */
@@ -192,7 +192,8 @@ describe("given every Postgres-backed view mapped into ClickHouse over seeded ro
         tenantA,
         `SELECT toString(CreatedAt) AS value FROM ${database}.projects`,
       );
-      expect(broken, "the old scale did not reproduce the bug").toMatch(/^2299-/);
+      // 26.8 saturates the misread at its latest date; 25.10 read a date in 2299.
+      expect(broken, "the old scale did not reproduce the bug").toBe("9999-12-31 23:59:59.000");
 
       await harness.applyAsAdmin(current);
       await provisionViews([projects]);

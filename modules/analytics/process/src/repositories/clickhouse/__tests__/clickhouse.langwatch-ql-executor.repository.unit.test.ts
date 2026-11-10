@@ -8,14 +8,22 @@
  */
 import { inspect } from "node:util";
 
+import { ClickHouseLogLevel } from "@clickhouse/client";
 import { describe, expect, it, vi } from "vitest";
 
 import { ClickHouseLangWatchQLExecutorRepository } from "../clickhouse.langwatch-ql-executor.repository.ts";
 
-const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
+const { queryMock, clientOptions } = vi.hoisted(() => ({
+  queryMock: vi.fn(),
+  clientOptions: [] as unknown[],
+}));
 
-vi.mock("@clickhouse/client", () => ({
-  createClient: () => ({ query: queryMock, close: async () => undefined }),
+vi.mock("@clickhouse/client", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  createClient: (options: unknown) => {
+    clientOptions.push(options);
+    return { query: queryMock, close: async () => undefined };
+  },
 }));
 
 /** A capability as production derives it: sha256 hex. */
@@ -232,6 +240,21 @@ describe("given a statement and its tenant capability", () => {
     });
   });
 
+  describe("when the run is scoped to no project", () => {
+    /** @scenario "The query log names the tenant without the raw key or its hash" */
+    it("still sends, naming no project in the log comment", async () => {
+      queryMock.mockReset();
+      queryMock.mockResolvedValueOnce({
+        json: async () => ({ data: [], meta: [], statistics: { elapsed: 0 } }),
+      });
+
+      await executor.execute({ sql: "SELECT 1", tenantCapability: "", projectIds: [] });
+
+      const [request] = queryMock.mock.calls[0] as [{ query: string }];
+      expect(request.query).toMatch(/, log_comment = 'lwql:project='$/);
+    });
+  });
+
   describe("when a project id could break out of the log comment", () => {
     /** @scenario "The query log names the tenant without the raw key or its hash" */
     it("refuses to inline it and sends nothing", async () => {
@@ -267,10 +290,12 @@ describe("given a statement and its tenant capability", () => {
 describe("given the server quotes the failing statement back in its error", () => {
   const TENANT_B_CAPABILITY = "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752";
   const joined = `${TENANT_A_CAPABILITY},${TENANT_B_CAPABILITY}`;
+  const cause = new Error("the socket's own reason");
   const quoting = (code: string, type: string) =>
     Object.assign(
       new Error(
         `Code: ${code}. DB::Exception: failed at SETTINGS custom_api_key_hash = '${joined}'. (${type})`,
+        { cause },
       ),
       { code, type },
     );
@@ -282,7 +307,8 @@ describe("given the server quotes the failing statement back in its error", () =
     describe(`when it refuses with ${type}`, () => {
       /** @scenario "The capability never appears in a request URL or a server log" */
       it("throws a refusal whose message, stack and reasons hold no hash", async () => {
-        queryMock.mockRejectedValueOnce(quoting(code, type));
+        const driverError = quoting(code, type);
+        queryMock.mockRejectedValueOnce(driverError);
 
         const thrown = await executor
           .execute({
@@ -301,7 +327,47 @@ describe("given the server quotes the failing statement back in its error", () =
           expect(everything).not.toContain(value);
         }
         expect(everything).toContain("[HIDDEN]");
+        // A copy, not the driver's error rewritten: its code, type and cause carried over.
+        expect(driverError.message).toContain(joined);
+        const [reason] = (thrown as { reasons?: unknown[] }).reasons ?? [];
+        expect(reason).not.toBe(driverError);
+        expect(reason).toMatchObject({ code, type, cause });
       });
     });
   }
+});
+
+describe("given 26.8's refusal whose scope text echoes the appended SETTINGS clause", () => {
+  const echoing = () =>
+    Object.assign(
+      new Error(
+        "Unknown expression identifier `Email` in scope SELECT Email FROM lwql_pgengine.annotations " +
+          `SETTINGS custom_api_key_hash = '${TENANT_A_CAPABILITY}', log_comment = 'lwql:project=project-a'.`,
+      ),
+      { code: "47", type: "UNKNOWN_IDENTIFIER" },
+    );
+
+  describe("when the executor runs the statement", () => {
+    /** @scenario "The capability never appears in a request URL or a server log" */
+    it("hands the driver no logger of its own, and throws a refusal that holds no hash", async () => {
+      expect(clientOptions).toContainEqual(
+        expect.objectContaining({ log: { level: ClickHouseLogLevel.OFF } }),
+      );
+      queryMock.mockRejectedValueOnce(echoing());
+
+      const thrown = await executor
+        .execute({
+          sql: "SELECT Email FROM annotations",
+          projectIds: PROJECT_IDS,
+          tenantCapability: TENANT_A_CAPABILITY,
+        })
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+
+      expect(thrown).not.toBeNull();
+      expect(inspect(thrown, { depth: 8 })).not.toContain(TENANT_A_CAPABILITY);
+    });
+  });
 });

@@ -16,7 +16,7 @@ import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,
   type LangWatchQLClickHouseHarness,
-  LWQL_ISOLATION_CLICKHOUSE_IMAGE,
+  LWQL_CLICKHOUSE_TEST_IMAGE,
   lwqlNamesForSuite,
   recordSeedControl,
   selectRows,
@@ -86,7 +86,7 @@ describe("given LangWatchQL provisioned on a real ClickHouse with two tenants", 
   beforeAll(async () => {
     harness = await startLangWatchQLClickHouse({
       suite: SUITE,
-      image: LWQL_ISOLATION_CLICKHOUSE_IMAGE,
+      image: LWQL_CLICKHOUSE_TEST_IMAGE,
       extraConfigFiles: [
         lwqlQueryMaskingConfigFile({ settings: [lwqlNamesForSuite(SUITE).tenantSetting] }),
         // Off in the stock image; on, so its refusal is the grant's and not a missing table.

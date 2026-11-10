@@ -95,14 +95,12 @@ function sortTopLevel(input: string): string[] {
   return parts.map((part) => part.trim()).filter((part) => part.length > 0);
 }
 
-/** A `Map(...)` column, whatever its key/value types. */
+/**
+ * A `Map(...)` column, whatever its key/value types. A filtered map keeps its source's type:
+ * 26.8's `mapFilter` returns its input's key and value types, LowCardinality included.
+ */
 function isMapType(type: string): boolean {
   return type.startsWith("Map(");
-}
-
-/** The type a filtered map is exposed as. */
-function filteredMapType(type: string): string {
-  return type.replace(/LowCardinality\(String\)/g, "String");
 }
 
 /** How an aggregate-function state column is finalised for reading. */
@@ -227,7 +225,7 @@ function projectColumn({
           `aggregating, so its state cannot be finalised`,
       );
     }
-    const finalized = filteredMapType(state.finalized);
+    const finalized = state.finalized;
     const value = (source: (name: string) => string): string => {
       const combined = `${state.combinator}(${source(sourceColumn)})`;
       // A SimpleAggregateFunction's plain function reports its own state type in
@@ -246,7 +244,7 @@ function projectColumn({
   }
   if (isMapType(type)) {
     return {
-      type: filteredMapType(type),
+      type,
       expression: (source) => contentFilteredMapSql(source(sourceColumn)),
     };
   }

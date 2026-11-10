@@ -10,7 +10,7 @@ import type { Readable } from "node:stream";
 import { clearTimeout, setTimeout } from "node:timers";
 import { fileURLToPath } from "node:url";
 
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { type ClickHouseClient, ClickHouseLogLevel, createClient } from "@clickhouse/client";
 import type { LangWatchQLResourceLimits } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
@@ -284,7 +284,11 @@ function writeConfigFile(directory: string, name: string, contents: string): str
   return path;
 }
 
-/** A statement ending in its own SETTINGS clause probes that clause, and is sent as written. */
+/**
+ * A statement ending in its own SETTINGS clause probes the server's settings constraints, and is
+ * sent as written, without the capability. A test of the tenant setting itself goes through the
+ * executor, which always appends the capability's clause.
+ */
 const OWN_SETTINGS_CLAUSE = /\bSETTINGS\s+[A-Za-z_]\w*\s*=[^()]*$/i;
 
 /**
@@ -316,7 +320,7 @@ function carryCapability({
  * The ClickHouse every LangWatchQL suite runs: the version the LangWatchQL server image builds on
  * (`infra/clickhouse-serverless/Dockerfile`, #9458), not the repo-wide test default (ADR-200).
  */
-export const LWQL_ISOLATION_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:26.8.34.13";
+export const LWQL_CLICKHOUSE_TEST_IMAGE = "clickhouse/clickhouse-server:26.8.34.13";
 
 /**
  * A well-formed capability no key-map row holds. The executor refuses anything but lowercase hex
@@ -332,7 +336,7 @@ export async function startLangWatchQLClickHouse({
   suite,
   facts = "fixture",
   extraConfigFiles = [],
-  image = LWQL_ISOLATION_CLICKHOUSE_IMAGE,
+  image = LWQL_CLICKHOUSE_TEST_IMAGE,
 }: {
   suite: string;
   facts?: LangWatchQLFactTableMode;
@@ -478,6 +482,8 @@ export async function startLangWatchQLClickHouse({
         url: httpUrl,
         username: names.restrictedUser,
         password: RESTRICTED_PASSWORD,
+        // As the executor: the driver never prints a restricted statement's server text.
+        log: { level: ClickHouseLogLevel.OFF },
       });
       if (keyHash !== undefined) {
         carryCapability({
@@ -2321,4 +2327,54 @@ export function expectPostgresError(
   expect(sqlState, `${context}: wrong rejection — "${result.stderr.trim()}"`).toBe(
     expectedSqlState,
   );
+}
+
+/** The values a named collection holds; the stand-in for the config store's file writes these. */
+export interface NamedCollectionFileValues {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password: string;
+}
+
+function namedCollectionFilePath(collection: string): string {
+  return `/etc/clickhouse-server/config.d/zz-${collection}.xml`;
+}
+
+/** The config store's stand-in: one named collection in a config.d file, loaded by a reload. */
+export async function writeNamedCollectionFile({
+  harness,
+  collection,
+  values,
+}: {
+  harness: LangWatchQLClickHouseHarness;
+  collection: string;
+  values: NamedCollectionFileValues;
+}): Promise<void> {
+  const escaped = (text: string) =>
+    text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  const keys = Object.entries(values)
+    .map(([key, value]) => `<${key}>${escaped(String(value))}</${key}>`)
+    .join("");
+  await harness.container.copyContentToContainer([
+    {
+      content: `<clickhouse><named_collections><${collection}>${keys}</${collection}></named_collections></clickhouse>`,
+      target: namedCollectionFilePath(collection),
+      mode: 0o644,
+    },
+  ]);
+  await harness.admin.command({ query: "SYSTEM RELOAD CONFIG" });
+}
+
+/** Deletes the stand-in's file and reloads: 26.8 drops the collection even while tables use it. */
+export async function removeNamedCollectionFile({
+  harness,
+  collection,
+}: {
+  harness: LangWatchQLClickHouseHarness;
+  collection: string;
+}): Promise<void> {
+  await harness.container.exec(["rm", "-f", namedCollectionFilePath(collection)]);
+  await harness.admin.command({ query: "SYSTEM RELOAD CONFIG" });
 }

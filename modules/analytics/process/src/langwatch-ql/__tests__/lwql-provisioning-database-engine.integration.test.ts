@@ -14,7 +14,7 @@ import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
 } from "../../services/langwatch-ql-access-model.service.ts";
-import { LWQL_ISOLATION_CLICKHOUSE_IMAGE } from "./lwql-clickhouse-harness.ts";
+import { LWQL_CLICKHOUSE_TEST_IMAGE } from "./lwql-clickhouse-harness.ts";
 
 const enabled = Boolean(process.env.LANGWATCH_TEST_CLICKHOUSE_URL);
 const accessModel = LangWatchQLAccessModelService.create();
@@ -45,7 +45,7 @@ describe.runIf(enabled)(
         suite: "lwql-provision-engine",
         names: ["migrated"],
         environment: process.env,
-        image: LWQL_ISOLATION_CLICKHOUSE_IMAGE,
+        image: LWQL_CLICKHOUSE_TEST_IMAGE,
       });
       if (!endpoint) throw new Error("no ClickHouse endpoint was provisioned");
       database = endpoint.database;

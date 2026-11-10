@@ -369,10 +369,9 @@ const SPANS: UngatedViewDefinition = {
     },
     {
       name: "SpanAttributes",
-      // Not the source's `Map(LowCardinality(String), String)`: `mapFilter`
-      // returns a plain-keyed map, and the catalog publishes what the view
-      // returns rather than what the table stores.
-      type: "Map(String, String)",
+      // What the view returns on 26.8, where `mapFilter` keeps the source's LowCardinality keys:
+      // declared as is, since a cast to plain keys would rebuild every map on every read.
+      type: "Map(LowCardinality(String), String)",
       description:
         "Span attributes, with every captured-content key removed. Content is reachable only through CapturedInput and CapturedOutput.",
       sourceColumns: ["SpanAttributes"],
@@ -380,7 +379,7 @@ const SPANS: UngatedViewDefinition = {
     },
     {
       name: "ResourceAttributes",
-      type: "Map(String, String)",
+      type: "Map(LowCardinality(String), String)",
       description: "Resource attributes, with every captured-content key removed.",
       sourceColumns: ["ResourceAttributes"],
       expression: (source) => contentFilteredMapSql(source("ResourceAttributes")),
@@ -1606,14 +1605,14 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
     },
     {
       name: "ToolCounts",
-      type: "Map(String, UInt32)",
+      type: "Map(LowCardinality(String), UInt32)",
       description: "Calls per tool.",
       sourceColumns: ["ToolCounts"],
       expression: (source) => contentFilteredMapSql(source("ToolCounts")),
     },
     {
       name: "ToolDurationMs",
-      type: "Map(String, UInt64)",
+      type: "Map(LowCardinality(String), UInt64)",
       unit: "ms",
       description: "Milliseconds spent per tool.",
       sourceColumns: ["ToolDurationMs"],
@@ -1769,7 +1768,7 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
     },
     {
       name: "CompactionTriggers",
-      type: "Map(String, UInt32)",
+      type: "Map(LowCardinality(String), UInt32)",
       description: "Compactions by trigger kind.",
       sourceColumns: ["CompactionTriggers"],
       expression: (source) => contentFilteredMapSql(source("CompactionTriggers")),
@@ -1816,7 +1815,7 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
     },
     {
       name: "ErrorTypes",
-      type: "Map(String, UInt32)",
+      type: "Map(LowCardinality(String), UInt32)",
       description: "Failures by error class.",
       sourceColumns: ["ErrorTypes"],
       expression: (source) => contentFilteredMapSql(source("ErrorTypes")),

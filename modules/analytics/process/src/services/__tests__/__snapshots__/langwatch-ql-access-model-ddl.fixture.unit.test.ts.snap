@@ -670,7 +670,7 @@ exports[`the definition-driven access DDL > given fixed names, password hash and
   "GRANT SELECT ON langwatch.webhook_endpoint_deliveries TO langwatch_lwql",
   "GRANT SELECT ON langwatch.workflow_versions TO langwatch_lwql",
   "GRANT SELECT ON langwatch.workflows TO langwatch_lwql",
-  "DROP NAMED COLLECTION IF EXISTS lwql_postgres",
-  "CREATE NAMED COLLECTION lwql_postgres AS host='pg.internal', port=5432, database='langwatch', user='lwql_ro', password='reader-secret'",
+  "CREATE NAMED COLLECTION IF NOT EXISTS lwql_postgres AS host='pg.internal', port=5432, database='langwatch', user='lwql_ro', password='reader-secret'",
+  "ALTER NAMED COLLECTION lwql_postgres SET host='pg.internal', port=5432, database='langwatch', user='lwql_ro', password='reader-secret'",
 ]
 `;

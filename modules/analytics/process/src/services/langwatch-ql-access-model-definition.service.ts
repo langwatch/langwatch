@@ -231,14 +231,16 @@ export class LangWatchQLAccessModelDefinitionService {
         `lwql provisioning: named collection port must be an integer, got ${namedCollection.port}`,
       );
     }
+    const values =
+      `host=${clickHouseLiteral(namedCollection.host)}, ` +
+      `port=${namedCollection.port}, ` +
+      `database=${clickHouseLiteral(namedCollection.database)}, ` +
+      `user=${clickHouseLiteral(namedCollection.user)}, ` +
+      `password=${clickHouseLiteral(namedCollection.password)}`;
+    // Never DROP: 26.8 refuses it while an engine table uses the collection (769), as ALTER is not.
     return [
-      `DROP NAMED COLLECTION IF EXISTS ${namedCollection.collection}`,
-      `CREATE NAMED COLLECTION ${namedCollection.collection} AS ` +
-        `host=${clickHouseLiteral(namedCollection.host)}, ` +
-        `port=${namedCollection.port}, ` +
-        `database=${clickHouseLiteral(namedCollection.database)}, ` +
-        `user=${clickHouseLiteral(namedCollection.user)}, ` +
-        `password=${clickHouseLiteral(namedCollection.password)}`,
+      `CREATE NAMED COLLECTION IF NOT EXISTS ${namedCollection.collection} AS ${values}`,
+      `ALTER NAMED COLLECTION ${namedCollection.collection} SET ${values}`,
     ];
   }
 

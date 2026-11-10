@@ -6,6 +6,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
@@ -183,52 +184,82 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 26.8 ser
   });
 
   describe("when the query text overrides settings", () => {
+    /**
+     * Each override, trailing and in a subquery, sent through the production executor, which
+     * appends tenant-a's capability last. On 26.8 the statement's own clause wins either way, so
+     * the validator refusing any SETTINGS (SETTINGS_CLAUSE) is what keeps the executor's value.
+     */
+    async function overrideOutcomes(
+      overrides: Readonly<Record<string, string>>,
+    ): Promise<Record<string, string>> {
+      const executor = ClickHouseLangWatchQLExecutorRepository.create({
+        connection: {
+          ...harness.restrictedConnection(),
+          database,
+          tenantSetting: harness.names.tenantSetting,
+        },
+      });
+      const setting = harness.names.tenantSetting;
+      const outcomes: Record<string, string> = {};
+      for (const [label, value] of Object.entries(overrides)) {
+        const own = `SETTINGS ${setting} = '${value}'`;
+        const statements: [string, string][] = [
+          [`trailing ${label}`, `SELECT TenantId FROM ${database}.traces ${own}`],
+          [
+            `subquery ${label}`,
+            `SELECT TenantId FROM (SELECT TenantId FROM ${database}.traces ${own})`,
+          ],
+        ];
+        for (const [name, sql] of statements) {
+          outcomes[name] = await executor
+            .execute({
+              sql,
+              tenantCapability: harness.tenantA.keyHash,
+              projectIds: [harness.tenantA.tenantId],
+            })
+            .then(
+              ({ rows }) =>
+                `rows: ${[...new Set(rows.map((row) => String(row.TenantId)))].toSorted().join(",") || "none"}`,
+              (error: { code?: string }) => `refused: ${error.code}`,
+            );
+        }
+      }
+      await executor.close();
+      return outcomes;
+    }
+
     /** @scenario "Overriding the tenant setting in query text cannot reach another tenant's rows without that tenant's valid key hash" */
-    it("reaches no foreign rows with a guessed tenant setting", async () => {
+    it("returns no tenant-b row for a guessed or an empty override, trailing or in a subquery", async () => {
       const control = await recordSeedControl({
         harness,
         table: "traces",
         tenantColumn: "TenantId",
       });
-
-      const rows = await selectRows<{ TenantId: string }>(
-        tenantA,
-        `SELECT TenantId FROM ${database}.traces ` +
-          `SETTINGS ${harness.names.tenantSetting} = 'guessed-key-hash'`,
-      );
-
       expect(
-        rows,
-        `a guessed key hash returned rows while ${control.tenantB} tenant-b rows exist`,
-      ).toHaveLength(0);
+        control.tenantB,
+        "tenant-b must hold rows for the absence to mean anything",
+      ).toBeGreaterThan(0);
+
+      // "none", not tenant-a's rows: the statement's value applied, and it matches no key.
+      expect(await overrideOutcomes({ guessed: UNMAPPED_KEY_HASH, empty: "" })).toEqual({
+        "trailing guessed": "rows: none",
+        "subquery guessed": "rows: none",
+        "trailing empty": "rows: none",
+        "subquery empty": "rows: none",
+      });
     });
 
     /**
-     * The documented capability boundary, asserted rather than hidden: the key
-     * hash IS the credential, so a caller holding a victim's valid hash reads
-     * the victim's rows. The issue's design says exactly this ("useless without
-     * a victim's valid key"), and the gateway's AST validator rejecting any
-     * SETTINGS clause is the defense-in-depth layer above it. A test that
-     * quietly omitted this would misrepresent what the database layer promises.
+     * The documented capability boundary, asserted rather than hidden: the key hash IS the
+     * credential, so an override carrying a victim's valid hash reads the victim's rows where the
+     * server accepts it. The validator refusing any SETTINGS clause is the layer above this.
      */
     /** @scenario "Overriding the tenant setting in query text cannot reach another tenant's rows without that tenant's valid key hash" */
-    it("does reach the other tenant's rows when the override carries that tenant's real key hash", async () => {
-      await recordSeedControl({
-        harness,
-        table: "traces",
-        tenantColumn: "TenantId",
+    it("reaches tenant-b's rows only with tenant-b's real key hash, the credential itself", async () => {
+      expect(await overrideOutcomes({ "tenant-b": harness.tenantB.keyHash })).toEqual({
+        "trailing tenant-b": `rows: ${harness.tenantB.tenantId}`,
+        "subquery tenant-b": `rows: ${harness.tenantB.tenantId}`,
       });
-
-      const rows = await selectRows<{ TenantId: string }>(
-        tenantA,
-        `SELECT DISTINCT TenantId FROM ${database}.traces ` +
-          `SETTINGS ${harness.names.tenantSetting} = '${harness.tenantB.keyHash}'`,
-      );
-
-      expect(
-        rows.map((row) => row.TenantId),
-        "possession of a valid key hash is the security boundary at the database layer",
-      ).toEqual([harness.tenantB.tenantId]);
     });
 
     /** @scenario "Overriding a pinned setting in query text is rejected by profile constraints" */
