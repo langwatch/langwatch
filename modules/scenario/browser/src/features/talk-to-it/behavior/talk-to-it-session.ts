@@ -1,3 +1,4 @@
+import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import type {
   VoiceSessionFinishResult,
   VoiceSessionMintResult,
@@ -80,8 +81,11 @@ export async function mintSession({
   refs,
   dispatch,
 }: {
-  props: TalkToItPanelProps;
-  refs: TalkRefs;
+  props: Pick<
+    TalkToItPanelProps,
+    "projectId" | "transport" | "agentId" | "scenarioId" | "sessionClient"
+  >;
+  refs: Pick<TalkRefs, "createdRowId">;
   dispatch: TalkDispatch;
 }): Promise<VoiceSessionMintResult | null> {
   try {
@@ -94,6 +98,11 @@ export async function mintSession({
       ...(props.scenarioId ? { scenarioId: props.scenarioId } : {}),
     });
   } catch (error) {
+    // The global handler already opened the upgrade prompt: go back to idle, show no call error.
+    if (isHandledByGlobalHandler(error)) {
+      dispatch({ type: "RETRY" });
+      return null;
+    }
     const failure = props.sessionClient.describeFailure(error);
     dispatch({
       type: "MINT_FAILED",
