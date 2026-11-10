@@ -30,7 +30,7 @@ docker run -d --name "$S3" --network "$NET" \
     -p 9000:9000 \
     -e RUSTFS_ROOT_USER="$S3_ACCESS_KEY" \
     -e RUSTFS_ROOT_PASSWORD="$S3_SECRET_KEY" \
-    rustfs/rustfs:latest server /data
+    rustfs/rustfs:1.0.4 server /data
 
 echo "Waiting for RustFS..."
 s3_ready=0
