@@ -3,6 +3,8 @@
  * @see specs/licensing/cloud-free-creation-caps.feature
  */
 import type { ScenarioRunsCountedEventData } from "@langwatch/entitlement-contract";
+import type { ProcessIntent } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it } from "vitest";
 
 import { DAY_MS } from "../../rules/scenario-run-cap.rules.ts";
@@ -13,16 +15,27 @@ import {
   type ScenarioRunNoticesState,
 } from "../scenario-run-notices.process.ts";
 
-type CountedCtx = Parameters<typeof scenarioRunsCounted>[2];
+type NoticesCtx = Parameters<typeof scenarioRunsCounted>[2];
+
+const asIntent =
+  (intentType: string) =>
+  (messageKey: string, payload: ProcessIntent["payload"]): ProcessIntent => ({
+    messageKey,
+    intentType,
+    payload,
+  });
 
 const now = Date.UTC(2026, 10, 20, 12);
-const ctx = (at: number) =>
-  ({
-    at,
-    now: at,
-    key: "org-1",
-    intent: (name: string, key: string, data: Record<string, unknown>) => ({ name, key, data }),
-  }) as CountedCtx;
+const ctx = (at: number): NoticesCtx => ({
+  at,
+  now: at,
+  key: "org-1",
+  projectId: "org-1",
+  intent: intentAccessorOf({
+    recordScenarioRunsThreshold: asIntent("recordScenarioRunsThreshold"),
+    recordScenarioRunGraceEnded: asIntent("recordScenarioRunGraceEnded"),
+  }),
+});
 
 const counted = (over: Partial<ScenarioRunsCountedEventData> = {}) =>
   ({
@@ -35,8 +48,8 @@ const counted = (over: Partial<ScenarioRunsCountedEventData> = {}) =>
     ...over,
   }) as ScenarioRunsCountedEventData;
 
-const intentNames = (result: { intents?: readonly unknown[] }) =>
-  (result.intents ?? []).map((intent) => (intent as { name: string }).name);
+const intentNames = (result: { intents?: readonly ProcessIntent[] }) =>
+  (result.intents ?? []).map((intent) => intent.intentType);
 
 describe("scenarioRunsCounted", () => {
   /** @scenario Reaching 80 runs in a month records the threshold once */
@@ -50,9 +63,9 @@ describe("scenarioRunsCounted", () => {
   /** @scenario The threshold is recorded during the grace too */
   it("records the threshold with the grace still running", () => {
     const result = scenarioRunsCounted(initialScenarioRunNoticesState, counted(), ctx(now));
-    const intent = result.intents?.[0] as { key: string; data: { inGrace: boolean } } | undefined;
-    expect(intent?.key).toBe("org-1:2026-11");
-    expect(intent?.data.inGrace).toBe(true);
+    const intent = result.intents?.[0];
+    expect(intent?.messageKey).toBe("org-1:2026-11");
+    expect(intent?.payload).toMatchObject({ inGrace: true });
     expect(result.nextWakeAt).toBe(now + 11 * DAY_MS);
   });
 

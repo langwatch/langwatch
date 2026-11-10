@@ -36,7 +36,7 @@ const CLOUD_FREE: Plan = {
   canPublish: true,
   prices: { USD: 0, EUR: 0 },
   maxScenarios: 3,
-  maxScenarioSets: 3,
+  maxScenarioRunsPerMonth: 100,
   maxEvaluators: 3,
 };
 

@@ -197,7 +197,7 @@ interface ScenarioAppDependencies {
   /** One HTTP agent call from its editor, run by the workflow engine and traced. */
   httpAgentTesting: HttpAgentTestService;
   scenarios: ScenarioService;
-  /** The cloud Free caps on scenarios and simulations. */
+  /** The cloud Free caps on scenarios and scenario runs. */
   creationCaps: ScenarioCreationCapService;
   simulations: SimulationServiceContract;
   /** Validates a run against its target before anything is queued. */
@@ -321,7 +321,6 @@ export class ScenarioModule implements ScenarioApi {
       plans: setup.dependencies.plans,
       projects: setup.dependencies.projects,
       scenarios: repositories.scenarios,
-      simulations,
     });
     const generateBounds = ScenarioGenerateBoundsService.create({
       entitlement: setup.dependencies.plans,
