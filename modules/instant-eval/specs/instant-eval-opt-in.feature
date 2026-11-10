@@ -180,7 +180,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     @integration
     Scenario: A refused switch is a warning and the popover stays
       Given the enable popover is open
-      When the server refuses the switch
+      When the server refuses the switch for a reason other than it no longer being offered
       Then the registry's words are shown as a warning
       And no estimate is requested and the popover stays open
 
@@ -292,3 +292,100 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       And an organization on the hosted service that switched them on is allowed without the flag
       And an install whose license does not name them, with the flag off and no switch, is refused "lwql_not_permitted"
       And Analytics never reads the release flag for that read itself
+
+  Rule: LangWatch can switch its hosted model off for one organization, whatever its plan, and its own decision models keep running
+
+    # Customer report: an organization that may only ever use its own models. The
+    # instant_evals_hosted_disabled flag, off by default and set per organization at
+    # /ops/feature-flags, wins over the plan, the organization's switch, the release flag and the
+    # license. It never touches an own decision model: its key, its bill (ADR-182).
+
+    @unit
+    Scenario: The hosted switch is off unless set for an organization
+      When the flag registry is read
+      Then instant_evals_hosted_disabled is a product flag, off by default
+
+    @unit
+    Scenario: A self-serve organization with hosted switched off is not released by its own switch
+      Given a self-serve organization on the hosted service that switched Instant Evals on
+      And LangWatch's hosted model is switched off for it
+      When the project asks whether it may judge
+      Then it may not, and LangWatch's own model is not released
+
+    @unit
+    Scenario: An enterprise organization with hosted switched off is not released by the release flag
+      Given an enterprise organization on the hosted service with the release flag on
+      And LangWatch's hosted model is switched off for it
+      When the project asks whether it may judge
+      Then it may not, and LangWatch's own model is not released
+
+    @unit
+    Scenario: An install judging through LangWatch with hosted switched off is not released by its license
+      Given a self-hosted install whose license names Instant Evals, left on by its admin
+      And LangWatch's hosted model is switched off for its organization
+      When the project asks whether it may judge
+      Then it may not
+
+    @unit
+    Scenario: An own decision model still runs for an organization with hosted switched off
+      Given an organization with LangWatch's hosted model switched off
+      And a project whose Instant Evals column is its own decision model, ready to run
+      When the project asks whether it may judge
+      Then it may, and the hosted switch is not read
+      And LangWatch's own model is still not released
+
+    @unit
+    Scenario: With the hosted switch off for nobody, the plan still decides
+      Given a self-serve organization on the hosted service that switched Instant Evals on
+      And LangWatch's hosted model is not switched off for it
+      When the project asks whether it may judge
+      Then it may, from its own switch
+
+    @unit
+    Scenario: An organization with hosted switched off is offered no switch
+      Given a self-serve organization on the hosted service with LangWatch's hosted model switched off
+      When the popover asks what to offer a member who may manage the organization
+      Then it offers a word with us, never the switch, and LangWatch's own model is not released
+      And so Default models lists no Evals Preview and the popover asks for an own decision model
+
+    @unit
+    Scenario: The server refuses the switch for an organization with hosted switched off
+      Given a self-serve organization on the hosted service with LangWatch's hosted model switched off
+      When a member throws the switch anyway
+      Then it is refused as not offered, and nothing is recorded
+      And the refusal says LangWatch's hosted model is off for the organization and names its own decision model instead
+
+    @unit
+    Scenario: A hosted-off refusal never sends the reader to the enterprise plan
+      Given the switch was refused because LangWatch's hosted model is off for the organization
+      When the refusal is explained
+      Then the headline says LangWatch's hosted model is off for the organization
+      And the words name the Instant Evals column of Default models, never an enterprise plan
+
+    @integration
+    Scenario: A stale Enable says why the hosted model is off and stops offering Enable
+      Given the enable popover was opened before LangWatch's hosted model was switched off
+      When the member clicks Enable and the server refuses it as not offered
+      Then the registry's words are shown as a warning
+      And the access read is asked again
+      And the popover turns into the one that asks for an own decision model, keeping the eval chip
+
+    @unit
+    Scenario: LangWatch's hosted judge never classifies for an organization with hosted switched off
+      Given an organization with LangWatch's hosted model switched off
+      When a run, a judged query, a classify call or the search bar's route reaches LangWatch's hosted judge
+      Then it skips as not configured and the hosted classifier is never called
+
+    @unit
+    Scenario: LangWatch's hosted judge classifies as before for every other organization
+      Given an organization with LangWatch's hosted model not switched off
+      When a text reaches LangWatch's hosted judge
+      Then the hosted classifier answers it
+
+    @unit
+    Scenario: An LLM judge on Evals Preview is an error for an organization with hosted switched off
+      Given an organization with LangWatch's hosted model switched off
+      And an LLM judge on Instant Evals in a project whose column is Evals Preview
+      When the evaluation runs
+      Then it is an error saying no decision model is set up, and the judge is never called
+      And the judge router flag is never read
