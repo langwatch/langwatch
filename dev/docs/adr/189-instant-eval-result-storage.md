@@ -19,7 +19,7 @@
 | ---------------------------------------- | ----------------------------- | ------------------------------------------------------------------------ | ------------------ |
 | Quick `eval()` in an LWQL query          | No, in memory for the call    | `instant-eval-judge-rows.service.ts:102` (a `Map`)                        | No                 |
 | Instant Eval run (search bar, CLI, REST) | Yes, indefinitely             | `instant_eval_runs` and `instant_eval_judgments` (migrations 00098, 00097) | No                 |
-| Code widget with `eval()`                | No, judges on every run       | Same path as a quick `eval()` (`use-dashboard-widget-executor.ts:91`)    | No                 |
+| Code widget with `eval()`                | No, judges on every run       | Same path as a quick `eval()` (`use-dashboard-widget-executor.ts:118-120`)    | No                 |
 | Saved-chart widget with `eval()`         | Cannot hold `eval()` today    | Save refuses it (`saved-workbench-chart-policy.service.ts:36-41`)        | No                 |
 | Monitor (online eval)                    | Yes, with the trace retention | `evaluation_runs` (00002), fed by `lw.evaluation.*` events               | Yes                |
 
@@ -160,7 +160,7 @@ Purge and erase: user erase today touches Postgres only (`prisma.user-data-erase
 
 The rule: every Instant Evals judgment is a row in `eval_results`, whoever asked. Drew decided this on 2026-10-29 (Laze): there is no reason to couple monitors and instant evals, but "the instant evals that a monitor uses should go in the table".
 
-- **A monitor on the Instant Evals judge** (`evaluation-execution.service.ts:355`, `instantEvalJudgeOf`) recalls from `eval_results` first, then judges the miss, and writes the row with `Source = monitor`. It still writes its result to `evaluation_runs`, so its charts, the `evaluations.passed` filter and its triggers do not change.
+- **A monitor on the Instant Evals judge** (`evaluation-execution.service.ts:360`, `instantEvalJudgeOf`) recalls from `eval_results` first, then judges the miss, and writes the row with `Source = monitor`. It still writes its result to `evaluation_runs`, so its charts, the `evaluations.passed` filter and its triggers do not change.
 - **A monitor on any other judge** (another LLM, a built-in check) is not touched. It writes `evaluation_runs` only.
 - **Nothing moves out of `evaluation_runs`.** There is no phase 2. The monitor lifecycle, charts, filters and triggers stay with the evaluation module.
 - **The trace page reads two stores** and labels the source. A `Source = monitor` row in `eval_results` has its twin in `evaluation_runs`, so the drawer shows it once: from `evaluation_runs`, and skips `monitor` rows from `eval_results`.
