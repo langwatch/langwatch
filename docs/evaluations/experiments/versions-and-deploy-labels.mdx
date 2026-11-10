@@ -20,7 +20,7 @@ A deploy label names one version. `production` and `staging` are offered from th
 
 To move a label, open **History** on the agent or the evaluator, choose **Deploy**, and point the label at a version. The same works through the API. For agents: [point a deploy label at a version](/api-reference/agents/point-a-deploy-label-at-an-agent-version) or [remove one](/api-reference/agents/remove-a-deploy-label-from-an-agent). For evaluators: [point a deploy label at a version](/api-reference/evaluators-config/update-labels) or [remove one](/api-reference/evaluators-config/delete-labels).
 
-Removing a label is not neutral. An experiment target pinned to a removed agent label fails until you pin it to a label that exists. An online evaluation pinned to a removed evaluator label falls back to the newest evaluator version, including settings nobody promoted.
+Removing a label is not neutral. An experiment target pinned to a removed agent label fails until you pin it to a label that exists. An online evaluation pinned to a removed evaluator label falls back to the newest evaluator version, including settings that were never promoted.
 
 What follows a label:
 
