@@ -52,14 +52,30 @@ const modelSchema = z
  * This is used both for stdio mode (single server) and HTTP mode (per-session servers).
  */
 export function createMcpServer(): McpServer {
-  const server = new McpServer({
-    name: "LangWatch",
-    version: packageJson.version,
-  });
+  const server = newLangWatchServer();
 
   registerTools(server);
 
   return server;
+}
+
+/**
+ * A server with only the documentation tools, for callers that present no credential: the
+ * hosted docs endpoint. Nothing it registers reads the config, an API key or a project.
+ */
+export function createDocsMcpServer(): McpServer {
+  const server = newLangWatchServer();
+
+  registerDocsTools(server);
+
+  return server;
+}
+
+function newLangWatchServer(): McpServer {
+  return new McpServer({
+    name: "LangWatch",
+    version: packageJson.version,
+  });
 }
 
 /**
@@ -87,6 +103,7 @@ function withToolLogging<T extends unknown[], R>(
 
 function registerTools(server: McpServer): void {
   registerDocsTools(server);
+  registerReportIssueTool(server);
   registerObservabilityTools(server);
   registerPromptTools(server);
   registerScenarioTools(server);
@@ -128,6 +145,29 @@ function registerDocsTools(server: McpServer): void {
   );
 
   server.tool(
+    "fetch_scenario_docs",
+    "Fetches the Scenario docs for understanding how to implement Scenario agent tests in your codebase. Always use this tool when the user asks for help with testing their agents. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
+    {
+      url: z
+        .string()
+        .optional()
+        .describe(
+          "The full url of the specific doc page. If not provided, the docs index will be fetched.",
+        ),
+    },
+    withToolLogging("fetch_scenario_docs", async ({ url }) => {
+      const text = await fetchDocumentation("scenario", url);
+      return { content: [{ type: "text", text }] };
+    }),
+  );
+}
+
+/**
+ * Works without an API key, but not without the config: the report goes to the configured
+ * endpoint. That is why the docs-only server leaves it out.
+ */
+function registerReportIssueTool(server: McpServer): void {
+  server.tool(
     "report_issue",
     "Report an issue to the LangWatch team: anything that did not work, confused you, or took trial and error while using LangWatch (docs, MCP tools, CLI, SDKs, the platform). Use it whenever you struggled, it is how rough edges get fixed for every agent. Ask the user for permission first, then call with user_approved=true. Works without an API key. Put VERBATIM error messages in the summary; optionally attach raw session content. Secrets, API keys, emails and phone numbers are redacted locally before anything is sent.",
     {
@@ -160,23 +200,6 @@ function registerDocsTools(server: McpServer): void {
       return {
         content: [{ type: "text", text: await handleReportIssue(params) }],
       };
-    }),
-  );
-
-  server.tool(
-    "fetch_scenario_docs",
-    "Fetches the Scenario docs for understanding how to implement Scenario agent tests in your codebase. Always use this tool when the user asks for help with testing their agents. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
-    {
-      url: z
-        .string()
-        .optional()
-        .describe(
-          "The full url of the specific doc page. If not provided, the docs index will be fetched.",
-        ),
-    },
-    withToolLogging("fetch_scenario_docs", async ({ url }) => {
-      const text = await fetchDocumentation("scenario", url);
-      return { content: [{ type: "text", text }] };
     }),
   );
 }

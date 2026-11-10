@@ -24,6 +24,18 @@ client for one project they may act on, and no code is issued while an
 operator impersonates a member. Tokens are person-bound and project-capped;
 an expired or unrecognised access token is answered 401 with a challenge.
 
+`POST /mcp/docs` is the one MCP path that takes no credential, and the one
+langwatch.ai/docs/mcp forwards to now that the docs site no longer serves its
+own MCP. It serves only `fetch_langwatch_docs` and `fetch_scenario_docs`,
+whose fetch stays locked to https://langwatch.ai/docs/ and /scenario/, and
+ignores any credential it is sent. It runs the Streamable HTTP transport in
+stateless mode: a fresh server per request, no session id, nothing written to
+any store, so an anonymous caller cannot fill session storage. GET and DELETE
+answer 405. `/mcp` itself is unchanged: MCP clients discover sign-in from its
+401 challenge, so it never answers anonymously. `report_issue` is left out of
+the docs endpoint: it posts to the configured endpoint, so it is not
+config-free, and it would let anyone relay reports through the platform.
+
 ## Dependencies
 
 `ProjectApi`, `AuthzApi` (grant re-checks), `AuthApi` (access and refresh
