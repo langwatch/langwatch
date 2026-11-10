@@ -8,6 +8,7 @@ import {
   BadgeCheck,
   Cloud,
   Blocks,
+  Bot,
   Brain,
   Bug,
   Building2,
@@ -289,7 +290,7 @@ function dataControlsGroup({ hasPermission }: SettingsMenuGates): SettingsMenuGr
   };
 }
 
-function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
+function projectGroup({ isLiteMember, hasPermission }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-project",
     label: "Project",
@@ -310,6 +311,9 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
           ]
         : []),
       { label: "Integrations", href: "/settings/integrations", icon: Blocks },
+      ...(!isLiteMember && hasPermission("langy:view")
+        ? [{ label: "Langy", href: "/settings/langy", icon: Bot }]
+        : []),
     ],
   };
 }

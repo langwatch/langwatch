@@ -42,6 +42,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "    redirect /settings/role-bindings -> /settings/roles (from /settings/role-bindings) [pin tab=assignments]",
   "    route /settings/annotation-scores -> pages/settings/annotation-scores",
   "    route /settings/data-retention -> pages/settings/data-retention",
+  "    route /settings/langy -> pages/settings/langy",
   "    route /settings/integrations -> pages/settings/integrations",
   "    route /settings/data-privacy -> pages/settings/data-privacy",
   "    route /settings/audit-log -> pages/settings/audit-log",

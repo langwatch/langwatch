@@ -29,6 +29,7 @@
   "/settings/role-bindings",
   "/settings/annotation-scores",
   "/settings/data-retention",
+  "/settings/langy",
   "/settings/integrations",
   "/settings/data-privacy",
   "/settings/audit-log",

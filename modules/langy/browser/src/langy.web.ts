@@ -22,6 +22,14 @@ export const langyWeb = defineBrowserModule("langy")
     "layouts/project-langy": {
       load: () => import("./features/langy/ui/sections/project-langy-layout.tsx"),
     },
+    // Placed by the application's settings table, as every settings screen is today.
+    "pages/settings/langy": {
+      path: "/settings/langy",
+      within: "settings",
+      label: "Langy",
+      requires: "langy:view",
+      load: () => import("./features/settings/ui/sections/langy-settings.screen.tsx"),
+    },
   })
   // All another module may do to the panel: dock it with a kickoff and hear
   // the scope it entered, or ask it a question with the view it is about, each
