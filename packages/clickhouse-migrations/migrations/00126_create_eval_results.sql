@@ -54,11 +54,10 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.eval_results
     -- TenantId first.
     TenantId String CODEC(ZSTD(1)),
 
-    -- What was judged. SpanId and ThreadId are empty when the statement did not
-    -- project them, as in 00097.
+    -- What was judged. SpanId is empty when the statement did not project it,
+    -- as in 00097.
     TraceId String CODEC(ZSTD(1)),
     SpanId String DEFAULT '' CODEC(ZSTD(1)),
-    ThreadId String DEFAULT '' CODEC(ZSTD(1)),
 
     -- What was asked. QuestionHash is sha256 of the normalised kind, text,
     -- criteria, range and categories; the statement's column alias is not in it.
