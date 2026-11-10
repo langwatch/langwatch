@@ -9,15 +9,15 @@ const read = (environment: Record<string, string | undefined>) =>
 
 describe("experiment server configuration", () => {
   describe("given a deployment that names EVAL_V3_CONCURRENCY", () => {
-    /** @scenario "A run's cell window defaults to main's concurrency knob" */
-    it("reads that many cells at once", () => {
+    /** @scenario "A run falls back to main's concurrency knob when active runs can't be read" */
+    it("reads that many cells as the fallback", () => {
       expect(read({ EVAL_V3_CONCURRENCY: "4" }).runConcurrency).toBe(4);
     });
   });
 
   describe("given a deployment that names none", () => {
-    /** @scenario "A run's cell window defaults to main's concurrency knob" */
-    it("reads ten, main's default", () => {
+    /** @scenario "A run falls back to main's concurrency knob when active runs can't be read" */
+    it("falls back to ten, main's default", () => {
       expect(read({}).runConcurrency).toBe(10);
     });
   });
