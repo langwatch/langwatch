@@ -58,6 +58,8 @@ export function localRaster({ src, basePath }: { src: string; basePath: string }
 type Open = { name: string; hidden: boolean; theme: Theme | null };
 type Scan = {
   images: PageImage[];
+  /** Each `<video>` with a poster: where its tag sits and whether it is above the fold. */
+  posters: { start: number; tag: string; aboveFold: boolean }[];
   stack: Open[];
   text: number;
   headings: number;
@@ -71,6 +73,9 @@ function closeTag({ scan, name }: { scan: Scan; name: string }) {
   if (at >= 0) scan.stack.length = at;
   if (name === "picture") scan.pictures -= 1;
 }
+
+const aboveFold = ({ scan }: { scan: Scan }) =>
+  scan.text <= FOLD_TEXT && scan.headings <= FOLD_HEADINGS;
 
 function addImage({
   scan,
@@ -91,7 +96,7 @@ function addImage({
     tag,
     src,
     visible: !scan.stack.some((open) => open.hidden),
-    aboveFold: scan.text <= FOLD_TEXT && scan.headings <= FOLD_HEADINGS,
+    aboveFold: aboveFold({ scan }),
     theme: themeOf({ classes }) ?? scan.stack.findLast((open) => open.theme)?.theme ?? null,
   });
 }
@@ -104,6 +109,8 @@ function openTag({ scan, match }: { scan: Scan; match: RegExpExecArray }) {
   const classes = attribute({ tag, name: "class" }) ?? "";
   if (name === "img" && /\bdocs-img\b/.test(classes) && scan.pictures === 0)
     addImage({ scan, tag, index: match.index, classes });
+  if (name === "video" && /\sposter="/.test(tag))
+    scan.posters.push({ start: match.index, tag, aboveFold: aboveFold({ scan }) });
   if (selfClosing || VOID.has(name)) return;
   const hidden =
     /\shidden(=|\s|$)/.test(attributes) ||
@@ -125,11 +132,11 @@ export function authoredHeroPreload({ html }: { html: string }): string {
   return "";
 }
 
-/** Every `docs-img` in the page's article that is not already inside a `<picture>`. */
-export function pageImages({ html }: { html: string }): PageImage[] {
+/** The page's article read once: its images and its videos' posters, each with its fold. */
+function scanArticle({ html }: { html: string }): Scan {
+  const scan: Scan = { images: [], posters: [], stack: [], text: 0, headings: 0, pictures: 0 };
   const article = html.search(/<article\b[^>]*\bdocs-prose\b/);
-  if (article < 0) return [];
-  const scan: Scan = { images: [], stack: [], text: 0, headings: 0, pictures: 0 };
+  if (article < 0) return scan;
   const tags = new RegExp(TAGS);
   tags.lastIndex = article;
   for (let match = tags.exec(html); match; match = tags.exec(html)) {
@@ -141,7 +148,28 @@ export function pageImages({ html }: { html: string }): PageImage[] {
       if (scan.stack.length === 0) break;
     }
   }
-  return scan.images;
+  return scan;
+}
+
+/** Every `docs-img` in the page's article that is not already inside a `<picture>`. */
+export function pageImages({ html }: { html: string }): PageImage[] {
+  return scanArticle({ html }).images;
+}
+
+/**
+ * A poster loads with the page, as no `loading="lazy"` exists for it, so one below the fold
+ * competes with what the reader sees first. Each moves to `data-docs-poster`; the media script
+ * sets it as the video nears the screen. Posters above the fold stay as they are.
+ */
+export function deferBelowFoldPosters({ html }: { html: string }) {
+  const later = scanArticle({ html }).posters.filter((video) => !video.aboveFold);
+  let out = html;
+  for (const { start, tag } of later.toReversed())
+    out =
+      out.slice(0, start) +
+      tag.replace(/\sposter="/, ' data-docs-poster="') +
+      out.slice(start + tag.length);
+  return out;
 }
 
 /** The largest WebP encoding, which an `<img>` names so the original need not be published. */

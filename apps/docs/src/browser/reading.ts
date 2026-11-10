@@ -64,7 +64,7 @@ document.addEventListener("pointerout", (event) => hoverEnd({ event }), { passiv
 document.addEventListener("focusin", (event) => {
   if (event.target instanceof HTMLAnchorElement) prefetch({ anchor: event.target });
 });
-/** Loads an island once a page holds what it enhances: clips. */
+/** Loads an island once a page holds what it enhances: clips and deferred posters. */
 function enhanceWith({ name, selector }: { name: string; selector: string }) {
   if (!document.querySelector(selector)) return;
   if (document.querySelector(`script[data-island="${name}"]`)) return;
@@ -81,7 +81,7 @@ function enhanceWith({ name, selector }: { name: string; selector: string }) {
 
 function enhance() {
   observeLinks();
-  enhanceWith({ name: "media", selector: "video[data-docs-clip]" });
+  enhanceWith({ name: "media", selector: "video[data-docs-clip], video[data-docs-poster]" });
 }
 
 document.addEventListener("docs:navigated", enhance);

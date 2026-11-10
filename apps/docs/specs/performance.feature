@@ -82,6 +82,7 @@ Feature: Static documentation with progressive interaction
     And neither is wider than twice the article column or plays more than 30 frames a second
     And a source without sound publishes no audio track
     And a video without an authored poster shows a WebP of its first frame and fetches nothing until it plays
+    And a video below the fold fetches its poster only as it nears the screen, so the first screen loads first
     And it autoplays only where authored and muted
     And unchanged videos are reused from the build cache instead of being encoded again
     But without ffmpeg the video is published as authored
