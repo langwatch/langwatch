@@ -962,6 +962,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "pages/ops/cloud/self-hosted-instances",
       },
       { path: "/ops/cloud/bug-reports", page: "pages/ops/cloud/bug-reports" },
+      { path: "/ops/cloud/seat-use", page: "pages/ops/cloud/seat-use" },
       // The retired back-office addresses: the bare one lands on Cloud admin,
       // each page on its new home, anything else on the Ops home.
       {

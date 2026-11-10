@@ -29,6 +29,7 @@ export interface InstantEvalOptInPeers extends InstantEvalPlanReader {
   /** The authority the switch's route declares (`organization:manage`), asked of the reader. */
   mayManageOrganization(input: { userId: string; organizationId: string }): Promise<boolean>;
   isReleased(input: { projectId: string }): Promise<boolean>;
+  isHostedReleased(input: { projectId: string }): Promise<boolean>;
   recordOptIn(input: { organizationId: string; userId: string }): Promise<void>;
 }
 
@@ -48,12 +49,13 @@ export class InstantEvalOptInService {
     userId: string;
   }): Promise<InstantEvalOptInAccess> {
     const organizationId = await this.organizationOf(projectId);
-    const [released, offer, viaConnect] = await Promise.all([
+    const [released, hostedReleased, offer, viaConnect] = await Promise.all([
       this.peers.isReleased({ projectId }),
+      this.peers.isHostedReleased({ projectId }),
       this.offerFor({ organizationId, userId }),
       this.judgesThroughConnect(),
     ]);
-    return { released, offer, viaConnect };
+    return { released, hostedReleased, offer, viaConnect };
   }
 
   /**
@@ -74,7 +76,7 @@ export class InstantEvalOptInService {
     }
     await this.peers.recordOptIn({ organizationId, userId });
     // The switch is thrown on the hosted service only, which never judges through Connect.
-    return { released: true, offer: "enable", viaConnect: false };
+    return { released: true, hostedReleased: true, offer: "enable", viaConnect: false };
   }
 
   /** A self-hosted install judging through LangWatch: "can't run" then names its two hosts. */

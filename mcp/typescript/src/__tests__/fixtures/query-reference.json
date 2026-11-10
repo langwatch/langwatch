@@ -4159,6 +4159,14 @@
               "unit": null,
               "gates": [],
               "available": true
+            },
+            {
+              "name": "Concurrency",
+              "type": "Nullable(UInt16)",
+              "description": "Concurrency",
+              "unit": null,
+              "gates": [],
+              "available": true
             }
           ],
           "exampleSql": "SELECT ProjectionId, RunId, ExperimentId\nFROM analytics.experiment_run_results\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"
@@ -4843,6 +4851,14 @@
               "name": "ImageCount",
               "type": "UInt64",
               "description": "ImageCount",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "WebSearchRequests",
+              "type": "UInt64",
+              "description": "WebSearchRequests",
               "unit": null,
               "gates": [],
               "available": true

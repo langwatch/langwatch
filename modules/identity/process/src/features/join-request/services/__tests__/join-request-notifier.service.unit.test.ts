@@ -269,4 +269,55 @@ describe("JoinRequestNotifierService", () => {
       expect(sent?.seats).toBeUndefined();
     });
   });
+
+  describe("when the joiner holds an open seat request", () => {
+    /** @scenario "A Lite joiner waiting for a full seat is mailed about once" */
+    it("leaves the telling to the seat request mail", async () => {
+      const recording = recordingMail();
+      const isSeatRequested = vi.fn(async () => true);
+      const adapter = JoinRequestNotifierService.create({
+        audience: fakeAudience(),
+        context: fakeContext(),
+        mail: recording.mail,
+        baseHost: "https://app.langwatch.ai",
+        seatRequests: { isSeatRequested },
+      });
+
+      await adapter.joinedAutomatically({
+        joinRequestId: "joinreq_1",
+        organizationId: "organization_acme",
+        requesterUserId: "user_lena",
+        domain: "acme.example",
+      });
+
+      expect(isSeatRequested).toHaveBeenCalledWith({
+        organizationId: "organization_acme",
+        userId: "user_lena",
+      });
+      expect(recording.sendJoinedAutomatically).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the joiner got a full seat", () => {
+    /** @scenario "A joiner with a full seat still gets the joined automatically mail" */
+    it("sends the joined automatically mail", async () => {
+      const recording = recordingMail();
+      const adapter = JoinRequestNotifierService.create({
+        audience: fakeAudience(),
+        context: fakeContext(),
+        mail: recording.mail,
+        baseHost: "https://app.langwatch.ai",
+        seatRequests: { isSeatRequested: async () => false },
+      });
+
+      await adapter.joinedAutomatically({
+        joinRequestId: "joinreq_1",
+        organizationId: "organization_acme",
+        requesterUserId: "user_mel",
+        domain: "acme.example",
+      });
+
+      expect(recording.sendJoinedAutomatically).toHaveBeenCalled();
+    });
+  });
 });

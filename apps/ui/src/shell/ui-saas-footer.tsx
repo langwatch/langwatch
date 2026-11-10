@@ -26,7 +26,8 @@ export function UiSaasFooter() {
 export function useUpdateLastLogin(): () => void {
   const rpc = useUiRpc();
   const { mutate } = useMutation({
-    mutationFn: () => rpc.mutate("user.updateLastLogin", {}),
+    // Recorded, not mutated: nothing on the page shows it, so no read is refetched.
+    mutationFn: () => rpc.record("user.updateLastLogin", {}),
     retry: shouldRetryQuery,
     retryDelay: queryRetryDelay,
   });

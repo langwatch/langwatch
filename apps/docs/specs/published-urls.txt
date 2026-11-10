@@ -613,10 +613,12 @@
 /coding-agents/find-your-context-sweet-spot
 /coding-agents/gemini-cli
 /coding-agents/github-copilot-cli
+/coding-agents/grok-cli
 /coding-agents/headless-and-ci
 /coding-agents/openai-codex
 /coding-agents/opencode
 /coding-agents/overview
+/coding-agents/pi
 /coding-agents/privacy
 /coding-agents/pull-requests
 /coding-agents/quickstart
@@ -661,6 +663,7 @@
 /evaluations/experiments/ui/answer-correctness
 /evaluations/experiments/ui/llm-as-a-judge
 /evaluations/experiments/ui/pairwise-compare
+/evaluations/experiments/versions-and-deploy-labels
 /evaluations/guardrails
 /evaluations/guardrails/code-integration
 /evaluations/guardrails/overview
@@ -678,6 +681,7 @@
 /features/instant-evals/cli
 /features/instant-evals/limits-and-cost
 /features/instant-evals/overview
+/features/instant-evals/own-model
 /features/instant-evals/questions
 /features/instant-evals/results
 /features/instant-evals/targets

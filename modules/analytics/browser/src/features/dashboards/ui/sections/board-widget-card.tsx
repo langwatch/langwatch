@@ -15,6 +15,7 @@ import { CHART_GRID_DRAG_HANDLE_CLASS } from "../../../../ui/sections/chart-grid
 import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
+import { useWidgetViewed } from "../../behavior/use-widget-viewed.ts";
 import type { WidgetSetup } from "../../langy/model/board-langy.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
@@ -47,12 +48,14 @@ export function BoardWidgetCard({
   dashboardId,
   boardName,
   period,
+  periodKey,
   isWriting,
   langy,
   onEdit,
   onDuplicate,
   onDelete,
   onEmptyChange,
+  onLimitFailureChange,
 }: {
   widget: BoardWidget;
   projectId: string;
@@ -61,6 +64,8 @@ export function BoardWidgetCard({
   /** The board's name, which an exported file is named for. */
   boardName: string;
   period: BoardPeriod;
+  /** The reader's chosen period, such as "1h:auto"; only a new choice restarts the widget. */
+  periodKey: string;
   isWriting: boolean;
   langy?: WidgetCardLangy;
   /**
@@ -72,11 +77,14 @@ export function BoardWidgetCard({
   onDelete?: () => void;
   /** Told whether the card shows none of the widget's data. */
   onEmptyChange?: (empty: boolean) => void;
+  /** Told whether the card's final failure is a resource limit. */
+  onLimitFailureChange?: (limited: boolean) => void;
 }) {
   const host = useAnalyticsHost();
   const readable = useReadableProjects({ projectId: host.project()?.id ?? "" });
   const clipboard = useWidgetClipboard({ dashboardId });
   const csvExport = useWidgetCsvExport({ board: boardName, widget: widget.name });
+  const viewRef = useWidgetViewed({ widgetSource: widget.definition.source?.kind ?? "unknown" });
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
   const [limits, setLimits] = useState("");
   // A widget the reader may not see offers nothing that reads its data: no Langy, alert or report.
@@ -90,6 +98,7 @@ export function BoardWidgetCard({
 
   return (
     <WidgetCardShell
+      viewRef={viewRef}
       name={widget.name}
       description={widget.definition.description}
       footer={widgetCardFooter({
@@ -149,10 +158,20 @@ export function BoardWidgetCard({
           maxHeight={widgetBodyHeightPx(widget.placement.rowSpan)}
           timeWindow={timeWindow}
           granularitySeconds={granularitySeconds}
+          periodKey={periodKey}
           onFaceChange={setFace}
+          limitAudience={{
+            kind: "editable",
+            editsDisabled: isWriting,
+            ...(langyOnData && onEdit
+              ? { onEditWithLangy: () => onEdit({ withLangy: true }) }
+              : {}),
+            ...(canEditCode && onEdit ? { onEditCode: () => onEdit({ withLangy: false }) } : {}),
+          }}
           onLimitsChange={setLimits}
           onExportChange={csvExport.onExportChange}
           onEmptyChange={onEmptyChange}
+          onLimitFailureChange={onLimitFailureChange}
           {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
         />
       )}

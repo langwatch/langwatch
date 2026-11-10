@@ -1,0 +1,117 @@
+Feature: An experiment run shows the agent version and the concurrency it ran with
+
+  An agent target can be pinned to a deploy label such as production instead of
+  a fixed version. The label moves when someone deploys another version, so two
+  runs pinned to the same label may have run different versions. A run also
+  takes its concurrency from the run API request or the workbench setting, else
+  the server default. Each run records the version its labels resolved to and
+  the concurrency it used when it started, and the results page shows both. Runs recorded before this keep showing what they recorded.
+
+  @unit
+  Scenario: A run records the version an agent label resolved to when it started
+    Given an agent target pinned to "production", which points at version 3
+    When the run's start is built
+    Then the run's target records the label "production" and version 3
+
+  @unit
+  Scenario: A target running the latest agent records no label
+    Given an agent target with no deploy label
+    When the run's start is built
+    Then the run's target records no label and no agent version
+
+  @unit
+  Scenario: A prompt target following the latest records the version it loaded
+    Given a prompt target with no pinned version, whose prompt loaded at version 4
+    When the run's start is built
+    Then the run's target records prompt version 4
+
+  @unit
+  Scenario: The run keeps the concurrency its plan carried
+    Given a run started with a plan whose concurrency is 1
+    When the start is folded into the run's state
+    Then the run holds concurrency 1
+
+  @unit
+  Scenario: A run started without a plan holds no concurrency
+    Given a run started by an SDK that sends no plan
+    When the start is folded into the run's state
+    Then the run holds no concurrency
+
+  @integration
+  Scenario: A stored run reads back its concurrency and its targets' label versions
+    Given a run stored with concurrency 2 and a target pinned to "production" at version 3
+    When the run and the experiment's run list are read
+    Then both carry concurrency 2
+    And the target reads label "production" at version 3
+
+  @integration
+  Scenario: A run stored before runs recorded concurrency reads none
+    Given a run stored with no concurrency
+    When the run is read
+    Then its concurrency is null
+
+  @integration
+  Scenario: A per-run concurrency is answered by the run API and leaves the saved setting alone
+    Given an experiment whose saved concurrency is 10
+    When a run is started through the run API with concurrency 1
+    Then the start answer and the poll answer carry concurrency 1
+    And the experiment's saved concurrency is still 10
+
+  @integration
+  Scenario: The results page shows the version a label resolved to
+    Given a run whose agent target ran "production" at version 3
+    When the results page shows that run
+    Then the target column header reads "production · v3"
+    And the run list entry reads "production · v3"
+
+  @integration
+  Scenario: A run recorded before label versions shows the label alone
+    Given a run whose agent target recorded "production" but no version
+    When the results page shows that run
+    Then the target column header reads "production"
+
+  @integration
+  Scenario: The run summary shows the concurrency the run used
+    Given a run that recorded concurrency 1
+    When the results page lists that run
+    Then its run list entry shows a "Concurrency 1" badge
+    And a run with no recorded concurrency shows no concurrency
+
+  @integration
+  Scenario: The concurrency badge explains what it counts
+    Given a run that recorded concurrency 1 and a run that recorded concurrency 10
+    When the results page lists them and shows each in the title
+    Then the concurrency 1 badge explains "Ran one cell at a time. A cell is one row against one target."
+    And the concurrency 10 badge explains "Ran up to 10 cells at once. A cell is one row against one target."
+    And keyboard and screen reader users get the same explanation from the focused run entry or title badge
+
+  @integration
+  Scenario: A run entry with many agent labels stays short
+    Given a run with four label-pinned agent targets
+    When the results page lists that run
+    Then its entry shows the first two label badges and a "+2" badge naming the rest
+
+  @unit
+  Scenario: A run's state read before the concurrency column exists answers no concurrency
+    Given a ClickHouse target without the experiment_runs Concurrency column
+    When a run's state is read
+    Then the read selects a null concurrency under the column name
+
+  @unit
+  Scenario: A run's state read once the concurrency column exists answers the stored concurrency
+    Given a ClickHouse target with the experiment_runs Concurrency column
+    When a run's state is read
+    Then the read selects the stored concurrency
+
+  @integration
+  Scenario: The selected run's title shows the concurrency it used
+    Given the results page shows a run that recorded concurrency 1
+    Then the title shows a "Concurrency 1" badge beside the run id
+    And a selected run with no recorded concurrency shows no concurrency in the title
+
+  @unit
+  Scenario: A release before label versions still reads the targets of a run that recorded one
+    Given a run target pinned to "production" at version 3
+    When the run stores its targets
+    Then the stored target passes the strict target schema of a release before label versions
+    And reading it back answers label "production" at version 3

@@ -12,7 +12,7 @@ import {
   forgetHeldAddressProof,
   type HeldAddressProof,
   holdAddressProof,
-  readHeldAddressProof,
+  takeHeldAddressProofOnReload,
 } from "../../behavior/held-address-proof.ts";
 import { usePasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
@@ -309,7 +309,7 @@ export function VerificationFirstSignUp() {
 
   const dialFederated = (method: SignInMethod) => {
     rememberPendingMethod(method);
-    void signIn(method.id, {
+    return signIn(method.id, {
       callbackUrl: callbackUrl ?? JOIN_BEFORE_CREATE_PATH,
       // The routed address prefills the provider's screen as the OIDC login hint.
       loginHint: routedEmail?.trim() || undefined,
@@ -858,7 +858,7 @@ function useHeldProofRestore({
   verifyToken: string | null | undefined;
   restoreEnrollment: (held: HeldAddressProof) => Promise<void>;
 }): boolean {
-  const [held] = useState(() => (verifyToken ? null : readHeldAddressProof()));
+  const [held] = useState(() => (verifyToken ? null : takeHeldAddressProofOnReload()));
   const [isRestoring, setIsRestoring] = useState(held !== null);
   const asked = useRef(false);
 

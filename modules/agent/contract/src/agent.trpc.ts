@@ -22,14 +22,14 @@ import {
   agentApiProjectInputSchema,
   agentApiPushToCopiesInputSchema,
 } from "./agent.schemas.ts";
-import { agentSchema, agentWithFieldsSchema } from "./agent.ts";
+import { AGENT_READ_HINTS, agentSchema, agentWithFieldsSchema } from "./agent.ts";
 
 export const agentTrpc = defineTrpcContract("agents")
-  .query("getAll")
+  .query("getAll", { invalidatedBy: AGENT_READ_HINTS })
   .withInput(agentApiProjectInputSchema)
   .withOutput(agentWithLegacyCopyCountSchema.array())
 
-  .query("getById")
+  .query("getById", { invalidatedBy: AGENT_READ_HINTS })
   .withInput(agentApiAgentInputSchema)
   .withOutput(agentWithLegacyCopyCountSchema)
 
@@ -49,7 +49,7 @@ export const agentTrpc = defineTrpcContract("agents")
   .withInput(agentApiAgentInputSchema)
   .withOutput(agentSchema)
 
-  .query("getCopies")
+  .query("getCopies", { invalidatedBy: AGENT_READ_HINTS })
   .withInput(agentApiAgentReferenceInputSchema)
   .withOutput(agentCopySchema.array())
 
@@ -61,11 +61,11 @@ export const agentTrpc = defineTrpcContract("agents")
   .withInput(agentApiAgentReferenceInputSchema)
   .withOutput(agentSyncFromSourceSchema)
 
-  .query("getHistory")
+  .query("getHistory", { invalidatedBy: AGENT_READ_HINTS })
   .withInput(agentApiAgentReferenceInputSchema)
   .withOutput(agentHistoryEntrySchema.array())
 
-  .query("listVersions")
+  .query("listVersions", { invalidatedBy: AGENT_READ_HINTS })
   .withInput(agentApiAgentReferenceInputSchema)
   .withOutput(agentVersionsSchema)
 

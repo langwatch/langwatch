@@ -102,6 +102,7 @@ export interface DatasetApi {
       name?: string;
       columnTypes?: DatasetColumns;
       datasetRecords?: UpsertDatasetInput["datasetRecords"];
+      columnRenames?: UpsertDatasetInput["columnRenames"];
     } & EditedBy,
   ) => Promise<Dataset>;
   validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult>;

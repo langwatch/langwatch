@@ -2,13 +2,16 @@
  * @vitest-environment node
  * @see modules/coding-agent/specs/coding-agent-session-stored.feature
  */
-import { CODING_AGENT_SESSION_STORED_EVENT_TYPE } from "@langwatch/coding-agent-contract";
+import {
+  CODING_AGENT_SESSION_STORED_EVENT_TYPE,
+  type CodingAgentSessionStoredEventData,
+} from "@langwatch/coding-agent-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import { RecordCodingAgentSessionStoredCommand } from "../coding-agent-project-milestones.commands.ts";
 
-const data = {
+const data: CodingAgentSessionStoredEventData = {
   tenantId: "project-1",
   projectId: "project-1",
   sessionId: "session-1",
@@ -17,7 +20,7 @@ const data = {
   occurredAt: 1_000,
 };
 
-function record(over: Partial<typeof data> = {}) {
+function record(over: Partial<CodingAgentSessionStoredEventData> = {}) {
   const [event] = new RecordCodingAgentSessionStoredCommand().handle({
     tenantId: createTenantId("project-1"),
     aggregateId: "project-1:1000",
@@ -43,6 +46,17 @@ describe("RecordCodingAgentSessionStoredCommand", () => {
     /** @scenario "A redelivered session-stored fact is one event" */
     it("keys both by the project, the session and its time", () => {
       expect(record().idempotencyKey).toBe(record().idempotencyKey);
+    });
+  });
+
+  describe("when the session learned its repo or terminal type at the same instant", () => {
+    /** @scenario "A session that learns its repo at the same instant is a distinct event" */
+    it("keys the repo's fact apart from the earlier one", () => {
+      expect(record({ repositoryKey: "a1b2" }).idempotencyKey).not.toBe(record().idempotencyKey);
+    });
+
+    it("keys the terminal type's fact apart from the earlier one", () => {
+      expect(record({ terminalType: "vscode" }).idempotencyKey).not.toBe(record().idempotencyKey);
     });
   });
 

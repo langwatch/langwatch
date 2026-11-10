@@ -109,3 +109,52 @@ describe("given a runner and an evaluator mapped to a dataset column", () => {
     });
   });
 });
+
+describe("given a runner and an evaluator mapped to dataset columns, edited in the columns drawer", () => {
+  const drawerColumns = () =>
+    store()
+      .datasets.find((d) => d.id === DATASET_ID)!
+      .columns.map((c) => ({ id: c.id, name: c.name, type: c.type }));
+
+  describe("when one save renames a column and deletes another", () => {
+    /** @scenario "Columns drawer edits carry mappings to renamed columns and clear those to deleted ones" */
+    it("maps the renamed column's readers to its new name and clears the deleted column's", () => {
+      store().applyDatasetColumnsEdit({
+        datasetId: DATASET_ID,
+        edited: {
+          datasetId: "",
+          name: "Test Data",
+          columnTypes: drawerColumns()
+            .filter((c) => c.name !== "input")
+            .map((c) => ({ ...c, name: "env" })),
+        },
+      });
+
+      expect(targetMappings()).toEqual({ environment: column("env") });
+      expect(evaluatorMappings()?.expected_output).toEqual(column("env"));
+      expect(evaluatorMappings()).toHaveProperty("output");
+    });
+  });
+
+  describe("when one save swaps two columns' names", () => {
+    /** @scenario "Columns drawer edits carry mappings to renamed columns and clear those to deleted ones" */
+    it("swaps the mappings with them", () => {
+      store().applyDatasetColumnsEdit({
+        datasetId: DATASET_ID,
+        edited: {
+          datasetId: "",
+          name: "Test Data",
+          columnTypes: drawerColumns().map((c) => ({
+            ...c,
+            name: c.name === "input" ? "environment" : "input",
+          })),
+        },
+      });
+
+      expect(targetMappings()).toEqual({
+        input: column("environment"),
+        environment: column("input"),
+      });
+    });
+  });
+});

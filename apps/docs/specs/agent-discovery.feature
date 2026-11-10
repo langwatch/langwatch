@@ -38,6 +38,10 @@ Feature: Agents discover the documentation and its skills
     Then the preview answers with the Markdown twin as text/markdown
     And every page response names its twin in a Link header and varies by Accept
     But a browser asking for HTML still gets the page
+    And a crawler that does not ask for Markdown gets the page, whatever its user agent
+  # Markdown by user agent would answer AI crawlers differently from readers, which search
+  # engines treat as cloaking; the big AI crawlers read HTML well, and the Link header and
+  # the page head name the twin for any that want it (issue 9459, item 2).
 
   @unit
   Scenario: Serve files with the caching a production host gives them

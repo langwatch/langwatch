@@ -285,6 +285,31 @@ describe("redeeming an activation code", () => {
     expect(licenses.issued).toHaveLength(1);
   });
 
+  /** @scenario "A code this install already redeemed is refused as used here" */
+  it("tells an install that redeems its own used code again that the code was used here", async () => {
+    const { service, licenses } = harness();
+    await redeemCode(service, { code: CODE, instanceId: "install-1" });
+
+    const again = redeemCode(service, { code: CODE, instanceId: "install-1" });
+
+    await expect(again).rejects.toBeInstanceOf(ActivationCodeAlreadyRedeemedError);
+    await expect(again).rejects.toMatchObject({ meta: { sameInstall: true } });
+    expect(licenses.issued).toHaveLength(1);
+  });
+
+  /** @scenario "A code another install redeemed is refused as used elsewhere" */
+  it("tells another install that the code was used elsewhere", async () => {
+    const { service } = harness();
+    await redeemCode(service, { code: CODE, instanceId: "install-1" });
+
+    await expect(
+      redeemCode(service, { code: CODE, instanceId: "install-2" }),
+    ).rejects.toMatchObject({
+      code: "activation_code_already_redeemed",
+      meta: { sameInstall: false },
+    });
+  });
+
   /** @scenario "A claim whose license could not be signed is released again" */
   it("puts the claim back when signing failed, so the code is not burned", async () => {
     const { service, licenses, repository } = harness();

@@ -3,6 +3,7 @@
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { findDecisionModel } from "@langwatch/model-provider-contract";
 import { cleanup, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -38,9 +39,9 @@ import { ModelSelector } from "../model-selector.tsx";
 const BUILT_IN = { value: "langwatch/instant-evals", label: "Instant Evals" };
 const OWN_DECISION_BUILT_IN = {
   value: "openai/decisions:gpt-6-luna",
-  label: "OpenAI Decisions API",
+  label: "gpt-6-luna",
 };
-const UNSTORED_PROVIDER_BUILT_IN = { value: "cloudflare/decisions:clef", label: "Cloudflare Clef" };
+const UNSTORED_PROVIDER_BUILT_IN = { value: "cloudflare/decisions:clef", label: "Clef" };
 
 afterEach(() => {
   cleanup();
@@ -107,8 +108,42 @@ describe("<ModelSelector/>", () => {
       );
 
       const listbox = screen.getByRole("listbox", { hidden: true });
-      expect(within(listbox).getAllByText("LangWatch")).toHaveLength(1);
+      expect(within(listbox).getAllByText("Decision models")).toHaveLength(1);
       expect(within(listbox).getByText("OpenAI")).toBeInTheDocument();
+    });
+  });
+
+  describe("given decision models the server titles from the catalogue", () => {
+    /** @scenario "The picker names a decision model by its catalogue title, an LLM by its id" */
+    it("titles each Decisions row Decisions API with its catalogue line, and leaves the LLM as its id", () => {
+      storedProviders.current = [STORED_OPENAI];
+      const decisionModels = ["openai/decisions:gpt-6-luna", "azure/decisions:gpt-6-luna"].map(
+        (id) => ({ value: id, label: findDecisionModel(id)?.label ?? id }),
+      );
+
+      renderWithDesignSystem(
+        <ModelSelector
+          model=""
+          options={["openai/gpt-6-luna"]}
+          onChange={() => undefined}
+          builtInModels={decisionModels}
+        />,
+      );
+
+      const listbox = screen.getByRole("listbox", { hidden: true });
+      const rows = within(listbox).getAllByRole("option", { hidden: true });
+      const rowFor = (value: string) => rows.find((row) => row.dataset.value === value);
+      const openai = rowFor("openai/decisions:gpt-6-luna");
+      const azure = rowFor("azure/decisions:gpt-6-luna");
+      for (const row of [openai, azure]) {
+        expect(row).toHaveTextContent("Decisions API");
+        expect(row).not.toHaveTextContent("(gpt-6-luna)");
+        expect(row?.querySelector("svg, img")).not.toBeNull();
+      }
+      expect(openai).toHaveTextContent("OpenAI's Decisions API, on your OpenAI key.");
+      const llm = rowFor("openai/gpt-6-luna");
+      expect(llm?.textContent).toBe("gpt-6-luna");
+      expect(within(llm!).queryByTestId("model-option-subtitle")).not.toBeInTheDocument();
     });
   });
 

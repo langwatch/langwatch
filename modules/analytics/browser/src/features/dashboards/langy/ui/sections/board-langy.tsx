@@ -4,6 +4,9 @@
  * chips ask Langy, when the member has it. A read-only board without Langy shows no bar.
  */
 
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { langyQuestionAsked } from "@langwatch/langy-contract";
+
 import type { BoardPeriod } from "../../../model/board-period.ts";
 import { useLangyAsk } from "../../behavior/use-board-langy.ts";
 import {
@@ -28,8 +31,13 @@ export function BoardLangy({
   onOpenPicker?: () => void;
 }) {
   const langy = useLangyAsk();
+  const analytics = useUiAnalytics();
+  // The one ask a person makes: a question submitted here. Drafts the app seeds send nothing.
   const onAsk = langy.enabled
-    ? (question: string) => langy.ask(boardQuestion({ question, board, period }))
+    ? (question: string) => {
+        langy.ask(boardQuestion({ question, board, period }));
+        analytics.track(langyQuestionAsked({ surface: "ask_bar" }));
+      }
     : void 0;
   const chips = withSuggestions ? SUGGESTED_QUESTIONS : [];
   if (onOpenPicker) {

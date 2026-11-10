@@ -38,7 +38,13 @@ import {
 import { experimentApi } from "../experiment-api.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 import { useOpenEvaluatorEditor } from "./use-open-evaluator-editor.ts";
-import { scrollToTargetColumn, useOpenTargetEditor } from "./use-open-target-editor.ts";
+import {
+  agentTargetDrawerCallbacks,
+  buildUIMappings,
+  isAgentTargetDrawer,
+  scrollToTargetColumn,
+  useOpenTargetEditor,
+} from "./use-open-target-editor.ts";
 
 /** Collects a not-yet-created prompt's mapping edits into `pending.current`, keyed by input. */
 const recordPendingMapping =
@@ -331,6 +337,40 @@ export const useWorkbenchEvaluatorAdd = () => {
   return { handleAddEvaluator };
 };
 
+/** An agent target's drawer keeps its callbacks and sources in memory; a reload re-wires them. */
+const useRewireAgentTargetDrawer = ({
+  buildAvailableSources,
+  isDatasetSource,
+  updateTarget,
+}: Pick<ReturnType<typeof useOpenTargetEditor>, "buildAvailableSources" | "isDatasetSource"> & {
+  updateTarget: (targetId: string, updates: Partial<TargetConfig>) => void;
+}) => {
+  const { currentDrawer } = useDrawer();
+  const experimentId = useEvaluationsV3Store((state) => state.experimentId);
+  const drawerParams = useDrawerParams();
+  const targetId = drawerParams.targetId;
+  useEffect(() => {
+    if (!isAgentTargetDrawer(currentDrawer) || !experimentId || !targetId) return;
+    if (getFlowCallbacks(currentDrawer)?.onAgentLabelChange) return;
+    const state = useEvaluationsV3Store.getState();
+    const target = state.targets.find((row) => row.id === targetId && row.type === "agent");
+    if (!target) return;
+    setFlowCallbacks(
+      currentDrawer,
+      agentTargetDrawerCallbacks({
+        targetId,
+        datasetId: state.activeDatasetId,
+        isDatasetSource,
+        updateTarget,
+      }),
+    );
+    setComplexProps({
+      availableSources: buildAvailableSources(targetId),
+      inputMappings: buildUIMappings(target, state.activeDatasetId),
+    });
+  }, [buildAvailableSources, currentDrawer, experimentId, isDatasetSource, targetId, updateTarget]);
+};
+
 /** The add-target and switch-target flows, and their comparison context after a reload. */
 export const useWorkbenchAddTargetFlow = ({
   pendingMappingsRef,
@@ -501,6 +541,8 @@ export const useWorkbenchAddTargetFlow = ({
     updateTarget,
     updateTargetComparison,
   ]);
+
+  useRewireAgentTargetDrawer({ buildAvailableSources, isDatasetSource, updateTarget });
 
   // Handler for switching a target (replace with another prompt/agent/evaluator)
   // Opens the specific drawer based on target type

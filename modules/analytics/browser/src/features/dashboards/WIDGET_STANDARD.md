@@ -34,7 +34,7 @@ and draws one of these states:
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | loading      | A skeleton until a query first answers; "Still loading…" after 5 seconds. See "Loading" below.                                                                            |
 | `no_access`  | What is withheld and who to ask, with a lock. See "No access" below.                                                                                                      |
-| failed       | "Couldn't load <widget>", the reason, and Retry. Retry runs all the widget's queries again.                                                                               |
+| failed       | "Couldn't load", the reason, and Retry; the card title names the widget. Retry runs all the widget's queries again. Short faces show whole lines only.                    |
 | `no_traffic` | "No traces in this period", naming what the query counts, and what sends it. See "Empty widgets" below.                                                                   |
 | `missing`    | The setup view: "Needs <field>", what sends it, and "Ask Langy to help" when the board offers Langy.                                                                      |
 | `partial`    | The widget's own card, with a clean face. The (i) says what is missing: "Total cost on 400 of 1,000 traces. No price for my-finetune-v2 (600 traces)." and "Add a price". |

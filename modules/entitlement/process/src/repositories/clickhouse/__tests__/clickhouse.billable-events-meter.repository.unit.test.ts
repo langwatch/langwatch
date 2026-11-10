@@ -76,3 +76,26 @@ describe("BillableEventsMeterClickHouseRepository.countByProjects", () => {
     });
   });
 });
+
+describe("BillableEventsMeterClickHouseRepository.countByDay", () => {
+  describe("given an organization metered in events", () => {
+    it("reads uniq keys per UTC day across the named projects", async () => {
+      const { meter, statements } = meterOver([{ day: "2026-09-02", total: "4" }]);
+
+      await expect(meter.countByDay(READ)).resolves.toEqual([{ day: "2026-09-02", count: 4 }]);
+      const sql = statements[0]?.query.replace(/\s+/g, " ");
+      expect(sql).toContain(
+        "SELECT toString(toDate(EventTimestamp, 'UTC')) as day, uniq(DeduplicationKeyHash) as total",
+      );
+      expect(sql).toContain("AND TenantId IN {projectIds:Array(String)}");
+      expect(sql).toContain("GROUP BY day ORDER BY day");
+    });
+
+    it("asks nothing for an organization with no projects", async () => {
+      const { meter, statements } = meterOver([]);
+
+      await expect(meter.countByDay({ ...READ, projectIds: [] })).resolves.toEqual([]);
+      expect(statements).toHaveLength(0);
+    });
+  });
+});

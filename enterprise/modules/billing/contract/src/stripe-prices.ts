@@ -30,6 +30,10 @@ export const STRIPE_PRICE_NAMES = [
   "GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026",
   "GROWTH_INSTANT_EVAL_USD",
   "CONNECTED_HOSTED_USAGE_QUARTERLY",
+  "DEVELOPER_SEAT_EUR_MONTHLY",
+  "DEVELOPER_SEAT_EUR_ANNUAL",
+  "DEVELOPER_SEAT_USD_MONTHLY",
+  "DEVELOPER_SEAT_USD_ANNUAL",
 ] as const;
 
 export type StripePriceName = (typeof STRIPE_PRICE_NAMES)[number];
@@ -42,7 +46,20 @@ export type StripePriceName = (typeof STRIPE_PRICE_NAMES)[number];
 export const OPTIONAL_STRIPE_PRICE_NAMES: readonly StripePriceName[] = [
   "GROWTH_INSTANT_EVAL_USD",
   "CONNECTED_HOSTED_USAGE_QUARTERLY",
+  "DEVELOPER_SEAT_EUR_MONTHLY",
+  "DEVELOPER_SEAT_EUR_ANNUAL",
+  "DEVELOPER_SEAT_USD_MONTHLY",
+  "DEVELOPER_SEAT_USD_ANNUAL",
 ];
+
+/** Prices that are optional: absent until an operator provisions them in a mode. */
+type OptionalStripePriceName =
+  | "GROWTH_INSTANT_EVAL_USD"
+  | "CONNECTED_HOSTED_USAGE_QUARTERLY"
+  | "DEVELOPER_SEAT_EUR_MONTHLY"
+  | "DEVELOPER_SEAT_EUR_ANNUAL"
+  | "DEVELOPER_SEAT_USD_MONTHLY"
+  | "DEVELOPER_SEAT_USD_ANNUAL";
 
 export type StripeEnvironment = "test" | "live";
 
@@ -74,10 +91,7 @@ export type StripePricesFile = {
 
 /** Resolved ids; an optional price is absent until its mode is provisioned. */
 export type StripePriceMap = Partial<Record<StripePriceName, string>> &
-  Record<
-    Exclude<StripePriceName, "GROWTH_INSTANT_EVAL_USD" | "CONNECTED_HOSTED_USAGE_QUARTERLY">,
-    string
-  >;
+  Record<Exclude<StripePriceName, OptionalStripePriceName>, string>;
 
 const stripePriceRecurringSchemaDefinition = z.object({
   interval: z.enum(["day", "week", "month", "year"]),

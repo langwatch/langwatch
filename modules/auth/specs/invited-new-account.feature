@@ -84,6 +84,13 @@ Feature: An invited person without an account gets in by any method
       And no new confirmation link is asked for
 
     @integration
+    Scenario: A fresh visit to sign-up starts at the address step
+      Given a tab holding a confirmed address from an earlier sign-up
+      When the person opens the sign-up page again without reloading it
+      Then the address step shows
+      And the tab no longer holds the earlier address
+
+    @integration
     Scenario: A held proof the server refuses falls back to the address step
       Given a tab holding a confirmed address whose proof was spent or expired
       When the sign-up page loads
@@ -108,6 +115,13 @@ Feature: An invited person without an account gets in by any method
       When the person opens the confirmation link again
       Then the screen says the person is signed in instead of asking them to log in
       And the browser goes on to where the link was taking it
+
+    @integration
+    Scenario: A member opening an invitation they already accepted goes in
+      Given a person signed in whose invitation was already accepted
+      When they open the invitation link again
+      Then they are not offered to join again
+      And the browser goes on into LangWatch
 
     @integration
     Scenario: A dead confirmation link in a browser already signed in goes on

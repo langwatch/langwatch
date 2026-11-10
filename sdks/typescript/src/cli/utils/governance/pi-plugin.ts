@@ -98,10 +98,17 @@ export function ensurePiTelemetryExtension({
 }
 
 /** What to tell the user when a file of theirs holds the extension's path. */
-export function piExtensionNotOursNotice({ displayPath }: { displayPath: string }): string {
+export function piExtensionNotOursNotice({
+  displayPath,
+  command = "langwatch pi",
+}: {
+  displayPath: string;
+  /** The command to run again once the user's file is out of the way. */
+  command?: string;
+}): string {
   return (
     `${displayPath} is not a LangWatch file, so it was left alone, and pi sessions send no ` +
-    `telemetry. Rename yours, then run \`langwatch pi\` again.`
+    `telemetry. Rename yours, then run \`${command}\` again.`
   );
 }
 

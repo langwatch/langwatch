@@ -184,6 +184,8 @@ export class TestAuthzApi implements AuthzApi {
   effectivePermissionsFor =
     unsupported<AuthzApi["effectivePermissionsFor"]>("effectivePermissionsFor");
   check = unsupported<AuthzApi["check"]>("check");
+  listBillingMembers = unsupported<AuthzApi["listBillingMembers"]>("listBillingMembers");
+  setBillingRole = unsupported<AuthzApi["setBillingRole"]>("setBillingRole");
   checkDetailed = unsupported<AuthzApi["checkDetailed"]>("checkDetailed");
   can = unsupported<AuthzApi["can"]>("can");
   authorize = unsupported<AuthzApi["authorize"]>("authorize");

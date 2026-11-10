@@ -14,7 +14,7 @@ import {
 const BUILT_IN = { value: "langwatch/instant-evals", label: "Instant Evals" };
 const OWN_DECISION_BUILT_IN = {
   value: "openai/decisions:gpt-6-luna",
-  label: "OpenAI Decisions API",
+  label: "gpt-6-luna",
 };
 
 describe("modelSelectionFrom", () => {
@@ -31,7 +31,7 @@ describe("modelSelectionFrom", () => {
       expect(selectOptions.map((option) => option.value)).toEqual(["langwatch/instant-evals"]);
       expect(selectOptions[0]?.label).toBe("Instant Evals");
       expect(groupedByProvider).toEqual([
-        { provider: BUILT_IN_MODELS_GROUP_KEY, label: "LangWatch", models: selectOptions },
+        { provider: BUILT_IN_MODELS_GROUP_KEY, label: "Decision models", models: selectOptions },
       ]);
     });
   });
@@ -73,7 +73,7 @@ describe("modelSelectionFrom", () => {
     it("heads that one group once, and the provider's group by its own name", () => {
       const groups = grouped();
 
-      expect(groups.filter((group) => group.label === "LangWatch")).toHaveLength(1);
+      expect(groups.filter((group) => group.label === "Decision models")).toHaveLength(1);
       expect(groups[0]?.models.map((model) => model.value)).toEqual([
         BUILT_IN.value,
         OWN_DECISION_BUILT_IN.value,

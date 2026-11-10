@@ -49,6 +49,8 @@ type RoleDialogProps = {
   organizationId: string;
   editing: EditedRole | null;
   onClose: () => void;
+  /** Offered while editing, for a reader who may delete the role. */
+  onDelete?: () => void;
 };
 
 export function RoleDialog(props: RoleDialogProps) {
@@ -66,6 +68,11 @@ export function RoleDialog(props: RoleDialogProps) {
         form: ROLE_FORM_ID,
         loading: form.saving,
       }}
+      secondaryActions={
+        props.editing && props.onDelete
+          ? [{ label: "Delete role", tone: "danger", onClick: props.onDelete }]
+          : void 0
+      }
     >
       <RoleFormBody organizationId={props.organizationId} {...form} />
     </Dialog>

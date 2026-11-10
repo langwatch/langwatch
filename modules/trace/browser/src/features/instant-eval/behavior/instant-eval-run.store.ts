@@ -12,9 +12,10 @@ import { isExplorerInstantEvalRunActive } from "@langwatch/trace-contract";
 
 /**
  * Where a run is, as the page shows it. Counters can still move after the
- * status turns terminal, so the page reads until they hold still.
+ * status turns terminal, so the page reads until they hold still. A failed run
+ * says so at once and keeps saying it, settled or not, until the query changes.
  */
-export type InstantEvalRunPhase = "judging" | "stopping" | "settling" | "settled";
+export type InstantEvalRunPhase = "judging" | "stopping" | "settling" | "settled" | "failed";
 
 /**
  * A run read for the first time this long after it ended is taken as settled:
@@ -34,6 +35,7 @@ export function instantEvalRunPhase({
   if (isExplorerInstantEvalRunActive(run.status)) {
     return isStopRequested ? "stopping" : "judging";
   }
+  if (run.status === "failed") return "failed";
   return isSettled ? "settled" : "settling";
 }
 
