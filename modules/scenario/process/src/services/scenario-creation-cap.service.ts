@@ -52,8 +52,21 @@ export class ScenarioCreationCapService {
     event: { type: string; scenarioSetId?: string | undefined };
   }): Promise<void> {
     if (input.event.type !== ScenarioEventType.RUN_STARTED) return;
-    const scenarioSetId = input.event.scenarioSetId;
-    if (scenarioSetId && !isCountedScenarioSet(scenarioSetId)) return;
+    await this.assertRunAllowed({
+      projectId: input.projectId,
+      scenarioSetId: input.event.scenarioSetId,
+    });
+  }
+
+  /**
+   * Asks the run cap before a run is queued, so the caller that started it gets the refusal.
+   * @throws LimitExceededError (`scenarioRuns`)
+   */
+  async assertRunAllowed(input: {
+    projectId: string;
+    scenarioSetId?: string | undefined;
+  }): Promise<void> {
+    if (input.scenarioSetId && !isCountedScenarioSet(input.scenarioSetId)) return;
 
     const organizationId = await this.deps.projects.getOrganizationId(input.projectId);
     await this.deps.plans.assertScenarioRunAllowed({ organizationId });

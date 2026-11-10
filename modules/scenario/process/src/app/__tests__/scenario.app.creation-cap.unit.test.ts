@@ -1,6 +1,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -43,7 +44,9 @@ const CLOUD_FREE: Plan = {
 const BY = { id: "user-1", label: "user" } as const;
 
 /** An organization on cloud Free whose two projects already hold 3 active scenarios. */
-async function organizationAtTheScenarioCap() {
+async function organizationAtTheScenarioCap({
+  runCap = async () => {},
+}: { runCap?: EntitlementApi["assertScenarioRunAllowed"] } = {}) {
   const repositories = MemoryScenarioRepositories.create();
   for (let index = 0; index < 3; index++) {
     await repositories.scenarios.create({
@@ -68,7 +71,10 @@ async function organizationAtTheScenarioCap() {
         getOrganizationId: async () => "organization-1",
         listIdsByOrganization: async () => ["project-1", "project-2"],
       }),
-      plans: createApiFixture<EntitlementApi>({ getActivePlan: async () => CLOUD_FREE }),
+      plans: createApiFixture<EntitlementApi>({
+        getActivePlan: async () => CLOUD_FREE,
+        assertScenarioRunAllowed: runCap,
+      }),
       modelProviders: createApiFixture<ModelProviderApi>(),
       presence: createApiFixture<PresenceApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
@@ -133,6 +139,39 @@ describe("ScenarioModule on the cloud Free scenario cap", () => {
       );
 
       expect(updated.name).toBe("Renamed");
+    });
+  });
+});
+
+describe("ScenarioModule on the cloud Free scenario run cap", () => {
+  describe("given an organization past the month's run cap", () => {
+    /** @scenario Running a scenario from the app past the run cap opens the upgrade prompt */
+    it("refuses queueing a run with the upgrade shape", async () => {
+      const { app } = await organizationAtTheScenarioCap({
+        runCap: async () => {
+          throw new LimitExceededError("scenarioRuns", 100, 100);
+        },
+      });
+
+      await expect(
+        app.queueSimulationRun({
+          projectId: "project-1",
+          scenarioId: "scenario-0",
+          scenarioRunId: "scenariorun-1",
+          batchRunId: "batch-1",
+          setId: "set-1",
+          name: "Scenario 0",
+          target: { type: "http", referenceId: "agent-1" },
+          parameters: {},
+          secretParameters: {},
+          note: undefined,
+          scenarioVersion: undefined,
+        }),
+      ).rejects.toMatchObject({
+        code: "resource_limit_exceeded",
+        httpStatus: 403,
+        meta: { limitType: "scenarioRuns", current: 100, max: 100 },
+      });
     });
   });
 });

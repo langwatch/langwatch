@@ -58,6 +58,21 @@ Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
     Then the run is refused with limit type "scenarioRuns", current 100 and max 100
 
   @unit
+  Scenario: Running a scenario from the app past the run cap opens the upgrade prompt
+    Given the organization is on the cloud Free plan
+    And it is past the month's run cap
+    When a member clicks Run on a scenario or a suite
+    Then the run is refused before it is queued
+    And the refusal carries limit type "scenarioRuns" with status 403, which opens the upgrade prompt
+
+  @unit
+  Scenario: A run reported through the SDK past the run cap is refused with the limit shape
+    Given the organization is on the cloud Free plan
+    And it is past the month's run cap
+    When the SDK reports a run start for a new run
+    Then the event is refused with limit type "scenarioRuns" and nothing is stored
+
+  @unit
   Scenario: Cloud Free allows runs below the monthly cap after the grace
     Given the organization is on the cloud Free plan
     And its first scenario run was 20 days ago

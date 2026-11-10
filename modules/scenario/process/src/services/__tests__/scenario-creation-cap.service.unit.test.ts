@@ -91,6 +91,7 @@ describe("ScenarioCreationCapService", () => {
         expect(assertScenarioRunAllowed).toHaveBeenCalledWith({ organizationId: "organization-1" });
       });
 
+      /** @scenario A run reported through the SDK past the run cap is refused with the limit shape */
       it("passes the run cap's refusal through", async () => {
         const { service } = capsWith({
           runCap: async () => {
