@@ -6,7 +6,7 @@ import type { NurturingClaimRepository } from "../repositories/nurturing-claim.r
 import type { NurturingMilestonesRepository } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingProjectDirectoryRepository } from "../repositories/nurturing-project-directory.repository.ts";
 import type { NurturingProjectUsageReadRepository } from "../repositories/nurturing-project-usage.repository.ts";
-import type { NurturingTraceDayRepository } from "../repositories/nurturing-trace-day.repository.ts";
+import type { NurturingTraceDayReadRepository } from "../repositories/nurturing-trace-day.repository.ts";
 import {
   organizationUsageTraits,
   PROJECT_USAGE_WINDOW_MS,
@@ -26,10 +26,7 @@ const COST_READ_CLAIM_SECONDS = 26 * 60 * 60;
 
 type OrganizationUsageDependencies = Readonly<{
   projectUsage: NurturingProjectUsageReadRepository;
-  traceDays: Pick<
-    NurturingTraceDayRepository,
-    "findForProjects" | "pruneBefore" | "findSeeds" | "recordSeed"
-  >;
+  traceDays: NurturingTraceDayReadRepository;
   /** Trace's read of its rollup: the daily cost (a span has no price), and each project's seed. */
   traces: Pick<TraceApi, "findTraceUsageByDay">;
   claims: NurturingClaimRepository;

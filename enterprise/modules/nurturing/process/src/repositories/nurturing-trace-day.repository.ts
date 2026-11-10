@@ -17,10 +17,8 @@ export function traceDayOfKey(key: string): Readonly<{ projectId: string; day: s
   return { projectId: key.slice(0, split), day: key.slice(split + 1) };
 }
 
-/** Nurturing's per-project, per-day trace counts: the fold's store, its read and its retention. */
-export interface NurturingTraceDayRepository {
-  /** The fold's store; its rows are keyed {@link traceDayKey}. */
-  readonly store: FoldProjectionStore<NurturingTraceDayState>;
+/** The read, retention and seed of the per-project, per-day trace counts: no fold write. */
+export interface NurturingTraceDayReadRepository {
   /** The projects' days after `afterDay`, of the current version. */
   findForProjects(
     input: Readonly<{ projectIds: readonly string[]; afterDay: string }>,
@@ -42,4 +40,10 @@ export interface NurturingTraceDayRepository {
       days: readonly NurturingTraceDayState[];
     }>,
   ): Promise<void>;
+}
+
+/** Nurturing's per-project, per-day trace counts: the fold's store, and the read over its rows. */
+export interface NurturingTraceDayRepository extends NurturingTraceDayReadRepository {
+  /** The fold's store; its rows are keyed {@link traceDayKey}. */
+  readonly store: FoldProjectionStore<NurturingTraceDayState>;
 }
