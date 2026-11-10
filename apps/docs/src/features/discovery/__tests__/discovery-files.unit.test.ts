@@ -30,6 +30,7 @@ describe("documentation discovery", () => {
     expect(files["robots.txt"]).toContain("Sitemap: https://langwatch.ai/docs/sitemap.xml");
     expect(files["agents.txt"]).toContain("not automatically installed agent configuration");
     expect(files["humans.txt"]).toContain("Reasoning Engine B.V.");
+    expect(files["indexnow.txt"]).toMatch(/^[0-9a-f]{32}\n$/);
     expect(files["llms.txt"]).toContain(
       "- [Coding agents](https://langwatch.ai/docs/coding-agents/overview.md): Trace agents",
     );
@@ -127,7 +128,7 @@ describe("when agents read the whole documentation", () => {
       "User-agent: *\nContent-Signal: ai-train=yes, search=yes, ai-input=yes\nAllow: /",
     );
     expect(robots).toContain(
-      "User-agent: CCBot\nContent-Signal: ai-train=yes, search=yes, ai-input=yes\nAllow: /",
+      `User-agent: ${AI_CRAWLERS.at(-1)}\nContent-Signal: ai-train=yes, search=yes, ai-input=yes\nAllow: /`,
     );
     expect(robots).toContain("Sitemap: https://langwatch.ai/docs/sitemap.xml");
   });

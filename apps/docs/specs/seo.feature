@@ -23,10 +23,11 @@ Feature: Search metadata matches the published documentation
 
   @unit
   Scenario: Describe a guide to search engines as a technical article
-    Given a guide with a known last commit date, and an organization that lists its X profile
+    Given a guide with known first and last commit dates, and an organization that lists its X profile
     When its head is generated
     Then its structured data is a TechArticle with a headline, language, image, author and publisher
-    And its social type is article, with the commit date as its modified time
+    And it is dated published at its first commit and modified at its last
+    And its social type is article, with the same published and modified times
     And the social card names the organization's X account
     But the docs home stays a web page that is part of the documentation website
 

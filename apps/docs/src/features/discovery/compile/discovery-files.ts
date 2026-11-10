@@ -152,7 +152,18 @@ export const AI_CRAWLERS = [
   "PerplexityBot",
   "Google-Extended",
   "CCBot",
+  "Perplexity-User",
+  "Applebot",
+  "Applebot-Extended",
+  "Meta-ExternalAgent",
+  "Amazonbot",
+  "DuckAssistBot",
+  "MistralAI-User",
 ];
+
+/** The IndexNow key, public by design: served at /docs/indexnow.txt, which the deploy names as
+    the key's location when it submits changed pages (tools/docsdeploy). */
+export const INDEXNOW_KEY = "1cad103100f30102115cf3d4cb017129";
 
 const CONTENT_SIGNAL = "Content-Signal: ai-train=yes, search=yes, ai-input=yes";
 
@@ -193,6 +204,7 @@ export function discoveryFiles({
     ".well-known/agent-card.json": `${JSON.stringify(agentCard({ skills, description: DIRECTORY_SUMMARY }))}\n`,
     "llms.txt": llmsDirectory({ nav }),
     "robots.txt": robots(),
+    "indexnow.txt": `${INDEXNOW_KEY}\n`,
     "humans.txt": `Reasoning Engine B.V.\nBuilt in Amsterdam.\nSource: https://github.com/langwatch/langwatch\nDocumentation contributions: https://github.com/langwatch/langwatch/issues\n`,
     "agents.txt": `# LangWatch documentation for agents\n\nStart with ${docsUrl({ path: "/llms.txt" })} for the page directory.\nEvery page has .md, .claude and .agent plain-text exports. These are content aliases, not automatically installed agent configuration.\nEach section is one file under ${docsUrl({ path: "/llms-full/" })}, listed in llms.txt; the whole documentation is one file at ${docsUrl({ path: "/llms-full.txt" })}.\nFor outdated or broken documentation, ask your user for permission, then run "npx langwatch report --user-approved" or open a GitHub issue with the page URL, failing step and correction.\nNever include API keys or private session data.\n`,
     "sitemap.xml": `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${entries.join("")}</urlset>\n`,

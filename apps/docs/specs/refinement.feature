@@ -16,6 +16,7 @@ Feature: Actionable documentation and restrained reading surfaces
     Given a generated documentation page
     Then its md, claude and agent exports contain the same page source
     And robots, humans, agents and sitemap metadata are available
+    And the IndexNow key is served at indexnow.txt, for the deploy to name when it submits changed pages
     And canonical, sitemap and llms.txt addresses name https://langwatch.ai/docs, where the docs are served
     And the sitemap dates each page by its last commit when the full history is available
     And llms-full.txt holds every page's Markdown in reading order, after the agent guidance
