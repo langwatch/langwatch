@@ -334,6 +334,14 @@ describe("a failed step", () => {
     });
 
     /** @scenario "A stopped turn keeps its failures folded while it is the latest turn" */
+    it("folds the failure into the receipt when the turn is stopped while still streaming", () => {
+      renderActivity({ parts: [failA], live: true, interrupted: true });
+
+      expect(receiptSteps().getByText("cat a.txt")).toBeTruthy();
+      expect(receiptHeader().textContent).toContain("1 action failed");
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
     it("titles the receipt by the failure when a reload ends the turn on an unfinished step", () => {
       renderActivity({ parts: [failA, runningRead], live: false, interrupted: false });
 

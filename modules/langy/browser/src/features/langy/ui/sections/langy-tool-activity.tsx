@@ -598,7 +598,7 @@ export function LangyActivityParts({
   });
   const heldFailure = heldFailureOf({
     view,
-    held: live && !busy,
+    held: live && !interrupted && !busy,
     folded: foldedFailures,
     later: [
       ...allCompletedGroups.map((group) => ({ order: group.lastOrder })),
