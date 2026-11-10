@@ -22,13 +22,15 @@ const RUN_STARTS = { eventType: SIMULATION_RUN_EVENT_TYPES.STARTED } as const;
 
 const defaultLogger = createLogger("langwatch:entitlement:scenario-run-cap");
 
-/** How long a month's count is reused at the door; accepted runs are added to it meanwhile. */
+/** How long a month's meter count is reused at the door; pending runs are added to it. */
 const RUN_COUNT_CACHE_TTL_MS = 30_000;
+/** A keyed run the meter has not seen by then never started, so it frees its slot. */
+const PENDING_RUN_TTL_MS = 10 * 60_000;
 
 type ScenarioRunCapDependencies = Readonly<{
   meter: Pick<
     BillableEventsMeterRepository,
-    "countEventType" | "findFirstEventAt" | "hasDeduplicationKey"
+    "countEventType" | "findFirstEventAt" | "hasDeduplicationKey" | "findDeduplicationKeys"
   >;
   plans: { getActivePlan(input: { organizationId: string }): Promise<Plan> };
   now: () => number;
@@ -42,7 +44,10 @@ type ScenarioRunCapDependencies = Readonly<{
  */
 export class ScenarioRunCapService {
   readonly #firstRuns = new Map<string, number>();
-  readonly #monthRuns = new Map<string, { month: string; runs: number; expiresAt: number }>();
+  readonly #monthRuns = new Map<string, { month: string; meterRuns: number; expiresAt: number }>();
+  /** Accepted runs the meter may not hold yet, by start key (or a local id), with when accepted. */
+  readonly #pendingRuns = new Map<string, { month: string; acceptedAt: Map<string, number> }>();
+  #localRunIds = 0;
   /** Run start keys this instance admitted, per organization, for the month they count in. */
   readonly #admittedRuns = new Map<string, { month: string; keys: Set<string> }>();
   readonly #logger: Pick<Logger, "error">;
@@ -91,7 +96,10 @@ export class ScenarioRunCapService {
     }
     if (!shouldCountRun) return;
     // Run starts reach the meter asynchronously, so an accepted run is counted at once.
-    this.#accept(organizationId);
+    this.#pending({ organizationId, now }).set(
+      runKey?.deduplicationKey ?? `local:${++this.#localRunIds}`,
+      now,
+    );
     if (runKey) this.#admittedKeys({ organizationId, now }).add(runKey.deduplicationKey);
     if (reading.firstRunAt === null) this.#firstRuns.set(organizationId, now);
   }
@@ -165,23 +173,52 @@ export class ScenarioRunCapService {
     const known = this.#monthRuns.get(organizationId);
     const firstKnown = this.#firstRuns.get(organizationId);
     const isFresh = known !== undefined && known.month === month && known.expiresAt > now;
+    const pending = this.#pending({ organizationId, now });
     if (cached && isFresh && firstKnown) {
-      return { runs: known.runs, firstRunAt: firstKnown };
+      return { runs: known.meterRuns + pending.size, firstRunAt: firstKnown };
     }
-    const [runs, firstRunAt] = await Promise.all([
+    const [meterRuns, firstRunAt] = await Promise.all([
       this.deps.meter.countEventType({ organizationId, ...RUN_STARTS, startDate, endDate }),
       firstKnown !== undefined
         ? Promise.resolve(firstKnown)
         : this.deps.meter.findFirstEventAt({ organizationId, ...RUN_STARTS }),
     ]);
     if (firstRunAt !== null) this.#firstRuns.set(organizationId, firstRunAt);
-    const counted = known && known.month === month ? Math.max(runs, known.runs) : runs;
+    await this.#settlePending({ organizationId, pending, now });
     this.#monthRuns.set(organizationId, {
       month,
-      runs: counted,
+      meterRuns,
       expiresAt: now + RUN_COUNT_CACHE_TTL_MS,
     });
-    return { runs: counted, firstRunAt };
+    return { runs: meterRuns + pending.size, firstRunAt };
+  }
+
+  /** Drops pending runs the meter now holds, and those too old to still be waiting on it. */
+  async #settlePending({
+    organizationId,
+    pending,
+    now,
+  }: {
+    organizationId: string;
+    pending: Map<string, number>;
+    now: number;
+  }): Promise<void> {
+    const keys = [...pending.keys()].filter((key) => !key.startsWith("local:"));
+    if (keys.length > 0) {
+      try {
+        const metered = await this.deps.meter.findDeduplicationKeys({
+          organizationId,
+          deduplicationKeys: keys,
+        });
+        for (const key of metered) pending.delete(key);
+      } catch (error) {
+        this.#logger.error({ error, organizationId }, "could not settle pending scenario runs");
+      }
+    }
+    for (const [key, acceptedAt] of pending) {
+      const ttl = key.startsWith("local:") ? RUN_COUNT_CACHE_TTL_MS : PENDING_RUN_TTL_MS;
+      if (now - acceptedAt >= ttl) pending.delete(key);
+    }
   }
 
   async #isAdmitted({
@@ -214,9 +251,12 @@ export class ScenarioRunCapService {
     return keys;
   }
 
-  #accept(organizationId: string): void {
-    const known = this.#monthRuns.get(organizationId);
-    if (!known) return;
-    this.#monthRuns.set(organizationId, { ...known, runs: known.runs + 1 });
+  #pending({ organizationId, now }: { organizationId: string; now: number }): Map<string, number> {
+    const { month } = scenarioRunMonthOf(now);
+    const known = this.#pendingRuns.get(organizationId);
+    if (known && known.month === month) return known.acceptedAt;
+    const acceptedAt = new Map<string, number>();
+    this.#pendingRuns.set(organizationId, { month, acceptedAt });
+    return acceptedAt;
   }
 }

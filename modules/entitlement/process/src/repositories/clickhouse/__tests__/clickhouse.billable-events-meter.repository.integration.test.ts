@@ -96,5 +96,20 @@ describe.skipIf(clickHouseUrl === null)(
         ).resolves.toBe(false);
       });
     });
+
+    describe("given pending run keys, one of them metered", () => {
+      /** @scenario A queued run that never starts frees its slot */
+      it("returns only the keys the organization was metered under", async () => {
+        await expect(
+          meter.findDeduplicationKeys({
+            organizationId,
+            deduplicationKeys: [startKey, `${projectA}:run_never:startRun`],
+          }),
+        ).resolves.toEqual(new Set([startKey]));
+        await expect(
+          meter.findDeduplicationKeys({ organizationId, deduplicationKeys: [] }),
+        ).resolves.toEqual(new Set());
+      });
+    });
   },
 );

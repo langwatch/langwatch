@@ -135,6 +135,22 @@ Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
     And a new run at the cap is refused
 
   @unit
+  Scenario: A queued run that never starts frees its slot
+    Given the organization is on the cloud Free plan
+    And its first scenario run was 20 days ago
+    And it ran 99 scenarios this month
+    When a run is admitted at queue time but its start never reaches the meter
+    Then the next run is refused while the admitted run may still start
+    And once the admitted run is too old to still start, the next run passes
+
+  @unit
+  Scenario: A run whose target cannot be resolved takes no run from the cap
+    Given the organization is on the cloud Free plan
+    When a member queues a run against a connected agent that does not exist
+    Then the run fails with the missing agent
+    And the run cap is never asked, so no run is counted
+
+  @unit
   Scenario: An unknown run count does not block runs
     Given the organization is on the cloud Free plan
     And its scenario run history cannot be read

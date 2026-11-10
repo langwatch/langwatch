@@ -130,6 +130,28 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
     return numberOf(result.rows[0]?.total) > 0;
   }
 
+  async findDeduplicationKeys(input: {
+    organizationId: string;
+    deduplicationKeys: readonly string[];
+  }): Promise<Set<string>> {
+    if (input.deduplicationKeys.length === 0) return new Set();
+    const result = await this.#clickhouse.query<{ key: string }>({
+      tenantId: "",
+      organizationId: input.organizationId,
+      sql: `
+        SELECT DISTINCT DeduplicationKey as key
+        FROM ${TABLE_NAME}
+        WHERE OrganizationId = {organizationId:String}
+          AND DeduplicationKeyHash IN (SELECT cityHash64(arrayJoin({keys:Array(String)})))
+          AND DeduplicationKey IN {keys:Array(String)}
+      `,
+      params: { organizationId: input.organizationId, keys: [...input.deduplicationKeys] },
+      // The organization's meter counts every project the organization owns.
+      SKIP_TENANT_CHECK: true,
+    });
+    return new Set(result.rows.map((row) => row.key));
+  }
+
   async findFirstEventAt(input: EventTypeFilter): Promise<number | null> {
     const result = await this.#clickhouse.query<FirstRow>({
       tenantId: "",

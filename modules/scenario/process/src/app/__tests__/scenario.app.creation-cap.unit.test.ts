@@ -1,4 +1,4 @@
-import type { AgentApi } from "@langwatch/agent-contract";
+import { type AgentApi, AgentNotFoundError } from "@langwatch/agent-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
@@ -46,7 +46,8 @@ const BY = { id: "user-1", label: "user" } as const;
 /** An organization on cloud Free whose two projects already hold 3 active scenarios. */
 async function organizationAtTheScenarioCap({
   runCap = async () => {},
-}: { runCap?: EntitlementApi["assertScenarioRunAllowed"] } = {}) {
+  agents = createApiFixture<AgentApi>(),
+}: { runCap?: EntitlementApi["assertScenarioRunAllowed"]; agents?: AgentApi } = {}) {
   const repositories = MemoryScenarioRepositories.create();
   for (let index = 0; index < 3; index++) {
     await repositories.scenarios.create({
@@ -64,7 +65,7 @@ async function organizationAtTheScenarioCap({
     channels: MemoryScenarioChannels.create(),
     repositories,
     dependencies: {
-      agents: createApiFixture<AgentApi>(),
+      agents,
       evaluations: createApiFixture<EvaluationApi>(),
       users: createApiFixture<UserApi>(),
       projects: createApiFixture<ProjectApi>({
@@ -176,10 +177,16 @@ describe("ScenarioModule on the cloud Free scenario run cap", () => {
   });
 
   describe("given a run whose connected target cannot be resolved", () => {
-    /** @scenario A run queued from the app is counted once */
-    it("fails before asking the run cap, so the failed queue keeps no slot", async () => {
+    /** @scenario A run whose target cannot be resolved takes no run from the cap */
+    it("fails with the missing agent before asking the run cap", async () => {
       const runCap = vi.fn<EntitlementApi["assertScenarioRunAllowed"]>(async () => {});
-      const { app } = await organizationAtTheScenarioCap({ runCap });
+      const agents = createApiFixture<AgentApi>({
+        getConnectedByNameAndEnvironment: async () => [],
+        getById: async ({ id, projectId }) => {
+          throw new AgentNotFoundError(id, projectId);
+        },
+      });
+      const { app } = await organizationAtTheScenarioCap({ runCap, agents });
 
       await expect(
         app.queueSimulationRun({
@@ -195,7 +202,7 @@ describe("ScenarioModule on the cloud Free scenario run cap", () => {
           note: undefined,
           scenarioVersion: undefined,
         }),
-      ).rejects.toBeInstanceOf(Error);
+      ).rejects.toMatchObject({ code: "agent_not_found" });
       expect(runCap).not.toHaveBeenCalled();
     });
   });

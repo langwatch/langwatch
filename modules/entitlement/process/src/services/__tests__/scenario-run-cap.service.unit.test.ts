@@ -43,11 +43,13 @@ function serviceOver({
   runs,
   firstRunAt,
   failing = false,
+  clock = () => now,
 }: {
   plan: Plan;
   runs: number;
   firstRunAt: number | null;
   failing?: boolean;
+  clock?: () => number;
 }) {
   const meter = failing ? new UnreachableMeter() : MemoryBillableEventsMeterRepository.create();
   const { startDate } = scenarioRunMonthOf(now);
@@ -67,11 +69,13 @@ function serviceOver({
     },
     hasDeduplicationKey: (input: Parameters<typeof meter.hasDeduplicationKey>[0]) =>
       meter.hasDeduplicationKey(input),
+    findDeduplicationKeys: (input: Parameters<typeof meter.findDeduplicationKeys>[0]) =>
+      meter.findDeduplicationKeys(input),
   };
   const service = ScenarioRunCapService.create({
     meter: counting,
     plans: { getActivePlan: async () => plan },
-    now: () => now,
+    now: clock,
     logger: { error: () => undefined },
   });
   return { service, reads, meter };
@@ -185,5 +189,63 @@ describe("ScenarioRunCapService", () => {
         runKey: { projectId: "project-1", deduplicationKey: "new-run" },
       }),
     ).rejects.toMatchObject({ meta: { limitType: "scenarioRuns", current: 100, max: 100 } });
+  });
+
+  /** @scenario A queued run that never starts frees its slot */
+  it("frees the slot of a run admitted at queue time whose start never reaches the meter", async () => {
+    let at = now;
+    const { service } = serviceOver({
+      plan: free,
+      runs: 99,
+      firstRunAt: now - 20 * DAY_MS,
+      clock: () => at,
+    });
+    const runKey = (id: string) => ({ projectId: "project-1", deduplicationKey: `key-${id}` });
+    await service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("failed") });
+    await expect(
+      service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("next") }),
+    ).rejects.toMatchObject({ meta: { current: 100, max: 100 } });
+
+    at = now + 11 * 60_000;
+
+    await expect(
+      service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("next") }),
+    ).resolves.toBeUndefined();
+  });
+
+  /** @scenario A retried run start is counted once */
+  it("does not count a run twice once its start reaches the meter", async () => {
+    let at = now;
+    const { service, meter } = serviceOver({
+      plan: free,
+      runs: 98,
+      firstRunAt: now - 20 * DAY_MS,
+      clock: () => at,
+    });
+    const runKey = { projectId: "project-1", deduplicationKey: "key-started" };
+    await service.assertRunAllowed({ organizationId: "org-1", runKey });
+    meter.rows.push({
+      organizationId: "org-1",
+      tenantId: "project-1",
+      eventId: "evt-started",
+      eventType: STARTED,
+      deduplicationKey: "key-started",
+      eventTimestamp: now,
+    });
+
+    at = now + 31_000;
+
+    await expect(
+      service.assertRunAllowed({
+        organizationId: "org-1",
+        runKey: { projectId: "project-1", deduplicationKey: "key-last" },
+      }),
+    ).resolves.toBeUndefined();
+    await expect(
+      service.assertRunAllowed({
+        organizationId: "org-1",
+        runKey: { projectId: "project-1", deduplicationKey: "key-over" },
+      }),
+    ).rejects.toMatchObject({ meta: { current: 100, max: 100 } });
   });
 });

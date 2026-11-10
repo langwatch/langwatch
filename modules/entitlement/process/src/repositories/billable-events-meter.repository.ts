@@ -42,6 +42,11 @@ export abstract class BillableEventsMeterRepository {
     projectId: string;
     deduplicationKey: string;
   }): Promise<boolean>;
+  /** The given deduplication keys the organization was already metered under. */
+  abstract findDeduplicationKeys(input: {
+    organizationId: string;
+    deduplicationKeys: readonly string[];
+  }): Promise<Set<string>>;
   /** Epoch ms of the earliest matching event of one type; null when it has none. */
   abstract findFirstEventAt(input: EventTypeFilter): Promise<number | null>;
   /** Approximate distinct keys per UTC day across the named projects; a day with none is absent. */
