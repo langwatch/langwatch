@@ -156,9 +156,10 @@ describe("given the Instant Evals flag is off for the project", () => {
     const keyless = optionFor(options, "openai/decisions:gpt-6-luna");
     expect(keyless.getAttribute("aria-disabled")).toBe("true");
     expect(keyless.textContent).toContain("Add an OpenAI key in Model Providers to use it.");
-    expect(screen.getByTestId("decision-model-picker-configure").getAttribute("href")).toBe(
-      MODEL_PROVIDERS_HREF,
-    );
+    const footer = screen.getByTestId("provider-model-selector-footer");
+    const configure = within(footer).getByTestId("decision-model-picker-configure");
+    expect(configure.getAttribute("href")).toBe(MODEL_PROVIDERS_HREF);
+    expect(configure.getAttribute("target")).toBe("_blank");
 
     await user.click(optionFor(options, "azure/decisions:microsoft-decision-1"));
 

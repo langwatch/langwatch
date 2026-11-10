@@ -247,7 +247,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       And the decision models the project's keys would run can be picked
       And it never lists Evals Preview
       And the rest of the catalogue is greyed out, each saying which key to add
-      And "Configure available models" opens Model Providers in a new tab
+      And "Configure available models" at the foot of the picker's list opens Model Providers in a new tab
       When the reader picks Azure Microsoft Decision 1
       Then it is saved as the project's Instant Evals default model
       And the popover closes and the held eval chip is estimated

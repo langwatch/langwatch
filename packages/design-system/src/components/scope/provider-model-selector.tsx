@@ -268,6 +268,8 @@ export function ProviderModelSelector({
   disabled = false,
   inheritOption,
   labelFor = (modelId) => modelId,
+  placeholder,
+  footer,
 }: {
   model: string;
   /** The options as a query result; the caller fetches, this only draws. */
@@ -287,6 +289,10 @@ export function ProviderModelSelector({
   };
   /** Label for a model id not among the options (a value saved before its provider went). */
   labelFor?: (modelId: string) => string;
+  /** What the trigger reads while nothing is picked and no inherit entry stands in. */
+  placeholder?: string;
+  /** Pinned under the rows inside the dropdown, such as a "Configure available models" link. */
+  footer?: React.ReactNode;
 }) {
   const [modelSearch, setModelSearch] = useState("");
 
@@ -331,7 +337,12 @@ export function ProviderModelSelector({
   const isUnknown = !!model && !selectedItem;
 
   const showInheritPlaceholder = !model && inheritOption;
-  const selectValueText = showInheritPlaceholder ? (
+  const showPlaceholder = !model && !inheritOption && placeholder;
+  const selectValueText = showPlaceholder ? (
+    <Box fontSize={labelFontSize(size)} color="fg.muted" lineClamp={1}>
+      {placeholder}
+    </Box>
+  ) : showInheritPlaceholder ? (
     <InheritValueText
       labelFor={labelFor}
       inheritIcon={inheritIcon}
@@ -443,6 +454,18 @@ export function ProviderModelSelector({
               <ModelItem key={item.value} item={item} size={size} />
             ))}
           </Select.List>
+          {footer ? (
+            <Box
+              flexShrink={0}
+              borderTop="1px solid"
+              borderColor="border"
+              marginTop={1}
+              paddingTop={1}
+              data-testid="provider-model-selector-footer"
+            >
+              {footer}
+            </Box>
+          ) : null}
         </Select.Content>
       </Select.Root>
       {query.error ? (
