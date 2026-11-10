@@ -227,8 +227,13 @@ func (f *File) validate() []string {
 		}
 	}
 
-	f.Policy.validate(add)
+	cat, err := ServerCatalogue()
+	if err != nil {
+		add("catalogue", "%v", err)
+	}
+	f.Policy.validate(cat, add)
 	rules := f.Policy.Rules()
+	rules.cat = cat
 	seenUsers := map[string]bool{}
 	for i, u := range f.Users {
 		where := fmt.Sprintf("users[%d] %q", i, u.Name)

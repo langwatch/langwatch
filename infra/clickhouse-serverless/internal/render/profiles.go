@@ -101,15 +101,19 @@ func renderProfiles(input *config.Input, c *config.Computed, usersD string) erro
 		profile["max_rows_to_group_by"] = c.MaxRowsToGroupBy
 		profile["group_by_overflow_mode"] = c.GroupByOverflowMode
 	}
-	if input.MaxConcurrentQueriesForUser > 0 {
-		profile["max_concurrent_queries_for_user"] = input.MaxConcurrentQueriesForUser
+	constraints := map[string]any{}
+	if share := input.MaxConcurrentQueriesForUser; share > 0 {
+		// A session may lower its share but never lift it, and 0 would mean no limit.
+		profile["max_concurrent_queries_for_user"] = share
+		constraints["max_concurrent_queries_for_user"] = map[string]any{"min": 1, "max": share}
 	}
 	if input.AuditQueryLog {
 		maps.Copy(profile, auditedQueryLog)
-		constraints := map[string]any{}
 		for name := range auditedQueryLog {
 			constraints[name] = map[string]any{"const": ""}
 		}
+	}
+	if len(constraints) > 0 {
 		profile["constraints"] = constraints
 	}
 	return writeYAML(filepath.Join(usersD, "profiles.yaml"), map[string]any{

@@ -7,8 +7,6 @@ import (
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
 
-const tiersFile = "access-tiers.yaml"
-
 // renderTiers writes the four tier roles and their settings profiles (ADR-198).
 // Every profile inherits default. Read tiers run with readonly=2, which lets
 // tools set their own query settings, and constraints stop them raising the caps.
@@ -41,7 +39,7 @@ func renderTiers(input *config.Input, c *config.Computed, usersD string) error {
 		profile["constraints"] = constraints
 		profiles[tier.Name()] = access.Profile{Parent: "default", Settings: profile}
 	}
-	return writeYAML(filepath.Join(usersD, tiersFile), map[string]any{
+	return writeYAML(filepath.Join(usersD, access.TiersFileName), map[string]any{
 		"roles":    roles,
 		"profiles": profiles,
 	})

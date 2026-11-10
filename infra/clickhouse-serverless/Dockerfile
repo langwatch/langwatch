@@ -22,6 +22,12 @@ RUN apt-get update \
 # Copy Go config generator
 COPY --from=builder /ch-config /usr/local/bin/ch-config
 
+# The server's own setting and privilege names, so ch-config refuses an access
+# file ClickHouse would reject (a bad name stops every users config reload).
+RUN install -d /usr/share/ch-config \
+    && clickhouse local --query "SELECT name, type FROM system.settings FORMAT TSV" > /usr/share/ch-config/settings.tsv \
+    && clickhouse local --query "SELECT privilege FROM system.privileges FORMAT TSV" > /usr/share/ch-config/privileges.tsv
+
 # Copy scripts
 COPY scripts/ /scripts/
 RUN chmod +x /scripts/*.sh

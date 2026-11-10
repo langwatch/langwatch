@@ -183,10 +183,11 @@ Feature: The clickhouse-serverless image renders every server setting from env
   Scenario: A masked setting's value never reaches a log
     Given CLICKHOUSE_MASKED_SETTINGS is unset, so the LangWatchQL capability setting is masked
     And a user whose profile turns log_query_settings off, on a server with query-log auditing on
-    When the user runs a query with the capability in a SETTINGS clause
+    When the user sends the capability in a SETTINGS clause, spelt plainly, with a quoted name, a comment, an escaped quote or a heredoc, and as an HTTP URL parameter
     Then neither the server log file, system.text_log, nor system.query_log's query or Settings holds its value
     And an unmasked setting in the same query does appear in each of those logs
-    And a list in CLICKHOUSE_MASKED_SETTINGS replaces the default, and an empty one masks nothing
+    And a sha256-shaped value folded into a filter, as the query condition cache logs it at Debug, is hidden too
+    And a list in CLICKHOUSE_MASKED_SETTINGS replaces the default, an empty one masks nothing, and CLICKHOUSE_MASK_SHA256_HEX=false drops the sha256 rule
 
   @unit
   Scenario: Query-log auditing and a per-user query share are opt-in
@@ -194,5 +195,5 @@ Feature: The clickhouse-serverless image renders every server setting from env
     When the renderer writes the server configuration
     Then the default profile pins the six query-log settings that decide whether a query is logged, as const
     And log_query_settings is left to each user's profile
-    And every user gets that share of the server's admission limit
+    And every user gets that share of the server's admission limit, which a session may lower but never raise or set to 0
     And without either, the profile carries neither

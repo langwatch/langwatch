@@ -53,7 +53,7 @@ var imageUsersFiles = map[string]bool{
 	"profiles.yaml":         true,
 	"default-password.yaml": true,
 	accessManagementFile:    true,
-	tiersFile:               true,
+	access.TiersFileName:    true,
 	access.UsersFileName:    true,
 	bootstrap.UsersFileName: true,
 }

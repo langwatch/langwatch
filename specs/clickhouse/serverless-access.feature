@@ -64,11 +64,19 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
 
   @unit
   Scenario: A user's own settings, quota and grants cannot widen the tier past its guarantees
-    Given a user whose settings change a query-log setting, set readonly to 0 on a read tier, or replace the profile or constraints
-    Or whose quota names an unknown limit or no positive duration
+    Given a user whose settings change a query-log setting, set readonly to anything but 1 or 2 on a read tier, or replace the profile or constraints
+    Or whose settings name a setting the server does not know, or give a value of the wrong type
+    Or whose quota names an unknown limit, a limit of 0, or no positive duration
     Or whose grants name anything but a read privilege on one database's tables, or every table of system
     When ch-config loads the access file
     Then it fails with an error naming the offending entry
+
+  @unit @e2e
+  Scenario: A user whose own settings break a rendered cap or pin is left out
+    Given the default profile and the tiers render caps and pins as constraints
+    And a user whose own settings pass its tier's cap, set a capped setting to 0, or change a pinned setting
+    When the access users are planned
+    Then that user is left out with a warning naming the setting, and every other user is planned as before
 
   @unit
   Scenario: An install adds to or replaces the default policy in its access file

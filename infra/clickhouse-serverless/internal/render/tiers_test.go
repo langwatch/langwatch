@@ -189,7 +189,31 @@ func TestRenderAll_TierConstraintsFollowThePolicy(t *testing.T) {
 	for _, name := range []string{"log_queries", "max_threads"} {
 		section(t, constraints, name)
 	}
-	if _, kept := constraints["log_query_settings"]; kept {
+	if _, kept := constraints["log_queries_min_type"]; kept {
 		t.Error("a replaced protected setting is still pinned on the tier")
+	}
+}
+
+// @scenario "A user whose own settings break a rendered cap or pin is left out"
+func TestRenderAll_ConstraintsThePlanChecksAreTheRenderedOnes(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.AccessTiers = true
+	input.ReadTierMaxExecutionTime = 120
+	input.AuditQueryLog = true
+	input.MaxConcurrentQueriesForUser = 6
+	renderInto(t, input, dir)
+	got, err := access.LoadConstraints(filepath.Join(dir, "users.d"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := got["tier_read"]["max_execution_time"]; c.Max == nil || *c.Max != 120 {
+		t.Errorf("tier_read max_execution_time cap = %+v, want 120", c)
+	}
+	if c := got["default"]["log_queries"]; !c.Const {
+		t.Errorf("default log_queries = %+v, want pinned", c)
+	}
+	if c := got["default"]["max_concurrent_queries_for_user"]; c.Min == nil || *c.Min != 1 || c.Max == nil || *c.Max != 6 {
+		t.Errorf("default share = %+v, want 1 to 6", c)
 	}
 }

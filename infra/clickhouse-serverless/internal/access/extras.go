@@ -1,7 +1,6 @@
 package access
 
 import (
-	"fmt"
 	"regexp"
 	"sort"
 
@@ -70,8 +69,9 @@ func checkExtras(u User, r Rules, add func(where, format string, args ...any), w
 			add(where, "quota.duration_seconds must be positive")
 		}
 		for name, limit := range q.Limits {
-			if !r.quota[name] || limit < 0 {
-				add(where, "quota limit %q is not a known non-negative limit", name)
+			// ClickHouse reads a limit of 0 as no limit at all.
+			if !r.quota[name] || limit <= 0 {
+				add(where, "quota limit %q must be a known limit above 0", name)
 			}
 		}
 	}
@@ -86,11 +86,16 @@ func checkSetting(u User, r Rules, name string, value any, add func(where, forma
 		add(where, "setting %q cannot be set here", name)
 	case r.protected[name]:
 		add(where, "setting %q is protected by the policy and cannot be changed", name)
-	case name == "readonly" && u.Tier.ReadOnly() && fmt.Sprint(value) == "0":
-		add(where, "a %s user cannot set readonly to 0", u.Tier)
+	case name == "readonly" && u.Tier.ReadOnly() && value != 1 && value != 2:
+		add(where, "a %s user may set readonly only to 1 or 2", u.Tier)
+	case name == "allow_ddl" && u.Tier.ReadOnly():
+		add(where, "a %s user cannot set allow_ddl", u.Tier)
 	}
 	switch value.(type) {
 	case string, int, float64, bool:
+		if err := r.cat.checkSettingValue(name, value); err != nil {
+			add(where, "%v", err)
+		}
 	default:
 		add(where, "setting %q must be a single value", name)
 	}

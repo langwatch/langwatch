@@ -366,17 +366,22 @@ func TestRenderAll_QueryMaskingFollowsMaskedSettings(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()
 	input.MaskedSettings = []string{"custom_api_key_hash"}
+	input.MaskSHA256Hex = true
 	renderInto(t, input, dir)
 	raw, err := os.ReadFile(filepath.Join(dir, "config.d", "query-masking.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`(?i)\b(custom_api_key_hash)\s*=\s*'[^']*'`, `\1 = '[HIDDEN]'`} {
+	for _, want := range []string{"hide custom_api_key_hash in a statement", "hide custom_api_key_hash in a URL", "hide custom_api_key_hash in an encoded URL", `replace: \1 = '[HIDDEN]'`} {
 		if !strings.Contains(string(raw), want) {
 			t.Errorf("query-masking.yaml lacks %q:\n%s", want, raw)
 		}
 	}
+	if !strings.Contains(string(raw), "hide sha256 hex values") {
+		t.Errorf("query-masking.yaml lacks the sha256 rule:\n%s", raw)
+	}
 	input.MaskedSettings = nil
+	input.MaskSHA256Hex = false
 	renderInto(t, input, dir)
 	assertExists(t, filepath.Join(dir, "config.d", "query-masking.yaml"), false)
 }

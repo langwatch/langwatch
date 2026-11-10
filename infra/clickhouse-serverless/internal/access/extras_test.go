@@ -1,6 +1,7 @@
 package access
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -60,7 +61,11 @@ func TestParse_RefusesExtrasThatWidenTheTier(t *testing.T) {
 	}
 	for _, tc := range []struct{ name, extra, want string }{
 		{"audited setting", "settings: {log_queries: 0}", "is protected by the policy"},
-		{"readonly off", "settings: {readonly: 0}", "cannot set readonly to 0"},
+		{"readonly off", "settings: {readonly: 0}", "readonly only to 1 or 2"},
+		{"readonly off, spelt as a string", `settings: {readonly: "00"}`, "readonly only to 1 or 2"},
+		{"readonly off, spelt as a boolean", "settings: {readonly: false}", "readonly only to 1 or 2"},
+		{"ddl on a read tier", "settings: {allow_ddl: 1}", "cannot set allow_ddl"},
+		{"a quota limit of 0 is no limit", "quota: {duration_seconds: 60, limits: {queries: 0}}", `quota limit "queries" must be a known limit above 0`},
 		{"replaced inheritance", "settings: {profile: default}", `setting "profile" cannot be set here`},
 		{"nested value", "settings: {max_threads: [1]}", "must be a single value"},
 		{"unknown quota limit", "quota: {duration_seconds: 60, limits: {cpu: 1}}", `quota limit "cpu"`},
@@ -92,7 +97,7 @@ users:
     tier: read
     databases: [d]
     login: {rolling: {dir: /x}}
-    settings: {log_query_settings: 0}
+    settings: {log_queries_min_type: QUERY_FINISH}
     quota: {duration_seconds: 60, limits: {queries: 5}}
     grants: ["SYSTEM FLUSH LOGS ON d.t", "SELECT ON d.t"]
 `
@@ -105,7 +110,7 @@ users:
 	}
 	for _, tc := range []struct{ name, file, want string }{
 		{"replaced quota limits", strings.Replace(added, "{queries: 5}", "{errors: 5}", 1), `quota limit "errors"`},
-		{"still protected", strings.Replace(added, "log_query_settings: 0", "log_queries: 0", 1), `setting "log_queries" is protected`},
+		{"still protected", strings.Replace(added, "log_queries_min_type: QUERY_FINISH", "log_queries: 0", 1), `setting "log_queries" is protected`},
 		{"added restricted database", strings.Replace(added, "databases: [d]", "databases: [secrets]", 1), `database "secrets" cannot be granted`},
 		{"no privilege left", strings.Replace(added, `{add: ["SYSTEM FLUSH LOGS"]}`, "{replace: []}", 1), "replace leaves no privilege"},
 		{"bad policy name", strings.Replace(added, "[secrets]", `["a;b"]`, 1), "policy.restricted_databases"},
@@ -125,3 +130,76 @@ func TestPlan_DroppedUserLeavesNoProfileOrQuota(t *testing.T) {
 		t.Errorf("profiles %v, quotas %v; want none for a user that cannot log in", p.Profiles, p.Quotas)
 	}
 }
+
+// @scenario "A user's own settings, quota and grants cannot widen the tier past its guarantees"
+func TestParse_RefusesWhatTheServerWouldReject(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"settings.tsv":   "max_threads\tMaxThreads\nlog_queries\tBool\nmax_execution_time\tSeconds\nreadonly\tUInt64\nload_balancing\tLoadBalancing\n",
+		"privileges.tsv": "SELECT\nSHOW TABLES\nSHOW COLUMNS\nSHOW DICTIONARIES\ndictGet\n",
+	})
+	cat, err := LoadCatalogue(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := Policy{}.Rules()
+	r.cat = cat
+	for _, tc := range []struct {
+		name  string
+		value any
+		want  string
+	}{
+		{"max_treads", 4, "is not a ClickHouse setting"},
+		{"max_threads", true, "not a boolean"},
+		{"max_execution_time", "30s", "give a number"},
+		{"load_balancing", "random", ""},
+		{"custom_anything", "x", ""},
+	} {
+		var got []string
+		checkSetting(User{Tier: TierWrite}, r, tc.name, tc.value, func(_, format string, args ...any) {
+			got = append(got, fmt.Sprintf(format, args...))
+		}, "u")
+		joined := strings.Join(got, "; ")
+		if (tc.want == "") != (joined == "") || !strings.Contains(joined, tc.want) {
+			t.Errorf("%s = %v: got %q, want %q", tc.name, tc.value, joined, tc.want)
+		}
+	}
+	var got []string
+	Policy{
+		ProtectedSettings: ListPolicy{Add: []string{"log_querys"}},
+		GrantPrivileges:   ListPolicy{Add: []string{"SYSTEM FLUSH LOGZ"}},
+	}.validate(cat, func(_, format string, args ...any) { got = append(got, fmt.Sprintf(format, args...)) })
+	if joined := strings.Join(got, "; "); !strings.Contains(joined, "log_querys") || !strings.Contains(joined, "SYSTEM FLUSH LOGZ") {
+		t.Errorf("a policy naming an unknown setting and privilege was accepted: %q", joined)
+	}
+}
+
+// @scenario "A user whose own settings break a rendered cap or pin is left out"
+func TestPlan_LeavesOutAUserWhoseSettingsBreakARenderedConstraint(t *testing.T) {
+	maxExec, maxShare, minShare := 300.0, 8.0, 1.0
+	in := Inputs{
+		Passwords: map[string][]Password{"monitor": {{SHA256Hex: sha("pw")}}},
+		Constraints: Constraints{
+			"default":   {"max_threads": {Const: true}, "max_concurrent_queries_for_user": {Min: &minShare, Max: &maxShare}},
+			"tier_read": {"max_execution_time": {Max: &maxExec}},
+		},
+	}
+	for _, tc := range []struct {
+		settings string
+		kept     bool
+	}{
+		{"{max_execution_time: 10}", true},
+		{"{max_execution_time: 1000000}", false},
+		{"{max_execution_time: 0}", false},
+		{"{max_threads: 2}", false},
+		{"{max_concurrent_queries_for_user: 0}", false},
+		{"{max_concurrent_queries_for_user: 4}", true},
+	} {
+		file := strings.Replace(monitorUser, "settings: {max_execution_time: 10, max_result_bytes: 10000000}", "settings: "+tc.settings, 1)
+		p := Plan(mustParse(t, file), in, now)
+		if _, kept := p.Users["monitor"]; kept != tc.kept {
+			t.Errorf("settings %s: kept = %v, want %v (warnings %v)", tc.settings, kept, tc.kept, p.Warnings)
+		}
+	}
+}
+

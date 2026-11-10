@@ -62,6 +62,7 @@ type Rules struct {
 	quota      map[string]bool
 	protected  map[string]bool
 	restricted map[string]bool
+	cat        Catalogue
 	// Protected lists the settings no user may change, in order.
 	Protected []string
 }
@@ -94,7 +95,17 @@ func set(names []string) map[string]bool {
 }
 
 // validate checks the names a policy lists, before they shape any rule.
-func (p Policy) validate(add func(where, format string, args ...any)) {
+func (p Policy) validate(cat Catalogue, add func(where, format string, args ...any)) {
+	for _, name := range p.ProtectedSettings.entries() {
+		if err := cat.checkSettingValue(name, nil); err != nil {
+			add("policy.protected_settings", "%v", err)
+		}
+	}
+	for _, priv := range p.GrantPrivileges.entries() {
+		if !cat.knowsPrivilege(priv) {
+			add("policy.grant_privileges", "%q is not a ClickHouse privilege", priv)
+		}
+	}
 	for _, c := range []struct {
 		where string
 		list  ListPolicy

@@ -30,11 +30,39 @@ func TestQueryMaskingAgainstRealClickHouse(t *testing.T) {
 			t.Fatalf("%s: %v", sql, err)
 		}
 	}
-	secret, control := randomHex(t), randomHex(t)
-	query := fmt.Sprintf("SELECT dummy FROM system.one SETTINGS custom_api_key_hash = '%s', custom_control = '%s'", secret, control)
-	if out, err := exec.Command("docker", "exec", grantsContainer, "clickhouse-client", "--user", "masking_probe",
-		"--password", "masking-probe-password-0123", "--query", query).CombinedOutput(); err != nil {
-		t.Fatalf("the probe query failed: %v: %s", err, out)
+	secret, control, settingsControl := randomHex(t), randomHex(t), randomHex(t)
+	asProbe := []string{"--user", "masking_probe", "--password", "masking-probe-password-0123"}
+	// Every spelling the reviews found, over the native protocol, then over HTTP.
+	for _, form := range []string{
+		"SETTINGS custom_api_key_hash = '%[1]s', custom_control = '%[2]s'",
+		"SETTINGS `custom_api_key_hash` = '%[1]s', custom_control = '%[2]s'",
+		"SETTINGS custom_api_key_hash/**/= 'x\\'%[1]s', custom_control = '%[2]s'",
+		"SETTINGS custom_api_key_hash = 'x''%[1]s', custom_control = '%[2]s'",
+		"SETTINGS custom_api_key_hash = $$%[1]s$$, custom_control = '%[2]s'",
+	} {
+		query := "SELECT dummy FROM system.one " + fmt.Sprintf(form, secret, control)
+		args := append(append([]string{"exec", grantsContainer, "clickhouse-client"}, asProbe...), "--query", query)
+		if out, err := exec.Command("docker", args...).CombinedOutput(); err != nil {
+			t.Fatalf("the probe query %q failed: %v: %s", form, err, out)
+		}
+	}
+	for _, url := range []string{
+		"http://127.0.0.1:8123/?custom_api_key_hash=" + secret + "&custom_control=" + control + "&query=SELECT+1",
+		"http://127.0.0.1:8123/?query=SELECT+1+SETTINGS+custom_api_key_hash%20%3D%20%27" + secret + "%27%2C+custom_control%3D%27" + control + "%27",
+	} {
+		if out, err := exec.Command("docker", "exec", grantsContainer, "curl", "-sf", "-u", "masking_probe:masking-probe-password-0123", url).CombinedOutput(); err != nil {
+			t.Fatalf("HTTP probe failed: %v: %s", err, out)
+		}
+	}
+	// A sha256-shaped value folded into a filter, as the query condition cache logs it.
+	hash := (randomHex(t) + randomHex(t))[:64]
+	folded := fmt.Sprintf("SELECT count() FROM system.one WHERE has(['%s', '%s'], toString(dummy))", hash, control)
+	if out, err := exec.Command("docker", append(append([]string{"exec", grantsContainer, "clickhouse-client"}, asProbe...), "--query", folded)...).CombinedOutput(); err != nil {
+		t.Fatalf("the folded probe failed: %v: %s", err, out)
+	}
+	// Proves the Settings column is recorded at all: default keeps log_query_settings on.
+	if _, err := run(fmt.Sprintf("SELECT 1 SETTINGS custom_control = '%s'", settingsControl)); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := run("SYSTEM FLUSH LOGS"); err != nil {
 		t.Fatal(err)
@@ -43,8 +71,10 @@ func TestQueryMaskingAgainstRealClickHouse(t *testing.T) {
 	// Read before any search below: ClickHouse logs each search's folded constant.
 	logs, _ := exec.Command("docker", "exec", grantsContainer, "sh", "-c",
 		"cat /var/log/clickhouse-server/clickhouse-server.log /var/log/clickhouse-server/clickhouse-server.err.log 2>/dev/null").CombinedOutput()
-	if strings.Contains(string(logs), secret) {
-		t.Error("the server log file holds the masked value")
+	for _, hidden := range []string{secret, hash} {
+		if strings.Contains(string(logs), hidden) {
+			t.Errorf("the server log file holds the masked value %s", hidden[:8])
+		}
 	}
 	if !strings.Contains(string(logs), control) {
 		t.Error("the server log file never logged the control value, so its absence proves nothing")
@@ -64,10 +94,16 @@ func TestQueryMaskingAgainstRealClickHouse(t *testing.T) {
 			}
 			return out
 		}
-		if n := got(secret); n != "0" {
-			t.Errorf("%s holds the masked value in %s rows", place.name, n)
+		for _, hidden := range []string{secret, hash} {
+			if n := got(hidden); n != "0" {
+				t.Errorf("%s holds the masked value %s in %s rows", place.name, hidden[:8], n)
+			}
 		}
-		if place.name != "system.query_log.Settings" && got(control) == "0" {
+		want := control
+		if place.name == "system.query_log.Settings" {
+			want = settingsControl
+		}
+		if got(want) == "0" {
 			t.Errorf("%s never logged the control value, so its absence proves nothing", place.name)
 		}
 	}

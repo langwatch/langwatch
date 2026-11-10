@@ -24,6 +24,11 @@ const (
 // Render plans the access users at now and writes them under usersD,
 // returning the plan. Used by `ch-config generate` and by every sync.
 func Render(f *File, in Inputs, now time.Time, usersD string) (Planned, bool, error) {
+	constraints, err := LoadConstraints(usersD)
+	if err != nil {
+		return Planned{}, false, err
+	}
+	in.Constraints = constraints
 	p := Plan(f, in, now)
 	data, err := p.UsersYAML()
 	if err != nil {

@@ -3,6 +3,7 @@ package access
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -14,6 +15,8 @@ const AuthServerName = "access"
 // Inputs are what Plan reads besides the file: each rolling user's passwords.
 type Inputs struct {
 	Passwords map[string][]Password // by user name
+	// Constraints rendered in users.d; a user whose own settings break one is left out.
+	Constraints Constraints
 }
 
 // Gather reads every rolling user's password directory, failing on the first
@@ -62,6 +65,10 @@ type Planned struct {
 func Plan(f *File, in Inputs, now time.Time) Planned {
 	p := Planned{Users: map[string]any{}, Profiles: map[string]any{}, Quotas: map[string]any{}}
 	for _, u := range f.Users {
+		if v := in.Constraints.violations(u); len(v) > 0 {
+			p.Warnings = append(p.Warnings, fmt.Sprintf("user %q is left out: %s", u.Name, strings.Join(v, "; ")))
+			continue
+		}
 		user := map[string]any{
 			"networks": map[string]any{"ip": u.Networks},
 			"profile":  u.Tier.Name(),

@@ -82,6 +82,9 @@ type Input struct {
 	// MaskedSettings are settings whose values query_masking_rules hide from query
 	// text in every log. Unset: the LangWatchQL capability; set-but-empty: none.
 	MaskedSettings []string
+	// MaskSHA256Hex hides every 64-hex-character run in logged text: the shape of
+	// the LangWatchQL capability, wherever ClickHouse folds it into a log line.
+	MaskSHA256Hex bool `env:"CLICKHOUSE_MASK_SHA256_HEX" default:"true"`
 	// AccessPolicy is the access file's policy block, read once by Load.
 	AccessPolicy *access.Policy
 

@@ -188,7 +188,7 @@ func TestPlan_IsDeterministic(t *testing.T) {
 	f := mustParse(t, validFile)
 	in := Inputs{Passwords: map[string][]Password{
 		"dashboards": {{File: "a", SHA256Hex: sha("a")}, {File: "b", SHA256Hex: sha("b")}},
-		"auditor":  {{File: "a", SHA256Hex: sha("a")}, {File: "copy", SHA256Hex: sha("a")}},
+		"auditor":    {{File: "a", SHA256Hex: sha("a")}, {File: "copy", SHA256Hex: sha("a")}},
 	}}
 	first, err := Plan(f, in, now).UsersYAML()
 	if err != nil {

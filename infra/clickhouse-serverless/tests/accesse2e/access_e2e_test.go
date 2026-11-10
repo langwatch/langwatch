@@ -122,6 +122,10 @@ func TestAccessAgainstRealClickHouse(t *testing.T) {
 		if _, err := h.query("monitor", monitorPassword, "SELECT 1 SETTINGS log_queries = 0"); err == nil {
 			t.Error("monitor changed an audited setting through its own profile")
 		}
+		// @scenario "A user whose own settings break a rendered cap or pin is left out"
+		if _, err := h.query("greedy", monitorPassword, "SELECT 1"); err == nil {
+			t.Error("a user whose own setting is past its tier's cap logged in")
+		}
 		// ClickHouse counts only queries that read something, so not SELECT 1.
 		var quotaErr error
 		for range 8 {
@@ -188,6 +192,11 @@ users:
     settings: {max_execution_time: 10}
     quota: {duration_seconds: 3600, limits: {queries: 6}}
     grants: ["SELECT ON system.query_log"]
+  - name: greedy
+    tier: read
+    databases: [analytics]
+    login: {rolling: {dir: /access/secrets/monitor}}
+    settings: {max_execution_time: 1000000}
 `, h.issuer.URL)
 	if err := os.WriteFile(filepath.Join(root, "access.yaml"), []byte(access), 0o644); err != nil {
 		t.Fatal(err)

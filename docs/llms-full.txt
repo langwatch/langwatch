@@ -65759,9 +65759,16 @@ users:
 | `quota`     | `duration_seconds` and `limits` (`queries`, `errors`, `read_bytes` and the other ClickHouse quota limits) |
 | `grants`    | Extra read grants, such as `SELECT ON system.query_log`. A whole `system` database is refused. |
 
-A user's settings cannot raise its tier's caps: the tier's constraints still
-apply. ClickHouse counts only queries that read data against a quota's
-`queries` limit, so `SELECT 1` does not use it up.
+ClickHouse applies a profile's own values without checking its constraints,
+so the image checks them. A setting ClickHouse does not know, or a value it
+cannot parse, stops the file loading. A user whose settings pass a cap of its
+tier, set a capped setting to 0 (no limit), or change a pinned setting is left
+out with a warning until the file is fixed. Read users may set `readonly` only
+to 1 or 2.
+
+A quota limit must be above 0, which ClickHouse reads as no limit. ClickHouse
+counts only queries that read data against a quota's `queries` limit, so
+`SELECT 1` does not use it up.
 
 Do not also define an access user in your own `users.d` files.
 
@@ -73367,7 +73374,7 @@ description: "How to upgrade a self-hosted LangWatch to the latest version: what
 
 The bundled ClickHouse now gives `default` the right to manage users, roles and named collections only when LangWatchQL runs in `sql` mode. A Helm install runs it in rendered mode, so after the upgrade `default` can no longer create or grant users, or create, alter or drop named collections; it keeps every other right. If you manage your own ClickHouse users through `default`, or set `LWQL_ACCESS_MODEL_MODE=sql` on a chart-managed ClickHouse, set `clickhouse.env.DEFAULT_USER_ACCESS_MANAGEMENT: "true"` before upgrading.
 
-The bundled ClickHouse also hides the value of the LangWatchQL capability setting, `custom_api_key_hash`, wherever it logs query text. List other settings to hide in `CLICKHOUSE_MASKED_SETTINGS`, or set it empty to turn masking off. If you run your own ClickHouse, add the same `query_masking_rules` entry yourself.
+The bundled ClickHouse also hides the value of the LangWatchQL capability setting, `custom_api_key_hash`, in logged statements and request URLs, and any 64-character hex value in every log line. Set `CLICKHOUSE_MASK_SHA256_HEX=false` to keep those visible. List other settings to hide in `CLICKHOUSE_MASKED_SETTINGS`, or set it empty to turn masking off. If you run your own ClickHouse, add the same `query_masking_rules` entry yourself.
 
 ### Database privileges
 
