@@ -1,0 +1,97 @@
+---
+title: Cap LLM spend per team with virtual keys and budgets
+sidebarTitle: Cap spend per team
+keywords: ai gateway, llm gateway, virtual keys, llm budgets, llm cost control, spend limits, budget per team, litellm alternative
+description: The LangWatch AI Gateway gives each app, team or person a virtual key with a USD budget that blocks at the limit.
+---
+
+To cap LLM spend per team, you put a gateway between your code and the providers and give every app, team or person its own virtual key instead of a provider key. Each key carries a budget in USD, and the gateway blocks requests once the budget is spent.
+
+The LangWatch AI Gateway does this for OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Google Vertex AI, Gemini and the other [providers](/ai-gateway/providers/overview). Your code keeps the OpenAI or Anthropic SDK and changes two values, the base URL and the API key. To start now, go to [Create a virtual key with a budget](#1-create-a-virtual-key-with-a-budget).
+
+## Why a virtual key per app
+
+With one shared provider key, the provider bill tells you the total and nothing else. You can't say which team spent it, and you can't stop one runaway agent without cutting off everyone using that key.
+
+A virtual key stands in for the provider key. The provider keys stay in LangWatch, and each key you hand out can only reach the providers you allow. You can rotate, disable or revoke it without touching the provider account.
+
+## 1. Create a virtual key with a budget
+
+Add your provider keys once, under **Settings > Model Providers**, then create the key:
+
+1. Open **AI Gateway > Virtual Keys** and click **New virtual key**.
+2. Name it after the app or team, for example `support-agent`.
+3. Keep **Ownership** on **Project**, so the key's traces and costs land in that project, or set it to the team.
+4. Under **Budget**, enter a monthly limit, for example `$50`, and the key is blocked when it reaches it.
+5. Under **Provider access**, keep **All providers** or pick the ones this key may call.
+6. Click **Create** and copy the secret. It is shown once.
+
+From the CLI (see [Manage keys from the CLI](/ai-gateway/virtual-keys#manage-keys-from-the-cli)), the same key on a team with a $100 monthly budget:
+
+```bash
+langwatch vk create \
+  --name support-agent \
+  --scope team:<team_id> --trace-project <project_id> \
+  --budget-limit 100 --budget-window month --budget-breach block
+```
+
+## 2. Point your code at the gateway
+
+Your code changes two values and nothing else: the API key becomes the virtual key, and the base URL becomes the gateway. The request body stays the same:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://gateway.langwatch.ai/v1",
+    api_key="vk-lw-...",  # the virtual key
+)
+
+response = client.chat.completions.create(
+    model="openai/gpt-6-luna",
+    messages=[{"role": "user", "content": "Summarise this ticket"}],
+)
+```
+
+The Anthropic SDK works the same way with `base_url="https://gateway.langwatch.ai"`. The gateway also translates between formats, so an OpenAI SDK call with `model="anthropic/claude-sonnet-4-5"` reaches Anthropic. See [Python](/ai-gateway/sdks/python), [TypeScript](/ai-gateway/sdks/typescript) and [Go](/ai-gateway/sdks/go).
+
+## 3. Add budgets on teams, projects and people
+
+A key's own budget is one layer. Under **AI Gateway > Budgets**, click **New budget** to cap a whole **Team**, **Project**, **Organization**, **Group** or **Member** as well.
+
+Every request is checked against every budget that applies to it, so a request on `support-agent` counts against the key, its project, its team and the organization at once, and the first one at its limit stops it.
+
+Each budget has a window (per day, week, calendar month, or no reset) and an action at the limit:
+
+| On breach | From 80 percent | At the limit |
+| --- | --- | --- |
+| **Block** | `X-LangWatch-Budget-Warning` header | HTTP 402 `budget_exceeded` |
+| **Warn** | `X-LangWatch-Budget-Warning` header | Request served, header set |
+
+The 402 is an OpenAI-shaped error whose `error.meta.budget_scope` says which budget ran out, so your app can tell its users something useful. Webhooks fire at 80 percent and at the limit, on warn budgets too.
+
+If you build a product on top of LLMs, an [end-user budget](/ai-gateway/budgets#per-end-user) gives each of your own customers a cap, read from the `X-LangWatch-End-User-Id` header or the OpenAI `user` field.
+
+## 4. See who spends what
+
+Open **AI Gateway > Usage** for total spend, cost per request, and the top keys and models over a period. The **Virtual Keys** list shows each key's spend this month.
+
+Every request is also a trace in Trace Explorer with the model, the tokens, the cost and the virtual key that sent it. So when a team's spend jumps, you can open the requests behind it and see which prompts and which model caused it, in the same place you debug the app.
+
+## Limits to know
+
+Treat a budget as a cap with a small margin, for three reasons:
+
+- **A budget can run slightly past its limit.** The gateway checks before a request and counts the cost after it, so a request admitted under the limit is served in full, and a key can keep serving for up to a minute after it crosses the limit.
+- **Rate limits count per gateway replica.** A key's requests per minute and per day are enforced on each replica, so with three replicas a key can send up to three times its limit. Tokens per minute are not enforced. See [Rate limits](/ai-gateway/rate-limits).
+- **Fallbacks run in order.** A [routing policy](/ai-gateway/governance/routing-policies) tries providers in the order you list them; it does not balance load across them.
+
+## Questions
+
+**I already run LiteLLM. What changes?** Keys, budgets, team budgets, model lists, end-user ids and fallbacks all have an equivalent, and LiteLLM's `x-litellm-end-user-id` header is accepted as is. [Migrate from LiteLLM](/ai-gateway/cookbooks/migrate-from-litellm) maps each setting and moves an app over with a base URL change.
+
+**Can I run the gateway myself?** Yes, it ships in the LangWatch Helm chart next to the app. See [Helm chart](/ai-gateway/self-hosting/helm).
+
+**How is spend calculated?** From the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected, and requests that failed at the provider, cost nothing.
+
+Next, follow the [Quickstart](/ai-gateway/quickstart) to send a first request and see its trace and its spend, or read [Budgets](/ai-gateway/budgets) for every scope and window.

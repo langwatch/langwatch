@@ -1,0 +1,102 @@
+---
+title: Debug LLM traces from your coding assistant with MCP
+sidebarTitle: Debug traces from your editor
+keywords: langwatch, mcp, model context protocol, mcp server, llm observability, traces, claude code, cursor, copilot, debugging
+description: The LangWatch MCP server lets Claude Code, Cursor or Copilot search and read your agent's traces themselves.
+---
+
+To let your coding assistant read your LLM traces, you add an observability MCP server to it. The assistant then searches the traces, opens the one that failed and reads every span, next to the code that produced it.
+
+The LangWatch MCP server does this for Claude Code, Cursor, GitHub Copilot, ChatGPT and any client that speaks MCP. You connect it once with a URL and a browser sign-in, and then you ask "why did the last refund conversation fail?" instead of copying trace JSON into the chat.
+
+Access stays scoped: the assistant reads only the one project you approve, with your permissions, and never sees what your redaction settings removed. To start now, go to [Connect the server](#1-connect-the-server).
+
+## Why give the assistant the traces
+
+In your traces the assistant finds what the code alone can't show it: the prompt the model actually received, the tool call it made, the arguments, the error, the tokens and the time each step took.
+
+Without the server you copy that into the chat one trace at a time, and the assistant only sees what you picked. With it, the assistant searches for the failures itself, reads them in a compact digest made for a model, and checks the next run after it changes the code.
+
+## 1. Connect the server
+
+The server is hosted at `https://app.langwatch.ai/mcp`. In Claude Code:
+
+```bash
+claude mcp add --transport http langwatch https://app.langwatch.ai/mcp
+```
+
+Then run `/mcp`, pick `langwatch` and choose **Authenticate**. A browser window opens: sign in to LangWatch and approve the project the assistant may read.
+
+In Cursor, Copilot, ChatGPT and other clients you add a remote MCP server with the same URL and sign in the same way. [LangWatch MCP setup](/integration/mcp#setup) has the steps for each client, the personal API key option for clients that can't sign in, and a local version that runs with `npx`.
+
+Your app needs to send traces to LangWatch first. If it doesn't yet, ask the assistant to "instrument this project with LangWatch": the server gives it the integration docs for your framework.
+
+## 2. Ask for the traces that went wrong
+
+Ask the way you would ask a colleague, and the assistant picks the tools:
+
+```text
+Find the traces with errors in the last 24 hours and group them by cause.
+```
+
+```text
+Open trace 4f2a9c1e and explain why the agent never called lookup_order.
+```
+
+```text
+Find the conversations where the user asked for a refund and the agent said no.
+```
+
+`search_traces` matches the text of inputs and outputs, trace names and span names, within a date range and filters such as labels or user id. `get_trace` opens one trace by id, and for traces from the last 90 days a unique prefix of 8 or more characters is enough, like a git commit. Both return a digest: the span tree with timings, inputs, outputs and errors, short enough to fit in the assistant's context.
+
+## 3. Fix it and check the next run
+
+Because the assistant has your code open, it can go from the trace to the line that caused it. A typical loop:
+
+1. The assistant reads the failing trace and finds the step that went wrong, for example a tool call with a missing argument.
+2. It edits the prompt or the code and runs the agent again.
+3. It searches for the new trace and compares it with the old one, span by span.
+
+You see the reasoning in the chat and the change in your diff, so you decide what stays.
+
+## 4. Count across many traces
+
+For questions about many traces at once, the `run_query` tool runs a read-only SQL query ([LangWatchQL](/api-reference/query/overview)) over the project's traces, spans and evaluations:
+
+```text
+How many traces per day failed in the last 7 days, split by model?
+```
+
+```text
+What is the p95 latency of the lookup_order tool this week compared with last week?
+```
+
+The assistant reads the available views first with `discover_schema`, then writes the query, and the answer comes back as a table.
+
+## 5. Turn a bad trace into a test
+
+When you have found a failure, keep it from coming back in the same chat:
+
+- **Add it to a dataset.** The assistant can add the trace's input and the expected output as a row in a [dataset](/datasets/overview), which experiments and evaluations then run against.
+- **Write a scenario test.** The assistant can write a [simulated-user test](/agent-testing/simulated-users) that starts the way that user did, so the same mistake fails a test in CI.
+- **Mark the trace.** It can add a thumbs down and a comment to the trace for whoever reviews it next.
+
+## What the assistant can see
+
+The assistant reads only the project you approve, with your permissions, and only what your redaction settings kept. What it does read, inputs and outputs included, goes to the assistant's model provider as part of the chat. The limits in detail:
+
+- **Only the approved project.** The sign-in approves one project, and the assistant reads only that project's traces.
+- **Your redaction applies.** The server returns traces as LangWatch stored them, so anything your [data privacy settings](/platform/data-privacy) redacted or dropped is not there to read.
+- **Your access applies.** The assistant acts as you, so it can't read or change anything your LangWatch role can't.
+
+## Questions
+
+**Which assistants does it work with?** Claude Code, Claude Desktop, Cursor, GitHub Copilot in VS Code, ChatGPT and any client that supports remote MCP servers over Streamable HTTP. The local version runs in any client that starts MCP servers as a command.
+
+**Does it work with self-hosted LangWatch?** Yes. Use your own host followed by `/mcp` as the URL.
+
+**Can it change things, or only read?** It can also create and update prompts, evaluators, datasets, scenarios and online evaluations. The full list is in the [tools reference](/integration/mcp#mcp-tools-reference). Your client's own permission prompts still apply to each tool call.
+
+**Do my traces need to come from a particular framework?** No. Anything that sends traces to LangWatch works, through the Python or TypeScript SDK or plain OpenTelemetry.
+
+Next, connect the server with the command in [step 1](#1-connect-the-server) and ask your assistant for the last failed trace, or read [LangWatch MCP](/integration/mcp) for every tool and setting.

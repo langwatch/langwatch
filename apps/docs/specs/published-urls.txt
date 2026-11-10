@@ -11,6 +11,7 @@
 /agent-testing/linking-your-traces
 /agent-testing/other-ways-to-connect
 /agent-testing/overview
+/agent-testing/red-team-open-source
 /agent-testing/red-teaming
 /agent-testing/results
 /agent-testing/run-from-ci
@@ -19,6 +20,7 @@
 /agent-testing/scenarios
 /agent-testing/scenarios-in-code
 /agent-testing/setup-and-teardown-hooks
+/agent-testing/simulated-users
 /agent-testing/targets
 /agent-testing/test-from-the-platform
 /agent-testing/test-suites
@@ -42,6 +44,7 @@
 /ai-gateway/billing-events
 /ai-gateway/budgets
 /ai-gateway/cache-control
+/ai-gateway/cap-spend-per-team
 /ai-gateway/concepts
 /ai-gateway/cookbooks
 /ai-gateway/cookbooks/ci-smoke-test
@@ -605,6 +608,7 @@
 /changelog
 /coding-agents
 /coding-agents/claude-code
+/coding-agents/claude-code-team
 /coding-agents/claude-code-usage
 /coding-agents/codebase-experiment
 /coding-agents/compare-provider-costs
@@ -644,6 +648,7 @@
 /datasets/programmatic-access
 /dspy-visualization
 /dspy-visualization/custom-optimizer
+/dspy-visualization/follow-optimization-in-a-ui
 /dspy-visualization/quickstart
 /dspy-visualization/rag-visualization
 /evaluations
@@ -724,8 +729,10 @@
 /integration/java/integrations
 /integration/java/integrations/spring-ai
 /integration/langflow
+/integration/langgraph-tracing
 /integration/litellm-proxy
 /integration/mcp
+/integration/mcp-debug-traces
 /integration/metadata-and-labels
 /integration/n8n
 /integration/openclaw

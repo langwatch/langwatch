@@ -94,6 +94,7 @@
               },
               "integration/cli",
               "integration/mcp",
+              "integration/mcp-debug-traces",
               "changelog"
             ]
           },
@@ -101,6 +102,7 @@
             "group": "Agent Testing",
             "pages": [
               "agent-testing/overview",
+              "agent-testing/simulated-users",
               {
                 "group": "Get started",
                 "pages": [
@@ -150,7 +152,8 @@
                 ]
               },
               "agent-testing/voice-agents",
-              "agent-testing/red-teaming"
+              "agent-testing/red-teaming",
+              "agent-testing/red-team-open-source"
             ]
           },
           {
@@ -499,6 +502,7 @@
                 "group": "LangGraph",
                 "expanded": true,
                 "pages": [
+                  "integration/langgraph-tracing",
                   "integration/python/integrations/langgraph",
                   "integration/typescript/integrations/langgraph"
                 ]
@@ -512,6 +516,7 @@
                 "group": "DSPy Optimization",
                 "pages": [
                   "dspy-visualization/quickstart",
+                  "dspy-visualization/follow-optimization-in-a-ui",
                   "dspy-visualization/custom-optimizer",
                   "dspy-visualization/rag-visualization"
                 ]
@@ -640,6 +645,7 @@
             "pages": [
               "ai-gateway/overview",
               "ai-gateway/quickstart",
+              "ai-gateway/cap-spend-per-team",
               "ai-gateway/concepts"
             ]
           },
@@ -898,7 +904,8 @@
             "pages": [
               "coding-agents/overview",
               "coding-agents/quickstart",
-              "coding-agents/claude-code-usage"
+              "coding-agents/claude-code-usage",
+              "coding-agents/claude-code-team"
             ]
           },
           {

@@ -1,0 +1,118 @@
+---
+title: Trace a LangGraph agent node by node
+sidebarTitle: Trace a LangGraph agent
+keywords: langwatch, langgraph, tracing, observability, callback, stategraph, spans, python, typescript, thread_id
+description: Pass the LangWatch callback to your graph's invoke and every node, tool call and LLM call becomes a span you can open.
+---
+
+To trace a LangGraph agent, you pass a tracing callback to the run of the compiled graph. LangGraph hands that callback to every node it runs, so each node, tool call and model call is recorded as a span inside one trace per run.
+
+With LangWatch that is one decorator and one callback in Python, or one `withConfig` call in TypeScript. You then see which node ran, in which order, how often the agent looped, and the exact prompt and tool arguments at each step. Both snippets are in [Trace the graph run](#1-trace-the-graph-run).
+
+## Why trace the graph and not only the model
+
+A graph agent fails between the model calls: a router picks the wrong edge, a tool node gets the wrong arguments, the agent loops between two nodes until it hits the recursion limit. The final answer shows none of that.
+
+A trace of the whole run shows each step as a span, nested in the order the graph ran them, with its input, its output, its time and its tokens. You get that only when the callback sits on the graph run, as step 1 shows.
+
+## 1. Trace the graph run
+
+Install the SDK and set `LANGWATCH_API_KEY`, which you find in your [project settings](https://app.langwatch.ai/settings):
+
+```bash
+uv add langwatch
+```
+
+Then wrap the function that runs the graph and pass the callback in the run's config:
+
+```python
+import langwatch
+from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
+
+from my_app.graph import agent  # your compiled StateGraph
+
+langwatch.setup()
+
+
+@langwatch.trace(name="support-agent")
+def answer(question: str) -> str:
+    result = agent.invoke(
+        {"messages": [HumanMessage(content=question)]},
+        config=RunnableConfig(
+            callbacks=[langwatch.get_current_trace().get_langchain_callback()]
+        ),
+    )
+    return result["messages"][-1].content
+```
+
+`@langwatch.trace` opens one trace per call, and the callback records everything the graph does inside it. The same `config` works for `ainvoke`, `stream` and `astream`.
+
+Put the callback on the graph run, as above. A callback attached only to the model inside one node records that model's calls and nothing else, so the tool nodes, the plain Python nodes and the order they ran in never appear.
+
+For TypeScript, install `langwatch` and attach the handler to the compiled graph:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
+
+setupObservability({ serviceName: "support-agent" });
+
+const agent = graph
+  .compile({ checkpointer })
+  .withConfig({ callbacks: [new LangWatchCallbackHandler()] });
+```
+
+[LangGraph for TypeScript](/integration/typescript/integrations/langgraph) has the full example.
+
+## 2. Read a run
+
+Run the agent once, then open the project in LangWatch. The trace appears within a few seconds:
+
+- **Each node is a span** named after the node, nested in the order the graph ran it, so a loop shows up as the same nodes repeating.
+- **Each model call is an LLM span** with the full prompt, the response, the model, the tokens and the cost.
+- **Each tool call is a tool span** with the arguments the model chose and what the tool returned.
+
+When a run goes wrong, open its trace and walk the spans down to the first one whose output is not what you expected. That is usually the node to fix.
+
+## 3. Group a conversation's runs
+
+Each `invoke` is its own trace. A chat agent that runs the graph once per user message needs those traces grouped into one conversation.
+
+LangGraph's own `thread_id` in `configurable` does not group them: LangWatch groups conversations by its own `thread_id` metadata. Set it to the same value:
+
+```python
+@langwatch.trace(name="support-agent")
+def answer(thread_id: str, user_id: str, question: str) -> str:
+    trace = langwatch.get_current_trace()
+    trace.update(metadata={"thread_id": thread_id, "user_id": user_id})
+
+    result = agent.invoke(
+        {"messages": [HumanMessage(content=question)]},
+        config=RunnableConfig(
+            callbacks=[trace.get_langchain_callback()],
+            configurable={"thread_id": thread_id},
+        ),
+    )
+    return result["messages"][-1].content
+```
+
+The traces then show as one conversation in LangWatch, and you can filter by user. In TypeScript, set `langwatch.thread.id` on the span around the run; see [Tracking conversations](/integration/typescript/tutorials/tracking-conversations).
+
+## 4. Go from traces to tests
+
+Once the runs are traced, you can check them in the same project:
+
+- **Score live runs.** An [online evaluation](/evaluations/online-evaluation/setup-monitors) scores incoming traces, for example on whether the answer is grounded in what a tool returned.
+- **Test the graph before release.** A [simulated-user test](/agent-testing/simulated-users) runs your graph against a model that plays the user, and its runs are traced the same way.
+- **Debug from your editor.** With the [LangWatch MCP server](/integration/mcp-debug-traces), your coding assistant can open the failing trace next to the graph code.
+
+## Questions
+
+**Does it work with LangGraph's prebuilt agents?** Yes. `create_react_agent` and other prebuilt graphs are compiled graphs, so the callback goes in the same `config`.
+
+**Do I need LangSmith?** No. The callback is a standard LangChain callback, so it works without a LangSmith account, and it can run next to LangSmith's tracer if you use both.
+
+**Can I self-host?** Yes. Point `LANGWATCH_ENDPOINT` at your own instance; see [Self-hosting](/self-hosting/overview).
+
+Next, add the callback to the place your code runs the graph and open the first trace, or read [LangGraph for Python](/integration/python/integrations/langgraph) for a complete runnable agent.
