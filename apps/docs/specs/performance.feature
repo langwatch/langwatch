@@ -18,6 +18,13 @@ Feature: Static documentation with progressive interaction
     Then its static HTML is fetched without navigating
     And following the link reuses that response
 
+  @unit
+  Scenario: Start fetching a page as the reader presses its link
+    When a reader presses an internal documentation link with the main button
+    Then its static HTML is requested before the click completes, on touch screens too
+    And following the link reuses that request
+    And a modified press, another button or a link that leaves the docs requests nothing
+
   @integration
   Scenario: Explain a search that fails to render
     Given the search dialog is open
@@ -132,6 +139,7 @@ Feature: Static documentation with progressive interaction
     Then the rules its markup can match are inlined in its head
     And rules for classes or ids found only on other pages are left out
     And rules a script can add at runtime, theme classes and unscoped rules are kept
+    And only the animations a kept rule or a script names are inlined
     And the browser asks for the shared stylesheet only once the page has loaded
     And the font faces are declared only in the page's own styles, so the late stylesheet cannot swap a font in
 
@@ -267,6 +275,13 @@ Feature: Static documentation with progressive interaction
     When a reader opens an English page
     Then the body and title fonts are requested before the stylesheet asks for them
     And no extended-Latin font file is downloaded
+
+  @unit
+  Scenario: Ship web fonts cut to the characters and weights the docs draw
+    Given each Latin web font file is subset to the characters its face declares
+    When the font files are checked against the stylesheet
+    Then every face covers the common text characters, so none falls back mid-word
+    And a variable face spans exactly the weights its face declares
 
   @unit
   Scenario: Preload the two fonts every page draws above the fold

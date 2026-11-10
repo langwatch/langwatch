@@ -1,4 +1,5 @@
-import { startNavigation } from "./navigation.ts";
+import { afterFirstPaint } from "./after-paint.ts";
+import { loadSharedSheets, startNavigation } from "./navigation.ts";
 
 import "./islands.css";
 import "../app/docs.css";
@@ -68,6 +69,7 @@ export function loadIsland({ name, trigger }: { name: string; trigger?: HTMLElem
 }
 
 prepareControls();
+afterFirstPaint(loadSharedSheets);
 startNavigation();
 if (document.querySelector('meta[name="docs-not-found"]')) loadIsland({ name: "redirect" });
 document.addEventListener("docs:navigated", prepareControls);
@@ -108,8 +110,12 @@ const enhanceReading = () => {
   loadIsland({ name: "tabs" });
   loadIsland({ name: "reading" });
 };
-if ("requestIdleCallback" in window) window.requestIdleCallback(enhanceReading, { timeout: 1000 });
-else setTimeout(enhanceReading, 100);
+/* Reading enhancements wait for the first paint, then for an idle moment, so they never hold it. */
+afterFirstPaint(() => {
+  if ("requestIdleCallback" in window)
+    window.requestIdleCallback(enhanceReading, { timeout: 1000 });
+  else setTimeout(enhanceReading, 100);
+});
 for (const eventName of ["pointerover", "focusin"])
   document.addEventListener(eventName, (event) => {
     const trigger =

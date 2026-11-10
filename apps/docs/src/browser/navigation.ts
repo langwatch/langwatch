@@ -57,6 +57,15 @@ function sheetHref(link: HTMLLinkElement) {
   return pending ? new URL(pending, document.baseURI).href : link.href;
 }
 
+/** Asks for every shared sheet still named only by `data-href`. The page paints from its inlined
+    rules, so the bootstrap calls this after the first paint. */
+export function loadSharedSheets() {
+  document.querySelectorAll<HTMLLinkElement>("link[data-docs-style][data-href]").forEach((link) => {
+    link.href = sheetHref(link);
+    link.removeAttribute("data-href");
+  });
+}
+
 async function installStyles({ next }: { next: Document }) {
   next
     .querySelectorAll("style[data-docs-style]")
@@ -162,6 +171,15 @@ async function navigate({ url, restored = false }: { url: URL; restored?: boolea
   }
 }
 
+/* A press comes some 100ms before its click, more on touch, where no hover prefetches: the
+   fetch starts there and the click reuses it from the page cache. */
+function fetchPressedPage(event: PointerEvent) {
+  if (event.button !== 0 || modifiedClick({ event })) return;
+  const anchor = event.target instanceof Element ? event.target.closest("a") : null;
+  const url = anchor ? pageUrl({ anchor }) : null;
+  if (url) fetchPage({ url }).catch(() => {});
+}
+
 export function startNavigation() {
   history.scrollRestoration = "manual";
   const status = document.createElement("output");
@@ -178,6 +196,7 @@ export function startNavigation() {
     event.preventDefault();
     void navigate({ url });
   });
+  document.addEventListener("pointerdown", fetchPressedPage, { passive: true });
   document.addEventListener("docs:prefetch", (event) => prefetch({ event }));
   window.addEventListener("popstate", () => {
     void navigate({ url: new URL(location.href), restored: true });

@@ -1,19 +1,29 @@
 import { createHash } from "node:crypto";
 
-import { criticalCss, customPropertyNames, markupNames, scriptedNames } from "./critical.ts";
+import {
+  criticalCss,
+  customPropertyNames,
+  markupNames,
+  scriptedNames,
+  wordsOf,
+} from "./critical.ts";
 import { darkFallbackCss, darkFallbackHead } from "./dark-fallback.ts";
 import { minifyCss } from "./minify.ts";
 import { parseStylesheet, serializeStylesheet, type CssNode } from "./stylesheet.ts";
 
 /* The page paints from the rules inlined in its head. The shared sheet (every server and island
    rule) names its address in `data-href`, so the browser does not ask for it until the page has
-   loaded; this script then sets `href`. Without JavaScript the inlined rules alone style the
-   page. */
-const loadSharedSheet =
-  'addEventListener("load",function(){document.querySelectorAll("link[data-docs-style][data-href]").forEach(function(l){l.href=l.dataset.href;l.removeAttribute("data-href")})})';
-
+   painted; the bootstrap then sets `href` (`afterFirstPaint`). Without JavaScript the
+   inlined rules alone style the page. */
 export function styleHead({ css, href }: { css: string; href: string }) {
-  return `<style>${css.replaceAll("</style", "<\\/style")}</style><link data-docs-style rel="stylesheet" data-href="${href}"><script>${loadSharedSheet}</script>`;
+  return `<style>${css.replaceAll("</style", "<\\/style")}</style><link data-docs-style rel="stylesheet" data-href="${href}">`;
+}
+
+/* Words of the page's own `style` attributes, which may start an animation by name. */
+function styleAttributeWords({ html }: { html: string }) {
+  return wordsOf({
+    text: Array.from(html.matchAll(/\sstyle="([^"]*)"/g), ([, style]) => style).join(" "),
+  });
 }
 
 /* Every page inlines its font faces. Declared again in the sheet that arrives after load, a face
@@ -64,6 +74,7 @@ export function inlinePageStyles({
   }
   const scripted = scriptedNames({ known, scripts });
   const scriptProperties = customPropertyNames({ text: scripts.join("\n") });
+  const scriptWords = wordsOf({ text: scripts.join("\n") });
   const styled = new Map<string, string>();
   const output = new Map<string, string>();
   for (const [target, page] of pages) {
@@ -75,6 +86,7 @@ export function inlinePageStyles({
         known,
         scripted,
         mentioned: new Set([...scriptProperties, ...customPropertyNames({ text: page })]),
+        animationWords: new Set([...scriptWords, ...styleAttributeWords({ html: page })]),
       });
       result = clientLinks
         .reduce((markup, link) => markup.replace(link, ""), page)
