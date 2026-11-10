@@ -1522,7 +1522,7 @@ metadata:
 spec:
   containers:
     - name: rustfs
-      image: rustfs/rustfs:latest
+      image: rustfs/rustfs:1.0.4
       args: ["server", "/data"]
       env:
         - name: RUSTFS_ROOT_USER
