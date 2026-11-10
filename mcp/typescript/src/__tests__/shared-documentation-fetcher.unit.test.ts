@@ -13,7 +13,7 @@ function fetcherOver({
 }) {
   const network = vi.fn((input: Parameters<typeof fetch>[0]) =>
     Promise.resolve(
-      new Response(`page ${String(input)}`, {
+      new Response(`page ${input instanceof Request ? input.url : input.toString()}`, {
         status: 200,
         headers: { "content-type": "text/markdown" },
       }),
