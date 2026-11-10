@@ -40,13 +40,6 @@ export class MemoryExperimentRunActivityRepository extends ExperimentRunActivity
     return Promise.resolve();
   }
 
-  countActive(input: {
-    projectId: string;
-    now: number;
-  }): Promise<{ project: number; global: number }> {
-    return Promise.resolve(this.#count(input));
-  }
-
   #count(input: { projectId: string; now: number }): { project: number; global: number } {
     let project = 0;
     for (const [key, run] of this.runs) {

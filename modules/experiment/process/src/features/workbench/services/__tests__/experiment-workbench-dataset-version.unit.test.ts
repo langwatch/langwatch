@@ -470,7 +470,10 @@ describe("given a saved experiment over a saved dataset", () => {
       });
 
       await expect(run()).rejects.toThrow("dispatch failed");
-      expect(await activity.countActive({ projectId: PROJECT_ID, now: Date.now() })).toEqual({
+      const now = Date.now();
+      expect(
+        await activity.claim({ projectId: PROJECT_ID, runId: "probe", now, expiresAt: now + 1 }),
+      ).toEqual({
         project: 0,
         global: 0,
       });
