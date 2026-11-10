@@ -85,6 +85,7 @@ Feature: Static documentation with progressive interaction
     And that poster is at most 1200 pixels wide, as a phone cannot choose a smaller one
     And a video below the fold fetches its poster only as it nears the screen, so the first screen loads first
     And a reader without scripts still sees that poster, from a copy the page keeps for them
+    And that reader sees each video once, as the deferred copy stays hidden
     And it autoplays only where authored and muted
     And unchanged videos are reused from the build cache instead of being encoded again
     But without ffmpeg the video is published as authored
