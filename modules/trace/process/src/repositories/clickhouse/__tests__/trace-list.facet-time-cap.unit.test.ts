@@ -38,6 +38,7 @@ function expectCapped(settings: QueryRequest["settings"]) {
   const seconds = Number(settings?.max_execution_time);
   expect(seconds).toBeGreaterThan(0);
   expect(seconds).toBeLessThanOrEqual(30);
+  expect(settings?.timeout_overflow_mode).toBe("throw");
   const memory = Number(settings?.max_memory_usage);
   expect(memory).toBeGreaterThanOrEqual(2 * GiB);
   expect(memory).toBeLessThanOrEqual(4 * GiB);
@@ -112,6 +113,56 @@ describe("the facet reads' time and memory cap", () => {
 
       expect(requests[0]?.settings?.max_memory_usage).toBe("1000000");
       expect(Number(requests[0]?.settings?.max_execution_time)).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when a raw facet query names settings of its own", () => {
+    /** @scenario "A facet read stopped at its time cap is not run again" */
+    it("never loosens the time cap", async () => {
+      const { repo, requests } = makeRepo();
+
+      await repo.findCategoricalFacetRaw({
+        authorization,
+        query: {
+          sql: `SELECT '' AS facet_value, 0 AS cnt, 0 AS total_distinct FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
+          params: {},
+          settings: { max_execution_time: "600", timeout_overflow_mode: "break" },
+        },
+      });
+
+      expect(requests[0]?.settings).toMatchObject({
+        max_execution_time: "20",
+        timeout_overflow_mode: "throw",
+      });
+    });
+  });
+
+  describe("when a facet read hits its time cap", () => {
+    /** @scenario "A facet read stopped at its time cap is not run again" */
+    it("asks the client not to run the statement again", async () => {
+      const { repo, requests } = makeRepo();
+
+      await repo.findBatchedFacets({
+        authorization,
+        timeRange,
+        table: "stored_spans",
+        timeColumn: "StartTime",
+        categoricalSpecs: [
+          { key: "spanType", expression: "SpanAttributes['langwatch.span.type']" },
+        ],
+        rangeSpecs: [{ key: "duration", expression: "DurationMs" }],
+        topN: 50,
+      });
+      await repo.findCategoricalFacetRaw({
+        authorization,
+        query: {
+          sql: `SELECT '' AS facet_value, 0 AS cnt, 0 AS total_distinct FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
+          params: {},
+        },
+      });
+
+      expect(requests).toHaveLength(3);
+      for (const request of requests) expect(request.retryOnTimeout).toBe(false);
     });
   });
 });

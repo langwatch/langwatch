@@ -1,8 +1,12 @@
-import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
+import type {
+  DataPrivacyServerConfig,
+  ResolvedDataPrivacy,
+} from "@langwatch/data-privacy-contract";
 import type { ModuleSecretsScope } from "@langwatch/process";
 import type { Team } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 
+import type { DataPrivacyChannels } from "../../channels/data-privacy.channels.ts";
 import { MemoryDataPrivacyChannels } from "../../channels/memory/memory.data-privacy.channels.ts";
 import type { DataPrivacyProjectScope } from "../../repositories/data-privacy-project-scope.repository.ts";
 import { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";
@@ -78,16 +82,24 @@ export async function createDataPrivacyTestApp({
   directory = MemoryDataPrivacyDirectoryRepository.create(),
   dependencies,
   enforcement,
+  settings = {},
+  channels,
 }: {
   directory?: MemoryDataPrivacyDirectoryRepository;
   dependencies: Parameters<typeof DataPrivacyModule.create>[0]["dependencies"];
   enforcement?: string;
+  /** Deployment settings over the defaults, such as the analysis endpoints. */
+  settings?: Partial<DataPrivacyServerConfig>;
+  /** Channels composed from the settings; memory channels when absent. */
+  channels?: (config: DataPrivacyServerConfig) => Promise<DataPrivacyChannels>;
 }): Promise<DataPrivacyModule> {
-  const config = {
+  const config: DataPrivacyServerConfig = {
     googleDlpDisabled: undefined,
     enforcement,
     nodeEnvironment: undefined,
     langevalsEndpoint: undefined,
+    piiRedactionModelEndpoint: undefined,
+    ...settings,
   };
   return DataPrivacyModule.create({
     repositories: {
@@ -95,7 +107,7 @@ export async function createDataPrivacyTestApp({
       directory,
       projectScopes: createDataPrivacyTestScopes(),
     },
-    channels: MemoryDataPrivacyChannels.create({ config }),
+    channels: channels ? await channels(config) : MemoryDataPrivacyChannels.create({ config }),
     dependencies,
     config,
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

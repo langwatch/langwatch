@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { criticalCss, markupNames, scriptedNames } from "../critical.ts";
+import { criticalCss, markupNames, scriptedNames, wordsOf } from "../critical.ts";
 import { inlinePageStyles } from "../page-styles.ts";
 import { parseStylesheet, serializeStylesheet } from "../stylesheet.ts";
 
@@ -8,6 +8,8 @@ const SHEET = [
   "@layer reset,recipes;",
   "@font-face{font-family:Inter;src:url(/fonts/inter.woff2)}",
   "@keyframes spin{to{transform:rotate(1turn)}}",
+  "@layer base{@keyframes fade{to{opacity:0}}@keyframes glint{to{opacity:1}}}",
+  ".css-here>span{animation:spin 1s}",
   ":root{--paper:#fff;--ink:var(--ink-base);--ink-base:#111;--unused:red;--menu:#eee}",
   ".dark{--paper:#000}",
   "@layer recipes{.css-here{color:var(--ink)}.css-there{color:blue}}",
@@ -30,6 +32,7 @@ function pageStyles({ html, scripts = [] }: { html: string; scripts?: string[] }
     known,
     scripted: scriptedNames({ known, scripts }),
     mentioned: new Set(),
+    animationWords: wordsOf({ text: scripts.join("\n") }),
   });
 }
 
@@ -80,7 +83,14 @@ describe("criticalCss", () => {
       expect(css).toContain(".docs-menu{background:var(--menu)}");
       expect(css).toContain("@layer reset,recipes;");
       expect(css).toContain("@font-face{font-family:Inter");
+    });
+
+    /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
+    it("keeps only the keyframes a kept rule names", () => {
       expect(css).toContain("@keyframes spin");
+      expect(css).not.toContain("@keyframes fade");
+      expect(css).not.toContain("@keyframes glint");
+      expect(css).not.toContain("@layer base");
     });
 
     /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
@@ -101,9 +111,43 @@ describe("criticalCss", () => {
       expect(css).toContain(".docs-nav-indicator{height:2px}");
     });
   });
+
+  describe("when a client bundle starts an animation by name", () => {
+    /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
+    it("keeps its keyframes, though no kept rule names them", () => {
+      const css = pageStyles({
+        html: '<main class="css-here"></main>',
+        scripts: ['node.style.animation="glint 2s"'],
+      });
+      expect(css).toContain("@layer base{@keyframes glint{to{opacity:1}}}");
+      expect(css).not.toContain("@keyframes fade");
+    });
+  });
 });
 
 describe("inlinePageStyles", () => {
+  describe("when a page's own style attribute starts an animation by name", () => {
+    /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
+    it("keeps those keyframes in that page alone", () => {
+      const placeholder = '<link data-docs-style rel="stylesheet" href="/assets/prerender.css">';
+      const page = (body: string) => `<html><head>${placeholder}</head><body>${body}</body></html>`;
+      const result = inlinePageStyles({
+        rules: ["@keyframes glint{to{opacity:1}}"],
+        clientCss: [],
+        clientLinks: [],
+        scripts: [],
+        pages: new Map([
+          ["shine/index.html", page('<p style="animation:glint 2s">Shine</p>')],
+          ["plain/index.html", page("<p>Plain</p>")],
+        ]),
+        placeholder,
+        href: (file) => `/${file}`,
+      });
+      expect(result.pages.get("shine/index.html")).toContain("@keyframes glint");
+      expect(result.pages.get("plain/index.html")).not.toContain("@keyframes glint");
+    });
+  });
+
   describe("when pages are assembled with a client stylesheet", () => {
     const placeholder = '<link data-docs-style rel="stylesheet" href="/assets/prerender.css">';
     const clientLink = '<link rel="stylesheet" crossorigin href="/assets/index-a.css">';
@@ -126,14 +170,14 @@ describe("inlinePageStyles", () => {
     const home = result.pages.get("index.html") ?? "";
 
     /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
-    it("inlines the page's rules and asks for the shared sheet only after load", () => {
+    it("inlines the page's rules and names the shared sheet without asking for it", () => {
       expect(home).toContain("@font-face{font-family:Inter");
       expect(home).toContain("@layer recipes{.css-here{color:red}}");
       expect(home).toContain(
         `<link data-docs-style rel="stylesheet" data-href="/docs/${result.file}">`,
       );
       expect(home).not.toMatch(/<link[^>]*data-docs-style[^>]*\shref=/);
-      expect(home).toContain('addEventListener("load"');
+      expect(home).not.toContain("<script>");
       expect(home).not.toContain(placeholder);
       expect(home).not.toContain(clientLink);
     });

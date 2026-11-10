@@ -17,7 +17,10 @@ on:
     paths:
       - "apps/docs/**"
       - "docs/**"
+      - "packages/design-system/**"
+      - "packages/time/**"
       - ".github/workflows/docs-site-lighthouse-all.yml"
+      - ".github/actions/docs-media-encoders/**"
   schedule:
     - cron: "17 5 * * *"
   workflow_dispatch:
@@ -34,7 +37,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -49,6 +52,11 @@ jobs:
           key: docs-site-docs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
             docs-site-docs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      # Measure the site production ships: the same encoders as docs-site.yml's build, which give
+      # every video a poster and preload="none". Restore only: the deploy build saves the cache.
+      - uses: ./.github/actions/docs-media-encoders
+        with:
+          save: "false"
       - name: Read the Playwright version
         id: playwright
         run: |

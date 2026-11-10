@@ -1099,6 +1099,35 @@ Rule: Facet count updates
     And a request differing in query, eval runs or protections runs its own count
     And a repeat after the count has answered counts afresh
 
+  # A live window's bounds roll forward on every request, so a repeat that
+  # differs only by that roll asks for the same counts.
+  @unit
+  Scenario: A live repeat in the same minute shares the count still running
+    Given the facet counts for a live window are still running
+    When the page asks again with its bounds rolled forward within the same minute
+    Then it is answered by the running count, not a second scan
+
+  @unit
+  Scenario: A facet read stopped at its time cap is not run again
+    When a sidebar facet read is stopped at its time cap
+    Then the client answers with the timeout instead of running the read again
+
+  @unit
+  Scenario: One facet discovery pass runs per tenant window at a time
+    Given a discovery pass for a tenant's window is still running in a process
+    When more viewers open the sidebar, or the live window rolls to its next bucket
+    Then that process starts no second pass for that window
+    And the pass runs a bounded number of ClickHouse statements at once
+    And a pass that failed is not started again until a short cooldown passes
+
+  # The `discover_updated` push is the fast path; a viewer answered pending
+  # must not depend on it arriving.
+  @unit
+  Scenario: A viewer answered pending asks again until the facets land
+    Given the sidebar's last discover answer was pending
+    Then it asks again every few seconds
+    And it stops asking once the facets have landed or a read fails
+
   Scenario: Facet counts leave out the hidden origin and the traces outside the window
     Given the project has a trace from Langy's own origin in the window
     And a trace outside the selected window

@@ -25,8 +25,8 @@ name: publish-docker-ecr
 #
 # Two shapes of image:
 #   - Service images (app, nlp-service, langevals, gateway, langy-agent): the
-#     bare tag is a one-entry image index over a `-arm64` manifest, written last
-#     by create-manifest.
+#     bare tag is a one-entry image index over a `-arm64` manifest, written
+#     last by create-manifest.
 #   - Lambda images (langwatch-nlp-lambda and the seven langwatch-eval-<pkg>
 #     evaluator functions): the bare tag is a plain single-platform manifest,
 #     because a Lambda function image cannot be an index. They have no `-arm64`
@@ -246,6 +246,9 @@ jobs:
           # included, builds on the standard hosted arm runner: the app build
           # peaked at about 5 GiB of its 16 GiB, with the contracts and app
           # bundle steps capping Node's heap at 4 GiB (infra/docker/Dockerfile).
+          #
+          # `context` is the build context, the repository root when a row has
+          # none. cmd/ecrtag reads a row's sources and .dockerignore there.
           ALL=$(cat <<'JSON'
           [
             {"image":"langwatch-app",         "dockerfile":"infra/docker/Dockerfile",              "arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"},
@@ -388,7 +391,9 @@ jobs:
         if: steps.exists.outputs.exists != 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
-          context: .
+          # The row's own context, or the repository root; `file` stays a
+          # path from the root either way.
+          context: ${{ matrix.context || '.' }}
           file: ${{ matrix.dockerfile }}
           push: true
           target: ${{ matrix.target }}

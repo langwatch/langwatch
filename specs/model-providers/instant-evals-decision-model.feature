@@ -356,6 +356,39 @@ Feature: Instant Evals decision model column in Default models
     Then I see an "Instant Evals" column
     And it reads "Evals Preview" with the LangWatch mark where nothing is set
 
+  @integration
+  Scenario: Without Evals Preview, the Instant Evals column reads Not set
+    Given LangWatch's hosted model is neither released for my organization nor one switch away
+    When I open Settings > Model Providers > Default models
+    Then the Instant Evals column reads "Not set" where nothing is set, or where Evals Preview is pinned
+    And it never reads "Evals Preview"
+    And a picked own decision model still reads its own name
+
+  @integration
+  Scenario: Without Evals Preview, the drawer offers only the project's own decision models
+    Given LangWatch's hosted model is neither released for my organization nor one switch away
+    And own decision models are on and my project has an OpenAI key
+    When I edit the Instant Evals column
+    Then "Evals Preview" is not listed
+    And I can pick OpenAI's "Decisions API"
+    And the column reads "Not set" while nothing is picked
+
+  @integration
+  Scenario: Without Evals Preview, a config that pinned it reads Not set in the drawer
+    Given LangWatch's hosted model is neither released for my organization nor one switch away
+    And a config row pinned "Evals Preview" for the Instant Evals column before that
+    When I edit that config row
+    Then the Instant Evals column reads "Not set", as the table does
+    And it never reads "Evals Preview"
+
+  @unit
+  Scenario: Evals Preview is offered where it is released or one switch away
+    Given what the server answers about Instant Evals for my project
+    Then Evals Preview is offered when LangWatch's hosted model is released
+    And when my organization, or its admin, can switch Instant Evals on
+    And not when the answer is a word with us or a self-hosted reason
+    And while the answer is still loading it stays offered, so a released organization never sees it flicker
+
   @unit
   Scenario: A decision model's full name opens with its provider
     When a decision model is listed in a picker
