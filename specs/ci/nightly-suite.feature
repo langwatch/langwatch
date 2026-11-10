@@ -33,6 +33,14 @@ Feature: One nightly suite runs the slow checks and reports them on one dashboar
       Then the nightly has no concurrency group that cancels a run in progress
       And a called workflow cancels a run in progress only for a pull request or a branch push
 
+    # A called workflow cannot ask for more than its calling job grants; a missing
+    # grant makes the whole run fail at startup, with no job to read a log from.
+    @regression @unit
+    Scenario: Each nightly call grants every permission its called workflow asks for
+      Given each job in the nightly workflow that calls another workflow
+      Then the call grants every scope the called workflow requests, at the same level or higher
+      And a scope the call does not mention counts as none
+
     # Each called workflow is its own job: a red smoke does not stop the lint report.
     # Proved by a dispatched run, not by a unit test.
     @unimplemented
