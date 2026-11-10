@@ -227,8 +227,11 @@ function harness({
   datasetVersion,
   results,
   inline,
+  startFails,
 }: {
   dataset: VersionedDataset;
+  /** The run's start command fails to send, after its concurrency was claimed. */
+  startFails?: boolean;
   datasetVersion?: number;
   /** The active dataset tab is inline rows rather than a saved dataset. */
   inline?: boolean;
@@ -236,10 +239,12 @@ function harness({
   results?: SavedResults;
 }) {
   const started: { runId: string; total: number }[] = [];
+  const activity = MemoryExperimentRunActivityRepository.create();
   const plans: ExperimentRunPlan[] = [];
   const runs: WorkbenchRunPipeline = {
     commands: createApiFixture<WorkbenchRunPipeline["commands"]>({
       startExperimentRun: async (start) => {
+        if (startFails) throw new Error("dispatch failed");
         started.push({ runId: start.runId, total: start.total });
         if ("plan" in start && start.plan) plans.push(start.plan);
       },
@@ -260,8 +265,8 @@ function harness({
     },
     ownership: { assertConnectedAgentsRunnable: async () => {} },
     concurrency: ExperimentRunConcurrencyService.create({
-      activity: MemoryExperimentRunActivityRepository.create(),
-      config: { runConcurrency: 4 },
+      activity,
+      config: { runConcurrency: 4, projectCellBudget: 20 },
     }),
     refusals: {},
   };
@@ -325,7 +330,7 @@ function harness({
       { id: "user-1" },
     );
 
-  return { run, started, plans, executeOnPage, prepare };
+  return { run, started, plans, executeOnPage, prepare, activity };
 }
 
 const questions = (...names: string[]): Row[] => names.map((question) => ({ question }));
@@ -454,6 +459,21 @@ describe("given a saved experiment over a saved dataset", () => {
       await run({ body: JSON.stringify({ dataset_id: DATASET_ID, dataset_version: 1 }) });
 
       expect(dataset.read).toEqual([1]);
+    });
+  });
+
+  describe("when the run's start fails to send after its concurrency was claimed", () => {
+    it("gives the claim back, so later runs do not count it", async () => {
+      const { run, activity } = harness({
+        dataset: new VersionedDataset(questions("a")),
+        startFails: true,
+      });
+
+      await expect(run()).rejects.toThrow("dispatch failed");
+      expect(await activity.countActive({ projectId: PROJECT_ID, now: Date.now() })).toEqual({
+        project: 0,
+        global: 0,
+      });
     });
   });
 

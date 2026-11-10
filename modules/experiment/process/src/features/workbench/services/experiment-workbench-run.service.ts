@@ -90,57 +90,65 @@ export class ExperimentWorkbenchRunService {
       runId,
       requested: saved.runInputs.concurrency,
     });
-    const savedRun = (options: { persistResults: boolean; runUrl?: string }): PipelineRunStart => {
-      const plan = ExperimentRunPlanService.create().buildPlan({
-        request: { state: saved.state, scope: saved.scope },
-        data: saved.data,
-        concurrency,
-        origin: "saved",
-        actor: workbenchActorFrom({ credential: input.credential }),
-        experimentSlug: slug,
-        ...(saved.boardRowIndices ? { boardRowIndices: saved.boardRowIndices } : {}),
-        ...options,
-      });
-      return {
-        start: this.#runsOn().startOf({
-          projectId,
-          runId,
-          experimentId: saved.experimentId,
-          plan,
-          state: saved.state,
+    try {
+      const savedRun = (options: {
+        persistResults: boolean;
+        runUrl?: string;
+      }): PipelineRunStart => {
+        const plan = ExperimentRunPlanService.create().buildPlan({
+          request: { state: saved.state, scope: saved.scope },
           data: saved.data,
-        }),
-        // The person behind a key; a personal agent refuses a key that names nobody, as main did.
-        actor: deriveRunActor({
-          userId: input.credential.kind === "legacyProjectKey" ? null : input.credential.userId,
-          surfaceHeader: null,
-        }),
-        data: saved.data,
-        state: saved.state,
-        carriedOverCells: saved.carriedOverCells,
-        reportContext: { projectId, slug },
+          concurrency,
+          origin: "saved",
+          actor: workbenchActorFrom({ credential: input.credential }),
+          experimentSlug: slug,
+          ...(saved.boardRowIndices ? { boardRowIndices: saved.boardRowIndices } : {}),
+          ...options,
+        });
+        return {
+          start: this.#runsOn().startOf({
+            projectId,
+            runId,
+            experimentId: saved.experimentId,
+            plan,
+            state: saved.state,
+            data: saved.data,
+          }),
+          // The person behind a key; a personal agent refuses a key that names nobody, as main did.
+          actor: deriveRunActor({
+            userId: input.credential.kind === "legacyProjectKey" ? null : input.credential.userId,
+            surfaceHeader: null,
+          }),
+          data: saved.data,
+          state: saved.state,
+          carriedOverCells: saved.carriedOverCells,
+          reportContext: { projectId, slug },
+        };
       };
-    };
 
-    // A stream never wrote the board; a polled run of the saved dataset fills the cells it shows.
-    if (input.acceptsEvents) {
+      // A stream never wrote the board; a polled run of the saved dataset fills the cells it shows.
+      if (input.acceptsEvents) {
+        return {
+          kind: "streaming",
+          events: this.#runsOn().streamRun(savedRun({ persistResults: false })),
+        };
+      }
+      const runUrl = this.#runUrl({ projectSlug: input.projectSlug, slug, runId });
+      const run = savedRun({ persistResults: runsSavedDataset(saved.runInputs), runUrl });
+      await this.#runsOn().startRun(run);
+
       return {
-        kind: "streaming",
-        events: this.#runsOn().streamRun(savedRun({ persistResults: false })),
+        kind: "started",
+        runId,
+        status: "running",
+        total: run.start.total,
+        ...(run.start.plan ? { concurrency: run.start.plan.concurrency } : {}),
+        runUrl,
       };
+    } catch (error) {
+      await runs.concurrency.release({ projectId, runId });
+      throw error;
     }
-    const runUrl = this.#runUrl({ projectSlug: input.projectSlug, slug, runId });
-    const run = savedRun({ persistResults: runsSavedDataset(saved.runInputs), runUrl });
-    await this.#runsOn().startRun(run);
-
-    return {
-      kind: "started",
-      runId,
-      status: "running",
-      total: run.start.total,
-      ...(run.start.plan ? { concurrency: run.start.plan.concurrency } : {}),
-      runUrl,
-    };
   }
 
   /** `POST /execute`: the browser's run, planned here and executed by the worker's run pipeline. */
@@ -173,55 +181,61 @@ export class ExperimentWorkbenchRunService {
 
     const experimentId = input.experimentId ?? "";
     const runId = generateHumanReadableId();
-    const plan = ExperimentRunPlanService.create().buildPlan({
-      request: {
-        state,
-        scope: input.scope,
-        ...(input.seedTargetOutputs ? { seedTargetOutputs: input.seedTargetOutputs } : {}),
-      },
-      data: dataResult,
-      concurrency: await runs.concurrency.resolve({
-        projectId,
-        runId,
-        requested: input.concurrency,
-      }),
-      origin: "workbench",
-      // The page saves these cells too; the server writes them so the board outlives the tab.
-      persistResults:
-        experimentId !== "" &&
-        runsSavedDataset({
-          ...(input.data !== undefined ? { data: input.data } : {}),
-          ...(input.dataset_id !== undefined ? { dataset_id: input.dataset_id } : {}),
-          ...(input.parameters !== undefined ? { parameters: input.parameters } : {}),
-        }),
-      actor: { userId: by.id, label: "user" },
-      ...(input.experimentSlug !== undefined ? { experimentSlug: input.experimentSlug } : {}),
+    const concurrency = await runs.concurrency.resolve({
+      projectId,
+      runId,
+      requested: input.concurrency,
     });
-
-    return {
-      kind: "streaming",
-      events: this.#runsOn().streamRun({
-        start: this.#runsOn().startOf({
-          projectId,
-          runId,
-          experimentId,
-          plan,
+    try {
+      const plan = ExperimentRunPlanService.create().buildPlan({
+        request: {
           state,
-          data: dataResult,
-        }),
-        actor: { id: by.id, label: "user" },
-        data: dataResult,
-        state,
-        carriedOverCells: input.carriedOverCells ?? [],
-        reportContext: { projectId },
-        ran: {
-          userId: by.id,
-          projectId,
-          experimentId: input.experimentId,
-          isFullRun: input.scope.type === "full",
+          scope: input.scope,
+          ...(input.seedTargetOutputs ? { seedTargetOutputs: input.seedTargetOutputs } : {}),
         },
-      }),
-    };
+        data: dataResult,
+        concurrency,
+        origin: "workbench",
+        // The page saves these cells too; the server writes them so the board outlives the tab.
+        persistResults:
+          experimentId !== "" &&
+          runsSavedDataset({
+            ...(input.data !== undefined ? { data: input.data } : {}),
+            ...(input.dataset_id !== undefined ? { dataset_id: input.dataset_id } : {}),
+            ...(input.parameters !== undefined ? { parameters: input.parameters } : {}),
+          }),
+        actor: { userId: by.id, label: "user" },
+        ...(input.experimentSlug !== undefined ? { experimentSlug: input.experimentSlug } : {}),
+      });
+
+      return {
+        kind: "streaming",
+        events: this.#runsOn().streamRun({
+          start: this.#runsOn().startOf({
+            projectId,
+            runId,
+            experimentId,
+            plan,
+            state,
+            data: dataResult,
+          }),
+          actor: { id: by.id, label: "user" },
+          data: dataResult,
+          state,
+          carriedOverCells: input.carriedOverCells ?? [],
+          reportContext: { projectId },
+          ran: {
+            userId: by.id,
+            projectId,
+            experimentId: input.experimentId,
+            isFullRun: input.scope.type === "full",
+          },
+        }),
+      };
+    } catch (error) {
+      await runs.concurrency.release({ projectId, runId });
+      throw error;
+    }
   }
 
   /** `GET /runs`: one page of an experiment's runs, newest first. */
