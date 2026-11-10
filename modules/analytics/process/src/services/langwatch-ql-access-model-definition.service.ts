@@ -134,7 +134,10 @@ export class LangWatchQLAccessModelDefinitionService {
 
   private constructor() {}
 
-  /** The tenant setting starts empty (zero rows, never all rows); everything else is `CONST`. */
+  /**
+   * The tenant setting starts empty (zero rows, never all rows), and the query log's comment is
+   * the executor's to set; everything else is `CONST`.
+   */
   profileSettings({
     names,
     limits = DEFAULT_LWQL_RESOURCE_LIMITS,
@@ -146,6 +149,7 @@ export class LangWatchQLAccessModelDefinitionService {
       quoted ? { name, value, quoted, constraint: "const" } : { name, value, constraint: "const" };
     return [
       { name: names.tenantSetting, value: "", quoted: true, constraint: "changeable_in_readonly" },
+      { name: "log_comment", value: "", quoted: true, constraint: "changeable_in_readonly" },
       constant("readonly", 1),
       constant("max_execution_time", limits.maxExecutionTimeSeconds),
       constant("max_memory_usage", limits.maxMemoryUsageBytes),
@@ -157,6 +161,12 @@ export class LangWatchQLAccessModelDefinitionService {
       constant("max_result_rows", limits.maxResultRows),
       constant("max_result_bytes", limits.maxResultBytes),
       constant("result_overflow_mode", "throw", true),
+      // The capability rides in each statement's SETTINGS clause; query_log never keeps it.
+      constant("log_query_settings", 0),
+      // Opt-in: no server default may turn a cache or introspection on for this identity.
+      constant("use_query_cache", 0),
+      constant("use_query_condition_cache", 0),
+      constant("allow_introspection_functions", 0),
     ];
   }
 
