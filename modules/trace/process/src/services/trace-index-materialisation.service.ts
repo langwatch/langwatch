@@ -61,9 +61,13 @@ export class TraceIndexMaterialisationService {
     return new TraceIndexMaterialisationService(mutations, pollIntervalMs);
   }
 
-  async waitForUpdatedAtIndex(args: WaitArguments): Promise<MaterialisationProgress> {
+  async waitForUpdatedAtIndex(
+    args: Omit<WaitArguments, "resumed">,
+  ): Promise<MaterialisationProgress> {
     return this.waitFor({
       ...args,
+      // A released step: it keeps main's restart on resume, tracked separately.
+      resumed: false,
       materialisation: {
         find: () => this.mutations.findUpdatedAtIndexMutations(),
         start: () => this.mutations.materialiseUpdatedAtIndex(),

@@ -17,15 +17,13 @@ function harness({
   const service = TraceIndexMaterialisationService.create({ mutations, pollIntervalMs: 0 });
   const run = ({
     dryRun = false,
-    resumed = false,
     signal = new AbortController().signal,
     onPoll = async (progress: MaterialisationProgress) => void saved.push(progress),
   }: {
     dryRun?: boolean;
-    resumed?: boolean;
     signal?: AbortSignal;
     onPoll?: (progress: MaterialisationProgress) => Promise<void>;
-  } = {}) => service.waitForUpdatedAtIndex({ dryRun, resumed, signal, onPoll });
+  } = {}) => service.waitForUpdatedAtIndex({ dryRun, signal, onPoll });
   return { saved, run };
 }
 
@@ -111,6 +109,7 @@ describe("TraceIndexMaterialisationService", () => {
     expect(result.mutationId).toBe("mutation_memory_1.txt");
   });
 
+  /** @scenario "The step saves its checkpoint before it starts the mutation" */
   it("saves a checkpoint before the start", async () => {
     const table = new IndexlessTable();
     let startedAtSave = -1;
@@ -126,14 +125,6 @@ describe("TraceIndexMaterialisationService", () => {
     expect(saved).toEqual([{ mutationId: null, partsToDo: 0 }]);
     expect(startedAtSave).toBe(0);
     expect(materialisationProgressSchema.safeParse(saved[0]).success).toBe(true);
-  });
-
-  it("finishes a resumed updated-at index run with nothing listed, starting nothing", async () => {
-    const table = new IndexlessTable();
-    const { run } = harness({ mutations: table });
-
-    await expect(run({ resumed: true })).resolves.toEqual({ mutationId: null, partsToDo: 0 });
-    expect(table.started).toBe(0);
   });
 
   /** @scenario "The step finishes when the table has no such index" */
@@ -302,6 +293,7 @@ describe("TraceIndexMaterialisationService, for the trace analytics metadata col
       onPoll: async () => undefined,
     });
 
+  /** @scenario "A resumed step waits for the columns without starting a second mutation" */
   it("a resumed run with no mutation listed and the parts not yet filled never starts a second materialisation", async () => {
     const table = new UnlistedColumnsTable();
     table.checks = 1; // the parts are filled by the second check, inside the one grace poll
@@ -312,6 +304,7 @@ describe("TraceIndexMaterialisationService, for the trace analytics metadata col
     expect(table.checks).toBe(3);
   });
 
+  /** @scenario "A resumed step fails for an operator when no mutation is listed and the parts stay unfilled" */
   it("a resumed run fails after one grace poll when no mutation is listed and the parts stay unfilled", async () => {
     const table = new IndexlessTable();
 

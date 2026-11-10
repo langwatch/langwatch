@@ -38,3 +38,28 @@ Feature: The trace analytics metadata columns are stored in existing rows after 
     Given the columns' mutation reports a failure reason
     When the step runs
     Then the step fails naming the trace_analytics metadata columns, the mutation and the reason
+
+  @unit
+  Scenario: The step saves its checkpoint before it starts the mutation
+    Given no mutation for the columns is recorded
+    And an active trace_analytics part does not yet store the nine columns
+    When the step runs
+    Then it saves a checkpoint before it starts the columns' mutation
+
+  @unit
+  Scenario: A resumed step waits for the columns without starting a second mutation
+    Given an earlier run saved a checkpoint
+    And no mutation for the columns is listed
+    And an active trace_analytics part does not yet store the nine columns
+    When the step resumes
+    Then it starts no mutation
+    And it finishes once every active part stores the columns
+
+  @unit
+  Scenario: A resumed step fails for an operator when no mutation is listed and the parts stay unfilled
+    Given an earlier run saved a checkpoint
+    And no mutation for the columns is listed
+    And an active trace_analytics part still lacks the columns after one poll
+    When the step resumes
+    Then the step fails naming the trace_analytics metadata columns
+    And it says an operator starts the fill by hand if none is running and retries the step

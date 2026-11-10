@@ -97,7 +97,6 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
             mutations: repositories.indexMaterialisation,
           }).waitForUpdatedAtIndex({
             dryRun,
-            resumed: materialisationProgressSchema.safeParse(checkpoint.resumeFrom).success,
             signal,
             onPoll: (progress) => checkpoint.save({ report: progress }),
           }),
