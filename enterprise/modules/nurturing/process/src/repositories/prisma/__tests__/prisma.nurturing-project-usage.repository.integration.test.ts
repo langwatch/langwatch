@@ -110,7 +110,7 @@ describe.skipIf(!databaseUrl)("given nurturing's project-usage rows", () => {
   });
 
   describe("when a row of another projection version is read", () => {
-    /** @scenario "A row of another projection version is re-folded, never counted" */
+    /** @scenario "A row of another projection version is never counted, nor folded over" */
     it("reads as undecodable, so the executor re-folds it", async () => {
       await repository
         .forOwner("prompt")

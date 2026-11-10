@@ -23,3 +23,10 @@ Feature: A person getting Langy's first message is recorded for nurturing
     Given a person already got an answer from Langy
     When Langy answers them again, in any conversation
     Then the fact lands on the same key and is not recorded twice
+
+  @unit
+  Scenario: An answer in a conversation not folded yet is retried, not dropped
+    Given Langy's answer arrives before its conversation is folded
+    When the subscriber looks up the conversation's owner
+    Then it fails retryably, so the job retries until the conversation is folded
+    And nothing is recorded meanwhile

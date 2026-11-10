@@ -3,7 +3,10 @@ import type { FoldProjectionStore } from "@langwatch/eventing";
 
 import type { NurturingProjectUsageState } from "../rules/nurturing-project-usage.rules.ts";
 
-/** The fold's version; a stored row of another version is re-folded from the owners' logs. */
+/**
+ * The folds' version. A row of another version is left out of the read and makes its fold throw
+ * (no re-fold path), so a bump needs a data migration or a replay first.
+ */
 export const NURTURING_PROJECT_USAGE_PROJECTION_VERSION = "2026-11-10" as const;
 
 /**

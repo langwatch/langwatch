@@ -35,7 +35,8 @@ type AppliedRead = {
 /**
  * The trace-day fold's Postgres rows (`NurturingProjectTraceDay`), one per project and UTC day,
  * and each project's seed from trace's rollup (`NurturingProjectTraceSeed`), one per project. A
- * fold row of another projection version reads as undecodable and is left out of every read.
+ * fold row of another projection version reads as undecodable: every read leaves it out, and the
+ * fold, having no re-fold path, throws rather than fold over it.
  */
 export class PrismaNurturingTraceDayRepository
   extends PrismaRepository.for("NurturingProjectTraceDay", "NurturingProjectTraceSeed")
@@ -59,6 +60,7 @@ export class PrismaNurturingTraceDayRepository
         where: { projectId_day: traceDayOfKey(key) },
       });
       if (!row) return { state: null, appliedEventIds: [], miss: "absent" };
+      // Undecodable, not absent: the executor then throws instead of folding onto an empty day.
       if (row.projectionVersion !== NURTURING_TRACE_DAY_PROJECTION_VERSION) {
         return { state: null, appliedEventIds: [], miss: "undecodable" };
       }

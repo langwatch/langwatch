@@ -57,8 +57,21 @@ organization's first sync, from trace's rollup through
 `TraceApi.findTraceUsageByDay({ untilMs })`: the window's minutes before the
 minute its first folded trace was appended (or up to now when the fold has not
 seen it), kept in `NurturingProjectTraceSeed`, whose row marks the project seeded.
-The seed and the fold are summed; the cut-off makes them disjoint, up to a trace
-in flight across that minute.
+The seed and the fold are summed; the cut-off makes them disjoint, except at
+these known edges:
+
+- Cut-off "now": a project the fold has not seen yet is seeded up to now, so a
+  trace already in the rollup but still queued for the fold counts twice.
+- The seed buckets a trace by its span time (the rollup's minute) and the fold by
+  its append time, so a trace whose span starts before the cut-off minute but is
+  appended after it falls in both.
+- A trace in flight across the cut-off minute: its spans can land on both sides.
+
+`traceDays` must not be replayed after seeding unless `NurturingProjectTraceSeed`
+is truncated first: a replay re-folds traces the seed already counted, and would
+double count them. A projection version bump has the same constraint, and needs a
+data migration or replay first: the folds have no re-fold path, so a row of
+another version makes them throw.
 
 These folds are keyed across many owner aggregates (a project, a project's day),
 so they set `refoldOnOutOfOrder: false`: the executor's out-of-order re-fold loads

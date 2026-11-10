@@ -192,9 +192,9 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Then each owner's row is read back apart, with the event ids of its last delivery
 
   @integration
-  Scenario: A row of another projection version is re-folded, never counted
+  Scenario: A row of another projection version is never counted, nor folded over
     Given a stored row of an older projection version
-    Then the fold store reads it as undecodable, so the executor re-folds it from the owner's log
+    Then the fold store reads it as undecodable, which the executor refuses to fold over
     And the organization's read leaves it out
 
   @integration

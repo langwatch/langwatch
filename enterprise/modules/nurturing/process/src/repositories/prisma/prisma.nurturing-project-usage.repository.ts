@@ -25,8 +25,8 @@ type NurturingProjectUsageDatabase = Pick<PrismaClient, "nurturingProjectUsageVi
 /**
  * The peer folds' Postgres rows (`NurturingProjectUsageView`): one per project and owner, plus the
  * project's evaluation-day row, the folded usage as JSON. A row of another projection version reads
- * as undecodable, so the executor re-folds it from the owner's log, and the organization's read
- * leaves it out.
+ * as undecodable: the fold has no re-fold path (no refoldOnStoreMiss), so the executor throws
+ * rather than fold over it, and the organization's read leaves it out.
  */
 export class PrismaNurturingProjectUsageRepository
   extends PrismaRepository.for("NurturingProjectUsageView")

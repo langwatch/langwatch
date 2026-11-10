@@ -3,7 +3,10 @@ import type { FoldProjectionStore } from "@langwatch/eventing";
 
 import type { NurturingTraceDayState } from "../rules/nurturing-trace-day.rules.ts";
 
-/** The trace-day fold's version; a stored row of another version is left out of every read. */
+/**
+ * The trace-day fold's version. A row of another version is left out of every read and makes the
+ * fold throw (no re-fold path), so a bump needs a data migration or a replay first.
+ */
 export const NURTURING_TRACE_DAY_PROJECTION_VERSION = "2026-11-10" as const;
 
 /** The projects already seeded, and their seed days in the window. */

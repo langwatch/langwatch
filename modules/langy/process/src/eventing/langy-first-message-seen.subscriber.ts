@@ -4,7 +4,7 @@
  * only the user, so the first one counts. Nurturing sets the person's trait from it.
  * @see specs/langy/langy-first-message-seen.feature
  */
-import type { EventSubscriberDefinition } from "@langwatch/eventing";
+import { DispatchError, type EventSubscriberDefinition } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
@@ -61,15 +61,20 @@ export function createLangyFirstMessageSeenSubscriber(deps: {
       if (!isCompletedLangyAnswer(event)) return;
       const projectId = event.tenantId;
       const conversationId = String(event.aggregateId);
+      // Not folded yet: retryable, since a 404 HandledError alone would block the job's group.
       const conversation = await deps.conversations
         .getById({ projectId, conversationId })
         .catch((error: unknown) => {
           if (HandledError.isHandled(error) && error.code === "langy_conversation_not_found") {
-            return null;
+            throw new DispatchError({
+              message: `Langy conversation ${conversationId} is not folded yet; retrying`,
+              retryable: true,
+              cause: error,
+            });
           }
           throw error;
         });
-      const userId = conversation?.ownerUserId;
+      const userId = conversation.ownerUserId;
       if (!userId) {
         logger.warn({ projectId, conversationId }, "Langy answered a conversation with no owner");
         return;

@@ -4,7 +4,8 @@
  * @see modules/langy/specs/langy-first-message-seen.feature
  */
 import type { EventSubscriberContext } from "@langwatch/eventing";
-import { createTenantId } from "@langwatch/eventing";
+import { createTenantId, DispatchError } from "@langwatch/eventing";
+import { NotFoundError } from "@langwatch/handled-error";
 import { LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
@@ -47,6 +48,31 @@ describe("the langyFirstMessageSeen subscriber", () => {
     expect(subscriber.options?.enqueue?.filter?.(responded(outcome))).toBe(false);
     await subscriber.handle(responded(outcome), context);
 
+    expect(recorded).toEqual([]);
+  });
+
+  /** @scenario "An answer in a conversation not folded yet is retried, not dropped" */
+  it("rethrows a conversation not folded yet as retryable, and records nothing", async () => {
+    const recorded: unknown[] = [];
+    const subscriber = createLangyFirstMessageSeenSubscriber({
+      conversations: {
+        getById: async () => {
+          throw new NotFoundError("langy_conversation_not_found", {
+            resource: "Langy conversation",
+            id: CONVERSATION_ID,
+          });
+        },
+      },
+      facts: { recordFirstMessageSeen: async (data) => void recorded.push(data) },
+    });
+
+    const failure = await subscriber.handle(responded("completed"), context).catch((e) => e);
+
+    expect(failure).toBeInstanceOf(DispatchError);
+    expect(failure).toMatchObject({
+      retryable: true,
+      cause: { code: "langy_conversation_not_found" },
+    });
     expect(recorded).toEqual([]);
   });
 
