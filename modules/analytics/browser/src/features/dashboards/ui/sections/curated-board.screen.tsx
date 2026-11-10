@@ -142,7 +142,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
           </VStack>
         </DashboardRefreshedAtContext.Provider>
       </DashboardRefetchIntervalContext.Provider>
-      {mayCreate && picker.isOpen && (
+      {mayCreate && picker.isOpen && !saved.isLoading && (
         <BlockPickerDialog
           board={subject}
           period={period}

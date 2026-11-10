@@ -1416,6 +1416,13 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And "dashboards.created.dashboard" is sent with createdFrom "widget_curated" and the From LangWatch board's templateId
 
   @integration
+  Scenario: From LangWatch: the picker waits for the member's dashboards to load
+    Given "Add a widget" is open on a From LangWatch board and the member's dashboards are still loading
+    Then the picker is not shown and Langy is asked nothing
+    When the dashboards have loaded
+    Then the picker shows, and a new dashboard's name never repeats one of them
+
+  @integration
   Scenario: From LangWatch: the picker has no I'll build it myself
     Given "Add a widget" is open on a From LangWatch board
     Then there is no "I'll build it myself" button

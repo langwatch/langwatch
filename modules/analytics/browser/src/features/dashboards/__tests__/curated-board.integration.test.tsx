@@ -52,16 +52,28 @@ const storedBoard = ({ name, index }: { name: string; index: number }) => ({
 });
 
 /** The curated reads plus the create-and-fill path; every call is kept, so a write would show. */
-function curatedServer(storedNames: readonly string[] = []) {
+function curatedServer({
+  storedNames = [],
+  boardsGate,
+  createFails = false,
+}: {
+  storedNames?: readonly string[];
+  /** Holds the saved boards' answer until it resolves. */
+  boardsGate?: Promise<void>;
+  createFails?: boolean;
+} = {}) {
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
     if (call.path === "boards.getAll") {
-      return Promise.resolve(storedNames.map((name, index) => storedBoard({ name, index })));
+      return (boardsGate ?? Promise.resolve()).then(() =>
+        storedNames.map((name, index) => storedBoard({ name, index })),
+      );
     }
     if (call.path === "boards.listStarred") return Promise.resolve([]);
     switch (call.path) {
       case "boards.create":
+        if (createFails) return Promise.reject(new Error("boards.create failed"));
         return Promise.resolve({ id: "board-1", ...(call.input as object) });
       case "boards.update":
       case "dashboardWidgets.batchUpdateLayouts":
@@ -80,16 +92,20 @@ function openCurated({
   flags = LANGY_ON,
   permissions = MEMBER,
   storedNames = [],
+  boardsGate,
+  createFails,
   query = {},
 }: {
   templateId: string;
   flags?: Record<string, boolean>;
   permissions?: readonly string[];
   storedNames?: readonly string[];
+  boardsGate?: Promise<void>;
+  createFails?: boolean;
   /** The address's query, as when "Add a widget" is already open. */
   query?: Record<string, string>;
 }) {
-  const server = curatedServer(storedNames);
+  const server = curatedServer({ storedNames, boardsGate, createFails });
   const host = new StubAnalyticsHost({
     flags,
     permissions,
@@ -166,6 +182,8 @@ describe("given a member opens a From LangWatch board", () => {
       expect(host.langyAsks[0]?.question).toBeUndefined();
       expect(host.langyAsks[0]?.draft).toContain(names[0]);
       expect(host.langyAsks[0]?.context[0]?.ref).toContain("From LangWatch dashboard");
+      expect(host.lastQuery).not.toEqual(PICKER_OPEN);
+      expect(screen.queryByRole("heading", { name: "Add a widget" })).toBeNull();
     });
   });
 
@@ -209,7 +227,10 @@ describe("given a member opens a From LangWatch board", () => {
       ).toBeInTheDocument();
     });
 
-    /** @scenario "From LangWatch: picking a widget makes a new dashboard with only that widget" */
+    /**
+     * @scenario "From LangWatch: picking a widget makes a new dashboard with only that widget"
+     * @scenario "Telemetry: making a board sends dashboards.created.dashboard with where it came from"
+     */
     it("makes a dashboard of only the picked widget and opens it", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const traffic = PICKER_QUESTIONS.find(({ id }) => id === "traffic")!;
@@ -264,6 +285,64 @@ describe("given a member opens a From LangWatch board", () => {
       expect(
         server.calls.filter(({ path }) => path === "boards.create").map(({ input }) => input),
       ).toEqual([{ projectId: "proj-1", name: `${widgetName} 2` }]);
+    });
+
+    /** @scenario "From LangWatch: the picker waits for the member's dashboards to load" */
+    it("shows the picker only once the saved boards have loaded, then numbers a taken name", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const traffic = PICKER_QUESTIONS.find(({ id }) => id === "traffic")!;
+      const widgetName = pickerWidgets(traffic.id)[0]!.name;
+      let load = () => {};
+      const boardsGate = new Promise<void>((resolve) => {
+        load = resolve;
+      });
+      const { host, server } = openCurated({
+        templateId: "breaks",
+        storedNames: [widgetName],
+        boardsGate,
+        query: PICKER_OPEN,
+      });
+
+      await screen.findByRole("heading", { name: "Where my agent breaks" });
+      expect(screen.queryByRole("heading", { name: "Add a widget" })).toBeNull();
+      expect(host.langyAsks).toEqual([]);
+      load();
+
+      await user.click(
+        await screen.findByRole("button", {
+          name: (accessible) => accessible.startsWith(traffic.question),
+        }),
+      );
+
+      await waitFor(() => expect(host.navigations).toHaveLength(1));
+      expect(
+        server.calls.filter(({ path }) => path === "boards.create").map(({ input }) => input),
+      ).toEqual([{ projectId: "proj-1", name: `${widgetName} 2` }]);
+    });
+
+    /** @scenario "Telemetry: making a board sends dashboards.created.dashboard with where it came from" */
+    it("sends nothing, goes nowhere and says so when the new dashboard cannot be made", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const traffic = PICKER_QUESTIONS.find(({ id }) => id === "traffic")!;
+      const { host } = openCurated({ templateId: "breaks", createFails: true, query: PICKER_OPEN });
+
+      await user.click(
+        await screen.findByRole("button", {
+          name: (accessible) => accessible.startsWith(traffic.question),
+        }),
+      );
+
+      await waitFor(() =>
+        expect(host.failures).toEqual([
+          expect.objectContaining({
+            fallbackTitle: "Couldn't create the dashboard from the widget",
+          }),
+        ]),
+      );
+      expect(host.navigations).toEqual([]);
+      expect(
+        tracked.events.filter(({ name, action }) => name === "dashboard" && action === "created"),
+      ).toEqual([]);
     });
   });
 
@@ -320,6 +399,7 @@ describe("given a member opens a From LangWatch board", () => {
       });
 
       await screen.findByRole("heading", { name: "Where my agent breaks" });
+      await screen.findByRole("button", { name: "What do you want to know?" });
       expect(screen.queryByRole("heading", { name: "Add a widget" })).toBeNull();
     });
   });
