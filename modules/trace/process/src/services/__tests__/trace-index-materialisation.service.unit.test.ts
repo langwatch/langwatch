@@ -248,7 +248,7 @@ describe("TraceIndexMaterialisationService, for the trace analytics metadata col
 
     expect(startedAtSave).toBe(0);
     expect(mutations.issuedAnalyticsMetadataColumns()).toBe(1);
-    expect(materialisationProgressSchema.safeParse(saved[0]).success).toBe(true);
+    expect(materialisationProgressSchema.validate(saved[0])).toBe(true);
   });
 
   /** @scenario "The step starts no mutation when the parts already store the metadata columns" */

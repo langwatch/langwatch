@@ -113,7 +113,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
             mutations: repositories.indexMaterialisation,
           }).waitForAnalyticsMetadataColumns({
             dryRun,
-            resumed: materialisationProgressSchema.safeParse(checkpoint.resumeFrom).success,
+            resumed: materialisationProgressSchema.validate(checkpoint.resumeFrom),
             signal,
             onPoll: (progress) => checkpoint.save({ report: progress }),
           }),

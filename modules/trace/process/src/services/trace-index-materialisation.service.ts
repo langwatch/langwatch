@@ -95,29 +95,20 @@ export class TraceIndexMaterialisationService {
     onPoll,
     materialisation,
   }: WaitArguments & { materialisation: Materialisation }): Promise<MaterialisationProgress> {
-    let started = resumed;
-    let graceSpent = false;
+    const state: UnlistedState = { started: resumed, graceSpent: false };
     let progress: MaterialisationProgress = { mutationId: null, partsToDo: 0 };
     while (!signal.aborted) {
       const [latest] = await materialisation.find();
       if (!latest) {
-        if (await nothingLeft({ dryRun, started, materialisation })) {
-          return { mutationId: null, partsToDo: 0 };
-        }
-        if (!started) {
-          // Saved before the start: if the run stops in between, the next one fails loudly for an
-          // operator, never starts a second rewrite.
-          await onPoll({ mutationId: null, partsToDo: 0 });
-          await materialisation.start();
-          started = true;
-          continue;
-        }
-        // One poll of grace: a mutation started just before the abort may not be listed yet.
-        if (resumed) {
-          if (graceSpent) throw unlistedMaterialisation({ builds: materialisation.builds });
-          graceSpent = true;
-        }
-        await wait(this.pollIntervalMs, undefined, { signal }).catch(() => undefined);
+        const outcome = await this.stepWhileUnlisted({
+          dryRun,
+          resumed,
+          signal,
+          onPoll,
+          materialisation,
+          state,
+        });
+        if (outcome === "done") return { mutationId: null, partsToDo: 0 };
         continue;
       }
       progress = { mutationId: latest.mutationId, partsToDo: latest.partsToDo };
@@ -131,7 +122,40 @@ export class TraceIndexMaterialisationService {
     }
     return progress;
   }
+
+  /** What to do when no mutation is listed: finish, or (after any start or wait) look again. */
+  private async stepWhileUnlisted({
+    dryRun,
+    resumed,
+    signal,
+    onPoll,
+    materialisation,
+    state,
+  }: WaitArguments & {
+    materialisation: Materialisation;
+    state: UnlistedState;
+  }): Promise<"done" | "again"> {
+    if (await nothingLeft({ dryRun, started: state.started, materialisation })) return "done";
+    if (!state.started) {
+      // Saved before the start: if the run stops in between, the next one fails loudly for an
+      // operator, never starts a second rewrite.
+      await onPoll({ mutationId: null, partsToDo: 0 });
+      await materialisation.start();
+      state.started = true;
+      return "again";
+    }
+    // One poll of grace: a mutation started just before the abort may not be listed yet.
+    if (resumed) {
+      if (state.graceSpent) throw unlistedMaterialisation({ builds: materialisation.builds });
+      state.graceSpent = true;
+    }
+    await wait(this.pollIntervalMs, undefined, { signal }).catch(() => undefined);
+    return "again";
+  }
 }
+
+/** What one run has done while its mutation was not listed. */
+type UnlistedState = { started: boolean; graceSpent: boolean };
 
 /**
  * Nothing to start or wait on. A table that can say so is done once it holds the build, even
