@@ -428,7 +428,34 @@ describe("createProjectMetadataHandler()", () => {
         occurredAt: expect.any(Number),
         userId: "admin-user-1",
         projectId: tenantId,
+        traceId: "trace-1",
+        containsErrorStatus: false,
+        totalCost: null,
       });
+    });
+  });
+
+  describe("when a later trace has an error and a cost", () => {
+    /** @scenario "A later trace carries its id, error status and cost" */
+    it("passes the trace's id, error status and cost from its summary", async () => {
+      mockProjects.findById.mockResolvedValue({
+        id: tenantId,
+        firstMessage: true,
+        integrated: true,
+      });
+      const subscriber = createProjectMetadataHandler(deps);
+      const state = { ...createFoldState(), containsErrorStatus: true, totalCost: 0.25 };
+
+      await subscriber(createEvent(tenantId), createContext(tenantId, state));
+
+      expect(mockRecordSignal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recorded: "traceReceived",
+          traceId: "trace-1",
+          containsErrorStatus: true,
+          totalCost: 0.25,
+        }),
+      );
     });
   });
 

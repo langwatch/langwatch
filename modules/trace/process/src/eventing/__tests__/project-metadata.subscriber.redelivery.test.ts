@@ -154,6 +154,9 @@ describe("given a project that was already integrated", () => {
       occurredAt: event.occurredAt,
       userId: "user-1",
       projectId: TENANT_ID,
+      traceId: foldState.traceId,
+      containsErrorStatus: false,
+      totalCost: null,
     });
   });
 });
