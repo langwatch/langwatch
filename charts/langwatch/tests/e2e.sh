@@ -1301,6 +1301,12 @@ COMMIT;
 SQL
   pass "Organisation B created with project ${LWQL_E2E_PROJECT_B}"
 
+  # B was written straight to Postgres, so no event fills its key-map row and the
+  # watch only refills daily; the provision task's backfill writes it now.
+  local backfill_out
+  backfill_out=$(kc exec "$app_pod" -- sh -c 'cd /app/apps/tasks && pnpm run task lwql-provision' 2>&1) ||
+    { tail -40 <<<"$backfill_out" >&2; fail "lwql:provision did not backfill project B's key-map row"; }
+
   # Send with the keys the projects hold: a seed that kept another key must not read as a
   # collector fault, and an archived or missing project fails here, by name.
   local held_a held_b
@@ -1321,10 +1327,9 @@ SQL
   send_e2e_traces "$app_pod" "$key_a" "e2e-lwql-a" 2
   send_e2e_traces "$app_pod" "$key_b" "e2e-lwql-b" 3
 
-  # Ingestion is asynchronous, and B's key-map row arrives with the reconvergence
-  # pass (every 5 minutes), so wait for both counts rather than sleeping.
+  # Ingestion is asynchronous, so wait for both counts rather than sleeping.
   local count_a="none" count_b="none" waited=0
-  while (( waited < 420 )); do
+  while (( waited < 300 )); do
     count_a=$(lwql_trace_count "$app_pod" "$key_a")
     count_b=$(lwql_trace_count "$app_pod" "$key_b")
     [[ "$count_a" == "2" && "$count_b" == "3" ]] && break
