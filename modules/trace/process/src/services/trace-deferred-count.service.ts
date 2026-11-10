@@ -1,6 +1,7 @@
 /**
  * Counts for deferred facets read without a filter, over the snapped discovery
- * window. One count runs per window and key set at a time, and is kept a minute.
+ * window. One count runs per window and key set at a time, and is kept a minute;
+ * a count that came back short is kept thirty seconds so it is not rerun per call.
  */
 
 import type { FacetDescriptor } from "@langwatch/trace-contract";
@@ -13,6 +14,7 @@ import {
 import { TraceTtlCacheService } from "./trace-ttl-cache.service.ts";
 
 const DEFERRED_COUNT_TTL_MS = 60 * 1000;
+const DEFERRED_COUNT_FAILURE_COOLDOWN_MS = 30 * 1000;
 
 type CountFacets = (input: {
   params: DiscoverParams;
@@ -32,7 +34,6 @@ export class TraceDeferredCountService {
     return new TraceDeferredCountService(count);
   }
 
-  /** A count missing one of the asked keys is returned but not kept. */
   get({
     params,
     facetKeys,
@@ -70,9 +71,12 @@ export class TraceDeferredCountService {
     if (lookup.kind === "hit") return lookup.value;
 
     const counted = await this.count({ params, facetKeys });
-    if (facetKeys.every((facetKey) => counted.some((facet) => facet.key === facetKey))) {
-      await this.counts.set(key, counted);
-    }
+    const complete = facetKeys.every((facetKey) => counted.some((facet) => facet.key === facetKey));
+    await this.counts.set(
+      key,
+      counted,
+      complete ? DEFERRED_COUNT_TTL_MS : DEFERRED_COUNT_FAILURE_COOLDOWN_MS,
+    );
     return counted;
   }
 }
