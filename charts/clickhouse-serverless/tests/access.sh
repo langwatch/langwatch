@@ -20,7 +20,7 @@ test_access_off_by_default() {
     || fail "default pod should run one container"
   ! grep -q 'CLICKHOUSE_ACCESS_FILE' <<<"$out" || fail "default pod should have no access file"
   ! grep -q 'access-config' <<<"$out" || fail "default pod should mount no access config"
-  ! helm template t . --set autogen.enabled=true | grep -q 'kind: ConfigMap' \
+  ! helm template t . --set autogen.enabled=true | grep -q -- '-access$' \
     || fail "default install should render no access ConfigMap"
   echo "PASS: access is off by default"
 }

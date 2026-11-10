@@ -49,10 +49,10 @@ Feature: clickhouse-serverless takes chained native backups from CronJobs or its
 
   @unit
   Scenario: An incremental only chains on a full from about the last day
-    Given every full backup completed more than 26 hours ago, or longer ago than BACKUP_RETENTION_DAYS less one day with a 12 hour floor when that is shorter
+    Given every full backup completed longer ago than two full-schedule intervals plus 2 hours (26 hours on the default schedule), or than BACKUP_RETENTION_DAYS less one day with a 12 hour floor when that is shorter
     When an incremental is due
     Then it fails, saying no full is recent enough
-    And so every backup's full expires at most 26 hours before it does
+    And so every backup's full expires at most that long before it does
 
   @unit
   Scenario: An incremental with no full ever is a clean no-op

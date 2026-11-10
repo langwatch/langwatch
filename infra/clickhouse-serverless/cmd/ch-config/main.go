@@ -118,6 +118,9 @@ func runAccess(ctx context.Context, log *zap.Logger, accessFile, outputDir strin
 		log.Fatal("invalid listen address", zap.Error(err))
 	}
 
+	if err := access.SettingCheckUnavailable(); err != nil {
+		log.Warn("access file setting values go unchecked", zap.Error(err))
+	}
 	verifier := &access.Verifier{Now: time.Now, Log: log}
 	syncer := &access.Syncer{
 		AccessFile: accessFile,

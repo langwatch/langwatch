@@ -126,6 +126,7 @@ var (
 	parsedValues sync.Map
 	localOnce    sync.Once
 	localBinary  string // empty when clickhouse local cannot run here
+	localErr     error  // why it cannot
 )
 
 func errOrNil(v any) error {
@@ -139,12 +140,7 @@ func errOrNil(v any) error {
 // never as SQL text. Where it cannot run at all (outside the image, no writable
 // /tmp) it checks nothing, so only the setting itself can refuse a file.
 func clickhouseLocalParses(name, value string) error {
-	localOnce.Do(func() {
-		if bin, err := exec.LookPath("clickhouse"); err == nil && runLocal(bin) == nil {
-			localBinary = bin
-		}
-	})
-	if localBinary == "" {
+	if SettingCheckUnavailable() != nil {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -163,6 +159,23 @@ func clickhouseLocalParses(name, value string) error {
 // knowsPrivilege reports whether the server has privilege p (any case).
 func (c Catalogue) knowsPrivilege(p string) bool {
 	return len(c.privileges) == 0 || c.privileges[strings.ToUpper(p)]
+}
+
+// SettingCheckUnavailable says why setting values go unchecked, nil when
+// clickhouse local runs. The sidecar warns with it at start.
+func SettingCheckUnavailable() error {
+	localOnce.Do(func() {
+		bin, err := exec.LookPath("clickhouse")
+		if err == nil {
+			err = runLocal(bin)
+		}
+		if err != nil {
+			localErr = fmt.Errorf("clickhouse local cannot run, so setting values are not checked before ClickHouse loads them: %w", err)
+			return
+		}
+		localBinary = bin
+	})
+	return localErr
 }
 
 func runLocal(bin string, args ...string) error {

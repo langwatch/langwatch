@@ -263,24 +263,24 @@ ch-config backup list                                 # names, newest first
 ch-config backup restore --name <name> --confirm      # or BACKUP_NAME, CONFIRM_RESTORE=yes
 ```
 
-A run exits 0 only when it wrote a backup, or when an incremental stands down: for a full in flight, or because no full exists yet. Each incremental chains on the newest backup since the newest full from the last 26 hours. Restore needs an exact name; `latest` is refused.
+A run exits 0 only when it wrote a backup, or when an incremental stands down: for a full in flight, or because no full exists yet. Each incremental chains on the newest backup since the newest full from the last two full intervals plus 2 hours (26 hours on the default schedule). Restore needs an exact name; `latest` is refused.
 
-| Variable                      | Default                    | Meaning                                                                                              |
-| ----------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `CLICKHOUSE_HOST`             | `localhost`                | Server to back up                                                                                    |
-| `CLICKHOUSE_HTTP_PORT`        | `8123`                     | Its HTTP port                                                                                        |
-| `BACKUP_USER`                 | `CLICKHOUSE_USER`          | Login; required unless the dynamic-only local admin is present (the shims default `default`)         |
-| `BACKUP_PASSWORD_FILE`        | `CLICKHOUSE_PASSWORD_FILE` | Password file. One-shot commands also take `CLICKHOUSE_PASSWORD`; the sidecar never does             |
-| `BACKUP_DATABASE`             | `langwatch`                | Database to back up and restore                                                                      |
-| `BACKUP_RETENTION_DAYS`       | `7`                        | The lifecycle rule on the backups prefix; a chain's full is at most 26h old (less when under 3 days) |
-| `STALE_BACKUP_HOURS`          | `12`                       | A backup in flight longer than this is overrunning: warned and flagged, still never doubled          |
-| `BACKUP_CLUSTER`              | unset                      | Look up bases and in-flight backups on every replica of this cluster                                 |
-| `BACKUP_MAX_BANDWIDTH`        | `0`                        | `max_backup_bandwidth`, bytes per second (0: unlimited)                                              |
-| `BACKUP_SIDECAR`              | `off`                      | `run`: the sidecar schedules backups. `observe`: it decides and reports, never backs up              |
-| `BACKUP_FULL_SCHEDULE`        | `0 */12 * * *`             | Cron, UTC                                                                                            |
-| `BACKUP_INCREMENTAL_SCHEDULE` | `0 * * * *`                | Cron, UTC                                                                                            |
-| `BACKUP_RUNNER_ORDINAL`       | `0`                        | Replica that runs backups while it answers; else the next that does                                  |
-| `BACKUP_METRICS_LISTEN`       | `127.0.0.1:8125`           | `/metrics`, `/status`, `/healthz`                                                                    |
+| Variable                      | Default                    | Meaning                                                                                                          |
+| ----------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `CLICKHOUSE_HOST`             | `localhost`                | Server to back up                                                                                                |
+| `CLICKHOUSE_HTTP_PORT`        | `8123`                     | Its HTTP port                                                                                                    |
+| `BACKUP_USER`                 | `CLICKHOUSE_USER`          | Login; required unless the dynamic-only local admin is present (the shims default `default`)                     |
+| `BACKUP_PASSWORD_FILE`        | `CLICKHOUSE_PASSWORD_FILE` | Password file. One-shot commands also take `CLICKHOUSE_PASSWORD`; the sidecar never does                         |
+| `BACKUP_DATABASE`             | `langwatch`                | Database to back up and restore                                                                                  |
+| `BACKUP_RETENTION_DAYS`       | `7`                        | The lifecycle rule on the backups prefix; a chain's full is at most two full intervals + 2h old (26h by default) |
+| `STALE_BACKUP_HOURS`          | `12`                       | A backup in flight longer than this is overrunning: warned and flagged, still never doubled                      |
+| `BACKUP_CLUSTER`              | unset                      | Look up bases and in-flight backups on every replica of this cluster                                             |
+| `BACKUP_MAX_BANDWIDTH`        | `0`                        | `max_backup_bandwidth`, bytes per second (0: unlimited)                                                          |
+| `BACKUP_SIDECAR`              | `off`                      | `run`: the sidecar schedules backups. `observe`: it decides and reports, never backs up                          |
+| `BACKUP_FULL_SCHEDULE`        | `0 */12 * * *`             | Cron, UTC                                                                                                        |
+| `BACKUP_INCREMENTAL_SCHEDULE` | `0 * * * *`                | Cron, UTC                                                                                                        |
+| `BACKUP_RUNNER_ORDINAL`       | `0`                        | Replica that runs backups while it answers; else the next that does                                              |
+| `BACKUP_METRICS_LISTEN`       | `127.0.0.1:8125`           | `/metrics`, `/status`, `/healthz`                                                                                |
 
 Example cadence, a full every third day at 05:00 UTC and an hourly incremental at :30:
 

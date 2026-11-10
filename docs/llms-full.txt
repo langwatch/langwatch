@@ -65567,9 +65567,10 @@ To try the sidecar without changing who takes backups, use `mode: cronjob-observ
 <Note>
   Backups are deleted by your object store's lifecycle rule on the `clickhouse-backup/` prefix, not
   by LangWatch. Set `retentionDays` to the same number of days. An incremental only builds on a full
-  from the last 26 hours, so every backup restores for at least `retentionDays` less 26 hours: set
-  the rule two days longer than the window you need. If fulls stop for more than 26 hours,
-  incrementals fail too, and the backup alerts fire.
+  from the last two full intervals plus 2 hours: 26 hours with fulls every 12 hours, 6 days and 2
+  hours with fulls every third day. Every backup restores for at least `retentionDays` less that, so
+  set the rule that much longer than the window you need. If fulls stop for longer, incrementals
+  fail too, and the backup alerts fire.
 </Note>
 
 ### Restore from Backup
@@ -65976,12 +65977,17 @@ Secret, Terraform state, a backup or a laptop is then of no use, because there
 is none, and a leaked token expires within minutes.
 
 Turn it on with `mode: dynamic-only` at the top of the access file. Under Helm,
-set `clickhouse.access.dynamicOnly.enabled: true` instead:
+set `clickhouse.access.dynamicOnly.enabled: true` instead. LangWatchQL's
+ClickHouse user still logs in with a password, so under the `langwatch` chart
+the mode also needs `clickhouse.lwqlAccess.secretName: ""`, which leaves
+LangWatchQL unavailable on that server:
 
 ```yaml
 clickhouse:
   auth:
     clusterSecretEnabled: true        # required with more than one replica
+  lwqlAccess:
+    secretName: ""                    # langwatch chart only: LangWatchQL is off
   access:
     enabled: true
     dynamicOnly:

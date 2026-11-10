@@ -80,6 +80,23 @@ func TestDecide_BaseMaxAge(t *testing.T) {
 			t.Errorf("retention %dd: base max age %s, want %s", tc.days, got, tc.want)
 		}
 	}
+	// The limit follows the full schedule: fulls every third day (with a
+	// two-day gap at a 31-day month's end) need chains up to 3 days old.
+	for _, tc := range []struct {
+		schedule string
+		days     int
+		want     time.Duration
+	}{
+		{DefaultFullSchedule, 7, 26 * time.Hour},
+		{"0 5 * * *", 7, 50 * time.Hour},
+		{"0 5 */3 * *", 14, 146 * time.Hour},
+		{"0 5 */3 * *", 7, 144 * time.Hour},
+	} {
+		c := Config{FullSchedule: tc.schedule, RetentionDays: tc.days}
+		if got := c.Policy().BaseMaxAge(); got != tc.want {
+			t.Errorf("%q, %dd: base max age %s, want %s", tc.schedule, tc.days, got, tc.want)
+		}
+	}
 
 	// Inside the 7-day lifecycle, but too old to root a chain: an incremental on
 	// it would outlive it by days and restore to nothing.

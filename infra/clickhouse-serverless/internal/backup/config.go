@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/bootstrap"
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/chclient"
@@ -144,7 +145,28 @@ func or(a, b string) string {
 
 // Policy is the part of the configuration Decide applies.
 func (c Config) Policy() Policy {
-	return Policy{Database: c.Database, RetentionDays: c.RetentionDays, StaleHours: c.StaleHours}
+	return Policy{Database: c.Database, RetentionDays: c.RetentionDays, StaleHours: c.StaleHours, FullGap: longestGap(c.FullSchedule)}
+}
+
+// longestGap is the longest wait between two firings of expr over a year, so
+// month ends and day-of-month steps count; 0 when expr does not parse.
+func longestGap(expr string) time.Duration {
+	s, err := ParseSchedule(expr)
+	if err != nil {
+		return 0
+	}
+	var gap time.Duration
+	t := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := t.AddDate(1, 0, 0)
+	for prev, ok := s.Next(t); ok && prev.Before(end); {
+		next, ok2 := s.Next(prev)
+		if !ok2 {
+			break
+		}
+		gap = max(gap, next.Sub(prev))
+		prev = next
+	}
+	return gap
 }
 
 // Credentials picks the login. The sidecar takes a password file only;

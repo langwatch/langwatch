@@ -32,19 +32,23 @@ type State struct {
 // Policy is the configuration Decide applies.
 type Policy struct {
 	Database      string
-	RetentionDays int // lifecycle expiry of the backups prefix
-	StaleHours    int // a backup in flight for longer is overrunning: alerted, still live
+	RetentionDays int           // lifecycle expiry of the backups prefix
+	FullGap       time.Duration // the full schedule's longest gap between firings
+	StaleHours    int           // a backup in flight for longer is overrunning: alerted, still live
 }
 
-// MaxChainRootAge caps how old an incremental's full may be: two default full
-// intervals plus margin. Every backup then restores for at least the lifecycle
-// expiry less this, since its full expires at most this much before it (ADR-199).
-const MaxChainRootAge = 26 * time.Hour
+// DefaultFullGap is the default schedule's longest gap between fulls.
+const DefaultFullGap = 12 * time.Hour
 
-// BaseMaxAge is how old an incremental's full may be: MaxChainRootAge, or less
-// for a lifecycle under three days (expiry less a day, at least 12h).
+// BaseMaxAge is how old an incremental's full may be: two full intervals plus
+// 2h (26h on the default schedule), never past expiry less a day (12h floor).
+// A full expires at most this long before the last incremental on it (ADR-199).
 func (p Policy) BaseMaxAge() time.Duration {
-	return min(MaxChainRootAge, max(time.Duration(p.RetentionDays*24-24)*time.Hour, 12*time.Hour))
+	gap := p.FullGap
+	if gap <= 0 {
+		gap = DefaultFullGap
+	}
+	return min(2*gap+2*time.Hour, max(time.Duration(p.RetentionDays*24-24)*time.Hour, 12*time.Hour))
 }
 
 // Action is what a run does.

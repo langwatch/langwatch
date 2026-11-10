@@ -307,12 +307,17 @@ Secret, Terraform state, a backup or a laptop is then of no use, because there
 is none, and a leaked token expires within minutes.
 
 Turn it on with `mode: dynamic-only` at the top of the access file. Under Helm,
-set `clickhouse.access.dynamicOnly.enabled: true` instead:
+set `clickhouse.access.dynamicOnly.enabled: true` instead. LangWatchQL's
+ClickHouse user still logs in with a password, so under the `langwatch` chart
+the mode also needs `clickhouse.lwqlAccess.secretName: ""`, which leaves
+LangWatchQL unavailable on that server:
 
 ```yaml
 clickhouse:
   auth:
     clusterSecretEnabled: true        # required with more than one replica
+  lwqlAccess:
+    secretName: ""                    # langwatch chart only: LangWatchQL is off
   access:
     enabled: true
     dynamicOnly:
