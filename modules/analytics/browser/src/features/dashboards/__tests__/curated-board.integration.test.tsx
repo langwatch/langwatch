@@ -7,7 +7,7 @@
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -31,7 +31,9 @@ vi.mock(import("@langwatch/design-system/color-mode"), async (importOriginal) =>
 
 const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
 const MEMBER = [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"];
-const WRITES = /^dashboards\.(?!getAll|listStarred|sourcePresence)|^dashboardWidgets\.(?!list)/;
+const WRITES =
+  /^boards\.(?:create|update|delete)$|^dashboards\.(?!getAll|listStarred|sourcePresence)|^dashboardWidgets\.(?!list)/;
+const PICKER_OPEN = { addBlock: "open" };
 
 const tracked = new RecordingUiAnalytics();
 
@@ -49,8 +51,8 @@ const storedBoard = ({ name, index }: { name: string; index: number }) => ({
   _count: { graphs: 0 },
 });
 
-/** The stored boards, none unless named; every call is kept, so a write would show. */
-function readOnlyServer(storedNames: readonly string[] = []) {
+/** The curated reads plus the create-and-fill path; every call is kept, so a write would show. */
+function curatedServer(storedNames: readonly string[] = []) {
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
@@ -73,17 +75,25 @@ function readOnlyServer(storedNames: readonly string[] = []) {
   return { calls, answer };
 }
 
-function openCurated(
-  templateId: string,
-  flags: Record<string, boolean> = LANGY_ON,
-  permissions: readonly string[] = MEMBER,
-  storedNames: readonly string[] = [],
-) {
-  const server = readOnlyServer(storedNames);
+function openCurated({
+  templateId,
+  flags = LANGY_ON,
+  permissions = MEMBER,
+  storedNames = [],
+  query = {},
+}: {
+  templateId: string;
+  flags?: Record<string, boolean>;
+  permissions?: readonly string[];
+  storedNames?: readonly string[];
+  /** The address's query, as when "Add a widget" is already open. */
+  query?: Record<string, string>;
+}) {
+  const server = curatedServer(storedNames);
   const host = new StubAnalyticsHost({
     flags,
     permissions,
-    route: { params: { templateId }, query: {} },
+    route: { params: { templateId }, query },
   });
   renderDashboards({
     element: withAnalytics(<CuratedBoardScreen />, tracked),
@@ -102,7 +112,7 @@ describe("given a member opens a From LangWatch board", () => {
   /** @scenario "From LangWatch: a template board is live and read-only" */
   it("shows the template badged, with no Duplicate to edit in the header and no way to change it", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    const { server } = openCurated("release");
+    const { server } = openCurated({ templateId: "release" });
 
     expect(await screen.findByRole("heading", { name: "Release check" })).toBeInTheDocument();
     expect(screen.getByText("From LangWatch")).toBeInTheDocument();
@@ -117,7 +127,7 @@ describe("given a member opens a From LangWatch board", () => {
 
   /** @scenario "AC3i The Dashboards pages do not point back to the old Analytics" */
   it("does not point back to the old Analytics", async () => {
-    openCurated("release");
+    openCurated({ templateId: "release" });
 
     await screen.findByRole("heading", { name: "Release check" });
     expect(screen.queryByText(/Looking for the old Analytics/)).toBeNull();
@@ -126,7 +136,7 @@ describe("given a member opens a From LangWatch board", () => {
   describe("when the board is Can I trust my numbers?", () => {
     /** @scenario "From LangWatch: every widget on a template board has code" */
     it("shows its four widgets and no placeholder", async () => {
-      openCurated("data");
+      openCurated({ templateId: "data" });
 
       expect(
         await screen.findByRole("heading", { name: "Can I trust my numbers?" }),
@@ -141,7 +151,7 @@ describe("given a member opens a From LangWatch board", () => {
     /** @scenario "AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included" */
     it("gives every widget an Ask Langy button that drafts that widget's prompt", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
-      const { host } = openCurated("release");
+      const { host } = openCurated({ templateId: "release" });
       const names = curatedBoardById("release")?.widgets.map(({ name }) => name) ?? [];
 
       await screen.findByRole("heading", { name: "Release check" });
@@ -162,7 +172,7 @@ describe("given a member opens a From LangWatch board", () => {
   describe("when Langy is off", () => {
     /** @scenario "AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included" */
     it("shows no Ask Langy on any widget", async () => {
-      openCurated("release", { release_dashboards: true });
+      openCurated({ templateId: "release", flags: { release_dashboards: true } });
 
       await screen.findByRole("heading", { name: "Release check" });
       expect(screen.queryByRole("button", { name: /^Ask Langy about / })).toBeNull();
@@ -173,26 +183,30 @@ describe("given a member opens a From LangWatch board", () => {
     /** @scenario "From LangWatch: the ask bar opens \"Add a widget\" for a member who may create dashboards" */
     it("opens Add a widget, with nothing stored and Langy asked nothing", async () => {
       const user = userEvent.setup();
-      const { host, server } = openCurated("breaks");
+      const { host, server } = openCurated({ templateId: "breaks" });
 
       await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
 
-      expect(await screen.findByRole("heading", { name: "Add a widget" })).toBeInTheDocument();
+      expect(host.lastQuery).toEqual(PICKER_OPEN);
       expect(host.langyAsks).toEqual([]);
       expect(server.calls.filter(({ path }) => WRITES.test(path))).toEqual([]);
     });
 
     /** @scenario "From LangWatch: the picker has no \"I'll build it myself\"" */
     it("offers no I'll build it myself", async () => {
-      const user = userEvent.setup();
-      openCurated("breaks");
-
-      await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
+      openCurated({ templateId: "breaks", query: PICKER_OPEN });
 
       await screen.findByRole("heading", { name: "Add a widget" });
       expect(screen.queryByRole("button", { name: "I'll build it myself" })).toBeNull();
       // Langy stays one click away from the picker.
       expect(screen.getByRole("button", { name: "Ask Langy" })).toBeInTheDocument();
+      // With nothing matching, it points to clearing the search, not to building one.
+      fireEvent.change(screen.getByRole("searchbox", { name: "What do you want to know?" }), {
+        target: { value: "zzz-no-such-widget" },
+      });
+      expect(
+        screen.getByText("No widget matches. Clear the search and filters to see them all."),
+      ).toBeInTheDocument();
     });
 
     /** @scenario "From LangWatch: picking a widget makes a new dashboard with only that widget" */
@@ -200,8 +214,7 @@ describe("given a member opens a From LangWatch board", () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const traffic = PICKER_QUESTIONS.find(({ id }) => id === "traffic")!;
       const widgetName = pickerWidgets(traffic.id)[0]!.name;
-      const { host, server } = openCurated("breaks");
-      await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
+      const { host, server } = openCurated({ templateId: "breaks", query: PICKER_OPEN });
 
       await user.click(
         await screen.findByRole("button", {
@@ -234,7 +247,11 @@ describe("given a member opens a From LangWatch board", () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const traffic = PICKER_QUESTIONS.find(({ id }) => id === "traffic")!;
       const widgetName = pickerWidgets(traffic.id)[0]!.name;
-      const { host, server } = openCurated("breaks", LANGY_ON, MEMBER, [widgetName]);
+      const { host, server } = openCurated({
+        templateId: "breaks",
+        storedNames: [widgetName],
+        query: PICKER_OPEN,
+      });
       await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
 
       await user.click(
@@ -254,11 +271,10 @@ describe("given a member opens a From LangWatch board", () => {
     /** @scenario "From LangWatch: the ask bar asks Langy for a member who may not create dashboards" */
     it("opens Langy about the template board with nothing asked yet", async () => {
       const user = userEvent.setup();
-      const { host } = openCurated(
-        "breaks",
-        LANGY_ON,
-        MEMBER.filter((permission) => permission !== "analytics:create"),
-      );
+      const { host } = openCurated({
+        templateId: "breaks",
+        permissions: MEMBER.filter((permission) => permission !== "analytics:create"),
+      });
 
       await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
 
@@ -268,10 +284,50 @@ describe("given a member opens a From LangWatch board", () => {
     });
   });
 
+  describe("when Langy is off and the member may create dashboards", () => {
+    /** @scenario "Boards: every board has the ask bar" */
+    it("keeps the ask bar, and a click opens Add a widget", async () => {
+      const user = userEvent.setup();
+      const { host } = openCurated({
+        templateId: "breaks",
+        flags: { release_dashboards: true },
+      });
+
+      await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
+
+      expect(host.lastQuery).toEqual(PICKER_OPEN);
+    });
+
+    /** @scenario "Boards: every board has the ask bar" */
+    it("shows Add a widget when the address asks for it", async () => {
+      openCurated({
+        templateId: "breaks",
+        flags: { release_dashboards: true },
+        query: PICKER_OPEN,
+      });
+
+      expect(await screen.findByRole("heading", { name: "Add a widget" })).toBeInTheDocument();
+    });
+  });
+
+  describe("when a member who may not create dashboards loads the address with Add a widget open", () => {
+    /** @scenario "From LangWatch: the ask bar asks Langy for a member who may not create dashboards" */
+    it("shows no picker", async () => {
+      openCurated({
+        templateId: "breaks",
+        permissions: MEMBER.filter((permission) => permission !== "analytics:create"),
+        query: PICKER_OPEN,
+      });
+
+      await screen.findByRole("heading", { name: "Where my agent breaks" });
+      expect(screen.queryByRole("heading", { name: "Add a widget" })).toBeNull();
+    });
+  });
+
   describe("when the address names no From LangWatch board", () => {
     /** @scenario "From LangWatch: a template board is live and read-only" */
     it("shows the not-found page", async () => {
-      openCurated("nope");
+      openCurated({ templateId: "nope" });
 
       expect(
         await screen.findByRole("heading", { name: "This page is not here" }),

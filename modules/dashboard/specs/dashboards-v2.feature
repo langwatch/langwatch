@@ -1420,6 +1420,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given "Add a widget" is open on a From LangWatch board
     Then there is no "I'll build it myself" button
     And Langy stays reachable in the picker
+    And a search that matches nothing shows "No widget matches. Clear the search and filters to see them all."
 
   @unit @integration
   Scenario: From LangWatch: the ask bar asks Langy for a member who may not create dashboards

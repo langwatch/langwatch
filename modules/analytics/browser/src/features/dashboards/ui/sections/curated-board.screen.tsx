@@ -6,7 +6,6 @@
 
 import { UiPageNotFound } from "@langwatch/browser/page-fallbacks";
 import { VStack } from "@langwatch/design-system/primitives";
-import { useState } from "react";
 
 import {
   DashboardRefetchIntervalContext,
@@ -14,6 +13,7 @@ import {
 } from "../../../../behavior/use-dashboard-auto-refresh.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
+import { useBlockPickerAddress } from "../../behavior/use-block-picker-address.ts";
 import { useBoardReader } from "../../behavior/use-board-access.ts";
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
 import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
@@ -67,7 +67,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
   // Whoever may create dashboards picks a widget for a new one; the rest ask Langy.
   const { mayCreate } = useBoardReader();
   const { createWithWidget } = useBoardFromTemplate();
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const picker = useBlockPickerAddress();
 
   return (
     <BoardPage
@@ -99,7 +99,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
       <BoardLangy
         board={subject}
         period={period}
-        {...(mayCreate ? { onOpenPicker: () => setPickerOpen(true) } : {})}
+        {...(mayCreate ? { onOpenPicker: () => (picker.isOpen ? void 0 : picker.open()) } : {})}
       />
       <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
         <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
@@ -139,7 +139,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
           </VStack>
         </DashboardRefreshedAtContext.Provider>
       </DashboardRefetchIntervalContext.Provider>
-      {mayCreate && pickerOpen && (
+      {mayCreate && picker.isOpen && (
         <BlockPickerDialog
           board={subject}
           period={period}
@@ -152,8 +152,8 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
               existingNames: saved.boards.map(({ name }) => name),
             })
           }
-          onSkip={() => setPickerOpen(false)}
-          onClose={() => setPickerOpen(false)}
+          onSkip={picker.close}
+          onClose={picker.close}
         />
       )}
     </BoardPage>

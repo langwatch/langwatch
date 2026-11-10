@@ -220,10 +220,11 @@ export function useBoardFromTemplate() {
     existingNames: readonly string[];
   }) => {
     const widgets = pickerWidgets(question.id);
+    const [widget] = widgets;
     const created = await createFrom({
       source: {
         id: question.id,
-        name: widgets[0]?.name ?? question.question,
+        name: widget.name,
         description: null,
         widgets: () => Promise.resolve(widgets),
         widgetSource: fromCatalogue,
