@@ -74,7 +74,7 @@ Feature: An experiment run shows the agent version and the concurrency it ran wi
   Scenario: The run summary shows the concurrency the run used
     Given a run that recorded concurrency 1
     When the results page lists that run
-    Then its run list entry reads "Concurrency 1"
+    Then its run list entry shows a "Concurrency 1" badge
     And a run with no recorded concurrency shows no concurrency
 
   @unit
@@ -92,7 +92,7 @@ Feature: An experiment run shows the agent version and the concurrency it ran wi
   @integration
   Scenario: The selected run's title shows the concurrency it used
     Given the results page shows a run that recorded concurrency 1
-    Then the title reads "Concurrency 1"
+    Then the title shows a "Concurrency 1" badge beside the run id
     And a selected run with no recorded concurrency shows no concurrency in the title
 
   @unit

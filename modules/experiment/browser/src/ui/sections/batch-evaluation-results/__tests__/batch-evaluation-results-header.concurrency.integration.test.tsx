@@ -41,10 +41,10 @@ afterEach(cleanup);
 describe("the results page title", () => {
   describe("given the selected run recorded concurrency 1", () => {
     /** @scenario "The selected run's title shows the concurrency it used" */
-    it("reads Concurrency 1 beside the run id", () => {
+    it("shows a Concurrency 1 badge beside the run id", () => {
       renderHeader(1);
 
-      expect(screen.getByTestId("shown-run-concurrency")).toHaveTextContent("· Concurrency 1");
+      expect(screen.getByTestId("shown-run-concurrency")).toHaveTextContent(/^Concurrency 1$/);
       expect(screen.getByText(/cool-bold-fox/)).toBeInTheDocument();
     });
   });

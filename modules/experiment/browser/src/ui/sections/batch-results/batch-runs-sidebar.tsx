@@ -5,6 +5,7 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
  */
 import {
   Alert,
+  Badge,
   Box,
   Button,
   chakra,
@@ -298,32 +299,41 @@ const RunItem = ({
   );
 };
 
-/** The agent version each label resolved to and the run's concurrency, when it recorded them. */
+/** The agent version each label resolved to and the run's concurrency, as badges, when it recorded them. */
 const RunSettingsLine = ({ run }: { run: BatchRunSummary }) => {
   const labels = runAgentLabelsOf(run.targets);
   if (labels.length === 0 && !run.concurrency) return null;
 
   return (
-    <Text color="fg.muted" textStyle="caption" lineClamp={2}>
-      {labels.map((label, index) => (
-        <chakra.span
+    <HStack gap={1} flexWrap="wrap" paddingTop={0.5}>
+      {labels.map((label) => (
+        <Badge
           key={label.targetId}
+          size="xs"
+          variant="subtle"
           title={label.targetName}
           data-testid={`run-agent-label-${run.runId}-${label.targetId}`}
         >
-          {index > 0 ? ", " : ""}
           {agentLabelText(label)}
-        </chakra.span>
+        </Badge>
       ))}
       {run.concurrency ? (
-        <chakra.span data-testid={`run-concurrency-${run.runId}`}>
-          {labels.length > 0 ? " · " : ""}
-          {`Concurrency ${run.concurrency}`}
-        </chakra.span>
+        <RunConcurrencyBadge runId={run.runId} concurrency={run.concurrency} />
       ) : null}
-    </Text>
+    </HStack>
   );
 };
+
+const RunConcurrencyBadge = ({ runId, concurrency }: { runId: string; concurrency: number }) => (
+  <Tooltip content={concurrencyTooltip(concurrency)} openDelay={300}>
+    <Badge size="xs" variant="outline" data-testid={`run-concurrency-${runId}`}>
+      {`Concurrency ${concurrency}`}
+    </Badge>
+  </Tooltip>
+);
+
+const concurrencyTooltip = (concurrency: number) =>
+  concurrency === 1 ? "Ran one row at a time" : `Ran up to ${concurrency} rows at the same time`;
 
 export function BatchRunsSidebar({
   runs,

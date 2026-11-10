@@ -103,8 +103,8 @@ describe("the run list", () => {
       expect(screen.getByTestId("run-agent-label-run-v3-target-agent")).toHaveTextContent(
         "production · v3",
       );
-      expect(screen.getByTestId("run-concurrency-run-v3")).toHaveTextContent("Concurrency 1");
-      expect(screen.getByTestId("run-concurrency-run-v2")).toHaveTextContent("Concurrency 10");
+      expect(screen.getByTestId("run-concurrency-run-v3")).toHaveTextContent(/^Concurrency 1$/);
+      expect(screen.getByTestId("run-concurrency-run-v2")).toHaveTextContent(/^Concurrency 10$/);
     });
   });
 

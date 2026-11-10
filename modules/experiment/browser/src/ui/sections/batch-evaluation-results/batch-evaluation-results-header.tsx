@@ -1,7 +1,7 @@
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { chakra, HStack, Skeleton, Spacer, Text } from "@langwatch/design-system/primitives";
+import { Badge, HStack, Skeleton, Spacer, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 
@@ -46,13 +46,13 @@ const ExperimentTitle = ({
       >
         {"// "}
         {shownRunId}
-        {shownRunConcurrency ? (
-          <chakra.span data-testid="shown-run-concurrency">
-            {` · Concurrency ${shownRunConcurrency}`}
-          </chakra.span>
-        ) : null}
       </Text>
     )}
+    {experiment && shownRunId && shownRunConcurrency ? (
+      <Badge size="xs" variant="outline" flexShrink={0} data-testid="shown-run-concurrency">
+        {`Concurrency ${shownRunConcurrency}`}
+      </Badge>
+    ) : null}
   </HStack>
 );
 
