@@ -8,14 +8,15 @@ import type Stripe from "stripe";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
-import type {
-  LicenseRenewalOutcome,
-  RenewalInvoice,
-} from "../features/license-purchase/services/license-renewal.service.ts";
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
 import { BestEffortService } from "./best-effort.service.ts";
 import { BillingCheckoutCompletionService } from "./billing-checkout-completion.service.ts";
+import {
+  BillingLicenseWebhookService,
+  type LicensePurchaseHandler,
+  type LicenseRenewalHandler,
+} from "./billing-license-webhook.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import type { CheckoutBillingRoles } from "./billing-starter-role.service.ts";
 import {
@@ -33,23 +34,6 @@ const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 type ItemCalculator = Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
   readonly prices: StripePriceMap;
 };
-
-/**
- * License purchase events originate from a specific Stripe payment link and
- * target self-hosted buyers who have no organization in the SaaS database.
- * The webhook service routes these before any org lookup.
- */
-export interface LicensePurchaseHandler {
-  handle(params: {
-    checkoutSession: Stripe.Checkout.Session;
-    stripeSubscriptions: Pick<StripeSubscriptionsChannel, "listCheckoutLineItems">;
-  }): Promise<void>;
-}
-
-/** Mints the next term's licence for a renewed self-serve licence subscription. */
-export interface LicenseRenewalHandler {
-  handleInvoice(input: { invoice: RenewalInvoice }): Promise<LicenseRenewalOutcome>;
-}
 
 /** Stripe webhooks can arrive before subscription state is fully consistent. */
 const STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS = 2000;
@@ -138,9 +122,7 @@ export class EEWebhookService implements WebhookService {
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
   private readonly stripeSubscriptions: StripeSubscriptionsChannel;
   private readonly itemCalculator: ItemCalculator;
-  private readonly licensePurchaseHandler?: LicensePurchaseHandler;
-  private readonly licensePaymentLinkId?: string;
-  private readonly licenseRenewal?: LicenseRenewalHandler;
+  private readonly license: BillingLicenseWebhookService;
   private readonly host: BillingWebhookHost;
   private readonly connectedBilling?: ConnectedBillingInvoiceEvents;
   private readonly recovery?: PaymentRecoveryHandler;
@@ -168,9 +150,12 @@ export class EEWebhookService implements WebhookService {
     this.organizationRepository = organizationRepository;
     this.stripeSubscriptions = stripeSubscriptions;
     this.itemCalculator = itemCalculator;
-    this.licensePurchaseHandler = licensePurchaseHandler;
-    this.licensePaymentLinkId = licensePaymentLinkId;
-    this.licenseRenewal = licenseRenewal;
+    this.license = BillingLicenseWebhookService.create({
+      stripeSubscriptions,
+      ...(licensePurchaseHandler ? { licensePurchaseHandler } : {}),
+      ...(licensePaymentLinkId ? { licensePaymentLinkId } : {}),
+      ...(licenseRenewal ? { licenseRenewal } : {}),
+    });
     this.host = host;
     this.connectedBilling = connectedBilling;
     this.recovery = recovery;
@@ -203,10 +188,8 @@ export class EEWebhookService implements WebhookService {
   async handleEvent(event: Stripe.Event): Promise<HandleEventResult> {
     try {
       if (event.type === "checkout.session.completed") {
-        const licenseResult = await this.tryRouteLicensePurchase(event);
-        if (licenseResult) {
-          return licenseResult;
-        }
+        const purchase = await this.license.routePurchase(event);
+        if (purchase.outcome === "handled") return purchase.result;
       }
 
       const settled = await this.routeSettledInvoice(event);
@@ -262,8 +245,8 @@ export class EEWebhookService implements WebhookService {
    */
   private async routeSettledInvoice(event: Stripe.Event): Promise<HandleEventResult | null> {
     if (event.type === "invoice.paid" || event.type === "invoice.payment_succeeded") {
-      const renewalResult = await this.tryRouteLicenseRenewal(event);
-      if (renewalResult) return renewalResult;
+      const renewal = await this.license.routeRenewal(event);
+      if (renewal.outcome === "handled") return renewal.result;
       // Both paid events of one invoice arrive; only the write that closes the case mails.
       await this.recovery?.invoicePaid({ invoice: recoveryInvoiceOf(event.data.object) });
       return event.type === "invoice.paid" ? { status: "ok" } : null;
@@ -273,66 +256,6 @@ export class EEWebhookService implements WebhookService {
       return { status: "ok" };
     }
     return null;
-  }
-
-  /**
-   * Returns a result when the session is a license purchase, otherwise null
-   * so `handleEvent` falls through to the subscription flow.
-   */
-  private async tryRouteLicensePurchase(
-    event: Stripe.Event & { type: "checkout.session.completed" },
-  ): Promise<HandleEventResult | null> {
-    const checkoutSession = event.data.object as Stripe.Checkout.Session;
-
-    const paymentLinkId =
-      typeof checkoutSession.payment_link === "string"
-        ? checkoutSession.payment_link
-        : checkoutSession.payment_link?.id;
-
-    if (!this.licensePaymentLinkId || paymentLinkId !== this.licensePaymentLinkId) {
-      return null;
-    }
-
-    if (!this.licensePurchaseHandler) {
-      logger.error(
-        { eventId: event.id },
-        "[stripeWebhook] License purchase handler is not configured",
-      );
-
-      return {
-        status: "error",
-        httpStatus: 500,
-        message: "License generation error: handler not configured",
-      };
-    }
-
-    await this.licensePurchaseHandler.handle({
-      checkoutSession,
-      stripeSubscriptions: this.stripeSubscriptions,
-    });
-
-    return { status: "ok" };
-  }
-
-  /**
-   * A paid renewal of a licence subscription gets its next term's licence;
-   * anything else returns null and goes on. Both paid events of one invoice
-   * arrive: the per-invoice claim lets only the first mint.
-   */
-  private async tryRouteLicenseRenewal(
-    event: Stripe.Event & { type: "invoice.paid" | "invoice.payment_succeeded" },
-  ): Promise<HandleEventResult | null> {
-    if (!this.licenseRenewal) return null;
-    const outcome = await this.licenseRenewal.handleInvoice({ invoice: event.data.object });
-    if (outcome === "not_license_renewal") return null;
-    if (outcome === "in_flight") {
-      logger.warn(
-        { eventId: event.id, eventType: event.type },
-        "[stripeWebhook] License renewal for this invoice is in flight; asking Stripe to retry",
-      );
-      return { status: "error", httpStatus: 500, message: "License renewal in progress" };
-    }
-    return { status: "ok" };
   }
 
   private async routeConnectedInvoiceFinalized(

@@ -82,13 +82,11 @@ import {
   resourceLimitCooldown,
 } from "../services/billing-alert-cooldown.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
+import type { LicensePurchaseHandler } from "../services/billing-license-webhook.service.ts";
 import { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
 import type { CheckoutBillingRoles } from "../services/billing-starter-role.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
-import {
-  EEWebhookService,
-  type LicensePurchaseHandler,
-} from "../services/billing-stripe-webhook.service.ts";
+import { EEWebhookService } from "../services/billing-stripe-webhook.service.ts";
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { CurrencyService } from "../services/currency.service.ts";
 import { CustomerService } from "../services/customer.service.ts";

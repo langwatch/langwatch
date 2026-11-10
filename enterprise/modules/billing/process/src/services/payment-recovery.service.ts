@@ -6,8 +6,6 @@
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
-  getFreePlanLimits,
-  PLAN_LIMITS,
   PlanTypes,
   SubscriptionStatus,
   type PaymentRecoveryDetails,
@@ -15,13 +13,10 @@ import {
   type PaymentRecoverySummary,
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
-import { format, nowInstant, Temporal, type Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
-import type {
-  PaymentRecoveryEmail,
-  PaymentRecoveryEmailChannel,
-} from "../channels/payment-recovery-email.channel.ts";
+import type { PaymentRecoveryEmailChannel } from "../channels/payment-recovery-email.channel.ts";
 import type {
   BillingInvoiceDetail,
   StripeInvoicesChannel,
@@ -40,6 +35,7 @@ import {
   type PaymentRecoveryNoticeDay,
 } from "../rules/payment-recovery.rules.ts";
 import type { OverPlanService } from "./over-plan.service.ts";
+import { PaymentRecoveryMailService, type PreparedMail } from "./payment-recovery-mail.service.ts";
 
 const logger = createLogger("langwatch:billing:payment-recovery");
 
@@ -63,14 +59,6 @@ export type PaymentRecoverySweepOutcome = {
   notified: number;
   closed: number;
   failed: number;
-};
-
-type Recipient = { userId: string; email: string };
-
-type PreparedMail = {
-  organizationId: string;
-  recipients: Recipient[];
-  content: PaymentRecoveryEmail;
 };
 
 type PaymentRecoveryOptions = {
@@ -98,10 +86,17 @@ export class PaymentRecoveryService {
 
   private readonly options: PaymentRecoveryOptions;
   private readonly now: () => Instant;
+  private readonly mail: PaymentRecoveryMailService;
 
   private constructor(options: PaymentRecoveryOptions) {
     this.options = options;
     this.now = options.now ?? nowInstant;
+    this.mail = PaymentRecoveryMailService.create({
+      organizations: options.organizations,
+      ...(options.billingMembers ? { billingMembers: options.billingMembers } : {}),
+      emails: options.emails,
+      publicBaseUrl: options.publicBaseUrl,
+    });
   }
 
   /** A failed charge opens the case for a card-collected renewal; the first email waits for day 3. */
@@ -157,7 +152,7 @@ export class PaymentRecoveryService {
       { organizationId: result.closed.organizationId, invoiceId: invoice.id },
       "Payment recovery case closed by payment",
     );
-    for (const mail of restored) await this.deliver(mail);
+    for (const mail of restored) await this.mail.deliver(mail);
   }
 
   /** Voided or marked uncollectible by staff: the case closes, the plan stays, nothing is mailed. */
@@ -267,7 +262,7 @@ export class PaymentRecoveryService {
         { organizationId: open.organizationId, invoiceId: open.invoiceId },
         "Payment recovery case closed by a sweep that found the invoice paid",
       );
-      for (const mail of restored) await this.deliver(mail);
+      for (const mail of restored) await this.mail.deliver(mail);
       return "closed";
     }
     if (invoice.status === "void" || invoice.status === "uncollectible") {
@@ -296,10 +291,7 @@ export class PaymentRecoveryService {
     invoice: BillingInvoiceDetail;
   }): Promise<boolean> {
     const kind = noticeKindOf(day);
-    const mail = await this.prepareMail({
-      organizationId: open.organizationId,
-      email: (organizationName) => this.emailOf({ kind, organizationName, open, invoice }),
-    });
+    const mail = await this.mail.prepare({ kind, open, invoice });
     const advanced = await this.options.recoveries.advanceNotice({
       subscriptionId: open.subscriptionId,
       from: open.noticeDay,
@@ -307,7 +299,7 @@ export class PaymentRecoveryService {
     });
     if (!advanced) return false;
     if (kind === "paused") await this.markIfOverPlan(open);
-    await this.deliver(mail);
+    await this.mail.deliver(mail);
     logger.info({ organizationId: open.organizationId, day, kind }, "Payment recovery notice sent");
     return true;
   }
@@ -347,12 +339,7 @@ export class PaymentRecoveryService {
   }): Promise<PreparedMail[]> {
     if (open.noticeDay === null) return [];
     const read = invoice ?? (await this.readInvoice({ invoiceId: open.invoiceId, fallback }));
-    const mail = await this.prepareMail({
-      organizationId: open.organizationId,
-      email: (organizationName) =>
-        this.emailOf({ kind: "restored", organizationName, open, invoice: read }),
-    });
-    return [mail];
+    return [await this.mail.prepare({ kind: "restored", open, invoice: read })];
   }
 
   /** The invoice as Stripe answers it now, else the webhook's copy without the card. */
@@ -382,107 +369,6 @@ export class PaymentRecoveryService {
     }
   }
 
-  /** Resolves who gets the email and its content; every lookup that can fail happens here. */
-  private async prepareMail({
-    organizationId,
-    email,
-  }: {
-    organizationId: string;
-    email: (organizationName: string) => PaymentRecoveryEmail;
-  }): Promise<PreparedMail> {
-    const { organizationName, recipients } = await this.recipientsOf(organizationId);
-    return { organizationId, recipients, content: email(organizationName) };
-  }
-
-  /** Sends to each person who can pay; one refused address does not stop the others. */
-  private async deliver({ organizationId, recipients, content }: PreparedMail): Promise<void> {
-    if (recipients.length === 0) {
-      logger.warn(
-        { organizationId },
-        "Payment recovery notice has no recipients; recorded as sent",
-      );
-      return;
-    }
-    for (const recipient of recipients) {
-      try {
-        await this.options.emails.send({ to: recipient.email, email: content });
-      } catch (error) {
-        logger.warn(
-          {
-            organizationId,
-            userId: recipient.userId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Payment recovery email refused for one recipient",
-        );
-      }
-    }
-  }
-
-  /** Admins and Billing members with an address, each once. */
-  private async recipientsOf(
-    organizationId: string,
-  ): Promise<{ organizationName: string; recipients: Recipient[] }> {
-    const organization = await this.options.organizations.findWithAdministrators(organizationId);
-    const admins = (organization?.administrators ?? []).flatMap((admin) =>
-      admin.email ? [{ userId: admin.userId, email: admin.email }] : [],
-    );
-    const holders = this.options.billingMembers
-      ? await this.options.billingMembers.listBillingMembers({ organizationId })
-      : [];
-    const billing = await this.options.organizations.findMemberEmails({
-      organizationId,
-      userIds: holders.map((holder) => holder.userId),
-    });
-    const byUser = new Map<string, Recipient>();
-    for (const recipient of [...admins, ...billing]) byUser.set(recipient.userId, recipient);
-    return {
-      organizationName: organization?.name ?? "Your organization",
-      recipients: [...byUser.values()],
-    };
-  }
-
-  private emailOf({
-    kind,
-    organizationName,
-    open,
-    invoice,
-  }: {
-    kind: PaymentRecoveryEmail["kind"];
-    organizationName: string;
-    open: PaymentRecoveryCase;
-    invoice: BillingInvoiceDetail;
-  }): PaymentRecoveryEmail {
-    const base = this.options.publicBaseUrl;
-    const actionUrl = {
-      failed: `${base}/settings/subscription?updateCard=1`,
-      reminder: `${base}/settings/subscription?updateCard=1`,
-      final: `${base}/settings/subscription?pay=1`,
-      paused: `${base}/settings/subscription?pay=1`,
-      restored: base,
-    }[kind];
-    const free = getFreePlanLimits();
-    return {
-      kind,
-      organizationName,
-      planName: planNameOf(open.plan),
-      amount: formatAmount({ amount: invoice.amountDue, currency: invoice.currency }),
-      ...(invoice.number ? { invoiceNumber: invoice.number } : {}),
-      invoiceDate: readableDate(Temporal.Instant.fromEpochMilliseconds(invoice.created * 1000)),
-      accessStopsOn: readableDate(accessStopsAt({ startedAt: open.startedAt })),
-      ...(invoice.card ? { card: invoice.card } : {}),
-      ...(kind === "final"
-        ? {
-            freeLimits: {
-              eventsPerMonth: free.maxMessagesPerMonth,
-              eachOfScenarios: free.maxScenarios ?? 0,
-            },
-          }
-        : {}),
-      actionUrl,
-    };
-  }
-
   private async alertAccountTeam({
     organizationId,
     invoice,
@@ -495,24 +381,7 @@ export class PaymentRecoveryService {
       organizationId,
       organizationName: organization?.name ?? "Unknown",
       stripeInvoiceId: invoice.id,
-      amount: formatAmount({ amount: invoice.amountDue, currency: invoice.currency }),
+      amount: this.mail.amountOf({ amount: invoice.amountDue, currency: invoice.currency }),
     });
   }
-}
-
-function planNameOf(plan: string): string {
-  const limits = (PLAN_LIMITS as Record<string, { name?: string } | undefined>)[plan];
-  return limits?.name ?? "paid";
-}
-
-function formatAmount({ amount, currency }: { amount: number; currency: string }): string {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(amount / 100);
-}
-
-/** "23 November 2026", in UTC, the way the emails name a date. */
-function readableDate(instant: Instant): string {
-  return format(instant.epochMilliseconds, "d MMMM yyyy", { timeZone: "UTC" });
 }
