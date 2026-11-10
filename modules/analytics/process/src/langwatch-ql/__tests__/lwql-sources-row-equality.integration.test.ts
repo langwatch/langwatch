@@ -108,7 +108,9 @@ const labelsOf = (queries: readonly StockQuery[]) => queries.map(({ label }) => 
 describe("given the stock queries that keep traces or spans to their sources", () => {
   /** @scenario "AC202d Stock widgets: a widget whose list did not change returns the same rows" */
   it("turns every one of their trace view reads back into the single lookup", () => {
-    expect(COVERED.length).toBeGreaterThan(50);
+    // The stock queries that read traces or spans with the sources parameter:
+    // 58 before tasks#1117 moved 15 of them to trace_metrics.
+    expect(COVERED).toHaveLength(43);
 
     const missed = COVERED.flatMap(({ label, sql }) => {
       const { sql: before, replaced } = singleLookupForm(sql);

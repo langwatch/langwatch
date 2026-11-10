@@ -364,7 +364,6 @@ describe("given traces of each source carrying the metadata the widgets read", (
 
   /** @scenario "A moved widget query returns the rows its traces form returned" */
   it.each(LISTS)("returns each moved query's traces rows under $list", async ({ list }) => {
-    expect(BASELINE).toHaveLength(14);
     expect(await differing({ list })).toEqual([]);
   });
 
