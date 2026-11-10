@@ -1,4 +1,3 @@
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import {
   type BoardResults,
   type CarriedOverCell,
@@ -45,7 +44,7 @@ interface SavedStateExecution {
   datasetRows: LoadedExecutionData["datasetRows"];
   datasetColumns: LoadedExecutionData["datasetColumns"];
   loadedPrompts: Map<string, VersionedPrompt>;
-  loadedAgents: Map<string, TypedAgent>;
+  loadedAgents: LoadedExecutionData["loadedAgents"];
   loadedEvaluators: LoadedExecutionData["loadedEvaluators"];
   loadedWorkflows: LoadedExecutionData["loadedWorkflows"];
   datasetVersion?: LoadedExecutionData["datasetVersion"];
@@ -191,7 +190,7 @@ export class ExperimentSavedStateExecutionService {
       datasetRows: dataResult.datasetRows,
       datasetColumns: dataResult.datasetColumns,
       loadedPrompts: dataResult.loadedPrompts as Map<string, VersionedPrompt>,
-      loadedAgents: dataResult.loadedAgents as Map<string, TypedAgent>,
+      loadedAgents: dataResult.loadedAgents,
       loadedEvaluators: dataResult.loadedEvaluators,
       loadedWorkflows: dataResult.loadedWorkflows,
       ...(dataResult.datasetVersion ? { datasetVersion: dataResult.datasetVersion } : {}),

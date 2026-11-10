@@ -667,11 +667,12 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `evaluator_lifecycle` (aggregate `evaluator`)
 
-Declared at `src/eventing/evaluator-lifecycle.pipeline.ts:24`. Events: `evaluatorDeletedEventSchema`.
+Declared at `src/eventing/evaluator-lifecycle.pipeline.ts:26`. Events: `evaluatorDeletedEventSchema`, `evaluatorCreatedEventSchema`.
 
 | Kind    | Name                     | Handles | Declared at                                       |
 | ------- | ------------------------ | ------- | ------------------------------------------------- |
-| command | `recordEvaluatorDeleted` | –       | `src/eventing/evaluator-lifecycle.pipeline.ts:29` |
+| command | `recordEvaluatorDeleted` | –       | `src/eventing/evaluator-lifecycle.pipeline.ts:31` |
+| command | `recordEvaluatorCreated` | –       | `src/eventing/evaluator-lifecycle.pipeline.ts:32` |
 
 ### Pipeline `evaluator_workflow_archive_cascade` (aggregate `global`)
 

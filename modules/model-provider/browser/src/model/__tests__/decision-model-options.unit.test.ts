@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   decisionModelPickerOptions,
+  isHostedDecisionModelOffered,
   ROUTED_HOSTED_DECISION_MODEL_SUBTITLE,
   rolePickerOptions,
 } from "../decision-model-options.ts";
@@ -44,6 +45,18 @@ describe("decisionModelPickerOptions", () => {
       const openai = options.find((option) => option.value === OPENAI.value);
       expect(openai).toMatchObject({ subtitle: "OpenAI's Decisions API, on your OpenAI key." });
       expect(openai?.disabled).toBeFalsy();
+    });
+
+    it("lists an own model that would run before the ones that need a key", () => {
+      const typesafe = { value: "typesafe/decisions:jev-1.14.0", label: "TypeSafe Jev 1.14" };
+      const own = decisionModelPickerOptions({
+        pickable: [HOSTED, typesafe],
+        isJudgeRouted: false,
+        isOwnModelEnabled: true,
+      }).filter((option) => option.value !== LANGWATCH_DECISION_MODEL_ID);
+      expect(own[0]).toMatchObject({ value: typesafe.value });
+      expect(own[0]?.disabled).toBeFalsy();
+      expect(own.slice(1).every((option) => option.disabled)).toBe(true);
     });
 
     it("tells how to enable a model whose provider has no key, and keeps it unpickable", () => {
@@ -120,5 +133,31 @@ describe("rolePickerOptions", () => {
 
   it("leaves the other columns to the LLMs", () => {
     expect(rolePickerOptions({ role: "DEFAULT", decisionOptions, llmOptions })).toEqual(llmOptions);
+  });
+});
+
+describe("isHostedDecisionModelOffered()", () => {
+  /** @scenario "Evals Preview is offered where it is released or one switch away" */
+  it.each([
+    [{ hostedReleased: true, offer: "contact_us" }, true],
+    [{ hostedReleased: false, offer: "enable" }, true],
+    [{ hostedReleased: false, offer: "ask_admin" }, true],
+    [{ hostedReleased: false, offer: "contact_us" }, false],
+    [{ hostedReleased: false, offer: "ask_operator" }, false],
+    [undefined, true],
+  ])("answers %o with %s", (access, offered) => {
+    expect(isHostedDecisionModelOffered(access)).toBe(offered);
+  });
+
+  /** @scenario "Without Evals Preview, the drawer offers only the project's own decision models" */
+  it("leaves LangWatch's models out of the picker when not offered", () => {
+    const options = decisionModelPickerOptions({
+      pickable: [],
+      isJudgeRouted: false,
+      isOwnModelEnabled: true,
+      isHostedOffered: false,
+    });
+
+    expect(options.find((option) => option.label === "Evals Preview")).toBeUndefined();
   });
 });

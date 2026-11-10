@@ -9,13 +9,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
 export const LWQL_FLAG = "release_lwql_workbench";
 
 /**
- * The experimental gate over the eval functions — the judged columns. Named
- * here rather than imported: LangWatchQL must recognise and refuse eval
- * syntax whether or not the Instant Evals module is installed.
- */
-const INSTANT_EVALS_FLAG = "release_instant_evals";
-
-/**
  * The rollout gate over the Dashboards area (Flight Deck). Analytics owns the
  * area's flags, so it answers this one too: the browser flag only hides chrome,
  * and every server entry point that gates the area asks through here.
@@ -39,29 +32,6 @@ export async function lwqlEnabled({
   const organizationId = await projects.getOrganizationId(projectId);
 
   return featureFlags.isEnabled(LWQL_FLAG, {
-    kind: "project",
-    projectId,
-    organizationId,
-  });
-}
-
-/**
- * Whether this project may call an eval function. Asked of the project, like
- * the surface gate above, and fails closed when the project names no
- * organization.
- */
-export async function instantEvalsEnabled({
-  featureFlags,
-  projectId,
-  projects,
-}: {
-  featureFlags: FeatureFlagApi;
-  projectId: string;
-  projects: ProjectApi;
-}): Promise<boolean> {
-  const organizationId = await projects.getOrganizationId(projectId);
-
-  return featureFlags.isEnabled(INSTANT_EVALS_FLAG, {
     kind: "project",
     projectId,
     organizationId,

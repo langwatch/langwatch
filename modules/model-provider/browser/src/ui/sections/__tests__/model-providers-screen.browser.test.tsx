@@ -50,6 +50,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
     },
+    instantEval: { access: { useQuery: () => ({ data: void 0, isLoading: true }) } },
   },
 }));
 
