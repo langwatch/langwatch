@@ -13,7 +13,6 @@ import {
   socialCardPath,
   type SocialCard,
 } from "../features/discovery/compile.ts";
-import { cacheRoot } from "../paths.ts";
 import { writeAtomically } from "./media-cache.ts";
 
 /** Draws a card's page to a raster image; the build's is one headless Chromium page. */
@@ -63,14 +62,14 @@ async function cached({ file }: { file: string | null }) {
 /** Each card's WebP keyed by its output name, from the disk cache or drawn on a miss. */
 export async function renderSocialCards({
   cards = allSocialCards(),
-  cacheDir = path.join(cacheRoot, "docs-site/social"),
+  cacheDir,
   open = chromiumCapture,
 }: {
   cards?: readonly SocialCard[];
   /** Where drawn cards are kept between builds; null draws every card and keeps none. */
-  cacheDir?: string | null;
+  cacheDir: string | null;
   open?: () => Promise<CardCapture>;
-} = {}) {
+}) {
   const files = new Map<string, Uint8Array>();
   let drawer: CardCapture | undefined;
   try {
