@@ -95,7 +95,7 @@ function queryParams(request: QueryRequest): Record<string, unknown> {
 /**
  * ClickHouse cancels a query whose client went away only when the query is read-only, and a POST
  * is read-only only under `readonly` 1 or 2. Every routed read carries both, so a read the app
- * abandons stops on the server (ADR-196).
+ * abandons stops on the server (ADR-197).
  */
 export const CANCELLED_ON_CLIENT_CLOSE = {
   readonly: "2",

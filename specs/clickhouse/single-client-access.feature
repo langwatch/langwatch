@@ -322,7 +322,7 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
       And the stream then fails with the server's code
 
   # ClickHouse cancels a query whose HTTP client went away only for a read-only query, and a POST
-  # is read-only only under readonly 1 or 2. ADR-196.
+  # is read-only only under readonly 1 or 2. ADR-197.
   Rule: A read the app abandons stops on the server
 
     @unit
@@ -359,7 +359,7 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
       And none is still running after the last attempt fails
 
     # A readonly=1 user refuses every setting change, so no routed client may connect as one; the
-    # vendor client's own defaults already fail there. ADR-196.
+    # vendor client's own defaults already fail there. ADR-197.
     @unit
     Scenario: A read the server refuses for readonly fails and is not resent
       Given the server refuses a read with READONLY (164)

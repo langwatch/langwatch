@@ -2,7 +2,7 @@
 
 /**
  * A read the app abandons must stop on the server, read back from `system.processes`.
- * Spec: specs/clickhouse/single-client-access.feature; ADR-196.
+ * Spec: specs/clickhouse/single-client-access.feature; ADR-197.
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";

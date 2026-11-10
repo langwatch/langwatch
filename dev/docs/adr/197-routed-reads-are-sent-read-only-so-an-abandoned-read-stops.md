@@ -1,4 +1,4 @@
-# ADR-196: Routed reads are sent read-only, so an abandoned read stops
+# ADR-197: Routed reads are sent read-only, so an abandoned read stops
 
 **Date:** 2026-11-09
 

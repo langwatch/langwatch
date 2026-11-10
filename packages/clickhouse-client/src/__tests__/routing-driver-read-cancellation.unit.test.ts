@@ -1,4 +1,4 @@
-/** Spec: specs/clickhouse/single-client-access.feature; ADR-196. */
+/** Spec: specs/clickhouse/single-client-access.feature; ADR-197. */
 import { describe, expect, it, vi } from "vitest";
 
 import { ClickHouseQueryClient } from "../client.ts";
