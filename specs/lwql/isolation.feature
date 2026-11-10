@@ -6,7 +6,7 @@ Feature: LangWatchQL never answers across a tenant or an instance
 
   # ADR-200. The gate decides before any SQL runs and fails closed; ClickHouse
   # isolates tenants on the server (ADR-084). Integration scenarios run against a
-  # real ClickHouse 26.8 through lwql-clickhouse-harness.ts (LWQL_ISOLATION_CLICKHOUSE_IMAGE).
+  # real ClickHouse 26.8 through lwql-clickhouse-harness.ts (LWQL_CLICKHOUSE_TEST_IMAGE).
 
   # --- The placement gate -------------------------------------------------
 

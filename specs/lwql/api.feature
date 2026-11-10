@@ -1306,6 +1306,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And they answer after every reader connection is ended, so no pool keeps the old password
     And a worker still on the old password rebuilds nothing
 
+  @integration
+  Scenario: An sql-mode deploy rotates the reader password while engine tables use the collection
+    Given an sql-mode install whose engine tables read through the app's named collection
+    When the reader's password changes and a second deploy converges
+    Then the deploy writes the collection in place, never dropping one the tables use
+    And the engine tables answer on the new password
+
   @e2e
   Scenario: A three-replica deployment reconverges LangWatchQL after provisioning failed during a ClickHouse outage
     Given a three-replica rendered-mode install whose PostgreSQL engine tables are missing

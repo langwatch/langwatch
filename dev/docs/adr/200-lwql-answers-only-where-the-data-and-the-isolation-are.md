@@ -28,7 +28,7 @@ Confirmed safe on 26.8: a named collection's keys cannot be overridden without `
 
 Re-run on 26.8.34.13, the version the LangWatchQL server image builds on (2026-11-10):
 
-- **The query condition cache** keeps tenants apart (tenant B reads 2, tenant A reads 0, tenant B again 2). Its `Debug` line from the key-map table's `SelectExecutor` logger still holds the capability: `Query condition cache has dropped 0/2 granules for PREWHERE condition has(_CAST(['<capability>']...), __table1.KeyHash)`. That is the only log line a `name = '...'` rule misses; the image's sha256 hex rule (#9458) hides it, and the integration test runs with the image's rules.
+- **The query condition cache** keeps tenants apart (tenant A reads 0, tenant B reads 2, tenant A again 0). Its `Debug` line from the key-map table's `SelectExecutor` logger still holds the capability: `Query condition cache has dropped 0/2 granules for PREWHERE condition has(_CAST(['<capability>']...), __table1.KeyHash)`. That is the only log line a `name = '...'` rule misses; the image's sha256 hex rule (#9458) hides it, and the integration test runs with the image's rules.
 - **A named collection's keys** cannot be redirected by a user granted only `NAMED COLLECTION`.
 
 25.10 differed on both (the cache crossed tenants, the override was allowed); LangWatchQL targets 26.8 only, so the isolation suites pin it.
@@ -54,7 +54,8 @@ A self-hosted install queries its own ClickHouse only once LangWatchQL is enable
 - The executor appends the statement's only `SETTINGS` clause, after checking the value is lowercase hex. The validator still refuses a caller's `SETTINGS`.
 - The server masks that setting's value. The image renders three `query_masking_rules` rules per name in `CLICKHOUSE_MASKED_SETTINGS` (default `custom_api_key_hash`): the statement, URL and encoded-URL forms. It adds one rule hiding every 64-character sha256 hex value, which covers the capability wherever ClickHouse logs it folded, such as the query condition cache's debug line. The self-hosting docs give operators of an external ClickHouse the same rules.
 - The restricted profile pins `log_query_settings = 0 CONST`, so `system.query_log.Settings`, which masking does not reach, never holds it.
-- The audit trail names the project, not the hash. The same clause sets `log_comment = 'lwql:project=<id>[,<id>]'` from validated project ids, and the profile lets the restricted user change only that and the capability. `query_log.log_comment` therefore names each run's projects while no column holds the hash or the key. The validator refuses a caller's own `SETTINGS`, and on 26.8 a subquery's `log_comment` does not replace the executor's.
+
+**The audit trail names the project, not the hash.** The same clause sets `log_comment = 'lwql:project=<id>[,<id>]'` from validated project ids (`lwql:project=` for a run scoped to no project), and the profile lets the restricted user change only that and the capability. `query_log.log_comment` therefore names each run's projects while no column holds the hash or the key. The validator refuses a caller's own `SETTINGS`, and on 26.8 a subquery's `log_comment` does not replace the executor's.
 
 **The restricted identity opts in to what it uses.** Its profile pins `use_query_cache = 0`, `use_query_condition_cache = 0` and `allow_introspection_functions = 0` CONST beside its limits, so no server default turns a cache or introspection on for it. Its grants are exactly the LangWatchQL tables; a test fails on any grant added, and on dictGet, remote(), url(), file() or s3() answering. Deleting a key-map row stops its key on the next query, since no cache holds the old answer.
 
@@ -65,7 +66,7 @@ A self-hosted install queries its own ClickHouse only once LangWatchQL is enable
 ## Consequences
 
 - A routed organisation loses LangWatchQL until it is opted in; today it gets wrong answers, so this trades silent error for a named refusal.
-- The executor builds `SETTINGS` into the statement; the validator already forbids user-written `SETTINGS`, so the clause is the app's alone.
+- The executor builds `SETTINGS` into the statement; the validator already forbids user-written `SETTINGS`, so the clause is the app's alone. That refusal carries the weight: on 26.8 a statement's own `SETTINGS`, trailing or in a subquery, overrides the clause appended after it. An override reads nothing without another tenant's valid hash, which is the credential (tested).
 - An external ClickHouse without the masking rule keeps the capability in its logs. Adding it is the operator's job, and the docs say so; the app cannot check a server's masking rules.
 - **Merge order: #9458 lands first.** It brings the 26.8 image and the masking rules this decision relies on; merged alone, this change would run on a server that neither is 26.8 nor masks the capability. The LangWatchQL integration suites pin `clickhouse/clickhouse-server:26.8.34.13` and render #9458's rules.
 - Revoking a capability (rotating `lwqlKey`, deleting key-map rows) and restored backups re-adding old rows are not covered here; they need their own decision.

@@ -204,14 +204,38 @@ Ensure the service account has S3 access (IRSA) or static credentials are config
 
 ### ClickHouse restarts with `NAMED_COLLECTION_ALREADY_EXISTS`
 
-With chart-managed ClickHouse, the chart delivers the LangWatchQL named collections `lwql_postgres` and `lwql_postgres_<database>` as server config. A collection of the same name created by hand with `CREATE NAMED COLLECTION` clashes with it, and the server stops at startup. Before you upgrade, list the collections and drop any whose `source` is `SQL`:
+With chart-managed ClickHouse, the chart delivers the LangWatchQL named collections `lwql_postgres` and `lwql_postgres_<database>` as server config. A collection of the same name created by hand with `CREATE NAMED COLLECTION` clashes with it, and the server stops at startup. Remove the hand-made one before you upgrade:
 
-```bash
-kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
-  "SELECT name, source FROM system.named_collections WHERE name LIKE 'lwql_postgres%'"
-kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
-  "DROP NAMED COLLECTION lwql_postgres_langwatch"
-```
+1. List the collections, and the LangWatchQL tables that read PostgreSQL through each one:
+
+   ```bash
+   kubectl -n langwatch exec -i sts/langwatch-clickhouse -- clickhouse-client <<'SQL'
+   SELECT c.name AS collection, c.source, t.database, t.name AS engine_table
+   FROM system.named_collections AS c
+   LEFT JOIN (
+     SELECT database, name,
+       extract(engine_full, '^PostgreSQL\\(\\s*`?([A-Za-z0-9_]+)') AS collection
+     FROM system.tables
+     WHERE engine = 'PostgreSQL'
+   ) AS t ON t.collection = c.name
+   WHERE c.name LIKE 'lwql_postgres%'
+   ORDER BY collection, engine_table
+   SQL
+   ```
+
+2. For each collection whose `source` is `SQL`, drop the tables listed beside it. They hold no data: each one reads PostgreSQL when it is queried, and the next deploy recreates them. Until then, LangWatchQL's PostgreSQL-backed views are unavailable.
+
+   ```bash
+   kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
+     "DROP TABLE langwatch.<engine_table>"
+   ```
+
+3. Drop the collection. ClickHouse refuses while any table still uses it (`NAMED_COLLECTION_IS_USED`):
+
+   ```bash
+   kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
+     "DROP NAMED COLLECTION lwql_postgres_langwatch"
+   ```
 
 Upgrades need no collection created by hand: the upgrade binds the LangWatchQL tables to a collection the server already holds.
 
