@@ -20,7 +20,7 @@ const UNIT_WIDGETS = ["att-share", "att-table", "att-change", "cost-by-segment"]
 /** The view each unit-grouped query reads: those needing a prompt version stay on `traces`. */
 const UNIT_QUERY_VIEWS: Record<string, Record<string, "traces" | "trace_metrics">> = {
   "att-share": { units: "trace_metrics", totals: "trace_metrics" },
-  "att-table": { units: "trace_metrics", passRates: "traces" },
+  "att-table": { units: "trace_metrics", passRates: "trace_metrics" },
   "att-change": { units: "traces" },
   "cost-by-segment": { units: "trace_metrics", totals: "trace_metrics" },
 };

@@ -1,7 +1,7 @@
 Feature: Stock trace widgets read the light trace table
   On a large project the stock widgets that read `traces` run out of memory, and they read it
   only for a few metadata keys. trace_analytics gets one column per key, computed by ClickHouse
-  from the row's Attributes; trace_metrics exposes them; and the 14 widget queries that need
+  from the row's Attributes; trace_metrics exposes them; and the 15 widget queries that need
   nothing else from `traces` read trace_metrics instead (tasks#1117). The Attributes map stays
   withheld from trace_metrics (tasks#598).
 
@@ -37,7 +37,7 @@ Feature: Stock trace widgets read the light trace table
 
     @unit
     Scenario: The moved widget queries read trace_metrics, not traces
-      Given the 14 stock queries tasks#1117 lists, from gen-acceptance/actions to ask-rising/daily
+      Given the 14 stock queries tasks#1117 lists, plus att-table/passRates, from gen-acceptance/actions to ask-rising/daily
       Then each reads trace_metrics and never traces
       And each keeps to its sources with Source IN {dashboard_context_sources:Array(String)}
 

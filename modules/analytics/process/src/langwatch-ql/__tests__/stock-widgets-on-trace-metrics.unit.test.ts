@@ -40,6 +40,7 @@ const MOVED = [
   "att-share/units",
   "att-share/totals",
   "att-table/units",
+  "att-table/passRates",
   "ask-rising/shares",
   "ask-rising/daily",
 ];
