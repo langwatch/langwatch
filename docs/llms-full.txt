@@ -72285,6 +72285,7 @@ ch() { kubectl -n "$NS" exec -i "$1" -c clickhouse -- sh -c \
 2. On each pod, for each collection whose `source` is `SQL`, drop the tables listed beside it. They hold no data: each one reads PostgreSQL when it is queried. The next deploy recreates the LangWatchQL tables only. Save the definition of any table you created yourself first (`SHOW CREATE TABLE`) and recreate it after the upgrade. Until the deploy, LangWatchQL's PostgreSQL-backed views are unavailable.
 
    ```bash
+   pod=pod/$RELEASE-clickhouse-0 # the pod that listed the table
    ch "$pod" -q "SHOW CREATE TABLE <database>.<engine_table>"
    ch "$pod" -q "DROP TABLE <database>.<engine_table>"
    ```
@@ -72292,6 +72293,7 @@ ch() { kubectl -n "$NS" exec -i "$1" -c clickhouse -- sh -c \
 3. On each pod, drop each collection whose `source` is `SQL`. ClickHouse refuses while any table still uses it (`NAMED_COLLECTION_IS_USED`):
 
    ```bash
+   pod=pod/$RELEASE-clickhouse-0 # the pod that listed the collection
    ch "$pod" -q "DROP NAMED COLLECTION <collection>"
    ```
 
