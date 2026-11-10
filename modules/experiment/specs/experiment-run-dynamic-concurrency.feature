@@ -72,13 +72,6 @@ Feature: An experiment run's default concurrency shares a cell budget between ac
     And no global budget is set
 
   @integration
-  Scenario: A concurrency service built without a project budget keeps the fixed default
-    Given no project cell budget and EVAL_V3_CONCURRENCY of 7
-    And two other runs active in the project
-    When a run is started without a concurrency
-    Then the run gets concurrency 7
-
-  @integration
   Scenario: A failed read of the active runs falls back to EVAL_V3_CONCURRENCY
     Given a project cell budget of 20 and EVAL_V3_CONCURRENCY of 7
     And the active runs cannot be read

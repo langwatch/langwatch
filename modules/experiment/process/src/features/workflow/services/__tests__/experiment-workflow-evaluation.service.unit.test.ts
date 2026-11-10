@@ -211,7 +211,7 @@ function buildService(
     services,
     concurrency: ExperimentRunConcurrencyService.create({
       activity: MemoryExperimentRunActivityRepository.create(),
-      config: { runConcurrency: 1 },
+      config: { runConcurrency: 1, projectCellBudget: 1 },
     }),
     folds: worker.folds,
     refusals: {},

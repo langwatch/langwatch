@@ -361,7 +361,7 @@ function boot({
         blockLocalHttpCalls: false,
         allowedProxyHosts: [],
         runConcurrency,
-        projectCellBudget: undefined,
+        projectCellBudget: runConcurrency,
         globalCellBudget: undefined,
         publicBaseUrl,
         legacyPublicBaseUrl: undefined,

@@ -111,7 +111,7 @@ async function bootWorker({
         blockLocalHttpCalls: false,
         allowedProxyHosts: [],
         runConcurrency: 10,
-        projectCellBudget: undefined,
+        projectCellBudget: 24,
         globalCellBudget: undefined,
         publicBaseUrl: undefined,
         legacyPublicBaseUrl: undefined,

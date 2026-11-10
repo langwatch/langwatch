@@ -460,7 +460,7 @@ describe("given a personal development agent of another person", () => {
         ownership: { assertConnectedAgentsRunnable: assertRunnable },
         concurrency: ExperimentRunConcurrencyService.create({
           activity: MemoryExperimentRunActivityRepository.create(),
-          config: { runConcurrency: 1 },
+          config: { runConcurrency: 1, projectCellBudget: 1 },
         }),
         refusals: {},
       },
