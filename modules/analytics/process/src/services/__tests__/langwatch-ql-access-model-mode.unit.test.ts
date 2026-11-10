@@ -85,7 +85,9 @@ describe("selfHostedClickHouseProvisioningStatements access-statement gating", (
       expect(sql.some((s) => s.includes("CREATE SETTINGS PROFILE"))).toBe(true);
       expect(sql.some((s) => s.includes("ROW POLICY"))).toBe(true);
       expect(sql.some((s) => s.startsWith("GRANT SELECT"))).toBe(true);
-      expect(sql.some((s) => s.includes("CREATE NAMED COLLECTION lwql_postgres"))).toBe(true);
+      expect(
+        sql.some((s) => s.includes("CREATE NAMED COLLECTION IF NOT EXISTS lwql_postgres")),
+      ).toBe(true);
     });
   });
 });

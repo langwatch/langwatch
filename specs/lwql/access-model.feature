@@ -42,6 +42,14 @@ Feature: LangWatchQL access model — one typed definition, two emitters, two de
     When the SQL DDL emitter and the config.d YAML emitter both render the named collection
     Then both name the same collection with the same host, port, database, user and password fields
 
+  @integration
+  Scenario: Sql mode rewrites the named collection while engine tables read it
+    Given sql mode has provisioned the named collection and PostgreSQL engine tables read it
+    When provisioning writes the named collection again
+    Then it creates the collection only when absent and alters it in place, never dropping it
+    And it succeeds on ClickHouse 26.2 and later, which refuse to drop a collection tables use
+    And every view over the engine tables still answers
+
   @unit
   Scenario: The DDL emitter renders the whole access model from the shared definition
     Given the shared access-model definition for fixed inputs

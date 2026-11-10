@@ -11,6 +11,8 @@ export const CLICKHOUSE_CONFIG_STORE_ERROR_CODE = {
   NAMED_COLLECTION_DOESNT_EXIST: 669,
   NAMED_COLLECTION_ALREADY_EXISTS: 670,
   NAMED_COLLECTION_IS_IMMUTABLE: 671,
+  /** 26.x: an ALTER of a config-defined collection looks for the SQL file it never had. */
+  FILE_DOESNT_EXIST: 107,
 } as const;
 
 const NAMED_COLLECTION_CODES: ReadonlySet<number> = new Set([
@@ -284,9 +286,9 @@ export function postgresEngineCollection(engineFull: string): PostgresEngineBind
 type ConfigStoreTolerance = { tolerated: true; code: number } | { tolerated: false };
 
 /**
- * 669/670/671 are tolerated only on a NAMED COLLECTION statement, and 495 only when the
- * statement's own target is an inventoried config-store entity. Anything else is fatal: a 669
- * on an engine table means the collection is absent, and every view over it would fail.
+ * 669/670/671 are tolerated only on a NAMED COLLECTION statement, 107 only on its ALTER, and
+ * 495 only when the statement's own target is an inventoried config-store entity. Anything else
+ * is fatal: a 669 on an engine table means the collection is absent, and every view would fail.
  */
 export function decideConfigStoreTolerance({
   error,
@@ -299,6 +301,12 @@ export function decideConfigStoreTolerance({
 }): ConfigStoreTolerance {
   const failure = readClickHouseFailure(error);
   if (failure.from === "client") return { tolerated: false };
+  if (
+    failure.code === CLICKHOUSE_CONFIG_STORE_ERROR_CODE.FILE_DOESNT_EXIST &&
+    statementKind(statement) === "ALTER NAMED COLLECTION"
+  ) {
+    return { tolerated: true, code: failure.code };
+  }
   if (NAMED_COLLECTION_CODES.has(failure.code)) {
     return statementKind(statement).endsWith("NAMED COLLECTION")
       ? { tolerated: true, code: failure.code }

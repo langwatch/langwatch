@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
 import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
+import { CLICKHOUSE_CONFIG_STORE_ERROR_CODE } from "../../rules/langwatch-ql-config-store.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../services/langwatch-ql-access-model-definition.service.ts";
 import {
@@ -209,18 +210,15 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
         CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_DOESNT_EXIST,
         CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_ALREADY_EXISTS,
         CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_IS_IMMUTABLE,
+        // An ALTER of a config-defined collection reports the SQL file it never had.
+        CLICKHOUSE_CONFIG_STORE_ERROR_CODE.FILE_DOESNT_EXIST,
       ] as number[];
+      // CREATE ... IF NOT EXISTS is a no-op on it; the ALTER is what the config store refuses.
       expect(
         skipped.some(
-          (s) => s.kind === "DROP NAMED COLLECTION" && namedCollectionCodes.includes(s.code),
+          (s) => s.kind === "ALTER NAMED COLLECTION" && namedCollectionCodes.includes(s.code),
         ),
-        "the config-owned named collection DROP was skipped as 669/670/671",
-      ).toBe(true);
-      expect(
-        skipped.some(
-          (s) => s.kind === "CREATE NAMED COLLECTION" && namedCollectionCodes.includes(s.code),
-        ),
-        "the config-owned named collection CREATE was skipped as 669/670/671",
+        "the config-owned named collection ALTER was skipped as 107/669/670/671",
       ).toBe(true);
       // The key-map row policy is not config-owned, so it was created, never
       // skipped — the config-owned user named in its `TO` clause must not
@@ -229,13 +227,16 @@ describe("given a ClickHouse whose config store already owns LangWatchQL entitie
         skipped.some((s) => s.kind === "CREATE ROW POLICY"),
         "no row-policy statement was skipped",
       ).toBe(false);
-      // Every skip is one of the four tolerated codes, never a laundered failure.
+      // Every skip is a tolerated code, never a laundered failure; 107 only on the ALTER.
       for (const skip of skipped) {
         expect([
           CLICKHOUSE_ERROR_CODE.ACCESS_STORAGE_READONLY,
           CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_DOESNT_EXIST,
           CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_ALREADY_EXISTS,
           CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_IS_IMMUTABLE,
+          ...(skip.kind === "ALTER NAMED COLLECTION"
+            ? [CLICKHOUSE_CONFIG_STORE_ERROR_CODE.FILE_DOESNT_EXIST]
+            : []),
         ]).toContain(skip.code);
         // The recorded skip is a statement kind only, never the DDL that carries
         // the restricted password.
