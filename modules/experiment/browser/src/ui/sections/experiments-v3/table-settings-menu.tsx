@@ -50,22 +50,22 @@ const MAX_ROWS_FOR_FIT_MODE = 100;
 // =============================================================================
 
 type ConcurrencyPopoverProps = {
-  value: number;
-  onChange: (value: number) => void;
+  /** Undefined is Auto: the server picks the run's concurrency. */
+  value: number | undefined;
+  onChange: (value: number | undefined) => void;
 };
 
-const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
-  value,
-  onChange,
-}: ConcurrencyPopoverProps) {
+const AUTO_LABEL = "Auto";
+
+function ConcurrencyPopover({ value, onChange }: ConcurrencyPopoverProps) {
   const [open, setOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(value.toString());
+  const [inputValue, setInputValue] = useState(value?.toString() ?? "");
 
   // Sync input when value changes externally
   const [valueFrom, setValueFrom] = useState(value);
   if (valueFrom !== value) {
     setValueFrom(value);
-    setInputValue(value.toString());
+    setInputValue(value?.toString() ?? "");
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,7 +77,7 @@ const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
     if (!isNaN(parsed) && parsed >= 1 && parsed <= 24) {
       onChange(parsed);
     } else {
-      setInputValue(value.toString());
+      setInputValue(value?.toString() ?? "");
     }
   };
 
@@ -86,6 +86,8 @@ const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
       handleInputBlur();
     }
   };
+
+  const isAuto = value === undefined;
 
   return (
     <Popover.Root
@@ -110,14 +112,24 @@ const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
             <LuGauge />
             <Text>Concurrency</Text>
           </HStack>
-          <Text>{value}</Text>
+          <Text data-testid="concurrency-value">{value ?? AUTO_LABEL}</Text>
         </Button>
       </Popover.Trigger>
-      <Popover.Content width="220px" padding={3}>
+      <Popover.Content width="240px" padding={3}>
         <VStack align="stretch" gap={3}>
           <HStack gap={3}>
+            <Button
+              size="xs"
+              variant={isAuto ? "solid" : "outline"}
+              aria-pressed={isAuto}
+              onClick={() => onChange(undefined)}
+            >
+              {AUTO_LABEL}
+            </Button>
             <Input
+              aria-label="Concurrency"
               value={inputValue}
+              placeholder={AUTO_LABEL}
               onChange={handleInputChange}
               onBlur={handleInputBlur}
               onKeyDown={handleInputKeyDown}
@@ -127,7 +139,7 @@ const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
               paddingX={1}
             />
             <SimpleSlider
-              value={[value]}
+              value={[value ?? DEFAULT_CONCURRENCY]}
               onValueChange={({ value: newValue }) => {
                 const v = newValue[0] ?? DEFAULT_CONCURRENCY;
                 onChange(v);
@@ -141,13 +153,15 @@ const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
             />
           </HStack>
           <Text textStyle="micro" color="fg.muted">
-            Higher values run more cells in parallel but may cause rate limiting
+            {isAuto
+              ? "The server picks how many cells run at once, sharing capacity with other runs"
+              : "Higher values run more cells in parallel but may cause rate limiting"}
           </Text>
         </VStack>
       </Popover.Content>
     </Popover.Root>
   );
-});
+}
 
 // =============================================================================
 // Main Component

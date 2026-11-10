@@ -27,4 +27,26 @@ describe("experiment server configuration", () => {
       expect(() => read({ EVAL_V3_CONCURRENCY: "0" })).toThrow(ConfigParseError);
     });
   });
+
+  describe("given a deployment that names the cell budgets", () => {
+    it("reads both budgets", () => {
+      const config = read({ EVAL_V3_PROJECT_CELL_BUDGET: "40", EVAL_V3_GLOBAL_CELL_BUDGET: "200" });
+      expect(config.projectCellBudget).toBe(40);
+      expect(config.globalCellBudget).toBe(200);
+    });
+  });
+
+  describe("given a deployment that names no cell budget", () => {
+    it("reads none, leaving the default fixed", () => {
+      const config = read({ EVAL_V3_PROJECT_CELL_BUDGET: "" });
+      expect(config.projectCellBudget).toBeUndefined();
+      expect(config.globalCellBudget).toBeUndefined();
+    });
+  });
+
+  describe("given a cell budget that is not a positive whole number", () => {
+    it("refuses the boot", () => {
+      expect(() => read({ EVAL_V3_PROJECT_CELL_BUDGET: "0" })).toThrow(ConfigParseError);
+    });
+  });
 });

@@ -2,7 +2,9 @@ import { createTenantId } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { ExperimentRunConcurrencyService } from "../../features/run/services/experiment-run-concurrency.service.ts";
 import { WorkflowEvaluationService } from "../../features/workflow/services/experiment-workflow-evaluation.service.ts";
+import { MemoryExperimentRunActivityRepository } from "../../repositories/memory/memory.experiment-run-activity.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
 import type {
   ExecutionDataServices,
@@ -46,7 +48,10 @@ describe("workflowEvaluationRequested redelivery", () => {
         experiments: { findOrCreateForWorkflow: () => Promise.reject(new Error("not reached")) },
         workflowSource: createApiFixture<ExperimentWorkflowDsl>({}, "workflowSource"),
         services: createApiFixture<ExecutionDataServices>({}, "services"),
-        concurrency: 1,
+        concurrency: ExperimentRunConcurrencyService.create({
+          activity: MemoryExperimentRunActivityRepository.create(),
+          config: { runConcurrency: 1 },
+        }),
         folds,
         refusals: {},
         requests: {

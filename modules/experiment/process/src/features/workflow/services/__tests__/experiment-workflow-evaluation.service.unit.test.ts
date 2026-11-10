@@ -23,10 +23,12 @@ import type {
 } from "../../../../eventing/experiment-run-events.process.ts";
 import { ExperimentRunProgressFoldProjection } from "../../../../eventing/experiment-run-progress.projection.ts";
 import { ExperimentRunProgressStore } from "../../../../eventing/experiment-run-progress.store.ts";
+import { MemoryExperimentRunActivityRepository } from "../../../../repositories/memory/memory.experiment-run-activity.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../../../../repositories/memory/memory.experiment-run-fold.repository.ts";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "../../../../rules/experiment-run-event-types.rules.ts";
 import { makeExperimentRunKey } from "../../../../rules/experiment-run-key.rules.ts";
 import type { ExperimentWorkflowDsl } from "../../../../services/experiment-execution-data.service.ts";
+import { ExperimentRunConcurrencyService } from "../../../run/services/experiment-run-concurrency.service.ts";
 import { WorkflowEvaluationService } from "../experiment-workflow-evaluation.service.ts";
 
 const PROJECT_ID = "project-1";
@@ -207,7 +209,10 @@ function buildService(
     },
     workflowSource,
     services,
-    concurrency: 1,
+    concurrency: ExperimentRunConcurrencyService.create({
+      activity: MemoryExperimentRunActivityRepository.create(),
+      config: { runConcurrency: 1 },
+    }),
     folds: worker.folds,
     refusals: {},
     requests: {

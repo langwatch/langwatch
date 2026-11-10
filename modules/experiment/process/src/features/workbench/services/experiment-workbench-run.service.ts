@@ -85,11 +85,15 @@ export class ExperimentWorkbenchRunService {
     // The refusal a process without Redis or a public address owes, as before the pipeline.
     const runs = this.#startable();
     const runId = generateHumanReadableId();
+    const concurrency = await runs.concurrency.resolve({
+      projectId,
+      requested: saved.runInputs.concurrency,
+    });
     const savedRun = (options: { persistResults: boolean; runUrl?: string }): PipelineRunStart => {
       const plan = ExperimentRunPlanService.create().buildPlan({
         request: { state: saved.state, scope: saved.scope },
         data: saved.data,
-        concurrency: saved.runInputs.concurrency ?? runs.concurrency,
+        concurrency,
         ...(saved.repeat ? { repeat: saved.repeat } : {}),
         origin: "saved",
         actor: workbenchActorFrom({ credential: input.credential }),
@@ -176,7 +180,7 @@ export class ExperimentWorkbenchRunService {
         ...(input.seedTargetOutputs ? { seedTargetOutputs: input.seedTargetOutputs } : {}),
       },
       data: dataResult,
-      concurrency: input.concurrency ?? runs.concurrency,
+      concurrency: await runs.concurrency.resolve({ projectId, requested: input.concurrency }),
       origin: "workbench",
       // The page saves these cells too; the server writes them so the board outlives the tab.
       persistResults:

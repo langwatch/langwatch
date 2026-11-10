@@ -1,0 +1,16 @@
+/** The runs executing now, per project and across the deployment, for the default concurrency. */
+export abstract class ExperimentRunActivityRepository {
+  /** Counts the run as active until `expiresAt`, unless it is marked inactive first. */
+  abstract markActive(input: {
+    projectId: string;
+    runId: string;
+    expiresAt: number;
+  }): Promise<void>;
+  /** Stops counting the run. Answers quietly for a run never marked. */
+  abstract markInactive(input: { projectId: string; runId: string }): Promise<void>;
+  /** The active runs in the project and in every project; an entry expired by `now` is dropped. */
+  abstract countActive(input: {
+    projectId: string;
+    now: number;
+  }): Promise<{ project: number; global: number }>;
+}

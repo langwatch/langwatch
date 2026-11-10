@@ -32,6 +32,7 @@ import { ExperimentResultDispatchService } from "../../../services/experiment-re
 import { ExperimentRunDatasetVersionService } from "../../../services/experiment-run-dataset-version.service.ts";
 import type { ExperimentService } from "../../../services/experiment.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "../../run/services/experiment-run-command-dispatcher.service.ts";
+import type { ExperimentRunConcurrencyService } from "../../run/services/experiment-run-concurrency.service.ts";
 import type { ExperimentWorkbenchObserver } from "./experiment-workbench-observer.service.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
@@ -51,8 +52,8 @@ export type WorkbenchRunPipeline = Readonly<{
   services: ExecutionDataServices;
   /** Refuses a run against someone else's personal development agent before it starts. */
   ownership: Pick<ExperimentAgentOwnershipService, "assertConnectedAgentsRunnable">;
-  /** Cells in flight at once when a run names no limit of its own. */
-  concurrency: number;
+  /** The cells in flight at once a run starts with when it names no limit of its own. */
+  concurrency: Pick<ExperimentRunConcurrencyService, "resolve">;
   /** What this process refuses of a run, for want of Redis or a public address. */
   refusals: ExperimentRunRefusals;
 }>;

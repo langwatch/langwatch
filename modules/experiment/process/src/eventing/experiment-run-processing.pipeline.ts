@@ -4,6 +4,7 @@
  */
 import {
   type AppendStore,
+  type EventSubscriberDefinition,
   defineAggregate,
   defineEventingModule,
   definePipeline,
@@ -102,6 +103,8 @@ interface ClickhouseExperimentRunProcessingRepository {
   runExecution: ExperimentRunExecutionEffects;
   /** The progress fold's reaction: each event's frames, live on the run's channel. */
   runFrames: ExperimentRunProgressSubscriber;
+  /** Counts a run as active from its start to its completion, for later runs' concurrency. */
+  runActivity: EventSubscriberDefinition<ExperimentRunProcessingEvent>;
   /** Trace's settled experiment trace, read back and folded into its run's cost. */
   traceMetricsSync: (input: {
     tenantId: string;
@@ -179,6 +182,7 @@ export function buildExperimentRunProcessingPipeline(
       "workflowEvaluationRequested",
       createWorkflowEvaluationRequestedSubscriber(deps.workflowEvaluations),
     )
+    .withEventSubscriber("experimentRunActivity", deps.runActivity)
     .withProcessManager(
       EXPERIMENT_RUN_EXECUTION_PROCESS_NAME,
       experimentRunExecutionProcess(deps.runExecution),

@@ -20,8 +20,10 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { MemoryExperimentRunActivityRepository } from "../../../../repositories/memory/memory.experiment-run-activity.repository.ts";
 import type { ExperimentWorkflowDsl } from "../../../../services/experiment-execution-data.service.ts";
 import type { ExperimentService } from "../../../../services/experiment.service.ts";
+import { ExperimentRunConcurrencyService } from "../../../run/services/experiment-run-concurrency.service.ts";
 import { ExperimentSavedRunPreparationService } from "../experiment-saved-run-preparation.service.ts";
 import type { ExperimentWorkbenchObserver } from "../experiment-workbench-observer.service.ts";
 import type { WorkbenchRunPipeline } from "../experiment-workbench-pipeline-run.service.ts";
@@ -257,7 +259,10 @@ function harness({
       projects: { getOrganizationId: async () => "organization-1" },
     },
     ownership: { assertConnectedAgentsRunnable: async () => {} },
-    concurrency: 4,
+    concurrency: ExperimentRunConcurrencyService.create({
+      activity: MemoryExperimentRunActivityRepository.create(),
+      config: { runConcurrency: 4 },
+    }),
     refusals: {},
   };
   const experiments = createApiFixture<ExperimentService>({
