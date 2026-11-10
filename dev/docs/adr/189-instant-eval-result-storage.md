@@ -17,7 +17,7 @@
 
 | Trigger                                  | Stored?                       | Where                                                                    | On the trace page? |
 | ---------------------------------------- | ----------------------------- | ------------------------------------------------------------------------ | ------------------ |
-| Quick `eval()` in an LWQL query          | No, in memory for the call    | `instant-eval-judge-rows.service.ts:94` (a `Map`)                        | No                 |
+| Quick `eval()` in an LWQL query          | No, in memory for the call    | `instant-eval-judge-rows.service.ts:102` (a `Map`)                        | No                 |
 | Instant Eval run (search bar, CLI, REST) | Yes, indefinitely             | `instant_eval_runs` and `instant_eval_judgments` (migrations 00098, 00097) | No                 |
 | Code widget with `eval()`                | No, judges on every run       | Same path as a quick `eval()` (`use-dashboard-widget-executor.ts:91`)    | No                 |
 | Saved-chart widget with `eval()`         | Cannot hold `eval()` today    | Save refuses it (`saved-workbench-chart-policy.service.ts:36-41`)        | No                 |
@@ -26,10 +26,10 @@
 Facts the design rests on:
 
 - `instant_eval_judgments` is `ReplacingMergeTree(UpdatedAt)`, `PARTITION BY toYYYYMM(CreatedAt)`, `ORDER BY (TenantId, RunId, TraceId, SpanId, QuestionId)` (00097). `QuestionId` is the statement's column alias, not the question. A read by trace is not a prefix of the key.
-- A run writes one bulk insert per page of up to 500 rows (`INSTANT_EVAL_PAGE_SIZE`, `instant-eval-run-sizing.rules.ts:15`) through `instant-eval-judge-page.service.ts:450`, with `async_insert` (`clickhouse.instant-eval-judgments.repository.ts:87-113`). The record carries no `_retention_days`, so every row keeps the default 0, which means never expire.
+- A run writes one bulk insert per page of up to 500 rows (`INSTANT_EVAL_PAGE_SIZE`, `instant-eval-run-sizing.rules.ts:15`) through `instant-eval-judge-page.service.ts:452`, with `async_insert` (`clickhouse.instant-eval-judgments.repository.ts:87-113`). The record carries no `_retention_days`, so every row keeps the default 0, which means never expire.
 - `instant_eval_judgments` and `instant_eval_runs` are in `INDEFINITE_DEFAULT_RETENTION_TABLES` (`modules/data-retention/contract/src/retention-tables.ts:81-87`), not in the customer cascade.
 - `Passed` is derived at write from `Probability >= threshold` (`instant-eval-verdicts.rules.ts:49-54`). So a pass can be derived again on read with any threshold.
-- Two readers depend on the judgments table: the Explorer `eval:"question"` chip (`trace-query-subquery.rules.ts:74`, a declared exception in `clickhouse-table-ownership.ts:128-133`) and the LWQL `analytics.judgments` view (`lwql-view-catalog.rules.ts:2277-2279`).
+- Two readers depend on the judgments table: the Explorer `eval:"question"` chip (`trace-query-subquery.rules.ts:74`, a declared exception in `clickhouse-table-ownership.ts:128-133`) and the LWQL `analytics.judgments` view (`lwql-view-catalog.rules.ts:2295-2296`).
 - `evaluation_runs` is `ReplacingMergeTree(UpdatedAt)`, `PARTITION BY toYearWeek(ScheduledAt)`, `ORDER BY (TenantId, EvaluationId)` (00002). The trace page reads it through `trace-evaluation-runs.repository.ts`, helped by the `evaluation_runs_by_trace_id_index` (00121).
 
 ## The two questions
@@ -56,10 +56,9 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.eval_results
 (
     TenantId String CODEC(ZSTD(1)),
 
-    -- What was judged. SpanId and ThreadId are empty when the statement did not project them, as in 00097.
+    -- What was judged. SpanId is empty when the statement did not project it, as in 00097.
     TraceId String CODEC(ZSTD(1)),
     SpanId String DEFAULT '' CODEC(ZSTD(1)),
-    ThreadId String DEFAULT '' CODEC(ZSTD(1)),
 
     -- What was asked. QuestionHash: sha256 of the normalised kind, text, criteria, range and categories (not the column alias).
     -- JudgeModel: the resolved decision model (ADR-182): the own model id, or the hosted classifier id and version.
@@ -215,7 +214,7 @@ Two more were asked as pictures in the Laze deck. On 2026-11-10, @lw-instant-eva
 ## Risks
 
 - **Concurrent misses.** Two viewers who open a new widget at the same moment can both miss and both judge. Both rows are kept and readers take the latest. A single-flight lock per key is a later fix if the cost shows.
-- **The hosted judge changes under one id.** Recall keys on `JudgeModel`. If `langwatch/instant-evals` (`instant-eval-judge.api.ts:103`) changes its weights without a new id, recall serves old verdicts. A new judge version must change the id the row records.
+- **The hosted judge changes under one id.** Recall keys on `JudgeModel`. If `langwatch/instant-evals` (`instant-eval-judge.api.ts:122`) changes its weights without a new id, recall serves old verdicts. A new judge version must change the id the row records.
 - **Dashboard reads are not prefix reads.** A widget reads by question over a time window, and the key leads with the trace. Partitions prune by `OccurredAt` and the `QuestionHash` bloom filter skips granules. This is unmeasured. If it is slow, add a time-leading rollup as ADR-034 did for evaluations.
 - **The key cap.** A quick `eval()` refuses above 1,000 trace keys (`langwatch-ql-app-function-shapes.rules.ts:96-103`). Whether a recalled key counts toward the cap goes to the build PLAN.
 - **The chip and the view see runs only.** Results from asks, dashboards and monitors show in the trace drawer, not in the `eval:"q"` chip or `analytics.judgments`, until those move (section 3).
