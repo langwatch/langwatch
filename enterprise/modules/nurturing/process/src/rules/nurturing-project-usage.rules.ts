@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { CioOrgTraits } from "@langwatch/enterprise-nurturing-contract";
+import { Temporal } from "@langwatch/time";
+import type { TraceUsageDay } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
@@ -13,15 +15,7 @@ export const PROJECT_USAGE_WINDOW_MS = 30 * DAY_MS;
 /** The free window the per-email journey speaks of, from the organization's creation. */
 export const PROJECT_USAGE_TRIAL_WINDOW_MS = 14 * DAY_MS;
 
-const traceUsageSchema = z.object({
-  /** Business time of the trace's latest received fact, epoch ms. */
-  at: z.number(),
-  error: z.boolean(),
-  /** USD; null when the trace is not priced. */
-  cost: z.number().nullable(),
-});
-
-/** One project's usage as nurturing folds it from the owners' events. */
+/** One project's prompt, evaluator and scenario usage as nurturing folds it from the owners. */
 export const nurturingProjectUsageStateSchema = z.object({
   projectId: z.string(),
   promptIds: z.array(z.string()),
@@ -29,9 +23,12 @@ export const nurturingProjectUsageStateSchema = z.object({
   /** The highest per-project count a scenario.created fact carried. */
   scenarioCount: z.number(),
   hasScenarioRun: z.boolean(),
-  /** The latest value per trace id, within the window. */
-  traces: z.record(z.string(), traceUsageSchema),
-  /** UTC days on which a trace arrived, within the window, ascending. */
+  /** The user simulation sets the project ran, each once. */
+  simulationSetIds: z.array(z.string()),
+  /**
+   * UTC days with a habit activity (a prompt version, a finished scenario run, an evaluation),
+   * within the window of the newest fact folded, ascending. Traces' days come from trace's read.
+   */
   activeDays: z.array(z.string()),
   LastEventOccurredAt: z.number(),
 });
@@ -41,16 +38,97 @@ export type NurturingProjectUsageState = z.infer<typeof nurturingProjectUsageSta
 export type NurturingProjectUsageFact = Readonly<{ occurredAt: number }> &
   (
     | Readonly<{ kind: "prompt_created" | "prompt_deleted"; promptId: string }>
+    | Readonly<{ kind: "prompt_version_saved" }>
     | Readonly<{ kind: "evaluator_created" | "evaluator_deleted"; evaluatorId: string }>
     | Readonly<{ kind: "scenario_created"; scenarioCount: number }>
+    | Readonly<{ kind: "simulation_set_created"; scenarioSetId: string }>
     | Readonly<{ kind: "scenario_run" }>
-    | Readonly<{
-        kind: "trace_received";
-        traceId: string | null;
-        containsErrorStatus: boolean;
-        totalCost: number | null;
-      }>
+    | Readonly<{ kind: "evaluation_completed" }>
   );
+
+/** An organization's traces within the window, summed over its projects; times in epoch ms. */
+export type NurturingTraceUsageTotals = Readonly<{
+  traceCount: number;
+  errorCount: number;
+  /** USD. */
+  totalCost: number;
+  lastTraceAt: number | null;
+  lastFailedTraceAt: number | null;
+  /** UTC `YYYY-MM-DD` days with a trace, each once. */
+  activeDays: readonly string[];
+}>;
+
+/** The totals of an organization none of whose projects traced within the window. */
+export const NO_TRACE_USAGE: NurturingTraceUsageTotals = {
+  traceCount: 0,
+  errorCount: 0,
+  totalCost: 0,
+  lastTraceAt: null,
+  lastFailedTraceAt: null,
+  activeDays: [],
+};
+
+/** The window's days, as trace's rollup answers them, summed into the organization's totals. */
+export function traceUsageTotalsOf(days: readonly TraceUsageDay[]): NurturingTraceUsageTotals {
+  const latestOf = (times: readonly number[]) => (times.length > 0 ? Math.max(...times) : null);
+  return {
+    traceCount: days.reduce((sum, day) => sum + day.traceCount, 0),
+    errorCount: days.reduce((sum, day) => sum + day.errorCount, 0),
+    totalCost: days.reduce((sum, day) => sum + day.totalCost, 0),
+    lastTraceAt: latestOf(days.map((day) => day.lastTraceAt)),
+    lastFailedTraceAt: latestOf(days.flatMap((day) => day.lastFailedTraceAt ?? [])),
+    activeDays: [...new Set(days.map((day) => day.day))].sort(),
+  };
+}
+
+/** The days after signup whose activity is a trait, `active_day_<n>`. */
+const TRACKED_SIGNUP_DAYS = [0, 1, 12, 13] as const;
+type SignupDayTraits = Pick<CioOrgTraits, `active_day_${(typeof TRACKED_SIGNUP_DAYS)[number]}`>;
+
+/** A habit takes this many distinct active days, or this many distinct active ISO weeks. */
+const HABIT_MIN_ACTIVE = 3;
+/** ... the days' first and last this many days apart at least. */
+const HABIT_MIN_SPAN_DAYS = 7;
+
+const epochOfDay = (day: string) => Date.parse(`${day}T00:00:00Z`);
+
+/** The ISO week a UTC day falls in, `YYYY-Www`. */
+function isoWeekOf(day: string): string {
+  const date = Temporal.PlainDate.from(day);
+  return `${date.yearOfWeek}-W${date.weekOfYear}`;
+}
+
+/**
+ * The review app's value-map rule: activity on 3 or more distinct days whose first and last are
+ * at least 7 days apart, or activity in 3 or more distinct ISO weeks.
+ */
+function hasHabit(activeDays: readonly string[]): boolean {
+  if (activeDays.length < HABIT_MIN_ACTIVE) return false;
+  const times = activeDays.map(epochOfDay);
+  const spreadOverAWeek = (Math.max(...times) - Math.min(...times)) / DAY_MS >= HABIT_MIN_SPAN_DAYS;
+  return spreadOverAWeek || new Set(activeDays.map(isoWeekOf)).size >= HABIT_MIN_ACTIVE;
+}
+
+/**
+ * `active_day_<n>` for each tracked day still fully inside the window. A day that left it is
+ * omitted, not false: its traces were pruned, and Customer.io keeps the value it last had.
+ */
+function signupDayTraits({
+  activeDays,
+  organizationCreatedAt,
+  windowStartDay,
+}: Readonly<{
+  activeDays: readonly string[];
+  organizationCreatedAt: number;
+  windowStartDay: string;
+}>): SignupDayTraits {
+  const traits: SignupDayTraits = {};
+  for (const n of TRACKED_SIGNUP_DAYS) {
+    const day = utcDayOf(organizationCreatedAt + n * DAY_MS);
+    if (day > windowStartDay) traits[`active_day_${n}` as const] = activeDays.includes(day);
+  }
+  return traits;
+}
 
 export function emptyProjectUsage(projectId: string): NurturingProjectUsageState {
   return {
@@ -59,10 +137,24 @@ export function emptyProjectUsage(projectId: string): NurturingProjectUsageState
     evaluatorIds: [],
     scenarioCount: 0,
     hasScenarioRun: false,
-    traces: {},
+    simulationSetIds: [],
     activeDays: [],
     LastEventOccurredAt: 0,
   };
+}
+
+/**
+ * The fact's UTC day added to the habit activity, and days older than the window, measured from the
+ * newest fact folded, dropped, so a row holds at most 31 days whatever the project does.
+ */
+function withActiveDay(
+  state: NurturingProjectUsageState,
+  occurredAt: number,
+): NurturingProjectUsageState {
+  const day = utcDayOf(occurredAt);
+  const firstDay = utcDayOf(Math.max(state.LastEventOccurredAt - PROJECT_USAGE_WINDOW_MS, 0));
+  const days = state.activeDays.includes(day) ? state.activeDays : [...state.activeDays, day];
+  return { ...state, activeDays: days.filter((known) => known >= firstDay).sort() };
 }
 
 function withId(ids: readonly string[], id: string): string[] {
@@ -71,19 +163,6 @@ function withId(ids: readonly string[], id: string): string[] {
 
 function withoutId(ids: readonly string[], id: string): string[] {
   return ids.filter((known) => known !== id);
-}
-
-/** Traces and days older than the window, measured from the newest fact folded, drop out. */
-function withinWindow(state: NurturingProjectUsageState): NurturingProjectUsageState {
-  const since = state.LastEventOccurredAt - PROJECT_USAGE_WINDOW_MS;
-  const firstDay = utcDayOf(Math.max(since, 0));
-  return {
-    ...state,
-    traces: Object.fromEntries(
-      Object.entries(state.traces).filter(([, trace]) => trace.at >= since),
-    ),
-    activeDays: state.activeDays.filter((day) => day >= firstDay),
-  };
 }
 
 /** Folds one fact into the project's usage; pure, so a replay rebuilds the same row. */
@@ -97,7 +176,13 @@ export function foldProjectUsage(
   };
   switch (fact.kind) {
     case "prompt_created":
-      return { ...base, promptIds: withId(state.promptIds, fact.promptId) };
+      return withActiveDay(
+        { ...base, promptIds: withId(state.promptIds, fact.promptId) },
+        fact.occurredAt,
+      );
+    case "prompt_version_saved":
+    case "evaluation_completed":
+      return withActiveDay(base, fact.occurredAt);
     case "prompt_deleted":
       return { ...base, promptIds: withoutId(state.promptIds, fact.promptId) };
     case "evaluator_created":
@@ -106,66 +191,82 @@ export function foldProjectUsage(
       return { ...base, evaluatorIds: withoutId(state.evaluatorIds, fact.evaluatorId) };
     case "scenario_created":
       return { ...base, scenarioCount: Math.max(state.scenarioCount, fact.scenarioCount) };
+    case "simulation_set_created":
+      return { ...base, simulationSetIds: withId(state.simulationSetIds, fact.scenarioSetId) };
     case "scenario_run":
-      return { ...base, hasScenarioRun: true };
-    case "trace_received": {
-      const day = utcDayOf(fact.occurredAt);
-      const activeDays = state.activeDays.includes(day)
-        ? state.activeDays
-        : [...state.activeDays, day].sort();
-      // A fact from before trace_received carried its trace id counts as an active day only.
-      const traces =
-        fact.traceId === null
-          ? state.traces
-          : {
-              ...state.traces,
-              [fact.traceId]: {
-                at: Math.max(state.traces[fact.traceId]?.at ?? 0, fact.occurredAt),
-                error: fact.containsErrorStatus,
-                cost: fact.totalCost,
-              },
-            };
-      return withinWindow({ ...base, activeDays, traces });
-    }
+      return withActiveDay({ ...base, hasScenarioRun: true }, fact.occurredAt);
   }
 }
 
+/** The traits a trace read answers; omitted from a sync that read no traces. */
+function traceTraits({
+  traces,
+  otherActiveDays,
+  now,
+  organizationCreatedAt,
+}: Readonly<{
+  traces: NurturingTraceUsageTotals;
+  /** The projects' prompt-version, scenario-run and evaluation days. */
+  otherActiveDays: readonly string[];
+  now: number;
+  organizationCreatedAt: number | null;
+}>): Partial<CioOrgTraits> {
+  const { lastTraceAt, lastFailedTraceAt, activeDays } = traces;
+  const windowStartDay = utcDayOf(now - PROJECT_USAGE_WINDOW_MS);
+  const habitDays = [
+    ...new Set([...activeDays, ...otherActiveDays.filter((day) => day > windowStartDay)]),
+  ];
+  // The newest trace's day answers both day traits: some day is after X exactly when it is.
+  const lastTraceDay = lastTraceAt === null ? null : utcDayOf(lastTraceAt);
+  return {
+    trace_count: traces.traceCount,
+    error_count: traces.errorCount,
+    total_cost: Math.round(traces.totalCost * 100) / 100,
+    ...(lastTraceAt !== null && { last_trace_date: unixSecondsOf(lastTraceAt) }),
+    ...(lastFailedTraceAt !== null && { last_failed_trace_at: unixSecondsOf(lastFailedTraceAt) }),
+    active_last_7_days: lastTraceDay !== null && lastTraceDay >= utcDayOf(now - 6 * DAY_MS),
+    has_habit: hasHabit(habitDays),
+    ...(organizationCreatedAt !== null && {
+      back_since_day_0: lastTraceDay !== null && lastTraceDay > utcDayOf(organizationCreatedAt),
+      ...signupDayTraits({ activeDays, organizationCreatedAt, windowStartDay }),
+    }),
+  };
+}
+
 /**
- * The organization's per-email traits, summed over its projects' usage at `now`. Counts and times
- * only, never content; flagged_count and has_habit wait on their definitions.
+ * The organization's per-email traits from its projects' usage and, when this sync read them, its
+ * traces' totals at `now`; `traces: null` leaves every trace trait out, so Customer.io keeps the
+ * values it last had. Counts and times only, never content; flagged_count waits on its definition.
  */
 export function organizationUsageTraits({
   projects,
+  traces,
   now,
   organizationCreatedAt,
 }: Readonly<{
   projects: readonly NurturingProjectUsageState[];
+  traces: NurturingTraceUsageTotals | null;
   now: number;
   organizationCreatedAt: number | null;
 }>): Partial<CioOrgTraits> {
-  const since = now - PROJECT_USAGE_WINDOW_MS;
-  const traces = projects.flatMap((project) =>
-    Object.values(project.traces).filter((trace) => trace.at >= since),
-  );
-  const failedAt = traces.filter((trace) => trace.error).map((trace) => trace.at);
-  const days = new Set(projects.flatMap((project) => project.activeDays));
-  const lastWeekFrom = utcDayOf(now - 6 * DAY_MS);
-  const totalCost = traces.reduce((sum, trace) => sum + (trace.cost ?? 0), 0);
   return {
     prompt_count: projects.reduce((sum, project) => sum + project.promptIds.length, 0),
     evaluator_count: projects.reduce((sum, project) => sum + project.evaluatorIds.length, 0),
     scenario_count: projects.reduce((sum, project) => sum + project.scenarioCount, 0),
-    trace_count: traces.length,
-    error_count: failedAt.length,
-    total_cost: Math.round(totalCost * 100) / 100,
-    ...(failedAt.length > 0 && { last_failed_trace_at: unixSecondsOf(Math.max(...failedAt)) }),
+    simulation_set_count: projects.reduce(
+      (sum, project) => sum + project.simulationSetIds.length,
+      0,
+    ),
     has_scenario_run: projects.some((project) => project.hasScenarioRun),
-    active_last_7_days: [...days].some((day) => day >= lastWeekFrom),
-    ...(organizationCreatedAt === null
-      ? {}
-      : {
-          back_since_day_0: [...days].some((day) => day > utcDayOf(organizationCreatedAt)),
-          window_end_date: unixSecondsOf(organizationCreatedAt + PROJECT_USAGE_TRIAL_WINDOW_MS),
-        }),
+    ...(organizationCreatedAt !== null && {
+      window_end_date: unixSecondsOf(organizationCreatedAt + PROJECT_USAGE_TRIAL_WINDOW_MS),
+    }),
+    ...(traces !== null &&
+      traceTraits({
+        traces,
+        otherActiveDays: projects.flatMap((project) => project.activeDays),
+        now,
+        organizationCreatedAt,
+      })),
   };
 }

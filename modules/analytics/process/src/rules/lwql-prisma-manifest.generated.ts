@@ -1945,9 +1945,8 @@ export interface LwqlPrismaRows {
     readonly updatedAt: "DateTime";
   };
   readonly NurturingProjectUsageView: {
-    readonly id: "String";
     readonly projectId: "String";
-    readonly organizationId: "String?";
+    readonly owner: "String";
     readonly folded: "Json";
     readonly appliedEventIds: "String[]";
     readonly projectionVersion: "String";

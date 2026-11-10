@@ -14,7 +14,7 @@ export interface NurturingRepositories {
     NurturingCodingMilestonesRepository &
     NurturingTraceMilestonesRepository;
   readonly projects: NurturingProjectDirectoryRepository;
-  /** Nurturing's own per-project usage: the peer fold's rows. */
+  /** Nurturing's own per-project usage: the peer folds' rows. */
   readonly projectUsage: NurturingProjectUsageRepository;
   readonly claims: NurturingClaimRepository;
 }

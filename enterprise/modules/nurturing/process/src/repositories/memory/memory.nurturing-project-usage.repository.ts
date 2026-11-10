@@ -5,41 +5,46 @@ import type {
   ProjectionStoreContext,
 } from "@langwatch/eventing";
 
-import type { NurturingProjectUsageState } from "../../rules/nurturing-project-usage.rules.ts";
 import {
+  emptyProjectUsage,
+  foldProjectUsage,
+  type NurturingProjectUsageState,
+} from "../../rules/nurturing-project-usage.rules.ts";
+import {
+  EVALUATION_ACTIVITY_OWNER,
   type NurturingProjectUsageOwner,
   type NurturingProjectUsageRepository,
-  projectUsageRowId,
 } from "../nurturing-project-usage.repository.ts";
 
 type Row = { state: NurturingProjectUsageState; appliedEventIds: string[] };
 
-/** Nurturing's project-usage rows in memory: one fold store per owner and the reads over them. */
+const rowKey = (owner: string, projectId: string) => `${projectId}:${owner}`;
+
+/** Nurturing's project-usage rows in memory: one fold store per owner and the read over them. */
 export class MemoryNurturingProjectUsageRepository implements NurturingProjectUsageRepository {
   static create(): MemoryNurturingProjectUsageRepository {
     return new MemoryNurturingProjectUsageRepository();
   }
 
   readonly #rows = new Map<string, Row>();
-  readonly #placements = new Map<string, string>();
 
   private constructor() {}
 
   forOwner(owner: NurturingProjectUsageOwner): FoldProjectionStore<NurturingProjectUsageState> {
     const rows = this.#rows;
     return {
-      async get(key: string): Promise<FoldStateRead<NurturingProjectUsageState>> {
-        const row = rows.get(projectUsageRowId(owner, key));
+      async get(projectId: string): Promise<FoldStateRead<NurturingProjectUsageState>> {
+        const row = rows.get(rowKey(owner, projectId));
         return row ? { kind: "folded", state: row.state } : { kind: "empty" };
       },
-      async getWithApplied(key: string) {
-        const row = rows.get(projectUsageRowId(owner, key));
+      async getWithApplied(projectId: string) {
+        const row = rows.get(rowKey(owner, projectId));
         return row
           ? { state: row.state, appliedEventIds: [...row.appliedEventIds] }
           : { state: null, appliedEventIds: [], miss: "absent" as const };
       },
       async store(state: NurturingProjectUsageState, context: ProjectionStoreContext) {
-        rows.set(projectUsageRowId(owner, context.key ?? context.aggregateId), {
+        rows.set(rowKey(owner, context.key ?? context.aggregateId), {
           state,
           appliedEventIds: [...(context.appliedEventIds ?? [])],
         });
@@ -47,18 +52,21 @@ export class MemoryNurturingProjectUsageRepository implements NurturingProjectUs
     };
   }
 
-  async placeProject({
+  async recordEvaluationDay({
     projectId,
-    organizationId,
-  }: Readonly<{ projectId: string; organizationId: string }>): Promise<void> {
-    this.#placements.set(projectId, organizationId);
+    occurredAt,
+  }: Readonly<{ projectId: string; occurredAt: number }>): Promise<void> {
+    const key = rowKey(EVALUATION_ACTIVITY_OWNER, projectId);
+    const current = this.#rows.get(key)?.state ?? emptyProjectUsage(projectId);
+    const state = foldProjectUsage(current, { kind: "evaluation_completed", occurredAt });
+    this.#rows.set(key, { state, appliedEventIds: [] });
   }
 
-  async findForOrganization({
-    organizationId,
-  }: Readonly<{ organizationId: string }>): Promise<NurturingProjectUsageState[]> {
+  async findForProjects({
+    projectIds,
+  }: Readonly<{ projectIds: readonly string[] }>): Promise<NurturingProjectUsageState[]> {
     return [...this.#rows.values()]
       .map(({ state }) => state)
-      .filter((state) => this.#placements.get(state.projectId) === organizationId);
+      .filter((state) => projectIds.includes(state.projectId));
   }
 }

@@ -8,6 +8,8 @@ import {
   SCENARIO_CREATED_EVENT_TYPE,
   SCENARIO_CREATED_EVENT_VERSION,
   type ScenarioCreatedEvent,
+  SIMULATION_SET_CREATED_EVENT_TYPE,
+  SIMULATION_SET_CREATED_EVENT_VERSION,
 } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -17,7 +19,7 @@ import {
 } from "../../transport/__tests__/scenario-rest.harness.ts";
 import {
   RecordScenarioCreatedCommand,
-  type RecordScenarioCreatedCommandData,
+  RecordSimulationSetCreatedCommand,
 } from "../scenario-lifecycle.commands.ts";
 
 const signal = {
@@ -27,11 +29,11 @@ const signal = {
   scenarioCount: 3,
 };
 
-function recordingSender(): {
-  sender: EventingCommandSender<RecordScenarioCreatedCommandData>;
-  sent: RecordScenarioCreatedCommandData[];
+function recordingSender<Data>(): {
+  sender: EventingCommandSender<Data>;
+  sent: Data[];
 } {
-  const sent: RecordScenarioCreatedCommandData[] = [];
+  const sent: Data[] = [];
   return {
     sent,
     sender: {
@@ -74,6 +76,31 @@ describe("the scenario lifecycle pipeline", () => {
     });
   });
 
+  describe("when the record-simulation-set-created command is handled", () => {
+    /** @scenario "A project's first run of a simulation set records the set once" */
+    it("appends one simulation_set_created event keyed by the project and the set", () => {
+      const data = { scenarioSetId: "checkout-suite", projectId: PROJECT_ID };
+
+      const events = new RecordSimulationSetCreatedCommand().handle({
+        tenantId: createTenantId(PROJECT_ID),
+        type: "lw.simulation_set.record_created",
+        aggregateId: "simulation_set:checkout-suite",
+        data: { tenantId: PROJECT_ID, occurredAt: 1_700_000_000_000, ...data },
+      });
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        type: SIMULATION_SET_CREATED_EVENT_TYPE,
+        version: SIMULATION_SET_CREATED_EVENT_VERSION,
+        aggregateType: "scenario",
+        aggregateId: "simulation_set:checkout-suite",
+        occurredAt: 1_700_000_000_000,
+        idempotencyKey: `${PROJECT_ID}:checkout-suite:simulation_set_created`,
+        data: { ...data, occurredAt: 1_700_000_000_000 },
+      });
+    });
+  });
+
   describe("when a scenario is created through the app", () => {
     it("sends the command with how many scenarios the project now holds", async () => {
       const { app } = await createScenarioRestTestApp({
@@ -88,7 +115,10 @@ describe("the scenario lifecycle pipeline", () => {
         },
       });
       const { sender, sent } = recordingSender();
-      app.connectLifecycleCommands({ recordScenarioCreated: sender });
+      app.connectLifecycleCommands({
+        recordScenarioCreated: sender,
+        recordSimulationSetCreated: recordingSender().sender,
+      });
 
       const first = await app.create(
         { projectId: PROJECT_ID, name: "Login", situation: "logs in", criteria: [], labels: [] },
@@ -114,7 +144,10 @@ describe("the scenario lifecycle pipeline", () => {
     it("records no variant when the organization's cannot be read, and still records the scenario", async () => {
       const { app } = await createScenarioRestTestApp();
       const { sender, sent } = recordingSender();
-      app.connectLifecycleCommands({ recordScenarioCreated: sender });
+      app.connectLifecycleCommands({
+        recordScenarioCreated: sender,
+        recordSimulationSetCreated: recordingSender().sender,
+      });
 
       await app.create(
         { projectId: PROJECT_ID, name: "Login", situation: "logs in", criteria: [], labels: [] },

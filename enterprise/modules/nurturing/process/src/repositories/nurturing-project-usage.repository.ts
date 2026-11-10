@@ -4,36 +4,32 @@ import type { FoldProjectionStore } from "@langwatch/eventing";
 import type { NurturingProjectUsageState } from "../rules/nurturing-project-usage.rules.ts";
 
 /** The fold's version; a stored row of another version is re-folded from the owners' logs. */
-export const NURTURING_PROJECT_USAGE_PROJECTION_VERSION = "2026-11-08" as const;
+export const NURTURING_PROJECT_USAGE_PROJECTION_VERSION = "2026-11-10" as const;
 
 /**
  * The owner pipeline a peer fold reads: one fold per owner, since a peer fold re-folds from one
  * owner's log (§9). Each owner's fold keeps its own row per project.
  */
-export type NurturingProjectUsageOwner =
-  | "prompt"
-  | "evaluator"
-  | "scenario"
-  | "simulation"
-  | "trace";
+export type NurturingProjectUsageOwner = "prompt" | "evaluator" | "scenario" | "simulation";
 
-/** The reads over the project-usage rows, and the organization each project is placed in. */
+/** The read over the project-usage rows. */
 export interface NurturingProjectUsageReadRepository {
-  /** Records which organization the project is in, on every owner's row for it. */
-  placeProject(input: Readonly<{ projectId: string; organizationId: string }>): Promise<void>;
-  /** Every owner's row for every placed project in the organization; empty when none was placed. */
-  findForOrganization(
-    input: Readonly<{ organizationId: string }>,
+  /** Every owner's row of the current version for each of the projects. */
+  findForProjects(
+    input: Readonly<{ projectIds: readonly string[] }>,
   ): Promise<NurturingProjectUsageState[]>;
 }
 
-/** Nurturing's own project-usage rows: one fold store per owner, and the reads over them all. */
-export interface NurturingProjectUsageRepository extends NurturingProjectUsageReadRepository {
-  /** The store of one owner's fold; its rows are keyed `<owner>:<project id>`. */
-  forOwner(owner: NurturingProjectUsageOwner): FoldProjectionStore<NurturingProjectUsageState>;
-}
+/**
+ * The row of a project's evaluation days. Not a peer fold: evaluations are too many to write one
+ * row per evaluation, so a throttled subscriber adds at most one day per project a day.
+ */
+export const EVALUATION_ACTIVITY_OWNER = "evaluation" as const;
 
-/** The row id of an owner's fold for a project. */
-export function projectUsageRowId(owner: NurturingProjectUsageOwner, projectId: string): string {
-  return `${owner}:${projectId}`;
+/** Nurturing's own project-usage rows: one fold store per owner, and the read over them all. */
+export interface NurturingProjectUsageRepository extends NurturingProjectUsageReadRepository {
+  /** The store of one owner's fold; its rows are keyed by project and owner. */
+  forOwner(owner: NurturingProjectUsageOwner): FoldProjectionStore<NurturingProjectUsageState>;
+  /** Adds the evaluation's UTC day to the project's evaluation row; a known day writes nothing. */
+  recordEvaluationDay(input: Readonly<{ projectId: string; occurredAt: number }>): Promise<void>;
 }

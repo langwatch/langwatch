@@ -76,6 +76,21 @@ export class PrismaNurturingProjectDirectoryRepository implements NurturingProje
     return { organizationCreatedAt: organization?.createdAt.getTime() ?? null };
   }
 
+  async findProjectIds({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<string[]> {
+    const teams = await this.prisma.team.findMany({
+      where: { organizationId },
+      select: { id: true },
+    });
+    if (teams.length === 0) return [];
+    const projects = await this.prisma.project.findMany({
+      where: { teamId: { in: teams.map(({ id }) => id) } },
+      select: { id: true },
+    });
+    return projects.map(({ id }) => id);
+  }
+
   async hasTracedProject({
     organizationId,
   }: Readonly<{ organizationId: string }>): Promise<boolean> {

@@ -60,6 +60,8 @@ import {
   GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
   type GuidedOnboardingTurnFailedEventData,
   guidedOnboardingTurnFailedEventDataSchema,
+  LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE,
+  langyFirstMessageSeenEventDataSchema,
 } from "@langwatch/langy-contract";
 import {
   GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
@@ -113,7 +115,10 @@ import {
 import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
-import { appOpenedSignals } from "../rules/nurturing-app-opened.rules.ts";
+import {
+  appOpenedSignals,
+  langyFirstMessageSeenSignal,
+} from "../rules/nurturing-app-opened.rules.ts";
 import {
   insightFiledSignal,
   insightReaderSignal,
@@ -536,6 +541,11 @@ export function buildNurturingPipeline(deps: {
         eventType: APP_PAGE_OPENED_EVENT_TYPE,
         data: appPageOpenedEventDataSchema,
         handle: (data) => deliverEach(appOpenedSignals({ data })),
+      })
+      .withPeerSubscriber("langyFirstMessageSeen", {
+        eventType: LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE,
+        data: langyFirstMessageSeenEventDataSchema,
+        handle: (data) => deliverSignal(langyFirstMessageSeenSignal({ data })),
       })
       // Insight's facts for PostHog: one signal per event, never its words or ids.
       .withPeerSubscriber("insightFiled", {

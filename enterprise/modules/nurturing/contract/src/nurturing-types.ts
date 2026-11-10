@@ -66,6 +66,8 @@ export interface CioPersonTraits {
   app_last_opened_at?: number;
   // The person's own last open of a usage, cost or plan page
   usage_page_viewed_at?: number;
+  // The person got an answer from Langy in a conversation they own; only ever set true
+  saw_langy_first_message?: boolean;
 
   // Evaluation milestones
   has_evaluations: boolean;
@@ -142,6 +144,8 @@ export interface CioOrgTraits {
   evaluator_count?: number;
   /** Only grows: no event records an archived scenario. */
   scenario_count?: number;
+  /** User simulation sets the organization's projects ran, each once; platform sets left out. */
+  simulation_set_count?: number;
   /** Traces over the last 30 days, each counted once. */
   trace_count?: number;
   /** Traces over the last 30 days with an error status. */
@@ -156,6 +160,21 @@ export interface CioOrgTraits {
   active_last_7_days?: boolean;
   /** Whether a trace arrived on a UTC day after the signup day. */
   back_since_day_0?: boolean;
+  /**
+   * Whether a trace arrived on the signup day (day 0) or the UTC day N days after it. Absent once
+   * that day has left the 30-day window, so Customer.io keeps the value it last had.
+   */
+  active_day_0?: boolean;
+  active_day_1?: boolean;
+  active_day_12?: boolean;
+  active_day_13?: boolean;
+  /** Unix seconds of the organization's newest trace; absent when none is in the window. */
+  last_trace_date?: number;
+  /**
+   * Active on 3 or more UTC days of the window spanning 7 or more days, or in 3 or more distinct
+   * ISO weeks; activity is a trace, a finished scenario run, an evaluation or a prompt version.
+   */
+  has_habit?: boolean;
   /** Unix seconds: the organization's creation plus 14 days. */
   window_end_date?: number;
 }

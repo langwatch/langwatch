@@ -50,6 +50,14 @@ export class MemoryNurturingProjectDirectoryRepository implements NurturingProje
     return owner === undefined ? [] : [owner];
   }
 
+  async findProjectIds({
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<string[]> {
+    return [...this.state.placed]
+      .filter(([, placedIn]) => placedIn === organizationId)
+      .map(([projectId]) => projectId);
+  }
+
   async hasTracedProject({
     organizationId,
   }: Readonly<{ organizationId: string }>): Promise<boolean> {

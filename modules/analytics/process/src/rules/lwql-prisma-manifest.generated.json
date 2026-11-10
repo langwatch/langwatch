@@ -20807,20 +20807,12 @@
     {
       "name": "NurturingProjectUsageView",
       "tableName": "NurturingProjectUsageView",
-      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand trace events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per organization\nfor the per-email traits.",
+      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per\norganization for the per-email traits. Traces are read from trace's own rollup, not copied.",
       "primaryKey": [
-        "id"
+        "projectId",
+        "owner"
       ],
       "fields": [
-        {
-          "name": "id",
-          "columnName": "id",
-          "type": "String",
-          "kind": "scalar",
-          "isList": false,
-          "isOptional": false,
-          "documentation": "`<owner>:<project id>`: one row per owner pipeline's peer fold and project."
-        },
         {
           "name": "projectId",
           "columnName": "projectId",
@@ -20831,13 +20823,13 @@
           "documentation": ""
         },
         {
-          "name": "organizationId",
-          "columnName": "organizationId",
+          "name": "owner",
+          "columnName": "owner",
           "type": "String",
           "kind": "scalar",
           "isList": false,
-          "isOptional": true,
-          "documentation": "The organization placement answered; null until the subscriber placed the project."
+          "isOptional": false,
+          "documentation": "The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation),\nor `evaluation`: the project's evaluation days, written by a subscriber, at most once a day."
         },
         {
           "name": "folded",

@@ -259,6 +259,7 @@ describe("NurturingMilestonesService", () => {
       let failuresLeft = 1;
       const milestones: NurturingMilestonesRepository = {
         recordOrganization: (input) => memory.recordOrganization(input),
+        findOrganization: (input) => memory.findOrganization(input),
         countSimulationRun: (input) => memory.countSimulationRun(input),
         countEvaluation: async (input) => {
           if (input.organizationId === "org-1" && failuresLeft > 0) {
@@ -316,6 +317,7 @@ describe("NurturingMilestonesService", () => {
           return directory.getFirstProjectCreatedAt(input);
         },
         getOrganizationCreatedAt: (input) => directory.getOrganizationCreatedAt(input),
+        findProjectIds: (input) => directory.findProjectIds(input),
         hasTracedProject: (input) => directory.hasTracedProject(input),
       };
       const service = serviceOver({ milestones, projects });

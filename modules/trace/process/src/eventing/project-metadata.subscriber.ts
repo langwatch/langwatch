@@ -94,15 +94,13 @@ async function trackTraceReceived({
   deps,
   source,
   tenantId,
-  foldState,
 }: {
   deps: ProjectMetadataSubscriberDeps;
   source: FirstTraceSource;
   tenantId: string;
-  foldState: TraceSummaryData;
 }): Promise<void> {
   try {
-    const { userId, organizationCreatedAt, onboardingVariant } =
+    const { userId, organizationId, organizationCreatedAt, onboardingVariant } =
       await deps.projects.resolveOrgAdmin(tenantId);
     if (!userId) return;
 
@@ -113,10 +111,7 @@ async function trackTraceReceived({
       occurredAt: source.occurredAt,
       organizationCreatedAt: organizationCreatedAt?.epochMilliseconds,
       onboardingVariant,
-      // The trace as its summary holds it now: readers keep the latest per trace.
-      ...(foldState.traceId && { traceId: foldState.traceId }),
-      containsErrorStatus: foldState.containsErrorStatus,
-      totalCost: foldState.totalCost,
+      ...(organizationId && { organizationId }),
     });
   } catch (error) {
     logger.error({ tenantId, error }, "Failed to record a later trace (non-fatal)");
@@ -144,7 +139,7 @@ async function syncProjectMetadata({
   // A real trace on a project that already sent its first: main's
   // last_trace_at update (customerIoTraceSync), keyed off the same flag.
   if (project.firstMessage) {
-    await trackTraceReceived({ deps, source, tenantId, foldState });
+    await trackTraceReceived({ deps, source, tenantId });
   }
 
   // Already marked — nothing to do

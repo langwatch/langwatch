@@ -8,8 +8,10 @@ import { describe, expect, it } from "vitest";
 import {
   emptyProjectUsage,
   foldProjectUsage,
+  NO_TRACE_USAGE,
   type NurturingProjectUsageFact,
   organizationUsageTraits,
+  traceUsageTotalsOf,
 } from "../nurturing-project-usage.rules.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -17,18 +19,6 @@ const NOW = Date.UTC(2026, 10, 20, 12);
 
 const foldAll = (facts: readonly NurturingProjectUsageFact[]) =>
   facts.reduce(foldProjectUsage, emptyProjectUsage("project-1"));
-
-const trace = (
-  traceId: string | null,
-  occurredAt: number,
-  { error = false, cost = null }: { error?: boolean; cost?: number | null } = {},
-): NurturingProjectUsageFact => ({
-  kind: "trace_received",
-  traceId,
-  containsErrorStatus: error,
-  totalCost: cost,
-  occurredAt,
-});
 
 describe("foldProjectUsage()", () => {
   /** @scenario "Prompts and evaluators count up when created and down when deleted" */
@@ -45,52 +35,102 @@ describe("foldProjectUsage()", () => {
     expect(state.evaluatorIds).toEqual([]);
   });
 
-  /** @scenario "A trace counts once however many times its received fact arrives" */
-  it("keeps one entry per trace id, with the latest error status and cost", () => {
+  /** @scenario "Each simulation set counts once" */
+  it("counts each simulation set once, however often its fact arrives", () => {
     const state = foldAll([
-      trace("t1", NOW - 3000, { cost: 0.1 }),
-      trace("t1", NOW - 2000, { cost: 0.2 }),
-      trace("t1", NOW - 1000, { error: true, cost: 0.3 }),
+      { kind: "simulation_set_created", scenarioSetId: "set-1", occurredAt: 1 },
+      { kind: "simulation_set_created", scenarioSetId: "set-1", occurredAt: 2 },
+      { kind: "simulation_set_created", scenarioSetId: "set-2", occurredAt: 3 },
     ]);
 
-    expect(state.traces).toEqual({ t1: { at: NOW - 1000, error: true, cost: 0.3 } });
+    expect(state.simulationSetIds).toEqual(["set-1", "set-2"]);
   });
 
-  /** @scenario "Traces older than 30 days drop out of the counts" */
-  it("drops traces older than 30 days before the newest fact", () => {
-    const state = foldAll([trace("old", NOW - 31 * DAY_MS, { cost: 5 }), trace("new", NOW)]);
+  /** @scenario "Prompt versions, scenario runs and evaluations mark their UTC day active" */
+  it("marks the day of each prompt, prompt version, scenario run and evaluation once", () => {
+    const state = foldAll([
+      { kind: "prompt_created", promptId: "p1", occurredAt: NOW - 3 * DAY_MS },
+      { kind: "prompt_version_saved", occurredAt: NOW - 2 * DAY_MS },
+      { kind: "scenario_run", occurredAt: NOW - 2 * DAY_MS + 1000 },
+      { kind: "evaluation_completed", occurredAt: NOW },
+      { kind: "evaluator_created", evaluatorId: "e1", occurredAt: NOW - DAY_MS },
+    ]);
 
-    expect(Object.keys(state.traces)).toEqual(["new"]);
+    expect(state.activeDays).toEqual(["2026-11-17", "2026-11-18", "2026-11-20"]);
   });
 
-  /** @scenario "A trace_received from before it carried a trace id counts as an active day only" */
-  it("counts a trace without an id as an active day only", () => {
-    const state = foldAll([trace(null, NOW)]);
+  it("drops active days older than the window of the newest fact", () => {
+    const state = foldAll([
+      { kind: "prompt_version_saved", occurredAt: NOW - 40 * DAY_MS },
+      { kind: "prompt_version_saved", occurredAt: NOW },
+      { kind: "evaluation_completed", occurredAt: NOW + DAY_MS },
+    ]);
 
-    expect(state.traces).toEqual({});
-    expect(state.activeDays).toEqual(["2026-11-20"]);
+    expect(state.activeDays).toEqual(["2026-11-20", "2026-11-21"]);
+  });
+});
+
+describe("traceUsageTotalsOf()", () => {
+  /** @scenario "The organization's traces are read from trace's rollup" */
+  it("sums trace's per-day rows into the window's totals", () => {
+    expect(
+      traceUsageTotalsOf([
+        {
+          day: "2026-11-18",
+          traceCount: 2,
+          errorCount: 1,
+          totalCost: 0.5,
+          lastTraceAt: NOW - 2 * DAY_MS,
+          lastFailedTraceAt: NOW - 2 * DAY_MS - 1000,
+        },
+        {
+          day: "2026-11-19",
+          traceCount: 1,
+          errorCount: 0,
+          totalCost: 0.25,
+          lastTraceAt: NOW - DAY_MS,
+          lastFailedTraceAt: null,
+        },
+      ]),
+    ).toEqual({
+      traceCount: 3,
+      errorCount: 1,
+      totalCost: 0.75,
+      lastTraceAt: NOW - DAY_MS,
+      lastFailedTraceAt: NOW - 2 * DAY_MS - 1000,
+      activeDays: ["2026-11-18", "2026-11-19"],
+    });
+  });
+
+  it("answers no traces for no days", () => {
+    expect(traceUsageTotalsOf([])).toEqual(NO_TRACE_USAGE);
   });
 });
 
 describe("organizationUsageTraits()", () => {
   /** @scenario "The organization's traits sum its projects" */
-  it("sums the organization's projects into its traits", () => {
+  it("sums the organization's projects and its traces into its traits", () => {
     const first = foldAll([
       { kind: "prompt_created", promptId: "p1", occurredAt: NOW - DAY_MS },
       { kind: "scenario_created", scenarioCount: 2, occurredAt: NOW - DAY_MS },
-      trace("t1", NOW - 2 * DAY_MS, { error: true, cost: 0.25 }),
-      trace("t2", NOW - DAY_MS, { cost: 0.5 }),
     ]);
     const second = foldAll([
       { kind: "evaluator_created", evaluatorId: "e1", occurredAt: NOW - DAY_MS },
       { kind: "scenario_run", occurredAt: NOW - DAY_MS },
-      trace("t3", NOW - DAY_MS, { error: true, cost: null }),
     ]);
     const createdAt = NOW - 10 * DAY_MS;
 
     expect(
       organizationUsageTraits({
         projects: [first, second],
+        traces: {
+          traceCount: 3,
+          errorCount: 2,
+          totalCost: 0.754,
+          lastTraceAt: NOW - DAY_MS,
+          lastFailedTraceAt: NOW - 2 * DAY_MS,
+          activeDays: ["2026-11-18", "2026-11-19"],
+        },
         now: NOW,
         organizationCreatedAt: createdAt,
       }),
@@ -98,20 +138,47 @@ describe("organizationUsageTraits()", () => {
       prompt_count: 1,
       evaluator_count: 1,
       scenario_count: 2,
+      simulation_set_count: 0,
       trace_count: 3,
       error_count: 2,
       total_cost: 0.75,
-      last_failed_trace_at: Math.floor((NOW - DAY_MS) / 1000),
+      last_trace_date: Math.floor((NOW - DAY_MS) / 1000),
+      last_failed_trace_at: Math.floor((NOW - 2 * DAY_MS) / 1000),
       has_scenario_run: true,
       active_last_7_days: true,
+      has_habit: false,
       back_since_day_0: true,
       window_end_date: Math.floor((createdAt + 14 * DAY_MS) / 1000),
+      active_day_0: false,
+      active_day_1: false,
+      active_day_12: false,
+      active_day_13: false,
     });
+  });
+
+  /** @scenario "A sync no trace started leaves the trace traits as Customer.io has them" */
+  it("leaves every trace trait out when the sync read no traces", () => {
+    const traits = organizationUsageTraits({
+      projects: [foldAll([{ kind: "prompt_created", promptId: "p1", occurredAt: NOW }])],
+      traces: null,
+      now: NOW,
+      organizationCreatedAt: NOW - DAY_MS,
+    });
+
+    expect(Object.keys(traits).sort()).toEqual([
+      "evaluator_count",
+      "has_scenario_run",
+      "prompt_count",
+      "scenario_count",
+      "simulation_set_count",
+      "window_end_date",
+    ]);
   });
 
   it("leaves out the failed-trace time and the window when they are unknown", () => {
     const traits = organizationUsageTraits({
-      projects: [foldAll([trace("t1", NOW)])],
+      projects: [],
+      traces: { ...NO_TRACE_USAGE, traceCount: 1, lastTraceAt: NOW },
       now: NOW,
       organizationCreatedAt: null,
     });
@@ -119,5 +186,97 @@ describe("organizationUsageTraits()", () => {
     expect(traits).not.toHaveProperty("last_failed_trace_at");
     expect(traits).not.toHaveProperty("window_end_date");
     expect(traits).not.toHaveProperty("back_since_day_0");
+    expect(traits).not.toHaveProperty("active_day_0");
+  });
+
+  it("leaves out the last trace's time when no trace is in the window", () => {
+    const traits = organizationUsageTraits({
+      projects: [],
+      traces: NO_TRACE_USAGE,
+      now: NOW,
+      organizationCreatedAt: null,
+    });
+
+    expect(traits).not.toHaveProperty("last_trace_date");
+    expect(traits).toMatchObject({ trace_count: 0, has_habit: false });
+  });
+
+  it("is neither active this week nor back since day 0 when the last trace was on day 0", () => {
+    const createdAt = NOW - 10 * DAY_MS;
+
+    const traits = organizationUsageTraits({
+      projects: [],
+      traces: { ...NO_TRACE_USAGE, traceCount: 1, lastTraceAt: createdAt + 1000 },
+      now: NOW,
+      organizationCreatedAt: createdAt,
+    });
+
+    expect(traits).toMatchObject({ active_last_7_days: false, back_since_day_0: false });
+  });
+});
+
+describe("organizationUsageTraits() per signup day", () => {
+  const traitsFor = (activeDays: readonly string[], organizationCreatedAt: number) =>
+    organizationUsageTraits({
+      projects: [],
+      traces: { ...NO_TRACE_USAGE, traceCount: activeDays.length, activeDays },
+      now: NOW,
+      organizationCreatedAt,
+    });
+
+  /** @scenario "The organization's activity on signup days 0, 1, 12 and 13 is a trait each" */
+  it("marks each tracked day after signup with whether a trace arrived on it", () => {
+    // Signed up 2026-11-07: day 0 is 11-07, day 1 is 11-08, day 12 is 11-19, day 13 is 11-20.
+    const traits = traitsFor(["2026-11-07", "2026-11-19", "2026-11-20"], NOW - 13 * DAY_MS);
+
+    expect(traits).toMatchObject({
+      active_day_0: true,
+      active_day_1: false,
+      active_day_12: true,
+      active_day_13: true,
+    });
+  });
+
+  /** @scenario "A signup day that left the window is not sent" */
+  it("leaves out a tracked day the window no longer covers", () => {
+    // Signed up 40 days ago: days 0 and 1 are before the window, days 12 and 13 inside it.
+    const traits = traitsFor(["2026-10-23"], NOW - 40 * DAY_MS);
+
+    expect(traits).not.toHaveProperty("active_day_0");
+    expect(traits).not.toHaveProperty("active_day_1");
+    expect(traits).toMatchObject({ active_day_12: true, active_day_13: false });
+  });
+});
+
+describe("organizationUsageTraits() has_habit", () => {
+  const habitOf = (traceDays: readonly string[], otherDays: readonly string[] = []) =>
+    organizationUsageTraits({
+      projects: [{ ...emptyProjectUsage("project-1"), activeDays: [...otherDays] }],
+      traces: { ...NO_TRACE_USAGE, traceCount: traceDays.length, activeDays: traceDays },
+      now: NOW,
+      organizationCreatedAt: null,
+    }).has_habit;
+
+  /** @scenario "A habit is activity on 3 or more days at least 7 days apart, or in 3 ISO weeks" */
+  it.each<[readonly string[], boolean]>([
+    [["2026-11-10", "2026-11-13", "2026-11-17"], true],
+    [["2026-11-01", "2026-11-05", "2026-11-12", "2026-11-19"], true],
+    // Sunday of week 45, Monday of week 46, Monday of week 47.
+    [["2026-11-08", "2026-11-09", "2026-11-16"], true],
+    [["2026-11-10", "2026-11-13", "2026-11-16"], false],
+    [["2026-11-01", "2026-11-19"], false],
+    [[], false],
+  ])("answers %j as %s", (traceDays, habit) => {
+    expect(habitOf(traceDays)).toBe(habit);
+  });
+
+  /** @scenario "Prompt versions, scenario runs and evaluations count toward the habit" */
+  it("counts the projects' other activity days with the trace days, each day once", () => {
+    expect(habitOf(["2026-11-10"], ["2026-11-10", "2026-11-13", "2026-11-17"])).toBe(true);
+    expect(habitOf(["2026-11-10"], ["2026-11-10", "2026-11-17"])).toBe(false);
+  });
+
+  it("ignores other activity days older than the window", () => {
+    expect(habitOf(["2026-11-10", "2026-11-17"], ["2026-10-01"])).toBe(false);
   });
 });

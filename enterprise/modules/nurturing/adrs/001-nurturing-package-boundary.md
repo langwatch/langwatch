@@ -38,13 +38,20 @@ The rule is now:
 > nurturing may subscribe to and project owner events and read placement through
 > shares; it never pulls owner state on a schedule
 
-So the per-email usage is five peer folds in nurturing, one per owner pipeline
-(prompt, evaluator, scenario, simulation, trace; a peer fold re-folds from one
-owner's log), in `nurturing-project-usage.pipeline.ts`, kept in nurturing's own
-`NurturingProjectUsageView` table, one row per owner and project. Each fold's subscriber places
-the project through shares and sends the organization's sum. The daily pull from
-the owners' Apis (#9382 before this change) is the thing still refused: "We're
-event driven so we don't do that."
+So the per-email usage is four peer folds in nurturing, one per owner pipeline
+(prompt, evaluator, scenario, simulation; a peer fold re-folds from one owner's
+log), in `nurturing-project-usage.pipeline.ts`, kept in nurturing's own
+`NurturingProjectUsageView` table, one row per project and owner. Evaluations
+only mark active days, so a throttled subscriber on `lw.evaluation.lifecycle_completed`
+adds at most one day per project a day to an `evaluation` row. Traces are not
+copied: trace's existing throttled `lw.trace.trace_received` fact, throttled again
+per organization to once per 15 minutes, starts one read of trace's own
+`trace_analytics_rollup` through `TraceApi.findTraceUsageByDay`, so nurturing now
+depends on `TraceApi` (no cycle: no module depends on nurturing). Each change sums
+the organization's projects, listed through the owners' shares, and sends one group
+call. The daily pull from the owners' Apis (#9382 before this change) is the thing
+still refused: "We're event driven so we don't do that." The trace read is not
+that pull: an owner fact starts it, never a schedule.
 
 ## Public surfaces and transports
 

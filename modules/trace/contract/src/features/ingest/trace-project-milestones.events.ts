@@ -37,12 +37,8 @@ const traceReceivedEventDataSchemaDefinition = z.object({
   organizationCreatedAt: z.number().int().nonnegative().nullish(),
   /** Which onboarding the organization went through; a string, so no new dependency. */
   onboardingVariant: z.string().nullish(),
-  /** The trace, so a reader counts it once: the event fires on each of its processing steps. */
-  traceId: z.string().min(1).optional(),
-  /** Whether a span of the trace had an error status, as the trace summary held it then. */
-  containsErrorStatus: z.boolean().optional(),
-  /** The trace's cost in USD so far, as the trace summary held it then; null when unpriced. */
-  totalCost: z.number().nullish(),
+  /** The admin's organization, so a reader can throttle per organization; absent on older facts. */
+  organizationId: z.string().min(1).optional(),
 });
 export interface TraceReceivedEventDataSchema extends Named<
   typeof traceReceivedEventDataSchemaDefinition

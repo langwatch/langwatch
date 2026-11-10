@@ -164,6 +164,14 @@ Feature: Customer.io nurturing integration
     Then the user is identified in Customer.io with updated scenario_count
     And a "scenario_created" event is tracked with scenario_id and project_id
 
+  @unit
+  Scenario: A project's first run of a simulation set records the set once
+    Given a project starts a run in a simulation set it never ran before
+    When scenario records the set on its own lifecycle pipeline
+    Then one simulation_set_created event names the project and the set
+    And later runs of the same set record no second one
+    And a platform-owned set (internal suite, agent test, voice call) is not recorded
+
   @integration
   Scenario: Experiment run fires event
     Given a user runs an experiment in a project

@@ -951,6 +951,15 @@ export interface TraceApi extends TraceOtlpIngestApi {
   readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
   /** The project's distinct traces over the last 24 hours. */
   countTracesInLastDay(input: { projectId: string }): Promise<number>;
+  /**
+   * One organization's projects' traces since `sinceMs`, per UTC day with a span, from the
+   * per-minute `trace_analytics_rollup`: one small query, no per-trace scan. Counts and times only.
+   */
+  findTraceUsageByDay(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+    sinceMs: number;
+  }): Promise<TraceUsageDay[]>;
   /** Whether any trace carrying `attribute` landed for the project at or after `sinceMs`. */
   hasTraceWithAttribute(input: {
     projectId: string;
@@ -975,6 +984,22 @@ export type TracePreconditionSampleInput = {
 };
 
 export const TraceApi = moduleApi<TraceApi>()("trace");
+
+/** One UTC day of a set of projects' traces, as the per-minute rollup sums them. */
+export interface TraceUsageDay {
+  /** `YYYY-MM-DD`, UTC. */
+  day: string;
+  /** Traces whose root span started that day. */
+  traceCount: number;
+  /** Of those, the ones whose root span had an error status. */
+  errorCount: number;
+  /** USD over every span of the day. */
+  totalCost: number;
+  /** Epoch ms of the day's last minute with a span. */
+  lastTraceAt: number;
+  /** Epoch ms of the day's last minute with a failed root span; null when none failed. */
+  lastFailedTraceAt: number | null;
+}
 
 /** One trace's per-role cost and latency, derived from its stored spans. */
 export interface ScenarioRoleMetrics {

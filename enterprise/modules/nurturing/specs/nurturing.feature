@@ -188,6 +188,12 @@ Feature: Nurturing sends the signals its owners record
     When an evaluation in one of them is counted
     Then the organization's earliest project creation, archived included, comes with the count
 
+  @integration
+  Scenario: The organization's projects are read through its teams
+    Given an organization with projects in its teams, one of them archived
+    When its projects are listed for the per-email usage sum
+    Then every project of its teams is listed, archived included
+
   # Round 46 E1 (R40): nurturing places a project through project's and organization's tables,
   # never a copy, so a project created before the cutover counts toward its organization.
   @unit

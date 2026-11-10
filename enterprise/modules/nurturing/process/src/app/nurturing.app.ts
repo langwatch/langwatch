@@ -10,12 +10,12 @@ import type { EventingCommands } from "@langwatch/eventing";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant } from "@langwatch/time";
+import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import type { NurturingChannels } from "../channels/nurturing.channels.ts";
 import { buildNurturingPipeline, type NurturingPipeline } from "../eventing/nurturing.pipeline.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
-import type { NurturingProjectUsageState } from "../rules/nurturing-project-usage.rules.ts";
 import { NurturingCodingMilestonesService } from "../services/nurturing-coding-milestones.service.ts";
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
 import { NurturingMemberFactsService } from "../services/nurturing-member-facts.service.ts";
@@ -33,7 +33,12 @@ type NurturingSetup = FeatureSetup<
 /** Owners tell nurturing; no module names it as a peer, so it can never close a cycle (§9). */
 export class NurturingModule implements NurturingApi {
   static readonly contract = NurturingApi;
-  static readonly dependencies = { users: UserApi, organizations: OrganizationApi };
+  static readonly dependencies = {
+    users: UserApi,
+    organizations: OrganizationApi,
+    /** Trace's per-day usage read for the per-email traits; trace names no nurturing, no cycle. */
+    traces: TraceApi,
+  };
   static readonly config = nurturingConfig;
   static readonly secrets = nurturingSecrets;
 
@@ -87,6 +92,7 @@ export class NurturingModule implements NurturingApi {
     const organizationUsage = customerIo
       ? NurturingOrganizationUsageService.create({
           projectUsage: repositories.projectUsage,
+          traces: dependencies.traces,
           projects: repositories.projects,
           milestones: repositories.milestones,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),
@@ -108,8 +114,13 @@ export class NurturingModule implements NurturingApi {
   }
 
   /** A project's usage changed: its organization's traits go to Customer.io, when it is set up. */
-  async organizationUsageChanged(state: NurturingProjectUsageState): Promise<void> {
-    await this.#organizationUsage?.usageChanged(state);
+  async organizationUsageChanged(input: Readonly<{ projectId: string }>): Promise<void> {
+    await this.#organizationUsage?.usageChanged(input);
+  }
+
+  /** A project traced: its organization's traits, trace traits included, go to Customer.io. */
+  async organizationTracesChanged(input: Readonly<{ projectId: string }>): Promise<void> {
+    await this.#organizationUsage?.tracesChanged(input);
   }
 
   async recordSignal(signal: NurturingSignal): Promise<void> {
