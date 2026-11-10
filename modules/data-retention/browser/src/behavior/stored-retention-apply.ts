@@ -42,11 +42,12 @@ export function useStoredRetentionApply({
   const viewedDays =
     viewedQuery.data?.categories.find((each) => each.category === "traces")?.retentionDays ?? null;
 
-  /** After a save: count what the new period would delete; ask only when there is some. */
+  /** After a save: count what the new period would delete, never the cached old period's count. */
   const offer = async (scopes: ScopeAssignment[]) => {
     const counted = await countStoredPastRetention({
       scopes,
-      count: (scope) => utils.dataRetention.getStoredPastRetention.fetch({ projectId, scope }),
+      count: (scope) =>
+        utils.dataRetention.getStoredPastRetention.fetch({ projectId, scope }, { staleTime: 0 }),
     });
     void utils.dataRetention.getStoredPastRetention.invalidate();
     if (counted && counted.rows === 0) return;

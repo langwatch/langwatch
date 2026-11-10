@@ -411,10 +411,11 @@ describe("given the retention policies page", () => {
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Apply now" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Not now" })).toBeInTheDocument();
-      expect(fetchStoredPast).toHaveBeenCalledWith({
-        projectId: "proj-1",
-        scope: { scopeType: "TEAM", scopeId: "team-1" },
-      });
+      // A fresh read: the cached count is still the old period's.
+      expect(fetchStoredPast).toHaveBeenCalledWith(
+        { projectId: "proj-1", scope: { scopeType: "TEAM", scopeId: "team-1" } },
+        { staleTime: 0 },
+      );
     });
 
     it("applies the saved scope's period when the admin chooses Apply now", async () => {
