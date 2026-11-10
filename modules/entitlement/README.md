@@ -11,7 +11,7 @@ What a plan allows, and what has been used and spent against it, so the allowanc
 | Classification | core (`modules/catalogue.json`)                                                                                      |
 | Subjects       | entitlement, usage                                                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                  |
-| Api token      | `EntitlementApi` = `moduleApi<EntitlementApi>()("entitlement")`, `contract/src/entitlement.api.ts:42` (8 operations) |
+| Api token      | `EntitlementApi` = `moduleApi<EntitlementApi>()("entitlement")`, `contract/src/entitlement.api.ts:50` (9 operations) |
 | Installed by   | api, worker, tasks (process)                                                                                         |
 
 ## What entitlement owns
@@ -19,7 +19,7 @@ What a plan allows, and what has been used and spent against it, so the allowanc
 | Kind                           | Name                                                           | Declared at                                                                             |
 | ------------------------------ | -------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Postgres, accessed not claimed | `Organization`, `Project`                                      | `process/src/repositories/prisma/prisma.tenancy.repository.ts:7`                        |
-| ClickHouse table (writes)      | `billable_events`                                              | `process/src/repositories/clickhouse/clickhouse.billable-events-meter.repository.ts:38` |
+| ClickHouse table (writes)      | `billable_events`                                              | `process/src/repositories/clickhouse/clickhouse.billable-events-meter.repository.ts:40` |
 | ClickHouse table (writes)      | `usage_trace_meter`                                            | `process/src/repositories/clickhouse/clickhouse.trace-count.repository.ts:46`           |
 | Stores required                | prisma, clickhouse                                             | `process/src/repositories/live/live.entitlement.repositories.ts:11`                     |
 | Stores required                | prisma                                                         | `process/src/repositories/prisma/prisma.entitlement.repositories.ts:15`                 |

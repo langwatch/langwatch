@@ -278,6 +278,14 @@ launchRun(input: ScenarioLaunchRunInput): Promise<ScenarioRunScheduled>;
 prefetchExecution(input: ScenarioExecutionPrefetchInput): Promise<ScenarioExecutionPrefetchResult>;
 ```
 
+#### `assertSimulationRunAllowed`
+
+Asks the plan's run cap once, so a caller about to queue a batch is refused before any run.
+
+```typescript
+assertSimulationRunAllowed(input: { projectId: string }): Promise<void>;
+```
+
 #### `queueSimulationRun`
 
 ```typescript
