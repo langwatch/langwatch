@@ -26,7 +26,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { ClickHouseStorageMeterRepository } from "../../repositories/clickhouse/clickhouse.storage-meter.repository.ts";
-import { MemoryDataRetentionDirectoryRepository } from "../../repositories/memory/memory.data-retention-directory.repository.ts";
 import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
 import { retentionStorageDayOf } from "../../rules/retention-storage.rules.ts";
 import { RetentionStorageReportService } from "../../services/retention-storage-report.service.ts";
@@ -151,9 +150,7 @@ async function setup({ failSends }: { failSends?: number } = {}) {
     category: "traces",
     retentionDays: 182,
   });
-  const directory = MemoryDataRetentionDirectoryRepository.create({
-    scopeProjects: [{ id: projectId, teamId: "team-1" }],
-  });
+  const projects = { findScopeProjectIds: async () => [projectId] };
   let measurements = 0;
   const countingMeter = {
     getTenantBytesBefore: (input: { tenantId: string; beforeMs: number }) => {
@@ -164,7 +161,7 @@ async function setup({ failSends }: { failSends?: number } = {}) {
   const { billing, sends, refusals } = meterBilling(failSends === undefined ? {} : { failSends });
   const report = RetentionStorageReportService.create({
     policies,
-    directory,
+    projects,
     meter: countingMeter,
     billing,
   });

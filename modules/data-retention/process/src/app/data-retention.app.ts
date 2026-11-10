@@ -199,7 +199,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
 
     const storageReport = RetentionStorageReportService.create({
       policies: repositories.policies,
-      directory: repositories.directory,
+      projects: retention,
       meter: repositories.storageMeter,
       billing: dependencies.billing,
     });

@@ -10,7 +10,6 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { MemoryDataRetentionDirectoryRepository } from "../../repositories/memory/memory.data-retention-directory.repository.ts";
 import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
 import { MemoryStorageMeterRepository } from "../../repositories/memory/memory.storage-meter.repository.ts";
 import {
@@ -38,7 +37,10 @@ function recordingBilling({ line = "kept" }: { line?: RetentionStorageOutcome["l
   return { billing, calls };
 }
 
-async function setup({ line }: { line?: RetentionStorageOutcome["line"] } = {}) {
+async function setup({
+  line,
+  projectIds = ["project-a", "project-b"],
+}: { line?: RetentionStorageOutcome["line"]; projectIds?: string[] } = {}) {
   const policies = MemoryDataRetentionRepository.create();
   await policies.upsertForScope({
     organizationId: "organization-1",
@@ -47,14 +49,9 @@ async function setup({ line }: { line?: RetentionStorageOutcome["line"] } = {}) 
     retentionDays: 182,
   });
   const meter = MemoryStorageMeterRepository.create();
-  const directory = MemoryDataRetentionDirectoryRepository.create({
-    scopeProjects: [
-      { id: "project-a", teamId: "team-1" },
-      { id: "project-b", teamId: "team-1" },
-    ],
-  });
+  const projects = { findScopeProjectIds: async () => projectIds };
   const { billing, calls } = recordingBilling(line ? { line } : {});
-  const service = RetentionStorageReportService.create({ policies, directory, meter, billing });
+  const service = RetentionStorageReportService.create({ policies, projects, meter, billing });
   return { service, meter, calls };
 }
 
@@ -106,6 +103,23 @@ describe("RetentionStorageReportService", () => {
       ]);
       // Measuring only aligns the line; the share goes to the meter from the event.
       expect(calls).toEqual([{ organizationId: "organization-1", longestRetentionDays: 182 }]);
+    });
+  });
+
+  describe("when one of its projects is archived", () => {
+    /** @scenario "An archived project's stored rows are still billed" */
+    it("counts the archived project's older rows too", async () => {
+      const { service, meter } = await setup({ projectIds: ["project-live", "project-archived"] });
+      meter.recordAt({ tenantId: "project-live", bytes: 1_000, atMs: NOW - 120 * DAY_MS });
+      meter.recordAt({ tenantId: "project-archived", bytes: 2_000, atMs: NOW - 120 * DAY_MS });
+
+      const [measured] = await service.measure({
+        organizationId: "organization-1",
+        day: TODAY,
+        measuredAt: NOW,
+      });
+
+      expect(measured?.bytesAboveIncluded).toBe(3_000);
     });
   });
 

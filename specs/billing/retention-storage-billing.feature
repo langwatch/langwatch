@@ -72,6 +72,13 @@ Feature: Billing storage kept past the 90 days Growth includes
     Then billing is told the bytes of the older rows of both projects
 
   @unit
+  Scenario: An archived project's stored rows are still billed
+    Given an organization keeping 182 days with one live and one archived project
+    And both projects keep rows older than 91 days
+    When the daily report runs
+    Then billing is told the bytes of the older rows of both projects
+
+  @unit
   Scenario: A retention rule change aligns the storage line
     Given a Growth organization that keeps 91 days
     When an administrator changes its traces retention to 182 days

@@ -207,6 +207,8 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
     organizationId: () => organizationOf(organizationId),
     viewedScope: storageScope,
     notices: host,
+    canApply:
+      !!rulesQuery.data?.canConfigureRetention && hasWritableScope(rulesQuery.data?.available),
   });
 
   const projectIsWritable =

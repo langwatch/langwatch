@@ -23,18 +23,21 @@ export function useStoredRetentionApply({
   organizationId,
   viewedScope,
   notices,
+  canApply,
 }: {
   projectId: string;
   organizationId: () => string;
   viewedScope: ScopeAssignment;
   notices: Notices;
+  /** Only a reader who can apply pays for the stored-data count. */
+  canApply: boolean;
 }) {
   const utils = dataRetentionApi.useUtils();
   const [pending, setPending] = useState<PendingStoredApply | null>(null);
-  const viewedQuery = dataRetentionApi.dataRetention.getStoredPastRetention.useQuery({
-    projectId,
-    scope: viewedScope,
-  });
+  const viewedQuery = dataRetentionApi.dataRetention.getStoredPastRetention.useQuery(
+    { projectId, scope: viewedScope },
+    { enabled: canApply, staleTime: 60_000 },
+  );
   const applyScope = dataRetentionApi.dataRetention.applyScopeRetentionToStoredData.useMutation();
 
   const viewedRows =

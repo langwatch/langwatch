@@ -5,7 +5,6 @@
  */
 import type { BillingApi, RetentionStorageOutcome } from "@langwatch/enterprise-billing-contract";
 
-import type { DataRetentionDirectoryReader } from "../app/data-retention.app.ts";
 import { type RetentionStorageMeasuredEventData } from "../eventing/retention-storage-report.events.ts";
 import type { DataRetentionRepository } from "../repositories/data-retention.repository.ts";
 import type { StorageMeterRepository } from "../repositories/storage-meter.repository.ts";
@@ -15,10 +14,12 @@ import {
   retentionStorageDayOf,
   retentionStorageMeasurement,
 } from "../rules/retention-storage.rules.ts";
+import type { DataRetentionService } from "./data-retention.service.ts";
 
 type Options = Readonly<{
   policies: Pick<DataRetentionRepository, "findAllInOrganization" | "findOrganizationIdsWithRules">;
-  directory: Pick<DataRetentionDirectoryReader, "findScopeProjects">;
+  /** Archived projects included: their stored rows are still kept, so they are still billed. */
+  projects: Pick<DataRetentionService, "findScopeProjectIds">;
   meter: Pick<StorageMeterRepository, "getTenantBytesBefore">;
   billing: Pick<BillingApi, "recordRetentionStorage">;
 }>;
@@ -110,15 +111,15 @@ export class RetentionStorageReportService {
     organizationId: string;
     measuredAt: number;
   }): Promise<number> {
-    const projects = await this.options.directory.findScopeProjects({
+    const projectIds = await this.options.projects.findScopeProjectIds({
       organizationId,
       scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
     });
     const beforeMs = includedRetentionCutoffMs(measuredAt);
     let total = 0;
     // One project at a time: each read already spans every metered table.
-    for (const project of projects) {
-      total += await this.options.meter.getTenantBytesBefore({ tenantId: project.id, beforeMs });
+    for (const tenantId of projectIds) {
+      total += await this.options.meter.getTenantBytesBefore({ tenantId, beforeMs });
     }
     return total;
   }
