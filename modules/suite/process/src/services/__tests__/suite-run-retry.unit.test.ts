@@ -21,6 +21,7 @@ function scenarios(commands: CollapsingRunCommands): ScenarioApi {
         parameters: {},
         secretParameters: {},
       })),
+    assertSimulationRunAllowed: async () => {},
     queueSimulationRun: (input) => commands.queueSimulationRun(input),
   });
 }

@@ -1,3 +1,4 @@
+import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import type {
   QueueSimulationRunInput,
   ResolvedScenarioRunParametersForScenario,
@@ -37,6 +38,10 @@ function harness(
     resolve?: Resolve;
     /** Refuses the queueing of these scenario run positions (0-based, in dispatch order). */
     refuseAt?: number[];
+    /** The organization is already past its run cap when the plan is asked to run. */
+    pastRunCap?: boolean;
+    /** Refuses with the run cap every run from this position on (0-based, in dispatch order). */
+    runCapAt?: number;
   } = {},
 ) {
   const started: StartSuiteRunCommandData[] = [];
@@ -50,9 +55,15 @@ function harness(
     },
     scenarios: createApiFixture<ScenarioApi>({
       resolveRunParametersForScenarios: options.resolve ?? resolveGold,
+      assertSimulationRunAllowed: async () => {
+        if (options.pastRunCap) throw new LimitExceededError("scenarioRuns", 100, 100);
+      },
       queueSimulationRun: async (input) => {
         const position = dispatched++;
         if (options.refuseAt?.includes(position)) throw new Error("queue unavailable");
+        if (options.runCapAt !== undefined && position >= options.runCapAt) {
+          throw new LimitExceededError("scenarioRuns", 100, 100);
+        }
         queued.push(input);
       },
     }),
@@ -304,6 +315,37 @@ describe("SuiteExecutionService", () => {
         { region: "us-east" },
         { region: "us-east", account_tier: "silver" },
       ]);
+    });
+  });
+
+  describe("given an organization on the cloud Free run cap", () => {
+    /** @scenario Running a scenario from the app past the run cap opens the upgrade prompt */
+    it("refuses a plan already past the cap before its suite run starts or any run is queued", async () => {
+      const { service, started, queued } = harness({ pastRunCap: true });
+
+      await expect(service.execute(input())).rejects.toMatchObject({
+        code: "resource_limit_exceeded",
+        limitType: "scenarioRuns",
+      });
+      expect(started).toEqual([]);
+      expect(queued).toEqual([]);
+    });
+
+    /** @scenario Running a scenario from the app past the run cap opens the upgrade prompt */
+    it("keeps the runs queued below the cap and still surfaces the refusal when the plan crosses it", async () => {
+      const { service, queued } = harness({ runCapAt: 2 });
+
+      await expect(service.execute(input({ repeatCount: 3 }))).rejects.toBeInstanceOf(
+        LimitExceededError,
+      );
+      expect(queued).toHaveLength(2);
+    });
+
+    it("keeps swallowing a refusal that is not the run cap", async () => {
+      const { service, queued } = harness({ refuseAt: [1] });
+
+      await expect(service.execute(input({ repeatCount: 3 }))).resolves.toBeDefined();
+      expect(queued).toHaveLength(2);
     });
   });
 });

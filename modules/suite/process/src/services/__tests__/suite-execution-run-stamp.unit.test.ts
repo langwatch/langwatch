@@ -24,6 +24,7 @@ function recordingScenarios(
         secretParameters: {},
         scenarioVersion: 1,
       })),
+    assertSimulationRunAllowed: async () => {},
     queueSimulationRun: async (input) => {
       queued.push(input);
     },

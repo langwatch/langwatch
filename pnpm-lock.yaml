@@ -15211,6 +15211,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
+      '@langwatch/enterprise-licensing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/contract
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract

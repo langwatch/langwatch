@@ -893,6 +893,10 @@ export class ScenarioModule implements ScenarioApi {
    * scheduled — the same order the suite execution port uses. The resolved parameters travel on the
    * metadata, which is the only channel that carries them into execution.
    */
+  assertSimulationRunAllowed(input: { projectId: string }): Promise<void> {
+    return this.#dependencies.creationCaps.assertRunAllowed({ projectId: input.projectId });
+  }
+
   async queueSimulationRun(input: QueueSimulationRunInput): Promise<void> {
     await this.#dependencies.creationCaps.assertRunAllowed({ projectId: input.projectId });
     const target = await this.#dependencies.connectedTargets.resolve({
