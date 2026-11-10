@@ -245,6 +245,14 @@ export class LangyService {
     return this.credentials.findModelsAllowedForProject(projectId);
   }
 
+  setModelsAllowedForProject(input: {
+    projectId: string;
+    actorUserId: string;
+    modelsAllowed: readonly string[];
+  }): Promise<string[] | null> {
+    return this.credentials.setModelsAllowedForProject(input);
+  }
+
   revokeWorkerSessionKey(input: {
     apiKeyId: string;
     projectId: string;

@@ -35,6 +35,13 @@ export interface LangyVirtualKeyService {
     organizationId: string;
     actorUserId: string;
   }): Promise<string>;
+  /** Writes the models every live Langy key of the project may serve; answers how many. */
+  setModelsAllowed(input: {
+    projectId: string;
+    organizationId: string;
+    modelsAllowed: readonly string[] | null;
+    actorUserId: string;
+  }): Promise<{ written: number }>;
 }
 
 export interface LangyGithubService {
@@ -243,6 +250,33 @@ export class LangyCredentialService {
     const allowed = virtualKeyConfigSchema.parse(config ?? {}).modelsAllowed;
 
     return allowed && allowed.length > 0 ? allowed : null;
+  }
+
+  /**
+   * Replaces the models Langy may run on in the project, trimmed and deduplicated; empty allows
+   * every model. A project whose Langy key was never minted gets one first, so the list has a
+   * key to live on. Answers the list as the enforcement points now read it.
+   */
+  async setModelsAllowedForProject(input: {
+    projectId: string;
+    actorUserId: string;
+    modelsAllowed: readonly string[];
+  }): Promise<string[] | null> {
+    const { organizationId } = await this.deps.repository.getProject(input.projectId);
+    const unique = [...new Set(input.modelsAllowed.map((model) => model.trim()))].filter(Boolean);
+    const target = {
+      projectId: input.projectId,
+      organizationId,
+      modelsAllowed: unique.length > 0 ? unique : null,
+      actorUserId: input.actorUserId,
+    };
+    const { written } = await this.deps.virtualKeys.setModelsAllowed(target);
+    if (written === 0) {
+      await this.deps.virtualKeys.provision(target);
+      await this.deps.virtualKeys.setModelsAllowed(target);
+    }
+
+    return this.findModelsAllowed({ projectId: input.projectId, organizationId });
   }
 
   async resolveMirrorTier({ projectId }: { projectId: string }): Promise<LangyMirrorTier> {

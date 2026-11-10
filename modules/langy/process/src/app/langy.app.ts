@@ -90,6 +90,7 @@ import {
   type langyPanelConversationInputSchema,
   type langyPanelCreateConversationInputSchema,
   type langyProjectInputSchema,
+  type langySetModelsAllowedInputSchema,
   type langyRecordFeedbackInputSchema,
   type langyRenameInputSchema,
   type langySetCodeAccessPreferenceInputSchema,
@@ -148,6 +149,7 @@ import { LangyPanelAccessService } from "../features/panel/services/langy-panel-
 import { LangyPanelConversationService } from "../features/panel/services/langy-panel-conversation.service.ts";
 import { LangyPanelEgressService } from "../features/panel/services/langy-panel-egress.service.ts";
 import { LangyPanelLocalService } from "../features/panel/services/langy-panel-local.service.ts";
+import { LangyPanelModelsService } from "../features/panel/services/langy-panel-models.service.ts";
 import { LangyPanelTurnStreamService } from "../features/panel/services/langy-panel-turn-stream.service.ts";
 import { LangySessionKeyMetricsOtelService } from "../features/session-key/services/langy-session-key-metrics-otel.service.ts";
 import type { LangySessionKeyService } from "../features/session-key/services/langy-session-key.service.ts";
@@ -222,6 +224,7 @@ type LangyAppDependencies = {
   panelTurnStream: LangyPanelTurnStreamService;
   panelLocal: LangyPanelLocalService;
   panelEgress: LangyPanelEgressService;
+  panelModels: LangyPanelModelsService;
   /** The pipeline's senders, bound once the process registers it (§9). */
   conversationCommands: LangyConversationCommandSenders;
   /** The conversation's own event log; bound only where the role holds a readable one. */
@@ -524,6 +527,7 @@ export class LangyModule implements LangyApiContract {
         baseHost: setup.config.publicBaseUrl,
       }),
       panelEgress: LangyPanelEgressService.create({ access, langy }),
+      panelModels: LangyPanelModelsService.create({ access, langy }),
       conversationCommands: commands,
       conversationEvents,
       conversationProcessing,
@@ -1097,7 +1101,13 @@ export class LangyModule implements LangyApiContract {
   getModelsAllowed(
     input: LangyPanelCall<typeof langyProjectInputSchema>,
   ): Promise<{ modelsAllowed: string[] | null }> {
-    return this.dependencies.panelConversations.getModelsAllowed(input);
+    return this.dependencies.panelModels.getModelsAllowed(input);
+  }
+
+  setModelsAllowed(
+    input: LangyPanelCall<typeof langySetModelsAllowedInputSchema>,
+  ): Promise<{ modelsAllowed: string[] | null }> {
+    return this.dependencies.panelModels.setModelsAllowed(input);
   }
 
   recordFeedback(input: LangyPanelCall<typeof langyRecordFeedbackInputSchema>): Promise<void> {

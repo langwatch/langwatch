@@ -93,7 +93,7 @@ function credentialsWithGithub() {
       getProject: async () => ({ organizationId: "organization-1" }),
     }),
     sessionKeys: { mint: vi.fn(), revokeManaged: vi.fn() },
-    virtualKeys: { provision: async () => "vk" },
+    virtualKeys: { provision: async () => "vk", setModelsAllowed: async () => ({ written: 1 }) },
     github: { enabled: true, findTurnTokens },
     runtime: {
       workerCallbackUrl: "http://langwatch.test",

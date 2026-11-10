@@ -66,7 +66,6 @@ export type LangyPanelConversationMembers = Readonly<{
     | "startConversationTurn"
     | "stopTurn"
     | "warmConversationWorker"
-    | "findModelsAllowedForProject"
   >;
   turnBounds: Pick<LangyTurnsBoundsService, "assertTurnWithinBounds">;
   /** Reads a confirmation card's click that arrives as the next message. */
@@ -300,15 +299,6 @@ export class LangyPanelConversationService {
       );
       return cold;
     }
-  }
-
-  async getModelsAllowed(
-    input: LangyPanelCall<typeof langyProjectInputSchema>,
-  ): Promise<{ modelsAllowed: string[] | null }> {
-    await this.members.access.assertPanelAccess(input);
-    return {
-      modelsAllowed: await this.members.langy.findModelsAllowedForProject(input.projectId),
-    };
   }
 
   /** Ids the caller cannot see are dropped, never attached, so feedback cannot be forged. */
