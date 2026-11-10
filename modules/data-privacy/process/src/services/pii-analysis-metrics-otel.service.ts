@@ -16,7 +16,17 @@ export const PII_CHECKS_METRIC_NAME = "pii_checks";
 export const PII_ANALYSIS_DURATION_METRIC_NAME = "evaluation_duration_milliseconds";
 export const PII_ANALYSIS_STATUS_METRIC_NAME = "evaluation_status_counter";
 export const PII_ANALYSIS_EVALUATOR_TYPE = "presidio/pii_detection";
+/** The PII redaction model's own label on the duration and status series. */
+export const PII_REDACTION_MODEL_EVALUATOR_TYPE = "pii_redaction_model";
 export const PII_REDACTION_MODEL_FALLBACKS_METRIC_NAME = "pii_redaction_model_fallbacks";
+
+/** Which analysis service answered a batch; each keeps its own label on the shared series. */
+export type PiiAnalysisMethod = "presidio" | "pii_redaction_model";
+
+const EVALUATOR_TYPE_BY_METHOD: Readonly<Record<PiiAnalysisMethod, string>> = {
+  presidio: PII_ANALYSIS_EVALUATOR_TYPE,
+  pii_redaction_model: PII_REDACTION_MODEL_EVALUATOR_TYPE,
+};
 
 /** Why a batch routed to the PII redaction model went to Presidio instead. */
 export type PiiRedactionModelFallbackReason =
@@ -71,12 +81,12 @@ export class PiiAnalysisMetricsOtelService {
     this.checks.inc({ method });
   }
 
-  analysisObserved(durationMs: number): void {
-    this.duration.observe(durationMs, { evaluator_type: PII_ANALYSIS_EVALUATOR_TYPE });
+  analysisObserved(durationMs: number, method: PiiAnalysisMethod): void {
+    this.duration.observe(durationMs, { evaluator_type: EVALUATOR_TYPE_BY_METHOD[method] });
   }
 
-  analysisFinished(outcome: PiiAnalysisOutcome): void {
-    this.status.inc({ evaluator_type: PII_ANALYSIS_EVALUATOR_TYPE, status: outcome });
+  analysisFinished(outcome: PiiAnalysisOutcome, method: PiiAnalysisMethod): void {
+    this.status.inc({ evaluator_type: EVALUATOR_TYPE_BY_METHOD[method], status: outcome });
   }
 
   modelFellBack(reason: PiiRedactionModelFallbackReason): void {

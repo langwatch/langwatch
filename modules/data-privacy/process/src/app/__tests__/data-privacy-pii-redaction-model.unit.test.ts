@@ -1,7 +1,7 @@
 /**
  * The whole module, from `redactSpan` down to the channels, for the two cases that must see no
  * change at all: an organization without the flag, and a deployment that names no model; and for
- * the metrics a model call must leave out of Presidio's series.
+ * the metrics a model call must keep apart from Presidio's.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { LangevalsPiiDetectionError } from "@langwatch/evaluation-contract";
@@ -126,7 +126,7 @@ describe("given the PII redaction model wired into the module", () => {
     afterEach(() => meters.uninstall());
 
     /** @scenario "Each PII redaction model call leaves one usage log line" */
-    it("counts the model call under its own method and leaves Presidio's series to Presidio", async () => {
+    it("counts and times the model call under its own labels and leaves Presidio's to Presidio", async () => {
       // Answers the configured probe, then refuses every batch as an HTTP 500 would.
       const refusingModel: PresidioChannel = {
         detect: async (input) => {
@@ -155,9 +155,19 @@ describe("given the PII redaction model wired into the module", () => {
       expect(redacted).toBe("call [PERSON]");
       expect(meters.valueOf("pii_checks", { method: "pii_redaction_model" })).toBe(1);
       expect(meters.valueOf("pii_checks", { method: "presidio" })).toBe(1);
-      expect(meters.valuesOf("evaluation_duration_milliseconds")).toHaveLength(1);
-      expect(meters.valueOf("evaluation_status_counter", { status: "processed" })).toBe(1);
-      expect(meters.valueOf("evaluation_status_counter", { status: "error" })).toBe(0);
+      const presidioLabel = { evaluator_type: "presidio/pii_detection" };
+      const modelLabel = { evaluator_type: "pii_redaction_model" };
+      expect(meters.valuesOf("evaluation_duration_milliseconds", presidioLabel)).toHaveLength(1);
+      expect(
+        meters.valueOf("evaluation_status_counter", { ...presidioLabel, status: "processed" }),
+      ).toBe(1);
+      expect(
+        meters.valueOf("evaluation_status_counter", { ...presidioLabel, status: "error" }),
+      ).toBe(0);
+      expect(meters.valuesOf("evaluation_duration_milliseconds", modelLabel)).toHaveLength(1);
+      expect(meters.valueOf("evaluation_status_counter", { ...modelLabel, status: "error" })).toBe(
+        1,
+      );
       expect(meters.valueOf("pii_redaction_model_fallbacks", { reason: "error" })).toBe(1);
     });
   });

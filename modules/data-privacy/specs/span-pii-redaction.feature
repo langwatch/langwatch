@@ -320,12 +320,6 @@ Feature: Redacting personal data out of a span at ingestion
     And a missing prelude, a non-2xx status, a function error or a truncated answer is refused
 
   @unit
-  Scenario: A batch over the synchronous invoke limit stays on Presidio
-    Given the model reached through its Lambda alias
-    When a batch serializes past the six megabyte invoke limit
-    Then it is refused without invoking the function
-
-  @unit
   Scenario: A long batch skips the model and goes to Presidio
     Given an organization allowlisted for the PII redaction model
     When a strict batch holds more than 8,000 characters in all its texts
@@ -347,5 +341,5 @@ Feature: Redacting personal data out of a span at ingestion
     And the outcome is ok, or the fallback reason such as timeout or error
     And the line holds no text, no finding value and no error message
     And each fallback is counted by reason, as is a routing that cannot be decided
-    And a model call is counted under its own method, never in Presidio's duration or status series
+    And a model call is counted, timed and its outcome recorded under its own labels, never Presidio's
     And an organization not allowlisted leaves no line

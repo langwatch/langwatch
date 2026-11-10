@@ -43,7 +43,7 @@ describe("given the PII analysis metrics pushed over OTLP", () => {
 
   /** @scenario "An operator can see the analysis calls from either process" */
   it("observes the batch duration under the evaluator label the App uses", () => {
-    PiiAnalysisMetricsOtelService.create().analysisObserved(42);
+    PiiAnalysisMetricsOtelService.create().analysisObserved(42, "presidio");
 
     expect(
       metrics.valuesOf("evaluation_duration_milliseconds", {
@@ -56,9 +56,9 @@ describe("given the PII analysis metrics pushed over OTLP", () => {
   it("counts each outcome separately, so an all-error batch cannot read as load", () => {
     const adapter = PiiAnalysisMetricsOtelService.create();
 
-    adapter.analysisFinished("processed");
-    adapter.analysisFinished("error");
-    adapter.analysisFinished("error");
+    adapter.analysisFinished("processed", "presidio");
+    adapter.analysisFinished("error", "presidio");
+    adapter.analysisFinished("error", "presidio");
 
     expect(
       metrics.valueOf("evaluation_status_counter", {
@@ -69,6 +69,26 @@ describe("given the PII analysis metrics pushed over OTLP", () => {
     expect(
       metrics.valueOf("evaluation_status_counter", {
         evaluator_type: "presidio/pii_detection",
+        status: "processed",
+      }),
+    ).toBe(1);
+  });
+
+  /** @scenario "Each PII redaction model call leaves one usage log line" */
+  it("times and counts a PII redaction model call under its own evaluator label", () => {
+    const adapter = PiiAnalysisMetricsOtelService.create();
+
+    adapter.analysisObserved(1_200, "pii_redaction_model");
+    adapter.analysisFinished("processed", "pii_redaction_model");
+
+    expect(
+      metrics.valuesOf("evaluation_duration_milliseconds", {
+        evaluator_type: "pii_redaction_model",
+      }),
+    ).toEqual([1_200]);
+    expect(
+      metrics.valueOf("evaluation_status_counter", {
+        evaluator_type: "pii_redaction_model",
         status: "processed",
       }),
     ).toBe(1);

@@ -104,18 +104,4 @@ describe("AwsPiiRedactionModelChannel", () => {
       await expect(channel.detect(batch())).rejects.toThrow("AccessDeniedException");
     });
   });
-
-  describe("when a batch serializes past the synchronous invoke limit", () => {
-    /** @scenario "A batch over the synchronous invoke limit stays on Presidio" */
-    it("refuses it without invoking the function", async () => {
-      const { channel, sent } = channelAnswering({
-        Payload: framed({ status: 200, body: "[]" }),
-      });
-
-      await expect(channel.detect(batch(["x".repeat(6 * 1024 * 1024)]))).rejects.toThrow(
-        "invoke limit",
-      );
-      expect(sent).toHaveLength(0);
-    });
-  });
 });

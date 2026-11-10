@@ -16,6 +16,7 @@ import type {
   PiiRedactionModelFallbackReason,
 } from "./pii-analysis-metrics-otel.service.ts";
 import type { PresidioRedactionService } from "./presidio-redaction.service.ts";
+import { ProjectLookupCacheService } from "./project-lookup-cache.service.ts";
 
 const logger = createLogger("langwatch:data-privacy:pii-redaction-model");
 
@@ -88,9 +89,8 @@ export class PiiRedactionModelService {
     });
   }
 
-  readonly #organizations = new Map<string, { organizationId: string; expiresAt: number }>();
-  /** Lookups in flight, so concurrent batches of one project share one read, as ADR-177 does. */
-  readonly #organizationLookups = new Map<string, Promise<string>>();
+  /** Each project's organization; concurrent batches of one project share one read. */
+  readonly #organizations: ProjectLookupCacheService<string>;
   /**
    * Per process, not per organization: the model is one deployment for every organization, so
    * when it is slow it is slow for all of them, and a per-organization breaker would pay the
@@ -118,6 +118,10 @@ export class PiiRedactionModelService {
     this.metrics = input.metrics;
     this.log = input.log;
     this.now = input.now;
+    this.#organizations = ProjectLookupCacheService.create<string>({
+      ttlMs: ORGANIZATION_TTL_MS,
+      now: input.now,
+    });
   }
 
   /** The model's clearing of one batch, or null when the batch stays on Presidio. */
@@ -227,28 +231,11 @@ export class PiiRedactionModelService {
     }
   }
 
-  async #organizationOf({ projectId }: { projectId: string }): Promise<string> {
-    const cached = this.#organizations.get(projectId);
-    if (cached && cached.expiresAt > this.now()) return cached.organizationId;
-
-    const pending = this.#organizationLookups.get(projectId);
-    if (pending) return pending;
-    const lookup = this.#readOrganization({ projectId }).finally(() => {
-      if (this.#organizationLookups.get(projectId) === lookup) {
-        this.#organizationLookups.delete(projectId);
-      }
+  #organizationOf({ projectId }: { projectId: string }): Promise<string> {
+    return this.#organizations.get(projectId, async () => {
+      const { organizationId } = await this.scopes.getScopeFacts({ projectId });
+      return organizationId;
     });
-    this.#organizationLookups.set(projectId, lookup);
-    return lookup;
-  }
-
-  async #readOrganization({ projectId }: { projectId: string }): Promise<string> {
-    const { organizationId } = await this.scopes.getScopeFacts({ projectId });
-    this.#organizations.set(projectId, {
-      organizationId,
-      expiresAt: this.now() + ORGANIZATION_TTL_MS,
-    });
-    return organizationId;
   }
 }
 

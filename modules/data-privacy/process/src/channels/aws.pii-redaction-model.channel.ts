@@ -11,7 +11,6 @@ import {
   type PiiDetectionRequest,
 } from "@langwatch/evaluation-contract";
 
-import { LAMBDA_SYNC_INVOKE_PAYLOAD_LIMIT_BYTES } from "../rules/pii-redaction-model.rules.ts";
 import {
   PII_DETECTION_PATH,
   presidioDetectionBody,
@@ -42,12 +41,6 @@ export class AwsPiiRedactionModelChannel implements PresidioChannel {
       headers: { "content-type": "application/json" },
       body: presidioDetectionBody(input),
     });
-    const bytes = Buffer.byteLength(payload, "utf-8");
-    if (bytes > LAMBDA_SYNC_INVOKE_PAYLOAD_LIMIT_BYTES) {
-      throw new LangevalsPiiDetectionError(
-        `PII redaction model batch is ${bytes} bytes, over the ${LAMBDA_SYNC_INVOKE_PAYLOAD_LIMIT_BYTES}-byte invoke limit`,
-      );
-    }
 
     const response = await this.lambda.send(
       new InvokeCommand({

@@ -15,9 +15,6 @@ export const PII_REDACTION_MODEL_TIMEOUT_MS = 50_000;
  */
 export const PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS = 2 * 60_000;
 
-/** AWS's ceiling for a synchronous invoke request; a larger batch stays on Presidio. */
-export const LAMBDA_SYNC_INVOKE_PAYLOAD_LIMIT_BYTES = 6 * 1024 * 1024;
-
 /** A function ARN, optionally qualified by an alias or version; the region is the fourth field. */
 const LAMBDA_FUNCTION_ARN =
   /^arn:aws[a-z-]*:lambda:([a-z0-9-]+):\d{12}:function:[\w-]+(?::[\w$-]+)?$/;
@@ -61,9 +58,9 @@ export function batchCharactersOf(texts: readonly string[]): number {
 }
 
 /**
- * Above this many characters in all of a batch's texts, the batch goes to Presidio. Per batch,
- * not per text: one batch is one invoke and its time grows with every character in it (about
- * 4 s for 2k, 40 to 56 s for 20k). A batch is never split across two services.
+ * Above this many characters in a batch's texts, it goes to Presidio, never split: time grows with
+ * every character (4 s for 2k, 40 to 56 s for 20k). It also keeps each invoke far under Lambda's
+ * 6 MB synchronous limit, so the channel does not check that limit.
  */
 export const PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS = 8_000;
 

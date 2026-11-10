@@ -9,7 +9,10 @@ import {
   redactSparingNamesAndPlaces,
   type PiiClearing,
 } from "../rules/pii-analysis.rules.ts";
-import type { PiiAnalysisMetricsOtelService } from "./pii-analysis-metrics-otel.service.ts";
+import type {
+  PiiAnalysisMethod,
+  PiiAnalysisMetricsOtelService,
+} from "./pii-analysis-metrics-otel.service.ts";
 
 /** One batch for `clear`, as the redaction pass hands it over. */
 type PresidioClearInput = {
@@ -33,8 +36,8 @@ export class PresidioRedactionService {
       "analysisCalled" | "analysisObserved" | "analysisFinished"
     >;
     timeoutMs: number;
-    /** The `method` label each call is counted under. */
-    method?: "presidio" | "pii_redaction_model";
+    /** The `method` label each call is counted under, and the evaluator label it is timed under. */
+    method?: PiiAnalysisMethod;
   }): PresidioRedactionService {
     return new PresidioRedactionService({ ...input, method: input.method ?? "presidio" });
   }
@@ -47,7 +50,7 @@ export class PresidioRedactionService {
     "analysisCalled" | "analysisObserved" | "analysisFinished"
   >;
   private readonly timeoutMs: number;
-  private readonly method: string;
+  private readonly method: PiiAnalysisMethod;
 
   private constructor(input: {
     presidio: PresidioChannel;
@@ -56,7 +59,7 @@ export class PresidioRedactionService {
       "analysisCalled" | "analysisObserved" | "analysisFinished"
     >;
     timeoutMs: number;
-    method: string;
+    method: PiiAnalysisMethod;
   }) {
     this.presidio = input.presidio;
     this.metrics = input.metrics;
@@ -94,7 +97,7 @@ export class PresidioRedactionService {
     }));
     const startedAt = performance.now();
     const outcome = await this.#detect({ ...input, texts: truncated.map((t) => t.input) });
-    this.metrics.analysisObserved(performance.now() - startedAt);
+    this.metrics.analysisObserved(performance.now() - startedAt, this.method);
 
     if (outcome.kind === "not_configured") {
       throw new Error("LANGEVALS_ENDPOINT is not set, PII check cannot be performed");
@@ -104,7 +107,7 @@ export class PresidioRedactionService {
     const cleared = truncated.map((entry, i) => {
       const result = outcome.results[i];
       if (!result) throw new Error(`Presidio returned no result for text ${i}`);
-      this.metrics.analysisFinished(result.status);
+      this.metrics.analysisFinished(result.status, this.method);
       if (result.status === "error") throw new Error(result.details);
       if (result.status !== "processed") return null;
       findings += findingsIn(result.raw_response);
@@ -136,8 +139,8 @@ export class PresidioRedactionService {
       });
     } catch (error) {
       if (error instanceof LangevalsPiiDetectionError) {
-        this.metrics.analysisObserved(performance.now() - startedAt);
-        this.metrics.analysisFinished("error");
+        this.metrics.analysisObserved(performance.now() - startedAt, this.method);
+        this.metrics.analysisFinished("error", this.method);
       }
       throw error;
     } finally {

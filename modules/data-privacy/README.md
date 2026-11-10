@@ -62,8 +62,9 @@ organization.
   finding's value or an error message. Fallbacks are also counted by `reason` on
   `pii_redaction_model_fallbacks` (`too_long`, `timeout`, `throttled`, `error`, `breaker_open`,
   and `routing_error` when the flag or the project could not be read). A model call counts on
-  `pii_checks` under `method="pii_redaction_model"`, never on Presidio's
-  `evaluation_duration_milliseconds` or `evaluation_status_counter`.
+  `pii_checks` under `method="pii_redaction_model"`, and its duration and outcome go on
+  `evaluation_duration_milliseconds` and `evaluation_status_counter` under
+  `evaluator_type="pii_redaction_model"`, never under Presidio's `presidio/pii_detection`.
 - **No change without the flag or the settings.** With neither setting, the model channel answers
   "not configured" and nothing new is read: no flag, no project, no request. With a setting but
   without the flag, the only new work is one flag read per batch and one project read per project
