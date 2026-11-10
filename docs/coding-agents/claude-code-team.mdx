@@ -15,7 +15,7 @@ To track Claude Code across a team, you collect the OpenTelemetry that Claude Co
 
 LangWatch does that with one command per machine, or one managed settings file for the whole fleet, and it works on Claude Max and Pro plans as well as on API keys.
 
-Each engineer's sessions, prompts included, land in a project only they own. You get the cost numbers per person; reading a session itself takes an audited admin path, and the organization can drop the prompts before they are stored. To start now, go to [Connect each engineer](#1-connect-each-engineer).
+With the per-machine setup, each engineer's sessions, prompts included, land in a project only they own. You get the cost numbers per person; reading a session itself takes an audited admin path, and the organization can drop the prompts before they are stored. To start now, go to [Connect each engineer](#1-connect-each-engineer).
 
 ## What you can answer once it is running
 
@@ -43,7 +43,7 @@ It opens a browser to sign in, then asks how Claude Code should run:
 - **Using a Claude subscription** keeps the engineer's own Max or Pro plan and login. LangWatch receives only the telemetry.
 - **Using an API key** routes calls through the [LangWatch AI Gateway](/ai-gateway/overview) with a virtual key, which makes cost exact and spend caps enforceable. See [Cap spend](#4-cap-spend).
 
-After that, `claude` works as usual. To wire the machine without the wrapper, run `npx langwatch instrument claude`, which writes the settings into `~/.claude/settings.json`.
+After that, `claude` works as usual. To wire the machine without the wrapper, run `npx langwatch instrument claude`, which writes the telemetry settings into `~/.claude/settings.json`. It does not route calls through the gateway, so budgets do not stop those calls.
 
 ## 2. Pick where sessions land
 
@@ -76,13 +76,13 @@ How hard a cap you can set depends on the path from step 1:
 | **API key**, through the AI Gateway | From Anthropic's own response | Enforced: requests fail with `budget_exceeded` |
 | **Claude subscription** | Claude Code's own estimate | Alerts at 80 and 100 percent, because subscription calls cannot be stopped from outside |
 
-On the API key path every call is a gateway request, so the gateway's [budgets](/ai-gateway/budgets) apply: a personal budget per engineer, or a budget on a team or project. See [Cap LLM spend per team](/ai-gateway/cap-spend-per-team).
+On the API key path set up by `npx langwatch claude`, every call is a gateway request, so the gateway's [budgets](/ai-gateway/budgets) apply: a personal budget per engineer, or a budget on a team or project. See [Cap LLM spend per team](/ai-gateway/cap-spend-per-team).
 
 ## What engineers can expect
 
 Engineers will ask who can read their sessions, so the answer belongs in the rollout email. By default the setup sends prompts and tool activity along with the numbers, so each engineer can replay their own sessions. Then:
 
-- **Their sessions land in a project only they own.** Teammates see them only in a team project the tool was pinned to.
+- **Their sessions land in a project only they own.** Teammates see them only in a team project the tool was pinned to. A managed settings file with one ingest key sends every machine to that key's project instead, so say which project in the email.
 - **Admins see spend as numbers.** Cost per person and per team, with no conversation content in it.
 - **Reading a session as an admin is never silent.** It goes through one audited path that shows a banner for the whole visit, and the engineer can read the audit log.
 - **The organization can drop the content entirely.** Set input, output and system instructions to **Drop** in the [data privacy policy](/platform/data-privacy), and LangWatch strips the content before it is stored. Cost and token numbers keep working. See [no-spy mode](/ai-governance/no-spy-mode).

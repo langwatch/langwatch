@@ -83,9 +83,9 @@ When you have found a failure, keep it from coming back in the same chat:
 
 ## What the assistant can see
 
-The assistant reads only the project you approve, with your permissions, and only what your redaction settings kept. What it does read, inputs and outputs included, goes to the assistant's model provider as part of the chat. The limits in detail:
+With the sign-in, the assistant reads only the project you approve, with your permissions, and only what your redaction settings kept. What it does read, inputs and outputs included, goes to the assistant's model provider as part of the chat. The limits in detail:
 
-- **Only the approved project.** The sign-in approves one project, and the assistant reads only that project's traces.
+- **Only the approved project.** The sign-in approves one project, and the assistant reads only that project's traces. A personal API key instead reaches every project you can access.
 - **Your redaction applies.** The server returns traces as LangWatch stored them, so anything your [data privacy settings](/platform/data-privacy) redacted or dropped is not there to read.
 - **Your access applies.** The assistant acts as you, so it can't read or change anything your LangWatch role can't.
 
@@ -95,7 +95,7 @@ The assistant reads only the project you approve, with your permissions, and onl
 
 **Does it work with self-hosted LangWatch?** Yes. Use your own host followed by `/mcp` as the URL.
 
-**Can it change things, or only read?** It can also create and update prompts, evaluators, datasets, scenarios and online evaluations. The full list is in the [tools reference](/integration/mcp#mcp-tools-reference). Your client's own permission prompts still apply to each tool call.
+**Can it change things, or only read?** It can also create and update prompts, evaluators, datasets, scenarios and online evaluations. The full list is in the [tools reference](/integration/mcp#mcp-tools-reference). Whether you approve each call depends on your client's permission settings, so check them before you let it write.
 
 **Do my traces need to come from a particular framework?** No. Anything that sends traces to LangWatch works, through the Python or TypeScript SDK or plain OpenTelemetry.
 

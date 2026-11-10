@@ -57,9 +57,9 @@ The Anthropic SDK works the same way with `base_url="https://gateway.langwatch.a
 
 ## 3. Add budgets on teams, projects and people
 
-A key's own budget is one layer. Under **AI Gateway > Budgets**, click **New budget** to cap a whole **Team**, **Project**, **Organization**, **Group** or **Member** as well.
+A key's own budget is one layer. Under **AI Gateway > Budgets**, click **New budget** to cap a whole **Team**, **Project** or **Organization**, or each **Member**, as well. A **Group** budget is not a shared cap: it gives every member of the group their own allowance. For one cap the whole team shares, use a **Team** budget.
 
-Every request is checked against every budget that applies to it, so a request on `support-agent` counts against the key, its project, its team and the organization at once, and the first one at its limit stops it.
+Every request is checked against every budget that applies to it, so a request on `support-agent` counts against the key, its project, its team and the organization at once, and the first block budget at its limit stops it. A warn budget at its limit still serves the request, and a block budget filtered to one provider only takes that provider out of the request's chain.
 
 Each budget has a window (per day, week, calendar month, or no reset) and an action at the limit:
 
@@ -80,9 +80,9 @@ Every request is also a trace in Trace Explorer with the model, the tokens, the 
 
 ## Limits to know
 
-Treat a budget as a cap with a small margin, for three reasons:
+Spend can pass a budget before the gateway stops it, so set the limit below what you can afford to lose:
 
-- **A budget can run slightly past its limit.** The gateway checks before a request and counts the cost after it, so a request admitted under the limit is served in full, and a key can keep serving for up to a minute after it crosses the limit.
+- **A budget can run slightly past its limit.** The gateway checks before a request and counts the cost after it, so a request admitted under the limit is served in full whatever it ends up costing, requests in flight at the same time all pass before their costs are counted, and a key can keep serving for up to a minute after it crosses the limit.
 - **Rate limits count per gateway replica.** A key's requests per minute and per day are enforced on each replica, so with three replicas a key can send up to three times its limit. Tokens per minute are not enforced. See [Rate limits](/ai-gateway/rate-limits).
 - **Fallbacks run in order.** A [routing policy](/ai-gateway/governance/routing-policies) tries providers in the order you list them; it does not balance load across them.
 

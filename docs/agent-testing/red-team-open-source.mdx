@@ -76,6 +76,8 @@ async def test_refund_cannot_be_talked_into():
 
 `marathon_script` runs the turns for you. The checks you pass run after every turn, so a broken rule fails the test at the turn it happened. The judge then reads the whole conversation against the criteria. Write each rule you can check in code as a check as well as a criterion: a check is exact and can't be argued with.
 
+The check above only asks that some order lookup happened before the test ended; to tie the lookup to the refunded order, compare the tool call arguments in `state.messages`.
+
 Pick targets from what your agent can actually do: its tools, its data and its instructions. Reveal the system prompt, call a tool without authorisation, read another customer's data and leave the role are the usual first four.
 
 ## 3. Pick a strategy

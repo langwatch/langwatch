@@ -30,7 +30,7 @@ OPENAI_API_KEY="your-openai-key"
 LANGWATCH_API_KEY="your-langwatch-key"
 ```
 
-Your LangWatch key is in your [project settings](https://app.langwatch.ai/settings). Without it the tests still run locally; you only lose the run history.
+Your LangWatch key is in your [project settings](https://app.langwatch.ai/settings). Without it the tests still run locally; you only lose the run history. Load the file in your test with `load_dotenv()` from `python-dotenv`, or export the variables in your shell.
 
 ## 2. Write the first test
 
@@ -70,7 +70,7 @@ async def test_refund_for_damaged_item():
         ],
     )
 
-    assert result.success
+    assert result.success, result.reasoning
 ```
 
 Run it:
@@ -103,6 +103,7 @@ result = await scenario.run(
         scenario.proceed(),
     ],
 )
+assert result.success, result.reasoning
 ```
 
 The first user line is fixed, the check after the agent's first reply is plain Python, and `scenario.proceed()` hands the rest of the conversation back to the simulated user and the judge.

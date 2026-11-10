@@ -5464,9 +5464,9 @@ The Anthropic SDK works the same way with `base_url="https://gateway.langwatch.a
 
 ## 3. Add budgets on teams, projects and people
 
-A key's own budget is one layer. Under **AI Gateway > Budgets**, click **New budget** to cap a whole **Team**, **Project**, **Organization**, **Group** or **Member** as well.
+A key's own budget is one layer. Under **AI Gateway > Budgets**, click **New budget** to cap a whole **Team**, **Project** or **Organization**, or each **Member**, as well. A **Group** budget is not a shared cap: it gives every member of the group their own allowance. For one cap the whole team shares, use a **Team** budget.
 
-Every request is checked against every budget that applies to it, so a request on `support-agent` counts against the key, its project, its team and the organization at once, and the first one at its limit stops it.
+Every request is checked against every budget that applies to it, so a request on `support-agent` counts against the key, its project, its team and the organization at once, and the first block budget at its limit stops it. A warn budget at its limit still serves the request, and a block budget filtered to one provider only takes that provider out of the request's chain.
 
 Each budget has a window (per day, week, calendar month, or no reset) and an action at the limit:
 
@@ -5487,9 +5487,9 @@ Every request is also a trace in Trace Explorer with the model, the tokens, the 
 
 ## Limits to know
 
-Treat a budget as a cap with a small margin, for three reasons:
+Spend can pass a budget before the gateway stops it, so set the limit below what you can afford to lose:
 
-- **A budget can run slightly past its limit.** The gateway checks before a request and counts the cost after it, so a request admitted under the limit is served in full, and a key can keep serving for up to a minute after it crosses the limit.
+- **A budget can run slightly past its limit.** The gateway checks before a request and counts the cost after it, so a request admitted under the limit is served in full whatever it ends up costing, requests in flight at the same time all pass before their costs are counted, and a key can keep serving for up to a minute after it crosses the limit.
 - **Rate limits count per gateway replica.** A key's requests per minute and per day are enforced on each replica, so with three replicas a key can send up to three times its limit. Tokens per minute are not enforced. See [Rate limits](/ai-gateway/rate-limits).
 - **Fallbacks run in order.** A [routing policy](/ai-gateway/governance/routing-policies) tries providers in the order you list them; it does not balance load across them.
 
@@ -17459,7 +17459,7 @@ To track Claude Code across a team, you collect the OpenTelemetry that Claude Co
 
 LangWatch does that with one command per machine, or one managed settings file for the whole fleet, and it works on Claude Max and Pro plans as well as on API keys.
 
-Each engineer's sessions, prompts included, land in a project only they own. You get the cost numbers per person; reading a session itself takes an audited admin path, and the organization can drop the prompts before they are stored. To start now, go to [Connect each engineer](#1-connect-each-engineer).
+With the per-machine setup, each engineer's sessions, prompts included, land in a project only they own. You get the cost numbers per person; reading a session itself takes an audited admin path, and the organization can drop the prompts before they are stored. To start now, go to [Connect each engineer](#1-connect-each-engineer).
 
 ## What you can answer once it is running
 
@@ -17487,7 +17487,7 @@ It opens a browser to sign in, then asks how Claude Code should run:
 - **Using a Claude subscription** keeps the engineer's own Max or Pro plan and login. LangWatch receives only the telemetry.
 - **Using an API key** routes calls through the [LangWatch AI Gateway](/ai-gateway/overview) with a virtual key, which makes cost exact and spend caps enforceable. See [Cap spend](#4-cap-spend).
 
-After that, `claude` works as usual. To wire the machine without the wrapper, run `npx langwatch instrument claude`, which writes the settings into `~/.claude/settings.json`.
+After that, `claude` works as usual. To wire the machine without the wrapper, run `npx langwatch instrument claude`, which writes the telemetry settings into `~/.claude/settings.json`. It does not route calls through the gateway, so budgets do not stop those calls.
 
 ## 2. Pick where sessions land
 
@@ -17520,13 +17520,13 @@ How hard a cap you can set depends on the path from step 1:
 | **API key**, through the AI Gateway | From Anthropic's own response | Enforced: requests fail with `budget_exceeded` |
 | **Claude subscription** | Claude Code's own estimate | Alerts at 80 and 100 percent, because subscription calls cannot be stopped from outside |
 
-On the API key path every call is a gateway request, so the gateway's [budgets](/ai-gateway/budgets) apply: a personal budget per engineer, or a budget on a team or project. See [Cap LLM spend per team](/ai-gateway/cap-spend-per-team).
+On the API key path set up by `npx langwatch claude`, every call is a gateway request, so the gateway's [budgets](/ai-gateway/budgets) apply: a personal budget per engineer, or a budget on a team or project. See [Cap LLM spend per team](/ai-gateway/cap-spend-per-team).
 
 ## What engineers can expect
 
 Engineers will ask who can read their sessions, so the answer belongs in the rollout email. By default the setup sends prompts and tool activity along with the numbers, so each engineer can replay their own sessions. Then:
 
-- **Their sessions land in a project only they own.** Teammates see them only in a team project the tool was pinned to.
+- **Their sessions land in a project only they own.** Teammates see them only in a team project the tool was pinned to. A managed settings file with one ingest key sends every machine to that key's project instead, so say which project in the email.
 - **Admins see spend as numbers.** Cost per person and per team, with no conversation content in it.
 - **Reading a session as an admin is never silent.** It goes through one audited path that shows a banner for the whole visit, and the engineer can read the audit log.
 - **The organization can drop the content entirely.** Set input, output and system instructions to **Drop** in the [data privacy policy](/platform/data-privacy), and LangWatch strips the content before it is stored. Cost and token numbers keep working. See [no-spy mode](/ai-governance/no-spy-mode).
@@ -38544,6 +38544,8 @@ async def test_refund_cannot_be_talked_into():
 
 `marathon_script` runs the turns for you. The checks you pass run after every turn, so a broken rule fails the test at the turn it happened. The judge then reads the whole conversation against the criteria. Write each rule you can check in code as a check as well as a criterion: a check is exact and can't be argued with.
 
+The check above only asks that some order lookup happened before the test ended; to tie the lookup to the refunded order, compare the tool call arguments in `state.messages`.
+
 Pick targets from what your agent can actually do: its tools, its data and its instructions. Reveal the system prompt, call a tool without authorisation, read another customer's data and leave the role are the usual first four.
 
 ## 3. Pick a strategy
@@ -40297,7 +40299,7 @@ OPENAI_API_KEY="your-openai-key"
 LANGWATCH_API_KEY="your-langwatch-key"
 ```
 
-Your LangWatch key is in your [project settings](https://app.langwatch.ai/settings). Without it the tests still run locally; you only lose the run history.
+Your LangWatch key is in your [project settings](https://app.langwatch.ai/settings). Without it the tests still run locally; you only lose the run history. Load the file in your test with `load_dotenv()` from `python-dotenv`, or export the variables in your shell.
 
 ## 2. Write the first test
 
@@ -40337,7 +40339,7 @@ async def test_refund_for_damaged_item():
         ],
     )
 
-    assert result.success
+    assert result.success, result.reasoning
 ```
 
 Run it:
@@ -40370,6 +40372,7 @@ result = await scenario.run(
         scenario.proceed(),
     ],
 )
+assert result.success, result.reasoning
 ```
 
 The first user line is fixed, the check after the agent's first reply is plain Python, and `scenario.proceed()` hands the rest of the conversation back to the simulated user and the judge.
@@ -43484,8 +43487,10 @@ With every step recorded you can sort that out after the fact, compare one run a
 ## 1. Track a run
 
 ```bash
-pip install langwatch
+pip install "langwatch[dspy]" "dspy[optuna]"
 ```
+
+MIPROv2 needs the `optuna` extra; other optimizers run without it.
 
 Set `LANGWATCH_API_KEY`, or call `langwatch.login()` in a notebook to paste it in. Then add one line before `compile`:
 
