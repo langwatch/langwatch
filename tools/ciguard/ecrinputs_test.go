@@ -49,6 +49,9 @@ func TestEveryImageIsPlannedFromItsInputs(t *testing.T) {
 		"a service build that does not record its inputs": func(s string) string {
 			return strings.Replace(s, "            org.langwatch.inputs=${{ matrix.inputs }}\n", "", 1)
 		},
+		"a service build that ignores its row's context": func(s string) string {
+			return strings.Replace(s, "context: ${{ matrix.context || '.' }}", "context: .", 1)
+		},
 		"a Lambda build that does not record its inputs": func(s string) string {
 			i := strings.LastIndex(s, "            org.langwatch.inputs=${{ matrix.inputs }}\n")
 			return s[:i] + s[i+len("            org.langwatch.inputs=${{ matrix.inputs }}\n"):]

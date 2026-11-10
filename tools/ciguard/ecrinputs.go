@@ -2,6 +2,7 @@ package ciguard
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"slices"
@@ -18,6 +19,9 @@ const (
 	// selectWorkflow makes the build steps every image's input.
 	selectWorkflow = "-workflow " + ImagesWorkflow
 	inputsLabel    = ecrtag.InputsKey + "=${{ matrix.inputs }}"
+	// rowContext builds a service image from its row's context, the
+	// repository root when the row names none.
+	rowContext = "${{ matrix.context || '.' }}"
 )
 
 // buildJobs push the images the select step plans to build.
@@ -26,8 +30,8 @@ var buildJobs = []string{"build-and-push", "build-and-push-lambda"}
 var (
 	// manifestLoop is the list of images create-manifest tags, one per pass.
 	manifestLoop = regexp.MustCompile(`for IMAGE in ([^;]*); do`)
-	// tableRow is one row of the select step's build tables.
-	tableRow = regexp.MustCompile(`\{"image":\s*"([^"]+)",\s*"dockerfile":\s*"([^"]+)"`)
+	// tableRow is one row of the select step's build tables, whole.
+	tableRow = regexp.MustCompile(`\{"image":\s*"([^"]+)",\s*"dockerfile":\s*"([^"]+)"[^{}]*\}`)
 )
 
 // ECRInputs reports a publish-docker-ecr.yml that could re-tag an image whose
@@ -85,11 +89,26 @@ func selectStep(wf *ciscan.Workflow) (*ciscan.Step, []string) {
 }
 
 // labelProblems: every build records its inputs, which the next commit's
-// plan compares with; a build without them is rebuilt on every commit.
+// plan compares with; a build without them is rebuilt on every commit. A
+// service build also takes its row's context, where its inputs were read.
 func labelProblems(wf *ciscan.Workflow) []string {
 	var problems []string
 	for _, job := range buildJobs {
 		problems = append(problems, jobLabelProblems(job, wf.Jobs[job].Steps)...)
+	}
+
+	return append(problems, contextProblems(wf.Jobs[buildJobs[0]].Steps)...)
+}
+
+// contextProblems reports a service build that does not build from its row's
+// context: its image would be built from other files than its inputs.
+func contextProblems(steps []ciscan.Step) []string {
+	var problems []string
+	for i := range steps {
+		step := &steps[i]
+		if c, _ := step.StringWith("context"); pushesImage(step) && c != rowContext {
+			problems = append(problems, fmt.Sprintf("%s job %s: step %q must build from context %s", ImagesWorkflow, buildJobs[0], step.Name, rowContext))
+		}
 	}
 
 	return problems
@@ -139,7 +158,12 @@ func inputsProblems(repoRoot string, rows [][]string) []string {
 	in := ecrtag.Inputs{Tree: tree, Read: ecrtag.ReadFile(repoRoot), GoDeps: ecrtag.GoList(ecrtag.Run, repoRoot)}
 	var problems []string
 	for _, row := range rows {
-		if _, err := in.Files(ctx, row[2]); err != nil {
+		var img ecrtag.ImageSpec
+		err := json.Unmarshal([]byte(row[0]), &img)
+		if err == nil {
+			_, err = in.FilesIn(ctx, img.Context, img.Dockerfile)
+		}
+		if err != nil {
 			problems = append(problems, fmt.Sprintf("%s: the inputs of %s cannot be read, so it would be rebuilt on every commit: %v", ImagesWorkflow, row[1], err))
 		}
 	}

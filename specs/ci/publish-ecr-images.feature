@@ -76,7 +76,15 @@ Feature: Publish every deployable image to the artifacts registry
   Scenario: A .dockerignore change rebuilds every image
     Given a merge to main changes .dockerignore
     When publish-docker-ecr selects the images to build
-    Then every image is rebuilt, because every build reads the repository root as its context
+    Then every image built from the repository root is rebuilt, because each reads that root as its context
+
+  @unit
+  Scenario: An image built from its own directory reads its inputs there
+    Given the build table gives langwatch-clickhouse-serverless the context infra/clickhouse-serverless
+    When publish-docker-ecr selects the images to build and builds that image
+    Then its Dockerfile's sources and its .dockerignore are read from that directory, and a change to the root .dockerignore does not rebuild it
+    And a source outside that directory makes its inputs unreadable
+    And every image whose row names no context hashes its inputs as it did before rows could name one
 
   @unit
   Scenario: A change to how the workflow builds rebuilds every image
