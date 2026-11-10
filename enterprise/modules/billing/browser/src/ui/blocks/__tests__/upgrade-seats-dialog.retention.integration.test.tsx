@@ -25,7 +25,6 @@ function renderDialog({
       onClose={vi.fn()}
       minimumSeats={2}
       price={{ seatCents: 2900, currency: Currency.EUR, periodSuffix: "/mo" }}
-      currency={Currency.EUR}
       retentionEstimate={retentionEstimate}
       onContinue={onContinue}
       isLoading={false}

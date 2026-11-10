@@ -117,7 +117,7 @@ export class RetentionStorageBillingService {
       prices: this.options.prices,
     });
     if (!priceId) {
-      logger.error(
+      logger.warn(
         { subscriptionId: subscription.id, currency, interval },
         "Retention storage price is not provisioned in this Stripe mode; storage above 90 days is not billed",
       );
@@ -141,7 +141,7 @@ export class RetentionStorageBillingService {
     if (report.bytesAboveIncluded === undefined) return null;
     const customerId = stripeSubscription.customerId;
     if (!this.options.isMeterProvisioned || !customerId) {
-      logger.error(
+      logger.warn(
         { organizationId: report.organizationId, hasCustomer: Boolean(customerId) },
         "Retention storage meter is not provisioned in this Stripe mode; nothing reported",
       );

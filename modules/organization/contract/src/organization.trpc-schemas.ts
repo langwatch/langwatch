@@ -1,3 +1,4 @@
+import { growthRetentionDaysSchema } from "@langwatch/data-retention-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -210,7 +211,7 @@ const organizationApiSeatCheckoutInputSchemaDefinition = z.object({
   billingInterval: z.enum(["monthly", "annual"]).optional(),
   totalSeats: z.number().min(1),
   /** The retention picked in the upgrade dialog; billing keeps it for the paid activation. */
-  retentionDays: z.number().int().positive().optional(),
+  retentionDays: growthRetentionDaysSchema.optional(),
   invites: z.array(
     z.object({
       email: z.string().email(),

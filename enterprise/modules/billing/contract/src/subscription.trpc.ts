@@ -2,6 +2,7 @@
  * Every `subscription.*` procedure, declared once. The names are the browser's
  * cache keys, so they are the wire names the billing page has always called.
  */
+import { growthRetentionDaysSchema } from "@langwatch/data-retention-contract";
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
@@ -67,7 +68,7 @@ export const subscriptionTrpc = defineTrpcContract("subscription")
       currency: currencySchema.optional(),
       billingInterval: subscriptionBillingIntervalSchema.optional(),
       /** The retention picked in the upgrade dialog; set on the organization once it is paid. */
-      retentionDays: z.number().int().positive().optional(),
+      retentionDays: growthRetentionDaysSchema.optional(),
     }),
   )
   .withOutput(billingRedirectSchema)

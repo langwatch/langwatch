@@ -94,7 +94,6 @@ export function UpgradeSeatsDialog({
   onClose,
   minimumSeats,
   price,
-  currency,
   retentionEstimate,
   onContinue,
   isLoading,
@@ -104,7 +103,6 @@ export function UpgradeSeatsDialog({
   /** The people already in the organization: the start and the floor. */
   minimumSeats: number;
   price: SeatPrice;
-  currency: Currency;
   /** The organization's storage read, for the price of a retention above 90 days. */
   retentionEstimate: RetentionEstimateState;
   /** Starts the checkout; the dialog stays open if it could not. */
@@ -186,7 +184,7 @@ export function UpgradeSeatsDialog({
         </VStack>
         <RetentionStorageNote
           retentionDays={retentionDays}
-          currency={currency}
+          currency={price.currency}
           estimate={retentionEstimate}
         />
         <HStack

@@ -572,7 +572,6 @@ export function SubscriptionPage() {
         onClose={() => setIsUpgradeDialogOpen(false)}
         minimumSeats={upgradeBillingSeats}
         price={seatPrice}
-        currency={effectiveCurrency}
         retentionEstimate={retentionEstimate}
         onContinue={({ seats, retentionDays }) => void handleUpgrade({ seats, retentionDays })}
         isLoading={isUpgradeLoading}

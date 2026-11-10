@@ -67,6 +67,12 @@ Feature: Data retention choice in the Growth upgrade dialog
     Then the estimate is the sum of both projects
 
   @unit
+  Scenario: A retention value outside the Growth options is refused at checkout
+    When a Growth checkout is asked for with a retention of 100 days
+    Then the checkout input is refused before any payment starts
+    And a retention of 182 days is accepted
+
+  @unit
   Scenario: The pending subscription keeps the picked retention
     When a Growth seat checkout is opened with a retention of 182 days
     Then the pending subscription records 182 days

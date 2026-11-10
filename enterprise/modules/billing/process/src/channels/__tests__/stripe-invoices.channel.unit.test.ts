@@ -92,6 +92,116 @@ describe.each(tiers)("Stripe invoices over $tier", ({ compose }) => {
   });
 });
 
+type HeldCard = { brand: string; last4: string } | null;
+
+/** One invoice the provider holds, its payment intent carrying the given methods. */
+function retrievedOverTheProvider({
+  attached,
+  failed,
+}: {
+  attached?: HeldCard | "unexpanded";
+  failed?: HeldCard;
+}): StripeInvoicesChannel {
+  const methodOf = (card: HeldCard | undefined) =>
+    card === undefined ? null : { id: "pm_1", object: "payment_method", card };
+  const stripe = stripeDouble({
+    invoices: {
+      retrieve: async (id: string) => ({
+        id,
+        object: "invoice",
+        customer: "cus_1",
+        created: 1_700_000_000,
+        amount_due: 5000,
+        currency: "eur",
+        status: "open",
+        payment_intent: {
+          id: "pi_1",
+          object: "payment_intent",
+          payment_method: attached === "unexpanded" ? "pm_1" : methodOf(attached),
+          last_payment_error:
+            failed === undefined ? null : { type: "card_error", payment_method: methodOf(failed) },
+        },
+      }),
+    },
+  });
+  return HttpStripeInvoicesChannel.create({ stripe });
+}
+
+/** The same invoice in the twin, seeded with the card the provider would answer. */
+function retrievedOverTheTwin({
+  attached,
+  failed,
+}: {
+  attached?: HeldCard | "unexpanded";
+  failed?: HeldCard;
+}): StripeInvoicesChannel {
+  const invoices = MemoryStripeInvoicesChannel.create();
+  const picked = attached && attached !== "unexpanded" ? attached : (failed ?? null);
+  const names: Record<string, string> = { visa: "Visa", amex: "American Express" };
+  invoices.seed({
+    invoice: heldInvoice(invoice({ id: "in_1", customer: "cus_1", created: 1 })),
+    card: picked ? { brand: names[picked.brand] ?? "card", last4: picked.last4 } : null,
+  });
+  return invoices;
+}
+
+const retrievalTiers = [
+  { tier: "the provider", compose: retrievedOverTheProvider },
+  { tier: "the memory twin", compose: retrievedOverTheTwin },
+];
+
+describe.each(retrievalTiers)("One Stripe invoice's card over $tier", ({ compose }) => {
+  it("answers the card attached to the invoice's payment, by its brand's display name", async () => {
+    const detail = await compose({
+      attached: { brand: "visa", last4: "4242" },
+      failed: { brand: "amex", last4: "0005" },
+    }).getInvoice({ invoiceId: "in_1" });
+
+    expect(detail.card).toEqual({ brand: "Visa", last4: "4242" });
+  });
+
+  it("falls back to the card the last payment error names when none is attached", async () => {
+    const detail = await compose({
+      attached: "unexpanded",
+      failed: { brand: "amex", last4: "0005" },
+    }).getInvoice({ invoiceId: "in_1" });
+
+    expect(detail.card).toEqual({ brand: "American Express", last4: "0005" });
+  });
+
+  it("names a brand outside the table plainly as a card", async () => {
+    const detail = await compose({ attached: { brand: "link", last4: "1111" } }).getInvoice({
+      invoiceId: "in_1",
+    });
+
+    expect(detail.card).toEqual({ brand: "card", last4: "1111" });
+  });
+
+  it("answers no card when the payment names none", async () => {
+    const detail = await compose({}).getInvoice({ invoiceId: "in_1" });
+
+    expect(detail.card).toBeNull();
+  });
+});
+
+describe("Card brands over the provider", () => {
+  it.each([
+    ["amex", "American Express"],
+    ["diners", "Diners Club"],
+    ["discover", "Discover"],
+    ["jcb", "JCB"],
+    ["mastercard", "Mastercard"],
+    ["unionpay", "UnionPay"],
+    ["visa", "Visa"],
+  ])("names %s as %s", async (brand, name) => {
+    const detail = await retrievedOverTheProvider({
+      attached: { brand, last4: "4242" },
+    }).getInvoice({ invoiceId: "in_1" });
+
+    expect(detail.card).toEqual({ brand: name, last4: "4242" });
+  });
+});
+
 describe("Billing's invoice shape over the provider", () => {
   it("answers an invoice's number, amount due, status and links, and an expanded customer by its id", async () => {
     const stripe = stripeDouble({
