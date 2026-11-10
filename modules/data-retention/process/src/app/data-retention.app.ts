@@ -224,6 +224,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
       }),
       storedPastRetention: StoredPastRetentionService.create({
         retention,
+        retroactive: repositories.retroactive,
         directory: repositories.directory,
         permissions,
       }),

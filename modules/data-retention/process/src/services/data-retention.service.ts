@@ -4,7 +4,6 @@ import {
   platformDefaultRetentionDaysSchema,
   resolveRetention,
   resolveScopeChain,
-  retentionCategories,
   retentionDaysInputSchema,
   retroactiveRetentionUpdateInputSchema,
   type IdIndexRetentionRaiseInput,
@@ -205,40 +204,6 @@ export class DataRetentionService {
     };
   }
 
-  /**
-   * Stored items past each category's resolved period, summed over `projectIds`; a category's
-   * `retentionDays` is null when the projects resolve to different periods.
-   */
-  async countPastRetention({
-    projectIds,
-    nowMs,
-  }: {
-    projectIds: readonly string[];
-    nowMs: number;
-  }): Promise<{ category: RetentionCategory; rows: number; retentionDays: number | null }[]> {
-    const resolved = await this.resolveForProjects({ projectIds });
-    return Promise.all(
-      retentionCategories.map(async (category) => {
-        const days = [...resolved.values()].map((retention) => retention[category]);
-        const counts = await Promise.all(
-          [...resolved].map(([projectId, retention]) =>
-            this.options.retroactive.countPastRetention({
-              projectId,
-              category,
-              retentionDays: retention[category],
-              nowMs,
-            }),
-          ),
-        );
-        return {
-          category,
-          rows: counts.reduce((sum, count) => sum + count, 0),
-          retentionDays: new Set(days).size === 1 ? (days[0] ?? null) : null,
-        };
-      }),
-    );
-  }
-
   async removeForScope(input: {
     organizationId: string;
     scope: ScopeAssignment;
@@ -389,7 +354,7 @@ export class DataRetentionService {
       indexes: held,
     });
     // The marker rows sit under the empty tenant, which is no project.
-    const retentionByTenant = await this.resolveForProjects({
+    const retentionByTenant = await this.getResolvedForProjects({
       projectIds: tenantIds.filter((tenantId) => tenantId !== ""),
     });
     const tables = await this.options.retroactive.raiseIdIndexRetention({
@@ -413,7 +378,7 @@ export class DataRetentionService {
    * then their organisations' rules. A project with no row is left out, as `getResolvedForProject`
    * refuses it.
    */
-  private async resolveForProjects({
+  async getResolvedForProjects({
     projectIds,
   }: {
     projectIds: readonly string[];
