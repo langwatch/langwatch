@@ -20,6 +20,11 @@ const mutations = vi.hoisted(() => ({
   estimate: { mutate: vi.fn<(input: unknown, options: MutateOptions) => void>(), isPending: false },
   start: { mutate: vi.fn<(input: unknown, options: MutateOptions) => void>(), isPending: false },
   enable: { mutate: vi.fn<(input: unknown, options: MutateOptions) => void>(), isPending: false },
+  assign: {
+    mutate: vi.fn<(input: unknown, options: MutateOptions) => void>(),
+    isPending: false,
+    variables: undefined,
+  },
   setAccess: vi.fn(),
   invalidateAccess: vi.fn(async () => undefined),
 }));
@@ -30,6 +35,7 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
       start: { useMutation: () => mutations.start },
       enable: { useMutation: () => mutations.enable },
     },
+    modelProvider: { setRoleAssignmentForScope: { useMutation: () => mutations.assign } },
     useUtils: () => ({
       instantEval: {
         access: { setData: mutations.setAccess, invalidate: mutations.invalidateAccess },
@@ -73,6 +79,7 @@ beforeEach(() => {
   mutations.estimate.mutate.mockClear();
   mutations.start.mutate.mockClear();
   mutations.enable.mutate.mockClear();
+  mutations.assign.mutate.mockClear();
   mutations.setAccess.mockClear();
   mutations.invalidateAccess.mockClear();
   toast.mockClear();
@@ -278,6 +285,44 @@ describe("given Instant Evals are off and the reader may not switch them on", ()
       act(() => result.current.enableInstantEvals());
     }
     expect(mutations.enable.mutate).not.toHaveBeenCalled();
+  });
+});
+
+describe("given Instant Evals are off and the organization may run its own decision model", () => {
+  let result: { readonly current: ReturnType<typeof useInstantEvalRoute> };
+
+  beforeEach(() => {
+    ({ result } = renderHook(() =>
+      useInstantEvalRoute({ isInstantEvalAvailable: false, optInOffer: "contact_us" }),
+    ));
+    act(() => result.current.onInstantEvalRoute(payload));
+    act(() => result.current.pickDecisionModel("azure/decisions:microsoft-decision-1"));
+  });
+
+  /** @scenario "The eval popover picks the project's own decision model in place" */
+  it("pins the picked model on the project, closes the popover and estimates the held submit", () => {
+    const assign = lastCall(mutations.assign);
+    expect(assign.input).toEqual({
+      scopeType: "PROJECT",
+      scopeId: "project-1",
+      role: "INSTANT_EVALS",
+      model: "azure/decisions:microsoft-decision-1",
+    });
+    expect(mutations.enable.mutate).not.toHaveBeenCalled();
+
+    act(() => assign.options.onSuccess?.({ ok: true }));
+
+    expect(mutations.invalidateAccess).toHaveBeenCalledTimes(1);
+    expect(result.current.refusal).toBeNull();
+    expect(lastCall(mutations.estimate).input).toMatchObject({ projectId: "project-1" });
+  });
+
+  it("warns and keeps the popover when the server refuses the pick", () => {
+    act(() => lastCall(mutations.assign).options.onError?.(new Error("forbidden")));
+
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ type: "warning" }));
+    expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+    expect(result.current.refusal).toEqual({ kind: "unreleased" });
   });
 });
 

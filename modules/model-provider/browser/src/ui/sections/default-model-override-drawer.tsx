@@ -35,6 +35,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { useHostedDecisionModelOffered } from "../../behavior/use-hosted-decision-model.ts";
 import {
   DECISION_MODEL_DISPLAY_NAMES,
   decisionModelPickerOptions,
@@ -458,10 +459,12 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     // Asked of the organization only, as the server asks it (ADR-182 decision 4).
     { projectId: NOT_TARGETED, organizationId, enabled: !!projectId && open },
   );
+  const isHostedOffered = useHostedDecisionModelOffered({ projectId, enabled: open });
   const decisionOptions = decisionModelPickerOptions({
     pickable: pickableDecisionModels.data,
     isJudgeRouted,
     isOwnModelEnabled,
+    isHostedOffered,
   });
   const modelOptionsByRole = modelOptionsByRoleFor({
     decisionOptions,
@@ -564,7 +567,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
               role={role}
               config={config}
               features={featuresByRole[role]}
-              roleInherit={roleInheritOption({ role, inherited, config })}
+              roleInherit={roleInheritOption({ role, inherited, config, isHostedOffered })}
               inheritedForFeature={inherited}
               expanded={expanded[role]}
               onToggleExpand={() => setExpanded((prev) => ({ ...prev, [role]: !prev[role] }))}
@@ -834,14 +837,19 @@ export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | un
 }
 
 /**
- * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With no cascade
- * hit it reads "Not configured" with no model attached, so an edit can clear a pinned key
- * back to inherit; the Instant Evals column instead falls back to LangWatch Evals Preview.
+ * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With no cascade hit it
+ * reads "Not configured" with no model attached, so an edit can clear a pinned key back to
+ * inherit; Instant Evals falls back to Evals Preview, or "Not set" where it is not offered.
  */
-export function buildInheritOption(entry: InheritedEntry, role?: ModelRole): InheritOptionShape {
+export function buildInheritOption(
+  entry: InheritedEntry,
+  role?: ModelRole,
+  { isHostedOffered = true }: { isHostedOffered?: boolean } = {},
+): InheritOptionShape {
   const hit = inheritHitOption(entry);
   if (hit) return hit;
   if (role === "INSTANT_EVALS") {
+    if (!isHostedOffered) return { label: "Not set" };
     return { model: LANGWATCH_DECISION_MODEL_ID, label: "Default", isUnsetDefault: true };
   }
   return { label: "Not configured" };
@@ -855,15 +863,18 @@ export function roleInheritOption({
   role,
   inherited,
   config,
+  isHostedOffered = true,
 }: {
   role: ModelRole;
   inherited: Record<string, InheritedEntry>;
   config: Record<string, string>;
+  /** Whether Evals Preview may be offered; not, the unset Instant Evals column reads "Not set". */
+  isHostedOffered?: boolean;
 }): InheritOptionShape {
   const own = inheritHitOption(inherited[role] ?? null);
   if (own) return own;
   const fallback = UNSET_ROLE_FALLBACK[role];
-  if (!fallback) return buildInheritOption(inherited[role] ?? null, role);
+  if (!fallback) return buildInheritOption(inherited[role] ?? null, role, { isHostedOffered });
   const fallbackLabel = MODEL_ROLE_LABEL[fallback];
   const picked = config[fallback];
   if (picked) return { model: picked, label: `Inherit (${fallbackLabel} in this config)` };
