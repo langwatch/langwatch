@@ -81,7 +81,9 @@ within an experiment, and a run without one is keyed by its runId anyway (D3).
 `config.runConcurrency` (`EVAL_V3_CONCURRENCY`, 10 when unset). With it, `ExperimentRunConcurrencyService`
 splits the budget between the runs active in the project, this one included, and the same for the
 optional `EVAL_V3_GLOBAL_CELL_BUDGET` across projects: `clamp(min(floor(project / (projectActive + 1)),
-floor(global / (globalActive + 1))), 1, 24)`. Active runs live in `ExperimentRunActivityRepository`
+floor(global / (globalActive + 1))), 1, 24)`. The budget is soft: runs keep the value they started
+with, so the cells in flight can exceed it (three runs on 24 hold 24 + 12 + 8 = 44); the group queue's
+per-project cap limits dispatch. Active runs live in `ExperimentRunActivityRepository`
 (Redis sorted sets `eval_v3_active_runs:project:<id>` and `eval_v3_active_runs:global`, scored by
 expiry): the `experimentRunActivity` subscriber adds a planned run on `started` for a 2 h window and
 removes it on `completed`; expired members are pruned on read. A failed read falls back to

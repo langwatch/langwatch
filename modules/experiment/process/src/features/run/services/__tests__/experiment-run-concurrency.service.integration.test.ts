@@ -46,6 +46,23 @@ function behavesOver(
     });
   });
 
+  describe("when three runs start one after another and stay active", () => {
+    /** @scenario "Runs keep their start value, so the cells in flight can exceed the soft budget" */
+    it("gives 24, 12 and 8, so 44 cells are in flight over a budget of 24", async () => {
+      const { activity, projectId } = store();
+      const service = serviceOver({ activity, projectCellBudget: 24 });
+      const started: number[] = [];
+      for (const runId of ["run-1", "run-2", "run-3"]) {
+        started.push(await service.resolve({ projectId }));
+        await service.recordStarted({ projectId, runId, startedAt: NOW });
+      }
+
+      expect(started).toEqual([24, 12, 8]);
+      // The budget is soft: runs keep their start value, the group queue caps dispatch.
+      expect(started.reduce((sum, value) => sum + value, 0)).toBe(44);
+    });
+  });
+
   describe("when no project budget is set", () => {
     /** @scenario "Dynamic mode off keeps the fixed default" */
     it("answers EVAL_V3_CONCURRENCY whatever is active", async () => {

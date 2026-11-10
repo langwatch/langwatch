@@ -21,7 +21,7 @@ export const experimentConfig = Config.define((c) => ({
   allowedProxyHosts,
   /** Cells of one run in flight at once when the request names no limit (main's knob). */
   runConcurrency: c.env("EVAL_V3_CONCURRENCY", z.coerce.number().int().positive().default(10)),
-  /** Cells one project's runs share when no run names a limit; set, the default is dynamic. */
+  /** Soft cell budget a project's runs split at start (runs keep it; total can exceed it). */
   projectCellBudget: c.env("EVAL_V3_PROJECT_CELL_BUDGET", optionalPositiveInt),
   /** Cells every project's runs share; caps the dynamic default when set. */
   globalCellBudget: c.env("EVAL_V3_GLOBAL_CELL_BUDGET", optionalPositiveInt),

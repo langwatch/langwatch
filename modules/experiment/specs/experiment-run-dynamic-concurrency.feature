@@ -6,7 +6,10 @@ Feature: An experiment run's default concurrency shares a cell budget between ac
   the project, the new run included, and capped by the same split of
   EVAL_V3_GLOBAL_CELL_BUDGET across every project when that is set. The result is
   never below 1 or above 24. It is computed once when the run starts and does not
-  change while the run is in flight. Without EVAL_V3_PROJECT_CELL_BUDGET, or when the
+  change while the run is in flight. The budget is soft: each new run gets the budget
+  divided by the active runs plus itself, runs keep the value they started with, so
+  the cells in flight can exceed the budget; the group queue's per-project cap limits
+  dispatch. Without EVAL_V3_PROJECT_CELL_BUDGET, or when the
   active runs cannot be read, the default is EVAL_V3_CONCURRENCY.
 
   @unit
@@ -33,6 +36,13 @@ Feature: An experiment run's default concurrency shares a cell budget between ac
     And a global cell budget of 30 with two other runs active across projects
     When the run's default concurrency is computed
     Then the run gets concurrency 10
+
+  @integration
+  Scenario: Runs keep their start value, so the cells in flight can exceed the soft budget
+    Given a project cell budget of 24 and no run active
+    When three runs start one after another without a concurrency, each still active
+    Then they get concurrency 24, 12 and 8
+    And 44 cells are in flight, more than the budget of 24, which is expected
 
   @integration
   Scenario: A concurrency named by the request wins over the dynamic default
