@@ -68382,6 +68382,27 @@ A missing required key leaves the pods that read it in `CreateContainerConfigErr
 To add the keys later on chart-managed ClickHouse, delete the `<release>-lwql-access-render-<hash>` Job so the next sync or upgrade runs it again. Once it is `Complete`, restart the ClickHouse StatefulSet and the app and workers Deployments, which read the passwords at startup.
 
 With external PostgreSQL, the `DATABASE_URL` user needs `CREATE ROLE`, or at least `ALTER ROLE` on a pre-created `lwql_ro`, because the app re-converges the role on every boot. Without it LangWatchQL stays unavailable and the rest of LangWatch runs normally. See the chart README for the exact role statements.
+
+With external ClickHouse, add these query masking rules to the server's `config.d`, for example as `config.d/query-masking.yaml`. Each LangWatchQL statement carries its tenant capability as `SETTINGS custom_api_key_hash = '…'`, and ClickHouse also logs it as a bare sha256 hex value. Without the rules the server log file, `system.text_log` and `system.query_log` keep it. Chart-managed ClickHouse renders the same rules for you.
+
+```yaml
+query_masking_rules:
+    rule:
+        - name: hide custom_api_key_hash in a statement
+          regexp: (?i)[\x60"]?\b(custom_api_key_hash)\b[\x60"]?(?:\s|/\*.*?\*/)*=(?:\s|/\*.*?\*/)*(?:'(?:[^'\\]|\\.|'')*'|\$\$.*?\$\$|[^\s,;)]+)
+          replace: \1 = '[HIDDEN]'
+        - name: hide custom_api_key_hash in a URL
+          regexp: (?i)\b(custom_api_key_hash)=[^&\s"]*
+          replace: \1=[HIDDEN]
+        - name: hide custom_api_key_hash in an encoded URL
+          regexp: (?i)\b(custom_api_key_hash)(?:%20|\+)*%3D[^&\s"]*
+          replace: \1%3D[HIDDEN]
+        - name: hide sha256 hex values
+          regexp: (?i)\b[0-9a-f]{64}\b
+          replace: '[HIDDEN]'
+```
+
+Only the restricted LangWatchQL identity is isolated by tenant. Any other ClickHouse user you grant the source database, the LangWatchQL database or a PostgreSQL engine table reads every tenant's rows.
 </Note>
 
 <Note>

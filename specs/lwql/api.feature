@@ -154,11 +154,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then none is present, because dictionaries are not subject to row policies
 
   @integration
-  Scenario: Key hash is auditable in the query log without exposing the raw key
+  Scenario: The query log names the tenant without the raw key or its hash
     Given the restricted identity ran a query carrying tenant-a's key-hash context
     When the server's query log is inspected for that query
-    Then the log entry carries the key hash
-    And the raw API key appears nowhere in the log entry
+    Then the log entry's comment names tenant-a's project
+    And neither the key hash nor the raw API key appears anywhere in the log entry
 
   @integration
   Scenario: Revoking a key hash from the key map takes effect within the stated revocation bound
@@ -1376,8 +1376,8 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 # AC "empty/garbage key context yields zero rows, never all rows"
 #   → Scenario: Empty key context yields zero rows, never all rows
 #   → Scenario: Garbage key context yields zero rows, never all rows
-# AC "key-hash appears in query_log without exposing the raw key"
-#   → Scenario: Key hash is auditable in the query log without exposing the raw key
+# AC "key-hash appears in query_log without exposing the raw key" (ADR-200: the project, not the hash)
+#   → Scenario: The query log names the tenant without the raw key or its hash
 # AC "key-map refresh has a bounded revocation lag"
 #   → Scenario: Revoking a key hash from the key map takes effect within the stated revocation bound
 # (supporting invariants of the same proof: baseline read, key-map hygiene, multi-statement)

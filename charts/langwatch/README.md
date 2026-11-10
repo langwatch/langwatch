@@ -286,8 +286,14 @@ autogen (the default) the chart generates them into its own chart-owned
 `<release>-lwql-passwords` Secret; with `secrets.existingSecret` set or `autogen`
 disabled they come from the app Secret you provide.
 
+**Only the restricted `langwatch_lwql` identity is isolated by tenant.** ClickHouse
+lets a user with no row policy on a table read every row of it, so any other user
+you grant the source database, the LangWatchQL database or a PostgreSQL engine
+table reads every tenant's data. Grant those to your own users only if they may
+see everything ([ADR-200](../../dev/docs/adr/200-lwql-answers-only-where-the-data-and-the-isolation-are.md)).
+
 **`sql`-mode prerequisites (bring-your-own only).** In `sql` mode your ClickHouse
-must satisfy four prerequisites before enabling `lwql.enabled`. Chart-managed
+must satisfy five prerequisites before enabling `lwql.enabled`. Chart-managed
 ClickHouse needs none of them from you: the `langwatch/clickhouse-serverless`
 image already ships the two server-level settings, and rendered delivery means
 the app never runs access DDL there.
@@ -312,6 +318,7 @@ Argo CD keeps the completed Job in sync and a changed spec gets a new Job.
 | The administrative user (the one whose credentials the app connects with) has `access_management: 1` | In `sql` mode the app needs DDL rights to create/repair `langwatch_lwql`, the settings profile and the row policies.                                                                                                | Granted unconditionally: `renderAccessManagement` writes `access_management: 1` for the `default` user into `users.d/zz-access-management.yaml`. Rendered delivery never exercises it, but `sql` mode pointed at this same chart-managed server (`LWQL_ACCESS_MODEL_MODE=sql`) does. The restricted `langwatch_lwql` identity is NOT granted it. |
 | `named_collection_control: 1` on that same administrative user                                       | In `sql` mode, required to create/drop the `lwql_postgres` named collection via `CREATE NAMED COLLECTION`.                                                                                                          | Granted unconditionally to the `default` user by the same `zz-access-management.yaml`; rendered delivery instead ships the named collection in the mounted `config.d` file and does not use the grant.                                                                                                                                           |
 | `access_control_improvements.settings_constraints_replace_previous` is `true`                        | The settings profile marks `custom_api_key_hash` `CHANGEABLE_IN_READONLY`; without this server-level setting, ClickHouse rejects that constraint on the profile.                                                    | Rendered by `renderAccessControl` into `config.d/access-control.yaml` in `infra/clickhouse-serverless/internal/render/access.go`.                                                                                                                                                                                                                |
+| `query_masking_rules` hide the `custom_api_key_hash` value and sha256 hex values                     | Each LangWatchQL statement carries its tenant capability as `SETTINGS custom_api_key_hash = '…'`. ClickHouse also logs it as a bare sha256 hex value. Without the rules the server log file, `system.text_log` and `system.query_log` keep it. The rules are in the self-hosting docs. | Rendered from `CLICKHOUSE_MASKED_SETTINGS` (default `custom_api_key_hash`) into `config.d/query-masking.yaml`.                                                                                                                                                                                                                                  |
 
 **AC9 — `sql` mode is fail-closed on clusters.** In `sql` mode the app reads
 `system.user_directories` and `system.clusters` before any access statement. If
