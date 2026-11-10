@@ -53453,6 +53453,12 @@
                       "type": "number",
                       "description": "Number of cells this run will execute"
                     },
+                    "concurrency": {
+                      "description": "Cells this run executes at once: the request's `concurrency`, else the server default",
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "runUrl": {
                       "description": "Link to the run in the LangWatch app",
                       "type": "string"
@@ -53703,6 +53709,19 @@
                               "null"
                             ]
                           },
+                          "concurrency": {
+                            "description": "Cells the run executed at once. Null for a run that recorded none.",
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "summary": {
                             "type": "object",
                             "properties": {
@@ -53916,6 +53935,12 @@
                     "total": {
                       "type": "number",
                       "description": "Cells in the run"
+                    },
+                    "concurrency": {
+                      "description": "Cells the run executes at once, as it was fixed when the run started",
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "startedAt": {
                       "description": "Unix milliseconds",
@@ -54225,6 +54250,19 @@
                         "null"
                       ]
                     },
+                    "concurrency": {
+                      "description": "Cells the run executed at once. Null for a run that recorded none.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "targets": {
                       "description": "Resolves the targetId each dataset row and evaluation carries",
                       "anyOf": [
@@ -54258,6 +54296,26 @@
                                 "type": [
                                   "string",
                                   "null"
+                                ]
+                              },
+                              "agentLabel": {
+                                "description": "The deploy label an agent target ran at, such as production",
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "agentVersion": {
+                                "description": "The agent version the label pointed at when the run started",
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ]
                               },
                               "evaluatorId": {

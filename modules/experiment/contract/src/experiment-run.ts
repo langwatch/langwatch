@@ -68,6 +68,32 @@ export interface ExperimentRunTimestampsSchema extends Named<
 export const experimentRunTimestampsSchema: ExperimentRunTimestampsSchema =
   experimentRunTimestampsSchemaDefinition;
 
+const experimentRunTargetSchemaDefinition = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    type: z.string(),
+    promptId: z.string().nullable().optional(),
+    promptVersion: z.number().nullable().optional(),
+    agentId: z.string().nullable().optional(),
+    /** The deploy label an agent target ran at, such as production; absent ran the latest. */
+    agentLabel: z.string().nullable().optional(),
+    /** The agent version the run resolved: the label's version when the run started. */
+    agentVersion: z.number().int().positive().nullable().optional(),
+    evaluatorId: z.string().nullable().optional(),
+    model: z.string().nullable().optional(),
+    metadata: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+      .nullable()
+      .optional(),
+  })
+  .strict();
+export interface ExperimentRunTargetSchema extends Named<
+  typeof experimentRunTargetSchemaDefinition
+> {}
+export const experimentRunTargetSchema: ExperimentRunTargetSchema =
+  experimentRunTargetSchemaDefinition;
+
 const experimentRunSchemaDefinition = z
   .object({
     experimentId: z.string(),
@@ -76,6 +102,9 @@ const experimentRunSchemaDefinition = z
     timestamps: experimentRunTimestampsSchema,
     progress: z.number().nullable().optional(),
     total: z.number().nullable().optional(),
+    /** Cells the run kept in flight at once; null for a run that recorded none. */
+    concurrency: z.number().int().positive().nullable().optional(),
+    targets: z.array(experimentRunTargetSchema).nullable().optional(),
     summary: experimentRunSummarySchema,
   })
   .strict();
@@ -98,28 +127,6 @@ export type ExperimentRunAggregate = z.infer<typeof experimentRunAggregateSchema
 
 export const serializedHandledErrorSchema = canonicalSerializedHandledErrorSchema;
 
-const experimentRunTargetSchemaDefinition = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    type: z.string(),
-    promptId: z.string().nullable().optional(),
-    promptVersion: z.number().nullable().optional(),
-    agentId: z.string().nullable().optional(),
-    evaluatorId: z.string().nullable().optional(),
-    model: z.string().nullable().optional(),
-    metadata: z
-      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
-      .nullable()
-      .optional(),
-  })
-  .strict();
-export interface ExperimentRunTargetSchema extends Named<
-  typeof experimentRunTargetSchemaDefinition
-> {}
-export const experimentRunTargetSchema: ExperimentRunTargetSchema =
-  experimentRunTargetSchemaDefinition;
-
 /**
  * The eventing command shape intentionally retains Zod's default unknown-key
  * stripping behaviour. Existing event commands accepted this shape before the
@@ -132,6 +139,10 @@ const experimentRunCommandTargetSchemaDefinition = z.object({
   promptId: z.string().nullable().optional(),
   promptVersion: z.number().nullable().optional(),
   agentId: z.string().nullable().optional(),
+  /** The deploy label an agent target ran at, such as production; absent ran the latest. */
+  agentLabel: z.string().nullable().optional(),
+  /** The agent version the run resolved: the label's version when the run started. */
+  agentVersion: z.number().int().positive().nullable().optional(),
   evaluatorId: z.string().nullable().optional(),
   model: z.string().nullable().optional(),
   metadata: z
@@ -321,6 +332,8 @@ const experimentRunWithItemsSchemaDefinition = z
     workflowVersionId: z.string().nullable().optional(),
     progress: z.number().nullable().optional(),
     total: z.number().nullable().optional(),
+    /** Cells the run kept in flight at once; null for a run that recorded none. */
+    concurrency: z.number().int().positive().nullable().optional(),
     targets: z.array(experimentRunTargetSchema).nullable().optional(),
     dataset: z.array(experimentRunDatasetEntrySchema),
     evaluations: z.array(experimentRunEvaluationSchema),

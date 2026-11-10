@@ -18,16 +18,24 @@ import type { PromptService } from "../services/prompt.service.ts";
 import {
   RecordPromptCreatedCommand,
   type RecordPromptCreatedCommandData,
+  RecordPromptDeletedCommand,
+  type RecordPromptDeletedCommandData,
+  RecordPromptVersionSavedCommand,
+  type RecordPromptVersionSavedCommandData,
   PROMPT_AGGREGATE_TYPE,
   PROMPT_LIFECYCLE_PIPELINE_NAME,
   promptCreatedEventSchema,
+  promptDeletedEventSchema,
+  promptVersionSavedEventSchema,
   type PromptLifecycleEvent,
 } from "./prompt-lifecycle.commands.ts";
 
 export type PromptLifecyclePipeline = StaticPipelineDefinition<
   PromptLifecycleEvent,
   Record<string, Projection>,
-  { name: "recordPromptCreated"; payload: RecordPromptCreatedCommandData }
+  | { name: "recordPromptCreated"; payload: RecordPromptCreatedCommandData }
+  | { name: "recordPromptVersionSaved"; payload: RecordPromptVersionSavedCommandData }
+  | { name: "recordPromptDeleted"; payload: RecordPromptDeletedCommandData }
 >;
 
 type PromptTagSeed = Pick<PromptService, "seedTagsForOrganization">;
@@ -52,8 +60,10 @@ export function buildPromptLifecyclePipeline({
     name: PROMPT_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: PROMPT_AGGREGATE_TYPE }),
   })
-    .withEvents([promptCreatedEventSchema])
+    .withEvents([promptCreatedEventSchema, promptVersionSavedEventSchema, promptDeletedEventSchema])
     .withCommand("recordPromptCreated", RecordPromptCreatedCommand)
+    .withCommand("recordPromptVersionSaved", RecordPromptVersionSavedCommand)
+    .withCommand("recordPromptDeleted", RecordPromptDeletedCommand)
     .withPeerSubscriber("seedOrganizationPromptTags", {
       eventType: ORGANIZATION_CREATED_EVENT_TYPE,
       data: organizationCreatedEventDataSchema,

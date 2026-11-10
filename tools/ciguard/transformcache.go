@@ -19,6 +19,7 @@ const (
 	appCIWorkflow       = ".github/workflows/langwatch-app-ci.yml"
 	packageSuitesJob    = "package-suites"
 	transformCachePath  = "node_modules/.vitest-cache"
+	transformCacheEnv   = "VITEST_FS_MODULE_CACHE_DIR"
 	transformInputsStep = "transform-inputs"
 	commitSuffix        = "${{ github.sha }}"
 )
@@ -42,6 +43,10 @@ func TransformCacheProblems(root string) ([]string, error) {
 		return []string{appCIWorkflow + ": no package-suites job"}, nil
 	}
 	problems := inputsHashProblems(job.Steps)
+	// Vitest's cache is one per user (ADR-196); the job points it at the directory it restores.
+	if want := "${{ github.workspace }}/" + transformCachePath; job.Env[transformCacheEnv] != want {
+		problems = append(problems, fmt.Sprintf("package-suites env %s is %q, want %q", transformCacheEnv, job.Env[transformCacheEnv], want))
+	}
 	caches := 0
 	for i := range job.Steps {
 		if path, _ := job.Steps[i].With["path"].(string); path == transformCachePath {

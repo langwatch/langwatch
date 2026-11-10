@@ -38,6 +38,11 @@ export interface QueryRequest {
   /** Cooperative cancellation. Policies should stop retrying when aborted. */
   signal?: AbortSignalLike | undefined;
   /**
+   * False when hitting the statement's own time cap (TIMEOUT_EXCEEDED) is its answer, so
+   * retrying would only hit the cap again. Absent keeps the timeout transient.
+   */
+  retryOnTimeout?: false | undefined;
+  /**
    * Skips the tenant predicate check (DDL, `system.*`, a cross-tenant sweep). `tenantId` still
    * routes the statement; every skip is counted and logged. A comment directly above the flag
    * gives the reason (`langwatch/skip-tenant-check-reason`).

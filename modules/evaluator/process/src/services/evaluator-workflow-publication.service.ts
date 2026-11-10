@@ -6,6 +6,7 @@ import {
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { EvaluatorCreationCapService } from "./evaluator-creation-cap.service.ts";
+import type { EvaluatorLifecycleFactsService } from "./evaluator-lifecycle-facts.service.ts";
 import type { EvaluatorVersionService } from "./evaluator-version.service.ts";
 import type { EvaluatorService } from "./evaluator.service.ts";
 
@@ -20,6 +21,7 @@ export class EvaluatorWorkflowPublicationService {
     evaluators: Pick<EvaluatorService, "findByWorkflow" | "create" | "update" | "archive">;
     creationCaps: Pick<EvaluatorCreationCapService, "assertCreationAllowed">;
     versions: Pick<EvaluatorVersionService, "assertDeletable">;
+    lifecycleFacts: Pick<EvaluatorLifecycleFactsService, "recordEvaluatorCreated">;
   }): EvaluatorWorkflowPublicationService {
     return new EvaluatorWorkflowPublicationService(deps);
   }
@@ -100,7 +102,7 @@ export class EvaluatorWorkflowPublicationService {
       return this.deps.evaluators.update({ id: existing.id, projectId, data: { name } });
     }
 
-    return this.deps.evaluators.create({
+    const created = await this.deps.evaluators.create({
       id: newEvaluatorId(),
       projectId,
       name,
@@ -108,5 +110,7 @@ export class EvaluatorWorkflowPublicationService {
       config: {},
       workflowId,
     });
+    await this.deps.lifecycleFacts.recordEvaluatorCreated({ projectId, evaluatorId: created.id });
+    return created;
   }
 }
