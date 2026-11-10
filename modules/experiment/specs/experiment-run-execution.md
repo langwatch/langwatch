@@ -77,9 +77,8 @@ within an experiment, and a run without one is keyed by its runId anyway (D3).
 
 ## 5. Concurrency: the manager is the window (D1, ruled (b))
 
-`concurrency = request.concurrency ?? default`. Without `EVAL_V3_PROJECT_CELL_BUDGET` the default is
-`config.runConcurrency` (`EVAL_V3_CONCURRENCY`, 10 when unset). With it, `ExperimentRunConcurrencyService`
-splits the budget between the runs active in the project, this one included, and the same for the
+`concurrency = request.concurrency ?? default`. `ExperimentRunConcurrencyService` splits the project
+budget (`EVAL_V3_PROJECT_CELL_BUDGET`, 24 when unset) between the runs active in the project, this one included, and the same for the
 optional `EVAL_V3_GLOBAL_CELL_BUDGET` across projects: `clamp(min(floor(project / (projectActive + 1)),
 floor(global / (globalActive + 1))), 1, 24)`. The budget is soft: runs keep the value they started
 with, so the cells in flight can exceed it (three runs on 24 hold 24 + 12 + 8 = 44); the group queue's

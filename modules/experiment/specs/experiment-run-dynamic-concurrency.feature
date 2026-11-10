@@ -1,8 +1,8 @@
 Feature: An experiment run's default concurrency shares a cell budget between active runs
 
   A run takes its concurrency from the run API request or the workbench setting.
-  When neither names one, the server picks a default. With EVAL_V3_PROJECT_CELL_BUDGET
-  set, that default is the project's cell budget split between the runs active in
+  When neither names one, the server picks a default: the project's cell budget
+  (EVAL_V3_PROJECT_CELL_BUDGET, 24 when unset) split between the runs active in
   the project, the new run included, and capped by the same split of
   EVAL_V3_GLOBAL_CELL_BUDGET across every project when that is set. The result is
   never below 1 or above 24. It is computed once when the run starts and does not
@@ -11,8 +11,7 @@ Feature: An experiment run's default concurrency shares a cell budget between ac
   claimed before them. The budget is soft: each new run gets the budget
   divided by the active runs plus itself, runs keep the value they started with, so
   the cells in flight can exceed the budget; the group queue's per-project cap limits
-  dispatch. Without EVAL_V3_PROJECT_CELL_BUDGET, or when the
-  active runs cannot be read, the default is EVAL_V3_CONCURRENCY.
+  dispatch. When the active runs cannot be read, the default is EVAL_V3_CONCURRENCY.
 
   Rollout: API, SDK and CI runs that send no concurrency get the dynamic default for
   every experiment, old or new; the API path never reads the saved workbench setting.
@@ -65,8 +64,15 @@ Feature: An experiment run's default concurrency shares a cell budget between ac
     Then the run gets concurrency 3
     And it counts as active for the next run, which gets concurrency 10
 
+  @unit
+  Scenario: A deployment that names no project budget shares a budget of 24
+    Given a deployment that sets no EVAL_V3_PROJECT_CELL_BUDGET
+    When its configuration is read
+    Then the project cell budget is 24
+    And no global budget is set
+
   @integration
-  Scenario: Dynamic mode off keeps the fixed default
+  Scenario: A concurrency service built without a project budget keeps the fixed default
     Given no project cell budget and EVAL_V3_CONCURRENCY of 7
     And two other runs active in the project
     When a run is started without a concurrency

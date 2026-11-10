@@ -118,7 +118,7 @@ function behavesOver(
   });
 
   describe("when no project budget is set", () => {
-    /** @scenario "Dynamic mode off keeps the fixed default" */
+    /** @scenario "A concurrency service built without a project budget keeps the fixed default" */
     it("answers EVAL_V3_CONCURRENCY whatever is active", async () => {
       const { activity, projectId } = store();
       for (const runId of ["run-a", "run-b"]) {
