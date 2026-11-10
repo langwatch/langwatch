@@ -1,0 +1,49 @@
+---
+title: Versions and Deploy Labels
+sidebarTitle: Versions and Deploy Labels
+description: Save agent and evaluator versions, point a deploy label such as production at one, and roll back by moving the label, with no code change.
+---
+
+Agents, evaluators and datasets keep numbered versions. A deploy label, such as `production`, points at one version of an agent or an evaluator. Experiments and online evaluations follow the label, so you choose what runs in production by moving the label, not by editing the experiment or your code.
+
+## Versions
+
+Every save of an agent or an evaluator adds a version: v1, v2, v3 and so on. Saving never changes what production runs. Open **History** on the agent or the evaluator to see every version, newest first, with the labels on each.
+
+A dataset saves a version when edits go quiet, when an experiment run starts, when you save one by hand and when you restore one. A version is an immutable snapshot of the dataset's columns and rows.
+
+## Deploy labels
+
+A deploy label names one version. `production` and `staging` are offered from the start, and you can add your own, such as `canary`. A label starts with a lowercase letter and holds only lowercase letters, digits, hyphens or underscores. It cannot be a number, since numbers pick versions, and it cannot be `latest`, which always points at the newest version.
+
+To move a label, open **History** on the agent or the evaluator, choose **Deploy**, and point the label at a version. The same works through the API: [point a deploy label at an agent version](/api-reference/agents/point-a-deploy-label-at-an-agent-version) or [remove one](/api-reference/agents/remove-a-deploy-label-from-an-agent).
+
+What follows a label:
+
+| Where                                | Setting          | Runs                                                       |
+| ------------------------------------ | ---------------- | ---------------------------------------------------------- |
+| An agent target in an experiment     | **Deploy label** | The agent version the label points at when the run starts  |
+| An online evaluation (monitor)       | **Deploy label** | The evaluator version the label points at                  |
+
+Without a label, or with `latest`, both run the newest version.
+
+## Moving production
+
+1. Pin the experiment's agent target to `production`.
+2. Save a new agent version, for example v3. Production still points at v2, so the next run still uses v2. Work in progress never reaches production.
+3. To try v3 first, point `staging` at v3 and add a second target for the same agent with the deploy label `staging`. Both columns run side by side.
+4. When v3 is good, point `production` at v3. The next run of the same, unedited experiment uses v3.
+
+Each run records the version its label resolved to. The run list shows it next to the run, for example `production · v3`, so you can tell later which version a run used, even after the label moved.
+
+## Rolling back
+
+Point the label back at the old version. If v3 misbehaves, deploy `production` to v2: the next run and the next online evaluation use v2. No code change, no redeploy, and v3 stays in history for when it is fixed.
+
+Agents and evaluators have no **Restore**. Moving the label is the rollback.
+
+## Restoring a dataset
+
+Datasets have **Restore**. Restoring a version makes the dataset's columns and rows that version's, saved as a new version. Earlier versions are never changed. Through the API, see [restore a dataset version](/api-reference/datasets/restore-a-dataset-version).
+
+To run an experiment on a fixed version without restoring, pass `dataset_version` when you [run it from CI](/evaluations/experiments/ci-cd#choosing-what-to-evaluate).
