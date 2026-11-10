@@ -398,7 +398,16 @@ function useInstantEvalSwitch({
           void utils.instantEval.access.invalidate();
           resumeHeld({ seq, seqRef, held, heldRef, setRefusal, route });
         },
-        onError: (error) => warnIfCurrent({ seq, seqRef, error }),
+        onError: (error) => {
+          // The cached offer may be stale (the hosted switch went off since the page loaded).
+          void utils.instantEval.access.invalidate();
+          warnIfCurrent({ seq, seqRef, error });
+          if (seq !== seqRef.current) return;
+          // No switch is offered any more: the popover asks for an own decision model instead.
+          if (readHandledError(error)?.code === "instant_eval_opt_in_not_offered") {
+            setRefusal({ kind: "unreleased" });
+          }
+        },
       },
     );
   }, [enable, heldRef, refusal, route, seqRef, setRefusal, utils]);

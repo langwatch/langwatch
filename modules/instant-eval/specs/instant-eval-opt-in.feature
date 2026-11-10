@@ -180,7 +180,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     @integration
     Scenario: A refused switch is a warning and the popover stays
       Given the enable popover is open
-      When the server refuses the switch
+      When the server refuses the switch for a reason other than it no longer being offered
       Then the registry's words are shown as a warning
       And no estimate is requested and the popover stays open
 
@@ -354,6 +354,21 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       When a member throws the switch anyway
       Then it is refused as not offered, and nothing is recorded
       And the refusal says LangWatch's hosted model is off for the organization and names its own decision model instead
+
+    @unit
+    Scenario: A hosted-off refusal never sends the reader to the enterprise plan
+      Given the switch was refused because LangWatch's hosted model is off for the organization
+      When the refusal is explained
+      Then the headline says LangWatch's hosted model is off for the organization
+      And the words name the Instant Evals column of Default models, never an enterprise plan
+
+    @integration
+    Scenario: A stale Enable says why the hosted model is off and stops offering Enable
+      Given the enable popover was opened before LangWatch's hosted model was switched off
+      When the member clicks Enable and the server refuses it as not offered
+      Then the registry's words are shown as a warning
+      And the access read is asked again
+      And the popover turns into the one that asks for an own decision model, keeping the eval chip
 
     @unit
     Scenario: LangWatch's hosted judge never classifies for an organization with hosted switched off
