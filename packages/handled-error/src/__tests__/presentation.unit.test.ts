@@ -1142,6 +1142,25 @@ describe("instant_eval_opt_in_not_offered", () => {
       );
     });
   });
+
+  describe("when LangWatch's hosted model is switched off for the organization", () => {
+    /** @scenario "A hosted-off refusal never sends the reader to the enterprise plan" */
+    it("says the hosted model is off and names the own decision model, never the plan", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "instant_eval_opt_in_not_offered",
+          httpStatus: 403,
+          meta: { deployment: "hosted_off" },
+        }),
+      );
+
+      expect(title).toBe("LangWatch's hosted model is off for this organization");
+      expect(description).toBe(
+        "Run Instant Evals on your own decision model: pick one in the Instant Evals column of Default models.",
+      );
+      expect(description).not.toMatch(/enterprise/i);
+    });
+  });
 });
 
 describe("agent_test_refused", () => {

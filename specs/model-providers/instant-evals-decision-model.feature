@@ -373,6 +373,14 @@ Feature: Instant Evals decision model column in Default models
     And I can pick OpenAI's "Decisions API"
     And the column reads "Not set" while nothing is picked
 
+  @integration
+  Scenario: Without Evals Preview, a config that pinned it reads Not set in the drawer
+    Given LangWatch's hosted model is neither released for my organization nor one switch away
+    And a config row pinned "Evals Preview" for the Instant Evals column before that
+    When I edit that config row
+    Then the Instant Evals column reads "Not set", as the table does
+    And it never reads "Evals Preview"
+
   @unit
   Scenario: Evals Preview is offered where it is released or one switch away
     Given what the server answers about Instant Evals for my project

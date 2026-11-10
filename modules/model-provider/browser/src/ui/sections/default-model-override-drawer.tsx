@@ -623,7 +623,14 @@ function RoleRow({
   /** This row's picker options from its LLM entries. */
   pickerFor: (llmOptions: ModelPickerOption[]) => ModelPickerOption[];
 }) {
-  const current = config[role] ?? "";
+  // A pinned Evals Preview the column no longer offers reads as unset, as the table cell does.
+  const stored = config[role] ?? "";
+  const current =
+    role === "INSTANT_EVALS" &&
+    stored === LANGWATCH_DECISION_MODEL_ID &&
+    !modelOptions.includes(stored)
+      ? ""
+      : stored;
   const pickerOptions = pickerFor(
     roleSelectModelOptions({ options: modelOptions, role }).map(pickerOptionFor),
   );
