@@ -1,5 +1,12 @@
 export { AwsClientProcessRuntime } from "./process-runtime.ts";
 export {
+  findLwaPreludeSeparator,
+  LWA_DEFAULT_STATUS,
+  LWA_PRELUDE_SEPARATOR_LENGTH,
+  readLwaPreludeStatus,
+  readLwaResponsePayload,
+} from "./lambda-web-adapter.ts";
+export {
   AwsClientConfiguration,
   OutboundProxyResolver,
   staticCredentialsOrUndefined,

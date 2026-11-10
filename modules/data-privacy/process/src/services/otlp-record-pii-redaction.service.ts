@@ -3,7 +3,7 @@
  * The span half lives in `otlp-span-pii-redaction.service.ts`, which composes this one.
  */
 
-import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
+import type { PiiLevel, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -158,6 +158,7 @@ export class OtlpRecordPiiRedactionService {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
         projectId: tenantId,
+        resolvedPiiLevel: native.level,
       });
     }
   }
@@ -174,6 +175,7 @@ export class OtlpRecordPiiRedactionService {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
       projectId?: string | undefined;
+      resolvedPiiLevel?: PiiLevel | undefined;
     },
   ): Promise<void> {
     const redaction = await this.policy.resolveRedactionOptions({
@@ -181,6 +183,7 @@ export class OtlpRecordPiiRedactionService {
       entities: lambda?.entities,
       exceptPatterns: lambda?.exceptPatterns,
       projectId: lambda?.projectId,
+      resolvedPiiLevel: lambda?.resolvedPiiLevel,
     });
     if (redaction.kind === "skip_redaction") {
       return;
@@ -250,6 +253,7 @@ export class OtlpRecordPiiRedactionService {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
         projectId: tenantId,
+        resolvedPiiLevel: native.level,
       });
     }
   }
@@ -265,6 +269,7 @@ export class OtlpRecordPiiRedactionService {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
       projectId?: string | undefined;
+      resolvedPiiLevel?: PiiLevel | undefined;
     },
   ): Promise<void> {
     const redaction = await this.policy.resolveRedactionOptions({
@@ -272,6 +277,7 @@ export class OtlpRecordPiiRedactionService {
       entities: lambda?.entities,
       exceptPatterns: lambda?.exceptPatterns,
       projectId: lambda?.projectId,
+      resolvedPiiLevel: lambda?.resolvedPiiLevel,
     });
     if (redaction.kind === "skip_redaction") {
       return;
