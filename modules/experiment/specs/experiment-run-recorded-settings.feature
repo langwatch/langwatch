@@ -77,6 +77,20 @@ Feature: An experiment run shows the agent version and the concurrency it ran wi
     Then its run list entry shows a "Concurrency 1" badge
     And a run with no recorded concurrency shows no concurrency
 
+  @integration
+  Scenario: The concurrency badge explains what it counts
+    Given a run that recorded concurrency 1 and a run that recorded concurrency 10
+    When the results page lists them and shows each in the title
+    Then the concurrency 1 badge explains "Ran one cell at a time. A cell is one row against one target."
+    And the concurrency 10 badge explains "Ran up to 10 cells at once. A cell is one row against one target."
+    And keyboard and screen reader users get the same explanation from the focused run entry or title badge
+
+  @integration
+  Scenario: A run entry with many agent labels stays short
+    Given a run with four label-pinned agent targets
+    When the results page lists that run
+    Then its entry shows the first two label badges and a "+2" badge naming the rest
+
   @unit
   Scenario: A run's state read before the concurrency column exists answers no concurrency
     Given a ClickHouse target without the experiment_runs Concurrency column

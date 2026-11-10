@@ -1,11 +1,12 @@
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Badge, HStack, Skeleton, Spacer, Text } from "@langwatch/design-system/primitives";
+import { HStack, Skeleton, Spacer, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 
 import type { ExperimentRow } from "../../../model/experiment-api-map.ts";
+import { RunConcurrencyBadge } from "../../elements/batch-results/run-concurrency-badge.tsx";
 import type { BatchEvaluationData } from "../batch-evaluation-results.types.ts";
 
 type BatchEvaluationResultsHeaderProps = {
@@ -49,9 +50,12 @@ const ExperimentTitle = ({
       </Text>
     )}
     {experiment && shownRunId && shownRunConcurrency ? (
-      <Badge size="xs" variant="outline" flexShrink={0} data-testid="shown-run-concurrency">
-        {`Concurrency ${shownRunConcurrency}`}
-      </Badge>
+      <RunConcurrencyBadge
+        concurrency={shownRunConcurrency}
+        explanationId="shown-run-concurrency-explanation"
+        focusable
+        testId="shown-run-concurrency"
+      />
     ) : null}
   </HStack>
 );

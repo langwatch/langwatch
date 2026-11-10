@@ -6,7 +6,7 @@ import "@testing-library/jest-dom/vitest";
  * @vitest-environment jsdom
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { BatchTargetColumn } from "../../batch-evaluation-results.types.ts";
@@ -115,6 +115,55 @@ describe("the run list", () => {
 
       expect(screen.queryByTestId("run-concurrency-run-1")).toBeNull();
       expect(screen.queryByText(/production/)).toBeNull();
+    });
+  });
+
+  describe("given runs at concurrency 1 and 10", () => {
+    /** @scenario "The concurrency badge explains what it counts" */
+    it("describes each run entry with what its concurrency counts", () => {
+      renderWithDesignSystem(
+        <BatchRunsSidebar
+          runs={[
+            run({ runId: "run-one", concurrency: 1 }),
+            run({
+              runId: "run-ten",
+              timestamps: { createdAt: 3_000, finishedAt: 4_000 },
+              concurrency: 10,
+            }),
+          ]}
+          onSelectRun={() => {}}
+        />,
+      );
+
+      const entry = (runId: string) =>
+        within(screen.getByTestId(`run-item-${runId}`)).getByRole("button");
+      expect(entry("run-one")).toHaveAccessibleDescription(
+        "Ran one cell at a time. A cell is one row against one target.",
+      );
+      expect(entry("run-ten")).toHaveAccessibleDescription(
+        "Ran up to 10 cells at once. A cell is one row against one target.",
+      );
+    });
+  });
+
+  describe("given a run with four label-pinned agent targets", () => {
+    /** @scenario "A run entry with many agent labels stays short" */
+    it("shows two label badges and folds the rest into +2", () => {
+      const targets = ["a", "b", "c", "d"].map((id, index) => ({
+        ...pinnedTarget(index + 1),
+        id: `target-${id}`,
+        name: `bot-${id}`,
+      }));
+      renderWithDesignSystem(<BatchRunsSidebar runs={[run({ targets })]} onSelectRun={() => {}} />);
+
+      expect(screen.getByTestId("run-agent-label-run-1-target-a")).toHaveTextContent(
+        "production · v1",
+      );
+      expect(screen.getByTestId("run-agent-label-run-1-target-b")).toBeInTheDocument();
+      expect(screen.queryByTestId("run-agent-label-run-1-target-c")).toBeNull();
+      const folded = screen.getByTestId("run-agent-labels-folded-run-1");
+      expect(folded).toHaveTextContent(/^\+2$/);
+      expect(folded).toHaveAttribute("title", "bot-c: production · v3\nbot-d: production · v4");
     });
   });
 });

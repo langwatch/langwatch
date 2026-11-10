@@ -30,6 +30,7 @@ import {
   INTERRUPTED_THRESHOLD_MS,
   isRunFinished,
 } from "../../../model/batch-evaluation-results.run-state.ts";
+import { RunConcurrencyBadge } from "../../elements/batch-results/run-concurrency-badge.tsx";
 import { RunDisplayName } from "../../elements/batch-results/run-display-name.tsx";
 import { formatTimeAgo, getColorForString } from "./presentation.tsx";
 
@@ -246,6 +247,7 @@ const RunItem = ({
       <chakra.button
         type="button"
         onClick={onClick}
+        aria-describedby={run.concurrency ? concurrencyExplanationId(run.runId) : undefined}
         display="flex"
         flexDirection="column"
         alignItems="start"
@@ -299,43 +301,52 @@ const RunItem = ({
   );
 };
 
+/** Label badges a run entry shows before folding the rest into "+N", so the narrow sidebar stays two lines. */
+const MAX_LABEL_BADGES = 2;
+
+const concurrencyExplanationId = (runId: string) => `run-concurrency-explanation-${runId}`;
+
 /** The agent version each label resolved to and the run's concurrency, as badges, when it recorded them. */
 const RunSettingsLine = ({ run }: { run: BatchRunSummary }) => {
   const labels = runAgentLabelsOf(run.targets);
   if (labels.length === 0 && !run.concurrency) return null;
+  const shown = labels.slice(0, MAX_LABEL_BADGES);
+  const folded = labels.slice(MAX_LABEL_BADGES);
 
   return (
-    <HStack gap={1} flexWrap="wrap" paddingTop={0.5}>
-      {labels.map((label) => (
+    <HStack gap={1} flexWrap="wrap" paddingTop={0.5} maxWidth="full">
+      {shown.map((label) => (
         <Badge
           key={label.targetId}
           size="xs"
           variant="subtle"
+          maxWidth="full"
           title={label.targetName}
           data-testid={`run-agent-label-${run.runId}-${label.targetId}`}
         >
-          {agentLabelText(label)}
+          <chakra.span truncate>{agentLabelText(label)}</chakra.span>
         </Badge>
       ))}
+      {folded.length > 0 ? (
+        <Badge
+          size="xs"
+          variant="subtle"
+          title={folded.map((label) => `${label.targetName}: ${agentLabelText(label)}`).join("\n")}
+          data-testid={`run-agent-labels-folded-${run.runId}`}
+        >
+          {`+${folded.length}`}
+        </Badge>
+      ) : null}
       {run.concurrency ? (
-        <RunConcurrencyBadge runId={run.runId} concurrency={run.concurrency} />
+        <RunConcurrencyBadge
+          concurrency={run.concurrency}
+          explanationId={concurrencyExplanationId(run.runId)}
+          testId={`run-concurrency-${run.runId}`}
+        />
       ) : null}
     </HStack>
   );
 };
-
-const RunConcurrencyBadge = ({ runId, concurrency }: { runId: string; concurrency: number }) => (
-  <Tooltip content={concurrencyTooltip(concurrency)} openDelay={300}>
-    <Badge size="xs" variant="outline" data-testid={`run-concurrency-${runId}`}>
-      {`Concurrency ${concurrency}`}
-    </Badge>
-  </Tooltip>
-);
-
-const concurrencyTooltip = (concurrency: number) =>
-  concurrency === 1
-    ? "Ran one cell at a time. A cell is one row against one target."
-    : `Ran up to ${concurrency} cells at once. A cell is one row against one target.`;
 
 export function BatchRunsSidebar({
   runs,
