@@ -22,9 +22,10 @@ import type {
 import type { FacetCatalog } from "#features/facet/rules/trace-facet-registry.rules";
 
 import type { TraceEvaluationRunsReadRepository } from "../../../repositories/trace-evaluation-runs.repository.ts";
-import type {
-  DiscoverParams,
-  FacetValuesParams,
+import {
+  facetCountWindowKey,
+  type DiscoverParams,
+  type FacetValuesParams,
 } from "../../../rules/trace-list-cache-key.rules.ts";
 import {
   cursorForTraceRow,
@@ -263,14 +264,12 @@ export class TraceListService {
    * warm start stay with `getDiscover`.
    */
   getFacets(params: FacetParams): Promise<FacetDescriptor[]> {
-    // A repeat of a request still counting shares its run: the page re-asks
-    // while a slow count holds its statement slots, and each repeat used to
-    // start another full scan beside it. Nothing is kept once it answers.
+    // A repeat of a request still counting shares its run, a live window's by
+    // its span since its bounds roll: each repeat used to start another full
+    // scan beside it. Nothing is kept once it answers.
     const key = JSON.stringify([
       readScopeKeyOf(params.authorization),
-      params.timeRange.from,
-      params.timeRange.to,
-      params.timeRange.live === true,
+      ...facetCountWindowKey(params.timeRange),
       params.filterKey,
     ]);
     const running = this.#facetsInFlight.get(key);
