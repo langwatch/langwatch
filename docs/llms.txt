@@ -100,6 +100,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Pairwise Comparison: judge candidates head-to-head](https://langwatch.ai/docs/evaluations/experiments/ui/pairwise-compare.md): Use the Comparison evaluator to judge two or more candidate outputs against each other, with built-in position-bias mitigation, and rank three or more candidates on a Bradley-Terry leaderboard.
 
 - [Running Experiments in CI/CD](https://langwatch.ai/docs/evaluations/experiments/ci-cd.md): Automate LLM quality gates by running experiments in your CI/CD pipelines.
+- [Versions and Deploy Labels](https://langwatch.ai/docs/evaluations/experiments/versions-and-deploy-labels.md): Save agent and evaluator versions, point a deploy label such as production at one, and roll back by moving the label, with no code change.
 - [Multimodal Evaluation: images, PDFs and vision models](https://langwatch.ai/docs/evaluations/experiments/multimodal-evaluation.md): Evaluate image generation, document parsing, and other multimodal AI pipelines with LLM-as-a-Judge vision models.
 
 ### Online Evaluation

@@ -194,6 +194,7 @@
                     ]
                   },
                   "evaluations/experiments/ci-cd",
+                  "evaluations/experiments/versions-and-deploy-labels",
                   "evaluations/experiments/multimodal-evaluation"
                 ]
               },
