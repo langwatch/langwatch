@@ -13,6 +13,7 @@ export {
   DEFAULT_SOCIAL_CARD,
   SOCIAL_CARDS,
   SOCIAL_CARD_SIZE,
+  SOCIAL_CARD_WEBP,
   allSocialCards,
   socialCardAlt,
   socialCardFor,

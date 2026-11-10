@@ -61,7 +61,7 @@ describe("when a page is shared", () => {
 
   /** @scenario "A shared link shows the card of the section it points into" */
   it("publishes each card under a hashed name that changes with its text", () => {
-    expect(socialCardPath({ card: tracing })).toMatch(/^\/social\/tracing\.[0-9a-f]{12}\.png$/);
+    expect(socialCardPath({ card: tracing })).toMatch(/^\/social\/tracing\.[0-9a-f]{12}\.webp$/);
     expect(socialCardPath({ card: { ...tracing, line: "Every LLM call." } })).not.toBe(
       socialCardPath({ card: tracing }),
     );

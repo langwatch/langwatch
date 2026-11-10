@@ -9,8 +9,11 @@ import { docsRoot } from "../../../paths.ts";
 
 export const SOCIAL_CARD_SIZE = { width: 1200, height: 630 } as const;
 
+/** How the build encodes a card; part of its file name's hash. */
+export const SOCIAL_CARD_WEBP = { quality: 90, effort: 6, smartSubsample: true } as const;
+
 export type SocialCard = {
-  /** Names the published file: `social/<id>.<hash>.png`. */
+  /** Names the published file: `social/<id>.<hash>.webp`. */
   id: string;
   /** Pages whose slug is this or starts with it and a slash use the card; the longest wins. */
   prefix: string;
@@ -153,18 +156,22 @@ background:#fffaf3 linear-gradient(135deg,#fff 0%,#fff4e5 100%);color:#1c1917;fo
 .logo svg{height:48px;width:auto}
 .eyebrow{margin-top:auto;color:#e17100;font-size:30px;font-weight:600;letter-spacing:.02em}
 h1{margin-top:18px;font-family:Sentient;font-weight:500;font-size:68px;line-height:1.08;
-letter-spacing:-.01em;max-width:1000px}
-p{margin-top:24px;font-size:30px;line-height:1.35;color:#57534e;max-width:960px}
+letter-spacing:-.01em;max-width:1000px;text-wrap:balance}
+p{margin-top:24px;font-size:30px;line-height:1.35;color:#57534e;max-width:960px;text-wrap:pretty}
 .bar{position:absolute;left:0;right:0;bottom:0;height:12px;background:linear-gradient(90deg,#e17100,#fe9a00)}
 </style></head><body><div class="logo">${logo}</div>
 <div class="eyebrow">${escapeHtml(card.eyebrow)}</div>
 <h1>${escapeHtml(card.title)}</h1><p>${escapeHtml(card.line)}</p><div class="bar"></div></body></html>`;
 }
 
-/** Where the card is published; its hash covers the template, so a change gets a new name. */
+/** Where the card is published; a change to its template or encoding gives it a new name. */
 export function socialCardPath({ card }: { card: SocialCard }) {
-  const hash = createHash("sha256").update(socialCardHtml({ card })).digest("hex").slice(0, 12);
-  return `/social/${card.id}.${hash}.png`;
+  const hash = createHash("sha256")
+    .update(socialCardHtml({ card }))
+    .update(JSON.stringify(SOCIAL_CARD_WEBP))
+    .digest("hex")
+    .slice(0, 12);
+  return `/social/${card.id}.${hash}.webp`;
 }
 
 /** Every card the build publishes: the listed ones and the default. */

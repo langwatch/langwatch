@@ -2,10 +2,12 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { chromium } from "playwright";
+import sharp from "sharp";
 
 import {
   allSocialCards,
   SOCIAL_CARD_SIZE,
+  SOCIAL_CARD_WEBP,
   socialCardHtml,
   socialCardPath,
   type SocialCard,
@@ -15,7 +17,7 @@ import { appRoot, cacheRoot } from "../paths.ts";
 const cacheDir = path.join(cacheRoot, "docs-site/social");
 const fontDir = path.join(appRoot, "src/app/fonts");
 
-/** Each card's PNG keyed by its output name, from the disk cache or one headless Chromium page. */
+/** Each card's WebP keyed by its output name, from the disk cache or one headless Chromium page. */
 export async function renderSocialCards({
   cards = allSocialCards(),
 }: { cards?: readonly SocialCard[] } = {}) {
@@ -48,11 +50,12 @@ export async function renderSocialCards({
       );
       await page.goto("http://cards.local/");
       await page.evaluate(() => document.fonts.ready);
-      const png = await page.screenshot({ type: "png" });
+      const shot = await page.screenshot({ type: "png" });
+      const image = await sharp(shot).webp(SOCIAL_CARD_WEBP).toBuffer();
       await page.unroute("http://cards.local/");
-      await writeFile(`${cached}.${process.pid}.partial`, png);
+      await writeFile(`${cached}.${process.pid}.partial`, image);
       await rename(`${cached}.${process.pid}.partial`, cached);
-      files.set(name, png);
+      files.set(name, image);
     }
   } finally {
     await browser.close();
