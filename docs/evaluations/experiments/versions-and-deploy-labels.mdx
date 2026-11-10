@@ -16,7 +16,7 @@ A dataset saves a version when edits go quiet, when an experiment run starts, wh
 
 A deploy label names one version. `production` and `staging` are offered from the start, and you can add your own, such as `canary`. A label starts with a lowercase letter and holds only lowercase letters, digits, hyphens or underscores. It cannot be a number, since numbers pick versions, and it cannot be `latest`, which always points at the newest version.
 
-To move a label, open **History** on the agent or the evaluator, choose **Deploy**, and point the label at a version. The same works through the API: [point a deploy label at an agent version](/api-reference/agents/point-a-deploy-label-at-an-agent-version) or [remove one](/api-reference/agents/remove-a-deploy-label-from-an-agent).
+To move a label, open **History** on the agent or the evaluator, choose **Deploy**, and point the label at a version. The same works through the API. For agents: [point a deploy label at a version](/api-reference/agents/point-a-deploy-label-at-an-agent-version) or [remove one](/api-reference/agents/remove-a-deploy-label-from-an-agent). For evaluators: [point a deploy label at a version](/api-reference/evaluators-config/update-labels) or [remove one](/api-reference/evaluators-config/delete-labels).
 
 What follows a label:
 
