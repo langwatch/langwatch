@@ -4,7 +4,7 @@ import { MemoryEvaluatorRepository } from "../../repositories/memory/memory.eval
 import { createEvaluatorTestApp } from "./evaluator.fixture.ts";
 
 /** The cloud Free caps (specs/licensing/cloud-free-creation-caps.feature). */
-const CLOUD_FREE = { maxScenarios: 3, maxScenarioSets: 3, maxEvaluators: 3 };
+const CLOUD_FREE = { maxScenarios: 3, maxEvaluators: 3 };
 
 async function organizationWithEvaluators(count: number): Promise<MemoryEvaluatorRepository> {
   const repository = MemoryEvaluatorRepository.create();

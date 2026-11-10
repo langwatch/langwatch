@@ -113,10 +113,6 @@ export class TestSimulationService extends SimulationService {
     };
   }
 
-  async getDistinctExternalSetIds(): Promise<Set<string>> {
-    return new Set();
-  }
-
   async countRunsForExport(): Promise<number> {
     return 0;
   }

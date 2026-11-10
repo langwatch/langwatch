@@ -21,7 +21,6 @@ const servedReads = {
   findRunDataForAllSuites: "getRunDataForAllSuites",
   findLastUpdatedAt: "getLastUpdatedAt",
   findAllRunIdsForSet: "getRunIdsForSet",
-  findDistinctExternalSetIds: "getDistinctExternalSetIds",
   countRunsForExport: "countRunsForExport",
   countUsage: "countUsage",
   countOrganizationRuns: "countOrganizationRuns",
