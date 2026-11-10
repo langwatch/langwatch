@@ -32,12 +32,15 @@ type EvaluationJudgingDeps = Readonly<{
   decisionModels: Pick<ModelProviderApi, "resolveDecisionModel">;
   /** The shared augmenter every judge's result runs through, so a leak is never hidden. */
   evaluators: Pick<EvaluatorApi, "augmentResult">;
-  /** Whether the project's organization has the judge router flag (ADR-190 decision 8). */
+  /** What the project's organization's flags say about LangWatch's hosted judge. */
   judgeRouting: EvaluationJudgeRouting;
 }>;
 
 export type EvaluationJudgeRouting = Readonly<{
+  /** The judge router flag (ADR-190 decision 8). */
   isRouted: (input: { projectId: string }) => Promise<boolean>;
+  /** Whether LangWatch switched its hosted model off for the organization, whatever its plan. */
+  isHostedOff: (input: { projectId: string }) => Promise<boolean>;
 }>;
 
 /** What an LLM-as-judge evaluator asks the router for; the table picks its slot and mode. */
@@ -110,6 +113,13 @@ export class EvaluationJudgingService {
     // A broken own key never falls back to LangWatch's classifier (ADR-182 decision 9).
     if (resolved.kind === "own_unavailable") {
       return instantEvalSkipResultOf(instantEvalUnavailableDecisionModelSkipOf(resolved));
+    }
+    // An organization LangWatch keeps on its own models never reaches the hosted judge.
+    if (
+      resolved.kind === "langwatch" &&
+      (await this.deps.judgeRouting.isHostedOff({ projectId }))
+    ) {
+      return instantEvalSkipResultOf("classifier_not_configured");
     }
     // An own decision model is never routed, so the flag is read on LangWatch's model only.
     const isRouted =
