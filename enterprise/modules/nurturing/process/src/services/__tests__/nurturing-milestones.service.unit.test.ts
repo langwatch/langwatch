@@ -336,6 +336,7 @@ describe("NurturingMilestonesService", () => {
         const service = NurturingMilestonesService.create({
           milestones: {
             recordOrganization: (input) => memory.recordOrganization(input),
+            findOrganization: (input) => memory.findOrganization(input),
             countSimulationRun: (input) => memory.countSimulationRun(input),
             countEvaluation: async (input) => {
               if (input.organizationId === "org-1") throw new Error("database unavailable");

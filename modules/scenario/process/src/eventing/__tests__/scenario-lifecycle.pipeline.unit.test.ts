@@ -19,7 +19,9 @@ import {
 } from "../../transport/__tests__/scenario-rest.harness.ts";
 import {
   RecordScenarioCreatedCommand,
+  type RecordScenarioCreatedCommandData,
   RecordSimulationSetCreatedCommand,
+  type RecordSimulationSetCreatedCommandData,
 } from "../scenario-lifecycle.commands.ts";
 
 const signal = {
@@ -114,10 +116,10 @@ describe("the scenario lifecycle pipeline", () => {
           }),
         },
       });
-      const { sender, sent } = recordingSender();
+      const { sender, sent } = recordingSender<RecordScenarioCreatedCommandData>();
       app.connectLifecycleCommands({
         recordScenarioCreated: sender,
-        recordSimulationSetCreated: recordingSender().sender,
+        recordSimulationSetCreated: recordingSender<RecordSimulationSetCreatedCommandData>().sender,
       });
 
       const first = await app.create(
@@ -143,10 +145,10 @@ describe("the scenario lifecycle pipeline", () => {
 
     it("records no variant when the organization's cannot be read, and still records the scenario", async () => {
       const { app } = await createScenarioRestTestApp();
-      const { sender, sent } = recordingSender();
+      const { sender, sent } = recordingSender<RecordScenarioCreatedCommandData>();
       app.connectLifecycleCommands({
         recordScenarioCreated: sender,
-        recordSimulationSetCreated: recordingSender().sender,
+        recordSimulationSetCreated: recordingSender<RecordSimulationSetCreatedCommandData>().sender,
       });
 
       await app.create(

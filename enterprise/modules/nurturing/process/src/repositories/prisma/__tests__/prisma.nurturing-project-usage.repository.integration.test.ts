@@ -6,7 +6,7 @@
  */
 import { randomUUID } from "node:crypto";
 
-import type { ProjectionStoreContext } from "@langwatch/eventing";
+import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -41,6 +41,12 @@ const withPrompts = (id: string, promptIds: readonly string[]): NurturingProject
 
 const context = (id: string, appliedEventIds: string[] = []): ProjectionStoreContext =>
   ({ aggregateId: id, tenantId: id, key: id, appliedEventIds }) as never;
+
+/** The executor's read of a row with its applied event ids; the Prisma store always has it. */
+function readApplied(store: FoldProjectionStore<NurturingProjectUsageState>, id: string) {
+  if (!store.getWithApplied) throw new Error("the Prisma fold store reads applied event ids");
+  return store.getWithApplied(id, context(id));
+}
 
 describe.skipIf(!databaseUrl)("given nurturing's project-usage rows", () => {
   let connection: PrismaConnection;
@@ -77,15 +83,16 @@ describe.skipIf(!databaseUrl)("given nurturing's project-usage rows", () => {
       await prompt.store(withPrompts(projectId, ["p1"]), context(projectId, ["event-1"]));
       await scenario.store(scenarioState, context(projectId, ["event-2"]));
 
-      await expect(prompt.getWithApplied(projectId)).resolves.toEqual({
+      await expect(readApplied(prompt, projectId)).resolves.toEqual({
         state: withPrompts(projectId, ["p1"]),
         appliedEventIds: ["event-1"],
       });
-      await expect(scenario.get(projectId)).resolves.toEqual({
+      await expect(scenario.get(projectId, context(projectId))).resolves.toEqual({
         kind: "folded",
         state: scenarioState,
       });
-      await expect(repository.forOwner("evaluator").get(projectId)).resolves.toEqual({
+      const evaluator = repository.forOwner("evaluator");
+      await expect(evaluator.get(projectId, context(projectId))).resolves.toEqual({
         kind: "empty",
       });
     });
@@ -95,7 +102,7 @@ describe.skipIf(!databaseUrl)("given nurturing's project-usage rows", () => {
 
       await prompt.store(withPrompts(projectId, ["p1", "p2"]), context(projectId, ["event-3"]));
 
-      await expect(prompt.get(projectId)).resolves.toEqual({
+      await expect(prompt.get(projectId, context(projectId))).resolves.toEqual({
         kind: "folded",
         state: withPrompts(projectId, ["p1", "p2"]),
       });
@@ -113,9 +120,11 @@ describe.skipIf(!databaseUrl)("given nurturing's project-usage rows", () => {
         data: { projectionVersion: "2000-01-01" },
       });
 
-      await expect(repository.forOwner("prompt").getWithApplied(staleProjectId)).resolves.toEqual(
-        { state: null, appliedEventIds: [], miss: "undecodable" },
-      );
+      await expect(readApplied(repository.forOwner("prompt"), staleProjectId)).resolves.toEqual({
+        state: null,
+        appliedEventIds: [],
+        miss: "undecodable",
+      });
       await expect(repository.findForProjects({ projectIds: [staleProjectId] })).resolves.toEqual(
         [],
       );
@@ -123,9 +132,12 @@ describe.skipIf(!databaseUrl)("given nurturing's project-usage rows", () => {
     });
 
     it("reads an absent row as absent", async () => {
-      await expect(
-        repository.forOwner("simulation").getWithApplied(`${namespace}-absent`),
-      ).resolves.toEqual({ state: null, appliedEventIds: [], miss: "absent" });
+      const simulation = repository.forOwner("simulation");
+      await expect(readApplied(simulation, `${namespace}-absent`)).resolves.toEqual({
+        state: null,
+        appliedEventIds: [],
+        miss: "absent",
+      });
     });
   });
 
