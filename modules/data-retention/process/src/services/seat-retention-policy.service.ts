@@ -29,7 +29,7 @@ export class SeatRetentionPolicyService {
    * The buyer's pick fills every category and lengthens shorter rules; never shortens one.
    * Answers each category's organization retention as it now stands, written or kept.
    */
-  async provisionMissing({
+  async applyActivationRetention({
     organizationId,
     retentionDays,
   }: {

@@ -1,4 +1,5 @@
 /** The words the apply prompt and the not-now note use for stored data past a new period. */
+import { formatDays } from "./retention-format.ts";
 
 const count = new Intl.NumberFormat("en-GB");
 
@@ -14,7 +15,8 @@ export function storedRetentionPrompt({
   rows: number | null;
   retentionDays: number | null;
 }): string {
-  const age = retentionDays === null ? "their new period" : `${retentionDays} days`;
+  // A preset is stored a week long (91 for 90 days); the prompt names the preset.
+  const age = retentionDays === null ? "their new period" : formatDays(retentionDays);
   if (rows === null) {
     return `We couldn't count the stored traces. Any older than ${age} will be deleted within a day.`;
   }

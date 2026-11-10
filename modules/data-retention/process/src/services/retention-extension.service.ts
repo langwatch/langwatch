@@ -21,7 +21,7 @@ type Senders = Readonly<{
 }>;
 
 type Options = Readonly<{
-  seatPolicies: Pick<SeatRetentionPolicyService, "provisionMissing">;
+  seatPolicies: Pick<SeatRetentionPolicyService, "applyActivationRetention">;
   projects: Pick<DataRetentionService, "findScopeProjectIds">;
 }>;
 
@@ -54,7 +54,7 @@ export class RetentionExtensionService {
     extensionId: string;
     at: number;
   }): Promise<void> {
-    const retention = await this.options.seatPolicies.provisionMissing({
+    const retention = await this.options.seatPolicies.applyActivationRetention({
       organizationId,
       ...(retentionDays === undefined ? {} : { retentionDays }),
     });

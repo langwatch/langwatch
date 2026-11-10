@@ -50,9 +50,9 @@ const {
     void input;
     return {
       categories: [
-        { category: "traces" as const, rows: 1234, retentionDays: 90 },
-        { category: "scenarios" as const, rows: 0, retentionDays: 90 },
-        { category: "experiments" as const, rows: 0, retentionDays: 90 },
+        { category: "traces" as const, rows: 1234, retentionDays: 91 },
+        { category: "scenarios" as const, rows: 0, retentionDays: 91 },
+        { category: "experiments" as const, rows: 0, retentionDays: 91 },
       ],
       projectCount: 2,
     };
@@ -459,7 +459,7 @@ describe("given the retention policies page", () => {
     /** @scenario "Not now leaves a note with an Apply button" */
     it("notes how many traces still use the old period and applies it after the prompt", async () => {
       storedPastRef.current = {
-        categories: [{ category: "traces", rows: 1234, retentionDays: 90 }],
+        categories: [{ category: "traces", rows: 1234, retentionDays: 91 }],
         projectCount: 2,
       };
       const user = userEvent.setup();

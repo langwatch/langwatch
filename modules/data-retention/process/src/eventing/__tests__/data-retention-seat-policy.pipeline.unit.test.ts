@@ -93,8 +93,8 @@ function policyRules(existing: PolicyWrite[] = []) {
 function harness(existing: PolicyWrite[] = []) {
   const { rules, written, state } = policyRules(existing);
   const seatPolicies = SeatRetentionPolicyService.create({ rules });
-  const provisionMissing = vi.fn((input: { organizationId: string }) =>
-    seatPolicies.provisionMissing(input),
+  const applyActivationRetention = vi.fn((input: { organizationId: string }) =>
+    seatPolicies.applyActivationRetention(input),
   );
   const eventing = new EventSourcing({
     eventStore: EventStoreMemory.createForTesting(),
@@ -103,7 +103,7 @@ function harness(existing: PolicyWrite[] = []) {
   const billing = eventing.register(billingStandIn());
   // The extension it records is the extension pipeline's concern, covered beside it.
   const extensions = RetentionExtensionService.create({
-    seatPolicies: { provisionMissing },
+    seatPolicies: { applyActivationRetention },
     projects: { findScopeProjectIds: async () => [] },
   });
   extensions.connect({
@@ -130,7 +130,7 @@ function harness(existing: PolicyWrite[] = []) {
       ],
       { tenantId: createTenantId(fact.tenantId) },
     );
-  return { started, written, state, provisionMissing };
+  return { started, written, state, applyActivationRetention };
 }
 
 const activation = (organizationId: string, plan: string): SubscriptionStartedEventData => ({
@@ -163,14 +163,14 @@ describe("given billing records a paid Growth Seat subscription as started", () 
 
     /** @scenario A billing event never overwrites an existing retention policy */
     it("fills only the categories that have no organization policy", async () => {
-      const { started, written, provisionMissing } = harness([
+      const { started, written, applyActivationRetention } = harness([
         { organizationId: "org-acme", category: "traces", retentionDays: 400 },
       ]);
 
       await started(activation("org-acme", "GROWTH_SEAT_EUR_MONTHLY"), "event-1");
 
-      await vi.waitFor(() => expect(provisionMissing).toHaveBeenCalledTimes(1));
-      await Promise.all(provisionMissing.mock.results.map((result) => result.value));
+      await vi.waitFor(() => expect(applyActivationRetention).toHaveBeenCalledTimes(1));
+      await Promise.all(applyActivationRetention.mock.results.map((result) => result.value));
       expect(written).toEqual(
         everyCategoryAtTheDefault("org-acme").filter((row) => row.category !== "traces"),
       );
@@ -178,13 +178,13 @@ describe("given billing records a paid Growth Seat subscription as started", () 
 
     /** @scenario A retention failure never fails the billing webhook */
     it("leaves billing's record standing when a write fails, and a redelivery fills the gap", async () => {
-      const { started, written, state, provisionMissing } = harness();
+      const { started, written, state, applyActivationRetention } = harness();
       state.failNextWrite = true;
 
       await expect(
         started(activation("org-acme", "GROWTH_SEAT_EUR_MONTHLY"), "event-1"),
       ).resolves.not.toThrow();
-      await vi.waitFor(() => expect(provisionMissing).toHaveBeenCalled());
+      await vi.waitFor(() => expect(applyActivationRetention).toHaveBeenCalled());
       await started(activation("org-acme", "GROWTH_SEAT_EUR_MONTHLY"), "event-redelivered");
 
       await vi.waitFor(() =>

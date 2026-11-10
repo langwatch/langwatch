@@ -45,7 +45,10 @@ export class StoredPastRetentionService {
     return { categories, projectCount: projectIds.length };
   }
 
-  /** A category's `retentionDays` is null when the projects resolve to different periods. */
+  /**
+   * One project at a time, its categories together, so a page load holds at most three reads.
+   * A category's `retentionDays` is null when the projects resolve to different periods.
+   */
   private async countPastRetention({
     projectIds,
     nowMs,
@@ -54,26 +57,31 @@ export class StoredPastRetentionService {
     nowMs: number;
   }): Promise<StoredPastRetention["categories"]> {
     const resolved = await this.options.retention.getResolvedForProjects({ projectIds });
-    return Promise.all(
-      retentionCategories.map(async (category) => {
-        const days = [...resolved.values()].map((retention) => retention[category]);
-        const counts = await Promise.all(
-          [...resolved].map(([projectId, retention]) =>
-            this.options.retroactive.countPastRetention({
-              projectId,
-              category,
-              retentionDays: retention[category],
-              nowMs,
-            }),
-          ),
-        );
-        return {
-          category,
-          rows: counts.reduce((sum, count) => sum + count, 0),
-          retentionDays: new Set(days).size === 1 ? (days[0] ?? null) : null,
-        };
-      }),
-    );
+    const rows = new Map(retentionCategories.map((category) => [category, 0]));
+    for (const [projectId, retention] of resolved) {
+      const counts = await Promise.all(
+        retentionCategories.map((category) =>
+          this.options.retroactive.countPastRetention({
+            projectId,
+            category,
+            retentionDays: retention[category],
+            nowMs,
+          }),
+        ),
+      );
+      retentionCategories.forEach((category, index) => {
+        rows.set(category, (rows.get(category) ?? 0) + (counts[index] ?? 0));
+      });
+    }
+    return retentionCategories.map((category) => {
+      const days = new Set([...resolved.values()].map((retention) => retention[category]));
+      const [only] = days;
+      return {
+        category,
+        rows: rows.get(category) ?? 0,
+        retentionDays: days.size === 1 && only !== undefined ? only : null,
+      };
+    });
   }
 
   /** A personal project (no organization) is only ever its own scope, which the door approved. */

@@ -50,7 +50,10 @@ describe("SeatRetentionPolicyService", () => {
       const store = organizationRules([{ category: "traces", retentionDays: 49 }]);
       const service = SeatRetentionPolicyService.create({ rules: store.rules });
 
-      await service.provisionMissing({ organizationId: ORGANIZATION_ID, retentionDays: 182 });
+      await service.applyActivationRetention({
+        organizationId: ORGANIZATION_ID,
+        retentionDays: 182,
+      });
 
       for (const category of retentionCategories) {
         expect(store.rows.get(category)).toBe(182);
@@ -67,7 +70,10 @@ describe("SeatRetentionPolicyService", () => {
       ]);
       const service = SeatRetentionPolicyService.create({ rules: store.rules });
 
-      await service.provisionMissing({ organizationId: ORGANIZATION_ID, retentionDays: 91 });
+      await service.applyActivationRetention({
+        organizationId: ORGANIZATION_ID,
+        retentionDays: 91,
+      });
 
       expect(store.rows.get("traces")).toBe(371);
       expect(store.rows.get("scenarios")).toBe(0);
@@ -81,7 +87,10 @@ describe("SeatRetentionPolicyService", () => {
       const store = organizationRules([{ category: "traces", retentionDays: 63 }]);
       const service = SeatRetentionPolicyService.create({ rules: store.rules });
 
-      await service.provisionMissing({ organizationId: ORGANIZATION_ID, retentionDays: 40 });
+      await service.applyActivationRetention({
+        organizationId: ORGANIZATION_ID,
+        retentionDays: 40,
+      });
 
       expect(store.rows.get("traces")).toBe(63);
       expect(store.rows.get("scenarios")).toBe(PLATFORM_DEFAULT_RETENTION_DAYS);
