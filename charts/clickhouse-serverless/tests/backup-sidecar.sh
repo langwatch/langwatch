@@ -26,6 +26,10 @@ test_cronjob_default() {
     || fail "both backup CronJobs need STALE_BACKUP_HOURS"
   [ "$(grep -A1 'name: BACKUP_RETENTION_DAYS' <<<"$out" | grep -c 'value: "7"')" = "2" ] \
     || fail "both backup CronJobs need BACKUP_RETENTION_DAYS, or a base outlives the bucket"
+  local slow
+  slow="$(helm template t . "${BASE[@]}" --set 'backup.full.schedule=0 5 */3 * *' --show-only templates/backup-cronjobs.yaml)"
+  [ "$(grep -A1 'name: BACKUP_FULL_SCHEDULE' <<<"$slow" | grep -c 'value: "0 5 \*/3 \* \*"')" = "2" ] \
+    || fail "both backup CronJobs need BACKUP_FULL_SCHEDULE, or the chain limit assumes 12h fulls"
   echo "PASS: CronJob mode is the default and unchanged"
 }
 

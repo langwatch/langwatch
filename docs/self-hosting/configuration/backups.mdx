@@ -136,6 +136,9 @@ clickhouse:
         enabled: true # scrape /metrics with the Prometheus operator
     monitoring:
       enabled: true
+      sidecar:
+        staleAfterHours:
+          full: 146 # two 72h gaps plus 2h; the default 26 fits 12-hourly fulls
 ```
 
 With more than one replica the sidecar reads every replica's backup log, so it needs `auth.clusterSecretEnabled: true`; the chart refuses to render without it.

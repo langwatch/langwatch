@@ -77,6 +77,9 @@ spec:
                   value: {{ .Values.backup.staleHours | quote }}
                 - name: BACKUP_RETENTION_DAYS
                   value: {{ .Values.backup.retentionDays | quote }}
+                # The chain limit follows the full cadence (ADR-199).
+                - name: BACKUP_FULL_SCHEDULE
+                  value: {{ .Values.backup.full.schedule | quote }}
 ---
 # Incremental backup
 apiVersion: batch/v1
@@ -153,6 +156,9 @@ spec:
                   value: {{ .Values.backup.staleHours | quote }}
                 - name: BACKUP_RETENTION_DAYS
                   value: {{ .Values.backup.retentionDays | quote }}
+                # The chain limit follows the full cadence (ADR-199).
+                - name: BACKUP_FULL_SCHEDULE
+                  value: {{ .Values.backup.full.schedule | quote }}
 {{- end }}
 {{- /* Dynamic-only has no password a Job could hold: restore with
        kubectl exec into the access container (ADR-199). */}}
