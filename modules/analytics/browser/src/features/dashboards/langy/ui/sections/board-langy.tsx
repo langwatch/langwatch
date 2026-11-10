@@ -1,9 +1,7 @@
-/**
- * The ask bar on a board. Where the caller passes the picker callback (a stored board, or a
- * From LangWatch board when the member may create dashboards), a click opens "Add a widget",
- * with or without Langy; otherwise it opens Langy about the board. The empty board's chips ask
- * Langy, when the member has it. Without the callback and without Langy there is no bar.
- */
+/** The ask bar on a board. With the picker callback (a stored board, or a From LangWatch board
+ * when the member may create dashboards), a click opens "Add a widget", Langy or not; else it
+ * opens Langy about the board. Empty-board chips ask Langy if the member has it. No callback,
+ * no Langy: no bar. */
 
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { langyQuestionAsked } from "@langwatch/langy-contract";
@@ -28,7 +26,10 @@ export function BoardLangy({
   period: BoardPeriod;
   /** On an empty board: the suggested questions under the bar. */
   withSuggestions?: boolean;
-  /** Passed by a stored board, and by a From LangWatch board when the member may create dashboards. */
+  /**
+   * Passed by a stored board, and by a From LangWatch board when the member may create
+   * dashboards.
+   */
   onOpenPicker?: () => void;
 }) {
   const langy = useLangyAsk();

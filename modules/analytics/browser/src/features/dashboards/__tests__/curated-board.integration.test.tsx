@@ -231,7 +231,8 @@ describe("given a member opens a From LangWatch board", () => {
         dashboardId: "board-1",
         name: widgetName,
       });
-      // The curated board is not the new board's context, so no draft is seeded; let a stray one land.
+      // The curated board is not the new board's context, so no draft is seeded;
+      // let a stray one land.
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(host.langyAsks).toEqual([]);
       const created = tracked.events.filter(
