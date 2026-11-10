@@ -144,7 +144,7 @@ Feature: Static documentation with progressive interaction
     And rules for classes or ids found only on other pages are left out
     And rules a script can add at runtime, theme classes and unscoped rules are kept
     And only the animations a kept rule or a script names are inlined
-    And the browser asks for the shared stylesheet only once the page has loaded and the first screen's images and posters are drawn
+    And the browser asks for the shared stylesheet only once the page has loaded and the first screen's images and posters are drawn, or 3 seconds have passed
     And the font faces are declared only in the page's own styles, so the late stylesheet cannot swap a font in
 
   @unit

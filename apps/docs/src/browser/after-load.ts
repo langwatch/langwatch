@@ -4,13 +4,15 @@ const FIRST_SCREEN = "video[poster],img[fetchpriority=high]";
 
 function firstScreenDecoded() {
   const shown = document.querySelectorAll<HTMLImageElement | HTMLVideoElement>(FIRST_SCREEN);
-  return Promise.all(
+  const decoded = Promise.all(
     [...shown].map((element) => {
       const image = new Image();
       image.src = element instanceof HTMLVideoElement ? element.poster : element.currentSrc;
       return image.decode().catch(() => {});
     }),
   );
+  /* A stalled picture must not hold the sheet back for good. */
+  return Promise.race([decoded, new Promise((resolve) => setTimeout(resolve, 3000))]);
 }
 
 /**

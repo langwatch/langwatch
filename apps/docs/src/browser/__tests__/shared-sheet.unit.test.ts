@@ -55,15 +55,24 @@ describe("afterLoad(loadSharedSheets)", () => {
   });
 
   describe("when the first screen shows a poster", () => {
+    let link: HTMLLinkElement | null = null;
+    const decodeWith = (decode: () => Promise<void>) =>
+      Object.defineProperty(HTMLImageElement.prototype, "decode", {
+        value: decode,
+        configurable: true,
+      });
+
+    beforeEach(() => {
+      vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
+      link = pendingSheet();
+      document.body.innerHTML = '<video poster="/media/clip-poster.webp"></video>';
+    });
     afterEach(() => {
       Reflect.deleteProperty(HTMLImageElement.prototype, "decode");
     });
 
     /** @scenario "Paint a page from its own styles without waiting for a stylesheet" */
     it("asks for the shared sheet only once that poster is decoded", async () => {
-      vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
-      const link = pendingSheet();
-      document.body.innerHTML = '<video poster="/media/clip-poster.webp"></video>';
       let decoded = () => {};
       const decode = vi.fn(
         () =>
@@ -71,18 +80,26 @@ describe("afterLoad(loadSharedSheets)", () => {
             decoded = resolve;
           }),
       );
-      Object.defineProperty(HTMLImageElement.prototype, "decode", {
-        value: decode,
-        configurable: true,
-      });
+      decodeWith(decode);
 
       afterLoad(loadSharedSheets);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(1000);
       expect(decode).toHaveBeenCalledOnce();
       expect(link?.getAttribute("href")).toBeNull();
 
       decoded();
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(100);
+      expect(link?.getAttribute("href")).toMatch(/\/assets\/docs-0123456789abcdef\.css$/);
+    });
+
+    it("asks for the shared sheet after three seconds when that poster never decodes", async () => {
+      decodeWith(() => new Promise<void>(() => {}));
+
+      afterLoad(loadSharedSheets);
+      await vi.advanceTimersByTimeAsync(2900);
+      expect(link?.getAttribute("href")).toBeNull();
+
+      await vi.advanceTimersByTimeAsync(200);
       expect(link?.getAttribute("href")).toMatch(/\/assets\/docs-0123456789abcdef\.css$/);
     });
   });
