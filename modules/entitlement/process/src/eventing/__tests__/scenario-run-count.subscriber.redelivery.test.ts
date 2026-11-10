@@ -20,22 +20,23 @@ const runStarted = EventSchema.parse({
 describe("scenarioRunCount redelivery", () => {
   it("asks for the same month count when one run start is handled twice", async () => {
     // countScenarioRuns collapses on `${organizationId}:${month}`: it recounts, never increments.
-    const pending = new Map<string, CountScenarioRunsCommandData>();
+    const calls: CountScenarioRunsCommandData[] = [];
     const subscriber = scenarioRunCountSubscriber({
       projects: {
         getProjectPlacement: async () => ({ kind: "placed" as const, organizationId: "org_1" }),
       },
       countScenarioRuns: async (data: CountScenarioRunsCommandData) => {
-        pending.set(`${data.organizationId}:${data.month}`, data);
+        calls.push(data);
       },
     });
     const context = { tenantId: "project_alpha", aggregateId: "run_1", foldState: undefined };
 
     await subscriber.handle(runStarted, context);
-    const once = [...pending.keys()];
     await subscriber.handle(runStarted, context);
 
-    expect([...pending.keys()]).toEqual(once);
-    expect(once.length).toBeGreaterThan(0);
+    expect(calls).toHaveLength(2);
+    const [first, second] = calls;
+    expect(first).toMatchObject({ organizationId: "org_1", tenantId: "org_1" });
+    expect(second).toMatchObject({ organizationId: first!.organizationId, month: first!.month });
   });
 });
