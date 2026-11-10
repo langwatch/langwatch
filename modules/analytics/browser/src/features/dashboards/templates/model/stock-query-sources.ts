@@ -4,7 +4,23 @@
  * refuses for a member with a gated column. A view with no origin is left as written (AC202f).
  */
 
-import { SOURCE_VIEWS, SOURCES_PLACEHOLDER, TRACE_VIEWS } from "../../model/sources-parameter.ts";
+import type { TraceSource } from "@langwatch/analytics-contract";
+
+import {
+  SOURCE_VIEWS,
+  SOURCES_PLACEHOLDER,
+  TRACE_VIEWS,
+  VIEWS_WITH_ORIGIN,
+} from "../../model/sources-parameter.ts";
+
+/** The trace views that leave out other sources' traces while the list holds application. */
+const COMPLEMENT_VIEWS = [
+  "traces",
+  "spans",
+] as const satisfies readonly (typeof TRACE_VIEWS)[number][];
+
+/** The source `trace_metrics` gives a trace with a null or empty Origin (`sourceOfOrigin`). */
+const UNSTAMPED_SOURCE = "application" satisfies TraceSource;
 
 /** Words that can follow a view name without being its alias. */
 const NOT_AN_ALIAS = new Set([
@@ -57,14 +73,25 @@ const TOKEN =
 
 type Insertion = { after: number; text: string };
 
-/** Bounds the trace lookup by the period, one window back plus a day, so it prunes by time. */
+/** The days a query scans back from the period start, as `subtractDays(start, N)` literals. */
+const DAYS_BEFORE_START =
+  /subtractDays\(\{dashboard_context_period_start:DateTime\},\s*(\d+)\s*\)/g;
+
+/**
+ * Bounds the trace lookup by the period, so it prunes by time, as far back as the query scans:
+ * one window back plus a day, or the most days the query subtracts from the period start when
+ * that reaches further. One day or less never does. Why: analytics ADR-003.
+ */
 function lookupBound(sql: string): string {
   if (!sql.includes(PERIOD_START) || !sql.includes(PERIOD_END)) return "";
 
-  return (
-    ` AND OccurredAt >= subtractDays(subtractSeconds(${PERIOD_START}, ` +
-    `dateDiff('second', ${PERIOD_START}, ${PERIOD_END})), 1)`
-  );
+  const oneWindowBack =
+    `subtractDays(subtractSeconds(${PERIOD_START}, ` +
+    `dateDiff('second', ${PERIOD_START}, ${PERIOD_END})), 1)`;
+  const days = Math.max(0, ...[...sql.matchAll(DAYS_BEFORE_START)].map(([, n]) => Number(n)));
+  if (days <= 1) return ` AND OccurredAt >= ${oneWindowBack}`;
+
+  return ` AND OccurredAt >= least(${oneWindowBack}, subtractDays(${PERIOD_START}, ${days}))`;
 }
 
 const isSpace = (token: string) => /^\s+$/.test(token);
@@ -124,17 +151,46 @@ function referenceAt({
   code: readonly string[];
   position: number;
   ctes: ReadonlySet<string>;
-}): { alias: string; isSource: boolean } | undefined {
+}): { alias: string; view: string } | undefined {
   const written = (code[position + 1] ?? "").replace(/^analytics\./i, "").toLowerCase();
-  const isSource = (SOURCE_VIEWS as readonly string[]).includes(written);
-  if (!isSource && !(TRACE_VIEWS as readonly string[]).includes(written)) return undefined;
+  if (!VIEWS_WITH_ORIGIN.includes(written)) return undefined;
   if (ctes.has(written)) return undefined;
 
   const word = code[position + 2 + (code[position + 2]?.toUpperCase() === "AS" ? 1 : 0)];
   const named =
     word !== undefined && /^[A-Za-z_]\w*$/.test(word) && !NOT_AN_ALIAS.has(word.toUpperCase());
 
-  return { alias: named ? word : written, isSource };
+  return { alias: named ? word : written, view: written };
+}
+
+/** The condition that keeps `view` to the sources, by its own column or by its trace's. */
+function sourcesPredicate({
+  alias,
+  view,
+  bound,
+}: {
+  alias: string;
+  view: string;
+  bound: string;
+}): string {
+  if ((SOURCE_VIEWS as readonly string[]).includes(view)) {
+    return `${alias}.Source IN ${SOURCES_PLACEHOLDER}`;
+  }
+
+  const key = `(${alias}.TenantId, ${alias}.TraceId)`;
+  const chosen = `has(${SOURCES_PLACEHOLDER}, '${UNSTAMPED_SOURCE}')`;
+  const lookup = ({ guard, operator }: { guard?: string; operator: string }) =>
+    `(SELECT TenantId, TraceId FROM trace_metrics WHERE ${guard ? `${guard} AND ` : ""}` +
+    `Source ${operator} ${SOURCES_PLACEHOLDER}${bound})`;
+
+  if (!(COMPLEMENT_VIEWS as readonly string[]).includes(view))
+    return `${key} IN ${lookup({ operator: "IN" })}`;
+
+  // The list is bound at run time, so the switch sits in each set's own WHERE: the side whose
+  // guard is false reads no row, so only one set ever fills. Why: analytics ADR-003.
+  const excluded = lookup({ guard: chosen, operator: "NOT IN" });
+  const included = lookup({ guard: `NOT ${chosen}`, operator: "IN" });
+  return `(${chosen} OR ${key} IN ${included}) AND ${key} NOT IN ${excluded}`;
 }
 
 /** `sql` with every view it names that can follow sources kept to them by its select's WHERE. */
@@ -149,11 +205,7 @@ export function readSources(sql: string): string {
   code.forEach((token, position) => {
     const view = token.toUpperCase() === "FROM" ? referenceAt({ code, position, ctes }) : undefined;
     if (!view) return;
-    const { alias, isSource } = view;
-    const predicate = isSource
-      ? `${alias}.Source IN ${SOURCES_PLACEHOLDER}`
-      : `(${alias}.TenantId, ${alias}.TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics ` +
-        `WHERE Source IN ${SOURCES_PLACEHOLDER}${bound})`;
+    const predicate = sourcesPredicate({ ...view, bound });
     const { where, end } = regionOf({ code, from: position + 2 });
     const last = at[end - 1] ?? at[position] ?? 0;
 
