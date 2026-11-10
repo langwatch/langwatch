@@ -120,7 +120,6 @@ type WebhookServiceOptions = {
 export class EEWebhookService implements WebhookService {
   private readonly subscriptionRepository: BillingWebhookSubscriptionRepository;
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
-  private readonly stripeSubscriptions: StripeSubscriptionsChannel;
   private readonly itemCalculator: ItemCalculator;
   private readonly license: BillingLicenseWebhookService;
   private readonly host: BillingWebhookHost;
@@ -148,7 +147,6 @@ export class EEWebhookService implements WebhookService {
   }: WebhookServiceOptions) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
-    this.stripeSubscriptions = stripeSubscriptions;
     this.itemCalculator = itemCalculator;
     this.license = BillingLicenseWebhookService.create({
       stripeSubscriptions,
