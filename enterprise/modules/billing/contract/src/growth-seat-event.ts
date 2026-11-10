@@ -1,3 +1,4 @@
+import { GROWTH_INCLUDED_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -134,9 +135,6 @@ export const isGrowthInstantEvalPriceProvisioned = ({
   prices: StripePriceMap;
 }): boolean => Boolean(prices.GROWTH_INSTANT_EVAL_USD);
 
-/** The retention Growth includes at no extra cost, in stored days: 90 days kept as 13 weeks. */
-export const GROWTH_INCLUDED_STORAGE_RETENTION_DAYS = 91;
-
 const RETENTION_STORAGE_PRICE_NAMES = [
   "RETENTION_STORAGE_EUR_MONTHLY",
   "RETENTION_STORAGE_EUR_ANNUAL",
@@ -162,7 +160,7 @@ export const isRetentionStoragePrice = (priceId: string, prices: StripePriceMap)
 
 /** A retention above what Growth includes bills the storage it keeps beyond 90 days. */
 export const retentionBillsStorage = (retentionDays: number | undefined): boolean =>
-  retentionDays !== undefined && retentionDays > GROWTH_INCLUDED_STORAGE_RETENTION_DAYS;
+  retentionDays !== undefined && retentionDays > GROWTH_INCLUDED_RETENTION_DAYS;
 
 /**
  * Stripe checkout line items for Growth: a seat item (quantity = coreMembers), metered events,

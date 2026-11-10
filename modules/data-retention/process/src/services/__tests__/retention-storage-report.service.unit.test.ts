@@ -2,10 +2,8 @@
  * The daily measurement of storage kept past the 90 days Growth includes, handed to billing.
  * @see specs/billing/retention-storage-billing.feature
  */
-import { GROWTH_INCLUDED_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import {
   type BillingApi,
-  GROWTH_INCLUDED_STORAGE_RETENTION_DAYS,
   type RetentionStorageOutcome,
   type RetentionStorageReport,
 } from "@langwatch/enterprise-billing-contract";
@@ -59,12 +57,6 @@ async function setup({ line }: { line?: RetentionStorageOutcome["line"] } = {}) 
   const service = RetentionStorageReportService.create({ policies, directory, meter, billing });
   return { service, meter, calls };
 }
-
-describe("the included retention", () => {
-  it("is the same number of days where it is measured and where it is billed", () => {
-    expect(GROWTH_INCLUDED_STORAGE_RETENTION_DAYS).toBe(GROWTH_INCLUDED_RETENTION_DAYS);
-  });
-});
 
 describe("longestRetentionDays()", () => {
   it("answers the longest rule, 0 when one keeps forever, 91 without rules", () => {
