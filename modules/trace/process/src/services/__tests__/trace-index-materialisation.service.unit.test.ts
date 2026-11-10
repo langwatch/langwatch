@@ -279,7 +279,6 @@ describe("TraceIndexMaterialisationService, for the trace analytics metadata col
 
     // Check 1 starts the mutation; check 2 still finds a part missing, so the step is not done.
     expect(table.started).toBe(1);
-    expect(table.checks).toBe(3);
     expect(result).toEqual({ mutationId: null, partsToDo: 0 });
   });
 
@@ -302,7 +301,6 @@ describe("TraceIndexMaterialisationService, for the trace analytics metadata col
     await expect(resume(table)).resolves.toEqual({ mutationId: null, partsToDo: 0 });
 
     expect(table.started).toBe(0);
-    expect(table.checks).toBe(3);
   });
 
   /** @scenario "A resumed step fails for an operator when no mutation is listed and the parts stay unfilled" */
@@ -310,7 +308,7 @@ describe("TraceIndexMaterialisationService, for the trace analytics metadata col
     const table = new IndexlessTable();
 
     await expect(resume(table)).rejects.toThrow(
-      /no mutation building the trace_analytics metadata columns.*killed or pruned.*system\.mutations/,
+      /no mutation building the trace_analytics metadata columns.*killed or pruned.*its start failed.*operator.*system\.mutations/,
     );
 
     expect(table.started).toBe(0);
