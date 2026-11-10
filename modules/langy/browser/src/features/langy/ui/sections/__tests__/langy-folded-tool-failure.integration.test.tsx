@@ -270,6 +270,41 @@ describe("a failed step", () => {
     });
 
     /** @scenario "A failed step folds into the record of the work" */
+    it("folds a CLI text envelope that opens with an Error line as a failed step", async () => {
+      const user = userEvent.setup();
+      const finished = {
+        type: "tool-bash",
+        toolCallId: "fail-login",
+        state: "output-available",
+        input: { command: "langwatch trace list" },
+        output: JSON.stringify({
+          kind: "text",
+          text: "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+        }),
+      } as never;
+      const { container } = renderActivity({ parts: [finished, reply], live: false });
+
+      expect(receiptHeader().textContent).toContain("1 action failed");
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(container.textContent).toContain("you're not logged in");
+    });
+
+    /** @scenario "A failed step folds into the record of the work" */
+    it("keeps a CLI text envelope that only mentions error mid-line as completed", () => {
+      const finished = {
+        type: "tool-bash",
+        toolCallId: "ok-error-word",
+        state: "output-available",
+        input: { command: "langwatch trace list" },
+        output: JSON.stringify({ kind: "text", text: "0 error: none found" }),
+      } as never;
+      renderActivity({ parts: [finished, reply], live: false });
+
+      expect(receiptHeader().textContent).toContain("1 action completed");
+    });
+
+    /** @scenario "A failed step folds into the record of the work" */
     it("opens its raw payload in developer mode", async () => {
       devMode = true;
       const user = userEvent.setup();
