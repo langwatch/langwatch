@@ -154,22 +154,20 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
     // No-op, as the Prisma twin is: the `isTrial` column does not exist yet.
   }
 
-  async migrateToSeatEvent(input: {
+  async findSupersededBySeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<{ stripeSubscriptionId: string | null }[]> {
-    const superseded = this.store.subscriptions.filter(
-      (subscription) =>
-        subscription.organizationId === input.organizationId &&
-        subscription.id !== input.excludeSubscriptionId &&
-        subscription.status !== CANCELLED &&
-        subscription.stripeSubscriptionId !== null &&
-        TIERED_PLANS.includes(subscription.plan),
-    );
-
-    for (const subscription of superseded) await this.cancel({ id: subscription.id });
-
-    return superseded.map(({ stripeSubscriptionId }) => ({ stripeSubscriptionId }));
+  }): Promise<{ id: string; stripeSubscriptionId: string | null }[]> {
+    return this.store.subscriptions
+      .filter(
+        (subscription) =>
+          subscription.organizationId === input.organizationId &&
+          subscription.id !== input.excludeSubscriptionId &&
+          subscription.status !== CANCELLED &&
+          subscription.stripeSubscriptionId !== null &&
+          TIERED_PLANS.includes(subscription.plan),
+      )
+      .map(({ id, stripeSubscriptionId }) => ({ id, stripeSubscriptionId }));
   }
 
   async updateQuantities(input: {

@@ -8,7 +8,10 @@ import type {
   SeatLineWriteRow,
   SeatRepairRow,
 } from "../repositories/seat-event-subscription.repository.ts";
-import type { BillingSubscription } from "../rules/billing-stripe-shapes.rules.ts";
+import {
+  type BillingSubscription,
+  ENDED_SUBSCRIPTION_STATUSES,
+} from "../rules/billing-stripe-shapes.rules.ts";
 import {
   SEAT_LINE_WRITE_TIMEOUT_MS,
   type SeatLineGuard,
@@ -23,8 +26,6 @@ export const SEAT_REPAIR_FLAG_AFTER_ATTEMPTS = 5;
 /** Repairs younger than this are skipped: their seat change may still be running. */
 export const SEAT_REPAIR_GRACE_MS = 5 * 60 * 1000;
 
-/** Subscriptions Stripe ended: nothing bills next cycle, so there is nothing to put back. */
-const ENDED_STATUSES = new Set(["canceled", "incomplete_expired"]);
 /** Subscriptions whose items Stripe refuses to change until the first payment lands. */
 const UNCHANGEABLE_STATUSES = new Set(["incomplete"]);
 
@@ -148,7 +149,8 @@ export class SeatLineRepairService {
     const subscription = await this.stripeSubscriptions.getSubscription({
       subscriptionId: write.stripeSubscriptionId,
     });
-    if (ENDED_STATUSES.has(subscription.status)) return settle(null).then(() => "settled");
+    if (ENDED_SUBSCRIPTION_STATUSES.has(subscription.status))
+      return settle(null).then(() => "settled");
     const seatItem = this.seatItemOf(subscription);
     const target = await this.subscriptions.findSeatLineTarget({ id: write.id });
     const changedSince = target.at !== null && Temporal.Instant.compare(target.at, write.since) > 0;
@@ -213,7 +215,7 @@ export class SeatLineRepairService {
     const subscription = await this.stripeSubscriptions.getSubscription({
       subscriptionId: repair.stripeSubscriptionId,
     });
-    if (ENDED_STATUSES.has(subscription.status)) return "settled";
+    if (ENDED_SUBSCRIPTION_STATUSES.has(subscription.status)) return "settled";
     const seatItem = this.seatItemOf(subscription);
     if (seatItem.quantity !== repair.liftedQuantity) return "settled";
     if (UNCHANGEABLE_STATUSES.has(subscription.status)) return "pending";

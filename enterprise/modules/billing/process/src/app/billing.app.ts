@@ -104,6 +104,7 @@ import {
   BillingSubscriptionService,
   type SeatsInUseCounter,
 } from "../services/subscription.service.ts";
+import { TieredPlanRetirementService } from "../services/tiered-plan-retirement.service.ts";
 import { UsageLimitOrganizationService } from "../services/usage-limit-organization.service.ts";
 import {
   StripeUsageReportingBuilder,
@@ -224,10 +225,22 @@ export class BillingModule
       organizations: setup.repositories.organizations,
       resourceLimitAlerts,
       planLimitAlerts: BillingModule.#composePlanLimitAlerts(setup, notices, stamps),
+      retireTieredPlans: (input) => {
+        if (!retirement) throw new Error("No payment provider is composed to retire plans at");
+        return retirement.retireTieredPlans(input);
+      },
       billingOrganizations: setup.repositories.reportOrganizations,
     });
     const { nodeEnvironment } = setup.config;
     const stripe = channels.stripe ? { channels: channels.stripe } : void 0;
+    // The lifecycle pipeline's process manager retires superseded tiered plans through this.
+    const retirement = stripe
+      ? TieredPlanRetirementService.create({
+          subscriptions: setup.repositories.webhookSubscriptions,
+          stripeSubscriptions: stripe.channels.subscriptions,
+          facts: lifecycle,
+        })
+      : void 0;
     return BillingModule.assemble({
       repositories: setup.repositories,
       config: setup.config,

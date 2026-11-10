@@ -43,7 +43,7 @@ type BillingSubscriptionLifecycleOptions = {
   organizationRepository: BillingWebhookOrganizationRepository;
   /** Clears a trial's licence once its subscription activates; organization owns the row. */
   licenses: LicenseClearer;
-  stripeSubscriptions: Pick<StripeSubscriptionsChannel, "getSubscription" | "cancelSubscription">;
+  stripeSubscriptions: Pick<StripeSubscriptionsChannel, "getSubscription">;
   itemCalculator: Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
     prices: StripePriceMap;
   };
@@ -51,7 +51,10 @@ type BillingSubscriptionLifecycleOptions = {
   /** Records subscription changes for peers; absent where nothing composes a lifecycle. */
   announcer?: Pick<
     BillingLifecycleAnnouncerService,
-    "subscriptionActivated" | "subscriptionCancelled" | "pricingModelChanged"
+    | "subscriptionActivated"
+    | "subscriptionCancelled"
+    | "pricingModelChanged"
+    | "supersededPlansFound"
   >;
 };
 
@@ -186,6 +189,16 @@ export class BillingSubscriptionLifecycleService {
     subscription: Stripe.Subscription;
     existing: BillingSubscriptionRecord;
   }): Promise<void> {
+    if (
+      existing.status === SubscriptionStatus.CANCELLED &&
+      !(await this.isActiveAtStripe(existing))
+    ) {
+      logger.info(
+        { subscriptionId: existing.id },
+        "[stripeWebhook] Active update for a cancelled subscription Stripe no longer reports active, skipping",
+      );
+      return;
+    }
     const shouldNotify = existing.status !== SubscriptionStatus.ACTIVE;
     const { usersQuantity, tracesQuantity } = this.quantitiesOf({ subscription, existing });
     const quantitiesResult = await this.subscriptionRepository.updateQuantities({
@@ -198,11 +211,23 @@ export class BillingSubscriptionLifecycleService {
     const updatedSubscription = quantitiesResult.subscription;
 
     await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription updated to active");
-    if (!shouldNotify) {
-      return;
-    }
+    if (shouldNotify) await this.announceSubscriptionStarted(updatedSubscription);
+    // Stripe may report the seat subscription active here before the invoice is paid, and
+    // the invoice path then sees an active subscription; the retirement cannot wait for it.
+    await this.recordSeatEventMove({ updated: updatedSubscription, activated: shouldNotify });
+  }
 
-    await this.announceSubscriptionStarted(updatedSubscription);
+  /**
+   * Stripe delivers out of order, so an active update for a row we cancelled may be stale. Only a
+   * subscription Stripe still reports active restores the row, matching how a non-active update
+   * cancels it; a failed read throws so Stripe redelivers.
+   */
+  private async isActiveAtStripe(existing: BillingSubscriptionRecord): Promise<boolean> {
+    if (!existing.stripeSubscriptionId) return false;
+    const atStripe = await this.stripeSubscriptions.getSubscription({
+      subscriptionId: existing.stripeSubscriptionId,
+    });
+    return atStripe.status === "active";
   }
 
   /**
@@ -321,15 +346,15 @@ export class BillingSubscriptionLifecycleService {
     }
     const updatedSubscription = activationResult.subscription;
 
-    if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
+    const activated = previousSubscription.status !== SubscriptionStatus.ACTIVE;
+    // Announced first, once: a redelivery after a failed record must not announce again.
+    if (activated) {
       await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");
-
-      if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
-        await this.migrateToSeatEventPlan(updatedSubscription);
-      }
-
       await this.announceSubscriptionStarted(updatedSubscription);
     }
+    // Every paid invoice re-checks: a redelivery after a failed record, or a renewal of an
+    // organization still billed for its old plan, asks again for what is still alive.
+    await this.recordSeatEventMove({ updated: updatedSubscription, activated });
   }
 
   /**
@@ -377,37 +402,35 @@ export class BillingSubscriptionLifecycleService {
     }
   }
 
-  /** Retires the plans this seat-event subscription supersedes, once the records agree. */
-  private async migrateToSeatEventPlan(updated: SubscriptionWithOrg): Promise<void> {
-    // Organization sets the pricing model from the fact; a refused fact fails before any row moves.
-    await this.announcer?.pricingModelChanged({
-      organizationId: updated.organizationId,
-      pricingModel: "SEAT_EVENT",
-    });
-    const oldSubscriptions = await this.subscriptionRepository.migrateToSeatEvent({
+  /**
+   * A Growth seat subscription moves the organization to seat pricing on activation, and on
+   * every active confirmation records the live tiered plans it supersedes; the lifecycle
+   * pipeline's process manager retires them. Throws, so Stripe redelivers a lost record.
+   */
+  private async recordSeatEventMove({
+    updated,
+    activated,
+  }: {
+    updated: SubscriptionWithOrg;
+    activated: boolean;
+  }): Promise<void> {
+    if (!isGrowthSeatEventPlan(updated.plan)) return;
+    if (activated) {
+      await this.announcer?.pricingModelChanged({
+        organizationId: updated.organizationId,
+        pricingModel: "SEAT_EVENT",
+      });
+    }
+    if (!updated.stripeSubscriptionId) return;
+    const superseded = await this.subscriptionRepository.findSupersededBySeatEvent({
       organizationId: updated.organizationId,
       excludeSubscriptionId: updated.id,
     });
-
-    // Cancel in Stripe after the records are consistent, outside the transaction.
-    for (const oldSub of oldSubscriptions) {
-      if (!oldSub.stripeSubscriptionId) {
-        continue;
-      }
-
-      try {
-        await this.stripeSubscriptions.cancelSubscription({
-          subscriptionId: oldSub.stripeSubscriptionId,
-          prorate: true,
-        });
-      } catch (err) {
-        logger.error(
-          { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
-          "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during " +
-            "upgrade. Manual intervention required.",
-        );
-      }
-    }
+    if (superseded.length === 0) return;
+    await this.announcer?.supersededPlansFound({
+      organizationId: updated.organizationId,
+      seatStripeSubscriptionId: updated.stripeSubscriptionId,
+    });
   }
 
   private async clearTrialLicenseIfPresent(

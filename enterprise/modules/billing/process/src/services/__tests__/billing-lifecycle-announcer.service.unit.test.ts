@@ -19,6 +19,7 @@ import type {
   RecordPricingModelChangedCommandData,
   RecordSeatCheckoutPaidCommandData,
   RecordSeatCheckoutsAbandonedCommandData,
+  RecordSupersededPlansFoundCommandData,
 } from "../../eventing/billing-lifecycle.events.ts";
 import type { BillingReportOrganizationLookup } from "../../repositories/billing-report-organization.repository.ts";
 import {
@@ -67,6 +68,7 @@ function announcerOver(input: {
     organizations: { findActiveMemberIds: async () => ["user-1", "user-2"] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+    retireTieredPlans: async () => {},
     billingOrganizations: {
       getOrganizationForBilling: input.lookup ?? (async () => billedLookup),
     },
@@ -96,6 +98,7 @@ function announcerOver(input: {
     recordPricingModelChanged: recorder<RecordPricingModelChangedCommandData>([]),
     recordSeatCheckoutPaid: recorder<RecordSeatCheckoutPaidCommandData>([]),
     recordSeatCheckoutsAbandoned: recorder<RecordSeatCheckoutsAbandonedCommandData>([]),
+    recordSupersededPlansFound: recorder<RecordSupersededPlansFoundCommandData>([]),
   });
   return { service, changed, started, checkouts, usageBilling, usageSends, pauses, lines };
 }
@@ -183,6 +186,7 @@ describe("BillingLifecycleAnnouncerService", () => {
       },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
       planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+      retireTieredPlans: async () => {},
       billingOrganizations: { getOrganizationForBilling: async () => billedLookup },
     });
     service.connect({
@@ -196,6 +200,7 @@ describe("BillingLifecycleAnnouncerService", () => {
       recordPricingModelChanged: recorder<RecordPricingModelChangedCommandData>([]),
       recordSeatCheckoutPaid: recorder<RecordSeatCheckoutPaidCommandData>([]),
       recordSeatCheckoutsAbandoned: recorder<RecordSeatCheckoutsAbandonedCommandData>([]),
+      recordSupersededPlansFound: recorder<RecordSupersededPlansFoundCommandData>([]),
     });
 
     await expect(service.subscriptionActivated(activation)).resolves.toBeUndefined();
@@ -209,6 +214,7 @@ describe("BillingLifecycleAnnouncerService", () => {
       organizations: { findActiveMemberIds: async () => [] },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
       planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+      retireTieredPlans: async () => {},
       billingOrganizations: { getOrganizationForBilling: async () => billedLookup },
     });
 

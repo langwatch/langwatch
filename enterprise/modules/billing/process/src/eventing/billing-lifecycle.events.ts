@@ -17,6 +17,8 @@ import {
   pricingModelChangedEventDataSchema,
   seatCheckoutPaidEventDataSchema,
   seatCheckoutsAbandonedEventDataSchema,
+  SUPERSEDED_PLANS_FOUND_EVENT_TYPE,
+  supersededPlansFoundEventDataSchema,
   checkoutCompletedEventDataSchema,
   subscriptionChangedEventDataSchema,
   subscriptionStartedEventDataSchema,
@@ -167,6 +169,20 @@ export const seatCheckoutsAbandonedEventSchema = z.object({
 });
 export type SeatCheckoutsAbandonedEvent = z.infer<typeof seatCheckoutsAbandonedEventSchema>;
 
+export const RECORD_SUPERSEDED_PLANS_FOUND_COMMAND_TYPE =
+  "lw.billing.record_superseded_plans_found" as const;
+export const recordSupersededPlansFoundCommandDataSchema = supersededPlansFoundEventDataSchema;
+export type RecordSupersededPlansFoundCommandData = z.infer<
+  typeof recordSupersededPlansFoundCommandDataSchema
+>;
+export const supersededPlansFoundEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(SUPERSEDED_PLANS_FOUND_EVENT_TYPE),
+  version: z.literal(BILLING_LIFECYCLE_EVENT_VERSION),
+  data: supersededPlansFoundEventDataSchema,
+});
+export type SupersededPlansFoundEvent = z.infer<typeof supersededPlansFoundEventSchema>;
+
 export type BillingLifecycleEvent =
   | SubscriptionChangedEvent
   | SubscriptionStartedEvent
@@ -177,4 +193,5 @@ export type BillingLifecycleEvent =
   | CheckoutCurrencySelectedEvent
   | PricingModelChangedEvent
   | SeatCheckoutPaidEvent
-  | SeatCheckoutsAbandonedEvent;
+  | SeatCheckoutsAbandonedEvent
+  | SupersededPlansFoundEvent;

@@ -74,12 +74,14 @@ Feature: Stripe webhook billing event handling
     And no notification is sent
 
   @unit
-  Scenario: Upgrade to a seat-event plan migrates old subscriptions
+  Scenario: Upgrade to a seat-event plan records the tiered subscriptions it supersedes
     Given a subscription on a seat-event plan that has not yet been activated
+    And the organization still holds a live tiered subscription
     When the invoice payment succeeded event arrives
-    Then old tiered subscriptions are migrated atomically
-    And the corresponding Stripe subscriptions are cancelled with proration
-    And failures to cancel old Stripe subscriptions are logged but do not block the handler
+    Then the organization is moved to seat pricing
+    And billing records that the seat subscription supersedes live tiered plans
+    And nothing is cancelled in Stripe by the webhook itself
+    And a failure to record the fact fails the delivery so Stripe redelivers it
 
   # --- Invoice payment failed ---
 

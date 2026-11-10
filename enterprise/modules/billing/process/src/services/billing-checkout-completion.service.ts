@@ -54,6 +54,7 @@ type BillingCheckoutCompletionOptions = {
     | "checkoutCurrencySelected"
     | "seatCheckoutPaid"
     | "pricingModelChanged"
+    | "supersededPlansFound"
   >;
 };
 

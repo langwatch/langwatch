@@ -6,7 +6,8 @@ import type {
 } from "./subscription.repository.ts";
 
 export type SubscriptionWithOrg = BillingSubscriptionWithOrganization;
-export type CancelledSubscription = { stripeSubscriptionId: string | null };
+/** A live tiered subscription a Growth seat subscription supersedes. */
+export type SupersededSubscription = { id: string; stripeSubscriptionId: string | null };
 
 /** Outcome names the why; never collapses to null. */
 export type SubscriptionMutationResult<T> =
@@ -55,10 +56,10 @@ export abstract class BillingWebhookSubscriptionRepository {
 
   abstract cancelTrialSubscriptions(organizationId: string): Promise<void>;
 
-  abstract migrateToSeatEvent(input: {
+  abstract findSupersededBySeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<CancelledSubscription[]>;
+  }): Promise<SupersededSubscription[]>;
 
   abstract updateQuantities(input: {
     id: string;

@@ -38,6 +38,7 @@ function billingAnnouncer({ billed }: { billed: Set<string> }) {
     organizations: { findActiveMemberIds: async () => [] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+    retireTieredPlans: async () => {},
     billingOrganizations: {
       getOrganizationForBilling: async (organizationId) =>
         billed.has(organizationId) ? billedLookup(organizationId) : { outcome: "not_usage_billed" },

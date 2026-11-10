@@ -16,6 +16,12 @@ export type BillingSubscriptionStatus =
   | "trialing"
   | "unpaid";
 
+/** Statuses Stripe never leaves: nothing at Stripe bills, and a cancel is refused. */
+export const ENDED_SUBSCRIPTION_STATUSES: ReadonlySet<BillingSubscriptionStatus> = new Set([
+  "canceled",
+  "incomplete_expired",
+]);
+
 /** One line of a subscription: the price it bills, with that price's unit amount and interval. */
 export type BillingSubscriptionItem = Readonly<{
   id: string;
