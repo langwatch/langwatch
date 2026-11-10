@@ -1272,9 +1272,13 @@ test_lwql_tenant_isolation() {
   key_b="sk-lw-e2elwqlb$(openssl rand -hex 16)"
 
   info "Seeding organisation A (the static seed)..."
-  kc exec "$app_pod" -- \
-    sh -c "cd /app/packages/prisma-client && HOME=/tmp LANGWATCH_API_KEY=$key_a pnpm run db:seed" \
-    >/dev/null || fail "db:seed did not seed organisation A"
+  local seed_out
+  seed_out=$(kc exec "$app_pod" -- \
+    sh -c "cd /app/packages/prisma-client && HOME=/tmp LANGWATCH_API_KEY=$key_a pnpm run db:seed" 2>&1) ||
+    { tail -40 <<<"$seed_out" >&2; fail "db:seed did not seed organisation A"; }
+  # A seed that ran nothing still exits 0, so check the row it must have written.
+  [[ -n "$(lwql_project_key "$pg_pod" "$LWQL_E2E_PROJECT_A")" ]] ||
+    { tail -40 <<<"$seed_out" >&2; fail "db:seed exited 0 but wrote no ${LWQL_E2E_PROJECT_A}"; }
   pass "Organisation A seeded"
 
   info "Copying it as organisation B with its own ids and key..."
@@ -1302,7 +1306,13 @@ SQL
   local held_a held_b
   held_a=$(lwql_project_key "$pg_pod" "$LWQL_E2E_PROJECT_A")
   held_b=$(lwql_project_key "$pg_pod" "$LWQL_E2E_PROJECT_B")
-  [[ -n "$held_a" ]] || fail "Project ${LWQL_E2E_PROJECT_A} has no live key"
+  if [[ -z "$held_a" ]]; then
+    # Name what Postgres holds, so the next run says why instead of only that.
+    printf 'SELECT id, "archivedAt" IS NOT NULL AS archived, left("apiKey", 8) AS key FROM "Project";\n' |
+      kc exec -i "$pg_pod" -- sh -c 'PGPASSWORD=e2etest psql -U postgres -d langwatch' >&2 || true
+    kc get pods -l app.kubernetes.io/component=postgresql -o name >&2 || true
+    fail "Project ${LWQL_E2E_PROJECT_A} has no live key"
+  fi
   [[ -n "$held_b" ]] || fail "Project ${LWQL_E2E_PROJECT_B} has no live key"
   [[ "$held_a" == "$key_a" ]] || warn "The seed kept another key on ${LWQL_E2E_PROJECT_A}; using it"
   [[ "$held_b" == "$key_b" ]] || warn "Organisation B's copy holds another key; using it"
