@@ -69,11 +69,13 @@ export function isCallerAccessRejection({
 const CALLER_PARAMETER_REFUSAL_CODES: ReadonlySet<unknown> = new Set<unknown>([
   "lwql_parameter_missing",
   "lwql_granularity_too_fine",
-  "lwql_parameter_invalid",
   "lwql_reserved_parameter_supplied",
 ]);
 
-/** Whether a handled error refuses the caller's own parameters: a window left out, a fine step. */
+/**
+ * Whether a handled error refuses the caller's own parameters: a window left out, a step too
+ * fine, a reserved name supplied.
+ */
 export function isCallerParameterRefusal({ error }: { error: unknown }): boolean {
   return CALLER_PARAMETER_REFUSAL_CODES.has((error as { code?: unknown } | null)?.code);
 }

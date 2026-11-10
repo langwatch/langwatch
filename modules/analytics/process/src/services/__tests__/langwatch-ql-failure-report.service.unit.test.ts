@@ -378,10 +378,6 @@ const PARAMETER_REFUSALS = [
       }),
   },
   {
-    name: "a bound value of the wrong type",
-    refusal: () => new LangWatchQLParameterInvalidError({ parameter: "start" }),
-  },
-  {
     name: "a reserved name supplied",
     refusal: () =>
       new LangWatchQLReservedParameterSuppliedError(["dashboard_context_granularity_seconds"]),
@@ -419,6 +415,23 @@ describe("given the caller's own parameter values are refused on the workbench p
       errorCode: "lwql_unknown_identifier",
     });
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(1);
+  });
+
+  /** @scenario "A statement failure still writes the built-in failure" */
+  it.each([
+    ["built_in", STOCK_SQL],
+    ["user_written", USER_SQL],
+  ] as const)("still reports a wrong-type parameter value for a %s statement", (origin, sql) => {
+    const { lines, service } = reporter();
+
+    service.reportFailure({
+      projectId: "project-1",
+      sql,
+      error: new LangWatchQLParameterInvalidError({ parameter: "start" }),
+    });
+
+    expect(lines.filter((line) => line.level === 50)).toHaveLength(origin === "built_in" ? 1 : 0);
+    expect(meter.valueOf(FAILURE_METRIC, { origin })).toBe(1);
   });
 
   /** @scenario "A refusal of the caller's own parameter values is neither reported nor counted" */

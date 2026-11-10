@@ -94,7 +94,8 @@ type ReportResult =
   | { readonly outcome: "reported"; readonly violation: LangWatchQLViolation }
   | { readonly outcome: "capped" };
 
-function report({
+/** Exported for the cap test: `walkNode` stops before this branch. */
+export function report({
   ctx,
   frame,
   code,
@@ -1083,8 +1084,11 @@ function parseTableReference(node: SqlAstNode): LiteralTableReference | null {
   };
 }
 
-/** Checks a table reference against the reserved schemas, then the catalog. */
-function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
+/**
+ * Checks a table reference against the reserved schemas, then the catalog. Exported for the cap
+ * test: `walkNode` stops before the capped branch.
+ */
+export function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
   const reference = parseTableReference(node);
   if (!reference) {
     report({

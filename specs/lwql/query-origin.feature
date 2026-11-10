@@ -84,19 +84,20 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
   Rule: Only the statement failing is reported; a refused request input is not
 
     A refusal of the caller's own access (every violation names a permission the caller lacks,
-    or a view a gate they lack would show) is about the caller, not the statement text: it is decided
-    from the parsed statement but writes no built-in line and is not counted, on either path.
+    or a view a gate they lack would show) is about the caller, not the statement text: it is
+    decided from the parsed statement but writes no built-in line and is not counted, on either
+    path.
     A refusal cut off at the violation cap is not that: the list may hide other reasons, so it
     is reported and counted.
     A refusal of the request's own projects, or of a reserved parameter name it supplies, is
     not the statement failing: it is refused before the report, writes no built-in line and is
     not counted. A refusal of the parameter values the caller sent (a parameter or time window
-    left out, a step too fine for the window, a value of the wrong type, a reserved name supplied) is not either, though it
+    left out, a step too fine for the window, a reserved name supplied) is not either, though it
     is decided inside: on the workbench path it writes no built-in line and is not counted, for
     a built-in and a user-written statement alike. Otherwise anyone could paste stock text, leave
     out the window and page on-call. The server-written path sends its own values, so a parameter
     refusal there is still reported. The statement's own failures (parse, policy, execution,
-    busy, timeout) are reported.
+    busy, timeout, a bound value of the wrong type) are reported.
 
     @unit
     Scenario: A refused project scope writes no built-in failure
@@ -160,7 +161,7 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
     @unit
     Scenario: A refusal of the caller's own parameter values is neither reported nor counted
       Given a stock statement is sent on the workbench door without its time window, with a step
-        too fine for its window, with a value of the wrong type, or with a reserved parameter name supplied
+        too fine for its window, or with a reserved parameter name supplied
       When the request is refused for those values
       Then no error-level record is written
       And the failure count does not rise, for a built-in and for a user-written statement alike

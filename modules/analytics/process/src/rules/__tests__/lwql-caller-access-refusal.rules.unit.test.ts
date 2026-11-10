@@ -8,7 +8,11 @@ import type { LangWatchQLViolation } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
 import { MAX_VIOLATIONS, type RefusedView } from "../langwatch-ql-validation-shape.rules.ts";
-import { hiddenViewTables, isCallerAccessRejection } from "../lwql-caller-access-refusal.rules.ts";
+import {
+  hiddenViewTables,
+  isCallerAccessRejection,
+  isCallerParameterRefusal,
+} from "../lwql-caller-access-refusal.rules.ts";
 
 describe("isCallerAccessRejection", () => {
   const violation = (extra: Partial<LangWatchQLViolation>): LangWatchQLViolation => ({
@@ -63,5 +67,22 @@ describe("hiddenViewTables", () => {
     expect(hiddenViewTables({ database: "analytics", showable, visible })).toEqual(
       new Set(["analytics.gateway_request_spend"]),
     );
+  });
+});
+
+describe("isCallerParameterRefusal", () => {
+  it.each([
+    "lwql_parameter_missing",
+    "lwql_granularity_too_fine",
+    "lwql_reserved_parameter_supplied",
+  ])("is true for %s", (code) => {
+    expect(isCallerParameterRefusal({ error: { code } })).toBe(true);
+  });
+
+  it("is false for a wrong-type value, an unrelated code, and no error", () => {
+    expect(isCallerParameterRefusal({ error: { code: "lwql_parameter_invalid" } })).toBe(false);
+    expect(isCallerParameterRefusal({ error: { code: "lwql_timeout" } })).toBe(false);
+    expect(isCallerParameterRefusal({ error: null })).toBe(false);
+    expect(isCallerParameterRefusal({ error: undefined })).toBe(false);
   });
 });

@@ -16,6 +16,11 @@ function errorCodeOf(error: unknown): string {
   return typeof code === "string" || typeof code === "number" ? String(code) : "unknown";
 }
 
+type AccessRefusalReader = Pick<
+  LangWatchQLAccessRefusalService,
+  "isCallerAccessRefusal" | "isCallerOwnRefusal"
+>;
+
 /**
  * Reports a failed LangWatchQL query by who wrote it: a built-in statement is one error line
  * (never its text or values), a user-written one a count; the error code never sets the origin.
@@ -26,20 +31,14 @@ export class LangWatchQLFailureReportService {
   private constructor(
     private readonly logger: Pick<Logger, "error">,
     private readonly failures: CounterHandle,
-    private readonly accessRefusals: Pick<
-      LangWatchQLAccessRefusalService,
-      "isCallerAccessRefusal" | "isCallerOwnRefusal"
-    >,
+    private readonly accessRefusals: AccessRefusalReader,
   ) {}
 
   static create(options: {
     logger: Pick<Logger, "error">;
     failures: CounterHandle;
     /** The ledger the throw site writes: the same instance the LangWatchQL service marks into. */
-    accessRefusals: Pick<
-      LangWatchQLAccessRefusalService,
-      "isCallerAccessRefusal" | "isCallerOwnRefusal"
-    >;
+    accessRefusals: AccessRefusalReader;
   }): LangWatchQLFailureReportService {
     return new LangWatchQLFailureReportService(
       options.logger,
