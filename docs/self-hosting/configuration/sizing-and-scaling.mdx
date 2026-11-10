@@ -118,11 +118,10 @@ For production with replicated ClickHouse.
 ```bash
 helm install langwatch langwatch/langwatch \
   -f examples/overlays/size-ha.yaml \
-  -f examples/overlays/access-ingress.yaml \
-  -f examples/overlays/cold-storage-s3.yaml \
-  --set clickhouse.objectStorage.bucket=my-langwatch-data \
-  --set clickhouse.objectStorage.region=us-east-1
+  -f examples/overlays/access-ingress.yaml
 ```
+
+Add ClickHouse backups to an object store as in [Backups](/self-hosting/configuration/backups).
 
 Both production overlays turn off the local-filesystem volume for stored objects, because more than one replica cannot share it. Set `app.dataplane.enabled: true` with an S3 or Azure Blob bucket, or stored objects (audio, images and documents) land on the pods' ephemeral disk and are lost on restart. Both commands also need the Secrets from [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets), or `--set autogen.enabled=true` for a test install.
 
@@ -230,8 +229,8 @@ spec:
 ### ClickHouse cold storage (S3, optional)
 
 - Off by default, and not needed: local disk is the simpler setup to run
-- Opt in with `clickhouse.cold.enabled: true` if disk cost matters more than query speed on older data
-- Data older than 49 days then moves to S3. Use a multiple of 7, to match ClickHouse's weekly partitions
+- Opt in with `clickhouse.cold.enabled: true`, plus `clickhouse.objectStorage.bucket` and its `region` or `endpoint` if disk cost matters more than query speed on older data
+- Data older than `clickhouse.cold.defaultTtlDays` (49) then moves to S3. Keep it a multiple of 7, to match ClickHouse's weekly partitions
 
 ### PostgreSQL
 
