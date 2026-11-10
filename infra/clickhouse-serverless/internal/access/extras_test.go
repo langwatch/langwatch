@@ -202,4 +202,3 @@ func TestPlan_LeavesOutAUserWhoseSettingsBreakARenderedConstraint(t *testing.T) 
 		}
 	}
 }
-

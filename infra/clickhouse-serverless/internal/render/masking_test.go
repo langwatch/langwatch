@@ -1,9 +1,14 @@
 package render
 
 import (
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
+	"gopkg.in/yaml.v3"
 )
 
 // @scenario "A masked setting's value never reaches a log"
@@ -50,5 +55,35 @@ func TestSHA256HexRule_HidesAFoldedCapability(t *testing.T) {
 	}
 	if short := strings.Repeat("ab12", 12); re.MatchString(short) {
 		t.Errorf("a 48-character hex value was treated as a sha256: %s", short)
+	}
+}
+
+// @scenario "A masked setting's value never reaches a log"
+func TestRenderQueryMasking_NamesEachRuleSoAnOperatorFileCannotReplaceIt(t *testing.T) {
+	dir := t.TempDir()
+	in := &config.Input{MaskedSettings: []string{"custom_api_key_hash"}, MaskSHA256Hex: true}
+	if err := renderQueryMasking(in, dir); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, queryMaskingFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Rules map[string]map[string]string `yaml:"query_masking_rules"`
+	}
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("%v\n%s", err, data)
+	}
+	if _, plain := doc.Rules["rule"]; plain {
+		t.Fatalf("a plain `rule` element is replaced by an operator's own list:\n%s", data)
+	}
+	if len(doc.Rules) != 4 {
+		t.Fatalf("want 3 rules for the setting plus the sha256 rule, got %d:\n%s", len(doc.Rules), data)
+	}
+	for key, rule := range doc.Rules {
+		if !strings.HasPrefix(key, "rule_chs_") || rule["regexp"] == "" {
+			t.Errorf("rule %q: ClickHouse reads only children named rule*, each needing a regexp: %v", key, rule)
+		}
 	}
 }

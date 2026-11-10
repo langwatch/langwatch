@@ -1,9 +1,11 @@
 package accesse2e
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -15,9 +17,16 @@ func TestQueryMaskingAgainstRealClickHouse(t *testing.T) {
 		t.Skip("CH_ACCESS_E2E_IMAGE not set; run `make e2e-access` (needs Docker)")
 	}
 	password := randomHex(t)
+	// An operator's own rule list, in a file merged after the image's: it must add, not replace.
+	operatorDir := t.TempDir()
+	operatorRule := "query_masking_rules:\n  rule:\n    - name: operator rule\n      regexp: opsecret[0-9a-f]+\n      replace: '[OPERATOR]'\n"
+	if err := os.WriteFile(filepath.Join(operatorDir, "zz-operator-masking.yaml"), []byte(operatorRule), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	// Trace level with text_log on, so every log would hold the query text.
 	run := startGrants(t, image, password, "-e", "CLICKHOUSE_AUDIT_QUERY_LOG=true",
-		"-e", "LOG_LEVEL=trace", "-e", "ENABLE_TEXT_LOG=true", "-e", "TEXT_LOG_LEVEL=trace")
+		"-e", "LOG_LEVEL=trace", "-e", "ENABLE_TEXT_LOG=true", "-e", "TEXT_LOG_LEVEL=trace",
+		"-v", filepath.Join(operatorDir, "zz-operator-masking.yaml")+":/etc/clickhouse-server/config.d/zz-operator-masking.yaml:ro")
 
 	// The audit pin must leave log_query_settings to the user's own profile.
 	for _, sql := range []string{
@@ -30,7 +39,20 @@ func TestQueryMaskingAgainstRealClickHouse(t *testing.T) {
 			t.Fatalf("%s: %v", sql, err)
 		}
 	}
+	// Every rule must survive the merge: a later file's plain `rule` list replaces earlier ones by position.
+	merged, _ := exec.Command("docker", "exec", grantsContainer, "sh", "-c",
+		"cat $(find / -path '*preprocessed_configs/config.xml' 2>/dev/null | head -1)").CombinedOutput()
+	for _, name := range []string{"hide custom_api_key_hash in a statement", "hide custom_api_key_hash in a URL",
+		"hide custom_api_key_hash in an encoded URL", "hide sha256 hex values", "operator rule"} {
+		if !strings.Contains(string(merged), "<name>"+name+"</name>") {
+			t.Errorf("the merged server config lost the masking rule %q", name)
+		}
+	}
 	secret, control, settingsControl := randomHex(t), randomHex(t), randomHex(t)
+	operatorSecret := "opsecret" + randomHex(t)
+	if _, err := run(fmt.Sprintf("SELECT '%s', '%s'", operatorSecret, control)); err != nil {
+		t.Fatal(err)
+	}
 	asProbe := []string{"--user", "masking_probe", "--password", "masking-probe-password-0123"}
 	// Every spelling the reviews found, over the native protocol, then over HTTP.
 	for _, form := range []string{
@@ -71,7 +93,7 @@ func TestQueryMaskingAgainstRealClickHouse(t *testing.T) {
 	// Read before any search below: ClickHouse logs each search's folded constant.
 	logs, _ := exec.Command("docker", "exec", grantsContainer, "sh", "-c",
 		"cat /var/log/clickhouse-server/clickhouse-server.log /var/log/clickhouse-server/clickhouse-server.err.log 2>/dev/null").CombinedOutput()
-	for _, hidden := range []string{secret, hash} {
+	for _, hidden := range []string{secret, hash, operatorSecret} {
 		if strings.Contains(string(logs), hidden) {
 			t.Errorf("the server log file holds the masked value %s", hidden[:8])
 		}
@@ -82,13 +104,13 @@ func TestQueryMaskingAgainstRealClickHouse(t *testing.T) {
 
 	// Each place holds the unmasked control value, so the secret's absence means masking.
 	for _, place := range []struct{ name, sql string }{
-		{"system.query_log.query", "SELECT count() FROM system.query_log WHERE position(query, reverse('%s')) > 0"},
-		{"system.query_log.Settings", "SELECT count() FROM system.query_log WHERE position(toString(Settings), reverse('%s')) > 0"},
-		{"system.text_log", "SELECT count() FROM system.text_log WHERE position(message, reverse('%s')) > 0"},
+		{"system.query_log.query", "SELECT count() FROM system.query_log WHERE position(hex(query), '%s') > 0"},
+		{"system.query_log.Settings", "SELECT count() FROM system.query_log WHERE position(hex(toString(Settings)), '%s') > 0"},
+		{"system.text_log", "SELECT count() FROM system.text_log WHERE position(hex(message), '%s') > 0"},
 	} {
 		got := func(value string) string {
-			// Reversed, so this search's own text never holds the value it looks for.
-			out, err := run(fmt.Sprintf(place.sql, reversed(value)))
+			// Hex-encoded, so no search, folded constant included, ever holds the value itself.
+			out, err := run(fmt.Sprintf(place.sql, hexOf(value)))
 			if err != nil {
 				t.Fatalf("%s: %v", place.name, err)
 			}
@@ -109,10 +131,5 @@ func TestQueryMaskingAgainstRealClickHouse(t *testing.T) {
 	}
 }
 
-func reversed(s string) string {
-	r := []rune(s)
-	for i, j := 0, len(r)-1; i < j; i, j = i+1, j-1 {
-		r[i], r[j] = r[j], r[i]
-	}
-	return string(r)
-}
+// hexOf is how a search names a value without its text holding the value.
+func hexOf(s string) string { return strings.ToUpper(hex.EncodeToString([]byte(s))) }

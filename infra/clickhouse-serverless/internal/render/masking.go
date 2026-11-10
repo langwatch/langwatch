@@ -1,6 +1,7 @@
 package render
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
@@ -11,16 +12,20 @@ const queryMaskingFile = "query-masking.yaml"
 // renderQueryMasking hides each masked setting's value wherever ClickHouse
 // logs query text: the server log, system.text_log and system.query_log.query.
 // query_log's Settings column is not masked; the user's profile turns it off.
+// Each rule has its own element name: a plain `rule` list in an operator's
+// later config.d file would replace a `rule` list of ours when files merge.
 func renderQueryMasking(input *config.Input, configD string) error {
-	rules := make([]map[string]any, 0, 3*len(input.MaskedSettings))
+	rules := map[string]any{}
 	for _, name := range input.MaskedSettings {
-		rules = append(rules, maskingRules(name)...)
+		for i, r := range maskingRules(name) {
+			rules[fmt.Sprintf("rule_chs_%s_%d", name, i+1)] = r
+		}
 	}
 	if input.MaskSHA256Hex {
-		rules = append(rules, sha256HexRule)
+		rules["rule_chs_sha256_hex"] = sha256HexRule
 	}
 	return writeYAML(filepath.Join(configD, queryMaskingFile), map[string]any{
-		"query_masking_rules": map[string]any{"rule": rules},
+		"query_masking_rules": rules,
 	})
 }
 
@@ -36,7 +41,7 @@ var sha256HexRule = map[string]any{
 const gap = `(?:\s|/\*.*?\*/)*`
 
 // maskingRules hide name's value in a statement (the name optionally quoted;
-// the value a string with \' or '' escapes, a $$heredoc$$ or a bare token),
+// the value a string with \' or ” escapes, a $$heredoc$$ or a bare token),
 // and in a URL parameter, plain or percent-encoded.
 func maskingRules(name string) []map[string]any {
 	return []map[string]any{
