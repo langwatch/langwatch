@@ -61,6 +61,16 @@ const keepForeverRowsSchema = z.array(
 const tenantFilterSql = "position(command, {tenantFilterNeedle:String}) > 0";
 
 const tableNameRowsSchema = z.array(z.object({ name: z.string() }));
+// `uniqExact` is UInt64, which ClickHouse's JSON output sends as a string.
+const countRowsSchema = z.array(z.object({ total: z.coerce.number() }));
+const DAY_MS = 86_400_000;
+
+/** Each category's main table, the id one stored item is counted by, and its TTL time column. */
+const PAST_RETENTION_COUNT_SOURCE = {
+  traces: { table: "trace_summaries", id: "TraceId", time: "OccurredAt" },
+  scenarios: { table: "simulation_runs", id: "ScenarioRunId", time: "StartedAt" },
+  experiments: { table: "experiment_runs", id: "RunId", time: "StartedAt" },
+} as const satisfies Record<RetentionCategory, { table: string; id: string; time: string }>;
 const tenantRowsSchema = z.array(z.object({ TenantId: z.string() }));
 
 // ClickHouse stores the command as `WHERE (TenantId = '..')` (25.x), so the needle omits WHERE.
@@ -203,6 +213,34 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     }
 
     return { tables: [...new Set([...categoryTables, ...heldIndexes, ...eventingTables])] };
+  }
+
+  async countPastRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    retentionDays: number;
+    nowMs: number;
+  }): Promise<number> {
+    if (input.retentionDays === 0) return 0;
+    const { table, id, time } = PAST_RETENTION_COUNT_SOURCE[input.category];
+    const { rows } = await this.clickhouse.query<unknown>({
+      tenantId: input.projectId,
+      table,
+      kind: "read",
+      sql: `
+        SELECT uniqExact(${id}) AS total
+        FROM ${table}
+        WHERE TenantId = {tenantId:String}
+          AND ${time} < fromUnixTimestamp64Milli({cutoffMs:Int64})
+          AND (_retention_days = 0 OR _retention_days > {retentionDays:UInt16})
+      `,
+      params: {
+        tenantId: input.projectId,
+        retentionDays: input.retentionDays,
+        cutoffMs: input.nowMs - input.retentionDays * DAY_MS,
+      },
+    });
+    return countRowsSchema.parse(rows)[0]?.total ?? 0;
   }
 
   async findMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {

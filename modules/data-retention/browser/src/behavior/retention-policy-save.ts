@@ -4,10 +4,10 @@ import {
   retentionCategories,
   type RetentionCategory,
   type ScopeAssignment,
+  type StoredPastRetention,
 } from "@langwatch/data-retention-contract";
 
 import type { DataRetentionHostApi } from "../model/data-retention-host.ts";
-import { formatDays } from "../model/retention-format.ts";
 import type { RetentionScopeGroup } from "../model/retention-grouping.ts";
 
 type Notices = Pick<DataRetentionHostApi, "succeeded" | "warned" | "informed" | "failed">;
@@ -79,123 +79,98 @@ function reportRetentionSave({
   return { success: false };
 }
 
-/** The categories whose policy saved, each once. */
-function savedCategories(result: RetentionSaveResult): RetentionCategory[] {
-  return Array.from(
-    new Set(result.results.filter((entry) => entry.ok).map((entry) => entry.category)),
-  );
-}
+type RetentionPolicyInput = { scopes: ScopeAssignment[]; retentionDays: number };
 
 /**
- * Rewrites existing rows for each saved category. The server resolves the cascade, so
- * a wider rule may not change what a project with a closer override uses: the notice
- * names the value the server applied, not the one typed.
- */
-async function applyRetentionToExisting({
-  categories,
-  trigger,
-  notices,
-}: {
-  categories: RetentionCategory[];
-  trigger: (category: RetentionCategory) => Promise<{ appliedRetentionDays: number }>;
-  notices: Notices;
-}): Promise<void> {
-  if (categories.length === 0) return;
-  const outcomes = await Promise.all(
-    categories.map((category) =>
-      trigger(category).then(
-        (response) => ({ ok: true as const, applied: response.appliedRetentionDays }),
-        (error: unknown) => ({ ok: false as const, error }),
-      ),
-    ),
-  );
-  const failure = outcomes.find((entry) => !entry.ok);
-  if (failure && !failure.ok) {
-    notices.failed({ error: failure.error, fallbackTitle: "Some retroactive updates failed" });
-    return;
-  }
-  const applied = Array.from(
-    new Set(outcomes.flatMap((entry) => (entry.ok ? [entry.applied] : []))),
-  );
-  notices.informed({
-    title: "Applying retention to existing data…",
-    description: rewriteDescription(applied),
-  });
-}
-
-function rewriteDescription(applied: number[]): string {
-  const [only] = applied;
-  if (applied.length === 1 && only !== undefined) {
-    return `Rewriting existing rows to ${formatDays(only)}.`;
-  }
-  return `Rewriting existing rows per category (${applied.map(formatDays).join(", ")}).`;
-}
-
-type RetentionPolicyInput = {
-  scopes: ScopeAssignment[];
-  retentionDays: number;
-  applyToExisting: boolean;
-};
-
-/**
- * The drawer's save: straight through, or via the apply-to-existing confirmation,
- * which rewrites only the current project's rows and says so when a wider scope saved.
+ * The drawer's save: one write per scope and category, reported once. A longer period reaches
+ * stored rows on the server; `afterSave` then offers the scopes saved for a shorter one.
  */
 export function retentionPolicySaver({
-  projectId,
   notices,
   write,
-  trigger,
   afterWrite,
+  afterSave,
   close,
-  confirm,
 }: {
-  projectId: string;
   notices: Notices;
   write: (input: {
     scope: ScopeAssignment;
     category: RetentionCategory;
     retentionDays: number;
   }) => Promise<unknown>;
-  trigger: (category: RetentionCategory) => Promise<{ appliedRetentionDays: number }>;
   afterWrite: () => void;
+  afterSave: (saved: { scopes: ScopeAssignment[]; retentionDays: number }) => void;
   close: () => void;
-  confirm: (pending: {
-    retentionDays: number;
-    savedScopeWiderThanCurrentProject: boolean;
-    onConfirm: () => Promise<void>;
-  }) => void;
 }): (input: RetentionPolicyInput) => Promise<void> {
-  return async ({ scopes, retentionDays, applyToExisting }) => {
-    const saveAndReport = async () => {
-      const result = await saveRetentionOverrides({
-        scopes,
-        categories: [...retentionCategories],
-        save: (pair) => write({ ...pair, retentionDays }),
-      });
-      afterWrite();
-      const status = reportRetentionSave({ result, scopeCount: scopes.length, notices });
-      return { result, status };
-    };
-
-    if (!applyToExisting) {
-      const { status } = await saveAndReport();
-      if (status.success) close();
-      return;
-    }
-
-    confirm({
-      retentionDays,
-      savedScopeWiderThanCurrentProject: scopes.some(
-        (scope) => !(scope.scopeType === "PROJECT" && scope.scopeId === projectId),
-      ),
-      onConfirm: async () => {
-        const { result, status } = await saveAndReport();
-        await applyRetentionToExisting({ categories: savedCategories(result), trigger, notices });
-        if (status.success) close();
-      },
+  return async ({ scopes, retentionDays }) => {
+    const result = await saveRetentionOverrides({
+      scopes,
+      categories: [...retentionCategories],
+      save: (pair) => write({ ...pair, retentionDays }),
     });
+    afterWrite();
+    const status = reportRetentionSave({ result, scopeCount: scopes.length, notices });
+    if (!status.success) return;
+    close();
+    afterSave({ scopes, retentionDays });
   };
+}
+
+/**
+ * Stored items past the new period summed over the saved scopes, for the apply prompt; null
+ * when any count failed, so the prompt says it could not count rather than "0".
+ */
+export async function countStoredPastRetention({
+  scopes,
+  count,
+}: {
+  scopes: ScopeAssignment[];
+  count: (scope: ScopeAssignment) => Promise<StoredPastRetention>;
+}): Promise<{ rows: number; retentionDays: number | null } | null> {
+  try {
+    const answers = await Promise.all(scopes.map((scope) => count(scope)));
+    const traces = answers.flatMap((answer) =>
+      answer.categories.filter((each) => each.category === "traces"),
+    );
+    const days = new Set(traces.map((each) => each.retentionDays));
+    const [only] = [...days];
+    return {
+      rows: answers.reduce(
+        (sum, answer) => sum + answer.categories.reduce((total, each) => total + each.rows, 0),
+        0,
+      ),
+      retentionDays: days.size === 1 && only !== undefined ? only : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Asks the server to apply each scope's period to its stored data, reported once. */
+export async function applyStoredRetention({
+  scopes,
+  apply,
+  notices,
+}: {
+  scopes: ScopeAssignment[];
+  apply: (scope: ScopeAssignment) => Promise<unknown>;
+  notices: Pick<Notices, "succeeded" | "failed">;
+}): Promise<{ success: boolean }> {
+  const outcomes = await Promise.all(
+    scopes.map((scope) =>
+      apply(scope).then(
+        () => ({ ok: true as const }),
+        (error: unknown) => ({ ok: false as const, error }),
+      ),
+    ),
+  );
+  const failure = outcomes.find((entry) => !entry.ok);
+  if (failure && !failure.ok) {
+    notices.failed({ error: failure.error, fallbackTitle: "Couldn't apply the new period" });
+    return { success: false };
+  }
+  notices.succeeded({ title: "Traces past the new period will be deleted within a day" });
+  return { success: true };
 }
 
 /** Removes a scope's policy in every category it sets, reported once. */

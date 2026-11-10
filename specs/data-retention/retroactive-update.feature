@@ -16,8 +16,8 @@ Feature: Retroactive retention changes
     And existing spans still have _retention_days = 49
 
   Scenario: Explicit retroactive update applies to existing data
-    When the admin adds a retention policy of 91 days with the "Apply this change to existing data" switch enabled
-    And confirms in the "Apply retention to existing data?" dialog
+    When the admin adds a shorter retention policy of 91 days
+    And chooses "Apply now" when asked to apply it to stored data
     Then a ClickHouse mutation is issued for each trace-category table
     And the mutation updates _retention_days = 91 for this tenant
     And the event_log mutation updates only trace-class rows
@@ -59,14 +59,13 @@ Feature: Retroactive retention changes
     And the caller can act on those ids without parsing the message text
 
   Scenario: Retroactive apply requires confirmation
-    When the admin saves a retention policy with the "Apply this change to existing data" switch enabled
-    Then a confirmation dialog warns that any rows older than the new retention become eligible for deletion on the next background merge
-    And the retroactive update does not proceed until the admin confirms
+    When the admin saves a shorter retention policy with stored data past it
+    Then a prompt names how many stored traces the new period would remove
+    And the retroactive update does not proceed until the admin chooses "Apply now"
 
   Scenario: Saving without retroactive apply leaves existing data untouched
-    When the admin saves a retention policy with the "Apply this change to existing data" switch disabled
-    Then no confirmation dialog is shown
-    And the scope rule is persisted without issuing any ClickHouse mutation
+    When the admin saves a shorter retention policy and chooses "Not now"
+    Then the scope rule is persisted without issuing any ClickHouse mutation
     And only newly ingested rows are stamped with the new _retention_days
 
   Scenario: Stuck mutation can be killed

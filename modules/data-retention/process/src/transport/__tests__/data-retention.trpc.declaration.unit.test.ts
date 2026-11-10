@@ -56,6 +56,8 @@ describe("the data retention tRPC declaration", () => {
         ["getMutationProgress", "query", "permission:traces:view"],
         ["killMutation", "mutation", "permission:project:update"],
         ["getScopeStorageUsage", "query", "permission:traces:view"],
+        ["getStoredPastRetention", "query", "permission:traces:view"],
+        ["applyScopeRetentionToStoredData", "mutation", "permission-by-input"],
         ["getOrganizationStorageEstimate", "query", "permission:subscription:upgrade"],
         ["getOrganizationRetention", "query", "permission:organization:view"],
       ]);
@@ -65,7 +67,7 @@ describe("the data retention tRPC declaration", () => {
     it("asks each scope write's permission on its target, chosen by the scope type", () => {
       const scopeWrites = declaredAccess().filter((access) => typeof access !== "string");
 
-      expect(scopeWrites).toHaveLength(3);
+      expect(scopeWrites).toHaveLength(4);
       for (const access of scopeWrites) {
         expect(access).toMatchObject({
           kind: "permission-by-input",

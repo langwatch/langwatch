@@ -1,7 +1,7 @@
 /**
- * Retention lengthened at a paid activation, carried to rows already stored: one extension per
- * activation, one raise per project and category, each recorded as applied.
- * Spec: specs/billing/seat-subscription-retention-policy.feature
+ * Retention carried to rows already stored: an extension (activation or save) or an apply request,
+ * then one rewrite per project and category under the scope, each recorded as applied.
+ * Specs: specs/billing/seat-subscription-retention-policy.feature, retention-apply-to-stored-data
  */
 import {
   defineAggregate,
@@ -16,17 +16,20 @@ import type { RetentionExtensionService } from "../services/retention-extension.
 import {
   ApplyRetentionExtensionCommand,
   RecordRetentionExtensionCommand,
+  RequestStoredRetentionApplyCommand,
 } from "./retention-extension.commands.ts";
 import {
   retentionAppliedEventSchema,
   retentionExtendedEventSchema,
   RETENTION_EXTENSION_AGGREGATE_TYPE,
   RETENTION_EXTENSION_PIPELINE_NAME,
+  storedRetentionApplyRequestedEventSchema,
 } from "./retention-extension.events.ts";
 import {
   RETENTION_EXTENSION_APPLY_INITIAL_STATE,
   RETENTION_EXTENSION_APPLY_PROCESS_NAME,
   retentionExtended,
+  storedRetentionApplyRequested,
   retentionExtensionApplySchema,
   retentionExtensionApplyStateSchema,
 } from "./retention-extension.process.ts";
@@ -47,8 +50,13 @@ const defineRetentionExtensionPipeline = (deps: RetentionExtensionPipelineDeps) 
     name: RETENTION_EXTENSION_PIPELINE_NAME,
     aggregate: defineAggregate({ type: RETENTION_EXTENSION_AGGREGATE_TYPE }),
   })
-    .withEvents([retentionExtendedEventSchema, retentionAppliedEventSchema])
+    .withEvents([
+      retentionExtendedEventSchema,
+      retentionAppliedEventSchema,
+      storedRetentionApplyRequestedEventSchema,
+    ])
     .withCommand("recordRetentionExtension", RecordRetentionExtensionCommand)
+    .withCommand("requestStoredRetentionApply", RequestStoredRetentionApplyCommand)
     .withCommandInstance({
       name: "applyRetentionExtension",
       handlerClass: ApplyRetentionExtensionCommand,
@@ -61,6 +69,7 @@ const defineRetentionExtensionPipeline = (deps: RetentionExtensionPipelineDeps) 
           deps.extensions.applyToProjects(payload),
         )
         .on(retentionExtendedEventSchema, retentionExtended)
+        .on(storedRetentionApplyRequestedEventSchema, storedRetentionApplyRequested)
         // The fan-out only sends commands; a rerun resends them and each raise's key absorbs it.
         .outbox({
           maxAttempts: APPLY_MAX_ATTEMPTS,

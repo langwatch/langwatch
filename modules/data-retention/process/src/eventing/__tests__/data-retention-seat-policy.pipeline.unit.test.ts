@@ -104,9 +104,13 @@ function harness(existing: PolicyWrite[] = []) {
   // The extension it records is the extension pipeline's concern, covered beside it.
   const extensions = RetentionExtensionService.create({
     seatPolicies: { provisionMissing },
-    projects: { findOrganizationProjectIds: async () => [] },
+    projects: { findScopeProjectIds: async () => [] },
   });
-  extensions.connect({ record: async () => undefined, apply: async () => undefined });
+  extensions.connect({
+    record: async () => undefined,
+    request: async () => undefined,
+    apply: async () => undefined,
+  });
   eventing.register(buildDataRetentionSeatPolicyPipeline({ extensions }));
   const started = (fact: SubscriptionStartedEventData, id: string) =>
     billing.service.storeEvents(

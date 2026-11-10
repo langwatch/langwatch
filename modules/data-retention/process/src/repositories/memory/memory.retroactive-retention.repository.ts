@@ -69,13 +69,46 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
   /** Raises to refuse as a running rewrite would, before any is applied; tests set it. */
   refuseNextRaises = 0;
 
-  triggerUpdate(input: {
+  /** Stored items keyed `project/category`: each one's age and stamped days; tests set it. */
+  readonly storedItems = new Map<string, { ageDays: number; retentionDays: number }[]>();
+  /** Counts to refuse as an unreachable store would; tests set it. */
+  refuseNextCounts = 0;
+
+  async countPastRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    retentionDays: number;
+    nowMs: number;
+  }): Promise<number> {
+    if (this.refuseNextCounts > 0) {
+      this.refuseNextCounts -= 1;
+      throw new Error("Stored data could not be counted");
+    }
+    if (input.retentionDays === 0) return 0;
+    return (this.storedItems.get(`${input.projectId}/${input.category}`) ?? []).filter(
+      (item) =>
+        item.ageDays > input.retentionDays &&
+        (item.retentionDays === 0 || item.retentionDays > input.retentionDays),
+    ).length;
+  }
+
+  async triggerUpdate(input: {
     projectId: string;
     category: RetentionCategory;
     newRetentionDays: number;
   }): Promise<{ tables: string[] }> {
-    return this.#rewrite({ ...input, raiseOnly: false });
+    const result = await this.#rewrite({ ...input, raiseOnly: false });
+    this.applies.push({
+      projectId: input.projectId,
+      category: input.category,
+      retentionDays: input.newRetentionDays,
+    });
+    return result;
   }
+
+  /** Each exact rewrite this twin was asked for, in order; tests read it. */
+  readonly applies: { projectId: string; category: RetentionCategory; retentionDays: number }[] =
+    [];
 
   async raiseRetention(input: {
     projectId: string;

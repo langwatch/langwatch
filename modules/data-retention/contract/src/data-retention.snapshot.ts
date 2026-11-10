@@ -91,6 +91,27 @@ export const retentionStorageUsageSchema: RetentionStorageUsageSchema =
 export type RetentionStorageUsage = z.infer<typeof retentionStorageUsageSchema>;
 
 /**
+ * Stored rows a scope's projects keep past their resolved retention, per category: what applying
+ * the period to stored data would delete. `retentionDays` is null when the projects differ.
+ */
+const storedPastRetentionSchemaDefinition = z.object({
+  categories: z.array(
+    z.object({
+      category: retentionCategorySchema,
+      rows: z.number().int().nonnegative(),
+      retentionDays: z.number().int().nonnegative().nullable(),
+    }),
+  ),
+  projectCount: z.number().int().nonnegative(),
+});
+export interface StoredPastRetentionSchema extends Named<
+  typeof storedPastRetentionSchemaDefinition
+> {}
+export const storedPastRetentionSchema: StoredPastRetentionSchema =
+  storedPastRetentionSchemaDefinition;
+export type StoredPastRetention = z.infer<typeof storedPastRetentionSchema>;
+
+/**
  * What an organization stores today and how many days of data that is, so the upgrade dialog
  * can price a longer retention before the buyer picks it.
  */

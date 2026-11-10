@@ -1,25 +1,28 @@
 /**
- * Retention lengthened at a paid activation, carried to the rows already stored: the activation
- * provisions the organization policies and records the extension; the extension then asks for one
- * raise per project and category. Spec: specs/billing/seat-subscription-retention-policy.feature
+ * Retention carried to the rows already stored. An activation or a lengthening save records an
+ * extension (raise only); an admin's apply records a request (exact rewrite). Either fans out one
+ * command per project under the scope and category. Spec: retention-apply-to-stored-data.feature
  */
-import type { RetentionCategory } from "@langwatch/data-retention-contract";
+import type { RetentionCategory, ScopeAssignment } from "@langwatch/data-retention-contract";
 
 import type {
   ApplyRetentionExtensionCommandData,
   RecordRetentionExtensionCommandData,
+  RequestStoredRetentionApplyCommandData,
+  StoredRetentionMode,
 } from "../eventing/retention-extension.events.ts";
 import type { DataRetentionService } from "./data-retention.service.ts";
 import type { SeatRetentionPolicyService } from "./seat-retention-policy.service.ts";
 
 type Senders = Readonly<{
   record: (data: RecordRetentionExtensionCommandData) => Promise<unknown>;
+  request: (data: RequestStoredRetentionApplyCommandData) => Promise<unknown>;
   apply: (data: ApplyRetentionExtensionCommandData) => Promise<unknown>;
 }>;
 
 type Options = Readonly<{
   seatPolicies: Pick<SeatRetentionPolicyService, "provisionMissing">;
-  projects: Pick<DataRetentionService, "findOrganizationProjectIds">;
+  projects: Pick<DataRetentionService, "findScopeProjectIds">;
 }>;
 
 export class RetentionExtensionService {
@@ -64,19 +67,76 @@ export class RetentionExtensionService {
     });
   }
 
-  /** One raise command per project and category; a failed send throws, so the outbox retries. */
+  /** Records a lengthening save at one scope; its projects' stored rows are then raised. */
+  async extendFromSave({
+    organizationId,
+    scope,
+    category,
+    retentionDays,
+    extensionId,
+    at,
+  }: {
+    organizationId: string;
+    scope: ScopeAssignment;
+    category: RetentionCategory;
+    retentionDays: number;
+    extensionId: string;
+    at: number;
+  }): Promise<void> {
+    await this.senders().record({
+      tenantId: organizationId,
+      organizationId,
+      extensionId,
+      scope,
+      retention: [{ category, retentionDays }],
+      extendedAt: at,
+    });
+  }
+
+  /** Records an admin's ask to rewrite the scope's stored rows to the periods they resolve to. */
+  async requestApply({
+    organizationId,
+    scope,
+    categories,
+    requestId,
+    at,
+  }: {
+    organizationId: string;
+    scope: ScopeAssignment;
+    categories: readonly RetentionCategory[];
+    requestId: string;
+    at: number;
+  }): Promise<void> {
+    await this.senders().request({
+      tenantId: organizationId,
+      organizationId,
+      requestId,
+      scope,
+      categories: [...categories],
+      requestedAt: at,
+    });
+  }
+
+  /** One command per project and category; a failed send throws, so the outbox retries. */
   async applyToProjects({
     organizationId,
     extensionId,
+    scope,
+    mode,
     categories,
     at,
   }: {
     organizationId: string;
     extensionId: string;
+    scope?: ScopeAssignment;
+    mode?: StoredRetentionMode;
     categories: readonly RetentionCategory[];
     at: number;
   }): Promise<void> {
-    const projectIds = await this.options.projects.findOrganizationProjectIds({ organizationId });
+    const projectIds = await this.options.projects.findScopeProjectIds({
+      organizationId,
+      scope: scope ?? { scopeType: "ORGANIZATION", scopeId: organizationId },
+    });
     for (const projectId of projectIds) {
       for (const category of categories) {
         await this.senders().apply({
@@ -85,6 +145,7 @@ export class RetentionExtensionService {
           projectId,
           extensionId,
           category,
+          mode: mode ?? "raise",
           occurredAt: at,
         });
       }

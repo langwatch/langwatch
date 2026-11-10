@@ -15,6 +15,11 @@ import {
   RETENTION_EXTENSION_EVENT_VERSION,
   type RetentionAppliedEvent,
   type RetentionExtendedEvent,
+  REQUEST_STORED_RETENTION_APPLY_COMMAND_TYPE,
+  type RequestStoredRetentionApplyCommandData,
+  requestStoredRetentionApplyCommandDataSchema,
+  STORED_RETENTION_APPLY_REQUESTED_EVENT_TYPE,
+  type StoredRetentionApplyRequestedEvent,
 } from "./retention-extension.events.ts";
 
 /** Records an organization's lengthened retention once per activation, keyed by its identity. */
@@ -34,6 +39,7 @@ export class RecordRetentionExtensionCommand implements CommandHandler<
     const data = {
       organizationId: command.data.organizationId,
       extensionId: command.data.extensionId,
+      ...(command.data.scope ? { scope: command.data.scope } : {}),
       retention: command.data.retention,
       extendedAt: command.data.extendedAt,
     };
@@ -64,8 +70,58 @@ export class RecordRetentionExtensionCommand implements CommandHandler<
   }
 }
 
+type StoredRetentionWriter = Pick<
+  DataRetentionService,
+  "raiseStoredRetention" | "applyStoredRetention"
+>;
+
+/** Records an admin's ask to apply the scope's periods to stored data, once per request. */
+export class RequestStoredRetentionApplyCommand implements CommandHandler<
+  Command<RequestStoredRetentionApplyCommandData>,
+  StoredRetentionApplyRequestedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    REQUEST_STORED_RETENTION_APPLY_COMMAND_TYPE,
+    requestStoredRetentionApplyCommandDataSchema,
+    "Record an ask to apply a scope's retention to its stored data",
+  );
+
+  async handle(
+    command: Command<RequestStoredRetentionApplyCommandData>,
+  ): Promise<StoredRetentionApplyRequestedEvent[]> {
+    const { organizationId, requestId, scope, categories, requestedAt } = command.data;
+    return [
+      EventUtils.createEvent<StoredRetentionApplyRequestedEvent>({
+        aggregateType: RETENTION_EXTENSION_AGGREGATE_TYPE,
+        aggregateId: organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: STORED_RETENTION_APPLY_REQUESTED_EVENT_TYPE,
+        version: RETENTION_EXTENSION_EVENT_VERSION,
+        data: { organizationId, requestId, scope, categories, requestedAt },
+        metadata: {},
+        occurredAt: requestedAt,
+        idempotencyKey: `stored-retention-apply:${requestId}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RequestStoredRetentionApplyCommandData): string {
+    return payload.organizationId;
+  }
+
+  static getSpanAttributes(
+    payload: RequestStoredRetentionApplyCommandData,
+  ): Record<string, string> {
+    return {
+      "payload.organization.id": payload.organizationId,
+      "payload.retention_apply.id": payload.requestId,
+    };
+  }
+}
+
 /**
- * Raises one project's stored rows in one category to its resolved retention and records it. A
+ * Raises (or, asked to apply, rewrites) one project's stored rows in one category to its resolved
+ * retention and records it. A
  * rewrite still running on those rows throws, so the command is retried until it applies.
  */
 export class ApplyRetentionExtensionCommand implements CommandHandler<
@@ -78,14 +134,12 @@ export class ApplyRetentionExtensionCommand implements CommandHandler<
     "Raise one project's stored rows to its lengthened retention",
   );
 
-  private constructor(
-    private readonly retention: Pick<DataRetentionService, "raiseStoredRetention">,
-  ) {}
+  private constructor(private readonly retention: StoredRetentionWriter) {}
 
   static create({
     retention,
   }: {
-    retention: Pick<DataRetentionService, "raiseStoredRetention">;
+    retention: StoredRetentionWriter;
   }): ApplyRetentionExtensionCommand {
     return new ApplyRetentionExtensionCommand(retention);
   }
@@ -94,10 +148,11 @@ export class ApplyRetentionExtensionCommand implements CommandHandler<
     command: Command<ApplyRetentionExtensionCommandData>,
   ): Promise<RetentionAppliedEvent[]> {
     const { organizationId, projectId, extensionId, category, occurredAt } = command.data;
-    const { tables, retentionDays } = await this.retention.raiseStoredRetention({
-      projectId,
-      category,
-    });
+    const mode = command.data.mode ?? "raise";
+    const { tables, retentionDays } =
+      mode === "apply"
+        ? await this.retention.applyStoredRetention({ projectId, category })
+        : await this.retention.raiseStoredRetention({ projectId, category });
     return [
       EventUtils.createEvent<RetentionAppliedEvent>({
         aggregateType: RETENTION_EXTENSION_AGGREGATE_TYPE,
@@ -111,6 +166,7 @@ export class ApplyRetentionExtensionCommand implements CommandHandler<
           extensionId,
           category,
           retentionDays,
+          mode,
           tables,
           appliedAt: occurredAt,
         },

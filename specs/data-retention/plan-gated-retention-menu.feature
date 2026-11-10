@@ -66,11 +66,11 @@ Feature: Plan-gated data-retention menu
     And the stored retention is never shortened on its own
 
   @integration
-  Scenario: Applying a change to existing data is opt-in, not automatic
+  Scenario: Saving a policy from the editor never rewrites stored data by itself
     Given a manager is setting a new retention policy
-    When the editor opens
-    Then "apply this change to existing data" is off by default
-    So that saving a policy never rewrites existing data unless explicitly chosen
+    When they save it from the editor
+    Then the editor saves only the scopes and the period
+    And the page, not the editor, offers to apply it to stored data
 
   @unit
   # A checkout that carried a retention pick sets it instead: specs/billing/retention-at-upgrade.feature

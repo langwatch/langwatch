@@ -5,6 +5,7 @@ import type {
   OrganizationStorageEstimate,
   RetentionPolicySnapshot,
   RetentionStorageUsage,
+  StoredPastRetention,
 } from "./data-retention.snapshot.ts";
 import type {
   IdIndexRetentionRaiseInput,
@@ -78,6 +79,13 @@ export interface DataRetentionApi {
   getScopeStorageUsage(
     input: { projectId: string; scope: ScopeAssignment } & RetentionCallerInput,
   ): Promise<RetentionStorageUsage>;
+  getStoredPastRetention(
+    input: { projectId: string; scope: ScopeAssignment } & RetentionCallerInput,
+  ): Promise<StoredPastRetention>;
+  /** Asks the worker to rewrite every project's stored rows under the scope to its period. */
+  applyScopeRetentionToStoredData(
+    input: { organizationId?: string; scope: ScopeAssignment } & RetentionCallerInput,
+  ): Promise<void>;
   /** Asked `subscription:upgrade` at the door; the total spans all the organization's projects. */
   getOrganizationStorageEstimate(input: {
     organizationId: string;
