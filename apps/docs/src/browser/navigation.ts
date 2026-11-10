@@ -1,5 +1,4 @@
 import { docsBasePath } from "../config.ts";
-import { mayFetchAhead } from "./fetch-ahead.ts";
 
 /** A fetched page: its HTML and the address it ended at after any host redirect. */
 type Fetched = { html: string; url: string };
@@ -46,10 +45,17 @@ async function fetchPage({ url }: { url: URL }) {
   }
 }
 
+/** Whether a page may be fetched ahead of a click: never offline or for a reader saving data. */
+function mayFetchAhead() {
+  const saveData = (navigator as { connection?: { saveData?: boolean } }).connection?.saveData;
+  return navigator.onLine && !saveData;
+}
+
+/* A hover or visible-link prefetch from the reading island passes the same policy as a press. */
 function prefetch({ event }: { event: Event }) {
   const request = (event as CustomEvent<PrefetchRequest>).detail;
   const url = pageUrl({ anchor: request.anchor });
-  if (url) request.result = fetchPage({ url }).then(() => {});
+  if (url && mayFetchAhead()) request.result = fetchPage({ url }).then(() => {});
 }
 
 /* The shared sheet of a page that has not finished loading names its address in `data-href`. */

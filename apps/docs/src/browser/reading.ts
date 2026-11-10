@@ -1,7 +1,6 @@
 import { startAgentChoice } from "../features/shell/browser.ts";
 /* Deferred reading enhancements, kept out of the bootstrap budget: speculative prefetch, the
    sidebar agent selection and the media island on pages that hold clips. */
-import { mayFetchAhead } from "./fetch-ahead.ts";
 import type { PrefetchRequest } from "./navigation.ts";
 
 startAgentChoice();
@@ -15,8 +14,9 @@ let hovered: HTMLAnchorElement | null = null;
 let hoverTimer: ReturnType<typeof setTimeout> | undefined;
 let observer: IntersectionObserver | null = null;
 
+/* Offline and Save-Data are navigation's call (mayFetchAhead); this caps what is in flight. */
 function allowed() {
-  return mayFetchAhead() && inFlight < MAX_IN_FLIGHT;
+  return inFlight < MAX_IN_FLIGHT;
 }
 
 /** Hands a likely destination to navigation, whose cache the click then reuses. */
