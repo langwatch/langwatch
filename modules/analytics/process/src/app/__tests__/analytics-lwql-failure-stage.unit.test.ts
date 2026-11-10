@@ -47,7 +47,6 @@ beforeEach(() => {
 afterEach(() => meter.uninstall());
 
 async function harness({ keyless = [] }: { keyless?: readonly string[] } = {}) {
-  const lookedUp: string[] = [];
   const app = await AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>(),
@@ -56,7 +55,6 @@ async function harness({ keyless = [] }: { keyless?: readonly string[] } = {}) {
       projects: createApiFixture<ProjectApi>({
         getOrganizationId: async () => "org-free",
         findById: async (id) => {
-          lookedUp.push(id);
           return keyless.includes(id) ? null : project(id);
         },
       }),
