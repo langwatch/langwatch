@@ -271,6 +271,37 @@ function docsSkill({ skills }: { skills: AgentSkill[] }) {
   ].join("\n");
 }
 
+/* The anonymous docs MCP: the hosted MCP's /mcp/docs, which the docs distribution forwards
+   langwatch.ai/docs/mcp to. Its tools are the docs tools in mcp/typescript (registerDocsTools). */
+const DOCS_MCP_TOOLS = [
+  {
+    name: "fetch_langwatch_docs",
+    description:
+      "Fetches the LangWatch docs: the index when given no URL, then any page's Markdown.",
+  },
+  {
+    name: "fetch_scenario_docs",
+    description:
+      "Fetches the Scenario agent-testing docs: the index when given no URL, then any page's Markdown.",
+  },
+];
+
+/** The server card at /.well-known/mcp/server-card.json, where the previous docs host had one. */
+function docsMcpServerCard() {
+  const name = "LangWatch Docs MCP";
+  return {
+    name,
+    description: "Read the LangWatch and Scenario documentation as Markdown",
+    version: "1.0.0",
+    serverInfo: { name, version: "1.0.0" },
+    url: docsUrl({ path: "/mcp" }),
+    transport: "http",
+    capabilities: { tools: true },
+    authentication: "none",
+    tools: DOCS_MCP_TOOLS,
+  };
+}
+
 /** The AI crawlers robots.txt allows by name; the agent readiness budgets list the same ones. */
 export const AI_CRAWLERS = [
   "GPTBot",
@@ -340,6 +371,7 @@ export function discoveryFiles({
     /* The previous docs host answered here too, and agents and link checkers kept the address. */
     ".well-known/llms.txt": directory,
     "skill.md": docsSkill({ skills }),
+    ".well-known/mcp/server-card.json": `${JSON.stringify(docsMcpServerCard())}\n`,
     "robots.txt": robots(),
     "indexnow.txt": `${INDEXNOW_KEY}\n`,
     "humans.txt": `Reasoning Engine B.V.\nBuilt in Amsterdam.\nSource: https://github.com/langwatch/langwatch\nDocumentation contributions: https://github.com/langwatch/langwatch/issues\n`,

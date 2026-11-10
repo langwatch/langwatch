@@ -58,6 +58,20 @@ describe("agent discovery files", () => {
       expect(files[".well-known/llms.txt"]).toBe(files["llms.txt"]);
     });
 
+    /** @scenario "The docs MCP keeps its server card" */
+    it("publishes the docs MCP's server card at its previous address", () => {
+      const card = JSON.parse(files[".well-known/mcp/server-card.json"] ?? "");
+      expect(card).toMatchObject({
+        url: "https://langwatch.ai/docs/mcp",
+        transport: "http",
+        authentication: "none",
+      });
+      expect(card.tools.map((tool: { name: string }) => tool.name)).toEqual([
+        "fetch_langwatch_docs",
+        "fetch_scenario_docs",
+      ]);
+    });
+
     /** @scenario "The agent card names LangWatch and lists its skills" */
     it("publishes a card with the summary and one entry per skill", () => {
       const card = JSON.parse(files[".well-known/agent-card.json"] ?? "");

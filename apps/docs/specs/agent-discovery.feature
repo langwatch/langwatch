@@ -29,6 +29,12 @@ Feature: Agents discover the documentation and its skills
     And /.well-known/llms.txt is the same file as /llms.txt
 
   @unit
+  Scenario: The docs MCP keeps its server card
+    When the discovery files are generated
+    Then /.well-known/mcp/server-card.json names the docs MCP at https://langwatch.ai/docs/mcp
+    And it takes no credential and lists the two docs tools
+
+  @unit
   Scenario: Robots.txt declares the content signals
     When the discovery files are generated
     Then robots.txt has the content signal line right after the user agent line
@@ -46,9 +52,10 @@ Feature: Agents discover the documentation and its skills
     And every page response names its twin in a Link header and varies by Accept
     But a browser asking for HTML still gets the page
     And a crawler that does not ask for Markdown gets the page, whatever its user agent
-  # Markdown by user agent would answer AI crawlers differently from readers, which search
-  # engines treat as cloaking; the big AI crawlers read HTML well, and the Link header and
-  # the page head name the twin for any that want it (issue 9459, item 2).
+  # The preview negotiates on Accept only. In production the docs distribution also answers
+  # ChatGPT-User and OAI-SearchBot with the Markdown twin by user agent, as the previous docs
+  # host did (langwatch-saas docs-site-viewer-request.js, ruled 2026-11-10); GPTBot and other
+  # crawlers still get the page unless they ask.
 
   @unit
   Scenario: Serve files with the caching a production host gives them
