@@ -16374,7 +16374,7 @@ For a request made by a person, LangWatch uses the first of these that is set: t
 
 A request that matches none of these is counted under **Unassigned**.
 
-The person always wins over the project, so a developer's personal AI use and the agents their team runs can land in the same department. The department breakdown on **Governance > Analytics** is in preview; spend per team is on **Governance > Teams** and spend per person on **Governance > People** today.
+The person always wins over the project, so a developer's personal AI use and the agents their team runs can land in the same department. The department breakdown on **Governance > Analytics** is in preview; spend per team is on the Teams page at `/governance/teams` and spend per person on **Governance > People** today.
 
 ## Archive a department
 
@@ -17475,7 +17475,7 @@ From a monthly invoice you get the total. Once every machine reports, you can al
 | --- | --- |
 | What did each engineer's sessions cost, and on which model? | [Sessions](/coding-agents/sessions), per person or per project |
 | What did this pull request cost, across everyone who worked on it? | [Pull requests](/coding-agents/pull-requests) |
-| How does spend split across teams and people? | **Governance > Teams** for each team's total, **Governance > People** for each person |
+| How does spend split across teams and people? | The Teams page at `/governance/teams` for each team's total, **Governance > People** for each person |
 | Why was one session so expensive? | The session's **Usage** tab: peak context, cache misses and the call that rebuilt the cache |
 
 Codex, GitHub Copilot, Gemini CLI, opencode, Grok CLI and pi report the same way, so a team that mixes agents reads one set of numbers.
@@ -21143,7 +21143,7 @@ See the [coding agents API reference](/api-reference/coding-agents/overview).
 
 ## For admins
 
-**Governance > Teams** at `/governance/teams` lists every team's spend and requests over the last 30 days. **Governance > People** at `/governance/people` ranks each person by spend, and a person's row opens their page, personal AI use included. To count spend by cost center, assign people, teams and projects to departments on [People](/ai-governance/people).
+The Teams page at `/governance/teams` lists every team's spend and requests over the last 30 days. **Governance > People** at `/governance/people` ranks each person by spend, and a person's row opens their page, personal AI use included. To count spend by cost center, assign people, teams and projects to departments on [People](/ai-governance/people).
 
 **Also check:** [Sessions](/coding-agents/sessions) for the per-session detail behind these rollups, and [Compare provider costs](/coding-agents/compare-provider-costs) to price your real usage mix against other providers.
 
