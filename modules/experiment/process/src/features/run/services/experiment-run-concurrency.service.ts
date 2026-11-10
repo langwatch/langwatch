@@ -79,6 +79,20 @@ export class ExperimentRunConcurrencyService {
     }
   }
 
+  /** Resolves the run's concurrency and starts it, giving the claim back when the start throws. */
+  async startClaimed(
+    claim: { projectId: string; runId: string; requested?: number | undefined },
+    start: (concurrency: number) => Promise<void>,
+  ): Promise<void> {
+    const concurrency = await this.resolve(claim);
+    try {
+      await start(concurrency);
+    } catch (error) {
+      await this.release(claim);
+      throw error;
+    }
+  }
+
   /** Gives back a claim whose run never started; a failed release only logs, the claim expires. */
   async release({ projectId, runId }: { projectId: string; runId: string }): Promise<void> {
     if (!this.isDynamic) return;

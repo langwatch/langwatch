@@ -103,6 +103,20 @@ function behavesOver(
     });
   });
 
+  describe("when a run's start throws after its concurrency was claimed", () => {
+    it("gives the claim back and rethrows", async () => {
+      const { activity, projectId } = store();
+      const service = serviceOver({ activity, projectCellBudget: 20 });
+
+      await expect(
+        service.startClaimed({ projectId, runId: "broken-run" }, async () => {
+          throw new Error("plan failed");
+        }),
+      ).rejects.toThrow("plan failed");
+      expect(await service.resolve({ projectId, runId: "next-run" })).toBe(20);
+    });
+  });
+
   describe("when no project budget is set", () => {
     /** @scenario "Dynamic mode off keeps the fixed default" */
     it("answers EVAL_V3_CONCURRENCY whatever is active", async () => {
