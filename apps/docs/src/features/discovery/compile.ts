@@ -4,6 +4,7 @@ export {
   discoveryFiles,
   exportSlug,
   llmsFull,
+  exportSizes,
   llmsSectionFiles,
   type PageExport,
 } from "./compile/discovery-files.ts";

@@ -35,6 +35,88 @@ export function sectionFile({ title }: { title: string }) {
   return `llms-full/${sectionId({ title })}.txt`;
 }
 
+/** A combined file past this many characters (about 100k tokens) is split by its groups. */
+export const LLMS_FILE_BUDGET = 400_000;
+
+/** One combined file: where it is published, what llms.txt calls it and its pages in order. */
+export type LlmsFile = { file: string; title: string; slugs: string[] };
+
+type FileScope = {
+  nav: DirectoryNav;
+  sizes: ReadonlyMap<string, number>;
+  budget: number;
+  /** Pages an earlier section already holds. */
+  listed: ReadonlySet<string>;
+};
+
+function scopeSlugs({ scope, items }: { scope: FileScope; items: NavItem[] }) {
+  return flatPages({ items })
+    .map((page) => page.slug)
+    .filter((slug) => Object.hasOwn(scope.nav.pages, slug) && !scope.listed.has(slug));
+}
+
+/** One file for the items; past the budget, one per group (split again while still over budget)
+    after one for the pages outside any group. */
+function filesFor({
+  scope,
+  items,
+  path,
+  title,
+}: {
+  scope: FileScope;
+  items: NavItem[];
+  path: string;
+  title: string;
+}): LlmsFile[] {
+  const slugs = scopeSlugs({ scope, items });
+  const size = slugs.reduce((sum, slug) => sum + (scope.sizes.get(slug) ?? 0), 0);
+  const groups = items.flatMap((item) => (item.type === "group" ? [item] : []));
+  if (size <= scope.budget || groups.length === 0)
+    return slugs.length > 0 ? [{ file: `llms-full/${path}.txt`, title, slugs }] : [];
+  const loose = items.filter((item) => item.type === "page");
+  return [
+    ...filesFor({ scope, items: loose, path, title }),
+    ...groups.flatMap((group) =>
+      filesFor({
+        scope,
+        items: group.children,
+        path: `${path}/${sectionId({ title: group.title })}`,
+        title: `${title}: ${group.title}`,
+      }),
+    ),
+  ];
+}
+
+/** Each section's pages and the combined files that hold them, in reading order. */
+function llmsFilePlan({
+  nav,
+  sizes = new Map(),
+  budget = LLMS_FILE_BUDGET,
+}: {
+  nav: DirectoryNav;
+  sizes?: ReadonlyMap<string, number>;
+  budget?: number;
+}) {
+  const listed = new Set<string>();
+  return (nav.anchors ?? []).map((section) => {
+    const scope = { nav, sizes, budget, listed: new Set(listed) };
+    const slugs = scopeSlugs({ scope, items: section.children });
+    for (const slug of slugs) listed.add(slug);
+    const files = filesFor({
+      scope,
+      items: section.children,
+      path: sectionId({ title: section.title }),
+      title: section.title,
+    });
+    return { section, slugs, files };
+  });
+}
+
+/** Each page's Markdown size, which decides where a combined file is split. */
+export function exportSizes({ exports }: { exports: PageExport[] }) {
+  return new Map(exports.map((page) => [page.slug, page.markdown.length]));
+}
+
 /** One line per resource group: its overview page and how many pages the section file holds. */
 function resourceLines({ nav, items }: { nav: DirectoryNav; items: NavItem[] }) {
   return items.flatMap((item) => {
@@ -49,37 +131,40 @@ function resourceLines({ nav, items }: { nav: DirectoryNav; items: NavItem[] }) 
   });
 }
 
-/** The pages a section lists, in reading order, skipping any an earlier section listed. */
-function sectionSlugs({
-  nav,
-  section,
-  listed,
-}: {
-  nav: DirectoryNav;
-  section: Section;
-  listed: Set<string>;
-}) {
-  return flatPages({ items: section.children })
-    .map((page) => page.slug)
-    .filter((slug) => Object.hasOwn(nav.pages, slug) && !listed.has(slug));
+function fileLine({ file }: { file: LlmsFile }) {
+  const pages = `${file.slugs.length} ${file.slugs.length === 1 ? "page" : "pages"}`;
+  return `- [${file.title}](${docsUrl({ path: `/${file.file}` })}): ${pages} in one file`;
 }
 
-/** Every page once, grouped under the site's own sections in reading order; the rest after. */
-export function llmsDirectory({ nav }: { nav: DirectoryNav }) {
+/** Every page once, grouped under the site's own sections in reading order; the rest after.
+    `sizes` (each page's Markdown length) decides which section files are split by group. */
+export function llmsDirectory({
+  nav,
+  sizes,
+  budget,
+}: {
+  nav: DirectoryNav;
+  sizes?: ReadonlyMap<string, number>;
+  budget?: number;
+}) {
   const listed = new Set<string>();
   const groups: string[] = [];
   const files: string[] = [];
-  for (const section of nav.anchors ?? []) {
-    const slugs = sectionSlugs({ nav, section, listed });
+  for (const { section, slugs, files: sectionFiles } of llmsFilePlan({ nav, sizes, budget })) {
     if (slugs.length === 0) continue;
     for (const slug of slugs) listed.add(slug);
-    const file = docsUrl({ path: `/${sectionFile({ title: section.title })}` });
-    files.push(`- [${section.title}](${file}): ${slugs.length} pages in one file`);
-    const lines = RESOURCE_LISTED_SECTIONS.has(section.title)
+    files.push(...sectionFiles.map((file) => fileLine({ file })));
+    const resourceListed = RESOURCE_LISTED_SECTIONS.has(section.title);
+    const lines = resourceListed
       ? resourceLines({ nav, items: section.children })
       : slugs.map((slug) => directoryLine({ nav, slug }));
-    const note = RESOURCE_LISTED_SECTIONS.has(section.title)
-      ? `\n\nOne entry per resource; every operation is in ${file}.`
+    const [only] = sectionFiles;
+    const where =
+      sectionFiles.length === 1 && only
+        ? docsUrl({ path: `/${only.file}` })
+        : "its resource's file, listed above";
+    const note = resourceListed
+      ? `\n\nOne entry per resource; every operation is in ${where}.`
       : "";
     groups.push(`## ${section.title}${note}\n\n${lines.join("\n")}`);
   }
@@ -123,17 +208,23 @@ export function llmsFull({ nav, exports }: { nav: DirectoryNav; exports: PageExp
   return combined({ nav, exports });
 }
 
-/** One file per section, named in llms.txt, each with the section's pages in reading order. */
-export function llmsSectionFiles({ nav, exports }: { nav: DirectoryNav; exports: PageExport[] }) {
+/** One file per section, named in llms.txt, each with the section's pages in reading order; a
+    section over the budget is one file per group instead. */
+export function llmsSectionFiles({
+  nav,
+  exports,
+  budget,
+}: {
+  nav: DirectoryNav;
+  exports: PageExport[];
+  budget?: number;
+}) {
   const bySlug = new Map(exports.map((page) => [page.slug, page]));
-  const listed = new Set<string>();
   const files: Record<string, string> = {};
-  for (const section of nav.anchors ?? []) {
-    const slugs = sectionSlugs({ nav, section, listed });
-    for (const slug of slugs) listed.add(slug);
+  const plan = llmsFilePlan({ nav, sizes: exportSizes({ exports }), budget });
+  for (const { file, slugs } of plan.flatMap((entry) => entry.files)) {
     const pages = slugs.flatMap((slug) => bySlug.get(slug) ?? []);
-    if (pages.length > 0)
-      files[sectionFile({ title: section.title })] = combined({ nav, exports: pages });
+    if (pages.length > 0) files[file] = combined({ nav, exports: pages });
   }
   return files;
 }
@@ -185,10 +276,13 @@ export function discoveryFiles({
   nav,
   lastModified = new Map(),
   skills = [],
+  sizes,
 }: {
   nav: DirectoryNav;
   lastModified?: ReadonlyMap<string, string>;
   skills?: AgentSkill[];
+  /** Each page's Markdown length, so llms.txt names the section files the build splits. */
+  sizes?: ReadonlyMap<string, number>;
 }): Record<string, string> {
   const entries = Object.keys(nav.pages).map((slug) => {
     const date = lastModified.get(slug);
@@ -199,7 +293,7 @@ export function discoveryFiles({
     ...Object.fromEntries(skills.map((skill) => [skillFile({ name: skill.name }), skill.contents])),
     ".well-known/agent-skills/index.json": `${JSON.stringify(agentSkillsIndex({ skills }))}\n`,
     ".well-known/agent-card.json": `${JSON.stringify(agentCard({ skills, description: DIRECTORY_SUMMARY }))}\n`,
-    "llms.txt": llmsDirectory({ nav }),
+    "llms.txt": llmsDirectory({ nav, sizes }),
     "robots.txt": robots(),
     "indexnow.txt": `${INDEXNOW_KEY}\n`,
     "humans.txt": `Reasoning Engine B.V.\nBuilt in Amsterdam.\nSource: https://github.com/langwatch/langwatch\nDocumentation contributions: https://github.com/langwatch/langwatch/issues\n`,

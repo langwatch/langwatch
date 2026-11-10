@@ -13,6 +13,7 @@ import { extractPromptBodies, extractSkillPrompts } from "../features/content/co
 import {
   breadcrumbTrail,
   discoveryFiles,
+  exportSizes,
   FONT_SOURCE,
   llmsFull,
   llmsSectionFiles,
@@ -393,6 +394,7 @@ async function generate() {
       nav: context.nav,
       lastModified: pageLastModified({ docsRoot }),
       skills: readAgentSkills(),
+      sizes: exportSizes({ exports: markdown }),
     }),
   ))
     files.set(name, contents);

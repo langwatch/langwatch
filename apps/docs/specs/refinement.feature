@@ -28,6 +28,13 @@ Feature: Actionable documentation and restrained reading surfaces
     And llms.txt names every section file, with its page count, before the page directory
     And a page reached only through its section file still counts as listed in llms.txt
   @unit
+  Scenario: Split a section too large to read whole by its groups
+    Given a section whose pages come to more than about 100k tokens
+    When the discovery files are generated
+    Then the section is one file per navigation group under llms-full/<section>/, split again while a group is still over
+    And llms.txt names each of those files, with its page count, instead of the section file
+    And a section under the budget stays one file
+  @unit
   Scenario: List the API reference once per resource
     Given the API reference holds one page per operation
     When llms.txt is generated

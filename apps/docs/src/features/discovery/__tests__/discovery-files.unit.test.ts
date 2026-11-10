@@ -5,6 +5,7 @@ import budgets from "../../../site/audit/budgets.json" with { type: "json" };
 import {
   AI_CRAWLERS,
   discoveryFiles,
+  exportSizes,
   llmsDirectory,
   llmsFull,
   llmsSectionFiles,
@@ -186,6 +187,27 @@ describe("when agents read the whole documentation", () => {
         "- [API Reference](https://langwatch.ai/docs/llms-full/api-reference.txt): 3 pages in one file",
       );
       expect(llms.indexOf("Sections in one file each")).toBeLessThan(llms.indexOf("## Platform"));
+    });
+
+    /** @scenario "Split a section too large to read whole by its groups" */
+    it("splits a section over the budget into one file per group, and llms.txt names each", () => {
+      const budget = exports[0]?.markdown.length ?? 0;
+      const files = llmsSectionFiles({ nav: sectioned, exports, budget });
+      expect(Object.keys(files)).toEqual([
+        "llms-full/platform.txt",
+        "llms-full/api-reference/traces.txt",
+      ]);
+      const llms = llmsDirectory({ nav: sectioned, sizes: exportSizes({ exports }), budget });
+      expect(llms).toContain(
+        "- [API Reference: Traces](https://langwatch.ai/docs/llms-full/api-reference/traces.txt): 3 pages in one file",
+      );
+      expect(llms).not.toContain("llms-full/api-reference.txt");
+    });
+
+    /** @scenario "Split a section too large to read whole by its groups" */
+    it("keeps a section under the budget as one file", () => {
+      const files = llmsSectionFiles({ nav: sectioned, exports, budget: Number.MAX_SAFE_INTEGER });
+      expect(Object.keys(files)).toContain("llms-full/api-reference.txt");
     });
 
     /** @scenario "List the API reference once per resource" */
