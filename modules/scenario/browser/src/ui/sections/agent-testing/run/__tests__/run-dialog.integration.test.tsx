@@ -5,7 +5,9 @@
  * @see specs/suites/run-notes.feature
  * @see specs/suites/test-suite-run-plan-reuse.feature
  * @see specs/features/agent-testing/results-tabs.feature
+ * @see specs/licensing/cloud-free-creation-caps.feature
  */
+import { markHandledGlobally } from "@langwatch/browser-host/errors";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -343,6 +345,27 @@ describe("<RunDialog/>", () => {
     expect(screen.getByTestId("customize-run-chips")).toBeInTheDocument();
     expect(screen.queryByTestId("run-note-field")).not.toBeInTheDocument();
     expect(screen.queryByTestId("run-dialog-parameters")).not.toBeInTheDocument();
+  });
+
+  /** @scenario "Running a scenario from the app past the run cap opens the upgrade prompt" */
+  it("leaves a run refused for the plan's run cap to the upgrade prompt", async () => {
+    const user = userEvent.setup();
+    const refusal = Object.assign(new Error("Run cap reached"), {
+      data: {
+        httpStatus: 403,
+        cause: { limitType: "scenarioRuns", current: 100, max: 100 },
+        error: { code: "limit_exceeded", httpStatus: 403, meta: {} },
+      },
+    });
+    markHandledGlobally(refusal);
+    mockSuitesRunPlan.mockRejectedValue(refusal);
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("run-dialog-run"));
+
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("run-dialog-error")).not.toBeInTheDocument();
+    expect(mockRunScenario).not.toHaveBeenCalled();
   });
 
   /** @scenario "The only agent of a project is not chosen for a scenario with no saved agent" */

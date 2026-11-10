@@ -1,4 +1,8 @@
-import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
+import {
+  describeError,
+  isHandledByGlobalHandler,
+  showErrorToast,
+} from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
@@ -123,6 +127,7 @@ function parameterErrorOf(error: unknown): ParameterFieldError | null {
 
 /**
  * Shows a coded refusal inside the dialog; anything else becomes a toast.
+ * A refusal a global handler already showed (the upgrade modal) stays quiet.
  */
 function useSurfaceRunError({
   setInlineError,
@@ -133,6 +138,7 @@ function useSurfaceRunError({
 }) {
   return useCallback(
     (error: unknown) => {
+      if (isHandledByGlobalHandler(error)) return;
       const parameterError = parameterErrorOf(error);
       if (parameterError) {
         setParameterError(parameterError);

@@ -65,6 +65,7 @@ Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
     When a member clicks Run on a scenario or a suite
     Then the run is refused before it is queued
     And the refusal carries limit type "scenarioRuns" with status 403, which opens the upgrade prompt
+    And the run dialog behind the upgrade prompt shows no error of its own
 
   @unit
   Scenario: A run reported through the SDK past the run cap is refused with the limit shape
