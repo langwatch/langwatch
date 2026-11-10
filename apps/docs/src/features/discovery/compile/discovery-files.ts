@@ -136,6 +136,31 @@ function fileLine({ file }: { file: LlmsFile }) {
   return `- [${file.title}](${docsUrl({ path: `/${file.file}` })}): ${pages} in one file`;
 }
 
+/** A section's heading and its entries: one per page, or one per resource in the API reference. */
+function sectionDirectory({
+  nav,
+  section,
+  slugs,
+  files,
+}: {
+  nav: DirectoryNav;
+  section: Section;
+  slugs: string[];
+  files: LlmsFile[];
+}) {
+  if (!RESOURCE_LISTED_SECTIONS.has(section.title)) {
+    const lines = slugs.map((slug) => directoryLine({ nav, slug }));
+    return `## ${section.title}\n\n${lines.join("\n")}`;
+  }
+  const [only] = files;
+  const where =
+    files.length === 1 && only
+      ? docsUrl({ path: `/${only.file}` })
+      : "its resource's file, listed above";
+  const lines = resourceLines({ nav, items: section.children });
+  return `## ${section.title}\n\nOne entry per resource; every operation is in ${where}.\n\n${lines.join("\n")}`;
+}
+
 /** Every page once, grouped under the site's own sections in reading order; the rest after.
     `sizes` (each page's Markdown length) decides which section files are split by group. */
 export function llmsDirectory({
@@ -154,19 +179,7 @@ export function llmsDirectory({
     if (slugs.length === 0) continue;
     for (const slug of slugs) listed.add(slug);
     files.push(...sectionFiles.map((file) => fileLine({ file })));
-    const resourceListed = RESOURCE_LISTED_SECTIONS.has(section.title);
-    const lines = resourceListed
-      ? resourceLines({ nav, items: section.children })
-      : slugs.map((slug) => directoryLine({ nav, slug }));
-    const [only] = sectionFiles;
-    const where =
-      sectionFiles.length === 1 && only
-        ? docsUrl({ path: `/${only.file}` })
-        : "its resource's file, listed above";
-    const note = resourceListed
-      ? `\n\nOne entry per resource; every operation is in ${where}.`
-      : "";
-    groups.push(`## ${section.title}${note}\n\n${lines.join("\n")}`);
+    groups.push(sectionDirectory({ nav, section, slugs, files: sectionFiles }));
   }
   const rest = Object.keys(nav.pages).filter((slug) => !listed.has(slug));
   if (rest.length > 0)
