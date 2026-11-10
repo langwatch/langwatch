@@ -1,5 +1,5 @@
 import { canonicalUrl, docsUrl, publicSlug } from "../../../lib/site-path.ts";
-import { flatPages, type NavItem, type Section } from "../../navigation/model.ts";
+import { flatPages, type NavItem, type Section, sectionId } from "../../navigation/model.ts";
 import { agentCard, agentSkillsIndex, skillFile } from "./agent-discovery.ts";
 import type { AgentSkill } from "./agent-discovery.ts";
 import { INDEX_LINE } from "./markdown-export.ts";
@@ -32,10 +32,7 @@ export const RESOURCE_LISTED_SECTIONS = new Set(["API Reference"]);
 
 /** A section's own file, holding every one of its pages' Markdown. */
 export function sectionFile({ title }: { title: string }) {
-  return `llms-full/${title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")}.txt`;
+  return `llms-full/${sectionId({ title })}.txt`;
 }
 
 /** One line per resource group: its overview page and how many pages the section file holds. */

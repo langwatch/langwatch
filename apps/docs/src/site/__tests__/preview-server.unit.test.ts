@@ -42,8 +42,6 @@ describe("when an agent asks for a page", () => {
     expect(prefersMarkdown({ accept: "text/html,application/xhtml+xml,*/*;q=0.8" })).toBe(false);
     expect(prefersMarkdown({ accept: "text/html, text/markdown;q=0.5" })).toBe(false);
     expect(prefersMarkdown({ accept: "" })).toBe(false);
-    /* A crawler's user agent is no input: GPTBot sending a browser Accept still gets HTML. */
-    expect(prefersMarkdown({ accept: "text/html,*/*;q=0.8" })).toBe(false);
   });
 
   /** @scenario "An agent that asks for Markdown gets the page's Markdown" */

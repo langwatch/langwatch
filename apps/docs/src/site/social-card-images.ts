@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { chromium } from "playwright";
@@ -7,58 +7,87 @@ import sharp from "sharp";
 import {
   allSocialCards,
   SOCIAL_CARD_SIZE,
+  SOCIAL_CARD_SOURCES,
   SOCIAL_CARD_WEBP,
   socialCardHtml,
   socialCardPath,
   type SocialCard,
 } from "../features/discovery/compile.ts";
-import { appRoot, cacheRoot } from "../paths.ts";
+import { cacheRoot } from "../paths.ts";
+import { writeAtomically } from "./media-cache.ts";
 
-const cacheDir = path.join(cacheRoot, "docs-site/social");
-const fontDir = path.join(appRoot, "src/app/fonts");
+/** Draws a card's page to a raster image; the build's is one headless Chromium page. */
+export type CardCapture = {
+  capture: (html: string) => Promise<Uint8Array>;
+  close: () => Promise<void>;
+};
 
-/** Each card's WebP keyed by its output name, from the disk cache or one headless Chromium page. */
-export async function renderSocialCards({
-  cards = allSocialCards(),
-}: { cards?: readonly SocialCard[] } = {}) {
-  const files = new Map<string, Uint8Array>();
-  const missing: { card: SocialCard; name: string; cached: string }[] = [];
-  for (const card of cards) {
-    const name = socialCardPath({ card }).slice(1);
-    const cached = path.join(cacheDir, path.basename(name));
-    try {
-      files.set(name, await readFile(cached));
-    } catch {
-      missing.push({ card, name, cached });
-    }
-  }
-  if (missing.length === 0) return files;
+async function chromiumCapture(): Promise<CardCapture> {
   const browser = await chromium.launch();
-  try {
-    const page = await browser.newPage({ viewport: SOCIAL_CARD_SIZE, deviceScaleFactor: 1 });
-    await page.route("http://cards.local/fonts/*", async (route) => {
-      const file = path.basename(new URL(route.request().url()).pathname);
-      await route.fulfill({
-        contentType: "font/woff2",
-        body: await readFile(path.join(fontDir, file)),
-      });
+  const page = await browser.newPage({ viewport: SOCIAL_CARD_SIZE, deviceScaleFactor: 1 });
+  await page.route("http://cards.local/fonts/*", async (route) => {
+    const file = path.basename(new URL(route.request().url()).pathname);
+    if (!SOCIAL_CARD_SOURCES.fontFiles.some((name) => name === file)) return route.abort();
+    await route.fulfill({
+      contentType: "font/woff2",
+      body: await readFile(path.join(SOCIAL_CARD_SOURCES.fonts, file)),
     });
-    await mkdir(cacheDir, { recursive: true });
-    for (const { card, name, cached } of missing) {
+  });
+  return {
+    capture: async (html) => {
       await page.route("http://cards.local/", (route) =>
-        route.fulfill({ contentType: "text/html", body: socialCardHtml({ card }) }),
+        route.fulfill({ contentType: "text/html", body: html }),
       );
       await page.goto("http://cards.local/");
       await page.evaluate(() => document.fonts.ready);
       const shot = await page.screenshot({ type: "png" });
-      const image = await sharp(shot).webp(SOCIAL_CARD_WEBP).toBuffer();
       await page.unroute("http://cards.local/");
-      await writeFile(`${cached}.${process.pid}.partial`, image);
-      await rename(`${cached}.${process.pid}.partial`, cached);
+      return shot;
+    },
+    close: () => browser.close(),
+  };
+}
+
+/** A cache entry that still decodes as a WebP card, else null so the card is drawn again. */
+async function cached({ file }: { file: string }) {
+  try {
+    const bytes = await readFile(file);
+    const meta = await sharp(bytes).metadata();
+    return meta.format === "webp" ? bytes : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Each card's WebP keyed by its output name, from the disk cache or drawn on a miss. */
+export async function renderSocialCards({
+  cards = allSocialCards(),
+  cacheDir = path.join(cacheRoot, "docs-site/social"),
+  open = chromiumCapture,
+}: {
+  cards?: readonly SocialCard[];
+  cacheDir?: string;
+  open?: () => Promise<CardCapture>;
+} = {}) {
+  const files = new Map<string, Uint8Array>();
+  let drawer: CardCapture | undefined;
+  try {
+    for (const card of cards) {
+      const name = socialCardPath({ card }).slice(1);
+      const file = path.join(cacheDir, path.basename(name));
+      const hit = await cached({ file });
+      if (hit) {
+        files.set(name, hit);
+        continue;
+      }
+      drawer ??= await open();
+      const shot = await drawer.capture(socialCardHtml({ card }));
+      const image = await sharp(shot).webp(SOCIAL_CARD_WEBP).toBuffer();
+      await writeAtomically({ file, bytes: image });
       files.set(name, image);
     }
   } finally {
-    await browser.close();
+    await drawer?.close();
   }
   return files;
 }

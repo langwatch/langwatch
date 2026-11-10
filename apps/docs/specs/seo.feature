@@ -39,6 +39,7 @@ Feature: Search metadata matches the published documentation
     And the other two show the default card
     And each card is published under a name that changes whenever its text or template changes
     And adding a card is one entry in the card list
+    And the build draws a card only when its cache holds no readable copy of it
 
   @integration
   Scenario: Every published page carries complete search and social metadata

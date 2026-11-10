@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { docsRoot } from "../../../paths.ts";
+import { appRoot, docsRoot } from "../../../paths.ts";
 
 export const SOCIAL_CARD_SIZE = { width: 1200, height: 630 } as const;
 
@@ -141,11 +141,29 @@ export function socialCardAlt({ card }: { card: SocialCard }) {
 const escapeHtml = (text: string) =>
   text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
+/** Files a card is drawn from besides its text: their bytes are part of every card's name. */
+export const SOCIAL_CARD_SOURCES = {
+  logo: path.join(docsRoot, "logo/dark.svg"),
+  fonts: path.join(appRoot, "src/app/fonts"),
+  fontFiles: ["Inter-Variable-latin.woff2", "Sentient-Medium.woff2"],
+} as const;
+
 let logo: string | undefined;
+let sourcesDigest: string | undefined;
+
+/** One digest of the logo and font bytes; a page render key folds it in with the card names. */
+export function socialCardSourcesDigest() {
+  if (sourcesDigest) return sourcesDigest;
+  const hash = createHash("sha256").update(readFileSync(SOCIAL_CARD_SOURCES.logo));
+  for (const file of SOCIAL_CARD_SOURCES.fontFiles)
+    hash.update(readFileSync(path.join(SOCIAL_CARD_SOURCES.fonts, file)));
+  sourcesDigest = hash.digest("hex");
+  return sourcesDigest;
+}
 
 /** The card as a page: fonts load from `/fonts/<file>`, which the renderer serves. */
 export function socialCardHtml({ card }: { card: SocialCard }) {
-  logo ??= readFileSync(path.join(docsRoot, "logo/dark.svg"), "utf8");
+  logo ??= readFileSync(SOCIAL_CARD_SOURCES.logo, "utf8");
   const { width, height } = SOCIAL_CARD_SIZE;
   return `<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face{font-family:Inter;src:url(/fonts/Inter-Variable-latin.woff2);font-weight:100 900}
@@ -164,11 +182,12 @@ p{margin-top:24px;font-size:30px;line-height:1.35;color:#57534e;max-width:960px;
 <h1>${escapeHtml(card.title)}</h1><p>${escapeHtml(card.line)}</p><div class="bar"></div></body></html>`;
 }
 
-/** Where the card is published; a change to its template or encoding gives it a new name. */
+/** Where the card is published; a change to its template, encoding, logo or fonts renames it. */
 export function socialCardPath({ card }: { card: SocialCard }) {
   const hash = createHash("sha256")
     .update(socialCardHtml({ card }))
     .update(JSON.stringify(SOCIAL_CARD_WEBP))
+    .update(socialCardSourcesDigest())
     .digest("hex")
     .slice(0, 12);
   return `/social/${card.id}.${hash}.webp`;
