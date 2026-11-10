@@ -39,31 +39,43 @@ export class ExperimentRunConcurrencyService {
     return this.deps.config.projectCellBudget !== undefined;
   }
 
-  /** The concurrency a run starts with, computed once; the requested one wins. */
+  /**
+   * The concurrency a run starts with, computed once; the requested one wins. Where the default is
+   * dynamic the run is claimed active in the same step, pinned or not, since it holds cells too.
+   */
   async resolve({
     projectId,
+    runId,
     requested,
   }: {
     projectId: string;
+    runId: string;
     requested?: number | undefined;
   }): Promise<number> {
-    if (requested !== undefined) return requested;
     const { runConcurrency, projectCellBudget, globalCellBudget } = this.deps.config;
-    if (projectCellBudget === undefined) return runConcurrency;
+    if (projectCellBudget === undefined) return requested ?? runConcurrency;
+    const fallback = requested ?? runConcurrency;
     try {
-      const active = await this.deps.activity.countActive({ projectId, now: this.now() });
+      const now = this.now();
+      const others = await this.deps.activity.claim({
+        projectId,
+        runId,
+        now,
+        expiresAt: now + EXPERIMENT_RUN_ACTIVITY_WINDOW_MS,
+      });
+      if (requested !== undefined) return requested;
       return dynamicRunConcurrency({
-        projectActiveRuns: active.project,
-        globalActiveRuns: active.global,
+        projectActiveRuns: others.project,
+        globalActiveRuns: others.global,
         projectBudget: projectCellBudget,
         globalBudget: globalCellBudget,
       });
     } catch (error) {
       this.logger.warn(
-        { projectId, error, fallback: runConcurrency },
+        { projectId, error, fallback },
         "active experiment runs could not be read; using the fixed default concurrency",
       );
-      return runConcurrency;
+      return fallback;
     }
   }
 

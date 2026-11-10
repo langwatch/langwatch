@@ -38,28 +38,52 @@ function behavesOver(
 
   describe("when a run names a concurrency", () => {
     /** @scenario "A concurrency named by the request wins over the dynamic default" */
-    it("answers the named concurrency", async () => {
+    it("answers the named concurrency and still counts the run for the next one", async () => {
       const { activity, projectId } = store();
       const service = serviceOver({ activity, projectCellBudget: 20 });
 
-      expect(await service.resolve({ projectId, requested: 3 })).toBe(3);
+      expect(await service.resolve({ projectId, runId: "pinned", requested: 3 })).toBe(3);
+      expect(await service.resolve({ projectId, runId: "next" })).toBe(10);
     });
   });
 
-  describe("when three runs start one after another and stay active", () => {
+  describe("when three runs resolve one after another before any worker sees them start", () => {
     /** @scenario "Runs keep their start value, so the cells in flight can exceed the soft budget" */
     it("gives 24, 12 and 8, so 44 cells are in flight over a budget of 24", async () => {
       const { activity, projectId } = store();
       const service = serviceOver({ activity, projectCellBudget: 24 });
       const started: number[] = [];
       for (const runId of ["run-1", "run-2", "run-3"]) {
-        started.push(await service.resolve({ projectId }));
-        await service.recordStarted({ projectId, runId, startedAt: NOW });
+        started.push(await service.resolve({ projectId, runId }));
       }
 
       expect(started).toEqual([24, 12, 8]);
       // The budget is soft: runs keep their start value, the group queue caps dispatch.
       expect(started.reduce((sum, value) => sum + value, 0)).toBe(44);
+    });
+  });
+
+  describe("when three runs resolve at the same moment", () => {
+    /** @scenario "Runs resolved at the same moment each see the ones claimed before them" */
+    it("hands out 24, 12 and 8 between them", async () => {
+      const { activity, projectId } = store();
+      const service = serviceOver({ activity, projectCellBudget: 24 });
+
+      const started = await Promise.all(
+        ["burst-1", "burst-2", "burst-3"].map((runId) => service.resolve({ projectId, runId })),
+      );
+
+      expect(started.toSorted((a, b) => b - a)).toEqual([24, 12, 8]);
+    });
+  });
+
+  describe("when the same run resolves twice", () => {
+    it("does not count itself", async () => {
+      const { activity, projectId } = store();
+      const service = serviceOver({ activity, projectCellBudget: 20 });
+      await service.resolve({ projectId, runId: "retried" });
+
+      expect(await service.resolve({ projectId, runId: "retried" })).toBe(20);
     });
   });
 
@@ -72,7 +96,7 @@ function behavesOver(
       }
       const service = serviceOver({ activity });
 
-      expect(await service.resolve({ projectId })).toBe(7);
+      expect(await service.resolve({ projectId, runId: "run-c" })).toBe(7);
     });
   });
 
@@ -87,7 +111,7 @@ function behavesOver(
         startedAt: NOW - EXPERIMENT_RUN_ACTIVITY_WINDOW_MS - 1,
       });
 
-      expect(await service.resolve({ projectId })).toBe(20);
+      expect(await service.resolve({ projectId, runId: "new-run" })).toBe(20);
     });
   });
 
@@ -96,12 +120,14 @@ function behavesOver(
     it("counts it while active and not once completed", async () => {
       const { activity, projectId } = store();
       const service = serviceOver({ activity, projectCellBudget: 20 });
+      await service.resolve({ projectId, runId: "done-run" });
       await service.recordStarted({ projectId, runId: "done-run", startedAt: NOW });
-      const whileActive = await service.resolve({ projectId });
+      const whileActive = await service.resolve({ projectId, runId: "second-run" });
       await service.recordCompleted({ projectId, runId: "done-run" });
+      await service.recordCompleted({ projectId, runId: "second-run" });
 
       expect(whileActive).toBe(10);
-      expect(await service.resolve({ projectId })).toBe(20);
+      expect(await service.resolve({ projectId, runId: "third-run" })).toBe(20);
     });
   });
 }
@@ -120,14 +146,14 @@ describe("ExperimentRunConcurrencyService", () => {
         const { logger, lines } = createTestLogger();
         const service = ExperimentRunConcurrencyService.create({
           activity: createApiFixture<ExperimentRunActivityRepository>(
-            { countActive: () => Promise.reject(new Error("redis down")) },
+            { claim: () => Promise.reject(new Error("redis down")) },
             "activity",
           ),
           config: { runConcurrency: 7, projectCellBudget: 20 },
           logger,
         });
 
-        expect(await service.resolve({ projectId: "project-down" })).toBe(7);
+        expect(await service.resolve({ projectId: "project-down", runId: "run-down" })).toBe(7);
         expect(lines.findLine("warn", "could not be read")).toBeDefined();
       });
     });
@@ -142,12 +168,14 @@ describe("ExperimentRunConcurrencyService", () => {
     });
 
     afterAll(async () => {
-      const members = projects.map((projectId) => `eval_v3_active_runs:project:${projectId}`);
+      const members = projects.map(
+        (projectId) => `eval_v3_active_runs:{active}:project:${projectId}`,
+      );
       if (members.length > 0) await redis.del(...members);
       for (const projectId of projects) {
-        for (const member of await redis.zrange("eval_v3_active_runs:global", 0, -1)) {
+        for (const member of await redis.zrange("eval_v3_active_runs:{active}:global", 0, -1)) {
           if (member.startsWith(`${projectId}:`))
-            await redis.zrem("eval_v3_active_runs:global", member);
+            await redis.zrem("eval_v3_active_runs:{active}:global", member);
         }
       }
       await redis.quit();

@@ -84,9 +84,11 @@ optional `EVAL_V3_GLOBAL_CELL_BUDGET` across projects: `clamp(min(floor(project 
 floor(global / (globalActive + 1))), 1, 24)`. The budget is soft: runs keep the value they started
 with, so the cells in flight can exceed it (three runs on 24 hold 24 + 12 + 8 = 44); the group queue's
 per-project cap limits dispatch. Active runs live in `ExperimentRunActivityRepository`
-(Redis sorted sets `eval_v3_active_runs:project:<id>` and `eval_v3_active_runs:global`, scored by
-expiry): the `experimentRunActivity` subscriber adds a planned run on `started` for a 2 h window and
-removes it on `completed`; expired members are pruned on read. A failed read falls back to
+(Redis sorted sets `eval_v3_active_runs:{active}:project:<id>` and `eval_v3_active_runs:{active}:global`,
+one hash slot, scored by expiry). The api claims the run while resolving its concurrency, pinned or
+not: one Lua script prunes expired members, counts the others and adds the run to both sets, so runs
+started together each see the ones claimed before them. The `experimentRunActivity` subscriber
+re-adds it on `started` (idempotent) and removes it on `completed`. A failed read falls back to
 `runConcurrency`. Scenarios: `experiment-run-dynamic-concurrency.feature`. The value is fixed at start
 and recorded in `started`. The manager sends the first `concurrency` cell intents on
 `started`, then the next unsent ordinal on each `cell_finished`, so at most `concurrency` cells of one

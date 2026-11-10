@@ -87,6 +87,7 @@ export class ExperimentWorkbenchRunService {
     const runId = generateHumanReadableId();
     const concurrency = await runs.concurrency.resolve({
       projectId,
+      runId,
       requested: saved.runInputs.concurrency,
     });
     const savedRun = (options: { persistResults: boolean; runUrl?: string }): PipelineRunStart => {
@@ -171,6 +172,7 @@ export class ExperimentWorkbenchRunService {
     const state = workbenchRunState(input);
 
     const experimentId = input.experimentId ?? "";
+    const runId = generateHumanReadableId();
     const plan = ExperimentRunPlanService.create().buildPlan({
       request: {
         state,
@@ -178,7 +180,11 @@ export class ExperimentWorkbenchRunService {
         ...(input.seedTargetOutputs ? { seedTargetOutputs: input.seedTargetOutputs } : {}),
       },
       data: dataResult,
-      concurrency: await runs.concurrency.resolve({ projectId, requested: input.concurrency }),
+      concurrency: await runs.concurrency.resolve({
+        projectId,
+        runId,
+        requested: input.concurrency,
+      }),
       origin: "workbench",
       // The page saves these cells too; the server writes them so the board outlives the tab.
       persistResults:
@@ -197,7 +203,7 @@ export class ExperimentWorkbenchRunService {
       events: this.#runsOn().streamRun({
         start: this.#runsOn().startOf({
           projectId,
-          runId: generateHumanReadableId(),
+          runId,
           experimentId,
           plan,
           state,
