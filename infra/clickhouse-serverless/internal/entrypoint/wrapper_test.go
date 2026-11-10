@@ -121,29 +121,28 @@ func passwordFile(t *testing.T, content string) string {
 
 // @scenario "Initialisation scripts and CLICKHOUSE_DB still log in as default"
 func TestWrapper_InitdbGetsThePassword(t *testing.T) {
+	plain := passwordFile(t, "file-pw\n")
 	for _, tc := range []struct {
-		name   string
-		initdb []string
-		env    map[string]string
+		name     string
+		initdb   []string
+		env      map[string]string
+		wantEnv  string // CLICKHOUSE_PASSWORD handed on, "" for unset
+		wantFile string // CLICKHOUSE_PASSWORD_FILE handed on, "" for unset
 	}{
 		{"CLICKHOUSE_DB with an env password", nil,
-			map[string]string{"CLICKHOUSE_DB": "db_under_test", "CLICKHOUSE_PASSWORD": "pw"}},
-		{"initdb script with a password file", []string{"01-schema.sql"},
-			map[string]string{"CLICKHOUSE_PASSWORD_FILE": passwordFile(t, "  file-pw \n")}},
-		{"password file wins over env, as in ch-config", []string{"01-schema.sql"},
-			map[string]string{"CLICKHOUSE_PASSWORD": "env-pw", "CLICKHOUSE_PASSWORD_FILE": passwordFile(t, "file-pw\n")}},
+			map[string]string{"CLICKHOUSE_DB": "db_under_test", "CLICKHOUSE_PASSWORD": "pw"}, "pw", ""},
+		{"a padded password file goes trimmed, as ch-config reads it", []string{"01-schema.sql"},
+			map[string]string{"CLICKHOUSE_PASSWORD_FILE": passwordFile(t, "  file-pw \n")}, "file-pw", ""},
+		{"a plain password file stays a file, and wins over env", []string{"01-schema.sql"},
+			map[string]string{"CLICKHOUSE_PASSWORD": "env-pw", "CLICKHOUSE_PASSWORD_FILE": plain}, "", plain},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			env, args := runWrapper(t, tc.initdb, tc.env, "--listen_host=0.0.0.0")
-			want := tc.env["CLICKHOUSE_PASSWORD"]
-			if tc.env["CLICKHOUSE_PASSWORD_FILE"] != "" {
-				want = "file-pw"
+			if env["CLICKHOUSE_PASSWORD"] != tc.wantEnv {
+				t.Errorf("CLICKHOUSE_PASSWORD = %q, want %q", env["CLICKHOUSE_PASSWORD"], tc.wantEnv)
 			}
-			if env["CLICKHOUSE_PASSWORD"] != want {
-				t.Errorf("CLICKHOUSE_PASSWORD = %q, want %q", env["CLICKHOUSE_PASSWORD"], want)
-			}
-			if _, set := env["CLICKHOUSE_PASSWORD_FILE"]; set {
-				t.Error("CLICKHOUSE_PASSWORD_FILE must be unset")
+			if env["CLICKHOUSE_PASSWORD_FILE"] != tc.wantFile {
+				t.Errorf("CLICKHOUSE_PASSWORD_FILE = %q, want %q", env["CLICKHOUSE_PASSWORD_FILE"], tc.wantFile)
 			}
 			if env["CLICKHOUSE_SKIP_USER_SETUP"] != "1" {
 				t.Error("CLICKHOUSE_SKIP_USER_SETUP must be 1")
@@ -152,6 +151,21 @@ func TestWrapper_InitdbGetsThePassword(t *testing.T) {
 				t.Errorf("args = %q, want the config file appended", args)
 			}
 		})
+	}
+}
+
+// @scenario "An install that names its own CLICKHOUSE_USER keeps that login"
+func TestWrapper_CustomUserKeepsTheOfficialUserSetup(t *testing.T) {
+	pw := passwordFile(t, " padded-pw \n")
+	env, _ := runWrapper(t, nil, map[string]string{"CLICKHOUSE_USER": "app", "CLICKHOUSE_PASSWORD_FILE": pw})
+	if _, set := env["CLICKHOUSE_SKIP_USER_SETUP"]; set {
+		t.Error("the official user setup was skipped, so user app would never be created")
+	}
+	if env["CLICKHOUSE_USER"] != "app" || env["CLICKHOUSE_PASSWORD_FILE"] != pw {
+		t.Errorf("handed on user %q with file %q, want app with %q", env["CLICKHOUSE_USER"], env["CLICKHOUSE_PASSWORD_FILE"], pw)
+	}
+	if _, set := env["CLICKHOUSE_PASSWORD"]; set {
+		t.Error("the password reached the server's environment")
 	}
 }
 
@@ -183,8 +197,13 @@ func TestWrapper_NoPasswordWithoutInitdb(t *testing.T) {
 func TestWrapper_DynamicOnlyInitdbUsesTheLocalAdmin(t *testing.T) {
 	pw := strings.Repeat("ab", 32)
 	env, _ := runWrapper(t, []string{"01-schema.sql"}, map[string]string{"TEST_BOOTSTRAP_PASSWORD": pw}, "--listen_host=0.0.0.0")
-	if env["CLICKHOUSE_USER"] != "local_admin" || env["CLICKHOUSE_PASSWORD"] != pw {
-		t.Errorf("initdb runs as %q with password %q, want local_admin with this start's password", env["CLICKHOUSE_USER"], env["CLICKHOUSE_PASSWORD"])
+	file := env["CLICKHOUSE_PASSWORD_FILE"]
+	got, _ := os.ReadFile(file)
+	if env["CLICKHOUSE_USER"] != "local_admin" || strings.TrimSpace(string(got)) != pw {
+		t.Errorf("initdb runs as %q with password file %q, want local_admin with this start's password", env["CLICKHOUSE_USER"], file)
+	}
+	if _, set := env["CLICKHOUSE_PASSWORD"]; set {
+		t.Error("the local admin password reached the server's environment")
 	}
 
 	t.Run("without initdb nothing is handed on", func(t *testing.T) {

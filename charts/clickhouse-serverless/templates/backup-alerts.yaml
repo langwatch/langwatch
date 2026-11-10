@@ -297,8 +297,8 @@ groups:
           summary: "More than one ClickHouse backup runner"
           description: >-
             {{ `{{ $value }}` }} pods of {{ $fullname }} in namespace {{ $ns }} each see a
-            different set of replicas. The cluster-wide in-flight check keeps them from
-            writing the same backup twice; find the partition.
+            different set of replicas. Each writes its own backup to its own path until
+            the partition heals, so storage grows; find the partition.
           {{- with $mon.runbookUrl }}
           runbook_url: {{ . | quote }}
           {{- end }}

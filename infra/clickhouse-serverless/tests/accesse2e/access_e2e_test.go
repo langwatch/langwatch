@@ -70,8 +70,12 @@ func TestAccessAgainstRealClickHouse(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "ACCESS_DENIED") {
 			t.Errorf("a read user reached system.query_log: %v", err)
 		}
-		if _, err := h.query("dashboards", pw, "SELECT max_execution_time FROM system.settings SETTINGS max_execution_time = 100000"); err == nil {
-			t.Error("a read user raised max_execution_time past its cap")
+		// A valid query, so only the constraint can refuse it; 0 is unlimited.
+		for _, raise := range []string{"max_execution_time = 100000", "max_execution_time = 0", "max_memory_usage = 0"} {
+			_, err := h.query("dashboards", pw, "SELECT getSetting('max_execution_time') SETTINGS "+raise)
+			if err == nil || !strings.Contains(err.Error(), "SETTING_CONSTRAINT_VIOLATION") {
+				t.Errorf("a read user lifted its cap with %s: %v", raise, err)
+			}
 		}
 		for _, hide := range []string{"log_queries = 0", "log_queries_min_type = 'EXCEPTION_WHILE_PROCESSING'",
 			"log_queries_min_query_duration_ms = 100000", "log_queries_probability = 0"} {

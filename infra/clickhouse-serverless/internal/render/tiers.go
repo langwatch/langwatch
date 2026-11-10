@@ -13,7 +13,8 @@ import (
 func renderTiers(input *config.Input, c *config.Computed, usersD string) error {
 	roles := map[string]any{}
 	profiles := map[string]any{}
-	memoryCap := map[string]any{"max": c.MaxMemoryUsagePerQuery}
+	// Zero means unlimited to ClickHouse, so every cap also has a floor of 1.
+	memoryCap := map[string]any{"min": 1, "max": c.MaxMemoryUsagePerQuery}
 	// The access file's policy may add to or replace the protected settings; a
 	// change takes a restart, as the tiers render only at startup.
 	protected := access.AuditedSettings
@@ -31,7 +32,7 @@ func renderTiers(input *config.Input, c *config.Computed, usersD string) error {
 		case tier.ReadOnly():
 			profile["readonly"] = 2
 			profile["max_execution_time"] = input.ReadTierMaxExecutionTime
-			constraints["max_execution_time"] = map[string]any{"max": input.ReadTierMaxExecutionTime}
+			constraints["max_execution_time"] = map[string]any{"min": 1, "max": input.ReadTierMaxExecutionTime}
 			constraints["max_memory_usage"] = memoryCap
 		case tier == access.TierWrite:
 			constraints["max_memory_usage"] = memoryCap

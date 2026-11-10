@@ -104,6 +104,13 @@ Feature: clickhouse-serverless takes chained native backups from CronJobs or its
     And a replica that cannot see its peers runs only if it is the configured one
 
   @unit
+  Scenario: A due backup that cannot read the backup history counts as failed
+    Given the runner's backup login cannot read system.backup_log
+    When a backup comes due
+    Then no backup starts
+    And the run is recorded as failed, so the failing alert fires
+
+  @unit
   Scenario: Observe mode decides and reports but never backs up
     Given BACKUP_SIDECAR=observe
     When backups are due

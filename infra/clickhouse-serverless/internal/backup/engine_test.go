@@ -271,6 +271,21 @@ func TestSidecar_OnlyTheRunnerBacksUp(t *testing.T) {
 	}
 }
 
+// @scenario "A due backup that cannot read the backup history counts as failed"
+func TestSidecar_UnreadableHistoryFailsTheDueRun(t *testing.T) {
+	f := &fakeStore{replicas: Replicas{Total: 1, Reachable: []int{0}}, failRead: errBoom}
+	s := sidecarFor(f, SidecarRun, 0)
+	tick(s)
+	if len(f.execs) != 0 {
+		t.Fatalf("started a backup without its history: %v", f.execs)
+	}
+	var b strings.Builder
+	s.Metrics.WritePrometheus(&b)
+	if !strings.Contains(b.String(), `clickhouse_backup_failures_total{mode="full"} 1`) {
+		t.Errorf("the skipped full run was not counted as failed:\n%s", b.String())
+	}
+}
+
 // @scenario "Observe mode decides and reports but never backs up"
 func TestSidecar_ObserveNeverBacksUp(t *testing.T) {
 	f := &fakeStore{finalStatus: "BACKUP_CREATED", replicas: Replicas{Total: 1, Reachable: []int{0}}}

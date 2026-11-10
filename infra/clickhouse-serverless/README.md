@@ -80,11 +80,15 @@ other, so turn it on in one of two ways:
 
 `ch-config` owns the `default` user, so the entrypoint sets
 `CLICKHOUSE_SKIP_USER_SETUP=1` and the official entrypoint never rewrites it.
+An install that sets `CLICKHOUSE_USER` to another name (and is not
+dynamic-only) keeps the official user setup, which creates that user as before.
 When the official entrypoint initialises (container args are server flags such
 as `--listen_host=...`, not the default `clickhouse-server` command) and
 `/docker-entrypoint-initdb.d` holds files or `CLICKHOUSE_DB` is set, it receives
-the password from `CLICKHOUSE_PASSWORD` or `CLICKHOUSE_PASSWORD_FILE`, so its
-client can log in. `CLICKHOUSE_PASSWORD_FILE` is always unset before it runs.
+the password so its client can log in: as `CLICKHOUSE_PASSWORD_FILE`, which it
+reads without exporting, or in `CLICKHOUSE_PASSWORD` when it was given that way
+or the file is padded with whitespace (`ch-config` trims it, the official
+entrypoint does not).
 
 `ch-config` only writes, and removes when disabled, the files it renders itself.
 Any other file in `config.d/` or `users.d/` (for example a Kubernetes `subPath`

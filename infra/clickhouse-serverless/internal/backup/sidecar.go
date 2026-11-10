@@ -122,8 +122,10 @@ func (s *Sidecar) TickOnce(ctx context.Context, wg *sync.WaitGroup) {
 			continue
 		}
 		// Re-read before acting: a CronJob or another runner may have
-		// finished this slot since the last refresh.
+		// finished this slot since the last refresh. A due run that cannot
+		// read the history fails, so the failing alert sees it.
 		if !s.refresh(ctx, mode) {
+			s.Metrics.Finish(Result{Mode: mode, Outcome: Failed, Err: errors.New("could not read the backup history")}, now)
 			continue
 		}
 		if _, due = Due(s.Schedules[mode], now, s.Metrics.LastSuccess(mode), slot); !due {

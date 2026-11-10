@@ -110,9 +110,17 @@ Feature: The clickhouse-serverless image renders every server setting from env
     And /docker-entrypoint-initdb.d holds a script or CLICKHOUSE_DB is set
     When the entrypoint hands over to the official ClickHouse entrypoint
     Then that entrypoint skips its own default-user setup, so the renderer's default user stands
-    And it receives the password in CLICKHOUSE_PASSWORD, so its initialisation client can log in
-    And CLICKHOUSE_PASSWORD_FILE is unset
+    And it receives the password file in CLICKHOUSE_PASSWORD_FILE, which it reads without exporting
+    And only a file padded with whitespace, which the renderer trims, goes in CLICKHOUSE_PASSWORD instead
     And with neither initialisation input present CLICKHOUSE_PASSWORD is unset too
+
+  @unit
+  Scenario: An install that names its own CLICKHOUSE_USER keeps that login
+    Given CLICKHOUSE_USER names a user other than default and the server is not dynamic-only
+    And its password comes from CLICKHOUSE_PASSWORD_FILE
+    When the entrypoint hands over to the official ClickHouse entrypoint
+    Then that entrypoint runs its own user setup and creates that user, as before this image
+    And it reads the password from the file, so the server's environment never holds it
 
   @unit
   Scenario: The LangWatchQL access model is linked from a directory mount

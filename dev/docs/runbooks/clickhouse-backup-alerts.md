@@ -138,7 +138,7 @@ is [ADR-199](../adr/199-clickhouse-serverless-backups-run-in-the-ch-config-sidec
 | `ClickHouseBackupStale`           | critical | No completed backup of a mode inside its window, or none ever                               |
 | `ClickHouseBackupFailing`         | warning  | The runner's last attempt of a mode failed                                                  |
 | `ClickHouseBackupNoRunner`        | critical | No sidecar reports itself as runner, or no sidecar is scraped at all                        |
-| `ClickHouseBackupMultipleRunners` | warning  | Two sidecars both elected themselves; the in-flight check still guards                      |
+| `ClickHouseBackupMultipleRunners` | warning  | Two sidecars both elected themselves; each writes its own backups until the partition heals |
 | `ClickHouseBackupConfigError`     | critical | A sidecar's backup env is invalid, so it schedules nothing                                  |
 | `ClickHouseBackupOverrunning`     | warning  | A backup of a mode has run longer than `backup.staleHours`; no new one starts until it ends |
 

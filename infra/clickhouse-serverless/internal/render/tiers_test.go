@@ -80,6 +80,9 @@ func TestRenderAll_Tiers(t *testing.T) {
 			constraints := section(t, profile, "constraints")
 			assertValue(t, name, section(t, constraints, "max_execution_time"), "max", 300)
 			assertValue(t, name, section(t, constraints, "max_memory_usage"), "max", int(memoryCap))
+			// Zero is unlimited to ClickHouse, so a user setting 0 must be refused.
+			assertValue(t, name, section(t, constraints, "max_execution_time"), "min", 1)
+			assertValue(t, name, section(t, constraints, "max_memory_usage"), "min", 1)
 		}
 	})
 
@@ -89,6 +92,7 @@ func TestRenderAll_Tiers(t *testing.T) {
 			t.Error("tier_write must not be readonly")
 		}
 		assertValue(t, "tier_write", section(t, section(t, profile, "constraints"), "max_memory_usage"), "max", int(memoryCap))
+		assertValue(t, "tier_write", section(t, section(t, profile, "constraints"), "max_memory_usage"), "min", 1)
 	})
 
 	t.Run("without an access file no access users or token server are rendered", func(t *testing.T) {
