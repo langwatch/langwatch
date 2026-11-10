@@ -212,6 +212,16 @@ export class VirtualKeyService {
     await this.status.setConnectServicesInternal(input);
   }
 
+  /** Writes the models a project's LANGY keys may serve, nothing else. Safe to repeat. */
+  async setLangyModelsAllowedInternal(input: {
+    organizationId: string;
+    projectId: string;
+    modelsAllowed: readonly string[] | null;
+    actorUserId: string;
+  }): Promise<{ virtualKeyIds: string[] }> {
+    return this.status.setLangyModelsAllowedInternal(input);
+  }
+
   /** Records the license a CONNECT key serves. Safe to repeat. */
   async setLicenseFactsInternal(input: {
     id: string;

@@ -781,6 +781,17 @@ export interface GatewayApi extends GatewayInternalProtocol {
 
   createVirtualKey(input: GatewayVirtualKeyCreateCommand): Promise<GatewayMintedVirtualKey>;
   updateVirtualKey(input: GatewayVirtualKeyUpdateCommand): Promise<GatewayVirtualKeyRecord>;
+  /**
+   * Langy's own write onto its product-managed keys: the models every unrevoked LANGY key of the
+   * project may serve, null for every model. Touches nothing else on the key, never the secret.
+   */
+  setLangyModelsAllowed(input: {
+    organizationId: string;
+    projectId: string;
+    modelsAllowed: readonly string[] | null;
+    actorUserId: string;
+  }): Promise<{ virtualKeyIds: string[] }>;
+
   rotateVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayMintedVirtualKey>;
   revokeVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayVirtualKeyRecord>;
 
