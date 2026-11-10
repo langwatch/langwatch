@@ -51,16 +51,20 @@ type WorkflowEvaluationParameters = Record<string, string | number | boolean>;
 
 const logger = createLogger("langwatch:experiment:workflow-evaluation");
 
-const WORKFLOW_TARGET_ID = "workflow-target";
+const WORKFLOW_TARGET_ID = "workflow-target"; // Stable id of a workflow experiment's one target.
 
-/** Runs a studio workflow as an evaluations-v3 evaluation, the path the v3 run API shares. */
+/**
+ * Runs a studio workflow as an evaluations-v3 evaluation. The single
+ * backend execution path, shared with the evaluations-v3 run API.
+ */
 type WorkflowEvaluationDependencies = {
   experiments: Pick<ExperimentService, "findOrCreateForWorkflow">;
   /** The workflow rows and versions this run reads, which it does not own. */
   workflowSource: ExperimentWorkflowDsl;
   /** The datasets, prompts, agents and evaluators the load reads through. */
   services: ExecutionDataServices;
-  concurrency: Pick<ExperimentRunConcurrencyService, "resolve" | "release">;
+  /** The cells in flight a run starts with, claimed against the shared budget until it ends. */
+  concurrency: Pick<ExperimentRunConcurrencyService, "startClaimed">;
   /** The run's progress fold: a start answers once it holds the run, and a redelivery reads it. */
   folds: ExperimentRunFoldRepository;
   /** What this process refuses of a run, for want of Redis or a public address. */
@@ -186,31 +190,29 @@ export class WorkflowEvaluationService {
       await this.failRequested({ request, error });
       return;
     }
-    const { prepared, runUrl } = started;
-    const { state, dataResult } = prepared;
-    const claim = { projectId: request.tenantId, runId: request.runId };
-    const plan = ExperimentRunPlanService.create().buildPlan({
-      request: {
-        state,
-        scope: request.rowIndices
-          ? { type: "rows", rowIndices: request.rowIndices }
-          : { type: "full" },
-      },
-      data: dataResult,
-      concurrency: await this.dependencies.concurrency.resolve(claim),
-      origin: "workflow",
-      persistResults: false,
-      experimentSlug: request.experimentSlug,
-      runUrl,
-    });
-
-    await this.dependencies.requests
-      .startExperimentRun({
+    const { state, dataResult, version } = started.prepared;
+    const { tenantId: projectId, runId } = request;
+    await this.dependencies.concurrency.startClaimed({ projectId, runId }, async (concurrency) => {
+      const plan = ExperimentRunPlanService.create().buildPlan({
+        request: {
+          state,
+          scope: request.rowIndices
+            ? { type: "rows", rowIndices: request.rowIndices }
+            : { type: "full" },
+        },
+        data: dataResult,
+        concurrency,
+        origin: "workflow",
+        persistResults: false,
+        experimentSlug: request.experimentSlug,
+        runUrl: started.runUrl,
+      });
+      await this.dependencies.requests.startExperimentRun({
         tenantId: request.tenantId,
         occurredAt: nowInstant().epochMilliseconds,
         runId: request.runId,
         experimentId: request.experimentId,
-        workflowVersionId: prepared.version.id,
+        workflowVersionId: version.id,
         total: plan.cells.length,
         targets: ExperimentResultDispatchService.create().buildTargetMetadata({
           targets: state.targets,
@@ -220,11 +222,8 @@ export class WorkflowEvaluationService {
           loadedWorkflows: dataResult.loadedWorkflows,
         }),
         plan,
-      })
-      .catch(async (error: unknown) => {
-        await this.dependencies.concurrency.release(claim);
-        throw error;
       });
+    });
     await ExperimentRunDatasetVersionService.create({
       datasets: this.dependencies.services.datasets,
     }).link({
@@ -296,7 +295,8 @@ export class WorkflowEvaluationService {
       parameters,
     });
 
-    // Dataset precedence: caller data, then caller dataset id, then the workflow's own dataset.
+    // Dataset precedence: caller data, then caller dataset id, then the workflow's attached
+    // dataset; a saved id loads fresh, and an inline one rides as the reference.
     const { resolvedDatasetId, datasetRef } =
       data || datasetId
         ? { resolvedDatasetId: datasetId, datasetRef: emptyDatasetRef(workflow.name) }
