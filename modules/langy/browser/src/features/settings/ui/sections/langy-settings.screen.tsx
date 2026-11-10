@@ -75,9 +75,7 @@ function LangyModelsSection({ projectId }: { projectId: string }) {
         <Banner
           status="error"
           title="Couldn't load Langy's models"
-          action={
-            <BannerAction onClick={allowlist.retryLoad}>Try again</BannerAction>
-          }
+          action={<BannerAction onClick={allowlist.retryLoad}>Try again</BannerAction>}
           data-testid="langy-models-load-error"
         >
           Nothing can be saved until the current list loads.
