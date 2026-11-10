@@ -241,7 +241,7 @@ interface Output {
 
 ### `subscription`
 
-Contract `../contract/src/subscription.trpc.ts:41`, router `src/transport/subscription.trpc.ts:111`.
+Contract `../contract/src/subscription.trpc.ts:42`, router `src/transport/subscription.trpc.ts:111`.
 
 | Procedure                             | Kind     | Gate                              | Input                     | Output                           |
 | ------------------------------------- | -------- | --------------------------------- | ------------------------- | -------------------------------- |
@@ -261,21 +261,21 @@ Contract `../contract/src/subscription.trpc.ts:41`, router `src/transport/subscr
 
 ```typescript
 // subscription.addTeamMemberOrEvents
-// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, upgradeMembers… (inline, ../contract/src/subscription.trpc.ts:44)
+// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, upgradeMembers… (inline, ../contract/src/subscription.trpc.ts:45)
 // Output: subscriptionItemsUpdatedSchema, ../contract/src/billing-types.ts:234
 interface Output {
   success: boolean;
 }
 
 // subscription.create
-// Input: z.object({ ...organizationScopeSchema.shape, baseUrl: z.string(), plan: subscribablePlanS… (inline, ../contract/src/subscription.trpc.ts:61)
+// Input: z.object({ ...organizationScopeSchema.shape, baseUrl: z.string(), plan: subscribablePlanS… (inline, ../contract/src/subscription.trpc.ts:62)
 // Output: billingRedirectSchema, ../contract/src/billing-types.ts:218
 interface Output {
   url: string | null;
 }
 
 // subscription.manage
-// Input: inline, ../contract/src/subscription.trpc.ts:76
+// Input: inline, ../contract/src/subscription.trpc.ts:77
 interface Input {
   organizationId: string;
   baseUrl: string;
@@ -286,27 +286,27 @@ interface Output {
 }
 
 // subscription.previewProration
-// Input: inline, ../contract/src/subscription.trpc.ts:80
+// Input: inline, ../contract/src/subscription.trpc.ts:81
 interface Input {
   organizationId: string;
   newTotalSeats: number;
 }
-// Output: providerOwnedSchema, ../contract/src/subscription.trpc.ts:39
+// Output: providerOwnedSchema, ../contract/src/subscription.trpc.ts:40
 type Output = unknown;
 
 // subscription.getLastSubscription
-// Input: organizationScopeSchema, ../contract/src/subscription.trpc.ts:25
+// Input: organizationScopeSchema, ../contract/src/subscription.trpc.ts:26
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:39
+type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:40
 
 // subscription.prospective
-// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, customerName: … (inline, ../contract/src/subscription.trpc.ts:89)
-type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:39
+// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, customerName: … (inline, ../contract/src/subscription.trpc.ts:90)
+type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:40
 
 // subscription.developerSeats
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:25
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:26
 // Output: developerSeatsSchema, ../contract/src/billing-types.ts:294
 interface Output {
   available: boolean;
@@ -318,7 +318,7 @@ interface Output {
 }
 
 // subscription.previewDeveloperSeats
-// Input: inline, ../contract/src/subscription.trpc.ts:106
+// Input: inline, ../contract/src/subscription.trpc.ts:107
 interface Input {
   organizationId: string;
   quantity: number;
@@ -334,7 +334,7 @@ interface Output {
 }
 
 // subscription.setDeveloperSeats
-// Input: inline, ../contract/src/subscription.trpc.ts:111
+// Input: inline, ../contract/src/subscription.trpc.ts:112
 interface Input {
   organizationId: string;
   quantity: number;
@@ -343,8 +343,8 @@ interface Input {
 type Output = z.infer<typeof subscriptionItemsUpdatedSchema>; // ../contract/src/billing-types.ts:234
 
 // subscription.listInvoices
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:25
-// Output: inline, ../contract/src/subscription.trpc.ts:121
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:26
+// Output: inline, ../contract/src/subscription.trpc.ts:122
 type Output = {
   id: string;
   number: string | null;
@@ -357,14 +357,14 @@ type Output = {
 }[];
 
 // subscription.paymentRecovery
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:25
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:26
 // Output: paymentRecoverySummarySchema, ../contract/src/payment-recovery.ts:18
 interface Output {
   state: "none" | "failing" | "paused";
 }
 
 // subscription.paymentRecoveryDetails
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:25
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:26
 // Output: paymentRecoveryDetailsSchema, ../contract/src/payment-recovery.ts:39
 interface Output {
   state: "none" | "failing" | "paused";
@@ -380,7 +380,7 @@ interface Output {
 }
 
 // subscription.paymentRecoveryPayLink
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:25
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:26
 // Output: paymentRecoveryPayLinkSchema, ../contract/src/payment-recovery.ts:52
 interface Output {
   url: string;
