@@ -1274,7 +1274,7 @@ test_lwql_tenant_isolation() {
   info "Seeding organisation A (the static seed)..."
   local seed_out
   seed_out=$(kc exec "$app_pod" -- \
-    sh -c "cd /app/packages/prisma-client && HOME=/tmp LANGWATCH_API_KEY=$key_a pnpm run db:seed" 2>&1) ||
+    sh -c "cd /app/apps/tasks && HOME=/tmp LANGWATCH_API_KEY=$key_a pnpm --silent task storage-seed" 2>&1) ||
     { tail -40 <<<"$seed_out" >&2; fail "db:seed did not seed organisation A"; }
   # A seed that ran nothing still exits 0, so check the row it must have written.
   [[ -n "$(lwql_project_key "$pg_pod" "$LWQL_E2E_PROJECT_A")" ]] ||
