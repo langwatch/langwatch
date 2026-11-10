@@ -10,7 +10,12 @@ export const NURTURING_PROJECT_USAGE_PROJECTION_VERSION = "2026-11-08" as const;
  * The owner pipeline a peer fold reads: one fold per owner, since a peer fold re-folds from one
  * owner's log (§9). Each owner's fold keeps its own row per project.
  */
-export type NurturingProjectUsageOwner = "prompt" | "evaluator" | "scenario" | "simulation" | "trace";
+export type NurturingProjectUsageOwner =
+  | "prompt"
+  | "evaluator"
+  | "scenario"
+  | "simulation"
+  | "trace";
 
 /** The reads over the project-usage rows, and the organization each project is placed in. */
 export interface NurturingProjectUsageReadRepository {

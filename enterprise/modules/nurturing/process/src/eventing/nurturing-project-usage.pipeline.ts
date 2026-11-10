@@ -37,6 +37,11 @@ import {
 import { TRACE_RECEIVED_EVENT_TYPE, traceReceivedEventDataSchema } from "@langwatch/trace-contract";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
+import {
+  NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
+  type NurturingProjectUsageOwner,
+  type NurturingProjectUsageRepository,
+} from "../repositories/nurturing-project-usage.repository.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import {
   emptyProjectUsage,
@@ -44,11 +49,6 @@ import {
   type NurturingProjectUsageFact,
   type NurturingProjectUsageState,
 } from "../rules/nurturing-project-usage.rules.ts";
-import {
-  NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
-  type NurturingProjectUsageOwner,
-  type NurturingProjectUsageRepository,
-} from "../repositories/nurturing-project-usage.repository.ts";
 
 /** Hosts nurturing's peer folds over the owners' usage facts; it records no event of its own. */
 export const NURTURING_PROJECT_USAGE_PIPELINE_NAME = "nurturing_project_usage" as const;
@@ -76,7 +76,7 @@ export const nurturingProjectUsagePeerEvents = {
 type AllPeerEvents = (typeof nurturingProjectUsagePeerEvents)[NurturingProjectUsageOwner];
 type ProjectUsagePeerEvent = PeerEvent<AllPeerEvents>;
 
-/** The project a fact is about: its data's project, else its tenant (a project for these owners). */
+/** The project a fact is about: its data's project, else its tenant (a project here). */
 export function projectIdOf(event: ProjectUsagePeerEvent): string {
   return "projectId" in event.data && typeof event.data.projectId === "string"
     ? event.data.projectId
@@ -110,7 +110,7 @@ export function projectUsageFactOf(event: ProjectUsagePeerEvent): NurturingProje
   }
 }
 
-/** One owner's peer fold, over its own store, one row per project; lane `<pipeline>.<owner>Usage`. */
+/** One owner's peer fold, one row per project in its store; lane `<pipeline>.<owner>Usage`. */
 export function nurturingProjectUsagePeerFold<Owner extends NurturingProjectUsageOwner>({
   owner,
   store,
@@ -178,8 +178,14 @@ function nurturingProjectUsageHost({
   })
     .withEvents([])
     .withPeerFoldProjection(nurturingProjectUsagePeerFold({ owner: "prompt", store }), subscribers)
-    .withPeerFoldProjection(nurturingProjectUsagePeerFold({ owner: "evaluator", store }), subscribers)
-    .withPeerFoldProjection(nurturingProjectUsagePeerFold({ owner: "scenario", store }), subscribers)
+    .withPeerFoldProjection(
+      nurturingProjectUsagePeerFold({ owner: "evaluator", store }),
+      subscribers,
+    )
+    .withPeerFoldProjection(
+      nurturingProjectUsagePeerFold({ owner: "scenario", store }),
+      subscribers,
+    )
     .withPeerFoldProjection(
       nurturingProjectUsagePeerFold({ owner: "simulation", store }),
       subscribers,

@@ -79,7 +79,9 @@ function withinWindow(state: NurturingProjectUsageState): NurturingProjectUsageS
   const firstDay = utcDayOf(Math.max(since, 0));
   return {
     ...state,
-    traces: Object.fromEntries(Object.entries(state.traces).filter(([, trace]) => trace.at >= since)),
+    traces: Object.fromEntries(
+      Object.entries(state.traces).filter(([, trace]) => trace.at >= since),
+    ),
     activeDays: state.activeDays.filter((day) => day >= firstDay),
   };
 }
