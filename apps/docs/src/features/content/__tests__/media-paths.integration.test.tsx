@@ -75,7 +75,9 @@ describe("when the docs home renders the product tour", () => {
         `type="image/${format}" srcSet="/docs/media/posters/introduction-640.${format} 640w, /docs/media/posters/introduction-1024.${format} 1024w, /docs/media/posters/introduction-1664.${format} 1664w"`,
       );
     }
-    expect(html).toContain('src="/docs/media/posters/introduction.jpg" width="1664" height="1040"');
+    expect(html).toContain(
+      'src="/docs/media/posters/introduction-1664.webp" width="1664" height="1040"',
+    );
     expect(html).toContain('fetchPriority="high"');
     expect(html).not.toContain("poster=");
     expect(html).toContain("aspect-ratio:1664 / 1040");
