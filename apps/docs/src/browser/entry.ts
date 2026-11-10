@@ -1,4 +1,5 @@
-import { startNavigation } from "./navigation.ts";
+import { afterLoad } from "./after-load.ts";
+import { loadSharedSheets, startNavigation } from "./navigation.ts";
 
 import "./islands.css";
 import "../app/docs.css";
@@ -108,8 +109,10 @@ const enhanceReading = () => {
   loadIsland({ name: "tabs" });
   loadIsland({ name: "reading" });
 };
+/* The reading enhancements wait for an idle moment; the shared sheet for the load and a frame. */
 if ("requestIdleCallback" in window) window.requestIdleCallback(enhanceReading, { timeout: 1000 });
 else setTimeout(enhanceReading, 100);
+afterLoad(loadSharedSheets);
 for (const eventName of ["pointerover", "focusin"])
   document.addEventListener(eventName, (event) => {
     const trigger =
