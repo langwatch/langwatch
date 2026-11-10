@@ -7,6 +7,7 @@ import type { NurturingRepositories } from "../nurturing.repositories.ts";
 import { MemoryNurturingMilestonesRepository } from "./memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "./memory.nurturing-project-directory.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "./memory.nurturing-project-usage.repository.ts";
+import { MemoryNurturingTraceDayRepository } from "./memory.nurturing-trace-day.repository.ts";
 
 /** One claim per key, lapsing when its window does, as the Redis key expires. */
 export class MemoryNurturingClaimRepository implements NurturingClaimRepository {
@@ -37,6 +38,7 @@ export class MemoryNurturingRepositories {
       milestones: MemoryNurturingMilestonesRepository.create(),
       projects: MemoryNurturingProjectDirectoryRepository.create(),
       projectUsage: MemoryNurturingProjectUsageRepository.create(),
+      traceDays: MemoryNurturingTraceDayRepository.create(),
       claims: MemoryNurturingClaimRepository.create(),
     };
   }

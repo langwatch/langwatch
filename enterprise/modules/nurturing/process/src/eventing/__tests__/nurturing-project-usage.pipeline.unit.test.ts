@@ -18,16 +18,21 @@ import {
   SIMULATION_RUN_EVENT_TYPES,
   SIMULATION_SET_CREATED_EVENT_TYPE,
 } from "@langwatch/scenario-contract";
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
+import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
 import type { NurturingProjectUsageOwner } from "../../repositories/nurturing-project-usage.repository.ts";
 import {
   evaluationDayKeyOf,
   type NurturingProjectUsagePeerEvent,
   nurturingProjectUsagePeerFold,
+  nurturingTraceDayPeerFold,
+  type NurturingTraceSpanEvent,
   projectIdOf,
   projectUsageFactOf,
+  traceDayKeyOf,
   traceSyncKeyOf,
 } from "../nurturing-project-usage.pipeline.ts";
 
@@ -232,5 +237,82 @@ describe("each owner's peer fold", () => {
     );
 
     expect(state.promptIds).toEqual([]);
+  });
+
+  /** @scenario "Folds keyed across aggregates never re-fold from one aggregate's log" */
+  it("folds an older event on as it comes, never re-folding the row from one prompt's log", () => {
+    const { fold } = nurturingProjectUsagePeerFold({
+      owner: "prompt",
+      store: MemoryNurturingProjectUsageRepository.create(),
+    });
+
+    expect(fold.options).toMatchObject({ refoldOnOutOfOrder: false });
+  });
+});
+
+describe("the trace-day fold", () => {
+  const NOON = Date.UTC(2026, 10, 20, 12);
+  const OK = 1;
+  const ERROR = 2;
+
+  /** trace's span fact: only the root marker and the status are parsed, never the span body. */
+  function spanEvent({
+    parentSpanId,
+    code,
+    createdAt = NOON,
+  }: Readonly<{
+    parentSpanId: string | null;
+    code: typeof OK | typeof ERROR;
+    createdAt?: number;
+  }>): NurturingTraceSpanEvent {
+    return {
+      ...envelope(SPAN_RECEIVED_EVENT_TYPE),
+      type: SPAN_RECEIVED_EVENT_TYPE,
+      createdAt,
+      data: { span: { parentSpanId, status: { message: null, code } } },
+    };
+  }
+
+  const { fold } = nurturingTraceDayPeerFold(MemoryNurturingTraceDayRepository.create());
+
+  /** @scenario "A trace is its root span, counted on its project's day" */
+  it("keys a span on its project and the UTC day it was appended", () => {
+    const evening = spanEvent({ parentSpanId: null, code: OK, createdAt: NOON + 11 * 3_600_000 });
+    const nextDay = spanEvent({ parentSpanId: null, code: OK, createdAt: NOON + 12 * 3_600_000 });
+
+    expect(traceDayKeyOf(evening)).toBe("project-1:2026-11-20");
+    expect(traceDayKeyOf(nextDay)).toBe("project-1:2026-11-21");
+    expect(fold.key?.(evening)).toBe(traceDayKeyOf(evening));
+  });
+
+  /** @scenario "A failed trace is a root span with an error status" */
+  it("counts a root span as a trace, an erroring root as a failed one, and a child as none", () => {
+    const state = [
+      spanEvent({ parentSpanId: null, code: OK }),
+      spanEvent({ parentSpanId: "", code: ERROR }),
+      spanEvent({ parentSpanId: "root-span", code: ERROR }),
+    ].reduce((folded, event) => fold.apply(folded, event), fold.init());
+
+    expect(state).toMatchObject({
+      projectId: "project-1",
+      day: "2026-11-20",
+      traceCount: 2,
+      errorCount: 1,
+      lastFailedTraceAt: NOON,
+    });
+  });
+
+  /** @scenario "Only a root span mints a trace-day job" */
+  it("admits root spans to the fold's queue and declines child spans", () => {
+    const filter = fold.options?.enqueue?.filter;
+
+    expect(filter?.(spanEvent({ parentSpanId: null, code: OK }))).toBe(true);
+    expect(filter?.(spanEvent({ parentSpanId: "", code: ERROR }))).toBe(true);
+    expect(filter?.(spanEvent({ parentSpanId: "root-span", code: OK }))).toBe(false);
+  });
+
+  /** @scenario "Spans arriving out of order count the same" */
+  it("declines to re-fold an out-of-order span from one trace's log", () => {
+    expect(fold.options).toMatchObject({ refoldOnOutOfOrder: false });
   });
 });

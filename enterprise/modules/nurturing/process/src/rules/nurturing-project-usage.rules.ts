@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
 import { utcDayOf } from "./nurturing-time.rules.ts";
+import type { NurturingTraceCounts } from "./nurturing-trace-day.rules.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -27,7 +28,7 @@ export const nurturingProjectUsageStateSchema = z.object({
   simulationSetIds: z.array(z.string()),
   /**
    * UTC days with a habit activity (a prompt version, a finished scenario run, an evaluation),
-   * within the window of the newest fact folded, ascending. Traces' days come from trace's read.
+   * within the window of the newest fact folded, ascending. Traces' days are their own rows.
    */
   activeDays: z.array(z.string()),
   LastEventOccurredAt: z.number(),
@@ -46,39 +47,14 @@ export type NurturingProjectUsageFact = Readonly<{ occurredAt: number }> &
     | Readonly<{ kind: "evaluation_completed" }>
   );
 
-/** An organization's traces within the window, summed over its projects; times in epoch ms. */
-export type NurturingTraceUsageTotals = Readonly<{
-  traceCount: number;
-  errorCount: number;
-  /** USD. */
-  totalCost: number;
-  lastTraceAt: number | null;
-  lastFailedTraceAt: number | null;
-  /** UTC `YYYY-MM-DD` days with a trace, each once. */
-  activeDays: readonly string[];
-}>;
+/** The UTC day the window starts after: a day after it is fully inside the window. */
+export function windowStartDayOf(now: number): string {
+  return utcDayOf(now - PROJECT_USAGE_WINDOW_MS);
+}
 
-/** The totals of an organization none of whose projects traced within the window. */
-export const NO_TRACE_USAGE: NurturingTraceUsageTotals = {
-  traceCount: 0,
-  errorCount: 0,
-  totalCost: 0,
-  lastTraceAt: null,
-  lastFailedTraceAt: null,
-  activeDays: [],
-};
-
-/** The window's days, as trace's rollup answers them, summed into the organization's totals. */
-export function traceUsageTotalsOf(days: readonly TraceUsageDay[]): NurturingTraceUsageTotals {
-  const latestOf = (times: readonly number[]) => (times.length > 0 ? Math.max(...times) : null);
-  return {
-    traceCount: days.reduce((sum, day) => sum + day.traceCount, 0),
-    errorCount: days.reduce((sum, day) => sum + day.errorCount, 0),
-    totalCost: days.reduce((sum, day) => sum + day.totalCost, 0),
-    lastTraceAt: latestOf(days.map((day) => day.lastTraceAt)),
-    lastFailedTraceAt: latestOf(days.flatMap((day) => day.lastFailedTraceAt ?? [])),
-    activeDays: [...new Set(days.map((day) => day.day))].toSorted(),
-  };
+/** The window's cost, as trace's rollup answers it per day, USD. */
+export function totalCostOf(days: readonly TraceUsageDay[]): number {
+  return days.reduce((sum, day) => sum + day.totalCost, 0);
 }
 
 /** The days after signup whose activity is a trait, `active_day_<n>`. */
@@ -198,21 +174,23 @@ export function foldProjectUsage(
   }
 }
 
-/** The traits a trace read answers; omitted from a sync that read no traces. */
+/** The trace traits, from nurturing's own trace days; cost only when this sync read it. */
 function traceTraits({
   traces,
+  totalCost,
   otherActiveDays,
   now,
   organizationCreatedAt,
 }: Readonly<{
-  traces: NurturingTraceUsageTotals;
+  traces: NurturingTraceCounts;
+  totalCost: number | null;
   /** The projects' prompt-version, scenario-run and evaluation days. */
   otherActiveDays: readonly string[];
   now: number;
   organizationCreatedAt: number | null;
 }>): Partial<CioOrgTraits> {
   const { lastTraceAt, lastFailedTraceAt, activeDays } = traces;
-  const windowStartDay = utcDayOf(now - PROJECT_USAGE_WINDOW_MS);
+  const windowStartDay = windowStartDayOf(now);
   const habitDays = [
     ...new Set([...activeDays, ...otherActiveDays.filter((day) => day > windowStartDay)]),
   ];
@@ -221,7 +199,7 @@ function traceTraits({
   return {
     trace_count: traces.traceCount,
     error_count: traces.errorCount,
-    total_cost: Math.round(traces.totalCost * 100) / 100,
+    ...(totalCost !== null && { total_cost: Math.round(totalCost * 100) / 100 }),
     ...(lastTraceAt !== null && { last_trace_date: unixSecondsOf(lastTraceAt) }),
     ...(lastFailedTraceAt !== null && { last_failed_trace_at: unixSecondsOf(lastFailedTraceAt) }),
     active_last_7_days: lastTraceDay !== null && lastTraceDay >= utcDayOf(now - 6 * DAY_MS),
@@ -234,18 +212,20 @@ function traceTraits({
 }
 
 /**
- * The organization's per-email traits from its projects' usage and, when this sync read them, its
- * traces' totals at `now`; `traces: null` leaves every trace trait out, so Customer.io keeps the
- * values it last had. Counts and times only, never content; flagged_count waits on its definition.
+ * The organization's per-email traits from its projects' usage and trace days at `now`. Cost is
+ * read from trace once a day: `totalCost: null` leaves total_cost out, so Customer.io keeps the
+ * value it last had. Counts and times only, never content; flagged_count waits on its definition.
  */
 export function organizationUsageTraits({
   projects,
   traces,
+  totalCost,
   now,
   organizationCreatedAt,
 }: Readonly<{
   projects: readonly NurturingProjectUsageState[];
-  traces: NurturingTraceUsageTotals | null;
+  traces: NurturingTraceCounts;
+  totalCost: number | null;
   now: number;
   organizationCreatedAt: number | null;
 }>): Partial<CioOrgTraits> {
@@ -261,12 +241,12 @@ export function organizationUsageTraits({
     ...(organizationCreatedAt !== null && {
       window_end_date: unixSecondsOf(organizationCreatedAt + PROJECT_USAGE_TRIAL_WINDOW_MS),
     }),
-    ...(traces !== null &&
-      traceTraits({
-        traces,
-        otherActiveDays: projects.flatMap((project) => project.activeDays),
-        now,
-        organizationCreatedAt,
-      })),
+    ...traceTraits({
+      traces,
+      totalCost,
+      otherActiveDays: projects.flatMap((project) => project.activeDays),
+      now,
+      organizationCreatedAt,
+    }),
   };
 }

@@ -146,11 +146,11 @@ export interface CioOrgTraits {
   scenario_count?: number;
   /** User simulation sets the organization's projects ran, each once; platform sets left out. */
   simulation_set_count?: number;
-  /** Traces over the last 30 days, each counted once. */
+  /** Traces (root spans) appended over the last 30 days, each counted once. */
   trace_count?: number;
-  /** Traces over the last 30 days with an error status. */
+  /** Traces over the last 30 days whose root span has an error status. */
   error_count?: number;
-  /** USD over the same 30 days. */
+  /** USD over the same 30 days, read from trace once per UTC day; absent from other syncs. */
   total_cost?: number;
   /** Unix seconds; absent when no trace in the window failed. */
   last_failed_trace_at?: number;

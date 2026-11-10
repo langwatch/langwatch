@@ -5117,7 +5117,7 @@ model NurturingOrganization {
 
 /// Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario
 /// and simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per
-/// organization for the per-email traits. Traces are read from trace's own rollup, not copied.
+/// organization for the per-email traits. Traces are counted in NurturingProjectTraceDay.
 model NurturingProjectUsageView {
   projectId         String
   /// The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation),
@@ -5133,6 +5133,24 @@ model NurturingProjectUsageView {
   updatedAt         DateTime
 
   @@id([projectId, owner])
+}
+
+/// Nurturing's own trace counts: a peer fold over trace's span_received (ARCHITECTURE §9), a root
+/// span being one trace, one row per project and UTC day of append time. Kept 30 days.
+model NurturingProjectTraceDay {
+  projectId         String
+  /// UTC `YYYY-MM-DD` of the spans' append time.
+  day               String
+  /// The day's counts as the fold folded them (NurturingTraceDayState).
+  folded            Json
+  /// The event ids of the last delivery folded in, so a redelivery folds once.
+  appliedEventIds   String[] @default([])
+  /// A row of another version is left out of every read.
+  projectionVersion String
+  /// Event-derived, so a replayed row equals the row it rebuilds.
+  updatedAt         DateTime
+
+  @@id([projectId, day])
 }
 
 model BillingMeterCheckpoint {

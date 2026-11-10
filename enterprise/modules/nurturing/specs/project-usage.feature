@@ -1,16 +1,18 @@
-Feature: Per-email usage reaches Customer.io from nurturing's own project rows and trace's rollup
+Feature: Per-email usage reaches Customer.io from nurturing's own project rows
 
   Nurturing folds the owners' prompt, evaluator, scenario and simulation-run events into its own
   table (peer folds, ARCHITECTURE §9). A peer fold re-folds from one owner's event log, so there
   are four folds, one per owner pipeline, each keeping its own row per project. Evaluations add
-  their UTC day to one more row per project, at most once a day. Traces are not copied: trace's
-  existing trace_received fact, throttled per organization to once per 15 minutes, starts one
-  read of trace's own per-minute rollup (trace_analytics_rollup) for the organization's projects
-  over the last 30 days. When a project's usage changes, nurturing places it in its organization
-  through the owners' shares, sums the organization's projects and sends their traits to
-  Customer.io as one group call on the admin. A sync no trace started sends no trace trait. It
-  never pulls owner state on a schedule, and sends counts and times only, never content.
-  flagged_count waits on its definition.
+  their UTC day to one more row per project, at most once a day. Traces are counted by a fifth
+  peer fold over trace's span_received, which queues root spans only: a root span is one trace,
+  a root span with an error status one failed trace, as trace's own rollup counts them, on one
+  row per project and UTC day of append time, kept 30 days. No span body reaches nurturing. A span carries no price, so the
+  window's cost is read from trace's rollup at most once per organization and UTC day. When a
+  project's usage changes, or its organization traced (throttled to once per 15 minutes),
+  nurturing places it in its organization through the owners' shares, sums the organization's
+  projects and sends their traits to Customer.io as one group call on the admin. It never pulls
+  owner state on a schedule, and sends counts and times only, never content. flagged_count waits
+  on its definition.
 
   @unit
   Scenario: Every owner event becomes the fact its fold counts
@@ -53,28 +55,77 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows a
     Then the project's evaluation row holds that day once
     And later evaluations that day write nothing
 
+  @unit @integration
+  Scenario: A trace is its root span, counted on its project's day
+    Given spans of a project's traces appended on one UTC day
+    When the trace-day fold takes them
+    Then each root span adds one trace to the project's row for that day, and a child span none
+    And a span appended on the next UTC day counts on the next day's row
+
+  @unit
+  Scenario: Only a root span mints a trace-day job
+    Given a trace's root span and its child spans
+    When trace appends them
+    Then only the root span is queued to the trace-day fold, so a trace is one job and one write
+
+  @unit
+  Scenario: A failed trace is a root span with an error status
+    Given a root span and a child span with an error status, and a root span without one
+    When the trace-day fold takes them
+    Then the day counts 2 traces and 1 failed trace, and the failed one's time
+
+  @unit
+  Scenario: Spans arriving out of order count the same
+    Given two traces' root spans of one project and day, the older arriving after the newer
+    When the trace-day fold takes them
+    Then both are counted, and the row is never re-folded from one trace's log
+
+  @unit
+  Scenario: A redelivered span counts once
+    Given a root span folded into its project's day
+    When the same span is delivered again
+    Then the day still counts it once
+
+  @unit
+  Scenario: Folds keyed across aggregates never re-fold from one aggregate's log
+    Given a fold whose row sums many owner aggregates, a project or a project's day
+    When an event older than the row's newest arrives
+    Then it is folded on as it comes, since a re-fold would rebuild the row from one aggregate
+
   @unit
   Scenario: Traces sync an organization at most once per 15 minutes
     Given traces arrive in two projects of one organization within 15 minutes
-    Then they share one sync, which reads trace's rollup once
+    Then they share one sync, one group call
     And a trace fact from before facts named their organization syncs on its project instead
 
   @unit
-  Scenario: The organization's traces are read from trace's rollup
-    Given a trace sync for a project of an organization
+  Scenario: The organization's traits sum its projects' trace days
+    Given trace days of an organization's projects, some older than the 30-day window
     When the organization syncs
-    Then trace's per-day rollup is read once for all its projects over the last 30 days
-    And the days are summed into trace_count, error_count and total_cost
+    Then trace_count, error_count, last_trace_date and last_failed_trace_at come from the days in the window
+
+  @unit @integration
+  Scenario: Trace days older than the window are deleted
+    Given a project's trace day older than the 30-day window
+    When its organization syncs
+    Then that day's row is deleted
 
   @unit
-  Scenario: A sync no trace started leaves the trace traits as Customer.io has them
-    Given an owner fact changed a project's row
-    When its organization syncs
-    Then no trace is read and no trace trait is sent, so Customer.io keeps their last values
+  Scenario: The window's cost is read from trace once per organization and UTC day
+    Given an organization that traced within the window
+    When it syncs twice in one UTC day
+    Then trace's per-day rollup is read for its cost on the first sync only
+    And a refused group call gives the day's read back, so the retry reads it again
+
+  @unit
+  Scenario: A sync that read no cost leaves total_cost as Customer.io has it
+    Given the organization's cost was already read this UTC day
+    When the traits are built
+    Then total_cost is left out and every count is sent
 
   @unit
   Scenario: The organization's traits sum its projects
-    Given an organization with two projects with usage, and its traces' totals
+    Given an organization with two projects with usage, its trace counts and its cost
     When the traits are built
     Then prompt, evaluator, scenario, simulation set, trace and error counts and total cost are summed
     And last_trace_date and last_failed_trace_at are the newest trace and failed trace in Unix seconds
@@ -118,7 +169,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows a
   Scenario: A project placed in no organization sends nothing
     Given a project its owners place in no organization
     When the project's usage changes or it traces
-    Then Customer.io receives nothing and no trace is read
+    Then Customer.io receives nothing and trace's cost is not read
 
   @integration
   Scenario: Each owner's fold keeps its own row per project

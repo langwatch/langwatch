@@ -13,7 +13,7 @@ import { EventSourcing } from "../../eventSourcing.ts";
 import { sealPipelineDefinition } from "../../pipeline/sealedPipeline.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types.ts";
-import type { PeerEvent } from "../../projections/peerProjection.ts";
+import { type PeerEvent, peerFoldProjection } from "../../projections/peerProjection.ts";
 import type { ProjectionRegistry } from "../../projections/projectionRegistry.ts";
 import { replayProjectionsOf } from "../../replay/replayProjections.ts";
 import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
@@ -243,6 +243,76 @@ describe("a peer fold projection", () => {
 
     await vi.waitFor(() => expect(seen).toEqual([{ eventId: "e1", costs: [7] }]));
     await eventSourcing.close();
+  });
+
+  /** @scenario "A peer fold's enqueue filter keeps a declined event from minting a fold job" */
+  it("folds only the events its filter admits, judged on the contract-parsed data", async () => {
+    const { store, rows } = memoryFoldStore();
+    const folded: string[] = [];
+    const eventSourcing = runtime();
+    const owner = eventSourcing.register(ownerPipeline());
+    eventSourcing.register(
+      definePipeline({ name: "host", aggregate: defineAggregate({ type: "global" }) })
+        .withEvents([])
+        .withPeerFoldProjection({
+          events: peerSpan,
+          fold: {
+            name: "costTotals",
+            version: "2026-10-07",
+            eventTypes: [SPAN_RECEIVED],
+            init: () => ({ costs: [], LastEventOccurredAt: 0 }),
+            apply: (state, event: PeerEvent<typeof peerSpan>) => {
+              folded.push(event.id);
+              return {
+                costs: [...state.costs, event.data.cost],
+                LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt),
+              };
+            },
+            store,
+            LastEventOccurredAtKey: "LastEventOccurredAt",
+            options: { enqueue: { filter: (event) => event.data.cost > 0 } },
+          },
+        })
+        .build(),
+    );
+
+    await owner.service.storeEvents(
+      [
+        span({ id: "e1", aggregateId: "trace-a", cost: 0, occurredAt: 10 }),
+        span({ id: "e2", aggregateId: "trace-a", cost: 5, occurredAt: 11 }),
+      ],
+      { tenantId },
+    );
+
+    await vi.waitFor(() => expect(rows.get("trace-a")?.state.costs).toEqual([5]));
+    expect(folded).toEqual(["e2"]);
+    await eventSourcing.close();
+  });
+
+  /** @scenario "A peer fold's enqueue filter keeps a declined event from minting a fold job" */
+  it("admits an event whose data the contract refuses, so the fold reports it", () => {
+    const { store } = memoryFoldStore();
+    const { options } = peerFoldProjection({
+      lane: "host.costTotals",
+      declaration: {
+        events: peerSpan,
+        fold: {
+          name: "costTotals",
+          version: "2026-10-07",
+          eventTypes: [SPAN_RECEIVED],
+          init: () => ({ costs: [], LastEventOccurredAt: 0 }),
+          apply: (state) => state,
+          store,
+          LastEventOccurredAtKey: "LastEventOccurredAt",
+          options: { enqueue: { filter: (event) => event.data.cost > 0 } },
+        },
+      },
+    });
+    const admitted = span({ id: "e1", aggregateId: "trace-a", cost: 5, occurredAt: 10 });
+
+    expect(options?.enqueue?.filter?.(admitted)).toBe(true);
+    expect(options?.enqueue?.filter?.({ ...admitted, data: { cost: 0, model: "x" } })).toBe(false);
+    expect(options?.enqueue?.filter?.({ ...admitted, data: { cost: "one" } })).toBe(true);
   });
 
   /** @scenario "A peer projection over an event no registered pipeline declares is refused" */

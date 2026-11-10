@@ -36,7 +36,7 @@ export class NurturingModule implements NurturingApi {
   static readonly dependencies = {
     users: UserApi,
     organizations: OrganizationApi,
-    /** Trace's per-day usage read for the per-email traits; trace names no nurturing, no cycle. */
+    /** Trace's once-a-day cost read (a span has no price); trace names no nurturing, no cycle. */
     traces: TraceApi,
   };
   static readonly config = nurturingConfig;
@@ -92,7 +92,9 @@ export class NurturingModule implements NurturingApi {
     const organizationUsage = customerIo
       ? NurturingOrganizationUsageService.create({
           projectUsage: repositories.projectUsage,
+          traceDays: repositories.traceDays,
           traces: dependencies.traces,
+          claims: repositories.claims,
           projects: repositories.projects,
           milestones: repositories.milestones,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),
@@ -113,14 +115,9 @@ export class NurturingModule implements NurturingApi {
     );
   }
 
-  /** A project's usage changed: its organization's traits go to Customer.io, when it is set up. */
+  /** A project's usage or traces changed: its organization's traits go to Customer.io. */
   async organizationUsageChanged(input: Readonly<{ projectId: string }>): Promise<void> {
     await this.#organizationUsage?.usageChanged(input);
-  }
-
-  /** A project traced: its organization's traits, trace traits included, go to Customer.io. */
-  async organizationTracesChanged(input: Readonly<{ projectId: string }>): Promise<void> {
-    await this.#organizationUsage?.tracesChanged(input);
   }
 
   async recordSignal(signal: NurturingSignal): Promise<void> {

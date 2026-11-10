@@ -6,11 +6,13 @@ import type { NurturingRepositories } from "../nurturing.repositories.ts";
 import { PrismaNurturingMilestonesRepository } from "./prisma.nurturing-milestones.repository.ts";
 import { PrismaNurturingProjectDirectoryRepository } from "./prisma.nurturing-project-directory.repository.ts";
 import { PrismaNurturingProjectUsageRepository } from "./prisma.nurturing-project-usage.repository.ts";
+import { PrismaNurturingTraceDayRepository } from "./prisma.nurturing-trace-day.repository.ts";
 
-/** Nurturing's `NurturingOrganization` and `NurturingProjectUsageView`: the tables it claims. */
+/** Nurturing's `NurturingOrganization`, usage view and trace days: the tables it claims. */
 const ownedRepositories = prismaRepositories({
   milestones: PrismaNurturingMilestonesRepository,
   projectUsage: PrismaNurturingProjectUsageRepository,
+  traceDays: PrismaNurturingTraceDayRepository,
 });
 
 /** Nurturing's own table, and the owners' project rows read through shares without a claim (R40). */

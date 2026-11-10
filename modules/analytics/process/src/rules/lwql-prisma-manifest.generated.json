@@ -20807,7 +20807,7 @@
     {
       "name": "NurturingProjectUsageView",
       "tableName": "NurturingProjectUsageView",
-      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per\norganization for the per-email traits. Traces are read from trace's own rollup, not copied.",
+      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per\norganization for the per-email traits. Traces are counted in NurturingProjectTraceDay.",
       "primaryKey": [
         "projectId",
         "owner"
@@ -20857,6 +20857,71 @@
           "isList": false,
           "isOptional": false,
           "documentation": "A row of another version reads as undecodable and is re-folded from the log."
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Event-derived, so a replayed row equals the row it rebuilds."
+        }
+      ]
+    },
+    {
+      "name": "NurturingProjectTraceDay",
+      "tableName": "NurturingProjectTraceDay",
+      "documentation": "Nurturing's own trace counts: a peer fold over trace's span_received (ARCHITECTURE §9), a root\nspan being one trace, one row per project and UTC day of append time. Kept 30 days.",
+      "primaryKey": [
+        "projectId",
+        "day"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "day",
+          "columnName": "day",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "UTC `YYYY-MM-DD` of the spans' append time."
+        },
+        {
+          "name": "folded",
+          "columnName": "folded",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The day's counts as the fold folded them (NurturingTraceDayState)."
+        },
+        {
+          "name": "appliedEventIds",
+          "columnName": "appliedEventIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "The event ids of the last delivery folded in, so a redelivery folds once."
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "A row of another version is left out of every read."
         },
         {
           "name": "updatedAt",

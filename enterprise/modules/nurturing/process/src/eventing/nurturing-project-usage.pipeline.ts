@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * Nurturing's own per-project usage (§9). Peer folds over the owners' prompt, evaluator, scenario
- * and simulation-run events, keyed by project: a peer fold re-folds from one owner's event log,
- * so there is one fold per owner pipeline, each with its own row per project. Evaluations add at
- * most one active day per project a day to their own row. Traces are not copied: trace's existing
- * trace_received fact, throttled per organization, triggers one read of trace's own rollup. Each
- * fold change syncs the project's organization as one Customer.io group call.
+ * Nurturing's own per-project usage (§9): one peer fold per owner pipeline (prompt, evaluator,
+ * scenario, simulation run), a row per project each, and a fold over trace's span_received that
+ * counts root spans per project and UTC day. Evaluations add a day per project a day. Each change
+ * syncs the organization as one Customer.io group call. See ADR 001 (nurturing), amendment.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
 import {
@@ -45,7 +43,13 @@ import {
   simulationRunFinishedEventDataSchema,
   simulationSetCreatedEventDataSchema,
 } from "@langwatch/scenario-contract";
-import { TRACE_RECEIVED_EVENT_TYPE, traceReceivedEventDataSchema } from "@langwatch/trace-contract";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  spanReceivedEventDataSchema,
+  TRACE_RECEIVED_EVENT_TYPE,
+  traceReceivedEventDataSchema,
+} from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
 import {
@@ -53,6 +57,11 @@ import {
   type NurturingProjectUsageOwner,
   type NurturingProjectUsageRepository,
 } from "../repositories/nurturing-project-usage.repository.ts";
+import {
+  NURTURING_TRACE_DAY_PROJECTION_VERSION,
+  type NurturingTraceDayRepository,
+  traceDayKey,
+} from "../repositories/nurturing-trace-day.repository.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import {
   emptyProjectUsage,
@@ -61,6 +70,11 @@ import {
   type NurturingProjectUsageState,
 } from "../rules/nurturing-project-usage.rules.ts";
 import { utcDayOf } from "../rules/nurturing-time.rules.ts";
+import {
+  emptyTraceDay,
+  foldTraceDay,
+  type NurturingTraceDayState,
+} from "../rules/nurturing-trace-day.rules.ts";
 
 /** Hosts nurturing's peer folds and subscribers over the owners' facts; no event of its own. */
 export const NURTURING_PROJECT_USAGE_PIPELINE_NAME = "nurturing_project_usage" as const;
@@ -69,13 +83,20 @@ export const NURTURING_PROJECT_USAGE_PIPELINE_NAME = "nurturing_project_usage" a
 const USAGE_SYNC_DELAY_MS = 60_000;
 
 /**
- * Traces sync an organization at most once per this window, however busy it is: each sync is one
- * ClickHouse read of trace's rollup, and the per-email traits need no fresher count than this.
+ * Traces sync an organization, one Customer.io group call, at most once per this window however
+ * busy it is: the owner's choice of freshness for the trace traits over one call a day.
  */
 export const TRACE_USAGE_SYNC_WINDOW_MS = 15 * 60_000;
 
 /** A project's evaluations write its day once: later ones the same day would add nothing. */
 const EVALUATION_DAY_DEDUP_TTL_MS = 24 * 60 * 60_000;
+
+/**
+ * Every fold here is keyed across many owner aggregates (a project, or a project's day): a re-fold
+ * loads one aggregate's log, so it would rebuild the row from that one alone. Their applies
+ * commute (sets, sums, maxima), so an event older than the row's newest is folded on as it comes.
+ */
+const KEYED_FOLD_OPTIONS = { refoldOnOutOfOrder: false } as const;
 
 /** Each owner pipeline's facts, each parsed by its owner contract's own schema. */
 export const nurturingProjectUsagePeerEvents = {
@@ -182,6 +203,63 @@ export function nurturingProjectUsagePeerFold<Owner extends NurturingProjectUsag
       key: (event) => projectIdOf(event as NurturingProjectUsagePeerEvent),
       store: store.forOwner(owner),
       LastEventOccurredAtKey: "LastEventOccurredAt",
+      options: KEYED_FOLD_OPTIONS,
+    },
+  };
+}
+
+/** What the trace-day fold reads of a span: whether it is a root, and its status; no body. */
+const traceSpanDataSchema = z.object({
+  span: spanReceivedEventDataSchema.shape.span.pick({ parentSpanId: true, status: true }),
+});
+
+/** OTLP's `STATUS_CODE_ERROR`: the status trace's rollup counts a failed trace by. */
+const OTLP_STATUS_CODE_ERROR = 2;
+
+/** trace's span fact, as the trace-day fold reads it. */
+export const nurturingTraceDayPeerEvents = [
+  { type: SPAN_RECEIVED_EVENT_TYPE, data: traceSpanDataSchema },
+] as const;
+
+/** A span fact as the trace-day fold receives it. */
+export type NurturingTraceSpanEvent = PeerEvent<typeof nurturingTraceDayPeerEvents>;
+
+/** A root span: one per trace, the only span the trace-day fold counts. */
+export function isRootSpan(event: NurturingTraceSpanEvent): boolean {
+  return !event.data.span.parentSpanId;
+}
+
+/** The row a span counts on: its project (the tenant) and the UTC day it was appended. */
+export function traceDayKeyOf(event: NurturingTraceSpanEvent): string {
+  return traceDayKey({ projectId: String(event.tenantId), day: utcDayOf(event.createdAt) });
+}
+
+/** One project's traces per UTC day: a root span is a trace, as trace's rollup counts it. */
+export function nurturingTraceDayPeerFold(
+  traceDays: NurturingTraceDayRepository,
+): PeerFoldProjectionDeclaration<NurturingTraceDayState, typeof nurturingTraceDayPeerEvents> {
+  return {
+    events: nurturingTraceDayPeerEvents,
+    fold: {
+      name: "traceDays",
+      version: NURTURING_TRACE_DAY_PROJECTION_VERSION,
+      eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+      init: emptyTraceDay,
+      apply: (state, event) =>
+        foldTraceDay(state, {
+          projectId: String(event.tenantId),
+          day: utcDayOf(event.createdAt),
+          // Still checked: a replay hands apply every span, the enqueue filter only live ones.
+          isRoot: isRootSpan(event),
+          isError: event.data.span.status.code === OTLP_STATUS_CODE_ERROR,
+          appendedAt: event.createdAt,
+          occurredAt: event.occurredAt,
+        }),
+      key: traceDayKeyOf,
+      store: traceDays.store,
+      LastEventOccurredAtKey: "LastEventOccurredAt",
+      // A child span changes no count: it mints no job, so a trace is one job and one write.
+      options: { ...KEYED_FOLD_OPTIONS, enqueue: { filter: isRootSpan } },
     },
   };
 }
@@ -214,12 +292,12 @@ const traceSyncDataSchema = traceReceivedEventDataSchema.pick({ projectId: true 
 
 function nurturingProjectUsageHost({
   store,
+  traceDays,
   usageChanged,
-  tracesChanged,
 }: Readonly<{
   store: NurturingProjectUsageRepository;
+  traceDays: NurturingTraceDayRepository;
   usageChanged: UsageChanged;
-  tracesChanged: UsageChanged;
 }>) {
   const subscribers = [organizationUsageSubscriber(usageChanged)];
   const traceSync = throttledWindow<Event>({
@@ -248,15 +326,16 @@ function nurturingProjectUsageHost({
         nurturingProjectUsagePeerFold({ owner: "simulation", store }),
         subscribers,
       )
+      .withPeerFoldProjection(nurturingTraceDayPeerFold(traceDays))
       // Throttled, not debounced: an organization tracing without pause still syncs once per
-      // window, 15 minutes after the window's first trace, so the read sees the whole window.
+      // window, 15 minutes after the window's first trace, when its spans are folded.
       .withPeerSubscriber("traceUsageSync", {
         eventType: TRACE_RECEIVED_EVENT_TYPE,
         data: traceSyncDataSchema,
         options: { delay: traceSync.delay, deduplication: traceSync.dedup },
-        handle: (data) => tracesChanged({ projectId: data.projectId }),
+        handle: (data) => usageChanged({ projectId: data.projectId }),
       })
-      // Evaluations count only as habit days, which a trace sync reads: no sync of their own.
+      // Evaluations count only as habit days, which the next sync reads: no sync of their own.
       .withPeerSubscriber("evaluationActiveDay", {
         eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
         data: evaluationLifecycleCompletedEventDataSchema,
@@ -290,7 +369,7 @@ export const nurturingProjectUsageEventing = defineEventingModule({
   build: ({ repositories, app }: EventingSetup<NurturingRepositories, NurturingModule>) =>
     buildNurturingProjectUsagePipeline({
       store: repositories.projectUsage,
+      traceDays: repositories.traceDays,
       usageChanged: (input) => app.organizationUsageChanged(input),
-      tracesChanged: (input) => app.organizationTracesChanged(input),
     }),
 });

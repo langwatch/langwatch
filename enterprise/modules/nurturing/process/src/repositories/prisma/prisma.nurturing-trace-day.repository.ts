@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type {
+  FoldProjectionStore,
+  FoldStateRead,
+  ProjectionStoreContext,
+} from "@langwatch/eventing";
+import { PrismaRepository } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
+import {
+  type NurturingTraceDayState,
+  nurturingTraceDayStateSchema,
+} from "../../rules/nurturing-trace-day.rules.ts";
+import {
+  NURTURING_TRACE_DAY_PROJECTION_VERSION,
+  type NurturingTraceDayRepository,
+  traceDayOfKey,
+} from "../nurturing-trace-day.repository.ts";
+
+type NurturingTraceDayDatabase = Pick<PrismaClient, "nurturingProjectTraceDay">;
+
+type AppliedRead = {
+  state: NurturingTraceDayState | null;
+  appliedEventIds: string[];
+  miss?: "absent" | "undecodable";
+};
+
+/**
+ * The trace-day fold's Postgres rows (`NurturingProjectTraceDay`): one per project and UTC day,
+ * the counts as JSON. A row of another projection version reads as undecodable and is left out
+ * of the organization's read.
+ */
+export class PrismaNurturingTraceDayRepository
+  extends PrismaRepository.for("NurturingProjectTraceDay")
+  implements NurturingTraceDayRepository
+{
+  static create({
+    prisma,
+  }: Readonly<{ prisma: NurturingTraceDayDatabase }>): PrismaNurturingTraceDayRepository {
+    return new PrismaNurturingTraceDayRepository(prisma);
+  }
+
+  readonly #database: NurturingTraceDayDatabase;
+
+  readonly store: FoldProjectionStore<NurturingTraceDayState>;
+
+  private constructor(prisma: NurturingTraceDayDatabase) {
+    super(prisma);
+    this.#database = prisma;
+    const getWithApplied = async (key: string): Promise<AppliedRead> => {
+      const row = await prisma.nurturingProjectTraceDay.findUnique({
+        where: { projectId_day: traceDayOfKey(key) },
+      });
+      if (!row) return { state: null, appliedEventIds: [], miss: "absent" };
+      if (row.projectionVersion !== NURTURING_TRACE_DAY_PROJECTION_VERSION) {
+        return { state: null, appliedEventIds: [], miss: "undecodable" };
+      }
+      return {
+        state: nurturingTraceDayStateSchema.parse(row.folded),
+        appliedEventIds: row.appliedEventIds,
+      };
+    };
+    this.store = {
+      getWithApplied,
+      async get(key: string): Promise<FoldStateRead<NurturingTraceDayState>> {
+        const { state } = await getWithApplied(key);
+        return state ? { kind: "folded", state } : { kind: "empty" };
+      },
+      async store(state: NurturingTraceDayState, context: ProjectionStoreContext) {
+        const where = traceDayOfKey(context.key ?? context.aggregateId);
+        const columns = {
+          folded: state,
+          appliedEventIds: [...(context.appliedEventIds ?? [])],
+          projectionVersion: NURTURING_TRACE_DAY_PROJECTION_VERSION,
+          // Business time from the spans, so a replayed row equals the row it rebuilds.
+          updatedAt: new Date(state.LastEventOccurredAt),
+        };
+        await prisma.nurturingProjectTraceDay.upsert({
+          where: { projectId_day: where },
+          create: { ...where, ...columns },
+          update: columns,
+        });
+      },
+    };
+  }
+
+  async findForProjects({
+    projectIds,
+    afterDay,
+  }: Readonly<{ projectIds: readonly string[]; afterDay: string }>): Promise<
+    NurturingTraceDayState[]
+  > {
+    if (projectIds.length === 0) return [];
+    const rows = await this.#database.nurturingProjectTraceDay.findMany({
+      where: {
+        projectId: { in: [...projectIds] },
+        day: { gt: afterDay },
+        projectionVersion: NURTURING_TRACE_DAY_PROJECTION_VERSION,
+      },
+    });
+    return rows.map((row) => nurturingTraceDayStateSchema.parse(row.folded));
+  }
+
+  async pruneBefore({
+    projectIds,
+    beforeDay,
+  }: Readonly<{ projectIds: readonly string[]; beforeDay: string }>): Promise<void> {
+    if (projectIds.length === 0) return;
+    await this.#database.nurturingProjectTraceDay.deleteMany({
+      where: { projectId: { in: [...projectIds] }, day: { lt: beforeDay } },
+    });
+  }
+}

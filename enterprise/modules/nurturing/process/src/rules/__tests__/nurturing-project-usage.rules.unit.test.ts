@@ -8,14 +8,22 @@ import { describe, expect, it } from "vitest";
 import {
   emptyProjectUsage,
   foldProjectUsage,
-  NO_TRACE_USAGE,
   type NurturingProjectUsageFact,
   organizationUsageTraits,
-  traceUsageTotalsOf,
+  totalCostOf,
 } from "../nurturing-project-usage.rules.ts";
+import type { NurturingTraceCounts } from "../nurturing-trace-day.rules.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 10, 20, 12);
+
+const NO_TRACES: NurturingTraceCounts = {
+  traceCount: 0,
+  errorCount: 0,
+  lastTraceAt: null,
+  lastFailedTraceAt: null,
+  activeDays: [],
+};
 
 const foldAll = (facts: readonly NurturingProjectUsageFact[]) =>
   facts.reduce(foldProjectUsage, emptyProjectUsage("project-1"));
@@ -70,40 +78,23 @@ describe("foldProjectUsage()", () => {
   });
 });
 
-describe("traceUsageTotalsOf()", () => {
-  /** @scenario "The organization's traces are read from trace's rollup" */
-  it("sums trace's per-day rows into the window's totals", () => {
-    expect(
-      traceUsageTotalsOf([
-        {
-          day: "2026-11-18",
-          traceCount: 2,
-          errorCount: 1,
-          totalCost: 0.5,
-          lastTraceAt: NOW - 2 * DAY_MS,
-          lastFailedTraceAt: NOW - 2 * DAY_MS - 1000,
-        },
-        {
-          day: "2026-11-19",
-          traceCount: 1,
-          errorCount: 0,
-          totalCost: 0.25,
-          lastTraceAt: NOW - DAY_MS,
-          lastFailedTraceAt: null,
-        },
-      ]),
-    ).toEqual({
-      traceCount: 3,
-      errorCount: 1,
-      totalCost: 0.75,
-      lastTraceAt: NOW - DAY_MS,
-      lastFailedTraceAt: NOW - 2 * DAY_MS - 1000,
-      activeDays: ["2026-11-18", "2026-11-19"],
-    });
-  });
+describe("totalCostOf()", () => {
+  /** @scenario "The window's cost is read from trace once per organization and UTC day" */
+  it("sums the cost of trace's per-day rows", () => {
+    const day = {
+      traceCount: 1,
+      errorCount: 0,
+      lastTraceAt: NOW,
+      lastFailedTraceAt: null,
+    };
 
-  it("answers no traces for no days", () => {
-    expect(traceUsageTotalsOf([])).toEqual(NO_TRACE_USAGE);
+    expect(
+      totalCostOf([
+        { ...day, day: "2026-11-18", totalCost: 0.5 },
+        { ...day, day: "2026-11-19", totalCost: 0.25 },
+      ]),
+    ).toBe(0.75);
+    expect(totalCostOf([])).toBe(0);
   });
 });
 
@@ -126,11 +117,11 @@ describe("organizationUsageTraits()", () => {
         traces: {
           traceCount: 3,
           errorCount: 2,
-          totalCost: 0.754,
           lastTraceAt: NOW - DAY_MS,
           lastFailedTraceAt: NOW - 2 * DAY_MS,
           activeDays: ["2026-11-18", "2026-11-19"],
         },
+        totalCost: 0.754,
         now: NOW,
         organizationCreatedAt: createdAt,
       }),
@@ -156,29 +147,25 @@ describe("organizationUsageTraits()", () => {
     });
   });
 
-  /** @scenario "A sync no trace started leaves the trace traits as Customer.io has them" */
-  it("leaves every trace trait out when the sync read no traces", () => {
+  /** @scenario "A sync that read no cost leaves total_cost as Customer.io has it" */
+  it("leaves total_cost out when this sync read no cost, and every count in", () => {
     const traits = organizationUsageTraits({
-      projects: [foldAll([{ kind: "prompt_created", promptId: "p1", occurredAt: NOW }])],
-      traces: null,
+      projects: [],
+      traces: { ...NO_TRACES, traceCount: 2, errorCount: 1, lastTraceAt: NOW },
+      totalCost: null,
       now: NOW,
-      organizationCreatedAt: NOW - DAY_MS,
+      organizationCreatedAt: null,
     });
 
-    expect(Object.keys(traits).toSorted()).toEqual([
-      "evaluator_count",
-      "has_scenario_run",
-      "prompt_count",
-      "scenario_count",
-      "simulation_set_count",
-      "window_end_date",
-    ]);
+    expect(traits).not.toHaveProperty("total_cost");
+    expect(traits).toMatchObject({ trace_count: 2, error_count: 1 });
   });
 
   it("leaves out the failed-trace time and the window when they are unknown", () => {
     const traits = organizationUsageTraits({
       projects: [],
-      traces: { ...NO_TRACE_USAGE, traceCount: 1, lastTraceAt: NOW },
+      traces: { ...NO_TRACES, traceCount: 1, lastTraceAt: NOW },
+      totalCost: null,
       now: NOW,
       organizationCreatedAt: null,
     });
@@ -192,7 +179,8 @@ describe("organizationUsageTraits()", () => {
   it("leaves out the last trace's time when no trace is in the window", () => {
     const traits = organizationUsageTraits({
       projects: [],
-      traces: NO_TRACE_USAGE,
+      traces: NO_TRACES,
+      totalCost: 0,
       now: NOW,
       organizationCreatedAt: null,
     });
@@ -206,7 +194,8 @@ describe("organizationUsageTraits()", () => {
 
     const traits = organizationUsageTraits({
       projects: [],
-      traces: { ...NO_TRACE_USAGE, traceCount: 1, lastTraceAt: createdAt + 1000 },
+      traces: { ...NO_TRACES, traceCount: 1, lastTraceAt: createdAt + 1000 },
+      totalCost: null,
       now: NOW,
       organizationCreatedAt: createdAt,
     });
@@ -219,7 +208,8 @@ describe("organizationUsageTraits() per signup day", () => {
   const traitsFor = (activeDays: readonly string[], organizationCreatedAt: number) =>
     organizationUsageTraits({
       projects: [],
-      traces: { ...NO_TRACE_USAGE, traceCount: activeDays.length, activeDays },
+      traces: { ...NO_TRACES, traceCount: activeDays.length, activeDays },
+      totalCost: null,
       now: NOW,
       organizationCreatedAt,
     });
@@ -252,7 +242,8 @@ describe("organizationUsageTraits() has_habit", () => {
   const habitOf = (traceDays: readonly string[], otherDays: readonly string[] = []) =>
     organizationUsageTraits({
       projects: [{ ...emptyProjectUsage("project-1"), activeDays: [...otherDays] }],
-      traces: { ...NO_TRACE_USAGE, traceCount: traceDays.length, activeDays: traceDays },
+      traces: { ...NO_TRACES, traceCount: traceDays.length, activeDays: traceDays },
+      totalCost: null,
       now: NOW,
       organizationCreatedAt: null,
     }).has_habit;

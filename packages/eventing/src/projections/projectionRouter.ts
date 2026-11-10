@@ -1145,7 +1145,9 @@ export class ProjectionRouter<
   ): Promise<FailedHandoff<EventType>[]> {
     const failures: FailedHandoff<EventType>[] = [];
     for (const [projectionName, { definition: fold }] of this.foldProjections) {
-      const filtered = foldEventsFor(fold, events);
+      const filtered = foldEventsFor(fold, events).filter((event) =>
+        this.foldEnqueueAccepts({ projectionName, fold, event }),
+      );
       if (filtered.length === 0) continue;
 
       const queueProcessor = this.queueManager.getProjectionQueue(projectionName);
@@ -1181,6 +1183,7 @@ export class ProjectionRouter<
     for (const event of events) {
       for (const [projectionName, { definition: fold, open: openFold }] of this.foldProjections) {
         if (fold.eventTypes.length > 0 && !fold.eventTypes.includes(event.type)) continue;
+        if (!this.foldEnqueueAccepts({ projectionName, fold, event })) continue;
         try {
           await openFold((definition) =>
             this.processFoldProjectionEvent({ projectionName, fold: definition, event, context }),
@@ -1207,6 +1210,35 @@ export class ProjectionRouter<
       }
     }
     return failures;
+  }
+
+  /** The fold's enqueue-time gate; fail-open on a throw, as a map's, so no fact is lost. */
+  private foldEnqueueAccepts({
+    projectionName,
+    fold,
+    event,
+  }: {
+    projectionName: string;
+    fold: SealedFoldProjection<EventType>["definition"];
+    event: EventType;
+  }): boolean {
+    const filter = fold.options?.enqueue?.filter;
+    if (!filter) return true;
+    try {
+      return filter(event);
+    } catch (error) {
+      this.logger.warn(
+        {
+          projectionName,
+          eventId: event.id,
+          eventType: event.type,
+          tenantId: String(event.tenantId),
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Fold projection enqueue filter threw; admitting the event so no fact is lost",
+      );
+      return true;
+    }
   }
 
   private async sendToStateProjection<State>({

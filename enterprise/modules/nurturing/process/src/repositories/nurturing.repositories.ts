@@ -7,6 +7,7 @@ import type {
 } from "./nurturing-milestones.repository.ts";
 import type { NurturingProjectDirectoryRepository } from "./nurturing-project-directory.repository.ts";
 import type { NurturingProjectUsageRepository } from "./nurturing-project-usage.repository.ts";
+import type { NurturingTraceDayRepository } from "./nurturing-trace-day.repository.ts";
 
 /** The rows nurturing owns and the owners' project rows it reads (R40), chosen once at boot. */
 export interface NurturingRepositories {
@@ -16,5 +17,7 @@ export interface NurturingRepositories {
   readonly projects: NurturingProjectDirectoryRepository;
   /** Nurturing's own per-project usage: the peer folds' rows. */
   readonly projectUsage: NurturingProjectUsageRepository;
+  /** Nurturing's own trace counts per project and day: the trace-day fold's rows. */
+  readonly traceDays: NurturingTraceDayRepository;
   readonly claims: NurturingClaimRepository;
 }

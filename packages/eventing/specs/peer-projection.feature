@@ -33,6 +33,13 @@ Feature: A module folds and maps a peer pipeline's events into its own state
     Then the subscriber is handed the event and the fold's state with that event folded in
 
   @unit
+  Scenario: A peer fold's enqueue filter keeps a declined event from minting a fold job
+    Given a module declares a peer fold whose enqueue filter declines some of the owner's events
+    When the owner's pipeline appends one event the filter declines and one it admits
+    Then only the admitted event is folded, judged on its data as the contract parses it
+    And an event whose data the contract refuses is admitted, so the fold reports it
+
+  @unit
   Scenario: A peer projection over an event no registered pipeline declares is refused
     Given a module declares a peer fold over an owner event
     And no registered pipeline declares that event type

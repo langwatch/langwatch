@@ -38,20 +38,37 @@ The rule is now:
 > nurturing may subscribe to and project owner events and read placement through
 > shares; it never pulls owner state on a schedule
 
-So the per-email usage is four peer folds in nurturing, one per owner pipeline
-(prompt, evaluator, scenario, simulation; a peer fold re-folds from one owner's
-log), in `nurturing-project-usage.pipeline.ts`, kept in nurturing's own
-`NurturingProjectUsageView` table, one row per project and owner. Evaluations
-only mark active days, so a throttled subscriber on `lw.evaluation.lifecycle_completed`
-adds at most one day per project a day to an `evaluation` row. Traces are not
-copied: trace's existing throttled `lw.trace.trace_received` fact, throttled again
-per organization to once per 15 minutes, starts one read of trace's own
-`trace_analytics_rollup` through `TraceApi.findTraceUsageByDay`, so nurturing now
-depends on `TraceApi` (no cycle: no module depends on nurturing). Each change sums
-the organization's projects, listed through the owners' shares, and sends one group
-call. The daily pull from the owners' Apis (#9382 before this change) is the thing
-still refused: "We're event driven so we don't do that." The trace read is not
-that pull: an owner fact starts it, never a schedule.
+So the per-email usage is peer folds in nurturing, in
+`nurturing-project-usage.pipeline.ts`. Four fold the owners' prompt, evaluator,
+scenario and simulation-run events (a peer fold re-folds from one owner's log, so
+one fold per owner pipeline) into `NurturingProjectUsageView`, one row per project
+and owner. Evaluations only mark active days, so a throttled subscriber on
+`lw.evaluation.lifecycle_completed` adds at most one day per project a day to an
+`evaluation` row. A fifth folds trace's `lw.obs.trace.span_received` into
+`NurturingProjectTraceDay`, one row per project and UTC day of append time: a root
+span is one trace and a root span with an error status one failed trace, as
+`trace_analytics_rollup` counts them. It parses only the span's parent id and
+status, never its body, and its enqueue filter queues root spans only, so a trace
+is one fold job and one row write. Rows older than the 30-day window are deleted when the
+organization syncs.
+
+These folds are keyed across many owner aggregates (a project, a project's day),
+so they set `refoldOnOutOfOrder: false`: the executor's out-of-order re-fold loads
+one aggregate's log and would rebuild the whole row from that aggregate alone.
+Their applies are sets, sums and maxima, so folding an older event on as it comes
+is exact. A redelivery is a no-op through the row's applied event ids.
+
+A span carries no price, so `total_cost` is read from trace's rollup through
+`TraceApi.findTraceUsageByDay` at most once per organization and UTC day (a Redis
+claim); every other trait comes from nurturing's own rows. Nurturing therefore
+still depends on `TraceApi` (no cycle: no module depends on nurturing).
+
+Each change sums the organization's projects, listed through the owners' shares,
+and sends one group call; trace's `lw.trace.trace_received`, throttled per
+organization to once per 15 minutes, starts the sync after traces. The daily pull
+from the owners' Apis (#9382 before this change) is the thing still refused:
+"We're event driven so we don't do that." The cost read is not that pull: an owner
+fact starts it, never a schedule.
 
 ## Public surfaces and transports
 

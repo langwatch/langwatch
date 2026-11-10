@@ -1952,6 +1952,14 @@ export interface LwqlPrismaRows {
     readonly projectionVersion: "String";
     readonly updatedAt: "DateTime";
   };
+  readonly NurturingProjectTraceDay: {
+    readonly projectId: "String";
+    readonly day: "String";
+    readonly folded: "Json";
+    readonly appliedEventIds: "String[]";
+    readonly projectionVersion: "String";
+    readonly updatedAt: "DateTime";
+  };
   readonly BillingMeterCheckpoint: {
     readonly id: "String";
     readonly organizationId: "String";
