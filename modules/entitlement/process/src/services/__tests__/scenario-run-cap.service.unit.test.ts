@@ -76,8 +76,8 @@ function serviceOver({
 }
 
 describe("ScenarioRunCapService", () => {
-  /** @scenario Scenario sets are not capped */
-  it("accepts a run for a new scenario set below the monthly cap after the grace", async () => {
+  /** @scenario The run cap counts runs, not scenario sets */
+  it("accepts a run below the monthly cap after the grace and counts runs only", async () => {
     const { service, meter } = serviceOver({ plan: free, runs: 0, firstRunAt: now - 20 * DAY_MS });
     for (let i = 0; i < 10; i++) seedRun({ meter, at: now - 1000 });
     await expect(service.assertRunAllowed({ organizationId: "org-1" })).resolves.toBeUndefined();

@@ -34,7 +34,7 @@ export abstract class BillableEventsMeterRepository {
     projectIds: readonly string[];
     window: MeterWindow;
   }): Promise<ProjectMeterCount[]>;
-  /** Distinct keys of one event type in the window, leaving out keys that start with the prefix. */
+  /** Distinct keys of one event type in the window. */
   abstract countEventType(input: EventTypeFilter & MeterWindow): Promise<number>;
   /** Epoch ms of the earliest matching event of one type; null when it has none. */
   abstract findFirstEventAt(input: EventTypeFilter): Promise<number | null>;

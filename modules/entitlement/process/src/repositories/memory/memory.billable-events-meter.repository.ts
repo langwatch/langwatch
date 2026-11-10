@@ -9,16 +9,6 @@ import {
   type ProjectMeterCount,
 } from "../billable-events-meter.repository.ts";
 
-function matchesFilter({
-  row,
-  filter,
-}: {
-  row: BillableEventRecord;
-  filter: EventTypeFilter;
-}): boolean {
-  return row.eventType === filter.eventType;
-}
-
 /** In-memory twin: deduplicates on read, as the ClickHouse count does. */
 export class MemoryBillableEventsMeterRepository extends BillableEventsMeterRepository {
   readonly rows: BillableEventRecord[] = [];
@@ -46,7 +36,7 @@ export class MemoryBillableEventsMeterRepository extends BillableEventsMeterRepo
 
   async countEventType(input: EventTypeFilter & MeterWindow): Promise<number> {
     const keys = this.#inWindow({ organizationId: input.organizationId, window: input })
-      .filter((row) => matchesFilter({ row, filter: input }))
+      .filter((row) => row.eventType === input.eventType)
       .map((row) => row.deduplicationKey);
     return new Set(keys).size;
   }
@@ -54,7 +44,7 @@ export class MemoryBillableEventsMeterRepository extends BillableEventsMeterRepo
   async findFirstEventAt(input: EventTypeFilter): Promise<number | null> {
     const times = this.rows
       .filter((row) => row.organizationId === input.organizationId)
-      .filter((row) => matchesFilter({ row, filter: input }))
+      .filter((row) => row.eventType === input.eventType)
       .map((row) => row.eventTimestamp);
     return times.length > 0 ? Math.min(...times) : null;
   }

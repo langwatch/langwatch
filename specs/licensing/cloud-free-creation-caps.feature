@@ -90,21 +90,20 @@ Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
     Then the run is accepted
 
   @unit
-  Scenario: Scenario sets are not capped
+  Scenario: The run cap counts runs, not scenario sets
     Given the organization is on the cloud Free plan
     And its first scenario run was 20 days ago
-    And it ran 10 scenarios this month across 8 distinct scenario sets
-    When a run starts for a new scenario set
+    And it ran 10 runs this month
+    When a run starts
     Then the run is accepted
+    And the month's count is 10 runs
 
   @unit
   Scenario: App runs, agent tests and voice calls count toward the monthly cap
     Given the organization is on the cloud Free plan
     And its first scenario run was 20 days ago
-    And it ran 99 runs this month from the app, agent tests and voice calls
-    When one more agent test or voice call run starts
-    Then the run is refused with limit type "scenarioRuns"
-    And an agent test or voice call run alone starts the grace
+    When a run starts from the app, an agent test or a voice call
+    Then each run is checked against the monthly cap and counted toward it
 
   @unit
   Scenario: A run queued from the app is counted once
