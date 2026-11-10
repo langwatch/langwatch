@@ -1286,6 +1286,32 @@ describe("budget_exceeded", () => {
   });
 });
 
+describe("provider_refused", () => {
+  const refused = (status: number) =>
+    explainHandledError(
+      shape({ code: "provider_refused", fault: "provider", meta: { provider: "azure", status } }),
+    );
+
+  describe("when the provider answered 404", () => {
+    it("points at the address instead of calling it temporary", () => {
+      const copy = refused(404);
+
+      expect(copy.title).toBe("Nothing answers at that address");
+      expect(copy.description).toContain("Check the endpoint");
+      expect(copy.description).not.toContain("temporary");
+    });
+  });
+
+  describe("when the provider refused with any other status", () => {
+    it("keeps the try-again copy", () => {
+      const copy = refused(503);
+
+      expect(copy.title).toBe("The provider refused the check");
+      expect(copy.description).toContain("try again");
+    });
+  });
+});
+
 describe("activation_code_already_redeemed", () => {
   const describeUsed = (meta: Record<string, unknown>) =>
     explainHandledError(shape({ code: "activation_code_already_redeemed", meta, httpStatus: 403 }))

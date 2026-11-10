@@ -74,18 +74,12 @@ const KEY: LangWatchQLKeyReach = {
 async function appOver(input: {
   listed: readonly Project[];
   grants: readonly string[];
-  flaggedProjects?: readonly string[];
+  enabledProjects?: readonly string[];
 }) {
-  const flagsAsked: string[] = [];
+  const accessAsked: string[] = [];
   const app = await AnalyticsModule.create({
     dependencies: {
-      featureFlags: createApiFixture<FeatureFlagApi>({
-        isEnabled: (_key, target) => {
-          const projectId = target.kind === "project" ? target.projectId : "";
-          flagsAsked.push(projectId);
-          return Promise.resolve(input.flaggedProjects?.includes(projectId) === true);
-        },
-      }),
+      featureFlags: createApiFixture<FeatureFlagApi>(),
       authz: createApiFixture<AuthzApi>({
         hasApiKeyPermission: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
         can: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
@@ -122,7 +116,14 @@ async function appOver(input: {
       traces: createApiFixture<TraceApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
-    channels: { judge: createApiFixture<InstantEvalApi>() },
+    channels: {
+      judge: createApiFixture<InstantEvalApi>({
+        isEnabled: ({ projectId }) => {
+          accessAsked.push(projectId);
+          return Promise.resolve(input.enabledProjects?.includes(projectId) === true);
+        },
+      }),
+    },
     repositories: MemoryAnalyticsRepositories.create(),
     config: {
       langwatchQl: {
@@ -143,7 +144,7 @@ async function appOver(input: {
     secrets: analyticsTestSecrets(),
   });
 
-  return { app, flagsAsked };
+  return { app, accessAsked };
 }
 
 async function referenceFor(input: { listed: readonly Project[]; grants: readonly string[] }) {
@@ -231,51 +232,51 @@ describe("AnalyticsModule.describeLangWatchQLSchemaForKey", () => {
 
   describe("given a key that reads more than one project", () => {
     /** @scenario "An eval function is refused for a key that reads more than one project" */
-    it("closes the eval functions without asking either project's flag", async () => {
-      const { app, flagsAsked } = await appOver({
+    it("closes the eval functions without asking either project", async () => {
+      const { app, accessAsked } = await appOver({
         listed: [project("project-a"), project("project-b")],
         grants: ["analytics:view"],
-        flaggedProjects: ["project-a", "project-b"],
+        enabledProjects: ["project-a", "project-b"],
       });
 
       const schema = await app.describeLangWatchQLSchemaForKey({ reach: KEY });
 
       expect(isEvalAvailable(schema)).toBe(false);
-      expect(flagsAsked).toEqual([]);
+      expect(accessAsked).toEqual([]);
     });
   });
 
   describe("given a key that reads one project", () => {
-    /** @scenario "A key that reads one project is judged on that project's own flag" */
-    it("answers with that project's own flag", async () => {
-      const flagged = await appOver({
+    /** @scenario "A key that reads one project is judged on that project's own Instant Evals access" */
+    it("answers with that project's own Instant Evals access", async () => {
+      const enabled = await appOver({
         listed: [project("project-a")],
         grants: ["analytics:view"],
-        flaggedProjects: ["project-a"],
+        enabledProjects: ["project-a"],
       });
-      const unflagged = await appOver({
+      const disabled = await appOver({
         listed: [project("project-c")],
         grants: ["analytics:view"],
       });
 
       expect(
-        isEvalAvailable(await flagged.app.describeLangWatchQLSchemaForKey({ reach: KEY })),
+        isEvalAvailable(await enabled.app.describeLangWatchQLSchemaForKey({ reach: KEY })),
       ).toBe(true);
       expect(
-        isEvalAvailable(await unflagged.app.describeLangWatchQLSchemaForKey({ reach: KEY })),
+        isEvalAvailable(await disabled.app.describeLangWatchQLSchemaForKey({ reach: KEY })),
       ).toBe(false);
-      expect([...flagged.flagsAsked, ...unflagged.flagsAsked]).toEqual(["project-a", "project-c"]);
+      expect([...enabled.accessAsked, ...disabled.accessAsked]).toEqual(["project-a", "project-c"]);
     });
   });
 
   describe("given a key that reads no project at all", () => {
     it("closes the eval functions rather than treating an empty scope as unrestricted", async () => {
-      const { app, flagsAsked } = await appOver({ listed: [], grants: ["analytics:view"] });
+      const { app, accessAsked } = await appOver({ listed: [], grants: ["analytics:view"] });
 
       expect(isEvalAvailable(await app.describeLangWatchQLSchemaForKey({ reach: KEY }))).toBe(
         false,
       );
-      expect(flagsAsked).toEqual([]);
+      expect(accessAsked).toEqual([]);
     });
   });
 });

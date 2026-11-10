@@ -207,7 +207,10 @@ await it("serves silent clips with posters that play only while visible and allo
         const page = await noScript.newPage();
         await page.goto(base + CLIP_PAGE);
         assert.equal(await page.locator('img[src$=".gif"]').count(), 0);
-        const clips = await page.locator("video[data-docs-clip]").evaluateAll((videos) =>
+        const deferred = page.locator("video[data-docs-poster]");
+        for (const video of await deferred.all()) assert.equal(await video.isVisible(), false);
+        const shown = "video[data-docs-clip]:not([data-docs-poster])";
+        const clips = await page.locator(shown).evaluateAll((videos) =>
           videos.map((video) => ({
             poster: video.getAttribute("poster"),
             controls: video.controls,
@@ -418,7 +421,7 @@ await it("styles a page, dark mode, search and navigation from inlined styles", 
         assert.match(html, /<style>@layer /);
         assert.doesNotMatch(
           html.replace(/<noscript>[\s\S]*?<\/noscript>/g, ""),
-          /<link(?![^>]*media="print")[^>]*rel="stylesheet"/,
+          /<link(?=[^>]*\srel="stylesheet")(?=[^>]*\shref=)[^>]*>/,
         );
         assert.equal(
           await page.locator(".docs-layout").evaluate((node) => getComputedStyle(node).display),

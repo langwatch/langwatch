@@ -1776,6 +1776,11 @@
           "name": "ExpectedEvaluatorResults",
           "type": "Nullable(UInt32)",
           "comment": ""
+        },
+        {
+          "name": "Concurrency",
+          "type": "Nullable(UInt16)",
+          "comment": ""
         }
       ]
     },

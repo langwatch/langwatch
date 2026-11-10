@@ -18,6 +18,14 @@ Feature: Static documentation with progressive interaction
     Then its static HTML is fetched without navigating
     And following the link reuses that response
 
+  @unit
+  Scenario: Start fetching a page as the reader presses its link
+    When a reader presses an internal documentation link with the main button
+    Then its static HTML is requested before the click completes, on touch screens too
+    And following the link reuses that request
+    And a modified press, another button or a link that leaves the docs requests nothing
+    And nothing is requested ahead of the click while offline or when the reader asks to save data
+
   @integration
   Scenario: Explain a search that fails to render
     Given the search dialog is open
@@ -74,6 +82,9 @@ Feature: Static documentation with progressive interaction
     And neither is wider than twice the article column or plays more than 30 frames a second
     And a source without sound publishes no audio track
     And a video without an authored poster shows a WebP of its first frame and fetches nothing until it plays
+    And that poster is at most 1200 pixels wide, as a phone cannot choose a smaller one
+    And a video below the fold fetches its poster only as it nears the screen, so the first screen loads first
+    And a reader without scripts still sees that poster, from a copy the page keeps for them
     And it autoplays only where authored and muted
     And unchanged videos are reused from the build cache instead of being encoded again
     But without ffmpeg the video is published as authored
@@ -132,7 +143,9 @@ Feature: Static documentation with progressive interaction
     Then the rules its markup can match are inlined in its head
     And rules for classes or ids found only on other pages are left out
     And rules a script can add at runtime, theme classes and unscoped rules are kept
-    And the shared stylesheet loads without blocking the first paint
+    And only the animations a kept rule or a script names are inlined
+    And the browser asks for the shared stylesheet only once the page has loaded and the first screen's images and posters are drawn, or 3 seconds have passed
+    And the font faces are declared only in the page's own styles, so the late stylesheet cannot swap a font in
 
   @unit
   Scenario: Minify the shared stylesheet for the supported browsers
@@ -186,7 +199,7 @@ Feature: Static documentation with progressive interaction
     Then search downloads at most 6,000 gzip bytes of script before it answers
     And the page menu downloads at most 3,000
     And the playground downloads at most 24,500
-    And the page itself still loads under 3,000 gzip bytes of script before any interaction
+    And the page itself still loads under 3,200 gzip bytes of script before any interaction
 
   @e2e
   Scenario: Use the shared command surface
@@ -246,6 +259,7 @@ Feature: Static documentation with progressive interaction
     When a reader opens a section index or a guide
     Then the text set in the metric-matched fallback fonts takes the same space as the web fonts
     And the page shifts by no more than 0.01 when the fonts swap in
+    And on a touch screen, where every heading shows its link icon, the page shifts no more either
 
   @e2e
   Scenario: Keep an API reference in place while the page starts
@@ -268,9 +282,17 @@ Feature: Static documentation with progressive interaction
     And no extended-Latin font file is downloaded
 
   @unit
-  Scenario: Preload the two fonts every page draws above the fold
+  Scenario: Ship web fonts cut to the characters and weights the docs draw
+    Given each Latin web font file is subset to the characters its face declares
+    When the font files are checked against the stylesheet
+    Then every face covers the common text characters, so none falls back mid-word
+    And a variable face spans exactly the weights its face declares
+
+  @unit
+  Scenario: Preload the fonts every page draws above the fold
     When a page head is built
-    Then it preloads the Latin body font and the regular title font, under the site's base path, and no other font
+    Then it preloads the Latin body font and both title weights, under the site's base path, and no other font
+    And each preloaded face draws only if it arrives before first paint, so a late one never moves a heading
 
   @integration
   Scenario: Serve the product tour poster at the size of the screen

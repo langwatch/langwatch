@@ -5,6 +5,9 @@ const STORAGE_KEY = "lw-docs:github-stars";
 /* A star count an hour old still reads right. GitHub's anonymous limit is per address, so
    readers behind one shared address can still spend it; the build's count then stays. */
 export const STARS_FRESH_MS = 60 * 60 * 1000;
+/* The build stamps the start of the UTC day it read the count, and docs deploy several times a
+   day, so a count from that day or the next needs no live read. */
+const BUILT_FRESH_MS = 2 * 24 * STARS_FRESH_MS;
 
 type StarsWindow = Pick<Window, "document" | "localStorage" | "fetch">;
 /* `count` is null when GitHub was asked at `at` but gave no count: the next ask waits the hour. */
@@ -39,6 +42,13 @@ function paintStars({ win, stars }: { win: Pick<Window, "document">; stars: numb
   });
 }
 
+/** The start of the UTC day GitHub reported the build's count, or null for a page without one. */
+function builtAt({ win }: { win: Pick<Window, "document"> }) {
+  const [link] = win.document.querySelectorAll<HTMLElement>("[data-docs-github]");
+  const at = Number(link?.dataset.docsStarsAt);
+  return Number.isFinite(at) && at > 0 ? at : null;
+}
+
 /** Whether the page shows the count GitHub reported at build time. */
 function builtCount({ win }: { win: Pick<Window, "document"> }) {
   return [...win.document.querySelectorAll<HTMLElement>("[data-docs-github]")].some(
@@ -61,9 +71,9 @@ async function fetchStars({ win }: { win: StarsWindow }) {
 let inFlight: Promise<void> | undefined;
 
 /**
- * Replaces the build's star count with a live one. A count this browser read within the hour is
- * used as it is; an older one stands in only on a page built without a count. If GitHub does not
- * answer, the page keeps the count it has and asks again after the hour. One ask at a time.
+ * Replaces the build's star count with a live one once the day after its read has passed. A count
+ * read within the hour is used as it is; an older one stands in only on a page built without one.
+ * If GitHub does not answer, the page keeps its count and asks again after the hour.
  */
 export function refreshStars(options: { win?: StarsWindow; now?: number } = {}) {
   inFlight ??= askAndPaint(options).finally(() => (inFlight = undefined));
@@ -80,6 +90,8 @@ async function askAndPaint({
   const fallback = fresh || !builtCount({ win }) ? (cached?.count ?? null) : null;
   if (fallback !== null) paintStars({ win, stars: fallback });
   if (fresh) return;
+  const built = builtAt({ win });
+  if (built !== null && now - built < BUILT_FRESH_MS) return;
   const count = await fetchStars({ win });
   writeCache({ win, stars: { count: count ?? fallback, at: now } });
   if (count !== null) paintStars({ win, stars: count });

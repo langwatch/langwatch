@@ -13,12 +13,14 @@ import {
   type LwqlAccessModelOwner,
   findMissingObjects,
   findStatementTargets,
+  postgresEngineCollection,
   statementKind,
 } from "../../rules/langwatch-ql-config-store.rules.ts";
 import {
   type ClickHouseAdminStatements,
   LangWatchQLProvisioningRepository,
   type LwqlClickHouseInventory,
+  type LwqlCollectionState,
   type LwqlKeyMapInsertRow,
   type LwqlPostgresCredentials,
   type ProvisioningFailureLevel,
@@ -128,6 +130,49 @@ async function readClickHouseInventory({
     ),
     functions: held.map((row) => String(row.name)),
   };
+}
+
+/**
+ * Two catalog reads; an unreadable one degrades to empty. A failed read drops the known
+ * bindings, so each engine table then takes the first collection the server holds.
+ */
+async function readLwqlCollectionState({
+  client,
+  database,
+  candidates,
+}: {
+  client: ClickHouseAdminStatements;
+  database: string;
+  candidates: readonly string[];
+}): Promise<LwqlCollectionState> {
+  const read = async (sql: string, params: Readonly<Record<string, unknown>>) => {
+    try {
+      return await client.rows(sql, params);
+    } catch (error) {
+      logger.warn(
+        { error: clickHouseErrorSummary(error) },
+        "lwql provisioning could not read the named collections or engine-table bindings; the known bindings are dropped and each engine table takes the first collection the server holds",
+      );
+      return [];
+    }
+  };
+  const [collections, tables] = await Promise.all([
+    read("SELECT name FROM system.named_collections WHERE has({names:Array(String)}, name)", {
+      names: [...candidates],
+    }),
+    read(
+      "SELECT name, engine_full FROM system.tables " +
+        "WHERE database = {database:String} AND engine = 'PostgreSQL'",
+      { database },
+    ),
+  ]);
+  const bound: Record<string, string> = {};
+  for (const row of tables) {
+    const engineFull = typeof row.engine_full === "string" ? row.engine_full : "";
+    const binding = postgresEngineCollection(engineFull);
+    if (binding.bound) bound[String(row.name)] = binding.collection;
+  }
+  return { available: collections.map((row) => String(row.name)), bound };
 }
 
 /**
@@ -272,6 +317,13 @@ export class ClickHouseLangWatchQLProvisioningRepository extends LangWatchQLProv
     functions: readonly string[];
   }): Promise<LwqlClickHouseInventory> {
     return readClickHouseInventory({ client: this.client, ...input });
+  }
+
+  readCollectionState(input: {
+    database: string;
+    candidates: readonly string[];
+  }): Promise<LwqlCollectionState> {
+    return readLwqlCollectionState({ client: this.client, ...input });
   }
 
   /** @param collection Validated as an identifier by `collectionProbe`. */

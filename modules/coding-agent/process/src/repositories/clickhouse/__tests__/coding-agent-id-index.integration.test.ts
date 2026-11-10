@@ -115,6 +115,14 @@ function sourceReadOf(table: string): QueryRequest {
   return read;
 }
 
+/** A list read's dedup subquery on its own, which the outer statement's plan does not show. */
+function dedupScopeOf(request: QueryRequest): QueryRequest {
+  const from = request.sql.indexOf("SELECT TenantId, SessionId, max(UpdatedAt)");
+  const having = "HAVING max(toUInt8(Auxiliary)) = 0";
+  const to = request.sql.indexOf(having, from) + having.length;
+  return { ...request, sql: request.sql.slice(from, to) };
+}
+
 beforeAll(async () => {
   const [endpoint] = await startTestClickHouseEndpoints({
     suite: "coding-agent-id-index",
@@ -316,6 +324,69 @@ describe("coding-agent lookups by id with the id index", () => {
       expect(await partsReached(bounded)).toBeLessThan(
         await partsReached(sourceReadOf("coding_agent_trace_sessions")),
       );
+    });
+  });
+});
+
+describe("coding-agent session reads bounded by the session id index", () => {
+  const sessionIds = () => [
+    `${tenantId}-session`,
+    ...decoyAgesInDays.flatMap((days) => decoyIds.map((id) => `${id}-${days}`)),
+  ];
+
+  describe("given a window around the session written eight weeks ago", () => {
+    it("lists the same sessions as the unbounded read, its dedup scope reaching fewer parts", async () => {
+      const window = { fromMs: eightWeeksAgoMs - DAY_MS, toMs: eightWeeksAgoMs + DAY_MS };
+
+      const listed = await sessions.findManyRecent({ tenantId, ...window, limit: 10 });
+
+      expect(listed.map((row) => row.sessionId)).toEqual([`${tenantId}-session`]);
+      const bounded = sourceReadOf("coding_agent_sessions");
+      expect(bounded.params).toMatchObject({
+        spanFrom: eightWeeksAgoMs - DAY_MS,
+        spanTo: eightWeeksAgoMs + DAY_MS,
+      });
+      statements = [];
+      const unboundedList = await unbounded.sessions.findManyRecent({
+        tenantId,
+        ...window,
+        limit: 10,
+      });
+      expect(unboundedList).toEqual(listed);
+      const unboundedDedup = dedupScopeOf(sourceReadOf("coding_agent_sessions"));
+      expect(
+        await partsAfterPartitionPruning({ query: queryRows, request: dedupScopeOf(bounded) }),
+      ).toBeLessThan(
+        await partsAfterPartitionPruning({ query: queryRows, request: unboundedDedup }),
+      );
+    });
+  });
+
+  describe("given a project whose sessions span two hundred days", () => {
+    it("counts its sessions and its first one as the unbounded read does", async () => {
+      const counted = await sessions.countUsage({ projectIds: [tenantId] });
+
+      expect(counted.sessions).toBe(sessionIds().length);
+      await expect(unbounded.sessions.countUsage({ projectIds: [tenantId] })).resolves.toEqual(
+        counted,
+      );
+    });
+
+    it("answers main for the other sessions, probing inside their span", async () => {
+      await expect(
+        sessions.findOtherSessionKind({ tenantId, excludeSessionIds: [`${tenantId}-session`] }),
+      ).resolves.toBe("main");
+
+      expect(sourceReadOf("coding_agent_sessions").sql).toContain("{spanFrom:Int64}");
+    });
+
+    it("answers none from the index alone when every session is excluded", async () => {
+      await expect(
+        sessions.findOtherSessionKind({ tenantId, excludeSessionIds: sessionIds() }),
+      ).resolves.toBe("none");
+
+      expect(statements).not.toHaveLength(0);
+      expect(statements.every((request) => request.sql.includes("_id_index"))).toBe(true);
     });
   });
 });

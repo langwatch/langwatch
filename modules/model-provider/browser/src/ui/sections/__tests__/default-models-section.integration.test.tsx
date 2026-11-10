@@ -12,6 +12,7 @@ import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../tes
 import { DefaultModelsSection } from "../default-models-section.tsx";
 import "@testing-library/jest-dom/vitest";
 
+const mockInstantEvalAccess = vi.fn();
 const mockGetDefaultModels = vi.fn();
 const mockInvalidate = vi.fn();
 const mockDelete = vi.fn();
@@ -23,6 +24,7 @@ vi.mock("@langwatch/feature-flag-client", () => ({
 
 vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
+    instantEval: { access: { useQuery: () => mockInstantEvalAccess() } },
     useUtils: () => ({ modelProvider: { invalidate: mockInvalidate } }),
     modelProvider: {
       getDefaultModelsForProject: { useQuery: () => mockGetDefaultModels() },
@@ -133,6 +135,10 @@ function renderSection({
 describe("given the Default Models table", () => {
   beforeEach(() => {
     mockGetDefaultModels.mockReturnValue({ data: FAKE_PAYLOAD, isLoading: false });
+    mockInstantEvalAccess.mockReturnValue({
+      data: { hostedReleased: true, offer: "enable" },
+      isLoading: false,
+    });
     mockInvalidate.mockReset();
     mockDelete.mockReset();
   });
@@ -230,6 +236,61 @@ describe("given the Default Models table", () => {
       const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
       expect(cell.textContent).toBe("Evals Preview");
       expect(cell.textContent).not.toMatch(/Not configured/);
+    });
+
+    describe("when Evals Preview is neither released nor one switch away", () => {
+      beforeEach(() => {
+        mockInstantEvalAccess.mockReturnValue({
+          data: { hostedReleased: false, offer: "contact_us" },
+          isLoading: false,
+        });
+      });
+
+      /** @scenario "Without Evals Preview, the Instant Evals column reads Not set" */
+      it("reads Not set where nothing is set, never Evals Preview", () => {
+        renderSection();
+
+        const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
+        expect(cell.textContent).toBe("Not set");
+      });
+
+      /** @scenario "Without Evals Preview, the Instant Evals column reads Not set" */
+      it("reads Not set where the row pins Evals Preview", () => {
+        mockGetDefaultModels.mockReturnValue({
+          data: {
+            ...FAKE_PAYLOAD,
+            configs: [
+              { ...FAKE_PAYLOAD.configs[0]!, config: { INSTANT_EVALS: "langwatch/instant-evals" } },
+            ],
+          },
+          isLoading: false,
+        });
+        renderSection();
+
+        expect(screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals").textContent).toBe(
+          "Not set",
+        );
+      });
+
+      it("still reads the project's own decision model", () => {
+        mockGetDefaultModels.mockReturnValue({
+          data: {
+            ...FAKE_PAYLOAD,
+            configs: [
+              {
+                ...FAKE_PAYLOAD.configs[0]!,
+                config: { INSTANT_EVALS: "inception/decisions:mercury-decide" },
+              },
+            ],
+          },
+          isLoading: false,
+        });
+        renderSection();
+
+        expect(screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals").textContent).toBe(
+          "Inception Mercury Decide",
+        );
+      });
     });
 
     it("reads the picked decision model's label, not its id", () => {

@@ -7,9 +7,9 @@
  */
 import {
   createTenantId,
+  type EventReadSeat,
   EventUtils,
   InMemoryProcessStore,
-  type OwnEventStore,
 } from "@langwatch/eventing";
 import {
   USER_AGGREGATE_TYPE,
@@ -24,6 +24,7 @@ import type {
   UserDeactivatedEvent,
   UserReactivatedEvent,
 } from "../../eventing/user-lifecycle.events.ts";
+import { EventingUserStandingRepository } from "../../repositories/eventing/eventing.user-standing.repository.ts";
 import { MemoryUserDatabase } from "../../repositories/memory/memory.user.database.ts";
 import {
   MemoryUserRepositories,
@@ -86,20 +87,20 @@ function lifecycleLog() {
     recordUserReactivated: append("reactivated"),
   };
   const reads: { aggregateIds: string[] }[] = [];
-  const eventStore: Pick<OwnEventStore, "findAggregates"> = {
-    findAggregates: async ({ aggregates, accepts }) => {
+  const eventReadSeat: Pick<EventReadSeat, "findEventsOfAggregates"> = {
+    findEventsOfAggregates: async ({ aggregates }) => {
       reads.push({ aggregateIds: aggregates.map(({ aggregateId }) => aggregateId) });
-      return aggregates.map(({ tenantId, aggregateId }) => ({
-        tenantId,
-        aggregateId,
-        events: facts
-          .filter(({ type, data }) => type !== "created" && data.userId === aggregateId)
-          .map(standingEventOf)
-          .flatMap((event) => (accepts(event) ? [event] : [])),
-      }));
+      return aggregates.flatMap(({ tenantId, aggregateId }) =>
+        facts
+          .filter(
+            ({ type, data }) =>
+              type !== "created" && data.userId === aggregateId && data.tenantId === tenantId,
+          )
+          .map(standingEventOf),
+      );
     },
   };
-  return { senders: logged, facts, batches, eventStore, reads };
+  return { senders: logged, facts, batches, eventReadSeat, reads };
 }
 
 /** An app over a memory store whose fact outbox the test reads, its bus optionally down. */
@@ -203,12 +204,14 @@ describe("user's created fact", () => {
     async function storedAccounts() {
       const log = lifecycleLog();
       const app = createUserTestApp({
-        repositories: MemoryUserRepositories.create({
-          processStore: InMemoryProcessStore.createForTesting(),
-        }),
+        repositories: {
+          ...MemoryUserRepositories.create({
+            processStore: InMemoryProcessStore.createForTesting(),
+          }),
+          standings: EventingUserStandingRepository.create({ eventReadSeat: log.eventReadSeat }),
+        },
         lifecycle: log.senders,
       });
-      app.keepLifecycleEventStore({ participation: "consume", eventStore: log.eventStore });
       const ids: string[] = [];
       for (const email of ["a@example.com", "b@example.com", "c@example.com"]) {
         ids.push((await app.create({ name: "Stored", email })).id);

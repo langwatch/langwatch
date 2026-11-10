@@ -150,6 +150,16 @@ Feature: Migration order check
     When the PR edits the declaring file outside the declaration, reformats the declaration, or moves it unchanged to another file
     Then the check passes
 
+  # A replay step is declared with defineProjectionReplayStep, not defineMigrationStep;
+  # its call is frozen like any step's, not the module file around it.
+  @unit
+  Scenario: A released replay step freezes only its own call
+    Given a release manifest on the base branch names the replay step "topic:replay-clusters"
+    And a module file declares it with defineProjectionReplayStep, and a spec names it
+    When the PR registers a new step in that module file and edits the spec
+    Then the check passes
+    And an edit inside the replay step's call still fails the check
+
   @unit
   Scenario: A code step no release manifest names yet may still change
     Given a module file declares the code step "topic:seed-clusters"

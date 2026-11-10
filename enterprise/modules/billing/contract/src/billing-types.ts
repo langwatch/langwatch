@@ -297,6 +297,9 @@ export type DeveloperSeats = z.infer<typeof developerSeatsSchema>;
 const developerSeatQuoteSchemaDefinition = z.object({
   amountDueCents: z.number(),
   formattedAmountDue: z.string(),
+  /** Of `amountDueCents`, the tax (VAT added on top); zero when none is charged. */
+  taxCents: z.number(),
+  /** Seats times the seat price, before any tax. */
   formattedRecurringTotal: z.string(),
   billingInterval: z.string(),
   /** The instant this quote priced, sent back on confirm so the charge matches it. */

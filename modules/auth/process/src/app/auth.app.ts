@@ -64,7 +64,7 @@ import {
   type SsoArrivalAdmission,
   type SsoArrivalApi,
 } from "@langwatch/identity-contract";
-import { NotificationService } from "@langwatch/notification-contract";
+import { isEmailUnconfigured, NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   OrganizationApi,
@@ -601,10 +601,8 @@ export class AuthModule implements AuthApiContract {
         checkSignUp,
         isWithinBudget: (input) => app.isWithinBudget(input),
         revokeAllBrowserSessions: (input) => app.revokeAllBrowserSessions(input),
-        isEmailUnconfigured: async () => {
-          const view = await dependencies.notifications.getMailDelivery();
-          return view.provider === undefined && !view.misconfigured;
-        },
+        isEmailUnconfigured: async () =>
+          isEmailUnconfigured({ mail: await dependencies.notifications.getMailDelivery() }),
       }),
       processName,
       rateLimits: repositories.rateLimits,

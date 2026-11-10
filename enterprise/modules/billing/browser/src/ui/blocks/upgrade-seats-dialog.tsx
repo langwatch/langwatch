@@ -33,7 +33,7 @@ export function UpgradeSeatsDialog({
     if (open) setSeats(floor);
   }, [open, floor]);
 
-  const { total, breakdown } = upgradeTotal({ seats, price });
+  const { total, note, breakdown } = upgradeTotal({ seats, price });
   const hint = seats <= floor ? upgradeMinimumHint(floor) : undefined;
   return (
     <Dialog
@@ -77,9 +77,14 @@ export function UpgradeSeatsDialog({
           paddingY={3}
           data-testid="upgrade-seats-total"
         >
-          <Text fontSize="2xl" fontWeight="semibold" fontVariantNumeric="tabular-nums">
-            {total}
-          </Text>
+          <HStack gap={2} align="baseline">
+            <Text fontSize="2xl" fontWeight="semibold" fontVariantNumeric="tabular-nums">
+              {total}
+            </Text>
+            <Text textStyle="bodySm" color="fg.muted">
+              {note}
+            </Text>
+          </HStack>
           <Text textStyle="bodySm" color="fg.muted" fontVariantNumeric="tabular-nums">
             {breakdown}
           </Text>

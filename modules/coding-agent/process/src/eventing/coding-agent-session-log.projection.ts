@@ -361,10 +361,11 @@ export class CodingAgentSessionLogProjection {
       decision: this.stateProjection.coerceString(attrs.decision),
       source: this.stateProjection.coerceString(attrs.source),
     });
+    // A REDIRECT (the human answered instead of approving) is not a refusal, so
+    // it counts as neither. An ABORT (they walked away) is a different act from
+    // a refusal, and NONE is a tool that broke: counting them as failures would
+    // report the human's judgement as the agent's fault.
     if (outcome !== "denied" && outcome !== "aborted") return base;
-    // An ABORT (the human walked away from the prompt) is a different act from
-    // a refusal, and NEITHER is a tool that broke. Counting them as failures
-    // would report the human's judgement as the agent's fault.
     return outcome === "aborted"
       ? { ...base, toolsAborted: base.toolsAborted + 1 }
       : { ...base, toolsDenied: base.toolsDenied + 1 };

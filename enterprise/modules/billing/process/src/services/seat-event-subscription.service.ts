@@ -417,9 +417,9 @@ export class SeatEventSubscriptionService {
     ).toUpperCase() as CurrencyType;
     const billingInterval = seatItem.interval ?? "month";
 
-    const { prorationCents, creditAppliedCents } = preview
+    const { prorationCents, creditAppliedCents, taxCents } = preview
       ? chargedAmounts({ preview, lifted, share: plan.chargedShare })
-      : { prorationCents: 0, creditAppliedCents: 0 };
+      : { prorationCents: 0, creditAppliedCents: 0, taxCents: 0 };
 
     const format = (cents: number) => {
       const amount = cents / 100;
@@ -437,6 +437,9 @@ export class SeatEventSubscriptionService {
       formattedAmountDue: format(prorationCents),
       // Null rather than a formatted zero: say nothing about credit on an account with none.
       formattedCreditApplied: creditAppliedCents > 0 ? format(creditAppliedCents) : null,
+      taxCents,
+      formattedAmountDueExcludingTax: taxCents > 0 ? format(prorationCents - taxCents) : null,
+      formattedTax: taxCents > 0 ? format(taxCents) : null,
       formattedRecurringTotal: format(newTotalSeats * unitAmountCents),
       billingInterval,
       // The instant this quote priced, sent back on confirm so the charge matches it.

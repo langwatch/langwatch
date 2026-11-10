@@ -3,9 +3,7 @@
  * helper — mirrors the shape of `computeBatchAggregates.ts`. No I/O, no React.
  */
 
-import { quantile } from "@langwatch/experiment-contract";
-
-import { mulberry32 } from "./batch-evaluation-results.bootstrap-ci.ts";
+import { mulberry32, percentileInterval95 } from "./batch-evaluation-results.bootstrap-ci.ts";
 import {
   type Comparability,
   computeComparability,
@@ -142,12 +140,14 @@ export function computeBTLeaderboard({
   // Smoothing keeps MM finite when at least one variant is degenerate. A shared
   // Beta(eps, eps) prior across every pair is the standard fix (Hunter §4).
   const smooth = hasDegenerate ? DEGENERATE_SMOOTHING_EPS : 0;
-  const { strength, didConverge } = fitBT({
-    W,
+  const fitted = createBTSolver(n).fit({
+    W: flatten(W),
     smooth,
     maxIter: opts.maxIter,
     tol: opts.tol,
   });
+  const strength = Array.from(fitted.strength);
+  const { didConverge } = fitted;
 
   // Computed before the bootstrap because the simultaneous bands are centred
   // on the observed differences, not on the mean of the replicates.
@@ -367,89 +367,123 @@ function perVariantTotals(W: number[][]): {
 /**
  * Hunter (2004) MM update: p_i ← (W_i + smooth*(n-1)) / Σ_{j≠i} (N_ij + 2*smooth) /
  * (p_i + p_j) where W_i = Σ_j W[i][j] and N_ij = W[i][j] + W[j][i]. Smoothing adds a
- * shared Beta(smooth, smooth) prior to every pair.
+ * shared Beta(smooth, smooth) prior to every pair. Flat arrays: experiment ADR-002.
  */
-function fitBT({
+type BTSolver = {
+  fit: (input: { W: Float64Array; smooth: number; maxIter: number; tol: number }) => {
+    strength: Float64Array;
+    didConverge: boolean;
+  };
+};
+
+/** wins[i] = W_i + smooth*(n-1); pairMass[i*n+j] = N_ij + 2*smooth. */
+function loadWinsAndPairMass({
   W,
+  n,
   smooth,
-  maxIter,
-  tol,
+  wins,
+  pairMass,
 }: {
-  W: number[][];
+  W: Float64Array;
+  n: number;
   smooth: number;
-  maxIter: number;
-  tol: number;
-}): { strength: number[]; didConverge: boolean } {
-  const n = W.length;
-  if (n === 0) return { strength: [], didConverge: true };
-  if (n === 1) return { strength: [1], didConverge: true };
-
-  let p: number[] = Array.from({ length: n }, () => 1);
-  let didConverge = false;
-
-  for (let iter = 0; iter < maxIter; iter++) {
-    const next = mmSweep({ W, p, smooth });
-    normalizeToGeometricMean(next);
-    const delta = maxRelativeChange({ next, previous: p });
-    p = next;
-    if (delta < tol) {
-      didConverge = true;
-      break;
+  wins: Float64Array;
+  pairMass: Float64Array;
+}): void {
+  for (let i = 0; i < n; i++) {
+    let wi = smooth * (n - 1);
+    for (let j = 0; j < n; j++) {
+      if (i !== j) wi += W[i * n + j]!;
+    }
+    wins[i] = wi;
+    for (let j = 0; j < n; j++) {
+      pairMass[i * n + j] = W[i * n + j]! + W[j * n + i]! + 2 * smooth;
     }
   }
-
-  return { strength: p, didConverge };
 }
 
-/** One MM iteration: the update applied to every variant at once. */
-function mmSweep({ W, p, smooth }: { W: number[][]; p: number[]; smooth: number }): number[] {
-  const n = W.length;
-  const next: number[] = Array.from({ length: n }, () => 0);
-  for (let i = 0; i < n; i++) {
-    next[i] = mmUpdateFor({ W, p, smooth, i });
-  }
-  return next;
+function createBTSolver(n: number): BTSolver {
+  const wins = new Float64Array(n);
+  const pairMass = new Float64Array(n * n);
+  const denom = new Float64Array(n);
+  let p = new Float64Array(n);
+  let next = new Float64Array(n);
+
+  const fit: BTSolver["fit"] = ({ W, smooth, maxIter, tol }) => {
+    if (n === 0) return { strength: new Float64Array(0), didConverge: true };
+    if (n === 1) return { strength: Float64Array.of(1), didConverge: true };
+
+    loadWinsAndPairMass({ W, n, smooth, wins, pairMass });
+    p.fill(1);
+    for (let iter = 0; iter < maxIter; iter++) {
+      mmSweep({ n, wins, pairMass, p, denom, next });
+      normalizeToGeometricMean(next);
+      const delta = maxRelativeChange({ next, previous: p });
+      const settled = p;
+      p = next;
+      next = settled;
+      if (delta < tol) return { strength: p, didConverge: true };
+    }
+    return { strength: p, didConverge: false };
+  };
+
+  return { fit };
 }
 
-/** The MM update for a single variant. Holds p_i when the pair mass is zero. */
-function mmUpdateFor({
-  W,
+/**
+ * One MM iteration over every variant; holds p_i when the pair mass is zero. N_ij /
+ * (p_i + p_j) is the same number both ways round, so each pair is divided once and
+ * credited to both sides, still summed in ascending j: the same sums as before.
+ */
+function mmSweep({
+  n,
+  wins,
+  pairMass,
   p,
-  smooth,
-  i,
+  denom,
+  next,
 }: {
-  W: number[][];
-  p: number[];
-  smooth: number;
-  i: number;
-}): number {
-  const n = W.length;
-  let wi = smooth * (n - 1);
-  for (let j = 0; j < n; j++) {
-    if (i !== j) wi += W[i]![j]!;
+  n: number;
+  wins: Float64Array;
+  pairMass: Float64Array;
+  p: Float64Array;
+  denom: Float64Array;
+  next: Float64Array;
+}): void {
+  denom.fill(0);
+  for (let i = 0; i < n; i++) {
+    const pi = p[i]!;
+    for (let j = i + 1; j < n; j++) {
+      const term = pairMass[i * n + j]! / (pi + p[j]!);
+      denom[i] = denom[i]! + term;
+      denom[j] = denom[j]! + term;
+    }
   }
-  let denom = 0;
-  for (let j = 0; j < n; j++) {
-    if (i === j) continue;
-    const nij = W[i]![j]! + W[j]![i]! + 2 * smooth;
-    denom += nij / (p[i]! + p[j]!);
+  for (let i = 0; i < n; i++) {
+    next[i] = denom[i]! > 0 ? wins[i]! / denom[i]! : p[i]!;
   }
-  return denom > 0 ? wi / denom : p[i]!;
 }
 
 /**
  * Renormalize in place to geometric mean 1 (stable across iterations and
  * avoids the trivial p_i → ∞ direction).
  */
-function normalizeToGeometricMean(values: number[]): void {
+function normalizeToGeometricMean(values: Float64Array): void {
   const n = values.length;
-  const logMean = values.reduce((s, v) => s + Math.log(Math.max(v, 1e-300)), 0) / n;
-  const scale = Math.exp(logMean);
+  let logSum = 0;
+  for (let i = 0; i < n; i++) logSum += Math.log(Math.max(values[i]!, 1e-300));
+  const scale = Math.exp(logSum / n);
   for (let i = 0; i < n; i++) values[i] = values[i]! / scale;
 }
 
 /** Largest relative move across the field — the MM convergence test. */
-function maxRelativeChange({ next, previous }: { next: number[]; previous: number[] }): number {
+function maxRelativeChange({
+  next,
+  previous,
+}: {
+  next: Float64Array;
+  previous: Float64Array;
+}): number {
   let delta = 0;
   for (let i = 0; i < next.length; i++) {
     const d = Math.abs(next[i]! - previous[i]!) / Math.max(previous[i]!, 1e-12);
@@ -458,20 +492,59 @@ function maxRelativeChange({ next, previous }: { next: number[]; previous: numbe
   return delta;
 }
 
+/** The win matrix flattened row-major, the solver's layout. */
+function flatten(W: number[][]): Float64Array {
+  const n = W.length;
+  const flat = new Float64Array(n * n);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) flat[i * n + j] = W[i]![j]!;
+  }
+  return flat;
+}
+
 /**
  * The Beta(eps, eps) prior a given win matrix needs to keep MM finite.
  */
-function smoothingFor(W: number[][], n: number): number {
+function smoothingFor(W: Float64Array, n: number): number {
   for (let i = 0; i < n; i++) {
     let wins = 0;
     let losses = 0;
     for (let j = 0; j < n; j++) {
-      wins += W[i]?.[j] ?? 0;
-      losses += W[j]?.[i] ?? 0;
+      wins += W[i * n + j]!;
+      losses += W[j * n + i]!;
     }
     if (wins === 0 || losses === 0) return 0.5;
   }
   return 0;
+}
+
+/**
+ * Each usable row as the win-matrix cells it adds to, so a resample can rebuild
+ * the matrix without revisiting candidates: row r adds `weight[e]` to
+ * `cell[e]` for e in [start[r], start[r + 1]).
+ */
+type EncodedRows = { start: Int32Array; cell: Int32Array; weight: Float64Array };
+
+function encodeRows({ resolved, n }: { resolved: ResolvedComparison[]; n: number }): EncodedRows {
+  const start = new Int32Array(resolved.length + 1);
+  const cells: number[] = [];
+  const weights: number[] = [];
+  resolved.forEach((r, k) => {
+    start[k] = cells.length;
+    if (r.winner === TIE) {
+      const [i, j] = r.candIdxs;
+      cells.push(i * n + j, j * n + i);
+      weights.push(0.5, 0.5);
+      return;
+    }
+    for (const cIdx of r.candIdxs) {
+      if (cIdx === r.winner) continue;
+      cells.push(r.winner * n + cIdx);
+      weights.push(1);
+    }
+  });
+  start[resolved.length] = cells.length;
+  return { start, cell: Int32Array.from(cells), weight: Float64Array.from(weights) };
 }
 
 /** The bootstrap outputs, or their disabled stand-ins when it does not run. */
@@ -543,19 +616,19 @@ function bootstrapScoreCI({
     tol,
   });
 
-  return {
-    scoreCI: scoreSamples.map((arr) => percentileCI(arr)),
-    differenceCI: pairwiseDifferenceCIs({
-      scoreSamples,
-      n,
-      variantIds,
-      samples,
-    }),
-    nonConverged,
-  };
+  // Differences first: the per-variant intervals reorder their replicates.
+  const differenceCI = pairwiseDifferenceCIs({ scoreSamples, n, variantIds, samples });
+  const scoreCI = Array.from({ length: n }, (_, i) =>
+    percentileInterval95(scoreSamples.subarray(i * samples, (i + 1) * samples)),
+  );
+
+  return { scoreCI, differenceCI, nonConverged };
 }
 
-/** Resample the rows `samples` times, refitting the whole field each time. */
+/**
+ * Resample the rows `samples` times, refitting the whole field each time.
+ * `scoreSamples[i * samples + b]` is variant i's score in replicate b.
+ */
 function runBootstrapReplicates({
   resolved,
   n,
@@ -570,24 +643,29 @@ function runBootstrapReplicates({
   seed: number;
   maxIter: number;
   tol: number;
-}): { scoreSamples: number[][]; nonConverged: number } {
+}): { scoreSamples: Float64Array; nonConverged: number } {
   const rand = mulberry32(seed);
   const m = resolved.length;
-  const scoreSamples: number[][] = Array.from({ length: n }, () => []);
+  const rows = encodeRows({ resolved, n });
+  const solver = createBTSolver(n);
+  const Wb = new Float64Array(n * n);
+  const scoreSamples = new Float64Array(n * samples);
   // Replicates whose own MM fit hit the iteration cap. Silently averaging
   // these in means the interval is partly built from fits that never
   // settled, and nothing downstream could tell.
   let nonConverged = 0;
 
   for (let b = 0; b < samples; b++) {
-    const resampled: ResolvedComparison[] = [];
+    Wb.fill(0);
     for (let k = 0; k < m; k++) {
       const r = Math.floor(rand() * m);
-      resampled[k] = resolved[r]!;
+      for (let e = rows.start[r]!; e < rows.start[r + 1]!; e++) {
+        const cell = rows.cell[e]!;
+        Wb[cell] = Wb[cell]! + rows.weight[e]!;
+      }
     }
-    const Wb = buildWinMatrix({ resolved: resampled, n });
     // Smoothing must be decided per replicate, not inherited from the full dataset.
-    const { strength, didConverge } = fitBT({
+    const { strength, didConverge } = solver.fit({
       W: Wb,
       smooth: smoothingFor(Wb, n),
       maxIter,
@@ -595,18 +673,11 @@ function runBootstrapReplicates({
     });
     if (!didConverge) nonConverged++;
     for (let i = 0; i < n; i++) {
-      scoreSamples[i]!.push(400 * Math.log10(strength[i] ?? 1));
+      scoreSamples[i * samples + b] = 400 * Math.log10(strength[i] ?? 1);
     }
   }
 
   return { scoreSamples, nonConverged };
-}
-
-/** Percentile interval over one variant's replicate scores. */
-function percentileCI(samples: number[]): [number, number] | null {
-  if (samples.length === 0) return null;
-  const sorted = [...samples].toSorted((a, b) => a - b);
-  return [quantile(sorted, 0.025), quantile(sorted, 0.975)];
 }
 
 /**
@@ -620,7 +691,7 @@ function pairwiseDifferenceCIs({
   variantIds,
   samples,
 }: {
-  scoreSamples: number[][];
+  scoreSamples: Float64Array;
   n: number;
   variantIds: string[];
   samples: number;
@@ -628,17 +699,18 @@ function pairwiseDifferenceCIs({
   const differenceCI: ScoreDifferenceCI = {};
   for (const id of variantIds) differenceCI[id] = {};
 
+  const diffs = new Float64Array(samples);
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
-      const diffs = finiteDifferences({
-        a: scoreSamples[i]!,
-        b: scoreSamples[j]!,
-        samples,
-      });
-      if (diffs.length === 0) continue;
-      diffs.sort((a, b) => a - b);
-      const lo = quantile(diffs, 0.025);
-      const hi = quantile(diffs, 0.975);
+      let count = 0;
+      for (let s = 0; s < samples; s++) {
+        const d = scoreSamples[i * samples + s]! - scoreSamples[j * samples + s]!;
+        // A non-finite score says nothing about the gap; keeping it would poison the quantiles.
+        if (Number.isFinite(d)) diffs[count++] = d;
+      }
+      const interval = percentileInterval95(diffs, count);
+      if (!interval) continue;
+      const [lo, hi] = interval;
       differenceCI[variantIds[i]!]![variantIds[j]!] = [lo, hi];
       // The mirrored pair, negated and reversed: CI(b − a) = −CI(a − b).
       // Stored rather than derived so a consumer never has to know which
@@ -648,26 +720,4 @@ function pairwiseDifferenceCIs({
   }
 
   return differenceCI;
-}
-
-/**
- * Replicate-by-replicate gap between two variants. A replicate that produced a
- * non-finite score for either variant says nothing about the gap between them. Dropping
- * it is the only honest option; keeping it would poison every quantile.
- */
-function finiteDifferences({
-  a,
-  b,
-  samples,
-}: {
-  a: number[];
-  b: number[];
-  samples: number;
-}): number[] {
-  const diffs: number[] = [];
-  for (let s = 0; s < samples; s++) {
-    const d = a[s]! - b[s]!;
-    if (Number.isFinite(d)) diffs.push(d);
-  }
-  return diffs;
 }
