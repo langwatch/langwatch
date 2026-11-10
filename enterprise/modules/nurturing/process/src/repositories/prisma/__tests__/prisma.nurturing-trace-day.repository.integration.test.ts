@@ -19,8 +19,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   emptyTraceDay,
   type NurturingTraceDayState,
+  traceDayKey,
 } from "../../../rules/nurturing-trace-day.rules.ts";
-import { traceDayKey } from "../../nurturing-trace-day.repository.ts";
 import { PrismaNurturingTraceDayRepository } from "../prisma.nurturing-trace-day.repository.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;

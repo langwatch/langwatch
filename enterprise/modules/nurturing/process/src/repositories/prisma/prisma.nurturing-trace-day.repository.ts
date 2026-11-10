@@ -11,11 +11,12 @@ import { z } from "zod";
 import {
   type NurturingTraceDayState,
   nurturingTraceDayStateSchema,
+  traceDayOfKey,
 } from "../../rules/nurturing-trace-day.rules.ts";
 import {
   NURTURING_TRACE_DAY_PROJECTION_VERSION,
   type NurturingTraceDayRepository,
-  traceDayOfKey,
+  type NurturingTraceSeeds,
 } from "../nurturing-trace-day.repository.ts";
 
 type NurturingTraceDayDatabase = Pick<
@@ -120,7 +121,7 @@ export class PrismaNurturingTraceDayRepository
   async findSeeds({
     projectIds,
     afterDay,
-  }: Readonly<{ projectIds: readonly string[]; afterDay: string }>) {
+  }: Readonly<{ projectIds: readonly string[]; afterDay: string }>): Promise<NurturingTraceSeeds> {
     if (projectIds.length === 0) return { seededProjectIds: [], days: [] };
     const rows = await this.#database.nurturingProjectTraceSeed.findMany({
       where: { projectId: { in: [...projectIds] } },
@@ -137,7 +138,11 @@ export class PrismaNurturingTraceDayRepository
     projectId,
     seededAt,
     days,
-  }: Readonly<{ projectId: string; seededAt: number; days: readonly NurturingTraceDayState[] }>) {
+  }: Readonly<{
+    projectId: string;
+    seededAt: number;
+    days: readonly NurturingTraceDayState[];
+  }>): Promise<void> {
     // The first seed stays: a concurrent second one finds the row and writes nothing.
     await this.#database.nurturingProjectTraceSeed.createMany({
       data: [{ projectId, days: [...days], seededAt: new Date(seededAt) }],

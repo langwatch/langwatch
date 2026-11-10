@@ -60,7 +60,6 @@ import {
 import {
   NURTURING_TRACE_DAY_PROJECTION_VERSION,
   type NurturingTraceDayRepository,
-  traceDayKey,
 } from "../repositories/nurturing-trace-day.repository.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
 import {
@@ -74,6 +73,7 @@ import {
   emptyTraceDay,
   foldTraceDay,
   type NurturingTraceDayState,
+  traceDayKey,
 } from "../rules/nurturing-trace-day.rules.ts";
 
 /** Hosts nurturing's peer folds and subscribers over the owners' facts; no event of its own. */

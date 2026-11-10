@@ -6,16 +6,11 @@ import type { NurturingTraceDayState } from "../rules/nurturing-trace-day.rules.
 /** The trace-day fold's version; a stored row of another version is left out of every read. */
 export const NURTURING_TRACE_DAY_PROJECTION_VERSION = "2026-11-10" as const;
 
-/** The fold's key: one row per project and UTC day. */
-export function traceDayKey({ projectId, day }: Readonly<{ projectId: string; day: string }>) {
-  return `${projectId}:${day}`;
-}
-
-/** The project and day a fold key names; the day, `YYYY-MM-DD`, never holds a colon. */
-export function traceDayOfKey(key: string): Readonly<{ projectId: string; day: string }> {
-  const split = key.lastIndexOf(":");
-  return { projectId: key.slice(0, split), day: key.slice(split + 1) };
-}
+/** The projects already seeded, and their seed days in the window. */
+export type NurturingTraceSeeds = Readonly<{
+  seededProjectIds: readonly string[];
+  days: NurturingTraceDayState[];
+}>;
 
 /** The read, retention and seed of the per-project, per-day trace counts: no fold write. */
 export interface NurturingTraceDayReadRepository {
@@ -28,7 +23,7 @@ export interface NurturingTraceDayReadRepository {
   /** The projects' seeds: which were seeded, and their seed days after `afterDay`. */
   findSeeds(
     input: Readonly<{ projectIds: readonly string[]; afterDay: string }>,
-  ): Promise<Readonly<{ seededProjectIds: readonly string[]; days: NurturingTraceDayState[] }>>;
+  ): Promise<NurturingTraceSeeds>;
   /**
    * Keeps a project's seed, its days from trace's rollup before the fold's first trace; the row is
    * the durable mark that it was seeded. A project already seeded keeps its first seed.
@@ -44,6 +39,6 @@ export interface NurturingTraceDayReadRepository {
 
 /** Nurturing's per-project, per-day trace counts: the fold's store, and the read over its rows. */
 export interface NurturingTraceDayRepository extends NurturingTraceDayReadRepository {
-  /** The fold's store; its rows are keyed {@link traceDayKey}. */
+  /** The fold's store; its rows are keyed by the rules' `traceDayKey`. */
   readonly store: FoldProjectionStore<NurturingTraceDayState>;
 }

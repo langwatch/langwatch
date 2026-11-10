@@ -104,6 +104,20 @@ export function traceCountsOf({
   };
 }
 
+/** The fold's key: one row per project and UTC day. */
+export function traceDayKey({
+  projectId,
+  day,
+}: Readonly<{ projectId: string; day: string }>): string {
+  return `${projectId}:${day}`;
+}
+
+/** The project and day a fold key names; the day, `YYYY-MM-DD`, never holds a colon. */
+export function traceDayOfKey(key: string): Readonly<{ projectId: string; day: string }> {
+  const split = key.lastIndexOf(":");
+  return { projectId: key.slice(0, split), day: key.slice(split + 1) };
+}
+
 const MINUTE_MS = 60_000;
 
 /**

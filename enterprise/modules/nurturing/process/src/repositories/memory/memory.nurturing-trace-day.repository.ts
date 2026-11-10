@@ -6,7 +6,10 @@ import type {
 } from "@langwatch/eventing";
 
 import type { NurturingTraceDayState } from "../../rules/nurturing-trace-day.rules.ts";
-import type { NurturingTraceDayRepository } from "../nurturing-trace-day.repository.ts";
+import type {
+  NurturingTraceDayRepository,
+  NurturingTraceSeeds,
+} from "../nurturing-trace-day.repository.ts";
 
 type Row = { state: NurturingTraceDayState; appliedEventIds: string[] };
 
@@ -67,7 +70,7 @@ export class MemoryNurturingTraceDayRepository implements NurturingTraceDayRepos
   async findSeeds({
     projectIds,
     afterDay,
-  }: Readonly<{ projectIds: readonly string[]; afterDay: string }>) {
+  }: Readonly<{ projectIds: readonly string[]; afterDay: string }>): Promise<NurturingTraceSeeds> {
     const seeded = projectIds.filter((projectId) => this.#seeds.has(projectId));
     return {
       seededProjectIds: seeded,
@@ -80,7 +83,11 @@ export class MemoryNurturingTraceDayRepository implements NurturingTraceDayRepos
   async recordSeed({
     projectId,
     days,
-  }: Readonly<{ projectId: string; seededAt: number; days: readonly NurturingTraceDayState[] }>) {
+  }: Readonly<{
+    projectId: string;
+    seededAt: number;
+    days: readonly NurturingTraceDayState[];
+  }>): Promise<void> {
     if (!this.#seeds.has(projectId)) this.#seeds.set(projectId, [...days]);
   }
 }

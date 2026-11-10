@@ -13,12 +13,12 @@ import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/me
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
-import { traceDayKey } from "../../repositories/nurturing-trace-day.repository.ts";
 import { emptyProjectUsage, foldProjectUsage } from "../../rules/nurturing-project-usage.rules.ts";
 import { utcDayOf } from "../../rules/nurturing-time.rules.ts";
 import {
   emptyTraceDay,
   type NurturingTraceDayState,
+  traceDayKey,
 } from "../../rules/nurturing-trace-day.rules.ts";
 import { NurturingOrganizationUsageService } from "../nurturing-organization-usage.service.ts";
 
@@ -229,7 +229,9 @@ describe("NurturingOrganizationUsageService", () => {
     });
     await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-19" });
 
-    await expect(service.usageChanged({ projectId: "project-1" })).rejects.toThrow();
+    await expect(service.usageChanged({ projectId: "project-1" })).rejects.toThrow(
+      "Customer.io unavailable",
+    );
     refuse = false;
     await service.usageChanged({ projectId: "project-1" });
 
