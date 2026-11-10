@@ -1,5 +1,7 @@
 import { setTimeout as wait } from "node:timers/promises";
 
+import { z } from "zod";
+
 import type {
   TraceIndexMaterialisationRepository,
   MaterialisationMutation,
@@ -8,10 +10,20 @@ import type {
 const POLL_INTERVAL_MS = 30_000;
 
 /** What the step saves after each poll and returns when the materialisation is done. */
-export type MaterialisationProgress = Readonly<{ mutationId: string | null; partsToDo: number }>;
+export const materialisationProgressSchema = z.object({
+  mutationId: z.string().nullable(),
+  partsToDo: z.number(),
+});
+export type MaterialisationProgress = Readonly<z.infer<typeof materialisationProgressSchema>>;
 
 type WaitArguments = Readonly<{
   dryRun: boolean;
+  /**
+   * A saved checkpoint says an earlier run already started the mutation: never start a second.
+   * Only a table that can say it is built (the metadata columns) then fails when nothing is
+   * listed; the updated-at index cannot, so started and unlisted still counts as done.
+   */
+  resumed: boolean;
   signal: AbortSignal;
   onPoll: (progress: MaterialisationProgress) => Promise<void>;
 }>;
@@ -74,11 +86,13 @@ export class TraceIndexMaterialisationService {
 
   private async waitFor({
     dryRun,
+    resumed,
     signal,
     onPoll,
     materialisation,
   }: WaitArguments & { materialisation: Materialisation }): Promise<MaterialisationProgress> {
-    let started = false;
+    let started = resumed;
+    let graceSpent = false;
     let progress: MaterialisationProgress = { mutationId: null, partsToDo: 0 };
     while (!signal.aborted) {
       const [latest] = await materialisation.find();
@@ -87,9 +101,17 @@ export class TraceIndexMaterialisationService {
           return { mutationId: null, partsToDo: 0 };
         }
         if (!started) {
+          // Saved before the start: if the run stops in between, the next one fails loudly for an
+          // operator, never starts a second rewrite.
+          await onPoll({ mutationId: null, partsToDo: 0 });
           await materialisation.start();
           started = true;
           continue;
+        }
+        // One poll of grace: a mutation started just before the abort may not be listed yet.
+        if (resumed) {
+          if (graceSpent) throw unlistedMaterialisation({ builds: materialisation.builds });
+          graceSpent = true;
         }
         await wait(this.pollIntervalMs, undefined, { signal }).catch(() => undefined);
         continue;
@@ -124,6 +146,16 @@ async function nothingLeft({
   if (dryRun) return true;
   if (!materialisation.built) return started;
   return materialisation.built();
+}
+
+function unlistedMaterialisation({ builds }: { builds: string }): Error {
+  return new Error(
+    `ClickHouse lists no mutation building ${builds} and parts still lack it; it was likely ` +
+      "killed or pruned. An operator must check system.mutations on every replica and " +
+      "start the materialisation by hand if none is running, then retry this step from Ops > " +
+      "Upgrades: the retry keeps this checkpoint, so it waits on that mutation and never starts " +
+      "one itself.",
+  );
 }
 
 function failedMaterialisation({

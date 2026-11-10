@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryTraceIndexMaterialisationRepository } from "../../repositories/memory/memory.trace-index-materialisation.repository.ts";
 import { TraceIndexMaterialisationRepository } from "../../repositories/trace-index-materialisation.repository.ts";
 import {
+  materialisationProgressSchema,
   TraceIndexMaterialisationService,
   type MaterialisationProgress,
 } from "../trace-index-materialisation.service.ts";
@@ -16,13 +17,15 @@ function harness({
   const service = TraceIndexMaterialisationService.create({ mutations, pollIntervalMs: 0 });
   const run = ({
     dryRun = false,
+    resumed = false,
     signal = new AbortController().signal,
     onPoll = async (progress: MaterialisationProgress) => void saved.push(progress),
   }: {
     dryRun?: boolean;
+    resumed?: boolean;
     signal?: AbortSignal;
     onPoll?: (progress: MaterialisationProgress) => Promise<void>;
-  } = {}) => service.waitForUpdatedAtIndex({ dryRun, signal, onPoll });
+  } = {}) => service.waitForUpdatedAtIndex({ dryRun, resumed, signal, onPoll });
   return { saved, run };
 }
 
@@ -101,8 +104,36 @@ describe("TraceIndexMaterialisationService", () => {
     });
 
     expect(mutations.issued()).toBe(1);
-    expect(saved).toEqual([{ mutationId: "mutation_memory_1.txt", partsToDo: 1 }]);
+    expect(saved).toEqual([
+      { mutationId: null, partsToDo: 0 },
+      { mutationId: "mutation_memory_1.txt", partsToDo: 1 },
+    ]);
     expect(result.mutationId).toBe("mutation_memory_1.txt");
+  });
+
+  it("saves a checkpoint before the start", async () => {
+    const table = new IndexlessTable();
+    let startedAtSave = -1;
+    const { saved, run } = harness({ mutations: table });
+
+    await run({
+      onPoll: async (progress) => {
+        saved.push(progress);
+        startedAtSave = table.started;
+      },
+    });
+
+    expect(saved).toEqual([{ mutationId: null, partsToDo: 0 }]);
+    expect(startedAtSave).toBe(0);
+    expect(materialisationProgressSchema.safeParse(saved[0]).success).toBe(true);
+  });
+
+  it("finishes a resumed updated-at index run with nothing listed, starting nothing", async () => {
+    const table = new IndexlessTable();
+    const { run } = harness({ mutations: table });
+
+    await expect(run({ resumed: true })).resolves.toEqual({ mutationId: null, partsToDo: 0 });
+    expect(table.started).toBe(0);
   });
 
   /** @scenario "The step finishes when the table has no such index" */
@@ -185,6 +216,7 @@ describe("TraceIndexMaterialisationService, for the trace analytics metadata col
     }: { onPoll?: (progress: MaterialisationProgress) => Promise<void> } = {}) =>
       service.waitForAnalyticsMetadataColumns({
         dryRun: false,
+        resumed: false,
         signal: new AbortController().signal,
         onPoll,
       });
@@ -220,7 +252,10 @@ describe("TraceIndexMaterialisationService, for the trace analytics metadata col
 
     expect(mutations.issuedAnalyticsMetadataColumns()).toBe(1);
     expect(mutations.issued()).toBe(0);
-    expect(saved).toEqual([{ mutationId: "mutation_memory_1.txt", partsToDo: 1 }]);
+    expect(saved).toEqual([
+      { mutationId: null, partsToDo: 0 },
+      { mutationId: "mutation_memory_1.txt", partsToDo: 1 },
+    ]);
     expect(result.mutationId).toBe("mutation_memory_1.txt");
   });
 
@@ -245,6 +280,7 @@ describe("TraceIndexMaterialisationService, for the trace analytics metadata col
 
     const result = await service.waitForAnalyticsMetadataColumns({
       dryRun: false,
+      resumed: false,
       signal: new AbortController().signal,
       onPoll: async () => undefined,
     });
@@ -253,6 +289,37 @@ describe("TraceIndexMaterialisationService, for the trace analytics metadata col
     expect(table.started).toBe(1);
     expect(table.checks).toBe(3);
     expect(result).toEqual({ mutationId: null, partsToDo: 0 });
+  });
+
+  const resume = (table: IndexlessTable) =>
+    TraceIndexMaterialisationService.create({
+      mutations: table,
+      pollIntervalMs: 0,
+    }).waitForAnalyticsMetadataColumns({
+      dryRun: false,
+      resumed: true,
+      signal: new AbortController().signal,
+      onPoll: async () => undefined,
+    });
+
+  it("a resumed run with no mutation listed and the parts not yet filled never starts a second materialisation", async () => {
+    const table = new UnlistedColumnsTable();
+    table.checks = 1; // the parts are filled by the second check, inside the one grace poll
+
+    await expect(resume(table)).resolves.toEqual({ mutationId: null, partsToDo: 0 });
+
+    expect(table.started).toBe(0);
+    expect(table.checks).toBe(3);
+  });
+
+  it("a resumed run fails after one grace poll when no mutation is listed and the parts stay unfilled", async () => {
+    const table = new IndexlessTable();
+
+    await expect(resume(table)).rejects.toThrow(
+      /no mutation building the trace_analytics metadata columns.*killed or pruned.*system\.mutations/,
+    );
+
+    expect(table.started).toBe(0);
   });
 
   /** @scenario "A failed metadata-column mutation fails the step naming the columns" */

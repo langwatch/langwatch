@@ -15,7 +15,10 @@ import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing
 import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
 import { TRACE_ID_INDEXES } from "./repositories/clickhouse/clickhouse.trace-id-indexes.database.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
-import { TraceIndexMaterialisationService } from "./services/trace-index-materialisation.service.ts";
+import {
+  materialisationProgressSchema,
+  TraceIndexMaterialisationService,
+} from "./services/trace-index-materialisation.service.ts";
 import { traceMonthIdsReportSchema } from "./services/trace-month-ids-migration.service.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
 import { exportProgressTrpcTransport } from "./transport/export-progress.trpc.ts";
@@ -94,6 +97,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
             mutations: repositories.indexMaterialisation,
           }).waitForUpdatedAtIndex({
             dryRun,
+            resumed: materialisationProgressSchema.safeParse(checkpoint.resumeFrom).success,
             signal,
             onPoll: (progress) => checkpoint.save({ report: progress }),
           }),
@@ -110,6 +114,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
             mutations: repositories.indexMaterialisation,
           }).waitForAnalyticsMetadataColumns({
             dryRun,
+            resumed: materialisationProgressSchema.safeParse(checkpoint.resumeFrom).success,
             signal,
             onPoll: (progress) => checkpoint.save({ report: progress }),
           }),
