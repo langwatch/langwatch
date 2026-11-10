@@ -145,8 +145,17 @@ describe("when a guide plays videos", () => {
       html: page({ article: `<p>${"word ".repeat(200)}</p>${video({ poster: "/docs/d.webp" })}` }),
     });
     const fallback = /<noscript>([\s\S]*?)<\/noscript>/.exec(html)?.[1] ?? "";
-    expect(fallback).toContain("video[data-docs-poster]{display:none}");
     expect(fallback).toContain(video({ poster: "/docs/d.webp" }));
+  });
+
+  /** @scenario "Serve videos as small web encodings with a poster" */
+  it("hides the deferred copy without scripts even when the video sets its own display", () => {
+    const styled = `<video controls="" preload="none" style="display:block" poster="/docs/e.webp"><source src="/docs/v.webm"/></video>`;
+    const html = deferBelowFoldPosters({
+      html: page({ article: `<p>${"word ".repeat(200)}</p>${styled}` }),
+    });
+    const fallback = /<noscript>([\s\S]*?)<\/noscript>/.exec(html)?.[1] ?? "";
+    expect(fallback).toContain("video[data-docs-poster]{display:none!important}");
   });
 
   /** @scenario "Serve videos as small web encodings with a poster" */
