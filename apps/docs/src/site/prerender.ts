@@ -58,6 +58,7 @@ import {
   type PrerenderPlan,
 } from "./render-keys.ts";
 import { renderWorkerCount, runOnWorkers, type WorkerOutcome } from "./render-workers.ts";
+import { renderSocialCards } from "./social-card-images.ts";
 import { optimisePageVideos } from "./video-variants.ts";
 
 /* Runs as the SSR bundle (see build.ts) after the client build. The main thread reads one
@@ -400,6 +401,7 @@ async function generate() {
     llmsSectionFiles({ nav: context.nav, exports: markdown }),
   ))
     files.set(name, contents);
+  for (const [name, contents] of await renderSocialCards()) files.set(name, contents);
   const searchJson = publishSearchIndex({ entries: searchIndex });
   files.set("search-index.json", searchJson);
   for (const [name, contents] of await compressedSearchIndex({

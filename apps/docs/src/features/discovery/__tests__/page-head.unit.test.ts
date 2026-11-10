@@ -240,7 +240,9 @@ describe("when a guide is described to search engines", () => {
       datePublished: "2025-03-04T10:00:00+00:00",
       dateModified: "2026-10-12T08:12:32+00:00",
       inLanguage: "en",
-      image: "https://langwatch.ai/docs/images/coding-agents/optimized/session-detail-1560.webp",
+      image: expect.stringMatching(
+        /^https:\/\/langwatch\.ai\/docs\/social\/integration\.[0-9a-f]{12}\.png$/,
+      ),
       mainEntityOfPage: "https://langwatch.ai/docs/integration/quick-start",
       author: { "@type": "Organization", name: "LangWatch" },
       publisher: { "@type": "Organization", name: "LangWatch" },

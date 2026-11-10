@@ -31,6 +31,15 @@ Feature: Search metadata matches the published documentation
     And the social card names the organization's X account
     But the docs home stays a web page that is part of the documentation website
 
+  @unit
+  Scenario: A shared link shows the card of the section it points into
+    Given a card listed for a popular section, and a default card
+    When a page in that section, a page in an unlisted section and the docs home are shared
+    Then the page in the section shows that section's card, sized and described for screen readers
+    And the other two show the default card
+    And each card is published under a name that changes whenever its text or template changes
+    And adding a card is one entry in the card list
+
   @integration
   Scenario: Every published page carries complete search and social metadata
     Given a build whose sitemap lists its navigable pages

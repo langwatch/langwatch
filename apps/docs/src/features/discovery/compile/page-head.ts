@@ -4,6 +4,7 @@ import { docsRoot } from "../../../paths.ts";
 import type { Operation } from "../../api-reference/model.ts";
 import { pageCommitDatesAt, readDocsConfig } from "../../navigation/compile.ts";
 import { firstSlug, type Organization, ownsSlug, type Section } from "../../navigation/model.ts";
+import { SOCIAL_CARD_SIZE, socialCardAlt, socialCardFor, socialCardPath } from "./social-cards.ts";
 
 /**
  * Where the web fonts live: dev serves them at this path, a build renames each to Vite's hashed
@@ -16,9 +17,6 @@ const ABOVE_THE_FOLD_FONTS = [
   `${FONT_SOURCE}/Inter-Variable-latin.woff2`,
   `${FONT_SOURCE}/Sentient-Regular.woff2`,
 ];
-
-/** The social card: shared links fetch it by this address, so it keeps its authored name. */
-export const SOCIAL_IMAGE = "/images/coding-agents/optimized/session-detail-1560.webp";
 
 /* Absolute links to the agent discovery files, the same on every page. */
 const DISCOVERY_LINKS = [
@@ -253,7 +251,9 @@ export function pageHead({
   const description = trimDescription({ text: authored || settings.description });
   const modified = settings.dates.get(slug);
   const published = settings.published?.get(slug);
-  const image = docsUrl({ path: SOCIAL_IMAGE });
+  const card = socialCardFor({ slug });
+  const image = docsUrl({ path: socialCardPath({ card }) });
+  const alt = escapeAttribute(socialCardAlt({ card }));
   const article = slug !== "introduction";
   const handle = twitterHandle({ organization: settings.organization });
   const tags = [
@@ -277,11 +277,14 @@ export function pageHead({
     `<meta property="og:title" content="${escapeAttribute(documentTitle({ title }))}">`,
     `<meta property="og:url" content="${escapeAttribute(url)}">`,
     `<meta property="og:image" content="${image}">`,
-    '<meta property="og:image:alt" content="A coding-agent session in LangWatch">',
+    `<meta property="og:image:width" content="${SOCIAL_CARD_SIZE.width}">`,
+    `<meta property="og:image:height" content="${SOCIAL_CARD_SIZE.height}">`,
+    `<meta property="og:image:alt" content="${alt}">`,
     '<meta name="twitter:card" content="summary_large_image">',
     ...(handle ? [`<meta name="twitter:site" content="${escapeAttribute(handle)}">`] : []),
     `<meta name="twitter:title" content="${escapeAttribute(documentTitle({ title }))}">`,
     `<meta name="twitter:image" content="${image}">`,
+    `<meta name="twitter:image:alt" content="${alt}">`,
   ];
   if (description) {
     for (const attribute of [
