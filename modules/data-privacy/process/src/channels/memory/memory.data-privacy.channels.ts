@@ -12,7 +12,7 @@ export class MemoryDataPrivacyChannels {
     return {
       presidio: MemoryPresidioChannel.create({ endpoint: config.langevalsEndpoint }),
       piiRedactionModel: MemoryPresidioChannel.create({
-        endpoint: config.piiRedactionModelLambdaArn ?? config.piiRedactionModelEndpoint,
+        endpoint: config.piiRedactionModelEndpoint,
       }),
       dlp: MemoryGoogleDlpChannel.create(),
     };

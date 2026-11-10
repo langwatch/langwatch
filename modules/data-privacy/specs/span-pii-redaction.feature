@@ -305,7 +305,7 @@ Feature: Redacting personal data out of a span at ingestion
 
   @unit
   Scenario: A deployment that names no model behaves exactly as today
-    Given neither PII_REDACTION_MODEL_LAMBDA_ARN nor PII_REDACTION_MODEL_ENDPOINT is set
+    Given PII_REDACTION_MODEL_ENDPOINT is not set
     When a strict batch is analysed
     Then Presidio answers it
     And neither the flag nor the project's organization is read
@@ -328,10 +328,13 @@ Feature: Redacting personal data out of a span at ingestion
     And its usage line records the outcome too_long
 
   @unit
-  Scenario: The model's Lambda alias wins over its address
-    Given the deployment settings for the PII redaction model
-    Then a Lambda alias ARN wins over an HTTP endpoint
+  Scenario: One setting names the model by Lambda ARN or by address
+    Given PII_REDACTION_MODEL_ENDPOINT is set
+    When its value starts with "arn:"
+    Then the model is invoked as that Lambda function, in the region the ARN names
     And an ARN that is not a Lambda function ARN leaves the model unconfigured
+    When its value is anything else
+    Then the model is called over HTTP at that address
 
   @unit
   Scenario: Each PII redaction model call leaves one usage log line

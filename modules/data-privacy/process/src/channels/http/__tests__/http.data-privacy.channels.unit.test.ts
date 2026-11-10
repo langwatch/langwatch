@@ -15,7 +15,6 @@ function channelsFor(settings: Partial<DataPrivacyServerConfig>) {
       enforcement: undefined,
       nodeEnvironment: undefined,
       langevalsEndpoint: "http://langevals:5562",
-      piiRedactionModelLambdaArn: undefined,
       piiRedactionModelEndpoint: undefined,
       ...settings,
     },
@@ -26,7 +25,7 @@ function channelsFor(settings: Partial<DataPrivacyServerConfig>) {
 const probe = { texts: [], entities: [], signal: new AbortController().signal };
 
 describe("HttpDataPrivacyChannels", () => {
-  describe("given neither model setting", () => {
+  describe("given no model setting", () => {
     /** @scenario "A deployment that names no model behaves exactly as today" */
     it("composes a model channel that answers not configured", async () => {
       const { piiRedactionModel } = await channelsFor({});
@@ -35,26 +34,26 @@ describe("HttpDataPrivacyChannels", () => {
     });
   });
 
-  describe("given the model's Lambda alias", () => {
-    /** @scenario "The model's Lambda alias wins over its address" */
-    it("composes the Lambda channel, even with an address set too", async () => {
-      const { piiRedactionModel } = await channelsFor({
-        piiRedactionModelLambdaArn: ARN,
-        piiRedactionModelEndpoint: "http://pii-redaction-model:8080",
-      });
+  describe("given the model's Lambda alias ARN", () => {
+    /** @scenario "One setting names the model by Lambda ARN or by address" */
+    it("composes the Lambda channel", async () => {
+      const { piiRedactionModel } = await channelsFor({ piiRedactionModelEndpoint: ARN });
 
       expect(piiRedactionModel).toBeInstanceOf(AwsPiiRedactionModelChannel);
     });
 
-    /** @scenario "The model's Lambda alias wins over its address" */
-    it("leaves the model unconfigured when the ARN is unusable", async () => {
-      const { piiRedactionModel } = await channelsFor({ piiRedactionModelLambdaArn: "not-an-arn" });
+    /** @scenario "One setting names the model by Lambda ARN or by address" */
+    it("leaves the model unconfigured when the ARN is not a Lambda function ARN", async () => {
+      const { piiRedactionModel } = await channelsFor({
+        piiRedactionModelEndpoint: "arn:aws:s3:::not-a-function",
+      });
 
       await expect(piiRedactionModel.detect(probe)).resolves.toEqual({ kind: "not_configured" });
     });
   });
 
-  describe("given only the model's address", () => {
+  describe("given the model's address", () => {
+    /** @scenario "One setting names the model by Lambda ARN or by address" */
     it("composes an HTTP channel that counts as configured", async () => {
       const { piiRedactionModel } = await channelsFor({
         piiRedactionModelEndpoint: "http://pii-redaction-model:8080",

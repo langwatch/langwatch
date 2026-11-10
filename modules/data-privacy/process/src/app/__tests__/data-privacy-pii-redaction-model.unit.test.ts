@@ -98,7 +98,7 @@ describe("given the PII redaction model wired into the module", () => {
         const { featureFlags, reads } = flagsOff();
         const app = await createDataPrivacyTestApp({
           dependencies: { featureFlags, permissions },
-          settings: { langevalsEndpoint: LANGEVALS, piiRedactionModelLambdaArn: ALIAS_ARN },
+          settings: { langevalsEndpoint: LANGEVALS, piiRedactionModelEndpoint: ALIAS_ARN },
           channels: async () => ({
             presidio,
             piiRedactionModel: AwsPiiRedactionModelChannel.create({

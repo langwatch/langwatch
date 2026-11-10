@@ -19,37 +19,33 @@ export const PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS = 2 * 60_000;
 const LAMBDA_FUNCTION_ARN =
   /^arn:aws[a-z-]*:lambda:([a-z0-9-]+):\d{12}:function:[\w-]+(?::[\w$-]+)?$/;
 
-/** Where the model is reached, read from the two deployment settings. */
+/** Where the model is reached, read from its one deployment setting. */
 export type PiiRedactionModelTarget =
   | Readonly<{ kind: "lambda"; functionArn: string; region: string }>
   | Readonly<{ kind: "http"; endpoint: string }>
   | Readonly<{ kind: "none" }>
   | Readonly<{ kind: "invalid"; reason: string }>;
 
-/** The Lambda alias wins over the address when both are set, as the NLP fleet wins over its URL. */
-export function piiRedactionModelTargetOf({
-  lambdaArn,
-  endpoint,
-}: {
-  lambdaArn: string | undefined;
-  endpoint: string | undefined;
-}): PiiRedactionModelTarget {
-  const functionArn = lambdaArn?.trim();
-  if (functionArn) {
-    const region = LAMBDA_FUNCTION_ARN.exec(functionArn)?.[1];
+/**
+ * Reads PII_REDACTION_MODEL_ENDPOINT: an `arn:` value is the model's Lambda (alias) ARN, invoked
+ * with the pod's role; anything else is its HTTP address; empty names no model.
+ */
+export function piiRedactionModelTargetOf(setting: string | undefined): PiiRedactionModelTarget {
+  const value = setting?.trim();
+  if (!value) return { kind: "none" };
+
+  if (value.startsWith("arn:")) {
+    const region = LAMBDA_FUNCTION_ARN.exec(value)?.[1];
     if (!region) {
       return {
         kind: "invalid",
-        reason: "PII_REDACTION_MODEL_LAMBDA_ARN is not a Lambda function ARN",
+        reason: "PII_REDACTION_MODEL_ENDPOINT is an ARN but not a Lambda function ARN",
       };
     }
-    return { kind: "lambda", functionArn, region };
+    return { kind: "lambda", functionArn: value, region };
   }
 
-  const address = endpoint?.trim();
-  if (address) return { kind: "http", endpoint: address.replace(/\/+$/, "") };
-
-  return { kind: "none" };
+  return { kind: "http", endpoint: value.replace(/\/+$/, "") };
 }
 
 /** All the characters one batch would send. */

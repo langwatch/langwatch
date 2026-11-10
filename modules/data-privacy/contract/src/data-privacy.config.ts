@@ -18,9 +18,10 @@ export const dataPrivacyConfig = Config.define((c) => ({
   nodeEnvironment,
   /** Evaluation's leaf, held by instance: this module calls Presidio itself (R5, 2026-10-06). */
   langevalsEndpoint,
-  /** The PII redaction model's Lambda alias ARN; wins over the endpoint when both are set. */
-  piiRedactionModelLambdaArn: c.env("PII_REDACTION_MODEL_LAMBDA_ARN", z.string().optional()),
-  /** The PII redaction model's HTTP address, for a cluster or self-hosted service. */
+  /**
+   * Where the PII redaction model is reached: its Lambda alias ARN (`arn:aws:lambda:...`) or its
+   * HTTP address, for a cluster or self-hosted service. Unset names no model.
+   */
   piiRedactionModelEndpoint: c.env("PII_REDACTION_MODEL_ENDPOINT", z.string().optional()),
 }));
 

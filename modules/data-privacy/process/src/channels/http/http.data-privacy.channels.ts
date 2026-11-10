@@ -41,10 +41,7 @@ function piiRedactionModelChannel({
 }: {
   config: DataPrivacyServerConfig;
 }): PresidioChannel {
-  const target = piiRedactionModelTargetOf({
-    lambdaArn: config.piiRedactionModelLambdaArn,
-    endpoint: config.piiRedactionModelEndpoint,
-  });
+  const target = piiRedactionModelTargetOf(config.piiRedactionModelEndpoint);
 
   if (target.kind === "lambda") {
     // The pod's own role (IRSA) signs the invoke, through the SDK's default credential chain.
