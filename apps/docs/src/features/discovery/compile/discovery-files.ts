@@ -237,6 +237,9 @@ export function llmsSectionFiles({
   return files;
 }
 
+const DOCS_SKILL_DESCRIPTION =
+  "Use when building, testing or monitoring LLM applications and AI agents with LangWatch: tracing, agent simulations, evaluations, prompt management and the AI Gateway. Read the LangWatch documentation as Markdown before answering.";
+
 /** The docs-wide skill at /skill.md, an address agents learned from the previous docs host:
     what LangWatch is, where the Markdown lives and which installable skills the docs publish. */
 export function docsSkill({ skills }: { skills: AgentSkill[] }) {
@@ -246,7 +249,8 @@ export function docsSkill({ skills }: { skills: AgentSkill[] }) {
   return [
     "---",
     "name: langwatch",
-    "description: Use when building, testing or monitoring LLM applications and AI agents with LangWatch: tracing, agent simulations, evaluations, prompt management and the AI Gateway. Read the LangWatch documentation as Markdown before answering.",
+    /* Quoted: an unquoted ": " would start a nested mapping and break the frontmatter. */
+    `description: ${JSON.stringify(DOCS_SKILL_DESCRIPTION)}`,
     "---",
     "",
     "# LangWatch documentation",
