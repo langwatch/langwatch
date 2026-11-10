@@ -10,7 +10,7 @@ import { computeVariantMetrics } from "../ui/sections/batch-evaluation-results.v
  */
 
 const rowsWith = (
-  perVariant: Record<string, { cost: number; duration: number }[]>,
+  perVariant: Record<string, ({ cost: number; duration: number } | undefined)[]>,
 ): BatchResultRow[] => {
   const ids = Object.keys(perVariant);
   const length = Math.max(...ids.map((id) => perVariant[id]!.length));
@@ -142,7 +142,7 @@ describe("computeVariantMetrics — paired difference intervals", () => {
       const [left, right] = Object.keys(perVariant);
       return computeVariantMetrics({
         variantIds: Object.keys(perVariant),
-        rows: rowsWith(perVariant as Record<string, { cost: number; duration: number }[]>),
+        rows: rowsWith(perVariant),
       })[left!]!.costDifferenceCI[right!]!;
     };
     /** The shared draw is seeded per metric, a pair's own draw by its variant ids. */
@@ -166,8 +166,8 @@ describe("computeVariantMetrics — paired difference intervals", () => {
 
     /** @scenario "A pair's cost interval does not move when another variant joins the run" */
     it("keeps a pair's interval when an unrelated variant joins the run", () => {
-      // c recorded rows a and b both missed; under the old rule that grew the draw
-      // and could flip a and b between the shared and per-pair resampling.
+      // c and sparse recorded rows a and b both missed; the pair's interval reads
+      // only its own two variants, so neither may move it.
       const a = withGaps(0.002, 1);
       const b = withGaps(0.003, 1);
       const c = spread(0.004);
