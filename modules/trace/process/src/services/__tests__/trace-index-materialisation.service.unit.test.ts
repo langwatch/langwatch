@@ -109,24 +109,6 @@ describe("TraceIndexMaterialisationService", () => {
     expect(result.mutationId).toBe("mutation_memory_1.txt");
   });
 
-  /** @scenario "The step saves its checkpoint before it starts the mutation" */
-  it("saves a checkpoint before the start", async () => {
-    const table = new IndexlessTable();
-    let startedAtSave = -1;
-    const { saved, run } = harness({ mutations: table });
-
-    await run({
-      onPoll: async (progress) => {
-        saved.push(progress);
-        startedAtSave = table.started;
-      },
-    });
-
-    expect(saved).toEqual([{ mutationId: null, partsToDo: 0 }]);
-    expect(startedAtSave).toBe(0);
-    expect(materialisationProgressSchema.safeParse(saved[0]).success).toBe(true);
-  });
-
   /** @scenario "The step finishes when the table has no such index" */
   it("finishes after one start when no mutation appears", async () => {
     const table = new IndexlessTable();
@@ -248,6 +230,25 @@ describe("TraceIndexMaterialisationService, for the trace analytics metadata col
       { mutationId: "mutation_memory_1.txt", partsToDo: 1 },
     ]);
     expect(result.mutationId).toBe("mutation_memory_1.txt");
+  });
+
+  /** @scenario "The step saves its checkpoint before it starts the mutation" */
+  it("saves a checkpoint before the start", async () => {
+    const mutations = MemoryTraceIndexMaterialisationRepository.create();
+    const { saved, run } = metadataHarness(mutations);
+    let startedAtSave = -1;
+
+    await run({
+      onPoll: async (progress) => {
+        saved.push(progress);
+        if (saved.length === 1) startedAtSave = mutations.issuedAnalyticsMetadataColumns();
+        else mutations.recordAnalyticsMetadataColumns({ ...running, isDone: true });
+      },
+    });
+
+    expect(startedAtSave).toBe(0);
+    expect(mutations.issuedAnalyticsMetadataColumns()).toBe(1);
+    expect(materialisationProgressSchema.safeParse(saved[0]).success).toBe(true);
   });
 
   /** @scenario "The step starts no mutation when the parts already store the metadata columns" */
