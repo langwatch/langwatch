@@ -38,15 +38,6 @@ function fixture(name: string): readonly StockQuery[] {
 const BASELINE = fixture("stock-widget-queries.traces-baseline.json");
 const STOCK = new Map(fixture("stock-widget-queries.json").map((q) => [q.label, q.sql]));
 
-/** The queries that sum `TotalCost`: a trace with two `trace_metrics` rows adds its cost twice. */
-const SUMS_COST = [
-  "cost-by-segment/units",
-  "cost-by-segment/totals",
-  "att-share/units",
-  "att-share/totals",
-  "att-table/units",
-];
-
 /** The queries that split the period into halves, windows or buckets by a row's OccurredAt. */
 const SPLITS = [
   "ask-rising/shares",
@@ -361,8 +352,8 @@ describe("given traces of each source carrying the metadata the widgets read", (
     expect(changed.length, `changed: ${changed.join(", ")}`).toBeGreaterThanOrEqual(12);
   });
 
-  /** @scenario "A trace with two trace_metrics rows adds its cost twice to the summed widgets" */
-  it("differs only in summed cost when a trace has two rows in trace_metrics", async () => {
+  /** @scenario "A trace with two trace_metrics rows adds its cost once to the summed widgets" */
+  it("returns the same rows when a trace has two rows in trace_metrics", async () => {
     const [first] = SEEDS;
     if (!first) throw new Error("no seed");
     // A row written before the storage anchor froze, whose OccurredAt later moved (ADR-082).
@@ -372,7 +363,7 @@ describe("given traces of each source carrying the metadata the widgets read", (
       values: [analyticsRow(first, timeOf(first) + 3_600_000)],
     });
 
-    expect((await differing({ list: ["application"] })).toSorted()).toEqual(SUMS_COST.toSorted());
+    expect(await differing({ list: ["application"] })).toEqual([]);
     expect(await differing({ list: ["langy"] })).toEqual([]);
   });
 
@@ -393,7 +384,7 @@ describe("given traces of each source carrying the metadata the widgets read", (
     // and past MIDPOINT (day 3.5): the bucket queries would count it on day 2 and day 3.
     await moveAnchor({ trace: "app_2", days: 1.75 });
 
-    expect((await differing({ list: ["application"] })).toSorted()).toEqual(SUMS_COST.toSorted());
+    expect(await differing({ list: ["application"] })).toEqual([]);
     expect(await differing({ list: ["langy"] })).toEqual([]);
   });
 

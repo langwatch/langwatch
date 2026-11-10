@@ -49,10 +49,10 @@ Feature: Stock trace widgets read the light trace table
       Then both return the same rows
 
     @integration
-    Scenario: A trace with two trace_metrics rows adds its cost twice to the summed widgets
+    Scenario: A trace with two trace_metrics rows adds its cost once to the summed widgets
       Given an application trace with a second trace_metrics row whose OccurredAt moved
       When the moved queries run under the application list
-      Then only the queries that sum TotalCost differ from their traces form
+      Then the queries that sum TotalCost return the same rows as their traces form
       And trace counts stay the same, since they count uniqExact(TraceId)
 
     @integration

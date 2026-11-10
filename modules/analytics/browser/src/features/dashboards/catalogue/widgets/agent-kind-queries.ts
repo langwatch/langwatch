@@ -135,6 +135,7 @@ SELECT unit_key, ${METRICS_UNIT} AS unit,
   sum(TotalCost) AS cost
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}
 GROUP BY unit
 ORDER BY conversations DESC
 LIMIT 8`;
@@ -148,12 +149,14 @@ SELECT uniqExact((${METRICS_UNIT}, ${METRICS_CONVERSATION})) AS conversations,
   uniqExact(${METRICS_UNIT}) AS units,
   sum(TotalCost) AS cost
 FROM trace_metrics
-WHERE ${inPeriod("OccurredAt")}`;
+WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}`;
 
 export const UNIT_COST_SQL = `WITH ${METRICS_UNIT_KEY}
 SELECT unit_key, ${METRICS_UNIT} AS unit, sum(TotalCost) AS cost
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}
 GROUP BY unit
 ORDER BY cost DESC
 LIMIT 6`;
