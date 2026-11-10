@@ -72255,10 +72255,19 @@ Ensure the service account has S3 access (IRSA) or static credentials are config
 
 With chart-managed ClickHouse, the chart delivers the LangWatchQL named collections `lwql_postgres` and `lwql_postgres_<database>` as server config. A collection of the same name created by hand with `CREATE NAMED COLLECTION` clashes with it, and the server stops at startup. Remove the hand-made one before you upgrade. If the server already stops, roll back to the previous release (`helm rollback`) so ClickHouse starts, follow these steps, then upgrade again:
 
-1. List the collections, and the LangWatchQL tables that read PostgreSQL through each one:
+Named collections created by hand live on one replica only, so run every step on each ClickHouse pod. Set your release and namespace, and a helper that runs a query on one pod with the chart's password:
+
+```bash
+RELEASE=langwatch NS=langwatch
+PODS=$(kubectl -n "$NS" get pods -l "app.kubernetes.io/name=$RELEASE-clickhouse" -o name)
+ch() { kubectl -n "$NS" exec -i "$1" -c clickhouse -- sh -c \
+  'clickhouse-client --password "$(cat /mnt/secrets/password)" "$@"' ch "${@:2}"; }
+```
+
+1. On each pod, list the collections, and the tables that read PostgreSQL through each one:
 
    ```bash
-   kubectl -n langwatch exec -i sts/langwatch-clickhouse -- clickhouse-client <<'SQL'
+   for pod in $PODS; do echo "== $pod"; ch "$pod" <<'SQL'
    SELECT c.name AS collection, c.source, t.database, t.name AS engine_table
    FROM system.named_collections AS c
    LEFT JOIN (
@@ -72270,20 +72279,20 @@ With chart-managed ClickHouse, the chart delivers the LangWatchQL named collecti
    WHERE c.name LIKE 'lwql_postgres%'
    ORDER BY collection, engine_table
    SQL
+   done
    ```
 
-2. For each collection whose `source` is `SQL`, drop the tables listed beside it. They hold no data: each one reads PostgreSQL when it is queried, and the next deploy recreates them. Until then, LangWatchQL's PostgreSQL-backed views are unavailable.
+2. On each pod, for each collection whose `source` is `SQL`, drop the tables listed beside it. They hold no data: each one reads PostgreSQL when it is queried. The next deploy recreates the LangWatchQL tables only. Save the definition of any table you created yourself first (`SHOW CREATE TABLE`) and recreate it after the upgrade. Until the deploy, LangWatchQL's PostgreSQL-backed views are unavailable.
 
    ```bash
-   kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
-     "DROP TABLE <database>.<engine_table>"
+   ch "$pod" -q "SHOW CREATE TABLE <database>.<engine_table>"
+   ch "$pod" -q "DROP TABLE <database>.<engine_table>"
    ```
 
-3. Drop each collection whose `source` is `SQL`. ClickHouse refuses while any table still uses it (`NAMED_COLLECTION_IS_USED`):
+3. On each pod, drop each collection whose `source` is `SQL`. ClickHouse refuses while any table still uses it (`NAMED_COLLECTION_IS_USED`):
 
    ```bash
-   kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
-     "DROP NAMED COLLECTION <collection>"
+   ch "$pod" -q "DROP NAMED COLLECTION <collection>"
    ```
 
 Upgrades need no collection created by hand: the upgrade binds the LangWatchQL tables to a collection the server already holds.
