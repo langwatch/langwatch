@@ -37,10 +37,12 @@ describe("experiment server configuration", () => {
   });
 
   describe("given a deployment that names no cell budget", () => {
-    it("reads none, leaving the default fixed", () => {
-      const config = read({ EVAL_V3_PROJECT_CELL_BUDGET: "" });
-      expect(config.projectCellBudget).toBeUndefined();
-      expect(config.globalCellBudget).toBeUndefined();
+    /** @scenario "A deployment that names no project budget shares a budget of 24" */
+    it("shares a project budget of 24 and sets no global budget", () => {
+      expect(read({}).projectCellBudget).toBe(24);
+      const blank = read({ EVAL_V3_PROJECT_CELL_BUDGET: "" });
+      expect(blank.projectCellBudget).toBe(24);
+      expect(blank.globalCellBudget).toBeUndefined();
     });
   });
 

@@ -1298,10 +1298,10 @@ Declared at `src/eventing/experiment-run-processing.pipeline.ts:149`. Events: `e
 | config | `allowedProxyHosts`   | `ALLOWED_PROXY_HOSTS`              | `../contract/src/experiment.config.ts:21` |
 | config | `runConcurrency`      | `EVAL_V3_CONCURRENCY`              | `../contract/src/experiment.config.ts:23` |
 | config | `projectCellBudget`   | `EVAL_V3_PROJECT_CELL_BUDGET`      | `../contract/src/experiment.config.ts:25` |
-| config | `globalCellBudget`    | `EVAL_V3_GLOBAL_CELL_BUDGET`       | `../contract/src/experiment.config.ts:27` |
-| config | `publicBaseUrl`       | `BASE_HOST`                        | `../contract/src/experiment.config.ts:29` |
-| config | `legacyPublicBaseUrl` | `NEXT_PUBLIC_BASE_URL`             | `../contract/src/experiment.config.ts:31` |
-| config | `foldCacheTtlSeconds` | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/experiment.config.ts:39` |
-| config | `isSaas`              | `IS_SAAS`                          | `../contract/src/experiment.config.ts:40` |
+| config | `globalCellBudget`    | `EVAL_V3_GLOBAL_CELL_BUDGET`       | `../contract/src/experiment.config.ts:33` |
+| config | `publicBaseUrl`       | `BASE_HOST`                        | `../contract/src/experiment.config.ts:35` |
+| config | `legacyPublicBaseUrl` | `NEXT_PUBLIC_BASE_URL`             | `../contract/src/experiment.config.ts:37` |
+| config | `foldCacheTtlSeconds` | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/experiment.config.ts:45` |
+| config | `isSaas`              | `IS_SAAS`                          | `../contract/src/experiment.config.ts:46` |
 
 <!-- readme:generated:end -->
