@@ -94,7 +94,10 @@ type ReportResult =
   | { readonly outcome: "reported"; readonly violation: LangWatchQLViolation }
   | { readonly outcome: "capped" };
 
-/** Exported for the cap test: `walkNode` stops before this branch. */
+/**
+ * The walk can reach the cap mid-node: `walkFields` reports once per field after `walkNode`'s
+ * entry check. Exported for the cap test.
+ */
 export function report({
   ctx,
   frame,

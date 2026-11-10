@@ -4,9 +4,6 @@
  * @see specs/lwql/query-origin.feature
  * @vitest-environment node
  */
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -23,6 +20,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, afterEach, beforeEach } from "vitest";
 
+import { loadStockStatements } from "../../langwatch-ql/__tests__/stock-statements.ts";
 import { analyticsProof } from "../../repositories/__tests__/analytics-proof.fixture.ts";
 import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
@@ -38,16 +36,7 @@ const DASHBOARD_PERIOD = {
   timeWindow: { start: "2026-03-10T00:00:00.000Z", end: "2026-03-11T00:00:00.000Z" },
   granularitySeconds: 3600,
 };
-const STOCK_SQL: string = (
-  JSON.parse(
-    readFileSync(
-      fileURLToPath(
-        new URL("../../langwatch-ql/__tests__/fixtures/stock-widget-queries.json", import.meta.url),
-      ),
-      "utf8",
-    ),
-  ) as { sql: string }[]
-)[0]!.sql;
+const STOCK_SQL: string = loadStockStatements()[0]!.sql;
 
 let meter: RecordingMeterProvider;
 

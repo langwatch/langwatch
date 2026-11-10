@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { loadStockStatements } from "../../langwatch-ql/__tests__/stock-statements.ts";
 import {
   LWQL_BUILTIN_STATEMENT_COVERAGE,
   LWQL_BUILTIN_STATEMENT_HASHES,
@@ -18,9 +19,7 @@ import { hashStatement, originOfStatement } from "../lwql-statement-origin.rules
 const read = (relative: string) =>
   readFileSync(fileURLToPath(new URL(relative, import.meta.url)), "utf8");
 
-const STOCK: readonly { label: string; sql: string }[] = JSON.parse(
-  read("../../langwatch-ql/__tests__/fixtures/stock-widget-queries.json"),
-);
+const STOCK = loadStockStatements();
 
 describe("given the committed stock widget statements", () => {
   /** @scenario "Every current stock statement is on the list" */

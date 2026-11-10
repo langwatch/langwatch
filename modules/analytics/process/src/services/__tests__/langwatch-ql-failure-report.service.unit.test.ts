@@ -4,9 +4,6 @@
  * @see specs/lwql/query-origin.feature
  * @vitest-environment node
  */
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
 import {
   LangWatchQLGranularityTooFineError,
   LangWatchQLInvalidQueryError,
@@ -29,6 +26,7 @@ import {
   createLangWatchQLService,
   EVERY_CATALOGUE_PERMISSION,
 } from "../../app/__tests__/analytics.fixture.ts";
+import { loadStockStatements } from "../../langwatch-ql/__tests__/stock-statements.ts";
 import { LangWatchQLAccessRefusalService } from "../langwatch-ql-access-refusal.service.ts";
 import { LangWatchQLFailureReportService } from "../langwatch-ql-failure-report.service.ts";
 import { catalogueWithout } from "./lwql-catalogue-access.fixture.ts";
@@ -42,14 +40,7 @@ const PINO_BASE_FIELDS = new Set(["level", "time", "pid", "hostname", "msg"]);
 /** A statement no stock widget holds, so the server reads it as user-written. */
 const USER_SQL = `SELECT '${SQL_MARKER}' AS marker FROM trace_metrics WHERE TraceId = {trace:String}`;
 /** The stock widget statements as saved widgets send them, so the server reads each as built in. */
-const STOCK_STATEMENTS = JSON.parse(
-  readFileSync(
-    fileURLToPath(
-      new URL("../../langwatch-ql/__tests__/fixtures/stock-widget-queries.json", import.meta.url),
-    ),
-    "utf8",
-  ),
-) as { label: string; sql: string }[];
+const STOCK_STATEMENTS = loadStockStatements();
 const STOCK_SQL: string = STOCK_STATEMENTS[0]!.sql;
 /** The stock gateway widget's statement: it needs gatewayUsage:view, so hiding that refuses it. */
 const STOCK_GATEWAY_SQL: string = STOCK_STATEMENTS.find(

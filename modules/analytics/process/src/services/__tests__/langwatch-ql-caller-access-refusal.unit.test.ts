@@ -4,9 +4,6 @@
  * @see specs/lwql/query-origin.feature
  * @vitest-environment node
  */
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
 import {
   LangWatchQLNotPermittedError,
   type LangWatchQLProtections,
@@ -20,6 +17,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import { loadStockStatements } from "../../langwatch-ql/__tests__/stock-statements.ts";
 import { MAX_VIOLATIONS } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessRefusalService } from "../langwatch-ql-access-refusal.service.ts";
@@ -29,16 +27,9 @@ import { catalogueWithout, EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-a
 
 const FAILURE_METRIC = "lwql_query_failure_total";
 /** The stock gateway widget's own statement, as a saved widget sends it: built in. */
-const STOCK_GATEWAY_SQL: string = (
-  JSON.parse(
-    readFileSync(
-      fileURLToPath(
-        new URL("../../langwatch-ql/__tests__/fixtures/stock-widget-queries.json", import.meta.url),
-      ),
-      "utf8",
-    ),
-  ) as { label: string; sql: string }[]
-).find(({ label }) => label === "fd-gateway/present")!.sql;
+const STOCK_GATEWAY_SQL: string = loadStockStatements().find(
+  ({ label }) => label === "fd-gateway/present",
+)!.sql;
 const accessRefusals = LangWatchQLAccessRefusalService.create();
 const lwql = LangWatchQLService.create({
   accessRefusals,
