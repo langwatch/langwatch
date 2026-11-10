@@ -1,7 +1,7 @@
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { HStack, Skeleton, Spacer, Text } from "@langwatch/design-system/primitives";
+import { chakra, HStack, Skeleton, Spacer, Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 
@@ -12,6 +12,8 @@ type BatchEvaluationResultsHeaderProps = {
   project?: UiHostProject;
   experiment?: ExperimentRow;
   shownRunId?: string;
+  /** Cells the shown run kept in flight; absent for a run that recorded none. */
+  shownRunConcurrency?: number | null;
   data: BatchEvaluationData | null;
   charts: { available: boolean; visible: boolean; onChange: (visible: boolean) => void };
   displayControls: React.ReactNode;
@@ -22,9 +24,11 @@ type BatchEvaluationResultsHeaderProps = {
 const ExperimentTitle = ({
   experiment,
   shownRunId,
+  shownRunConcurrency,
 }: {
   experiment?: ExperimentRow;
   shownRunId?: string;
+  shownRunConcurrency?: number | null;
 }) => (
   <HStack gap={1} minWidth={0} overflow="hidden" flexShrink={1}>
     <PageLayout.Heading whiteSpace="nowrap" flexShrink={0}>
@@ -42,6 +46,11 @@ const ExperimentTitle = ({
       >
         {"// "}
         {shownRunId}
+        {shownRunConcurrency ? (
+          <chakra.span data-testid="shown-run-concurrency">
+            {` · Concurrency ${shownRunConcurrency}`}
+          </chakra.span>
+        ) : null}
       </Text>
     )}
   </HStack>
@@ -84,6 +93,7 @@ export const BatchEvaluationResultsHeader = ({
   project,
   experiment,
   shownRunId,
+  shownRunConcurrency,
   data,
   charts,
   displayControls,
@@ -98,7 +108,11 @@ export const BatchEvaluationResultsHeader = ({
 
   return (
     <PageLayout.Header paddingX={2} withBorder={false} flexShrink={0}>
-      <ExperimentTitle experiment={experiment} shownRunId={shownRunId} />
+      <ExperimentTitle
+        experiment={experiment}
+        shownRunId={shownRunId}
+        shownRunConcurrency={shownRunConcurrency}
+      />
       <Spacer />
       {charts.available && (
         <PageLayout.HeaderButton

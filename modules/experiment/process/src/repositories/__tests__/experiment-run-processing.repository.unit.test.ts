@@ -45,6 +45,7 @@ function foldedState(overrides: Partial<ExperimentRunStateData> = {}): Experimen
     StoppedAt: null,
     ExpectedTargetResults: null,
     ExpectedEvaluatorResults: null,
+    Concurrency: null,
     TotalScoreSum: 0.75,
     ScoreCount: 1,
     PassedCount: 1,

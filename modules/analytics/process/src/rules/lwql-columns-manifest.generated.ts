@@ -364,6 +364,7 @@ export interface LwqlClickHouseRows {
     readonly _size_bytes: "UInt32";
     readonly ExpectedTargetResults: "Nullable(UInt32)";
     readonly ExpectedEvaluatorResults: "Nullable(UInt32)";
+    readonly Concurrency: "Nullable(UInt16)";
   };
   readonly gateway_budget_ledger_events: {
     readonly TenantId: "String";
