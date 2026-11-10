@@ -17,6 +17,8 @@ on:
     paths:
       - "apps/docs/**"
       - "docs/**"
+      - "packages/design-system/**"
+      - "packages/design-system-internal/**"
       - ".github/workflows/docs-site-lighthouse-all.yml"
   schedule:
     - cron: "17 5 * * *"

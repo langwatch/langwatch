@@ -83,6 +83,9 @@ outputs:
   codeql-python:
     description: "'true' if code CodeQL analyses as python changed. See codeql-javascript."
     value: ${{ steps.filter.outputs.codeql-python || steps.sha.outputs.codeql-python || steps.force.outputs.codeql-python }}
+  docs-site:
+    description: "'true' if the docs site's content or look changed, or if the event is neither a PR nor a diff-mode push. Used by docs-site.yml to build, browser-test, audit and deploy the site only then; its cheap verify job keeps the wider `relevant` filter."
+    value: ${{ steps.filter.outputs.docs-site || steps.sha.outputs.docs-site || steps.force.outputs.docs-site }}
   heavy:
     description: >-
       "'true' unless this is a draft or a release-please pull request. Gate expensive jobs on
@@ -183,3 +186,4 @@ runs:
         echo "ingest=true" >> "$GITHUB_OUTPUT"
         echo "codeql-javascript=true" >> "$GITHUB_OUTPUT"
         echo "codeql-python=true" >> "$GITHUB_OUTPUT"
+        echo "docs-site=true" >> "$GITHUB_OUTPUT"
