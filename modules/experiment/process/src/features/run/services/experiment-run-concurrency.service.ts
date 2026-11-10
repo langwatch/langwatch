@@ -110,9 +110,15 @@ export class ExperimentRunConcurrencyService {
     });
   }
 
-  /** Stops counting a run once it completed, however it ended. */
+  /**
+   * Stops counting a run once it completed, however it ended, even where this process has no
+   * budget: the api that claimed it may have one. Without a budget a failure is ignored.
+   */
   async recordCompleted({ projectId, runId }: { projectId: string; runId: string }): Promise<void> {
-    if (!this.isDynamic) return;
-    await this.deps.activity.markInactive({ projectId, runId });
+    try {
+      await this.deps.activity.markInactive({ projectId, runId });
+    } catch (error) {
+      if (this.isDynamic) throw error;
+    }
   }
 }

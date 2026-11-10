@@ -77,17 +77,4 @@ export class RedisExperimentRunActivityRepository extends ExperimentRunActivityR
       this.redis.zrem(GLOBAL_KEY, member),
     ]);
   }
-
-  async countActive(input: {
-    projectId: string;
-    now: number;
-  }): Promise<{ project: number; global: number }> {
-    const [project, global] = await Promise.all(
-      [projectKeyOf(input.projectId), GLOBAL_KEY].map(async (key) => {
-        await this.redis.zremrangebyscore(key, "-inf", input.now);
-        return this.redis.zcard(key);
-      }),
-    );
-    return { project: project ?? 0, global: global ?? 0 };
-  }
 }

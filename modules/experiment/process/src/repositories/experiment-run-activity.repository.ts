@@ -18,9 +18,4 @@ export abstract class ExperimentRunActivityRepository {
     now: number;
     expiresAt: number;
   }): Promise<{ project: number; global: number }>;
-  /** The active runs in the project and in every project; an entry expired by `now` is dropped. */
-  abstract countActive(input: {
-    projectId: string;
-    now: number;
-  }): Promise<{ project: number; global: number }>;
 }

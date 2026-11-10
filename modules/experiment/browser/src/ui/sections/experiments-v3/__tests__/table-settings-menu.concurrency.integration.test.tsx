@@ -4,33 +4,32 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
  * The run options' concurrency: Auto by default, a picked value sent with the run, and Auto again.
  * @see modules/experiment/specs/experiment-run-dynamic-concurrency.feature
  */
-import { buildExecutionRequest, extractPersistedState } from "@langwatch/experiment-contract";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { extractPersistedState } from "@langwatch/experiment-contract";
+import { act, cleanup, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { useExecuteEvaluation } from "../../../../behavior/experiments-v3/use-execute-evaluation.ts";
 import { TableSettingsMenu } from "../table-settings-menu.tsx";
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project_1", slug: "acme" } }),
 }));
 
-/** What the workbench sends when it runs, built from the store as the run hook builds it. */
-const runRequest = () => {
-  const state = useEvaluationsV3Store.getState();
-  return buildExecutionRequest({
-    state: {
-      name: state.name,
-      datasets: state.datasets,
-      activeDatasetId: state.activeDatasetId,
-      targets: state.targets,
-      evaluators: state.evaluators,
-    },
-    projectId: "project_1",
-    scope: { type: "full" },
-    concurrency: state.ui.concurrency,
-  })?.request;
+const sentPayloads: unknown[] = [];
+vi.mock("@langwatch/browser-host/fetch-sse", () => ({
+  fetchSSE: async ({ payload }: { payload: unknown }) => {
+    sentPayloads.push(payload);
+  },
+}));
+
+/** What the workbench sends when it runs: the real run hook's request, caught at the wire. */
+const runRequest = async () => {
+  const { result, unmount } = renderHook(() => useExecuteEvaluation());
+  await act(() => result.current.execute());
+  unmount();
+  return sentPayloads.at(-1);
 };
 
 const savedState = () => extractPersistedState(useEvaluationsV3Store.getState());
@@ -47,6 +46,7 @@ async function openConcurrency() {
 describe("the run options' concurrency", () => {
   beforeEach(() => {
     useEvaluationsV3Store.getState().reset();
+    sentPayloads.length = 0;
   });
 
   afterEach(() => {
@@ -61,8 +61,9 @@ describe("the run options' concurrency", () => {
       await user.click(screen.getByRole("button", { name: /run options/i }));
 
       expect(shownConcurrency()).toBe("Auto");
-      expect(runRequest()).toBeDefined();
-      expect(runRequest()).not.toHaveProperty("concurrency");
+      const request = await runRequest();
+      expect(request).toBeDefined();
+      expect(request).not.toHaveProperty("concurrency");
       expect(savedState()).not.toHaveProperty("concurrency");
     });
   });
@@ -77,7 +78,7 @@ describe("the run options' concurrency", () => {
       await user.type(input, "4{Enter}");
 
       await waitFor(() => expect(shownConcurrency()).toBe("4"));
-      expect(runRequest()?.concurrency).toBe(4);
+      expect(await runRequest()).toMatchObject({ concurrency: 4 });
       expect(savedState().concurrency).toBe(4);
     });
   });
@@ -92,7 +93,7 @@ describe("the run options' concurrency", () => {
       await user.click(await screen.findByRole("button", { name: "Auto" }));
 
       await waitFor(() => expect(shownConcurrency()).toBe("Auto"));
-      expect(runRequest()).not.toHaveProperty("concurrency");
+      expect(await runRequest()).not.toHaveProperty("concurrency");
       expect(savedState()).not.toHaveProperty("concurrency");
     });
   });

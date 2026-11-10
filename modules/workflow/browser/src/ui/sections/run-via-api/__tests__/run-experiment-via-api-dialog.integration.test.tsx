@@ -130,6 +130,7 @@ describe("RunExperimentViaApiDialog (evaluations-v3)", () => {
       await screen.findByRole("dialog");
       await click("CLI");
 
+      expect(screen.getByRole("radio", { name: "Auto" })).toHaveProperty("checked", true);
       expect(dialogText()).not.toContain("--concurrency");
       expect(screen.queryByLabelText("Concurrency")).toBeNull();
     });

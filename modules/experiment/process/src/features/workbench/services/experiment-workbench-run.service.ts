@@ -90,65 +90,68 @@ export class ExperimentWorkbenchRunService {
       runId,
       requested: saved.runInputs.concurrency,
     });
-    try {
-      const savedRun = (options: {
-        persistResults: boolean;
-        runUrl?: string;
-      }): PipelineRunStart => {
-        const plan = ExperimentRunPlanService.create().buildPlan({
-          request: { state: saved.state, scope: saved.scope },
-          data: saved.data,
-          concurrency,
-          origin: "saved",
-          actor: workbenchActorFrom({ credential: input.credential }),
-          experimentSlug: slug,
-          ...(saved.boardRowIndices ? { boardRowIndices: saved.boardRowIndices } : {}),
-          ...options,
-        });
-        return {
-          start: this.#runsOn().startOf({
-            projectId,
-            runId,
-            experimentId: saved.experimentId,
-            plan,
-            state: saved.state,
-            data: saved.data,
-          }),
-          // The person behind a key; a personal agent refuses a key that names nobody, as main did.
-          actor: deriveRunActor({
-            userId: input.credential.kind === "legacyProjectKey" ? null : input.credential.userId,
-            surfaceHeader: null,
-          }),
-          data: saved.data,
-          state: saved.state,
-          carriedOverCells: saved.carriedOverCells,
-          reportContext: { projectId, slug },
-        };
-      };
-
-      // A stream never wrote the board; a polled run of the saved dataset fills the cells it shows.
-      if (input.acceptsEvents) {
-        return {
-          kind: "streaming",
-          events: this.#runsOn().streamRun(savedRun({ persistResults: false })),
-        };
-      }
-      const runUrl = this.#runUrl({ projectSlug: input.projectSlug, slug, runId });
-      const run = savedRun({ persistResults: runsSavedDataset(saved.runInputs), runUrl });
-      await this.#runsOn().startRun(run);
-
+    const savedRun = (options: { persistResults: boolean; runUrl?: string }): PipelineRunStart => {
+      const plan = ExperimentRunPlanService.create().buildPlan({
+        request: { state: saved.state, scope: saved.scope },
+        data: saved.data,
+        concurrency,
+        origin: "saved",
+        actor: workbenchActorFrom({ credential: input.credential }),
+        experimentSlug: slug,
+        ...(saved.boardRowIndices ? { boardRowIndices: saved.boardRowIndices } : {}),
+        ...options,
+      });
       return {
-        kind: "started",
-        runId,
-        status: "running",
-        total: run.start.total,
-        ...(run.start.plan ? { concurrency: run.start.plan.concurrency } : {}),
-        runUrl,
+        start: this.#runsOn().startOf({
+          projectId,
+          runId,
+          experimentId: saved.experimentId,
+          plan,
+          state: saved.state,
+          data: saved.data,
+        }),
+        // The person behind a key; a personal agent refuses a key that names nobody, as main did.
+        actor: deriveRunActor({
+          userId: input.credential.kind === "legacyProjectKey" ? null : input.credential.userId,
+          surfaceHeader: null,
+        }),
+        data: saved.data,
+        state: saved.state,
+        carriedOverCells: saved.carriedOverCells,
+        reportContext: { projectId, slug },
       };
-    } catch (error) {
-      await runs.concurrency.release({ projectId, runId });
-      throw error;
+    };
+
+    // A run that cannot even be built gives its claim back; once built, `startRun` and
+    // `streamRun` release it themselves if the start command is never sent.
+    const built = async (options: { persistResults: boolean; runUrl?: string }) => {
+      try {
+        return savedRun(options);
+      } catch (error) {
+        await runs.concurrency.release({ projectId, runId });
+        throw error;
+      }
+    };
+
+    // A stream never wrote the board; a polled run of the saved dataset fills the cells it shows.
+    if (input.acceptsEvents) {
+      return {
+        kind: "streaming",
+        events: this.#runsOn().streamRun(await built({ persistResults: false })),
+      };
     }
+    const runUrl = this.#runUrl({ projectSlug: input.projectSlug, slug, runId });
+    const run = await built({ persistResults: runsSavedDataset(saved.runInputs), runUrl });
+    await this.#runsOn().startRun(run);
+
+    return {
+      kind: "started",
+      runId,
+      status: "running",
+      total: run.start.total,
+      ...(run.start.plan ? { concurrency: run.start.plan.concurrency } : {}),
+      runUrl,
+    };
   }
 
   /** `POST /execute`: the browser's run, planned here and executed by the worker's run pipeline. */

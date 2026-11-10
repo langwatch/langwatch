@@ -133,20 +133,22 @@ export class ExperimentWorkbenchPipelineRunService {
    * `GET /runs/:runId` (spec section 7).
    */
   async *streamRun(run: PipelineRunStart): AsyncGenerator<EvaluationV3Event> {
+    const sent = { start: false };
     try {
       // A personal development agent runs on one person's machine; only they may send it a turn.
       await this.runs.ownership.assertConnectedAgentsRunnable({
         agents: [...run.data.loadedAgents.values()],
         actor: run.actor,
       });
-      for await (const frame of this.#frames(run)) {
+      for await (const frame of this.#frames(run, sent)) {
         yield frame;
         if (run.ran && (frame.type === "done" || frame.type === "stopped")) {
           this.observer.recordExperimentRan(run.ran);
         }
       }
     } catch (error) {
-      await this.#releaseClaim(run);
+      // Once the start is sent the worker runs the cells, so the claim stays until completion.
+      if (!sent.start) await this.#releaseClaim(run);
       logger.error({ error, ...run.reportContext }, "Pipeline run error");
       this.observer.reportError(error, run.reportContext);
       yield mapThrownErrorEvent({ error });
@@ -180,13 +182,16 @@ export class ExperimentWorkbenchPipelineRunService {
     await this.#recordStart({ run });
   }
 
-  /** A run that failed before or while starting gives its concurrency claim back. */
+  /** A run whose start command was never sent gives its concurrency claim back. */
   async #releaseClaim(run: PipelineRunStart): Promise<void> {
     await this.runs.concurrency.release({ projectId: run.start.tenantId, runId: run.start.runId });
   }
 
   /** The run's frames in `seq` order, a redelivered one dropped, until the run ends. */
-  async *#frames(run: PipelineRunStart): AsyncGenerator<EvaluationV3Event> {
+  async *#frames(
+    run: PipelineRunStart,
+    sent: { start: boolean },
+  ): AsyncGenerator<EvaluationV3Event> {
     const { runId } = run.start;
     const queued: ExperimentRunStreamMessage[] = [];
     let wake: (() => void) | null = null;
@@ -199,6 +204,7 @@ export class ExperimentWorkbenchPipelineRunService {
     });
     try {
       await this.runs.commands.startExperimentRun(run.start);
+      sent.start = true;
       await this.#linkDatasetVersion({ run });
       await this.#carryBoard({ run });
       // The page polls the moment a frame names the run; the run API answers for it first.

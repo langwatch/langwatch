@@ -87,6 +87,22 @@ function behavesOver(
     });
   });
 
+  describe("when a worker without a budget sees a run claimed by an api with one complete", () => {
+    it("still stops counting it", async () => {
+      const { activity, projectId } = store();
+      await serviceOver({ activity, projectCellBudget: 20 }).resolve({
+        projectId,
+        runId: "api-run",
+      });
+
+      await serviceOver({ activity }).recordCompleted({ projectId, runId: "api-run" });
+
+      expect(
+        await activity.claim({ projectId, runId: "probe", now: NOW, expiresAt: NOW + 1 }),
+      ).toMatchObject({ project: 0 });
+    });
+  });
+
   describe("when no project budget is set", () => {
     /** @scenario "Dynamic mode off keeps the fixed default" */
     it("answers EVAL_V3_CONCURRENCY whatever is active", async () => {
@@ -194,10 +210,20 @@ describe("ExperimentRunConcurrencyService", () => {
         projects.push(projectId);
         const replicaA = RedisExperimentRunActivityRepository.create({ redis });
         const replicaB = RedisExperimentRunActivityRepository.create({ redis });
-        const before = await replicaB.countActive({ projectId, now: NOW });
+        const before = await replicaB.claim({
+          projectId,
+          runId: "probe",
+          now: NOW,
+          expiresAt: NOW + 1,
+        });
 
         await replicaA.markActive({ projectId, runId: "run-1", expiresAt: NOW + 60_000 });
-        const after = await replicaB.countActive({ projectId, now: NOW });
+        const after = await replicaB.claim({
+          projectId,
+          runId: "probe",
+          now: NOW,
+          expiresAt: NOW + 1,
+        });
 
         expect(after.project).toBe(1);
         expect(after.global).toBe(before.global + 1);
