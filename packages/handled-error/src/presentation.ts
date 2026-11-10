@@ -5106,11 +5106,6 @@ const presentations = {
     describe: () =>
       "Langy needs a model to run. Pick one in your project's model settings, then try again.",
   },
-  langy_virtual_key_missing: {
-    title: "Langy's key for this project is missing",
-    describe: () =>
-      "Nothing was saved, so Langy keeps its previous models. Contact support to restore Langy's key.",
-  },
   langy_model_unavailable: {
     // The other half of `langy_model_not_configured`: there nothing is chosen,
     // here something is and this project cannot serve it. The gateway's own
@@ -5121,6 +5116,11 @@ const presentations = {
     title: "Langy can't use that model",
     describe: () =>
       "The model chosen for Langy has no provider connected in this project. Pick another model, or connect its provider in model settings.",
+  },
+  langy_virtual_key_missing: {
+    title: "Langy's key for this project is missing",
+    describe: () =>
+      "Nothing was saved, so Langy keeps its previous models. Contact support to restore Langy's key.",
   },
   langy_codex_plan_limit: {
     // fault: provider. The limit belongs to the customer's OpenAI plan, not to

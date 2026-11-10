@@ -3,7 +3,7 @@
  * Spec: specs/langy/langy-model-allowlist.feature
  */
 
-import { Banner } from "@langwatch/design-system/banner";
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, Button, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
@@ -76,9 +76,7 @@ function LangyModelsSection({ projectId }: { projectId: string }) {
           status="error"
           title="Couldn't load Langy's models"
           action={
-            <Button size="xs" variant="outline" onClick={allowlist.retryLoad}>
-              Try again
-            </Button>
+            <BannerAction onClick={allowlist.retryLoad}>Try again</BannerAction>
           }
           data-testid="langy-models-load-error"
         >
