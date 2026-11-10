@@ -85,7 +85,7 @@ When you have found a failure, keep it from coming back in the same chat:
 
 With the sign-in, the assistant reads only the project you approve, with your permissions, and only what your redaction settings kept. What it does read, inputs and outputs included, goes to the assistant's model provider as part of the chat. The limits in detail:
 
-- **Only the approved project.** The sign-in approves one project, and the assistant reads only that project's traces. A personal API key instead reaches every project you can access.
+- **Only the approved project.** The sign-in approves one project, and the assistant reads only that project's traces. A [personal API key](/platform/api-keys#create-a-personal-key) instead reaches every project its scope covers, which can be more than one.
 - **Your redaction applies.** The server returns traces as LangWatch stored them, so anything your [data privacy settings](/platform/data-privacy) redacted or dropped is not there to read.
 - **Your access applies.** The assistant acts as you, so it can't read or change anything your LangWatch role can't.
 
