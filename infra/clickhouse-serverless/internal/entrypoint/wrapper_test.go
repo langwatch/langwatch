@@ -127,7 +127,7 @@ func TestWrapper_InitdbGetsThePassword(t *testing.T) {
 		env    map[string]string
 	}{
 		{"CLICKHOUSE_DB with an env password", nil,
-			map[string]string{"CLICKHOUSE_DB": "langwatch", "CLICKHOUSE_PASSWORD": "pw"}},
+			map[string]string{"CLICKHOUSE_DB": "db_under_test", "CLICKHOUSE_PASSWORD": "pw"}},
 		{"initdb script with a password file", []string{"01-schema.sql"},
 			map[string]string{"CLICKHOUSE_PASSWORD_FILE": passwordFile(t, "  file-pw \n")}},
 		{"password file wins over env, as in ch-config", []string{"01-schema.sql"},
@@ -165,7 +165,7 @@ func TestWrapper_NoPasswordWithoutInitdb(t *testing.T) {
 	}{
 		{"no initdb inputs", nil, map[string]string{"CLICKHOUSE_PASSWORD": "pw"}, nil},
 		{"default clickhouse-server command skips initdb", []string{"01-schema.sql"},
-			map[string]string{"CLICKHOUSE_PASSWORD": "pw", "CLICKHOUSE_DB": "langwatch"}, []string{"clickhouse-server"}},
+			map[string]string{"CLICKHOUSE_PASSWORD": "pw", "CLICKHOUSE_DB": "db_under_test"}, []string{"clickhouse-server"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			env, _ := runWrapper(t, tc.initdb, tc.env, tc.args...)

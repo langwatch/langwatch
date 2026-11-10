@@ -6,12 +6,14 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
 
 // The two files the app's access-render Job writes into the LangWatchQL
 // access Secret, and where ClickHouse must find each one.
 const (
-	lwqlAccessFile          = "lwql-access.yaml"
+	lwqlAccessFile          = config.LWQLAccessFile
 	lwqlNamedCollectionFile = "lwql-named-collection.yaml"
 )
 

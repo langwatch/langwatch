@@ -3,10 +3,18 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/access"
 )
+
+// DefaultLWQLAccessDir is where a deployment that sets no LWQL_ACCESS_DIR
+// mounts the LangWatchQL access model; a var so tests can move it.
+var DefaultLWQLAccessDir = "/etc/clickhouse-server/lwql"
+
+// LWQLAccessFile is the access model's users file inside that directory.
+const LWQLAccessFile = "lwql-access.yaml"
 
 // Input holds all user-provided configuration, loaded from env vars via struct tags.
 type Input struct {
@@ -16,8 +24,8 @@ type Input struct {
 	RAMBytes     int64  `validate:"gte=536870912"` // min 512MB
 	Replicated   bool   `env:"CH_REPLICATED"`
 	ClusterName  string `env:"CH_CLUSTER" default:"default"`
-	Shard        string `env:"CH_SHARD" default:"shard_01"`
-	Replica      string `env:"CH_REPLICA"`
+	Shard        string `env:"CH_SHARD" alias:"SHARD_NAME" default:"shard_01"`
+	Replica      string `env:"CH_REPLICA" alias:"REPLICA_NAME"`
 	KeeperNodes  string `env:"CH_KEEPER_NODES"`
 	KeeperPort   int    `env:"CH_KEEPER_PORT" default:"9181"`
 	DataNodes    string `env:"CH_DATA_NODES"`
@@ -54,7 +62,8 @@ type Input struct {
 
 	// A directory holding the app-rendered LangWatchQL access model (a mounted
 	// Secret). Its two files are linked into users.d and config.d, so an update
-	// to the Secret reaches the running server with no restart.
+	// to the Secret reaches the running server with no restart. Unset, Load
+	// uses DefaultLWQLAccessDir when the model is mounted there.
 	LWQLAccessDir string `env:"LWQL_ACCESS_DIR"`
 
 	// nil means true: default gets access_management and named_collection_control.
@@ -187,6 +196,12 @@ func Load() (*Input, error) {
 			return nil, fmt.Errorf("CLICKHOUSE_PASSWORD_FILE: %w", err)
 		}
 		i.Password = strings.TrimSpace(string(data))
+	}
+
+	if i.LWQLAccessDir == "" {
+		if _, err := os.Stat(filepath.Join(DefaultLWQLAccessDir, LWQLAccessFile)); err == nil {
+			i.LWQLAccessDir = DefaultLWQLAccessDir
+		}
 	}
 
 	// The mode decides which passwords are required and which refused.

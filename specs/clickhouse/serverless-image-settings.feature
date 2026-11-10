@@ -120,10 +120,25 @@ Feature: The clickhouse-serverless image renders every server setting from env
 
   @unit
   Scenario: Without LWQL_ACCESS_DIR a mounted access file is left alone
-    Given LWQL_ACCESS_DIR is not set
+    Given LWQL_ACCESS_DIR is not set and nothing is mounted at /etc/clickhouse-server/lwql
     And users.d holds a mounted lwql-access.yaml and config.d a link an earlier boot made
     When the renderer writes the server configuration
     Then the mounted file is unchanged and the stale link is removed
+
+  @unit
+  Scenario: The image finds the access model at the conventional directory with no env
+    Given LWQL_ACCESS_DIR is not set
+    And the access model is mounted at /etc/clickhouse-server/lwql
+    When the renderer loads its configuration
+    Then it links the access model from that directory, as if LWQL_ACCESS_DIR named it
+
+  @unit
+  Scenario: The image reads the replica and shard names an older image read
+    Given CH_REPLICA and CH_SHARD are not set
+    And REPLICA_NAME and SHARD_NAME are
+    When the renderer loads its configuration
+    Then the replica and shard take the older names' values
+    And CH_REPLICA and CH_SHARD win over the older names when both are set
 
   @unit
   Scenario: Every default system log can be given the system log TTL
