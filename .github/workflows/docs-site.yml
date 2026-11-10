@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
-      site: ${{ steps.detect.outputs.docs-site }}
+      docs-site: ${{ steps.detect.outputs.docs-site }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -46,13 +46,15 @@ jobs:
           push-strategy: diff
           filters: |
             # The heavy jobs (build, browser checks, audit, deploy): what the
-            # site shows and how it looks, and the tooling that ships it.
+            # site shows, the workspace packages its build reads (the app's
+            # dependency closure, tools/docsdeploy/site_gate_test.go) and the
+            # tooling that ships it.
             docs-site:
               - 'docs/**'
               - 'apps/docs/**'
               - 'CHANGELOG.md'
               - 'packages/design-system/**'
-              - 'packages/design-system-internal/**'
+              - 'packages/time/**'
               - '.github/workflows/docs-site.yml'
               - 'cmd/docsdeploy/**'
               - 'tools/docsdeploy/**'
@@ -116,7 +118,7 @@ jobs:
 
   build:
     needs: changes
-    if: needs.changes.outputs.site == 'true'
+    if: needs.changes.outputs.docs-site == 'true'
     runs-on: ubuntu-latest
     # A cold media cache encodes every image and video (about 8 minutes), then the
     # 340 MB artifact uploads; warm runs finish well inside this.
@@ -383,7 +385,7 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main'
       && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      && needs.changes.outputs.site == 'true'
+      && needs.changes.outputs.docs-site == 'true'
       && vars.DOCS_SITE_BUCKET != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30

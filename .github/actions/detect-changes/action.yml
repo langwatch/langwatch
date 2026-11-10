@@ -9,7 +9,8 @@
 # the real jobs always run — required aggregator checks need a concrete
 # result. Exception: with `push-strategy: diff` a push is diffed against its
 # before-commit through dorny/paths-filter instead of force-run, for
-# workflows whose real jobs spend money on live LLM calls.
+# workflows whose real jobs are expensive: live LLM calls, or long runner time
+# such as the docs site's build, browser checks, audit and deploy.
 #
 # Never the files API: it stops at 3,000 files and, past that, gave each
 # workflow a different subset (#7536). On pull requests the base and head
@@ -60,8 +61,8 @@ inputs:
       How push events are treated. 'force' (default) marks every filter
       true so the real jobs always run post-merge. 'diff' diffs the push
       against its before-commit with dorny/paths-filter instead, so
-      workflows whose real jobs spend money (live LLM calls) only run
-      them when the push actually touched relevant paths.
+      workflows whose real jobs are expensive (live LLM calls, or long
+      runner time) only run them when the push actually touched relevant paths.
     required: false
     default: force
 outputs:
