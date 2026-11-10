@@ -212,6 +212,27 @@ describe("a failed step", () => {
     });
 
     /** @scenario "A failed step folds into the record of the work" */
+    it("says a failure finished as output-available once, not above its own raw text", async () => {
+      const user = userEvent.setup();
+      const message = "Something broke on our side.";
+      const finished = {
+        type: "tool-bash",
+        toolCallId: "fail-out",
+        state: "output-available",
+        input: { command: "langwatch trace list" },
+        output: JSON.stringify({
+          ok: false,
+          error: { code: "internal_error", message, httpStatus: 500, isHandled: true },
+        }),
+      } as never;
+      const { container } = renderActivity({ parts: [finished, reply], live: false });
+
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(container.textContent?.split(message).length).toBe(2);
+    });
+
+    /** @scenario "A failed step folds into the record of the work" */
     it("opens its raw payload in developer mode", async () => {
       devMode = true;
       const user = userEvent.setup();
@@ -341,7 +362,9 @@ describe("a failed step", () => {
       expect(receiptHeader().textContent).toContain("1 action failed");
       expect(screen.queryByRole("alert")).toBeNull();
     });
+  });
 
+  describe("given a reloaded turn, not stopped, that ends on a step that never finished", () => {
     it("titles the receipt by the failure when a reload ends the turn on an unfinished step", () => {
       renderActivity({ parts: [failA, runningRead], live: false, interrupted: false });
 

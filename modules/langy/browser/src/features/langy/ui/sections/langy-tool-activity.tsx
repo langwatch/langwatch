@@ -1031,9 +1031,10 @@ function CompletedActivityRow({ group, devMode }: { group: ActivityGroup; devMod
 function FailedActivityRow({ failure, devMode }: { failure: FailedToolCall; devMode: boolean }) {
   const { call, presentation } = failure;
   const described = describeToolCall({ name: call.name, input: call.input });
-  // Copy the raw block already carries (a plain error's own text) is not said twice.
-  const raw = call.errorText ?? "";
   const { message, detail } = presentation;
+  // Copy the raw block already carries (a plain error's own text) is not said twice. The
+  // presentation's raw is the ANSI-stripped failure from errorText or an output-available output.
+  const raw = presentation.raw ?? call.errorText ?? "";
   const messageIsNew = !raw.includes(message);
   const detailIsNew = detail === undefined || !raw.includes(detail);
   const explainsBeyondRaw = messageIsNew && detailIsNew;
