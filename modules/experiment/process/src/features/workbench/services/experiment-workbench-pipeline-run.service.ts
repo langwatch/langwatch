@@ -53,7 +53,7 @@ export type WorkbenchRunPipeline = Readonly<{
   /** Refuses a run against someone else's personal development agent before it starts. */
   ownership: Pick<ExperimentAgentOwnershipService, "assertConnectedAgentsRunnable">;
   /** The cells in flight at once a run starts with when it names no limit of its own. */
-  concurrency: Pick<ExperimentRunConcurrencyService, "resolve">;
+  concurrency: Pick<ExperimentRunConcurrencyService, "resolve" | "release">;
   /** What this process refuses of a run, for want of Redis or a public address. */
   refusals: ExperimentRunRefusals;
 }>;
@@ -146,6 +146,7 @@ export class ExperimentWorkbenchPipelineRunService {
         }
       }
     } catch (error) {
+      await this.#releaseClaim(run);
       logger.error({ error, ...run.reportContext }, "Pipeline run error");
       this.observer.reportError(error, run.reportContext);
       yield mapThrownErrorEvent({ error });
@@ -168,10 +169,20 @@ export class ExperimentWorkbenchPipelineRunService {
       return;
     }
 
-    await this.runs.commands.startExperimentRun(run.start);
+    try {
+      await this.runs.commands.startExperimentRun(run.start);
+    } catch (error) {
+      await this.#releaseClaim(run);
+      throw error;
+    }
     await this.#linkDatasetVersion({ run });
     await this.#carryBoard({ run });
     await this.#recordStart({ run });
+  }
+
+  /** A run that failed before or while starting gives its concurrency claim back. */
+  async #releaseClaim(run: PipelineRunStart): Promise<void> {
+    await this.runs.concurrency.release({ projectId: run.start.tenantId, runId: run.start.runId });
   }
 
   /** The run's frames in `seq` order, a redelivered one dropped, until the run ends. */

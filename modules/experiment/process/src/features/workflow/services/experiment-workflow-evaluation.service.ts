@@ -64,7 +64,7 @@ type WorkflowEvaluationDependencies = {
   workflowSource: ExperimentWorkflowDsl;
   /** The datasets, prompts, agents and evaluators the load reads through. */
   services: ExecutionDataServices;
-  concurrency: Pick<ExperimentRunConcurrencyService, "resolve">;
+  concurrency: Pick<ExperimentRunConcurrencyService, "resolve" | "release">;
   /** The run's progress fold: a start answers once it holds the run, and a redelivery reads it. */
   folds: ExperimentRunFoldRepository;
   /** What this process refuses of a run, for want of Redis or a public address. */
@@ -191,6 +191,28 @@ export class WorkflowEvaluationService {
       return;
     }
     const { prepared, runUrl } = started;
+    const claim = { projectId: request.tenantId, runId: request.runId };
+    const concurrency = await this.dependencies.concurrency.resolve(claim);
+    try {
+      await this.startPlanned({ request, prepared, runUrl, concurrency });
+    } catch (error) {
+      await this.dependencies.concurrency.release(claim);
+      throw error;
+    }
+  }
+
+  /** Plans the prepared run at its concurrency and sends its start. */
+  private async startPlanned({
+    request,
+    prepared,
+    runUrl,
+    concurrency,
+  }: {
+    request: WorkflowEvaluationRequestedEventData & { tenantId: string };
+    prepared: PreparedEvaluation;
+    runUrl: string;
+    concurrency: number;
+  }): Promise<void> {
     const { state, dataResult } = prepared;
     const plan = ExperimentRunPlanService.create().buildPlan({
       request: {
@@ -200,10 +222,7 @@ export class WorkflowEvaluationService {
           : { type: "full" },
       },
       data: dataResult,
-      concurrency: await this.dependencies.concurrency.resolve({
-        projectId: request.tenantId,
-        runId: request.runId,
-      }),
+      concurrency,
       origin: "workflow",
       persistResults: false,
       experimentSlug: request.experimentSlug,

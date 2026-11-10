@@ -75,7 +75,7 @@ export type ExperimentRunProcessing = Readonly<{
   /** Refuses a run against someone else's personal development agent before it starts. */
   ownership: Pick<ExperimentAgentOwnershipService, "assertConnectedAgentsRunnable">;
   /** The cells in flight at once a run starts with when it names no limit of its own. */
-  concurrency: Pick<ExperimentRunConcurrencyService, "resolve">;
+  concurrency: Pick<ExperimentRunConcurrencyService, "resolve" | "release">;
   /** What this process refuses of a run, for want of Redis or a public address. */
   refusals: ExperimentRunRefusals;
 }>;

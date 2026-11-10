@@ -79,6 +79,19 @@ export class ExperimentRunConcurrencyService {
     }
   }
 
+  /** Gives back a claim whose run never started; a failed release only logs, the claim expires. */
+  async release({ projectId, runId }: { projectId: string; runId: string }): Promise<void> {
+    if (!this.isDynamic) return;
+    try {
+      await this.deps.activity.markInactive({ projectId, runId });
+    } catch (error) {
+      this.logger.warn(
+        { projectId, runId, error },
+        "an unstarted run's claim could not be released",
+      );
+    }
+  }
+
   /** Counts a started run as active for the activity window, where the default is dynamic. */
   async recordStarted({
     projectId,

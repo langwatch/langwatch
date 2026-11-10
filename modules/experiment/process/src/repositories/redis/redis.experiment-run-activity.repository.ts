@@ -9,7 +9,7 @@ import { ExperimentRunActivityRepository } from "../experiment-run-activity.repo
 /** One hash tag for every set, so a claim's script reaches both sets on a cluster. */
 const KEY_PREFIX = "eval_v3_active_runs:{active}:";
 const GLOBAL_KEY = `${KEY_PREFIX}global`;
-/** A set nobody wrote for a day holds only expired runs; Redis drops it. */
+/** A set left unwritten for a day holds only expired runs; Redis drops it. */
 const KEY_IDLE_TTL_SECONDS = 24 * 60 * 60;
 
 const projectKeyOf = (projectId: string) => `${KEY_PREFIX}project:${projectId}`;
