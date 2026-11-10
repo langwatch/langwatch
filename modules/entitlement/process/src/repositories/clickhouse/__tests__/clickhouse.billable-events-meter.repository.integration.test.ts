@@ -33,7 +33,11 @@ let meter: BillableEventsMeterClickHouseRepository;
 
 beforeAll(async () => {
   if (!clickHouseUrl) return;
-  ch = createClient({ url: clickHouseUrl });
+  // The production clients read ISO timestamps the same way (managed-client.ts).
+  ch = createClient({
+    url: clickHouseUrl,
+    clickhouse_settings: { date_time_input_format: "best_effort" },
+  });
   meter = BillableEventsMeterClickHouseRepository.create(
     vendorQueryClient({ vendor: ch, indexes: [] }),
   );

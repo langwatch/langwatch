@@ -11,7 +11,7 @@ What a plan allows, and what has been used and spent against it, so the allowanc
 | Classification | core (`modules/catalogue.json`)                                                                                      |
 | Subjects       | entitlement, usage                                                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                  |
-| Api token      | `EntitlementApi` = `moduleApi<EntitlementApi>()("entitlement")`, `contract/src/entitlement.api.ts:50` (9 operations) |
+| Api token      | `EntitlementApi` = `moduleApi<EntitlementApi>()("entitlement")`, `contract/src/entitlement.api.ts:52` (9 operations) |
 | Installed by   | api, worker, tasks (process)                                                                                         |
 
 ## What entitlement owns

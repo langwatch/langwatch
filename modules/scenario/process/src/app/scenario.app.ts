@@ -900,10 +900,6 @@ export class ScenarioModule implements ScenarioApi {
    * metadata, which is the only channel that carries them into execution.
    */
   async queueSimulationRun(input: QueueSimulationRunInput): Promise<void> {
-    await this.#dependencies.creationCaps.assertRunAllowed({
-      projectId: input.projectId,
-      scenarioRunId: input.scenarioRunId,
-    });
     const target = await this.#dependencies.connectedTargets.resolve({
       projectId: input.projectId,
       target: input.target,
@@ -932,6 +928,12 @@ export class ScenarioModule implements ScenarioApi {
       ...(Object.keys(input.parameters).length > 0 ? { parameters: input.parameters } : {}),
       ...(secretParameterNames.length > 0 ? { secretParameterNames } : {}),
     };
+
+    // Admitting counts the run, so it comes last: a target that fails to resolve keeps no slot.
+    await this.#dependencies.creationCaps.assertRunAllowed({
+      projectId: input.projectId,
+      scenarioRunId: input.scenarioRunId,
+    });
 
     await this.#dependencies.simulations.queueRun({
       tenantId: input.projectId,

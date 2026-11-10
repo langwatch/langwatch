@@ -13,7 +13,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   scenarioExecutorPeers,
@@ -172,6 +172,31 @@ describe("ScenarioModule on the cloud Free scenario run cap", () => {
         httpStatus: 403,
         meta: { limitType: "scenarioRuns", current: 100, max: 100 },
       });
+    });
+  });
+
+  describe("given a run whose connected target cannot be resolved", () => {
+    /** @scenario A run queued from the app is counted once */
+    it("fails before asking the run cap, so the failed queue keeps no slot", async () => {
+      const runCap = vi.fn<EntitlementApi["assertScenarioRunAllowed"]>(async () => {});
+      const { app } = await organizationAtTheScenarioCap({ runCap });
+
+      await expect(
+        app.queueSimulationRun({
+          projectId: "project-1",
+          scenarioId: "scenario-0",
+          scenarioRunId: "scenariorun-2",
+          batchRunId: "batch-1",
+          setId: "set-1",
+          name: "Scenario 0",
+          target: { type: "connected", referenceId: "agent-missing" },
+          parameters: {},
+          secretParameters: {},
+          note: undefined,
+          scenarioVersion: undefined,
+        }),
+      ).rejects.toBeInstanceOf(Error);
+      expect(runCap).not.toHaveBeenCalled();
     });
   });
 });
