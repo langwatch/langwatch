@@ -204,7 +204,7 @@ Ensure the service account has S3 access (IRSA) or static credentials are config
 
 ### ClickHouse restarts with `NAMED_COLLECTION_ALREADY_EXISTS`
 
-With chart-managed ClickHouse, the chart delivers the LangWatchQL named collections `lwql_postgres` and `lwql_postgres_<database>` as server config. A collection of the same name created by hand with `CREATE NAMED COLLECTION` clashes with it, and the server stops at startup. Remove the hand-made one before you upgrade:
+With chart-managed ClickHouse, the chart delivers the LangWatchQL named collections `lwql_postgres` and `lwql_postgres_<database>` as server config. A collection of the same name created by hand with `CREATE NAMED COLLECTION` clashes with it, and the server stops at startup. Remove the hand-made one before you upgrade. If the server already stops, roll back to the previous release (`helm rollback`) so ClickHouse starts, follow these steps, then upgrade again:
 
 1. List the collections, and the LangWatchQL tables that read PostgreSQL through each one:
 
@@ -227,14 +227,14 @@ With chart-managed ClickHouse, the chart delivers the LangWatchQL named collecti
 
    ```bash
    kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
-     "DROP TABLE langwatch.<engine_table>"
+     "DROP TABLE <database>.<engine_table>"
    ```
 
-3. Drop the collection. ClickHouse refuses while any table still uses it (`NAMED_COLLECTION_IS_USED`):
+3. Drop each collection whose `source` is `SQL`. ClickHouse refuses while any table still uses it (`NAMED_COLLECTION_IS_USED`):
 
    ```bash
    kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
-     "DROP NAMED COLLECTION lwql_postgres_langwatch"
+     "DROP NAMED COLLECTION <collection>"
    ```
 
 Upgrades need no collection created by hand: the upgrade binds the LangWatchQL tables to a collection the server already holds.
