@@ -233,6 +233,23 @@ describe("a failed step", () => {
     });
 
     /** @scenario "A failed step folds into the record of the work" */
+    it("still explains a coloured error whose raw block shows the codes, not the clean copy", async () => {
+      const user = userEvent.setup();
+      const failure = failedStep({
+        id: "fail-ansi",
+        command: "cat x.txt",
+        errorText: "\u001b[31mfailed\u001b[0m to open boom",
+      });
+      const { container } = renderActivity({ parts: [failure, reply], live: false });
+
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(container.textContent).toContain(
+        "This step couldn't be completed. failed to open boom",
+      );
+    });
+
+    /** @scenario "A failed step folds into the record of the work" */
     it("opens its raw payload in developer mode", async () => {
       devMode = true;
       const user = userEvent.setup();

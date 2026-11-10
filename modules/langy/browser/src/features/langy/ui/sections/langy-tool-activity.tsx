@@ -1032,9 +1032,9 @@ function FailedActivityRow({ failure, devMode }: { failure: FailedToolCall; devM
   const { call, presentation } = failure;
   const described = describeToolCall({ name: call.name, input: call.input });
   const { message, detail } = presentation;
-  // Copy the raw block already carries (a plain error's own text) is not said twice. The
-  // presentation's raw is the ANSI-stripped failure from errorText or an output-available output.
-  const raw = presentation.raw ?? call.errorText ?? "";
+  // Copy the raw block already carries (a plain error's own text) is not said twice. Compare
+  // against what that block shows (toolResultText, ANSI codes kept), not the stripped presentation.
+  const raw = toolResultText(call) ?? "";
   const messageIsNew = !raw.includes(message);
   const detailIsNew = detail === undefined || !raw.includes(detail);
   const explainsBeyondRaw = messageIsNew && detailIsNew;
