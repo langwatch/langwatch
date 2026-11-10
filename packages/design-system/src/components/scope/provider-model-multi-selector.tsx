@@ -1,13 +1,12 @@
-import { Search } from "lucide-react";
 import { useState } from "react";
 
-import { Box, createListCollection, Field, HStack, Input, Text, Wrap } from "../../primitives.ts";
-import { InputGroup } from "../forms/input-group.tsx";
+import { Box, createListCollection, Field, HStack, Text, Wrap } from "../../primitives.ts";
 import { scrollToListItem, Select } from "../forms/select.tsx";
 import {
   filterModels,
   ModelItem,
   type ModelOption,
+  ModelSearchField,
   type ModelPickerOption,
   type ModelPickerQuery,
   providerIconFor,
@@ -94,7 +93,12 @@ export function ProviderModelMultiSelector({
         positioning={{ sameWidth: false }}
         disabled={disabled || query.isLoading}
       >
-        <Select.Trigger background="bg.panel" aria-label={ariaLabel} minHeight="10">
+        <Select.Trigger
+          className="fix-hidden-inputs"
+          background="bg.panel"
+          aria-label={ariaLabel}
+          minHeight="10"
+        >
           <Select.ValueText placeholder={emptyLabel}>
             {() =>
               picked.length > 0 ? (
@@ -124,18 +128,7 @@ export function ProviderModelMultiSelector({
               borderBottom="1px solid"
               borderColor="border"
             >
-              <InputGroup startElement={<Search size={16} />} startOffset="-4px" width="full">
-                <Input
-                  size="sm"
-                  placeholder="Search models"
-                  type="search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  border="none"
-                  _focus={{ boxShadow: "none" }}
-                  paddingX={2}
-                />
-              </InputGroup>
+              <ModelSearchField value={search} onChange={setSearch} />
             </Box>
           </Field.Root>
           <Select.List data-testid="provider-model-multi-selector-list">

@@ -409,24 +409,7 @@ export function ProviderModelSelector({
               borderBottom="1px solid"
               borderColor="border"
             >
-              <InputGroup startElement={<Search size={16} />} startOffset="-4px" width="full">
-                <Input
-                  size="sm"
-                  placeholder="Search models"
-                  type="search"
-                  value={modelSearch}
-                  onChange={(e) => setModelSearch(e.target.value)}
-                  border="none"
-                  _focus={{ boxShadow: "none" }}
-                  _focusVisible={{
-                    outline: "2px solid",
-                    outlineColor: "colorPalette.focusRing",
-                    outlineOffset: "1px",
-                    borderRadius: "sm",
-                  }}
-                  paddingX={2}
-                />
-              </InputGroup>
+              <ModelSearchField value={modelSearch} onChange={setModelSearch} />
             </Box>
           </Field.Root>
           <Select.List data-testid="provider-model-selector-list">
@@ -451,5 +434,35 @@ export function ProviderModelSelector({
         </Text>
       ) : null}
     </>
+  );
+}
+
+/** The search field atop a model picker's list, shared by the single and multi pickers. */
+export function ModelSearchField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <InputGroup startElement={<Search size={16} />} startOffset="-4px" width="full">
+      <Input
+        size="sm"
+        placeholder="Search models"
+        type="search"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        border="none"
+        _focus={{ boxShadow: "none" }}
+        _focusVisible={{
+          outline: "2px solid",
+          outlineColor: "colorPalette.focusRing",
+          outlineOffset: "1px",
+          borderRadius: "sm",
+        }}
+        paddingX={2}
+      />
+    </InputGroup>
   );
 }

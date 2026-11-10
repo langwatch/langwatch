@@ -37,3 +37,11 @@ export const NothingPicked: Story = { args: { models: [] } };
 export const PickedModelNoLongerOffered: Story = {
   args: { models: ["openai/gpt-5-mini", "mistral/mistral-large"] },
 };
+
+export const Loading: Story = { args: { models: [], query: { isLoading: true, data: [] } } };
+
+export const LoadFailed: Story = {
+  args: { query: { isLoading: false, data: [], error: new Error("network") } },
+};
+
+export const ReadOnly: Story = { args: { disabled: true } };
