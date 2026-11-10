@@ -25,6 +25,8 @@ A scenario often needs test data that exists before the first turn and is remove
 
 Epic: https://github.com/langwatch/tasks/issues/1063.
 
+**The HTTP hooks chain is parked, not dropped.** On 2026-11-10 https://github.com/langwatch/langwatch/pull/8956, https://github.com/langwatch/langwatch/pull/9193, https://github.com/langwatch/langwatch/pull/9194, https://github.com/langwatch/langwatch/pull/9195 and https://github.com/langwatch/langwatch/pull/9239 were closed with a "parked, reopen any time" note; https://github.com/langwatch/langwatch/issues/8955 stays open. The Connector does not need them and does not touch the HTTP agent, and nothing in this ADR blocks them: if a customer asks for a hooks URL they host, the chain is reopened beside the Connector.
+
 What main has, and the Connector reuses:
 
 - **The hook lifecycle is on main and is caller-agnostic.** `ScenarioRunHooksService.around` runs setup, the turns, then teardown in a `finally`, records each hook, and never lets teardown change the score (`apps/scenario-child/src/services/scenario-run-hooks.service.ts:100-115`). It calls hooks through a two-member interface, `ScenarioHookCaller { runState; callHook({ kind, timeoutMs }) }` (`:20-23`). Only the wiring picks connected agents: `hookTargetOf` returns null for any other agent type (`apps/scenario-child/src/services/scenario-child-execution.service.ts:209-222`).
@@ -107,7 +109,6 @@ Blocks run only in nlpgo's code-block sandbox, never in the worker or the child.
 
 They stay open. This ADR does not decide them.
 
-- **The HTTP hooks chain.** Close https://github.com/langwatch/langwatch/pull/8956, https://github.com/langwatch/langwatch/pull/9193, https://github.com/langwatch/langwatch/pull/9194 and https://github.com/langwatch/langwatch/pull/9195, and https://github.com/langwatch/langwatch/issues/8955? The Connector no longer needs them: it does not touch the HTTP agent. The cost of keeping them open is a customer-hosted hooks transport that nobody has asked for.
 - **Self-hosted gate.** Does the flag gate self-hosted too? Proposal: yes, default on there, so it can be switched off anywhere.
 - **The cloud default of the flag.** Proposal: off, turned on per project, until code blocks get an address fence. Cost: each cloud project needs turning on.
 
@@ -124,7 +125,7 @@ They stay open. This ADR does not decide them.
 - `modules/agent/contract/src/config/api-agent.ts`: the right shape for the config (base URL, key, turn, setup, teardown, fixtures dataset). Rename to `connector`; add `secretNames`; the dataset reaches the blocks.
 - `apps/scenario-child/src/channels/http/http.serialized-api-agent.channel.ts` and `rules/api-agent.rules.ts`: the own-channel-for-a-new-type pattern, and the turn running as a block. The prototype's registry row, browser wiring (`agent-card.tsx`, `get-agent-editor-drawer.ts`) and `hookTargetOf` change are the file list for the new type.
 
-Not reused: the HTTP agent `connector` field, the `{{ state }}` turn templates in HTTP agents, and anything in the ADR-188 chain.
+Not reused: the HTTP agent `connector` field, the `{{ state }}` turn templates in HTTP agents, and anything in the ADR-188 chain, which stays parked (see above).
 
 ## Rationale / Trade-offs
 
