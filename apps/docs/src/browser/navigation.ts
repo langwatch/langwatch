@@ -1,4 +1,5 @@
 import { docsBasePath } from "../config.ts";
+import { mayFetchAhead } from "./fetch-ahead.ts";
 
 /** A fetched page: its HTML and the address it ended at after any host redirect. */
 type Fetched = { html: string; url: string };
@@ -58,7 +59,7 @@ function sheetHref(link: HTMLLinkElement) {
 }
 
 /** Asks for every shared sheet still named only by `data-href`. The page paints from its inlined
-    rules, so the bootstrap calls this after the first paint. */
+    rules, so the bootstrap calls this once the window has loaded (`afterLoad`). */
 export function loadSharedSheets() {
   document.querySelectorAll<HTMLLinkElement>("link[data-docs-style][data-href]").forEach((link) => {
     link.href = sheetHref(link);
@@ -179,12 +180,6 @@ async function navigate({ url, restored = false }: { url: URL; restored?: boolea
   }
 }
 
-/** A fetch ahead of the click: never offline or for a reader who asked to save data. */
-function mayFetchEarly() {
-  const saveData = (navigator as { connection?: { saveData?: boolean } }).connection?.saveData;
-  return navigator.onLine && !saveData;
-}
-
 /** The page a plain main-button press or click on an internal link leads to, if any. */
 function followedPage({ event }: { event: MouseEvent }) {
   if (event.button !== 0 || modifiedClick({ event })) return null;
@@ -211,7 +206,7 @@ export function startNavigation() {
     "pointerdown",
     (event) => {
       const url = followedPage({ event });
-      if (url && mayFetchEarly()) fetchPage({ url }).catch(() => {});
+      if (url && mayFetchAhead()) fetchPage({ url }).catch(() => {});
     },
     { passive: true },
   );

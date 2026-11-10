@@ -214,7 +214,7 @@ await it("preloads the body and title fonts and never fetches extended Latin", a
               preloaded
                 .map((name) => name.replace(/-[A-Za-z0-9_-]{8}\.woff2$/, ".woff2"))
                 .toSorted(),
-              ["Inter-Variable-latin.woff2", "Sentient-Regular.woff2"],
+              ["Inter-Variable-latin.woff2", "Sentient-Medium.woff2", "Sentient-Regular.woff2"],
             );
             assert.ok(
               preloaded.every((name) => name !== "Inter-Variable-latin.woff2"),
