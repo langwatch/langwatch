@@ -260,7 +260,7 @@ function docsSkill({ skills }: { skills: AgentSkill[] }) {
     "## Reading the docs",
     "",
     `- ${docsUrl({ path: "/llms.txt" })} lists every page with a one-line description, and the one file per section.`,
-    "- Every page has a Markdown twin: add `.md` to its address, or ask for it with `Accept: text/markdown`.",
+    `- Every page has a Markdown twin: its address without a trailing slash, plus \`.md\` (the docs home is ${docsUrl({ path: "/index.md" })}). Or ask for the page with \`Accept: text/markdown\`.`,
     `- ${docsUrl({ path: "/llms-full.txt" })} is the whole documentation in one file, too large to read whole.`,
     "",
     ...(listed.length > 0 ? ["## Installable skills", "", ...listed, ""] : []),
