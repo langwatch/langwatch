@@ -338,29 +338,36 @@ export function ProviderModelSelector({
 
   const showInheritPlaceholder = !model && inheritOption;
   const showPlaceholder = !model && !inheritOption && placeholder;
-  const selectValueText = showPlaceholder ? (
-    <Box fontSize={labelFontSize(size)} color="fg.muted" lineClamp={1}>
-      {placeholder}
-    </Box>
-  ) : showInheritPlaceholder ? (
-    <InheritValueText
-      labelFor={labelFor}
-      inheritIcon={inheritIcon}
-      inheritOption={inheritOption}
-      isModelId={!inheritOption.model || isModelId(inheritOption.model)}
-      size={size}
-    />
-  ) : (
-    <SelectedValueText
-      labelFor={labelFor}
-      isUnknown={isUnknown}
-      isModelId={isModelId(model)}
-      model={model}
-      selectedIcon={selectedIcon}
-      selectedLabel={selectedItem?.label}
-      size={size}
-    />
-  );
+  let selectValueText: React.ReactNode;
+  if (showPlaceholder) {
+    selectValueText = (
+      <Box fontSize={labelFontSize(size)} color="fg.muted" lineClamp={1}>
+        {placeholder}
+      </Box>
+    );
+  } else if (showInheritPlaceholder) {
+    selectValueText = (
+      <InheritValueText
+        labelFor={labelFor}
+        inheritIcon={inheritIcon}
+        inheritOption={inheritOption}
+        isModelId={!inheritOption.model || isModelId(inheritOption.model)}
+        size={size}
+      />
+    );
+  } else {
+    selectValueText = (
+      <SelectedValueText
+        labelFor={labelFor}
+        isUnknown={isUnknown}
+        isModelId={isModelId(model)}
+        model={model}
+        selectedIcon={selectedIcon}
+        selectedLabel={selectedItem?.label}
+        size={size}
+      />
+    );
+  }
 
   const [highlightedValue, setHighlightedValue] = useState<string | null>(model);
 
