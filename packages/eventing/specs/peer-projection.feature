@@ -27,6 +27,12 @@ Feature: A module folds and maps a peer pipeline's events into its own state
     Then the state is unchanged and records the event once
 
   @unit
+  Scenario: A peer fold's subscriber reacts to its committed state
+    Given a module declares a peer fold with a subscriber
+    When the owner's pipeline appends an event the fold takes
+    Then the subscriber is handed the event and the fold's state with that event folded in
+
+  @unit
   Scenario: A peer projection over an event no registered pipeline declares is refused
     Given a module declares a peer fold over an owner event
     And no registered pipeline declares that event type
