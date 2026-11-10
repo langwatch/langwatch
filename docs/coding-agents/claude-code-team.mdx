@@ -11,9 +11,9 @@ keywords:
 description: Send every engineer's Claude Code telemetry to LangWatch and see cost per session, engineer, project and pull request, without reading anyone's prompts.
 ---
 
-To track Claude Code across a team, you collect the OpenTelemetry that Claude Code already emits from every engineer's machine into one place that splits it by person, project and pull request.
+To track Claude Code across a team, run `npx langwatch claude` on each engineer's machine. LangWatch then collects the OpenTelemetry that Claude Code already emits into one place that splits it by person, project and pull request.
 
-LangWatch does that with one command per machine, or one managed settings file for the whole fleet, and it works on Claude Max and Pro plans as well as on API keys.
+Instead of the command on every machine, one managed settings file can cover the whole fleet. Both work on Claude Max and Pro plans as well as on API keys.
 
 With the per-machine setup, each engineer's sessions, prompts included, land in a project only they own. You get the cost numbers per person; reading a session itself takes an audited admin path, and the organization can drop the prompts before they are stored. To start now, go to [Connect each engineer](#1-connect-each-engineer).
 
@@ -89,12 +89,18 @@ Engineers will ask who can read their sessions, so the answer belongs in the rol
 
 Credentials in prompts or tool output are replaced with `[SECRET]` at ingestion by default. See [Privacy](/coding-agents/privacy).
 
-## Questions
+## Questions about LangWatch for Claude Code
 
-**Does it work on Claude Max and Pro plans?** Yes. The subscription path keeps the engineer's plan and login and sends only telemetry. Cost there is Claude Code's own estimate.
+### Does LangWatch track Claude Code on Max and Pro plans?
 
-**How is this different from the analytics in my Anthropic account?** LangWatch works per session: it replays what the agent did, shows where the context and the cache cost went, and adds up every session behind a pull request, across Claude Code and the other coding agents your team uses.
+Yes. The subscription path keeps the engineer's plan and login and sends only telemetry. Cost there is Claude Code's own estimate.
 
-**Can we self-host it?** Yes, point the OTLP endpoint at your own instance followed by `/api/otel`. See [Self-hosting](/self-hosting/overview).
+### How is LangWatch different from the analytics in my Anthropic account?
+
+LangWatch works per session: it replays what the agent did, shows where the context and the cache cost went, and adds up every session behind a pull request, across Claude Code and the other coding agents your team uses.
+
+### Can we self-host LangWatch for Claude Code telemetry?
+
+Yes, point the OTLP endpoint at your own instance followed by `/api/otel`. See [Self-hosting](/self-hosting/overview).
 
 Next, run `npx langwatch claude` on your own machine and open [Sessions](https://app.langwatch.ai/me/sessions) to see what your engineers will see, then read [Reduce coding agent cost](/coding-agents/reduce-coding-agent-cost) for what to change once the numbers are in.

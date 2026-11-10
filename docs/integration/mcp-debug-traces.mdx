@@ -5,9 +5,9 @@ keywords: langwatch, mcp, model context protocol, mcp server, llm observability,
 description: The LangWatch MCP server lets Claude Code, Cursor or Copilot search and read your agent's traces themselves.
 ---
 
-To let your coding assistant read your LLM traces, you add an observability MCP server to it. The assistant then searches the traces, opens the one that failed and reads every span, next to the code that produced it.
+To let your coding assistant read your LLM traces, add the LangWatch MCP server (`https://app.langwatch.ai/mcp`) to Claude Code, Cursor or Copilot. The assistant then searches the traces, opens the one that failed and reads every span, next to the code that produced it.
 
-The LangWatch MCP server does this for Claude Code, Cursor, GitHub Copilot, ChatGPT and any client that speaks MCP. You connect it once with a URL and a browser sign-in, and then you ask "why did the last refund conversation fail?" instead of copying trace JSON into the chat.
+It also works in ChatGPT and any other client that speaks MCP. You connect it once with a URL and a browser sign-in, and then you ask "why did the last refund conversation fail?" instead of copying trace JSON into the chat.
 
 Access stays scoped: the assistant reads only the one project you approve, with your permissions, and never sees what your redaction settings removed. To start now, go to [Connect the server](#1-connect-the-server).
 
@@ -89,14 +89,22 @@ With the sign-in, the assistant reads only the project you approve, with your pe
 - **Your redaction applies.** The server returns traces as LangWatch stored them, so anything your [data privacy settings](/platform/data-privacy) redacted or dropped is not there to read.
 - **Your access applies.** The assistant acts as you, so it can't read or change anything your LangWatch role can't.
 
-## Questions
+## Questions about the LangWatch MCP server
 
-**Which assistants does it work with?** Claude Code, Claude Desktop, Cursor, GitHub Copilot in VS Code, ChatGPT and any client that supports remote MCP servers over Streamable HTTP. The local version runs in any client that starts MCP servers as a command.
+### Which assistants work with the LangWatch MCP server?
 
-**Does it work with self-hosted LangWatch?** Yes. Use your own host followed by `/mcp` as the URL.
+Claude Code, Claude Desktop, Cursor, GitHub Copilot in VS Code, ChatGPT and any client that supports remote MCP servers over Streamable HTTP. The local version runs in any client that starts MCP servers as a command.
 
-**Can it change things, or only read?** It can also create and update prompts, evaluators, datasets, scenarios and online evaluations. The full list is in the [tools reference](/integration/mcp#mcp-tools-reference). Whether you approve each call depends on your client's permission settings, so check them before you let it write.
+### Does the LangWatch MCP server work with self-hosted LangWatch?
 
-**Do my traces need to come from a particular framework?** No. Anything that sends traces to LangWatch works, through the Python or TypeScript SDK or plain OpenTelemetry.
+Yes. Use your own host followed by `/mcp` as the URL.
+
+### Can the LangWatch MCP server change things, or only read?
+
+It can also create and update prompts, evaluators, datasets, scenarios and online evaluations. The full list is in the [tools reference](/integration/mcp#mcp-tools-reference). Whether you approve each call depends on your client's permission settings, so check them before you let it write.
+
+### Do my traces need a particular framework to use the LangWatch MCP server?
+
+No. Anything that sends traces to LangWatch works, through the Python or TypeScript SDK or plain OpenTelemetry.
 
 Next, connect the server with the command in [step 1](#1-connect-the-server) and ask your assistant for the last failed trace, or read [LangWatch MCP](/integration/mcp) for every tool and setting.

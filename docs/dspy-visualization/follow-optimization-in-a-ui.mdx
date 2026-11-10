@@ -1,5 +1,5 @@
 ---
-title: Follow DSPy prompt optimization in a UI
+title: Track DSPy optimization (MIPROv2, GEPA) in a UI with LangWatch
 sidebarTitle: Follow optimization in a UI
 keywords: langwatch, dspy, prompt optimization, ui, miprov2, gepa, copro, bootstrapfewshot, optimizer tracking, experiments, langy
 description: One call to `langwatch.dspy.init` streams every optimizer step to LangWatch, with the score, the instructions, the examples, the LLM calls and the cost.
@@ -65,14 +65,22 @@ Each run keeps its own steps, so you can go back to the winning candidate of las
 
 To improve a single prompt without DSPy, ask Langy, the assistant built into LangWatch, in the Experiments Workbench. Pick **Optimize this prompt** on a prompt column: Langy scores the current prompt with your evaluator on your dataset, writes a candidate, runs both and reports the pass rate and the cost before and after. See [Prompt optimization with Langy](/langy/prompt-optimization).
 
-## Questions
+## Questions about tracking DSPy in LangWatch
 
-**Does LangWatch run the optimizer?** No. The optimizer runs in your notebook or job, with your models and your keys. LangWatch receives the steps and shows them.
+### Does LangWatch run the DSPy optimizer?
 
-**Which optimizer should I use?** [Optimization algorithms](/improve-your-agent/algorithms) compares what each one changes, what it needs and how many metric calls it costs.
+No. The optimizer runs in your notebook or job, with your models and your keys. LangWatch receives the steps and shows them.
 
-**Can I optimize a whole agent, not just one prompt?** Yes. [Optimize with DSPy](/improve-your-agent/optimize-with-dspy) uses scenario tests as the metric, so the optimizer rewrites the agent's instructions and tool descriptions and scores each candidate on full conversations.
+### Which DSPy optimizer should I use?
 
-**Does it work self-hosted?** Yes, set `LANGWATCH_ENDPOINT` to the address of your own instance before you call `init`.
+[Optimization algorithms](/improve-your-agent/algorithms) compares what each one changes, what it needs and how many metric calls it costs.
+
+### Can LangWatch optimize a whole agent, not just one prompt?
+
+Yes. [Optimize with DSPy](/improve-your-agent/optimize-with-dspy) uses scenario tests as the metric, so the optimizer rewrites the agent's instructions and tool descriptions and scores each candidate on full conversations.
+
+### Does LangWatch DSPy tracking work self-hosted?
+
+Yes, set `LANGWATCH_ENDPOINT` to the address of your own instance before you call `init`.
 
 Next, add `langwatch.dspy.init` to your next optimizer run and open the link it prints, or start with the small runnable example in the [DSPy visualization quickstart](/dspy-visualization/quickstart).

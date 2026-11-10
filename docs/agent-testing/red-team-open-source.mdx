@@ -1,7 +1,7 @@
 ---
 title: Red team AI agents with an open-source multi-turn attacker
 sidebarTitle: Red team with an open-source attacker
-keywords: langwatch, scenario, red teaming, open source, ai agent security, multi-turn attacks, crescendo, goat, jailbreak, prompt injection, pytest
+keywords: langwatch, scenario, red teaming, garak, pyrit, promptfoo, open source, ai agent security, multi-turn attacks, crescendo, goat, jailbreak, prompt injection, pytest
 description: Scenario, LangWatch's open-source testing library, attacks your agent over dozens of turns inside pytest or vitest and fails the test when it breaks.
 ---
 
@@ -108,22 +108,29 @@ The dashboard opens on `localhost` with the latest batch of findings, and it run
 
 With `LANGWATCH_API_KEY` set, every run also shows on the [Results](/agent-testing/results) tab in LangWatch with the full conversation and the judge's reasoning, next to your functional tests.
 
-## How this compares to other open-source tools
+## How Scenario compares to garak, PyRIT and promptfoo
 
-| Tool type | What it does well | What it leaves out |
-| --- | --- | --- |
-| Prompt scanners with jailbreak datasets | Broad coverage of known single-prompt attacks against a model or endpoint | Attacks that build up over a conversation |
-| Red-teaming frameworks for security teams | Orchestrated attacks and scoring outside the codebase | Your agent's real tools, and your test suite |
-| Scenario | Adaptive multi-turn attacks on your agent and its tools, as tests in your repository | A large catalogue of single-prompt jailbreaks |
+| Tool | Multi-turn attacks | What it attacks | Where the attack lives |
+| --- | --- | --- | --- |
+| garak (NVIDIA) | A few; most of its large library is single-prompt probes | A model or an HTTP endpoint | Its own command-line scan |
+| PyRIT (Microsoft) | Yes, with Crescendo, PAIR, TAP and other multi-turn attacks | A model or endpoint target you configure | Python scripts and notebooks |
+| promptfoo | Yes, with Crescendo, GOAT and other strategies | A provider you configure: an endpoint, a model or your own function | Its own YAML config and command line, which can run in CI |
+| Scenario | Yes, with Crescendo and GOAT | Your agent and its real tools, through an adapter | A pytest or vitest test, which can assert on the tool calls your agent made |
 
-The approaches combine well: a scanner for breadth on known prompts, Scenario for depth on your agent's own actions.
+Scenario's catalogue of single-prompt jailbreaks is smaller than garak's or promptfoo's. The tools combine well: a scanner for breadth on known prompts, Scenario for depth on your agent's own actions.
 
-## Questions
+## Questions about red teaming with Scenario
 
-**Can a coding assistant write the attacks for me?** Yes. Install the scenarios skill with `npx skills add langwatch/skills/scenarios`, then ask your assistant to "add red teaming to my agent". It finds your agent in the codebase and writes the test.
+### Can a coding assistant write Scenario red-team attacks for me?
 
-**What does a run cost?** Every turn calls the attacker model and your agent and scores the reply, so the cost grows with `total_turns`. Run the long attacks before a release, and turn off per-turn scoring with `score_responses=False` for faster runs on every pull request.
+Yes. Install the scenarios skill with `npx skills add langwatch/skills/scenarios`, then ask your assistant to "add red teaming to my agent". It finds your agent in the codebase and writes the test.
 
-**Does it work with my framework?** The adapter only needs a function that takes the messages and returns a reply, so it works with LangGraph, CrewAI, Pydantic AI, the OpenAI Agents SDK, Mastra, the Vercel AI SDK or your own code.
+### What does a Scenario red-team run cost?
+
+Every turn calls the attacker model and your agent and scores the reply, so the cost grows with `total_turns`. Run the long attacks before a release, and turn off per-turn scoring with `score_responses=False` for faster runs on every pull request.
+
+### Does Scenario red teaming work with my agent framework?
+
+The adapter only needs a function that takes the messages and returns a reply, so it works with LangGraph, CrewAI, Pydantic AI, the OpenAI Agents SDK, Mastra, the Vercel AI SDK or your own code.
 
 Next, copy the test above, change the target to the action your agent must never take, and run it, or read the [Scenario red-teaming reference](https://langwatch.ai/scenario/advanced/red-teaming) for every option.

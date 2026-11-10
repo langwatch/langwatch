@@ -5,7 +5,7 @@ keywords: langwatch, langgraph, tracing, observability, callback, stategraph, sp
 description: Pass the LangWatch callback to your graph's invoke and every node, tool call and LLM call becomes a span you can open.
 ---
 
-To trace a LangGraph agent, you pass a tracing callback to the run of the compiled graph. LangGraph hands that callback to every node it runs, so each node is recorded as a span inside one trace per run, and so is each tool and model call made through a LangChain or LangGraph runnable. A call your node makes with a provider SDK directly needs that SDK instrumented as well.
+To trace a LangGraph agent with LangWatch's open-source LLM observability, pass `get_langchain_callback()` to the run of the compiled graph. LangGraph hands that callback to every node it runs, so each node is recorded as a span inside one trace per run, and so is each tool and model call made through a LangChain or LangGraph runnable. A call your node makes with a provider SDK directly needs that SDK instrumented as well.
 
 With LangWatch that is one decorator and one callback in Python, or one `withConfig` call in TypeScript. You then see which node ran, in which order, how often the agent looped, and the exact prompt and tool arguments at each step. Both snippets are in [Trace the graph run](#1-trace-the-graph-run).
 
@@ -122,12 +122,18 @@ Once the runs are traced, you can check them in the same project:
 - **Test the graph before release.** A [simulated-user test](/agent-testing/simulated-users) runs your graph against a model that plays the user, and its runs are traced the same way.
 - **Debug from your editor.** With the [LangWatch MCP server](/integration/mcp-debug-traces), your coding assistant can open the failing trace next to the graph code.
 
-## Questions
+## Questions about tracing LangGraph with LangWatch
 
-**Does it work with LangGraph's prebuilt agents?** Yes. `create_react_agent` and other prebuilt graphs are compiled graphs, so the callback goes in the same `config`.
+### Does LangWatch trace LangGraph's prebuilt agents?
 
-**Do I need LangSmith?** No. The callback is a standard LangChain callback, so it works without a LangSmith account, and it can run next to LangSmith's tracer if you use both.
+Yes. `create_react_agent` and other prebuilt graphs are compiled graphs, so the callback goes in the same `config`.
 
-**Can I self-host?** Yes. Point `LANGWATCH_ENDPOINT` at your own instance; see [Self-hosting](/self-hosting/overview).
+### Do I need LangSmith to trace LangGraph with LangWatch?
+
+No. The callback is a standard LangChain callback, so it works without a LangSmith account, and it can run next to LangSmith's tracer if you use both.
+
+### Can I self-host LangWatch for LangGraph tracing?
+
+Yes. Point `LANGWATCH_ENDPOINT` at your own instance; see [Self-hosting](/self-hosting/overview).
 
 Next, add the callback to the place your code runs the graph and open the first trace, or read [LangGraph for Python](/integration/python/integrations/langgraph) for a complete runnable agent.

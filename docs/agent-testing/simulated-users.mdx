@@ -1,13 +1,13 @@
 ---
-title: Test AI agents with simulated users
+title: Test AI agents with simulated users in pytest or vitest
 sidebarTitle: Simulated users
 keywords: langwatch, agent testing, simulated user, user simulator, llm as a judge, multi-turn testing, scenario, pytest, vitest, ci
-description: Scenario runs a simulated user against your agent inside pytest or vitest, and a judge grades each conversation.
+description: Scenario, LangWatch's open-source testing library, runs a simulated user against your agent inside pytest or vitest, and a judge grades each conversation.
 ---
 
-To test an agent with simulated users, you let one model play the user while your agent answers it. A second model, the judge, reads the conversation and passes or fails it against criteria you wrote.
+To test an agent with simulated users, use [Scenario](https://github.com/langwatch/scenario) (`langwatch-scenario` for Python, `@langwatch/scenario` for TypeScript), LangWatch's open-source testing library: one model plays the user while your agent answers it, and a judge model passes or fails the conversation against criteria you wrote.
 
-With [Scenario](https://github.com/langwatch/scenario), LangWatch's open-source testing library, that loop is one `scenario.run` call inside a normal pytest or vitest test, so it runs in CI with the rest of your suite. Your first test is one adapter around your agent and one `scenario.run` call, both below. To start now, go to [Install Scenario](#1-install-scenario).
+This page is the pytest and vitest tutorial. The loop is one `scenario.run` call inside a normal test, so it runs in CI with the rest of your suite. For what agent testing covers and the other ways to run it, see the [agent testing overview](/agent-testing/overview). To start now, go to [Install Scenario](#1-install-scenario).
 
 ## Why use a simulated user
 
@@ -127,14 +127,22 @@ When a production conversation goes wrong, copy how that user opened it into a n
 
 Evaluations still fit the steps inside the agent, such as retrieval or one prompt, and both run in the same LangWatch project. See [Agent testing vs evaluations](/agent-testing/overview#agent-testing-vs-evaluations).
 
-## Questions
+## Questions about Scenario
 
-**Which model should play the user and the judge?** Start with a small, cheap model: `scenario.configure(default_model=...)` sets it for both roles. Pass a different model to `UserSimulatorAgent` or `JudgeAgent` when one role needs more.
+### Which model should play the user and the judge in Scenario?
 
-**Does it work with my agent framework?** The adapter only needs a function that takes the messages and returns a reply, so it works with LangGraph, CrewAI, Pydantic AI, the OpenAI Agents SDK, Mastra, the Vercel AI SDK or your own code.
+Start with a small, cheap model: `scenario.configure(default_model=...)` sets it for both roles. Pass a different model to `UserSimulatorAgent` or `JudgeAgent` when one role needs more.
 
-**Can I test without writing code?** Yes. [Test from the platform](/agent-testing/test-from-the-platform) runs the same simulated user and judge against your agent's endpoint, with scenarios written in the LangWatch interface.
+### Does Scenario work with my agent framework?
 
-**Can the simulated user attack the agent?** [Red teaming](/agent-testing/red-teaming) swaps the simulated user for a multi-turn attacker in the same loop.
+The adapter only needs a function that takes the messages and returns a reply, so it works with LangGraph, CrewAI, Pydantic AI, the OpenAI Agents SDK, Mastra, the Vercel AI SDK or your own code.
+
+### Can I test agents in LangWatch without writing code?
+
+Yes. [Test from the platform](/agent-testing/test-from-the-platform) runs the same simulated user and judge against your agent's endpoint, with scenarios written in the LangWatch interface.
+
+### Can Scenario's simulated user attack my agent?
+
+[Red teaming](/agent-testing/red-teaming) swaps the simulated user for a multi-turn attacker in the same loop.
 
 Next, [write scenarios in code](/agent-testing/scenarios-in-code) for the full Python and TypeScript setup, or paste the [scenarios prompt](/skills/directory) into your coding agent and let it add the first tests to your repository.

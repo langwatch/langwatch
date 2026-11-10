@@ -1,13 +1,13 @@
 ---
-title: Cap LLM spend per team with virtual keys and budgets
+title: "AI gateway budgets: cap LLM spend per team with LangWatch virtual keys"
 sidebarTitle: Cap spend per team
 keywords: ai gateway, llm gateway, virtual keys, llm budgets, llm cost control, spend limits, budget per team, litellm alternative
 description: The LangWatch AI Gateway gives each app, team or person a virtual key with a USD budget that blocks at the limit.
 ---
 
-To cap LLM spend per team, you put a gateway between your code and the providers and give every app, team or person its own virtual key instead of a provider key. Each key carries a budget in USD, and the gateway blocks requests once the budget is spent.
+To cap LLM spend per team, you put an AI gateway such as the LangWatch AI Gateway between your code and the providers and give every app, team or person its own virtual key instead of a provider key. Each key carries a budget in USD, and the gateway blocks requests once the budget is spent.
 
-The LangWatch AI Gateway does this for OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Google Vertex AI, Gemini and the other [providers](/ai-gateway/providers/overview). Your code keeps the OpenAI or Anthropic SDK and changes two values, the base URL and the API key. To start now, go to [Create a virtual key with a budget](#1-create-a-virtual-key-with-a-budget).
+It does this for OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Google Vertex AI, Gemini and the other [providers](/ai-gateway/providers/overview). Your code keeps the OpenAI or Anthropic SDK and changes two values, the base URL and the API key. To start now, go to [Create a virtual key with a budget](#1-create-a-virtual-key-with-a-budget).
 
 ## Why a virtual key per app
 
@@ -86,12 +86,18 @@ Spend can pass a budget before the gateway stops it, so set the limit below what
 - **Rate limits count per gateway replica.** A key's requests per minute and per day are enforced on each replica, so with three replicas a key can send up to three times its limit. Tokens per minute are not enforced. See [Rate limits](/ai-gateway/rate-limits).
 - **Fallbacks run in order.** A [routing policy](/ai-gateway/governance/routing-policies) tries providers in the order you list them; it does not balance load across them.
 
-## Questions
+## Questions about the LangWatch AI Gateway
 
-**I already run LiteLLM. What changes?** Keys, budgets, team budgets, model lists, end-user ids and fallbacks all have an equivalent, and LiteLLM's `x-litellm-end-user-id` header is accepted as is. [Migrate from LiteLLM](/ai-gateway/cookbooks/migrate-from-litellm) maps each setting and moves an app over with a base URL change.
+### Does the LangWatch AI Gateway work as a LiteLLM alternative?
 
-**Can I run the gateway myself?** Yes, it ships in the LangWatch Helm chart next to the app. See [Helm chart](/ai-gateway/self-hosting/helm).
+Yes, it works as a LiteLLM alternative. Keys, budgets, team budgets, model lists, end-user ids and fallbacks all have an equivalent, and LiteLLM's `x-litellm-end-user-id` header is accepted as is. [Migrate from LiteLLM](/ai-gateway/cookbooks/migrate-from-litellm) maps each setting and moves an app over with a base URL change.
 
-**How is spend calculated?** From the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected, and requests that failed at the provider, are not charged.
+### Can I self-host the LangWatch AI Gateway?
+
+Yes, it ships in the LangWatch Helm chart next to the app. See [Helm chart](/ai-gateway/self-hosting/helm).
+
+### How does the LangWatch AI Gateway calculate spend?
+
+From the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected, and requests that failed at the provider, are not charged.
 
 Next, follow the [Quickstart](/ai-gateway/quickstart) to send a first request and see its trace and its spend, or read [Budgets](/ai-gateway/budgets) for every scope and window.

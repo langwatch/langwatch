@@ -5406,15 +5406,15 @@ Archive the rule from the row menu on the Cache Rules page. The next change-feed
 # FILE: ./ai-gateway/cap-spend-per-team.mdx
 
 ---
-title: Cap LLM spend per team with virtual keys and budgets
+title: "AI gateway budgets: cap LLM spend per team with LangWatch virtual keys"
 sidebarTitle: Cap spend per team
 keywords: ai gateway, llm gateway, virtual keys, llm budgets, llm cost control, spend limits, budget per team, litellm alternative
 description: The LangWatch AI Gateway gives each app, team or person a virtual key with a USD budget that blocks at the limit.
 ---
 
-To cap LLM spend per team, you put a gateway between your code and the providers and give every app, team or person its own virtual key instead of a provider key. Each key carries a budget in USD, and the gateway blocks requests once the budget is spent.
+To cap LLM spend per team, you put an AI gateway such as the LangWatch AI Gateway between your code and the providers and give every app, team or person its own virtual key instead of a provider key. Each key carries a budget in USD, and the gateway blocks requests once the budget is spent.
 
-The LangWatch AI Gateway does this for OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Google Vertex AI, Gemini and the other [providers](/ai-gateway/providers/overview). Your code keeps the OpenAI or Anthropic SDK and changes two values, the base URL and the API key. To start now, go to [Create a virtual key with a budget](#1-create-a-virtual-key-with-a-budget).
+It does this for OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Google Vertex AI, Gemini and the other [providers](/ai-gateway/providers/overview). Your code keeps the OpenAI or Anthropic SDK and changes two values, the base URL and the API key. To start now, go to [Create a virtual key with a budget](#1-create-a-virtual-key-with-a-budget).
 
 ## Why a virtual key per app
 
@@ -5493,13 +5493,19 @@ Spend can pass a budget before the gateway stops it, so set the limit below what
 - **Rate limits count per gateway replica.** A key's requests per minute and per day are enforced on each replica, so with three replicas a key can send up to three times its limit. Tokens per minute are not enforced. See [Rate limits](/ai-gateway/rate-limits).
 - **Fallbacks run in order.** A [routing policy](/ai-gateway/governance/routing-policies) tries providers in the order you list them; it does not balance load across them.
 
-## Questions
+## Questions about the LangWatch AI Gateway
 
-**I already run LiteLLM. What changes?** Keys, budgets, team budgets, model lists, end-user ids and fallbacks all have an equivalent, and LiteLLM's `x-litellm-end-user-id` header is accepted as is. [Migrate from LiteLLM](/ai-gateway/cookbooks/migrate-from-litellm) maps each setting and moves an app over with a base URL change.
+### Does the LangWatch AI Gateway work as a LiteLLM alternative?
 
-**Can I run the gateway myself?** Yes, it ships in the LangWatch Helm chart next to the app. See [Helm chart](/ai-gateway/self-hosting/helm).
+Yes, it works as a LiteLLM alternative. Keys, budgets, team budgets, model lists, end-user ids and fallbacks all have an equivalent, and LiteLLM's `x-litellm-end-user-id` header is accepted as is. [Migrate from LiteLLM](/ai-gateway/cookbooks/migrate-from-litellm) maps each setting and moves an app over with a base URL change.
 
-**How is spend calculated?** From the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected, and requests that failed at the provider, are not charged.
+### Can I self-host the LangWatch AI Gateway?
+
+Yes, it ships in the LangWatch Helm chart next to the app. See [Helm chart](/ai-gateway/self-hosting/helm).
+
+### How does the LangWatch AI Gateway calculate spend?
+
+From the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected, and requests that failed at the provider, are not charged.
 
 Next, follow the [Quickstart](/ai-gateway/quickstart) to send a first request and see its trace and its spend, or read [Budgets](/ai-gateway/budgets) for every scope and window.
 
@@ -17455,9 +17461,9 @@ keywords:
 description: Send every engineer's Claude Code telemetry to LangWatch and see cost per session, engineer, project and pull request, without reading anyone's prompts.
 ---
 
-To track Claude Code across a team, you collect the OpenTelemetry that Claude Code already emits from every engineer's machine into one place that splits it by person, project and pull request.
+To track Claude Code across a team, run `npx langwatch claude` on each engineer's machine. LangWatch then collects the OpenTelemetry that Claude Code already emits into one place that splits it by person, project and pull request.
 
-LangWatch does that with one command per machine, or one managed settings file for the whole fleet, and it works on Claude Max and Pro plans as well as on API keys.
+Instead of the command on every machine, one managed settings file can cover the whole fleet. Both work on Claude Max and Pro plans as well as on API keys.
 
 With the per-machine setup, each engineer's sessions, prompts included, land in a project only they own. You get the cost numbers per person; reading a session itself takes an audited admin path, and the organization can drop the prompts before they are stored. To start now, go to [Connect each engineer](#1-connect-each-engineer).
 
@@ -17533,13 +17539,19 @@ Engineers will ask who can read their sessions, so the answer belongs in the rol
 
 Credentials in prompts or tool output are replaced with `[SECRET]` at ingestion by default. See [Privacy](/coding-agents/privacy).
 
-## Questions
+## Questions about LangWatch for Claude Code
 
-**Does it work on Claude Max and Pro plans?** Yes. The subscription path keeps the engineer's plan and login and sends only telemetry. Cost there is Claude Code's own estimate.
+### Does LangWatch track Claude Code on Max and Pro plans?
 
-**How is this different from the analytics in my Anthropic account?** LangWatch works per session: it replays what the agent did, shows where the context and the cache cost went, and adds up every session behind a pull request, across Claude Code and the other coding agents your team uses.
+Yes. The subscription path keeps the engineer's plan and login and sends only telemetry. Cost there is Claude Code's own estimate.
 
-**Can we self-host it?** Yes, point the OTLP endpoint at your own instance followed by `/api/otel`. See [Self-hosting](/self-hosting/overview).
+### How is LangWatch different from the analytics in my Anthropic account?
+
+LangWatch works per session: it replays what the agent did, shows where the context and the cache cost went, and adds up every session behind a pull request, across Claude Code and the other coding agents your team uses.
+
+### Can we self-host LangWatch for Claude Code telemetry?
+
+Yes, point the OTLP endpoint at your own instance followed by `/api/otel`. See [Self-hosting](/self-hosting/overview).
 
 Next, run `npx langwatch claude` on your own machine and open [Sessions](https://app.langwatch.ai/me/sessions) to see what your engineers will see, then read [Reduce coding agent cost](/coding-agents/reduce-coding-agent-cost) for what to change once the numbers are in.
 
@@ -38380,6 +38392,8 @@ Both use the same simulated user, the same judge and the same results pages. The
   </Card>
 </CardGroup>
 
+New to writing scenarios in code? [Test AI agents with simulated users in pytest or vitest](/agent-testing/simulated-users) builds a first test step by step.
+
 ## What you can test
 
 <CardGroup cols={3}>
@@ -38469,7 +38483,7 @@ Use evaluations for the parts inside the agent. Use agent testing to check the a
 ---
 title: Red team AI agents with an open-source multi-turn attacker
 sidebarTitle: Red team with an open-source attacker
-keywords: langwatch, scenario, red teaming, open source, ai agent security, multi-turn attacks, crescendo, goat, jailbreak, prompt injection, pytest
+keywords: langwatch, scenario, red teaming, garak, pyrit, promptfoo, open source, ai agent security, multi-turn attacks, crescendo, goat, jailbreak, prompt injection, pytest
 description: Scenario, LangWatch's open-source testing library, attacks your agent over dozens of turns inside pytest or vitest and fails the test when it breaks.
 ---
 
@@ -38576,23 +38590,30 @@ The dashboard opens on `localhost` with the latest batch of findings, and it run
 
 With `LANGWATCH_API_KEY` set, every run also shows on the [Results](/agent-testing/results) tab in LangWatch with the full conversation and the judge's reasoning, next to your functional tests.
 
-## How this compares to other open-source tools
+## How Scenario compares to garak, PyRIT and promptfoo
 
-| Tool type | What it does well | What it leaves out |
-| --- | --- | --- |
-| Prompt scanners with jailbreak datasets | Broad coverage of known single-prompt attacks against a model or endpoint | Attacks that build up over a conversation |
-| Red-teaming frameworks for security teams | Orchestrated attacks and scoring outside the codebase | Your agent's real tools, and your test suite |
-| Scenario | Adaptive multi-turn attacks on your agent and its tools, as tests in your repository | A large catalogue of single-prompt jailbreaks |
+| Tool | Multi-turn attacks | What it attacks | Where the attack lives |
+| --- | --- | --- | --- |
+| garak (NVIDIA) | A few; most of its large library is single-prompt probes | A model or an HTTP endpoint | Its own command-line scan |
+| PyRIT (Microsoft) | Yes, with Crescendo, PAIR, TAP and other multi-turn attacks | A model or endpoint target you configure | Python scripts and notebooks |
+| promptfoo | Yes, with Crescendo, GOAT and other strategies | A provider you configure: an endpoint, a model or your own function | Its own YAML config and command line, which can run in CI |
+| Scenario | Yes, with Crescendo and GOAT | Your agent and its real tools, through an adapter | A pytest or vitest test, which can assert on the tool calls your agent made |
 
-The approaches combine well: a scanner for breadth on known prompts, Scenario for depth on your agent's own actions.
+Scenario's catalogue of single-prompt jailbreaks is smaller than garak's or promptfoo's. The tools combine well: a scanner for breadth on known prompts, Scenario for depth on your agent's own actions.
 
-## Questions
+## Questions about red teaming with Scenario
 
-**Can a coding assistant write the attacks for me?** Yes. Install the scenarios skill with `npx skills add langwatch/skills/scenarios`, then ask your assistant to "add red teaming to my agent". It finds your agent in the codebase and writes the test.
+### Can a coding assistant write Scenario red-team attacks for me?
 
-**What does a run cost?** Every turn calls the attacker model and your agent and scores the reply, so the cost grows with `total_turns`. Run the long attacks before a release, and turn off per-turn scoring with `score_responses=False` for faster runs on every pull request.
+Yes. Install the scenarios skill with `npx skills add langwatch/skills/scenarios`, then ask your assistant to "add red teaming to my agent". It finds your agent in the codebase and writes the test.
 
-**Does it work with my framework?** The adapter only needs a function that takes the messages and returns a reply, so it works with LangGraph, CrewAI, Pydantic AI, the OpenAI Agents SDK, Mastra, the Vercel AI SDK or your own code.
+### What does a Scenario red-team run cost?
+
+Every turn calls the attacker model and your agent and scores the reply, so the cost grows with `total_turns`. Run the long attacks before a release, and turn off per-turn scoring with `score_responses=False` for faster runs on every pull request.
+
+### Does Scenario red teaming work with my agent framework?
+
+The adapter only needs a function that takes the messages and returns a reply, so it works with LangGraph, CrewAI, Pydantic AI, the OpenAI Agents SDK, Mastra, the Vercel AI SDK or your own code.
 
 Next, copy the test above, change the target to the action your agent must never take, and run it, or read the [Scenario red-teaming reference](https://langwatch.ai/scenario/advanced/red-teaming) for every option.
 
@@ -40268,15 +40289,15 @@ Also check: [Connect your agent](/agent-testing/connect-your-agent), [Run parame
 # FILE: ./agent-testing/simulated-users.mdx
 
 ---
-title: Test AI agents with simulated users
+title: Test AI agents with simulated users in pytest or vitest
 sidebarTitle: Simulated users
 keywords: langwatch, agent testing, simulated user, user simulator, llm as a judge, multi-turn testing, scenario, pytest, vitest, ci
-description: Scenario runs a simulated user against your agent inside pytest or vitest, and a judge grades each conversation.
+description: Scenario, LangWatch's open-source testing library, runs a simulated user against your agent inside pytest or vitest, and a judge grades each conversation.
 ---
 
-To test an agent with simulated users, you let one model play the user while your agent answers it. A second model, the judge, reads the conversation and passes or fails it against criteria you wrote.
+To test an agent with simulated users, use [Scenario](https://github.com/langwatch/scenario) (`langwatch-scenario` for Python, `@langwatch/scenario` for TypeScript), LangWatch's open-source testing library: one model plays the user while your agent answers it, and a judge model passes or fails the conversation against criteria you wrote.
 
-With [Scenario](https://github.com/langwatch/scenario), LangWatch's open-source testing library, that loop is one `scenario.run` call inside a normal pytest or vitest test, so it runs in CI with the rest of your suite. Your first test is one adapter around your agent and one `scenario.run` call, both below. To start now, go to [Install Scenario](#1-install-scenario).
+This page is the pytest and vitest tutorial. The loop is one `scenario.run` call inside a normal test, so it runs in CI with the rest of your suite. For what agent testing covers and the other ways to run it, see the [agent testing overview](/agent-testing/overview). To start now, go to [Install Scenario](#1-install-scenario).
 
 ## Why use a simulated user
 
@@ -40396,15 +40417,23 @@ When a production conversation goes wrong, copy how that user opened it into a n
 
 Evaluations still fit the steps inside the agent, such as retrieval or one prompt, and both run in the same LangWatch project. See [Agent testing vs evaluations](/agent-testing/overview#agent-testing-vs-evaluations).
 
-## Questions
+## Questions about Scenario
 
-**Which model should play the user and the judge?** Start with a small, cheap model: `scenario.configure(default_model=...)` sets it for both roles. Pass a different model to `UserSimulatorAgent` or `JudgeAgent` when one role needs more.
+### Which model should play the user and the judge in Scenario?
 
-**Does it work with my agent framework?** The adapter only needs a function that takes the messages and returns a reply, so it works with LangGraph, CrewAI, Pydantic AI, the OpenAI Agents SDK, Mastra, the Vercel AI SDK or your own code.
+Start with a small, cheap model: `scenario.configure(default_model=...)` sets it for both roles. Pass a different model to `UserSimulatorAgent` or `JudgeAgent` when one role needs more.
 
-**Can I test without writing code?** Yes. [Test from the platform](/agent-testing/test-from-the-platform) runs the same simulated user and judge against your agent's endpoint, with scenarios written in the LangWatch interface.
+### Does Scenario work with my agent framework?
 
-**Can the simulated user attack the agent?** [Red teaming](/agent-testing/red-teaming) swaps the simulated user for a multi-turn attacker in the same loop.
+The adapter only needs a function that takes the messages and returns a reply, so it works with LangGraph, CrewAI, Pydantic AI, the OpenAI Agents SDK, Mastra, the Vercel AI SDK or your own code.
+
+### Can I test agents in LangWatch without writing code?
+
+Yes. [Test from the platform](/agent-testing/test-from-the-platform) runs the same simulated user and judge against your agent's endpoint, with scenarios written in the LangWatch interface.
+
+### Can Scenario's simulated user attack my agent?
+
+[Red teaming](/agent-testing/red-teaming) swaps the simulated user for a multi-turn attacker in the same loop.
 
 Next, [write scenarios in code](/agent-testing/scenarios-in-code) for the full Python and TypeScript setup, or paste the [scenarios prompt](/skills/directory) into your coding agent and let it add the first tests to your repository.
 
@@ -43466,7 +43495,7 @@ For any questions or issues, feel free to contact our support, join our channel 
 # FILE: ./dspy-visualization/follow-optimization-in-a-ui.mdx
 
 ---
-title: Follow DSPy prompt optimization in a UI
+title: Track DSPy optimization (MIPROv2, GEPA) in a UI with LangWatch
 sidebarTitle: Follow optimization in a UI
 keywords: langwatch, dspy, prompt optimization, ui, miprov2, gepa, copro, bootstrapfewshot, optimizer tracking, experiments, langy
 description: One call to `langwatch.dspy.init` streams every optimizer step to LangWatch, with the score, the instructions, the examples, the LLM calls and the cost.
@@ -43532,15 +43561,23 @@ Each run keeps its own steps, so you can go back to the winning candidate of las
 
 To improve a single prompt without DSPy, ask Langy, the assistant built into LangWatch, in the Experiments Workbench. Pick **Optimize this prompt** on a prompt column: Langy scores the current prompt with your evaluator on your dataset, writes a candidate, runs both and reports the pass rate and the cost before and after. See [Prompt optimization with Langy](/langy/prompt-optimization).
 
-## Questions
+## Questions about tracking DSPy in LangWatch
 
-**Does LangWatch run the optimizer?** No. The optimizer runs in your notebook or job, with your models and your keys. LangWatch receives the steps and shows them.
+### Does LangWatch run the DSPy optimizer?
 
-**Which optimizer should I use?** [Optimization algorithms](/improve-your-agent/algorithms) compares what each one changes, what it needs and how many metric calls it costs.
+No. The optimizer runs in your notebook or job, with your models and your keys. LangWatch receives the steps and shows them.
 
-**Can I optimize a whole agent, not just one prompt?** Yes. [Optimize with DSPy](/improve-your-agent/optimize-with-dspy) uses scenario tests as the metric, so the optimizer rewrites the agent's instructions and tool descriptions and scores each candidate on full conversations.
+### Which DSPy optimizer should I use?
 
-**Does it work self-hosted?** Yes, set `LANGWATCH_ENDPOINT` to the address of your own instance before you call `init`.
+[Optimization algorithms](/improve-your-agent/algorithms) compares what each one changes, what it needs and how many metric calls it costs.
+
+### Can LangWatch optimize a whole agent, not just one prompt?
+
+Yes. [Optimize with DSPy](/improve-your-agent/optimize-with-dspy) uses scenario tests as the metric, so the optimizer rewrites the agent's instructions and tool descriptions and scores each candidate on full conversations.
+
+### Does LangWatch DSPy tracking work self-hosted?
+
+Yes, set `LANGWATCH_ENDPOINT` to the address of your own instance before you call `init`.
 
 Next, add `langwatch.dspy.init` to your next optimizer run and open the link it prints, or start with the small runnable example in the [DSPy visualization quickstart](/dspy-visualization/quickstart).
 
