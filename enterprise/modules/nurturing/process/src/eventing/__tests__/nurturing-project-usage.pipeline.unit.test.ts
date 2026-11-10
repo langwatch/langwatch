@@ -7,7 +7,7 @@ import {
   EVALUATOR_CREATED_EVENT_TYPE,
   EVALUATOR_DELETED_EVENT_TYPE,
 } from "@langwatch/evaluator-contract";
-import type { Event } from "@langwatch/eventing";
+import { createTenantId, type Event } from "@langwatch/eventing";
 import {
   PROMPT_CREATED_EVENT_TYPE,
   PROMPT_DELETED_EVENT_TYPE,
@@ -33,66 +33,78 @@ import {
 
 const OCCURRED_AT = 1_000;
 
-/** An owner event as the peer fold receives it, on tenant `project-1`. */
-function ownerEvent(type: string, data: Record<string, unknown>): NurturingProjectUsagePeerEvent {
+/** The envelope every owner event carries, on tenant `project-1`. */
+function envelope(type: string) {
   return {
     id: `${type}-event`,
     aggregateId: "aggregate-1",
     aggregateType: "owner",
-    tenantId: "project-1",
+    tenantId: createTenantId("project-1"),
     createdAt: OCCURRED_AT,
     occurredAt: OCCURRED_AT,
-    type,
     version: "2026-11-09",
-    data,
-  } as unknown as NurturingProjectUsagePeerEvent;
+  };
 }
 
-const promptCreated = ownerEvent(PROMPT_CREATED_EVENT_TYPE, {
+const promptCreatedData = {
   promptId: "p1",
   projectId: "project-1",
   userId: "user-1",
   orgPromptCount: 1,
   occurredAt: OCCURRED_AT,
-});
-const promptVersionSaved = ownerEvent(PROMPT_VERSION_SAVED_EVENT_TYPE, {
-  promptId: "p1",
-  projectId: "project-1",
-  versionId: "v2",
-  occurredAt: OCCURRED_AT,
-});
-const promptDeleted = ownerEvent(PROMPT_DELETED_EVENT_TYPE, {
-  promptId: "p1",
-  projectId: "project-1",
-  occurredAt: OCCURRED_AT,
-});
-const evaluatorCreated = ownerEvent(EVALUATOR_CREATED_EVENT_TYPE, {
+};
+const promptCreated: NurturingProjectUsagePeerEvent = {
+  ...envelope(PROMPT_CREATED_EVENT_TYPE),
+  type: PROMPT_CREATED_EVENT_TYPE,
+  data: promptCreatedData,
+};
+const promptVersionSaved: NurturingProjectUsagePeerEvent = {
+  ...envelope(PROMPT_VERSION_SAVED_EVENT_TYPE),
+  type: PROMPT_VERSION_SAVED_EVENT_TYPE,
+  data: { promptId: "p1", projectId: "project-1", versionId: "v2", occurredAt: OCCURRED_AT },
+};
+const promptDeleted: NurturingProjectUsagePeerEvent = {
+  ...envelope(PROMPT_DELETED_EVENT_TYPE),
+  type: PROMPT_DELETED_EVENT_TYPE,
+  data: { promptId: "p1", projectId: "project-1", occurredAt: OCCURRED_AT },
+};
+const evaluatorIds = {
   tenantId: "project-1",
   projectId: "project-1",
   evaluatorId: "e1",
   occurredAt: OCCURRED_AT,
-});
-const evaluatorDeleted = ownerEvent(EVALUATOR_DELETED_EVENT_TYPE, {
-  tenantId: "project-1",
-  projectId: "project-1",
-  evaluatorId: "e1",
-  occurredAt: OCCURRED_AT,
-});
-const scenarioCreated = ownerEvent(SCENARIO_CREATED_EVENT_TYPE, {
-  scenarioId: "s1",
-  projectId: "project-1",
-  userId: "user-1",
-  scenarioCount: 3,
-  occurredAt: OCCURRED_AT,
-});
-const simulationSetCreated = ownerEvent(SIMULATION_SET_CREATED_EVENT_TYPE, {
-  scenarioSetId: "set-1",
-  projectId: "project-1",
-  occurredAt: OCCURRED_AT,
-});
-const simulationFinished = ownerEvent(SIMULATION_RUN_EVENT_TYPES.FINISHED, {
-  scenarioRunId: "run-1",
-});
+};
+const evaluatorCreated: NurturingProjectUsagePeerEvent = {
+  ...envelope(EVALUATOR_CREATED_EVENT_TYPE),
+  type: EVALUATOR_CREATED_EVENT_TYPE,
+  data: evaluatorIds,
+};
+const evaluatorDeleted: NurturingProjectUsagePeerEvent = {
+  ...envelope(EVALUATOR_DELETED_EVENT_TYPE),
+  type: EVALUATOR_DELETED_EVENT_TYPE,
+  data: evaluatorIds,
+};
+const scenarioCreated: NurturingProjectUsagePeerEvent = {
+  ...envelope(SCENARIO_CREATED_EVENT_TYPE),
+  type: SCENARIO_CREATED_EVENT_TYPE,
+  data: {
+    scenarioId: "s1",
+    projectId: "project-1",
+    userId: "user-1",
+    scenarioCount: 3,
+    occurredAt: OCCURRED_AT,
+  },
+};
+const simulationSetCreated: NurturingProjectUsagePeerEvent = {
+  ...envelope(SIMULATION_SET_CREATED_EVENT_TYPE),
+  type: SIMULATION_SET_CREATED_EVENT_TYPE,
+  data: { scenarioSetId: "set-1", projectId: "project-1", occurredAt: OCCURRED_AT },
+};
+const simulationFinished: NurturingProjectUsagePeerEvent = {
+  ...envelope(SIMULATION_RUN_EVENT_TYPES.FINISHED),
+  type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+  data: { scenarioRunId: "run-1" },
+};
 
 describe("projectUsageFactOf()", () => {
   /** @scenario "Every owner event becomes the fact its fold counts" */
@@ -113,13 +125,11 @@ describe("projectUsageFactOf()", () => {
 describe("projectIdOf()", () => {
   /** @scenario "A fact without a project id is counted on its tenant" */
   it("takes the data's project id, else the event's tenant", () => {
-    const elsewhere = ownerEvent(PROMPT_CREATED_EVENT_TYPE, {
-      promptId: "p1",
-      projectId: "project-2",
-      userId: "user-1",
-      orgPromptCount: 1,
-      occurredAt: OCCURRED_AT,
-    });
+    const elsewhere: NurturingProjectUsagePeerEvent = {
+      ...envelope(PROMPT_CREATED_EVENT_TYPE),
+      type: PROMPT_CREATED_EVENT_TYPE,
+      data: { ...promptCreatedData, projectId: "project-2" },
+    };
 
     expect(projectIdOf(elsewhere)).toBe("project-2");
     expect(projectIdOf(simulationFinished)).toBe("project-1");
@@ -127,8 +137,12 @@ describe("projectIdOf()", () => {
 });
 
 /** A peer fact as a subscriber's dedup reads it. */
-const peerFact = (data: Record<string, unknown>, occurredAt = OCCURRED_AT) =>
-  ({ ...ownerEvent("peer", data), occurredAt }) as unknown as Event;
+const peerFact = (data: Record<string, unknown>, occurredAt = OCCURRED_AT): Event => ({
+  ...envelope("peer"),
+  type: "peer",
+  data,
+  occurredAt,
+});
 
 describe("traceSyncKeyOf()", () => {
   /** @scenario "Traces sync an organization at most once per 15 minutes" */

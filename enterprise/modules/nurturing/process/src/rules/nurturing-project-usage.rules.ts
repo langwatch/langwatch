@@ -90,7 +90,7 @@ const HABIT_MIN_ACTIVE = 3;
 /** ... the days' first and last this many days apart at least. */
 const HABIT_MIN_SPAN_DAYS = 7;
 
-const epochOfDay = (day: string) => Date.parse(`${day}T00:00:00Z`);
+const epochOfDay = (day: string) => Temporal.Instant.from(`${day}T00:00:00Z`).epochMilliseconds;
 
 /** The ISO week a UTC day falls in, `YYYY-Www`. */
 function isoWeekOf(day: string): string {

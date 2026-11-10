@@ -55,7 +55,9 @@ export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
       if (!input.projectIds.includes(bucket.tenantId) || bucket.bucketStartMs < input.sinceMs) {
         continue;
       }
-      const day = new Date(bucket.bucketStartMs).toISOString().slice(0, 10);
+      const day = Temporal.Instant.fromEpochMilliseconds(bucket.bucketStartMs)
+        .toString()
+        .slice(0, 10);
       const known = days.get(day);
       const failedAt = bucket.errorCount > 0 ? bucket.bucketStartMs : null;
       days.set(day, {

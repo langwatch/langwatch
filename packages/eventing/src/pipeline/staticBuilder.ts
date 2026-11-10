@@ -250,11 +250,9 @@ export class PipelineBuilder<
   }
 
   /**
-   * This module's fold over a peer pipeline's events (§9), on the global registry: lane
-   * `<this pipeline>.<fold name>`, ordered per source aggregate, deduped by event id, re-folded
-   * and replayed from the owner's event log. Spec: packages/eventing/specs/peer-projection.feature.
-   * Its optional subscribers get the committed state, as `withProjectionSubscriber` does on a local
-   * fold; each runs on lane `<fold lane>.<subscriber name>`.
+   * This module's fold over peer events (§9), lane `<this pipeline>.<fold name>`: ordered per
+   * source aggregate, deduped by event id, replayed from the owner's log; each subscriber gets
+   * committed state on `<fold lane>.<name>`. Spec: packages/eventing/specs/peer-projection.feature.
    */
   withPeerFoldProjection<State, const Events extends readonly PeerEventSchema[]>(
     declaration: PeerFoldProjectionDeclaration<State, Events>,
