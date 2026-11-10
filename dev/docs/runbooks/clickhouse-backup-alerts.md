@@ -133,13 +133,14 @@ metrics (`clickhouse_backup_*`, scraped from `/metrics` on port 8125; enable
 `backup.sidecar.podMonitor`). In `cronjob-observe` both sets render. The design
 is [ADR-199](../adr/199-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md).
 
-| Alert                             | Severity | Means                                                                  |
-| --------------------------------- | -------- | ---------------------------------------------------------------------- |
-| `ClickHouseBackupStale`           | critical | No completed backup of a mode inside its window, or none ever          |
-| `ClickHouseBackupFailing`         | warning  | The runner's last attempt of a mode failed                             |
-| `ClickHouseBackupNoRunner`        | critical | No sidecar reports itself as runner, or no sidecar is scraped at all   |
-| `ClickHouseBackupMultipleRunners` | warning  | Two sidecars both elected themselves; the in-flight check still guards |
-| `ClickHouseBackupConfigError`     | critical | A sidecar's backup env is invalid, so it schedules nothing             |
+| Alert                             | Severity | Means                                                                                       |
+| --------------------------------- | -------- | ------------------------------------------------------------------------------------------- |
+| `ClickHouseBackupStale`           | critical | No completed backup of a mode inside its window, or none ever                               |
+| `ClickHouseBackupFailing`         | warning  | The runner's last attempt of a mode failed                                                  |
+| `ClickHouseBackupNoRunner`        | critical | No sidecar reports itself as runner, or no sidecar is scraped at all                        |
+| `ClickHouseBackupMultipleRunners` | warning  | Two sidecars both elected themselves; the in-flight check still guards                      |
+| `ClickHouseBackupConfigError`     | critical | A sidecar's backup env is invalid, so it schedules nothing                                  |
+| `ClickHouseBackupOverrunning`     | warning  | A backup of a mode has run longer than `backup.staleHours`; no new one starts until it ends |
 
 To see what a sidecar thinks, read its status and logs:
 
