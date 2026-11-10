@@ -7,14 +7,21 @@
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
+import { PICKER_QUESTIONS, pickerWidgets } from "../catalogue/index.ts";
 import { curatedBoardById } from "../model/curated-boards.ts";
 import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
-import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
+import {
+  HOME_BOARD,
+  NO_PROCEDURES,
+  RecordingUiAnalytics,
+  renderDashboards,
+  withAnalytics,
+} from "./render-dashboards.test-helpers.tsx";
 
 // jsdom loads no stylesheet, so the theme colours a chart frame is handed have no value to read.
 vi.mock(import("@langwatch/design-system/color-mode"), async (importOriginal) => ({
@@ -26,31 +33,70 @@ const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
 const MEMBER = [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"];
 const WRITES = /^dashboards\.(?!getAll|listStarred|sourcePresence)|^dashboardWidgets\.(?!list)/;
 
-/** No stored boards; every call is kept, so a write would show. */
-function readOnlyServer() {
+const tracked = new RecordingUiAnalytics();
+
+/** A saved board in the project in view, as the list returns it. */
+const storedBoard = ({ name, index }: { name: string; index: number }) => ({
+  ...HOME_BOARD,
+  id: `stored-${index}`,
+  name,
+  order: index,
+  description: null,
+  createdById: "user-1",
+  isStarred: false,
+  createdAt: new Date("2026-01-01"),
+  updatedAt: new Date("2026-01-01"),
+  _count: { graphs: 0 },
+});
+
+/** The stored boards, none unless named; every call is kept, so a write would show. */
+function readOnlyServer(storedNames: readonly string[] = []) {
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
-    if (call.path === "boards.getAll" || call.path === "boards.listStarred") {
-      return Promise.resolve([]);
+    if (call.path === "boards.getAll") {
+      return Promise.resolve(storedNames.map((name, index) => storedBoard({ name, index })));
     }
-    return NO_PROCEDURES(call);
+    if (call.path === "boards.listStarred") return Promise.resolve([]);
+    switch (call.path) {
+      case "boards.create":
+        return Promise.resolve({ id: "board-1", ...(call.input as object) });
+      case "boards.update":
+      case "dashboardWidgets.batchUpdateLayouts":
+        return Promise.resolve({ success: true });
+      case "dashboardWidgets.create":
+        return Promise.resolve({ id: "widget-1" });
+      default:
+        return NO_PROCEDURES(call);
+    }
   };
   return { calls, answer };
 }
 
-function openCurated(templateId: string, flags: Record<string, boolean> = LANGY_ON) {
-  const server = readOnlyServer();
+function openCurated(
+  templateId: string,
+  flags: Record<string, boolean> = LANGY_ON,
+  permissions: readonly string[] = MEMBER,
+  storedNames: readonly string[] = [],
+) {
+  const server = readOnlyServer(storedNames);
   const host = new StubAnalyticsHost({
     flags,
-    permissions: MEMBER,
+    permissions,
     route: { params: { templateId }, query: {} },
   });
-  renderDashboards({ element: <CuratedBoardScreen />, host, answer: server.answer });
+  renderDashboards({
+    element: withAnalytics(<CuratedBoardScreen />, tracked),
+    host,
+    answer: server.answer,
+  });
   return { host, server };
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  tracked.events.length = 0;
+});
 
 describe("given a member opens a From LangWatch board", () => {
   /** @scenario "From LangWatch: a template board is live and read-only" */
@@ -123,11 +169,96 @@ describe("given a member opens a From LangWatch board", () => {
     });
   });
 
-  describe("when the member clicks its ask bar", () => {
-    /** @scenario "From LangWatch: a template board asks Langy with the board as context" */
+  describe("when a member who may create dashboards clicks its ask bar", () => {
+    /** @scenario "From LangWatch: the ask bar opens \"Add a widget\" for a member who may create dashboards" */
+    it("opens Add a widget, with nothing stored and Langy asked nothing", async () => {
+      const user = userEvent.setup();
+      const { host, server } = openCurated("breaks");
+
+      await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
+
+      expect(await screen.findByRole("heading", { name: "Add a widget" })).toBeInTheDocument();
+      expect(host.langyAsks).toEqual([]);
+      expect(server.calls.filter(({ path }) => WRITES.test(path))).toEqual([]);
+    });
+
+    /** @scenario "From LangWatch: the picker has no \"I'll build it myself\"" */
+    it("offers no I'll build it myself", async () => {
+      const user = userEvent.setup();
+      openCurated("breaks");
+
+      await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
+
+      await screen.findByRole("heading", { name: "Add a widget" });
+      expect(screen.queryByRole("button", { name: "I'll build it myself" })).toBeNull();
+      // Langy stays one click away from the picker.
+      expect(screen.getByRole("button", { name: "Ask Langy" })).toBeInTheDocument();
+    });
+
+    /** @scenario "From LangWatch: picking a widget makes a new dashboard with only that widget" */
+    it("makes a dashboard of only the picked widget and opens it", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const traffic = PICKER_QUESTIONS.find(({ id }) => id === "traffic")!;
+      const widgetName = pickerWidgets(traffic.id)[0]!.name;
+      const { host, server } = openCurated("breaks");
+      await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
+
+      await user.click(
+        await screen.findByRole("button", {
+          name: (accessible) => accessible.startsWith(traffic.question),
+        }),
+      );
+
+      await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-1"]));
+      const inputsTo = (path: string) =>
+        server.calls.filter((call) => call.path === path).map(({ input }) => input);
+      expect(inputsTo("boards.create")).toEqual([{ projectId: "proj-1", name: widgetName }]);
+      expect(inputsTo("dashboardWidgets.create")).toHaveLength(1);
+      expect(inputsTo("dashboardWidgets.create")[0]).toMatchObject({
+        dashboardId: "board-1",
+        name: widgetName,
+      });
+      // The curated board is not the new board's context, so no draft is seeded; let a stray one land.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(host.langyAsks).toEqual([]);
+      const created = tracked.events.filter(
+        ({ name, action }) => name === "dashboard" && action === "created",
+      );
+      expect(created.map(({ attributes }) => attributes)).toEqual([
+        { createdFrom: "widget_curated", templateId: "breaks" },
+      ]);
+    });
+
+    /** @scenario "From LangWatch: picking a widget makes a new dashboard with only that widget" */
+    it("numbers the new dashboard from 2 when a dashboard already has the widget's name", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const traffic = PICKER_QUESTIONS.find(({ id }) => id === "traffic")!;
+      const widgetName = pickerWidgets(traffic.id)[0]!.name;
+      const { host, server } = openCurated("breaks", LANGY_ON, MEMBER, [widgetName]);
+      await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
+
+      await user.click(
+        await screen.findByRole("button", {
+          name: (accessible) => accessible.startsWith(traffic.question),
+        }),
+      );
+
+      await waitFor(() => expect(host.navigations).toHaveLength(1));
+      expect(
+        server.calls.filter(({ path }) => path === "boards.create").map(({ input }) => input),
+      ).toEqual([{ projectId: "proj-1", name: `${widgetName} 2` }]);
+    });
+  });
+
+  describe("when a member who may not create dashboards clicks its ask bar", () => {
+    /** @scenario "From LangWatch: the ask bar asks Langy for a member who may not create dashboards" */
     it("opens Langy about the template board with nothing asked yet", async () => {
       const user = userEvent.setup();
-      const { host } = openCurated("breaks");
+      const { host } = openCurated(
+        "breaks",
+        LANGY_ON,
+        MEMBER.filter((permission) => permission !== "analytics:create"),
+      );
 
       await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
 

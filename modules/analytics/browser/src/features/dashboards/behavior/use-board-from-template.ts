@@ -10,6 +10,7 @@ import { useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
+import { pickerWidgets } from "../catalogue/index.ts";
 import { boardCopyWidgets, boardWidgetsOf } from "../model/board-widgets.ts";
 import {
   boardCopyName,
@@ -19,6 +20,7 @@ import {
 } from "../model/boards.ts";
 import type { CuratedBoard } from "../model/curated-boards.ts";
 import { dashboardCreated } from "../model/dashboard-usage-events.ts";
+import type { WidgetQuestion } from "../model/widget-questions.ts";
 import { catalogueSource } from "../model/widget-source.ts";
 import type { BoardTemplate, BoardTemplateWidget } from "../templates/index.ts";
 import type { SavedBoard } from "./use-saved-dashboards.ts";
@@ -206,5 +208,32 @@ export function useBoardFromTemplate() {
       made: dashboardCreated({ createdFrom: "duplicate_curated", templateId: board.templateId }),
     });
 
-  return { creatingId, createFromTemplate, duplicateBoard, duplicateCurated };
+  /** A From LangWatch board's picked widget as a board of its own, named after the widget. */
+  const createWithWidget = async ({
+    question,
+    templateId,
+    existingNames,
+  }: {
+    question: WidgetQuestion;
+    /** The From LangWatch board the widget was picked on. */
+    templateId: string;
+    existingNames: readonly string[];
+  }) => {
+    const widgets = pickerWidgets(question.id);
+    const created = await createFrom({
+      source: {
+        id: question.id,
+        name: widgets[0]?.name ?? question.question,
+        description: null,
+        widgets: () => Promise.resolve(widgets),
+        widgetSource: fromCatalogue,
+      },
+      existingNames,
+      fallbackTitle: "Couldn't create the dashboard from the widget",
+      made: dashboardCreated({ createdFrom: "widget_curated", templateId }),
+    });
+    return created !== void 0;
+  };
+
+  return { creatingId, createFromTemplate, duplicateBoard, duplicateCurated, createWithWidget };
 }
