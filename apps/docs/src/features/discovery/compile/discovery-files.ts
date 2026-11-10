@@ -286,14 +286,16 @@ const DOCS_MCP_TOOLS = [
   },
 ];
 
-/** The server card at /.well-known/mcp/server-card.json, where the previous docs host had one. */
+/** The server card at /.well-known/mcp/server-card.json, where the previous docs host had one,
+    in the same flat shape it served, so readers of that card keep working. */
 function docsMcpServerCard() {
   const name = "LangWatch Docs MCP";
   return {
     name,
     description: "Read the LangWatch and Scenario documentation as Markdown",
     version: "1.0.0",
-    serverInfo: { name, version: "1.0.0" },
+    /* What the server's own initialize answers (mcp/typescript create-mcp-server.ts). */
+    serverInfo: { name: "LangWatch" },
     url: docsUrl({ path: "/mcp" }),
     transport: "http",
     capabilities: { tools: true },
