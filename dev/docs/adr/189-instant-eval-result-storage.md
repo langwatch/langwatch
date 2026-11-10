@@ -207,6 +207,11 @@ Drew accepted both on 2026-10-29 (Convoz ask 12563, then Laze).
 1. **Monitors into the one table?** No: monitors stay separate, for good, and nothing moves out of `evaluation_runs`. But a monitor's Instant Evals judgments also land in `eval_results` (section 5). This replaces the first answer, "later".
 2. **Does changed judged text count as "something changed"?** Yes. The text is read anyway to judge, and a trace can gain spans after its first judgment. Without it, a recall can return a verdict on text that is no longer there.
 
+Two more were asked as pictures in the Laze deck. On 2026-11-10, @lw-instant-evals took their recommended answers under the rule that a reversible step goes ahead (Convoz 526 #24370). Either can be changed by saying so.
+
+3. **Do runs keep their own table?** Yes, for now. A run keeps writing `instant_eval_judgments` for its run page, chip and view, and also writes `eval_results` for recall (sections 2 and 3). Moving the run page onto `eval_results` is a later change.
+4. **Are threads stored?** No. Traces and spans are stored and recalled; a thread-keyed `eval()` is judged each time, as today (section 2).
+
 ## Risks
 
 - **Concurrent misses.** Two viewers who open a new widget at the same moment can both miss and both judge. Both rows are kept and readers take the latest. A single-flight lock per key is a later fix if the cost shows.
