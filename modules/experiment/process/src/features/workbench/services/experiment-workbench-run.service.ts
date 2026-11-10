@@ -122,16 +122,8 @@ export class ExperimentWorkbenchRunService {
       };
     };
 
-    // A run that cannot even be built gives its claim back; once built, `startRun` and
-    // `streamRun` release it themselves if the start command is never sent.
-    const built = async (options: { persistResults: boolean; runUrl?: string }) => {
-      try {
-        return savedRun(options);
-      } catch (error) {
-        await runs.concurrency.release({ projectId, runId });
-        throw error;
-      }
-    };
+    const built = (options: { persistResults: boolean; runUrl?: string }) =>
+      this.#builtOrReleased({ build: () => savedRun(options), projectId, runId });
 
     // A stream never wrote the board; a polled run of the saved dataset fills the cells it shows.
     if (input.acceptsEvents) {
@@ -152,6 +144,26 @@ export class ExperimentWorkbenchRunService {
       ...(run.start.plan ? { concurrency: run.start.plan.concurrency } : {}),
       runUrl,
     };
+  }
+
+  /**
+   * A run that cannot even be built gives its claim back; once built, `startRun` and `streamRun`
+   * release it themselves if the start command is never sent.
+   */
+  async #builtOrReleased(input: {
+    build: () => PipelineRunStart;
+    projectId: string;
+    runId: string;
+  }): Promise<PipelineRunStart> {
+    try {
+      return input.build();
+    } catch (error) {
+      await this.#startable().concurrency.release({
+        projectId: input.projectId,
+        runId: input.runId,
+      });
+      throw error;
+    }
   }
 
   /** `POST /execute`: the browser's run, planned here and executed by the worker's run pipeline. */
@@ -184,36 +196,34 @@ export class ExperimentWorkbenchRunService {
 
     const experimentId = input.experimentId ?? "";
     const runId = generateHumanReadableId();
-    const concurrency = await runs.concurrency.resolve({
+    const { concurrency: requested } = input;
+    const concurrency = await runs.concurrency.resolve({ projectId, runId, requested });
+    const run = await this.#builtOrReleased({
       projectId,
       runId,
-      requested: input.concurrency,
-    });
-    try {
-      const plan = ExperimentRunPlanService.create().buildPlan({
-        request: {
-          state,
-          scope: input.scope,
-          ...(input.seedTargetOutputs ? { seedTargetOutputs: input.seedTargetOutputs } : {}),
-        },
-        data: dataResult,
-        concurrency,
-        origin: "workbench",
-        // The page saves these cells too; the server writes them so the board outlives the tab.
-        persistResults:
-          experimentId !== "" &&
-          runsSavedDataset({
-            ...(input.data !== undefined ? { data: input.data } : {}),
-            ...(input.dataset_id !== undefined ? { dataset_id: input.dataset_id } : {}),
-            ...(input.parameters !== undefined ? { parameters: input.parameters } : {}),
-          }),
-        actor: { userId: by.id, label: "user" },
-        ...(input.experimentSlug !== undefined ? { experimentSlug: input.experimentSlug } : {}),
-      });
+      build: () => {
+        const plan = ExperimentRunPlanService.create().buildPlan({
+          request: {
+            state,
+            scope: input.scope,
+            ...(input.seedTargetOutputs ? { seedTargetOutputs: input.seedTargetOutputs } : {}),
+          },
+          data: dataResult,
+          concurrency,
+          origin: "workbench",
+          // The page saves these cells too; the server writes them so the board outlives the tab.
+          persistResults:
+            experimentId !== "" &&
+            runsSavedDataset({
+              ...(input.data !== undefined ? { data: input.data } : {}),
+              ...(input.dataset_id !== undefined ? { dataset_id: input.dataset_id } : {}),
+              ...(input.parameters !== undefined ? { parameters: input.parameters } : {}),
+            }),
+          actor: { userId: by.id, label: "user" },
+          ...(input.experimentSlug !== undefined ? { experimentSlug: input.experimentSlug } : {}),
+        });
 
-      return {
-        kind: "streaming",
-        events: this.#runsOn().streamRun({
+        return {
           start: this.#runsOn().startOf({
             projectId,
             runId,
@@ -233,12 +243,10 @@ export class ExperimentWorkbenchRunService {
             experimentId: input.experimentId,
             isFullRun: input.scope.type === "full",
           },
-        }),
-      };
-    } catch (error) {
-      await runs.concurrency.release({ projectId, runId });
-      throw error;
-    }
+        };
+      },
+    });
+    return { kind: "streaming", events: this.#runsOn().streamRun(run) };
   }
 
   /** `GET /runs`: one page of an experiment's runs, newest first. */
