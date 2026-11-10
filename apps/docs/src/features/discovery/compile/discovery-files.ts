@@ -242,7 +242,7 @@ const DOCS_SKILL_DESCRIPTION =
 
 /** The docs-wide skill at /skill.md, an address agents learned from the previous docs host:
     what LangWatch is, where the Markdown lives and which installable skills the docs publish. */
-export function docsSkill({ skills }: { skills: AgentSkill[] }) {
+function docsSkill({ skills }: { skills: AgentSkill[] }) {
   const listed = skills.map(
     (skill) => `- [${skill.name}](${skillUrl({ name: skill.name })}): ${skill.description}`,
   );
