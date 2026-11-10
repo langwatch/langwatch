@@ -16,11 +16,21 @@ func renderTiers(input *config.Input, c *config.Computed, usersD string) error {
 	roles := map[string]any{}
 	profiles := map[string]any{}
 	memoryCap := map[string]any{"max": c.MaxMemoryUsagePerQuery}
+	// The access file's policy may add to or replace the protected settings; a
+	// change takes a restart, as the tiers render only at startup.
+	protected := access.AuditedSettings
+	if input.AccessFile != "" {
+		f, err := access.Load(input.AccessFile)
+		if err != nil {
+			return err
+		}
+		protected = f.Policy.Rules().Protected
+	}
 	for _, tier := range access.Tiers {
 		roles[tier.Name()] = map[string]any{"grants": map[string]any{"query": tier.RoleGrants()}}
 		profile := map[string]any{}
 		constraints := map[string]any{}
-		for _, name := range access.AuditedSettings {
+		for _, name := range protected {
 			constraints[name] = map[string]any{"const": ""}
 		}
 		switch {

@@ -109,7 +109,7 @@ func TestRenderAll_TierExecutionTimeFollowsEnv(t *testing.T) {
 func writeAccessFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	secrets := filepath.Join(root, "metabase")
+	secrets := filepath.Join(root, "dashboards")
 	if err := os.MkdirAll(secrets, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func writeAccessFixture(t *testing.T) string {
 	}
 	path := filepath.Join(root, "access.yaml")
 	body := "issuers: [{name: staff, url: 'https://idp.example'}]\nusers:\n" +
-		"  - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: " + secrets + "}}}\n" +
+		"  - {name: dashboards, tier: read, databases: [analytics], login: {rolling: {dir: " + secrets + "}}}\n" +
 		"  - {name: alice, tier: inspect, login: {token: {issuer: staff}}}\n"
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
@@ -136,7 +136,7 @@ func TestRenderAll_AccessFileOnThenOff(t *testing.T) {
 
 	assertExists(t, filepath.Join(dir, "users.d", "access-tiers.yaml"), true)
 	users := section(t, readYAML(t, dir, "users.d/access-users.yaml"), "users")
-	for _, name := range []string{"metabase", "alice"} {
+	for _, name := range []string{"dashboards", "alice"} {
 		section(t, users, name)
 	}
 	server := section(t, section(t, readYAML(t, dir, "config.d/access-auth.yaml"), "http_authentication_servers"), "access")
@@ -153,12 +153,37 @@ func TestRenderAll_InvalidAccessFileFails(t *testing.T) {
 	input := testInput()
 	input.AccessFile = writeAccessFixture(t)
 	input.AccessListen = "127.0.0.1:8124"
-	if err := os.RemoveAll(filepath.Join(filepath.Dir(input.AccessFile), "metabase")); err != nil {
+	if err := os.RemoveAll(filepath.Join(filepath.Dir(input.AccessFile), "dashboards")); err != nil {
 		t.Fatal(err)
 	}
 	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
 	err := render.RenderAll(testLogger(), input, computed, t.TempDir())
-	if err == nil || !strings.Contains(err.Error(), `user "metabase"`) {
+	if err == nil || !strings.Contains(err.Error(), `user "dashboards"`) {
 		t.Errorf("RenderAll = %v, want it to refuse the missing password directory", err)
+	}
+}
+
+// @scenario "An install adds to or replaces the default policy in its access file"
+func TestRenderAll_TierConstraintsFollowThePolicy(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.AccessFile = writeAccessFixture(t)
+	input.AccessListen = "127.0.0.1:8124"
+	raw, err := os.ReadFile(input.AccessFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy := "policy: {protected_settings: {replace: [log_queries], add: [max_threads]}}\n"
+	if err := os.WriteFile(input.AccessFile, append([]byte(policy), raw...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	renderInto(t, input, dir)
+	profile := section(t, section(t, readYAML(t, dir, "users.d/access-tiers.yaml"), "profiles"), "tier_read")
+	constraints := section(t, profile, "constraints")
+	for _, name := range []string{"log_queries", "max_threads"} {
+		section(t, constraints, name)
+	}
+	if _, kept := constraints["log_query_settings"]; kept {
+		t.Error("a replaced protected setting is still pinned on the tier")
 	}
 }

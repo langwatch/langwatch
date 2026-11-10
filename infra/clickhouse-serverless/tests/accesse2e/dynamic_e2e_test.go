@@ -104,7 +104,7 @@ users:
 `, h.staff.server.URL, h.other.server.URL)
 
 	t.Run("the server refuses to start with a long-lived password", func(t *testing.T) {
-		rolling := h.access + "  - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: /access/secrets}}}\n"
+		rolling := h.access + "  - {name: dashboards, tier: read, databases: [analytics], login: {rolling: {dir: /access/secrets}}}\n"
 		out := h.runOnce(t, image, rolling)
 		if !strings.Contains(out, "refused in dynamic-only mode") {
 			t.Errorf("a rolling user started:\n%s", out)
@@ -222,7 +222,7 @@ users:
 		otherKid, otherKey := h.other.current()
 		forged, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		for name, token := range map[string]string{
-			"wrong audience": h.token(h.staff, "reader@example.com", exp, map[string]any{"aud": "grafana"}),
+			"wrong audience": h.token(h.staff, "reader@example.com", exp, map[string]any{"aud": "reporting"}),
 			"wrong issuer":   h.token(h.staff, "reader@example.com", exp, map[string]any{"iss": h.other.server.URL}),
 			"another issuer's key": h.sign(otherKid, otherKey, map[string]any{
 				"iss": h.other.server.URL, "aud": "clickhouse", "email": "reader@example.com", "exp": exp.Unix(),

@@ -65698,9 +65698,9 @@ for users you write yourself, set `CLICKHOUSE_ACCESS_TIERS=true`.
 | `tier_admin`   | Everything, including DDL and user management                                            | None                                      |
 
 `READ_TIER_MAX_EXECUTION_TIME` sets the execution-time cap of the inspect and
-read tiers, in seconds (default `300`). A read user cannot raise it. Only admin
+read tiers, in seconds (default `300`). A read user cannot raise it. By default only admin
 users can read `system.query_log` and the other system tables that hold query
-text.
+text; a user's own `grants` can add a named one.
 
 ## The access file
 
@@ -65716,22 +65716,22 @@ issuers:
     username_claim: email             # default: sub
     required_claims: { email_verified: true }
 users:
-  - name: metabase
+  - name: dashboards
     tier: read
     databases: [langwatch]
     login:
-      rolling: { dir: /etc/clickhouse-access/secrets/metabase-passwords }
+      rolling: { dir: /etc/clickhouse-access/secrets/dashboards-passwords }
   - name: alice
     tier: read
     databases: [langwatch]
     networks: [10.0.0.0/8]            # default: any address
     login:
       token: { issuer: staff, subject: alice@example.com }
-  - name: ops
+  - name: monitor
     tier: read
     databases: [langwatch]
     login:
-      rolling: { dir: /etc/clickhouse-access/secrets/ops-passwords }
+      rolling: { dir: /etc/clickhouse-access/secrets/monitor-passwords }
     settings: { max_execution_time: 30 }
     quota: { duration_seconds: 3600, limits: { queries: 600 } }
     grants: ["SELECT ON system.query_log"]
@@ -65765,6 +65765,30 @@ apply. ClickHouse counts only queries that read data against a quota's
 
 Do not also define an access user in your own `users.d` files.
 
+### Policy
+
+The image checks each user's `settings`, `quota` and `grants` against default
+rules. A `policy` block adds to them or replaces them for your install. Each
+list takes `add`, `replace`, or both. A replaced list starts empty, then takes
+the added names.
+
+| Policy key             | Default                                                        | Checks                                          |
+| ---------------------- | -------------------------------------------------------------- | ----------------------------------------------- |
+| `grant_privileges`     | `SELECT`, `SHOW TABLES`, `SHOW COLUMNS`, `SHOW DICTIONARIES`, `dictGet` | The privileges a user's `grants` may name |
+| `quota_limits`         | Every ClickHouse quota limit except per-hash ones              | The limits a user's `quota` may set             |
+| `protected_settings`   | The settings that decide what reaches `system.query_log`       | Settings no user may change, pinned on each tier |
+| `restricted_databases` | `system`, `information_schema`                                 | Databases no tier may list and no grant may wildcard |
+
+```yaml access.yaml
+policy:
+  grant_privileges: { add: ["SYSTEM FLUSH LOGS"] }
+  restricted_databases: { add: [billing] }
+```
+
+The defaults are the image's guarantees. A policy that loosens them moves those
+guarantees to you. A change to `protected_settings` takes effect at the next
+restart; the rest apply at the next sync.
+
 ## Rolling passwords
 
 A `rolling` login points at a directory. Every regular, non-hidden file in it is
@@ -65779,7 +65803,7 @@ To rotate a password without downtime:
     Both passwords now work.
 
     ```bash
-    kubectl -n langwatch patch secret metabase-passwords --type merge \
+    kubectl -n langwatch patch secret dashboards-passwords --type merge \
       -p "{\"stringData\":{\"2026-11\":\"$(openssl rand -hex 24)\"}}"
     ```
   </Step>
@@ -65792,7 +65816,7 @@ To rotate a password without downtime:
     `2026-11-30T00:00:00Z`.
 
     ```bash
-    kubectl -n langwatch patch secret metabase-passwords --type json \
+    kubectl -n langwatch patch secret dashboards-passwords --type json \
       -p '[{"op":"remove","path":"/data/2026-10"}]'
     ```
   </Step>
@@ -65848,7 +65872,7 @@ On EKS, the cluster's OIDC issuer is public, so the issuer is only its URL:
 ```yaml
 issuers:
   - name: cluster
-    url: https://oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE
+    url: https://oidc.example.com/cluster
 users:
   - name: report-job
     tier: read
@@ -65956,13 +65980,13 @@ clickhouse:
     config:
       issuers:
         - name: cluster
-          url: https://oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE
+          url: https://oidc.example.com/cluster
       users:
-        - name: grafana
+        - name: reporting
           tier: read
           databases: [langwatch]
           login:
-            token: { issuer: cluster, subject: "system:serviceaccount:monitoring:grafana" }
+            token: { issuer: cluster, subject: "system:serviceaccount:monitoring:reporting" }
 ```
 
 In this mode the server:
@@ -66012,15 +66036,15 @@ Under the `langwatch` chart, set `clickhouse.access`. (On the standalone
 clickhouse:
   access:
     enabled: true
-    passwordSecrets: [metabase-passwords]   # each mounted at /etc/clickhouse-access/secrets/<name>
+    passwordSecrets: [dashboards-passwords]   # each mounted at /etc/clickhouse-access/secrets/<name>
     config:
       issuers: []
       users:
-        - name: metabase
+        - name: dashboards
           tier: read
           databases: [langwatch]
           login:
-            rolling: { dir: /etc/clickhouse-access/secrets/metabase-passwords }
+            rolling: { dir: /etc/clickhouse-access/secrets/dashboards-passwords }
 ```
 
 Create the password Secrets yourself. The chart creates no passwords. The chart
@@ -66033,7 +66057,7 @@ access file out of your values, put it in a ConfigMap under the key
 Mount a directory holding the access file and the password directories, and set
 `CLICKHOUSE_ACCESS_FILE`. Mounted at `/etc/clickhouse-access`, the paths in the
 example above work unchanged: put the passwords in
-`access/secrets/metabase-passwords/`.
+`access/secrets/dashboards-passwords/`.
 
 ```bash
 docker run -d \

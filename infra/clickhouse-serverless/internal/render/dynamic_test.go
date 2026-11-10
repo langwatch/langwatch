@@ -162,12 +162,12 @@ func TestRenderAll_DynamicOnlyRefusesOperatorPasswords(t *testing.T) {
 		{"a rendered LangWatchQL user", "users.d/lwql-access.yaml",
 			"users:\n  langwatch_lwql: {password_sha256_hex: abc, profile: default}\n",
 			"lwql-access.yaml: user langwatch_lwql logs in with password_sha256_hex"},
-		{"a password for default", "users.d/ops.xml",
+		{"a password for default", "users.d/monitor.xml",
 			"<clickhouse><users><default><password>pw</password></default></users></clickhouse>",
-			"ops.xml: user default logs in with password"},
+			"monitor.xml: user default logs in with password"},
 		{"a passwordless user in users.xml", "users.xml",
-			"<clickhouse><users><default><password/></default><ops><no_password/></ops></users></clickhouse>",
-			"users.xml: user ops logs in with no_password"},
+			"<clickhouse><users><default><password/></default><monitor><no_password/></monitor></users></clickhouse>",
+			"users.xml: user monitor logs in with no_password"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -189,7 +189,7 @@ func TestRenderAll_DynamicOnlyRefusesOperatorPasswords(t *testing.T) {
 		dir := t.TempDir()
 		_ = os.MkdirAll(filepath.Join(dir, "users.d"), 0o755)
 		_ = os.WriteFile(filepath.Join(dir, "users.d", "corp.yaml"),
-			[]byte("users:\n  analyst: {ldap: {server: corp}}\n  grafana: {profile: tier_read}\n"), 0o600)
+			[]byte("users:\n  analyst: {ldap: {server: corp}}\n  reporting: {profile: tier_read}\n"), 0o600)
 		renderInto(t, dynamicOnlyInput(t), dir)
 	})
 

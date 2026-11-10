@@ -25,10 +25,10 @@ users:
   - name: deployer
     tier: admin
     login: {token: {issuer: ci}}
-  - name: metabase
+  - name: dashboards
     tier: write
     databases: [analytics, staging]
-    login: {rolling: {dir: /mnt/secrets/metabase}}
+    login: {rolling: {dir: /mnt/secrets/dashboards}}
   - name: auditor
     tier: inspect
     login: {rolling: {dir: /mnt/secrets/auditor}}
@@ -105,7 +105,7 @@ func TestParse_DynamicOnly(t *testing.T) {
   - {name: ci, url: 'https://token.actions.githubusercontent.com', allow_admin: true}
 users:
   - {name: app, tier: write, databases: [langwatch], login: {token: {issuer: cluster, subject: 'system:serviceaccount:langwatch:app'}}}
-  - {name: grafana, tier: read, databases: [langwatch], login: {token: {issuer: cluster}}}
+  - {name: reporting, tier: read, databases: [langwatch], login: {token: {issuer: cluster}}}
   - {name: deployer, tier: admin, login: {token: {issuer: ci}}}
 `
 	t.Run("token users only is valid", func(t *testing.T) {
@@ -127,10 +127,10 @@ users:
 
 	// Each violation is reported on its own, naming the user.
 	for _, tc := range []struct{ name, user, want string }{
-		{"a rolling user", "{name: metabase, tier: read, databases: [d], login: {rolling: {dir: /secrets/metabase}}}",
-			`users[3] "metabase": login.rolling is a long-lived password, refused in dynamic-only mode`},
-		{"a rolling admin", "{name: ops, tier: admin, login: {rolling: {dir: /secrets/ops}}}",
-			`users[3] "ops": login.rolling is a long-lived password`},
+		{"a rolling user", "{name: dashboards, tier: read, databases: [d], login: {rolling: {dir: /secrets/dashboards}}}",
+			`users[3] "dashboards": login.rolling is a long-lived password, refused in dynamic-only mode`},
+		{"a rolling admin", "{name: monitor, tier: admin, login: {rolling: {dir: /secrets/monitor}}}",
+			`users[3] "monitor": login.rolling is a long-lived password`},
 		{"the local admin's name", "{name: local_admin, tier: admin, login: {token: {issuer: ci}}}",
 			`users[3] "local_admin": name is reserved`},
 		{"default", "{name: default, tier: admin, login: {token: {issuer: ci}}}",
@@ -147,7 +147,7 @@ users:
 	}
 
 	t.Run("the same rolling user is fine in standard mode", func(t *testing.T) {
-		if _, err := Parse([]byte(tokens + "  - {name: metabase, tier: read, databases: [d], login: {rolling: {dir: /secrets/metabase}}}\n")); err != nil {
+		if _, err := Parse([]byte(tokens + "  - {name: dashboards, tier: read, databases: [d], login: {rolling: {dir: /secrets/dashboards}}}\n")); err != nil {
 			t.Errorf("Parse: %v", err)
 		}
 	})

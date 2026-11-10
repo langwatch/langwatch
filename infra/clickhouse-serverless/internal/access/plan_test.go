@@ -67,21 +67,21 @@ func TestPlan_TierGrantsOnListedDatabases(t *testing.T) {
 	f := mustParse(t, `
 issuers: [{name: staff, url: 'https://idp.example'}]
 users:
-  - {name: grafana, tier: read, databases: [analytics], networks: [10.0.0.0/8], login: {token: {issuer: staff}}}
+  - {name: reporting, tier: read, databases: [analytics], networks: [10.0.0.0/8], login: {token: {issuer: staff}}}
   - {name: loader, tier: write, databases: [analytics, staging], login: {token: {issuer: staff}}}
   - {name: auditor, tier: inspect, login: {token: {issuer: staff}}}
 `)
 	p := Plan(f, Inputs{}, now)
 
-	grafana := plannedUser(t, p, "grafana")
+	reporting := plannedUser(t, p, "reporting")
 	wantRead := []string{"GRANT tier_read", "GRANT SELECT ON `analytics`.*"}
-	if got := grafana["grants"].(map[string]any)["query"]; !reflect.DeepEqual(got, wantRead) {
+	if got := reporting["grants"].(map[string]any)["query"]; !reflect.DeepEqual(got, wantRead) {
 		t.Errorf("read grants = %v, want %v", got, wantRead)
 	}
-	if grafana["profile"] != "tier_read" {
-		t.Errorf("read profile = %v", grafana["profile"])
+	if reporting["profile"] != "tier_read" {
+		t.Errorf("read profile = %v", reporting["profile"])
 	}
-	if got := grafana["networks"].(map[string]any)["ip"]; !reflect.DeepEqual(got, []string{"10.0.0.0/8"}) {
+	if got := reporting["networks"].(map[string]any)["ip"]; !reflect.DeepEqual(got, []string{"10.0.0.0/8"}) {
 		t.Errorf("networks = %v", got)
 	}
 
@@ -110,20 +110,20 @@ users:
 }
 
 func rollingFile(dir string) *File {
-	return &File{Users: []User{{Name: "metabase", Tier: TierRead, Databases: []string{"analytics"}, Networks: []string{"::/0"},
+	return &File{Users: []User{{Name: "dashboards", Tier: TierRead, Databases: []string{"analytics"}, Networks: []string{"::/0"},
 		Login: Login{Rolling: &RollingLogin{Dir: dir}}}}}
 }
 
 // @scenario "Two passwords in a rolling directory are valid at once"
 func TestPlan_TwoRollingPasswords(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "metabase")
+	dir := filepath.Join(t.TempDir(), "dashboards")
 	writeFiles(t, dir, map[string]string{"2026-10": "october-password-0123\n", "2026-11": "november-password-0123"})
 	f := rollingFile(dir)
 	in, err := Gather(f)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := methods(t, plannedUser(t, Plan(f, in, now), "metabase"))
+	got := methods(t, plannedUser(t, Plan(f, in, now), "dashboards"))
 	want := []string{sha("october-password-0123"), sha("november-password-0123")}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("methods = %v, want %v", got, want)
@@ -132,7 +132,7 @@ func TestPlan_TwoRollingPasswords(t *testing.T) {
 
 // @scenario "A password past its valid_until stops working at the next sync"
 func TestPlan_ExpiredPasswordIsRemoved(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "metabase")
+	dir := filepath.Join(t.TempDir(), "dashboards")
 	writeFiles(t, dir, map[string]string{
 		"old": "old-password-0123456", "old.valid_until": now.Add(time.Minute).Format(time.RFC3339),
 		"new": "new-password-0123456",
@@ -144,7 +144,7 @@ func TestPlan_ExpiredPasswordIsRemoved(t *testing.T) {
 	}
 
 	before := Plan(f, in, now)
-	if got := methods(t, plannedUser(t, before, "metabase")); len(got) != 2 {
+	if got := methods(t, plannedUser(t, before, "dashboards")); len(got) != 2 {
 		t.Fatalf("before expiry: %d methods, want 2", len(got))
 	}
 	if before.NextChange == nil || !before.NextChange.Equal(now.Add(time.Minute)) {
@@ -158,7 +158,7 @@ func TestPlan_ExpiredPasswordIsRemoved(t *testing.T) {
 	}
 
 	after := Plan(f, in, now.Add(time.Minute))
-	if got := methods(t, plannedUser(t, after, "metabase")); !reflect.DeepEqual(got, []string{sha("new-password-0123456")}) {
+	if got := methods(t, plannedUser(t, after, "dashboards")); !reflect.DeepEqual(got, []string{sha("new-password-0123456")}) {
 		t.Errorf("after expiry methods = %v, want only the new password", got)
 	}
 	if after.NextChange != nil {
@@ -168,7 +168,7 @@ func TestPlan_ExpiredPasswordIsRemoved(t *testing.T) {
 
 // @scenario "A rolling user whose passwords have all expired cannot log in"
 func TestPlan_AllPasswordsExpired(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "metabase")
+	dir := filepath.Join(t.TempDir(), "dashboards")
 	writeFiles(t, dir, map[string]string{"old": "old-password-0123456", "old.valid_until": now.Add(-time.Second).Format(time.RFC3339)})
 	f := rollingFile(dir)
 	in, err := Gather(f)
@@ -176,10 +176,10 @@ func TestPlan_AllPasswordsExpired(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := Plan(f, in, now)
-	if _, ok := p.Users["metabase"]; ok {
+	if _, ok := p.Users["dashboards"]; ok {
 		t.Error("a user with no valid password must be left out")
 	}
-	if len(p.Warnings) != 1 || !strings.Contains(p.Warnings[0], `"metabase" has no valid password`) {
+	if len(p.Warnings) != 1 || !strings.Contains(p.Warnings[0], `"dashboards" has no valid password`) {
 		t.Errorf("warnings = %v", p.Warnings)
 	}
 }
@@ -187,7 +187,7 @@ func TestPlan_AllPasswordsExpired(t *testing.T) {
 func TestPlan_IsDeterministic(t *testing.T) {
 	f := mustParse(t, validFile)
 	in := Inputs{Passwords: map[string][]Password{
-		"metabase": {{File: "a", SHA256Hex: sha("a")}, {File: "b", SHA256Hex: sha("b")}},
+		"dashboards": {{File: "a", SHA256Hex: sha("a")}, {File: "b", SHA256Hex: sha("b")}},
 		"auditor":  {{File: "a", SHA256Hex: sha("a")}, {File: "copy", SHA256Hex: sha("a")}},
 	}}
 	first, err := Plan(f, in, now).UsersYAML()
@@ -239,7 +239,7 @@ func TestReadPasswordDir(t *testing.T) {
 	}
 
 	t.Run("given a missing directory", func(t *testing.T) {
-		if _, err := Gather(rollingFile(filepath.Join(t.TempDir(), "absent"))); err == nil || !strings.Contains(err.Error(), `user "metabase"`) {
+		if _, err := Gather(rollingFile(filepath.Join(t.TempDir(), "absent"))); err == nil || !strings.Contains(err.Error(), `user "dashboards"`) {
 			t.Errorf("Gather = %v, want an error naming the user", err)
 		}
 	})

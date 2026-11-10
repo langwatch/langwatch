@@ -160,18 +160,21 @@ users:
     networks: [10.0.0.0/8] # default: anywhere
     login:
       token: { issuer: staff, subject: alice@example.com } # subject defaults to the user name
-  - name: metabase
+  - name: dashboards
     tier: read
     databases: [analytics]
     login:
-      rolling: { dir: /run/access/metabase }
+      rolling: { dir: /run/access/dashboards }
 ```
 
 Issuer keys: `name`, `url`, `audience`, `username_claim`, `required_claims`,
 `jwks_url` (skip discovery), `ca_file` (a private CA), `allow_admin` (token users
 of this issuer may hold `tier_admin`). User keys: `name`, `tier`, `databases`
 (read and write only), `networks`, `login` with exactly one of `rolling` or
-`token`.
+`token`, and optionally `settings`, `quota` (`duration_seconds`, `limits`) and
+`grants` (extra read grants). A top-level `policy` block adds to or replaces the
+rules those are checked against (`grant_privileges`, `quota_limits`,
+`protected_settings`, `restricted_databases`), each with `add` or `replace`.
 
 **Rolling passwords.** Every regular, non-hidden file in a `rolling` directory is
 a valid password of at least 16 characters, at most 8 per directory. A file

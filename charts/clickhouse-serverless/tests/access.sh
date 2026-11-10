@@ -37,13 +37,13 @@ test_access_enabled_wires_sidecar() {
   ! grep -q '/mnt/secrets' <<<"$sidecar" || fail "sidecar must not see the default password"
   for where in "$sidecar" "$(sed -n '/^        - name: clickhouse$/,/^        - name: access$/p' <<<"$out")"; do
     grep -q 'mountPath: /etc/clickhouse-access/config' <<<"$where" || fail "access file not mounted in both containers"
-    grep -q 'mountPath: /etc/clickhouse-access/secrets/metabase-passwords' <<<"$where" || fail "password Secret not mounted in both containers"
+    grep -q 'mountPath: /etc/clickhouse-access/secrets/dashboards-passwords' <<<"$where" || fail "password Secret not mounted in both containers"
   done
   grep -A1 'name: CLICKHOUSE_ACCESS_SIDECAR' <<<"$out" | grep -q 'value: external' \
     || fail "ClickHouse must not also run an embedded sidecar"
-  grep -q 'secretName: metabase-passwords' <<<"$out" || fail "password Secret volume missing"
+  grep -q 'secretName: dashboards-passwords' <<<"$out" || fail "password Secret volume missing"
   helm template t . -f tests/values-access.yaml --show-only templates/access-configmap.yaml \
-    | grep -q 'subject: system:serviceaccount:monitoring:grafana' || fail "access.yaml not rendered into the ConfigMap"
+    | grep -q 'subject: system:serviceaccount:monitoring:reporting' || fail "access.yaml not rendered into the ConfigMap"
   helm template t . -f tests/values-access.yaml --show-only templates/access-configmap.yaml \
     | grep -q 'ca.crt: "-----BEGIN CERTIFICATE-----' || fail "extraFiles not rendered into the ConfigMap"
   echo "PASS: access enabled wires the sidecar"

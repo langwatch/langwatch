@@ -290,17 +290,17 @@ tiers alone, for users you write yourself. Design and limits: [ADR-198](../../de
 ```yaml
 access:
   enabled: true
-  passwordSecrets: [metabase-passwords]
+  passwordSecrets: [dashboards-passwords]
   config:
     issuers:
       - name: cluster
-        url: https://oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE
+        url: https://oidc.example.com/cluster
     users:
-      - name: metabase
+      - name: dashboards
         tier: read
         databases: [langwatch]
         login:
-          rolling: { dir: /etc/clickhouse-access/secrets/metabase-passwords }
+          rolling: { dir: /etc/clickhouse-access/secrets/dashboards-passwords }
       - name: report-job
         tier: read
         databases: [langwatch]
@@ -308,7 +308,7 @@ access:
           token: { issuer: cluster, subject: "system:serviceaccount:reports:report-job" }
 ```
 
-Every key of `metabase-passwords` is a valid password (16 characters or more),
+Every key of `dashboards-passwords` is a valid password (16 characters or more),
 so a rotation is: add a key with the new password, move the client to it, delete
 the old key. A key `<name>.valid_until` holding an RFC 3339 instant ends `<name>`
 at that instant instead. Each change applies within about 10 seconds without a

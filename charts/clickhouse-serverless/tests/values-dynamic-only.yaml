@@ -17,10 +17,10 @@ access:
           token:
             issuer: cluster
             subject: system:serviceaccount:langwatch:langwatch-app
-      - name: grafana
+      - name: reporting
         tier: read
         databases: [langwatch]
         login:
           token:
             issuer: cluster
-            subject: system:serviceaccount:monitoring:grafana
+            subject: system:serviceaccount:monitoring:reporting

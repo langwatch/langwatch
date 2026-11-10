@@ -27,7 +27,7 @@ import (
 
 const container = "ch-e2e-access"
 
-const opsPassword = "ops-password-0123456789"
+const monitorPassword = "monitor-password-0123456789"
 
 type harness struct {
 	t        *testing.T
@@ -52,10 +52,10 @@ func TestAccessAgainstRealClickHouse(t *testing.T) {
 
 	t.Run("both rolling passwords log in over HTTP and native", func(t *testing.T) {
 		for _, pw := range []string{"first-password-0123456789", "second-password-0123456789"} {
-			if out, err := h.query("metabase", pw, "SELECT count() FROM analytics.events"); err != nil || out != "2" {
+			if out, err := h.query("dashboards", pw, "SELECT count() FROM analytics.events"); err != nil || out != "2" {
 				t.Errorf("HTTP with %s...: %q, %v", pw[:6], out, err)
 			}
-			if out, err := h.native("metabase", pw, "SELECT count() FROM analytics.events"); err != nil || out != "2" {
+			if out, err := h.native("dashboards", pw, "SELECT count() FROM analytics.events"); err != nil || out != "2" {
 				t.Errorf("native with %s...: %q, %v", pw[:6], out, err)
 			}
 		}
@@ -63,19 +63,19 @@ func TestAccessAgainstRealClickHouse(t *testing.T) {
 
 	t.Run("the read tier cannot write or read query text", func(t *testing.T) {
 		pw := "second-password-0123456789"
-		if _, err := h.query("metabase", pw, "INSERT INTO analytics.events VALUES (3)"); err == nil {
+		if _, err := h.query("dashboards", pw, "INSERT INTO analytics.events VALUES (3)"); err == nil {
 			t.Error("a read user inserted a row")
 		}
-		_, err := h.query("metabase", pw, "SELECT count() FROM system.query_log")
+		_, err := h.query("dashboards", pw, "SELECT count() FROM system.query_log")
 		if err == nil || !strings.Contains(err.Error(), "ACCESS_DENIED") {
 			t.Errorf("a read user reached system.query_log: %v", err)
 		}
-		if _, err := h.query("metabase", pw, "SELECT max_execution_time FROM system.settings SETTINGS max_execution_time = 100000"); err == nil {
+		if _, err := h.query("dashboards", pw, "SELECT max_execution_time FROM system.settings SETTINGS max_execution_time = 100000"); err == nil {
 			t.Error("a read user raised max_execution_time past its cap")
 		}
 		for _, hide := range []string{"log_queries = 0", "log_queries_min_type = 'EXCEPTION_WHILE_PROCESSING'",
 			"log_queries_min_query_duration_ms = 100000", "log_queries_probability = 0"} {
-			if _, err := h.query("metabase", pw, "SELECT 1 SETTINGS "+hide); err == nil {
+			if _, err := h.query("dashboards", pw, "SELECT 1 SETTINGS "+hide); err == nil {
 				t.Errorf("a read user kept its query out of the query log with %s", hide)
 			}
 		}
@@ -86,10 +86,10 @@ func TestAccessAgainstRealClickHouse(t *testing.T) {
 			t.Fatal(err)
 		}
 		h.eventually(func() bool {
-			_, err := h.query("metabase", "first-password-0123456789", "SELECT 1")
+			_, err := h.query("dashboards", "first-password-0123456789", "SELECT 1")
 			return err != nil
 		}, "the removed password still logs in")
-		if _, err := h.query("metabase", "second-password-0123456789", "SELECT 1"); err != nil {
+		if _, err := h.query("dashboards", "second-password-0123456789", "SELECT 1"); err != nil {
 			t.Errorf("the remaining password stopped working: %v", err)
 		}
 	})
@@ -99,38 +99,38 @@ func TestAccessAgainstRealClickHouse(t *testing.T) {
 		h.writeSecret("third", "third-password-0123456789")
 		h.writeSecret("third.valid_until", until)
 		h.eventually(func() bool {
-			_, err := h.query("metabase", "third-password-0123456789", "SELECT 1")
+			_, err := h.query("dashboards", "third-password-0123456789", "SELECT 1")
 			return err == nil
 		}, "the added password never logged in")
 		h.eventually(func() bool {
-			_, err := h.query("metabase", "third-password-0123456789", "SELECT 1")
+			_, err := h.query("dashboards", "third-password-0123456789", "SELECT 1")
 			return err != nil
 		}, "the expired password still logs in")
 	})
 
 	// @scenario "A user narrows its tier with its own settings and quota, and adds named read grants"
 	t.Run("a user's own settings, quota and grants hold on the server", func(t *testing.T) {
-		if out, err := h.query("ops", opsPassword, "SELECT getSetting('max_execution_time')"); err != nil || out != "10" {
-			t.Errorf("ops max_execution_time: %q, %v; want its own 10", out, err)
+		if out, err := h.query("monitor", monitorPassword, "SELECT getSetting('max_execution_time')"); err != nil || out != "10" {
+			t.Errorf("monitor max_execution_time: %q, %v; want its own 10", out, err)
 		}
-		if _, err := h.query("ops", opsPassword, "SELECT count() FROM system.query_log"); err != nil {
-			t.Errorf("ops was refused the system table it was granted: %v", err)
+		if _, err := h.query("monitor", monitorPassword, "SELECT count() FROM system.query_log"); err != nil {
+			t.Errorf("monitor was refused the system table it was granted: %v", err)
 		}
-		if _, err := h.query("ops", opsPassword, "SELECT count() FROM system.processes"); err == nil {
-			t.Error("ops read a system table it was not granted")
+		if _, err := h.query("monitor", monitorPassword, "SELECT count() FROM system.processes"); err == nil {
+			t.Error("monitor read a system table it was not granted")
 		}
-		if _, err := h.query("ops", opsPassword, "SELECT 1 SETTINGS log_queries = 0"); err == nil {
-			t.Error("ops changed an audited setting through its own profile")
+		if _, err := h.query("monitor", monitorPassword, "SELECT 1 SETTINGS log_queries = 0"); err == nil {
+			t.Error("monitor changed an audited setting through its own profile")
 		}
 		// ClickHouse counts only queries that read something, so not SELECT 1.
 		var quotaErr error
 		for range 8 {
-			if _, quotaErr = h.query("ops", opsPassword, "SELECT count() FROM system.query_log"); quotaErr != nil {
+			if _, quotaErr = h.query("monitor", monitorPassword, "SELECT count() FROM system.query_log"); quotaErr != nil {
 				break
 			}
 		}
 		if quotaErr == nil || !strings.Contains(quotaErr.Error(), "QUOTA_EXCEEDED") {
-			t.Errorf("ops ran past its quota of 6 queries an hour: %v", quotaErr)
+			t.Errorf("monitor ran past its quota of 6 queries an hour: %v", quotaErr)
 		}
 	})
 
@@ -156,7 +156,7 @@ func TestAccessAgainstRealClickHouse(t *testing.T) {
 
 func start(t *testing.T, image string) *harness {
 	root := t.TempDir()
-	h := &harness{t: t, secrets: filepath.Join(root, "secrets", "metabase"), password: randomHex(t)}
+	h := &harness{t: t, secrets: filepath.Join(root, "secrets", "dashboards"), password: randomHex(t)}
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -169,22 +169,22 @@ func start(t *testing.T, image string) *harness {
 	}
 	h.writeSecret("first", "first-password-0123456789")
 	h.writeSecret("second", "second-password-0123456789")
-	opsDir := filepath.Join(root, "secrets", "ops")
-	if err := os.MkdirAll(opsDir, 0o755); err != nil {
+	monitorDir := filepath.Join(root, "secrets", "monitor")
+	if err := os.MkdirAll(monitorDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(opsDir, "current"), []byte(opsPassword+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(monitorDir, "current"), []byte(monitorPassword+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	access := fmt.Sprintf(`issuers:
   - {name: staff, url: '%s', username_claim: email, required_claims: {email_verified: true}}
 users:
-  - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: /access/secrets/metabase}}}
+  - {name: dashboards, tier: read, databases: [analytics], login: {rolling: {dir: /access/secrets/dashboards}}}
   - {name: alice, tier: read, databases: [analytics], login: {token: {issuer: staff, subject: alice@example.com}}}
-  - name: ops
+  - name: monitor
     tier: read
     databases: [analytics]
-    login: {rolling: {dir: /access/secrets/ops}}
+    login: {rolling: {dir: /access/secrets/monitor}}
     settings: {max_execution_time: 10}
     quota: {duration_seconds: 3600, limits: {queries: 6}}
     grants: ["SELECT ON system.query_log"]

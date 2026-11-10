@@ -66,7 +66,6 @@ func Plan(f *File, in Inputs, now time.Time) Planned {
 			"networks": map[string]any{"ip": u.Networks},
 			"profile":  u.Tier.Name(),
 		}
-		planExtras(&p, u, user)
 		switch {
 		case u.Login.Token != nil:
 			user["http_authentication"] = map[string]any{"server": AuthServerName, "scheme": "basic"}
@@ -93,6 +92,7 @@ func Plan(f *File, in Inputs, now time.Time) Planned {
 			}
 			user["auth_methods"] = methods
 		}
+		planExtras(&p, u, user)
 		p.Users[u.Name] = user
 	}
 	return p

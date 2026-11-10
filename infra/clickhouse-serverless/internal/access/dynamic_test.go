@@ -28,7 +28,7 @@ func TestStaticCredentials(t *testing.T) {
 <clickhouse>
   <profiles><default/></profiles>
   <users>
-    <grafana><password_sha256_hex>abc</password_sha256_hex><profile>default</profile></grafana>
+    <reporting><password_sha256_hex>abc</password_sha256_hex><profile>default</profile></reporting>
     <legacy><password>plain</password></legacy>
     <open><no_password/></open>
     <multi><auth_methods><a><ldap><server>corp</server></ldap></a><b><password_double_sha1_hex>x</password_double_sha1_hex></b></auth_methods></multi>
@@ -63,14 +63,14 @@ profiles:
 		allow               []string
 		want                []string
 	}{
-		{"XML", "ops.xml", xmlFile, nil, []string{
-			"user grafana logs in with password_sha256_hex",
+		{"XML", "monitor.xml", xmlFile, nil, []string{
+			"user reporting logs in with password_sha256_hex",
 			"user legacy logs in with password",
 			"user open logs in with no_password",
 			"user multi logs in with auth_methods.b.password_double_sha1_hex",
 			"user robot logs in with ssh_keys",
 		}},
-		{"XML, allowing one user", "ops.xml", xmlFile, []string{"grafana", "legacy", "open", "robot"}, []string{
+		{"XML, allowing one user", "monitor.xml", xmlFile, []string{"reporting", "legacy", "open", "robot"}, []string{
 			"user multi logs in with auth_methods.b.password_double_sha1_hex",
 		}},
 		{"YAML", "lwql-access.yaml", yamlFile, nil, []string{

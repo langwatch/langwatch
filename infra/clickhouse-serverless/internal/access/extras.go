@@ -8,18 +8,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// AuditedSettings decide whether a query reaches system.query_log. No tier and
-// no per-user settings may change them: a session that did could hide its queries.
-var AuditedSettings = []string{
-	"log_queries",
-	"log_queries_min_type",
-	"log_queries_min_query_duration_ms",
-	"log_queries_probability",
-	"log_queries_cut_to_length",
-	"log_query_settings",
-	"log_profile_events",
-}
-
 // Profile renders its parent first. ClickHouse applies a profile's elements in
 // order, so a parent listed after a setting would override that setting.
 type Profile struct {
@@ -64,14 +52,6 @@ type Quota struct {
 
 var (
 	settingNameRE = regexp.MustCompile(`^[a-z][a-z0-9_]{0,99}$`)
-	// A privilege a reading tool needs, ON one database's table or tables. Column
-	// lists are plain names; anything else (ALL, ACCESS MANAGEMENT, *.*) is refused.
-	grantRE     = regexp.MustCompile(`^(SELECT(\([A-Za-z_][A-Za-z0-9_]*(, ?[A-Za-z_][A-Za-z0-9_]*)*\))?|SHOW TABLES|SHOW COLUMNS|SHOW DICTIONARIES|dictGet) ON ([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*|\*)$`)
-	quotaLimits = map[string]bool{
-		"queries": true, "query_selects": true, "query_inserts": true, "errors": true,
-		"result_rows": true, "result_bytes": true, "read_rows": true, "read_bytes": true,
-		"written_bytes": true, "execution_time": true, "failed_sequential_authentications": true,
-	}
 	// Keys that would replace the inheritance or the constraints the tier sets.
 	reservedSettings = map[string]bool{"profile": true, "constraints": true}
 )
@@ -81,31 +61,31 @@ func ProfileName(user string) string { return "access_" + user }
 func QuotaName(user string) string   { return "access_" + user }
 
 // checkExtras validates a user's settings, quota and extra grants.
-func checkExtras(u User, add func(where, format string, args ...any), where string) {
+func checkExtras(u User, r Rules, add func(where, format string, args ...any), where string) {
 	for name, value := range u.Settings {
-		checkSetting(u, name, value, add, where)
+		checkSetting(u, r, name, value, add, where)
 	}
 	if q := u.Quota; q != nil {
 		if q.DurationSeconds <= 0 {
 			add(where, "quota.duration_seconds must be positive")
 		}
 		for name, limit := range q.Limits {
-			if !quotaLimits[name] || limit < 0 {
+			if !r.quota[name] || limit < 0 {
 				add(where, "quota limit %q is not a known non-negative limit", name)
 			}
 		}
 	}
 	for _, g := range u.Grants {
-		checkGrant(g, add, where)
+		checkGrant(g, r, add, where)
 	}
 }
 
-func checkSetting(u User, name string, value any, add func(where, format string, args ...any), where string) {
+func checkSetting(u User, r Rules, name string, value any, add func(where, format string, args ...any), where string) {
 	switch {
 	case !settingNameRE.MatchString(name) || reservedSettings[name]:
 		add(where, "setting %q cannot be set here", name)
-	case isAudited(name):
-		add(where, "setting %q decides what reaches system.query_log and cannot be changed", name)
+	case r.protected[name]:
+		add(where, "setting %q is protected by the policy and cannot be changed", name)
 	case name == "readonly" && u.Tier.ReadOnly() && fmt.Sprint(value) == "0":
 		add(where, "a %s user cannot set readonly to 0", u.Tier)
 	}
@@ -116,25 +96,16 @@ func checkSetting(u User, name string, value any, add func(where, format string,
 	}
 }
 
-func checkGrant(g string, add func(where, format string, args ...any), where string) {
-	m := grantRE.FindStringSubmatch(g)
+func checkGrant(g string, r Rules, add func(where, format string, args ...any), where string) {
+	m := r.grantRE.FindStringSubmatch(g)
 	if m == nil {
-		add(where, "grant %q must be SELECT, SHOW TABLES, SHOW COLUMNS, SHOW DICTIONARIES or dictGet ON <database>.<table>", g)
+		add(where, "grant %q must be %s, ON <database>.<table>", g, r.describePrivileges())
 		return
 	}
 	// A wildcard over system would open query text and other users' metadata.
-	if forbiddenDatabases[m[4]] && m[5] == "*" {
+	if r.restricted[m[4]] && m[5] == "*" {
 		add(where, "grant %q must name each %s table", g, m[4])
 	}
-}
-
-func isAudited(name string) bool {
-	for _, a := range AuditedSettings {
-		if a == name {
-			return true
-		}
-	}
-	return false
 }
 
 // planExtras adds the user's own profile and quota to p, and its grants to user.

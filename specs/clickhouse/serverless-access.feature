@@ -71,6 +71,14 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
     Then it fails with an error naming the offending entry
 
   @unit
+  Scenario: An install adds to or replaces the default policy in its access file
+    Given an access file whose policy adds a grant privilege and a restricted database, and replaces the quota limits and protected settings
+    When ch-config loads it and renders the tiers
+    Then users are checked against the resulting rules, not the defaults
+    And each tier pins the replaced protected settings instead of the default ones
+    And a policy naming an invalid entry, or replacing the privileges with none, stops the server from starting
+
+  @unit
   Scenario: Two passwords in a rolling directory are valid at once
     Given a rolling user whose directory holds two password files
     When the access users are planned

@@ -29,7 +29,7 @@ func newSyncFixture(t *testing.T) *syncFixture {
 	fx := &syncFixture{
 		t:          t,
 		accessFile: filepath.Join(root, "access.yaml"),
-		secrets:    filepath.Join(root, "secrets", "metabase"),
+		secrets:    filepath.Join(root, "secrets", "dashboards"),
 		usersFile:  filepath.Join(root, "users.d", UsersFileName),
 		logs:       logs,
 	}
@@ -41,7 +41,7 @@ func newSyncFixture(t *testing.T) *syncFixture {
 		Now:        func() time.Time { return now },
 		OnLoad:     func(*File) { fx.loads++ },
 	}
-	fx.writeAccess("users:\n  - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n")
+	fx.writeAccess("users:\n  - {name: dashboards, tier: read, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n")
 	writeFiles(t, fx.secrets, map[string]string{"current": "current-password-0123"})
 	return fx
 }
@@ -81,7 +81,7 @@ func TestSyncer_KeepsTheLastGoodFile(t *testing.T) {
 	})
 
 	t.Run("when the access file becomes invalid", func(t *testing.T) {
-		fx.writeAccess("users:\n  - {name: metabase, tier: owner}\n")
+		fx.writeAccess("users:\n  - {name: dashboards, tier: owner}\n")
 		loads := fx.loads
 		fx.syncer.Sync()
 		if fx.rendered() != good {
@@ -96,7 +96,7 @@ func TestSyncer_KeepsTheLastGoodFile(t *testing.T) {
 	})
 
 	t.Run("when the inputs are readable again", func(t *testing.T) {
-		fx.writeAccess("users:\n  - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n")
+		fx.writeAccess("users:\n  - {name: dashboards, tier: read, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n")
 		writeFiles(t, fx.secrets, map[string]string{"next": "next-password-0123456"})
 		fx.syncer.Sync()
 		if got := fx.rendered(); !strings.Contains(got, sha("next-password-0123456")) || strings.Contains(got, sha("current-password-0123")) {
@@ -112,7 +112,7 @@ func TestSyncer_ExpiresPasswordsPastABadDirectory(t *testing.T) {
 	writeFiles(t, other, map[string]string{"current": "app-password-0123456"})
 	writeFiles(t, fx.secrets, map[string]string{"current.valid_until": now.Add(time.Minute).Format(time.RFC3339)})
 	fx.writeAccess("users:\n" +
-		"  - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n" +
+		"  - {name: dashboards, tier: read, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n" +
 		"  - {name: app, tier: read, databases: [analytics], login: {rolling: {dir: " + other + "}}}\n")
 	fx.syncer.Sync()
 	if got := fx.rendered(); !strings.Contains(got, sha("current-password-0123")) {
@@ -145,12 +145,12 @@ func TestSyncer_FreshSyncerIsolatesABadDirectory(t *testing.T) {
 	})
 	writeFiles(t, other, map[string]string{"current": "short"}) // malformed
 	fx.writeAccess("users:\n" +
-		"  - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n" +
+		"  - {name: dashboards, tier: read, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n" +
 		"  - {name: app, tier: read, databases: [analytics], login: {rolling: {dir: " + other + "}}}\n")
 	// users.d persists across a sidecar restart: the previous process
 	// rendered both users, the expired password and app's old one included.
 	writeFiles(t, fx.syncer.UsersD, map[string]string{UsersFileName: "users:\n" +
-		"  metabase: {auth_methods: {password_1: {password_sha256_hex: " + sha("expired-password-0123") + "}}}\n" +
+		"  dashboards: {auth_methods: {password_1: {password_sha256_hex: " + sha("expired-password-0123") + "}}}\n" +
 		"  app: {auth_methods: {password_1: {password_sha256_hex: " + sha("app-old-password-0123") + "}}}\n"})
 
 	fx.syncer.Sync() // a fresh Syncer: no last good passwords in this process
@@ -203,7 +203,7 @@ func TestSyncer_WritesOnlyOnChange(t *testing.T) {
 // @scenario "The sidecar never switches mode while the server runs"
 func TestSyncer_KeepsTheServersMode(t *testing.T) {
 	const tokenOnly = "mode: dynamic-only\nissuers: [{name: s, url: 'https://oidc.example.com'}]\n" +
-		"users:\n  - {name: grafana, tier: inspect, login: {token: {issuer: s}}}\n"
+		"users:\n  - {name: reporting, tier: inspect, login: {token: {issuer: s}}}\n"
 
 	t.Run("a standard server ignores a file turning dynamic-only on", func(t *testing.T) {
 		fx := newSyncFixture(t)
@@ -230,7 +230,7 @@ func TestSyncer_KeepsTheServersMode(t *testing.T) {
 			t.Fatalf("dynamic-only rendered a password:\n%s", good)
 		}
 		// Back to standard mode with a rolling user: its password must not appear.
-		fx.writeAccess("users:\n  - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n")
+		fx.writeAccess("users:\n  - {name: dashboards, tier: read, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n")
 		fx.syncer.Sync()
 		if got := fx.rendered(); got != good || strings.Contains(got, sha("current-password-0123")) {
 			t.Errorf("a dynamic-only server got a rolling password without a restart:\n%s", got)
@@ -251,7 +251,7 @@ func TestSyncer_LoadsTheVerifierOnlyAfterTheWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(usersD, 0o755) })
-	fx.writeAccess("users:\n  - {name: metabase, tier: write, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n")
+	fx.writeAccess("users:\n  - {name: dashboards, tier: write, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n")
 	fx.syncer.Sync()
 	if fx.loads != 1 {
 		t.Errorf("the verifier took a file whose users were never written (%d loads)", fx.loads)
@@ -278,7 +278,7 @@ func TestSyncer_ExpiresPasswordsWhileTheAccessFileIsBroken(t *testing.T) {
 		t.Fatal("the password was not rendered before its valid_until")
 	}
 
-	fx.writeAccess("users:\n  - {name: metabase, tier: owner}\n")
+	fx.writeAccess("users:\n  - {name: dashboards, tier: owner}\n")
 	fx.syncer.Now = func() time.Time { return now.Add(2 * time.Minute) }
 	fx.syncer.Sync()
 	got := fx.rendered()

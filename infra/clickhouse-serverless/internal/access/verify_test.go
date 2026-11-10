@@ -116,7 +116,7 @@ issuers:
   - {name: other, url: '` + fx.other.server.URL + `'}
 users:
   - {name: alice, tier: read, databases: [analytics], login: {token: {issuer: staff, subject: alice@example.com}}}
-  - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: /secrets/metabase}}}
+  - {name: dashboards, tier: read, databases: [analytics], login: {rolling: {dir: /secrets/dashboards}}}
 `)
 	return fx
 }
@@ -178,7 +178,7 @@ func TestVerifier_AcceptsTheNamedUser(t *testing.T) {
 		rsaKey := signingKey{kid: "r1", alg: jose.RS256, key: priv}
 		fx.issuer.publish(fx.key, rsaKey)
 		fx.setClock(fx.now().Add(KeyRefetchMinInterval))
-		token := sign(t, rsaKey, fx.claims(func(c map[string]any) { c["aud"] = []string{"grafana", "clickhouse"} }))
+		token := sign(t, rsaKey, fx.claims(func(c map[string]any) { c["aud"] = []string{"reporting", "clickhouse"} }))
 		if err := fx.verifier.Verify(context.Background(), "alice", token); err != nil {
 			t.Errorf("RSA token refused: %v", err)
 		}
@@ -216,7 +216,7 @@ func TestVerifier_RefusesUnlessEveryCheckPasses(t *testing.T) {
 		{"expiring this second", "alice", valid(func(c map[string]any) { c["exp"] = fx.now().Unix() }), "expired"},
 		{"not yet valid", "alice", valid(func(c map[string]any) { c["nbf"] = fx.now().Add(time.Minute).Unix() }), "claims"},
 		{"without exp", "alice", valid(func(c map[string]any) { delete(c, "exp") }), "claims"},
-		{"for another audience", "alice", valid(func(c map[string]any) { c["aud"] = "grafana" }), "claims"},
+		{"for another audience", "alice", valid(func(c map[string]any) { c["aud"] = "reporting" }), "claims"},
 		{"naming another issuer", "alice", valid(func(c map[string]any) { c["iss"] = fx.other.server.URL }), "claims"},
 		{"signed by another issuer", "alice", sign(t, newECKey(t, "k1"), fx.claims(nil)), "bad_signature"},
 		{"signed by an unknown key", "alice", sign(t, newECKey(t, "k9"), fx.claims(nil)), "unknown_key"},
@@ -226,7 +226,7 @@ func TestVerifier_RefusesUnlessEveryCheckPasses(t *testing.T) {
 		{"HMAC-signed", "alice", hmac(), "malformed"},
 		{"with a tampered payload", "alice", tampered(), "bad_signature"},
 		{"too large", "alice", strings.Repeat("a", MaxTokenBytes+1), "too_large"},
-		{"presented for a password user", "metabase", valid(nil), "not_token_user"},
+		{"presented for a password user", "dashboards", valid(nil), "not_token_user"},
 		{"presented for an unknown user", "mallory", valid(nil), "not_token_user"},
 	}
 	for _, tc := range cases {
@@ -345,9 +345,9 @@ func TestVerifier_JWKSURLSkipsDiscovery(t *testing.T) {
 	is.publish(key)
 	v := &Verifier{Now: func() time.Time { return now }, Log: zap.NewNop()}
 	v.SetFile(context.Background(), mustParse(t, "issuers: [{name: k8s, url: 'https://kubernetes.default.svc', jwks_url: '"+is.server.URL+"/keys'}]\n"+
-		"users: [{name: grafana, tier: inspect, login: {token: {issuer: k8s, subject: 'system:serviceaccount:monitoring:grafana'}}}]\n"))
-	token := sign(t, key, map[string]any{"iss": "https://kubernetes.default.svc", "aud": []string{"clickhouse"}, "sub": "system:serviceaccount:monitoring:grafana", "exp": now.Add(time.Hour).Unix()})
-	if err := v.Verify(context.Background(), "grafana", token); err != nil {
+		"users: [{name: reporting, tier: inspect, login: {token: {issuer: k8s, subject: 'system:serviceaccount:monitoring:reporting'}}}]\n"))
+	token := sign(t, key, map[string]any{"iss": "https://kubernetes.default.svc", "aud": []string{"clickhouse"}, "sub": "system:serviceaccount:monitoring:reporting", "exp": now.Add(time.Hour).Unix()})
+	if err := v.Verify(context.Background(), "reporting", token); err != nil {
 		t.Errorf("token without kid from a single-key JWKS refused: %v", err)
 	}
 }

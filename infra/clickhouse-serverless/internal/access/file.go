@@ -26,6 +26,8 @@ type File struct {
 	Mode    Mode     `yaml:"mode"`
 	Issuers []Issuer `yaml:"issuers"`
 	Users   []User   `yaml:"users"`
+	// Policy adds to or replaces the default rules users are checked against.
+	Policy Policy `yaml:"policy"`
 
 	// Raw is the file's content, so a caller can tell when it changed.
 	Raw []byte `yaml:"-"`
@@ -102,8 +104,6 @@ var (
 	// No dot: ClickHouse config paths split on it.
 	userNameRE     = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]{0,62}$`)
 	databaseNameRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,205}$`)
-	// A read grant on these would open query text and other users' metadata.
-	forbiddenDatabases = map[string]bool{"system": true, "information_schema": true, "INFORMATION_SCHEMA": true}
 )
 
 // LWQLUser is the LangWatchQL restricted identity: a second definition
@@ -227,6 +227,8 @@ func (f *File) validate() []string {
 		}
 	}
 
+	f.Policy.validate(add)
+	rules := f.Policy.Rules()
 	seenUsers := map[string]bool{}
 	for i, u := range f.Users {
 		where := fmt.Sprintf("users[%d] %q", i, u.Name)
@@ -253,14 +255,14 @@ func (f *File) validate() []string {
 			switch {
 			case !databaseNameRE.MatchString(db):
 				add(where, "database %q must match %s", db, databaseNameRE)
-			case forbiddenDatabases[db]:
+			case rules.restricted[db]:
 				add(where, "database %q cannot be granted", db)
 			case seenDBs[db]:
 				add(where, "database %q listed twice", db)
 			}
 			seenDBs[db] = true
 		}
-		checkExtras(u, add, where)
+		checkExtras(u, rules, add, where)
 		for _, n := range u.Networks {
 			if _, err := netip.ParsePrefix(n); err != nil {
 				if _, err := netip.ParseAddr(n); err != nil {
