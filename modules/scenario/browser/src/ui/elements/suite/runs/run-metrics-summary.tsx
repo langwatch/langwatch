@@ -8,12 +8,7 @@ import { useCallback, useRef, useState } from "react";
 
 import { formatCost, formatLatency } from "../../../../model/suite/formatters.ts";
 import type { RunGroupSummary } from "../../../../model/suite/run-history-transforms.ts";
-
-function getPassRateGradientColor(passRate: number | null): string {
-  if (passRate === null) return "fg.subtle";
-  if (passRate <= 50) return "orange.fg";
-  return "green.fg";
-}
+import { passRateColor } from "../../agent-testing/shared/pass-rate-color.ts";
 
 function PassRateCircle({ passRate }: { passRate: number | null }) {
   return (
@@ -21,7 +16,7 @@ function PassRateCircle({ passRate }: { passRate: number | null }) {
       width="10px"
       height="10px"
       borderRadius="full"
-      bg={getPassRateGradientColor(passRate)}
+      bg={passRateColor(passRate)}
       flexShrink={0}
     />
   );
@@ -104,7 +99,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
           <Text color="fg.muted">Pass</Text>
           <HStack gap={1.5}>
             <PassRateCircle passRate={summary.passRate} />
-            <Text fontWeight="medium" color={getPassRateGradientColor(summary.passRate)}>
+            <Text fontWeight="medium" color={passRateColor(summary.passRate)}>
               {summary.passRate === null ? (
                 <EmptyValue label="No pass rate" />
               ) : (
@@ -271,7 +266,7 @@ export function RunMetricsSummary({ summary, size = "sm" }: RunMetricsSummaryPro
             <Text fontWeight="600">Pass</Text>
             <HStack gap={1}>
               <PassRateCircle passRate={summary.passRate} />
-              <Text color={getPassRateGradientColor(summary.passRate)} fontWeight="medium">
+              <Text color={passRateColor(summary.passRate)} fontWeight="medium">
                 {summary.passRate === null ? (
                   <EmptyValue label="No pass rate" />
                 ) : (
@@ -286,7 +281,7 @@ export function RunMetricsSummary({ summary, size = "sm" }: RunMetricsSummaryPro
             <Text fontWeight="600">Pass</Text>
             <HStack gap={1}>
               <PassRateCircle passRate={summary.passRate} />
-              <Text color={getPassRateGradientColor(summary.passRate)} fontWeight="medium">
+              <Text color={passRateColor(summary.passRate)} fontWeight="medium">
                 {summary.passRate === null ? (
                   <EmptyValue label="No pass rate" />
                 ) : (
