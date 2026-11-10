@@ -211,6 +211,9 @@ describe("ScenarioRunCapService", () => {
     await expect(
       service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("next") }),
     ).resolves.toBeUndefined();
+    await expect(
+      service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("failed") }),
+    ).rejects.toMatchObject({ meta: { current: 100, max: 100 } });
   });
 
   /** @scenario A retried run start is counted once */

@@ -142,6 +142,7 @@ Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
     When a run is admitted at queue time but its start never reaches the meter
     Then the next run is refused while the admitted run may still start
     And once the admitted run is too old to still start, the next run passes
+    And a retry of the run that never started is refused at the cap
 
   @unit
   Scenario: A run whose target cannot be resolved takes no run from the cap

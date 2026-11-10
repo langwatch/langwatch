@@ -48,8 +48,6 @@ export class ScenarioRunCapService {
   /** Accepted runs the meter may not hold yet, by start key (or a local id), with when accepted. */
   readonly #pendingRuns = new Map<string, { month: string; acceptedAt: Map<string, number> }>();
   #localRunIds = 0;
-  /** Run start keys this instance admitted, per organization, for the month they count in. */
-  readonly #admittedRuns = new Map<string, { month: string; keys: Set<string> }>();
   readonly #logger: Pick<Logger, "error">;
 
   private constructor(private readonly deps: ScenarioRunCapDependencies) {
@@ -100,7 +98,6 @@ export class ScenarioRunCapService {
       runKey?.deduplicationKey ?? `local:${++this.#localRunIds}`,
       now,
     );
-    if (runKey) this.#admittedKeys({ organizationId, now }).add(runKey.deduplicationKey);
     if (reading.firstRunAt === null) this.#firstRuns.set(organizationId, now);
   }
 
@@ -230,25 +227,15 @@ export class ScenarioRunCapService {
     runKey: { projectId: string; deduplicationKey: string };
     now: number;
   }): Promise<boolean> {
-    const admitted = this.#admittedKeys({ organizationId, now });
-    if (admitted.has(runKey.deduplicationKey)) return true;
+    // A pending run past its window is no longer admitted: its retry asks the cap again.
+    const acceptedAt = this.#pending({ organizationId, now }).get(runKey.deduplicationKey);
+    if (acceptedAt !== undefined && now - acceptedAt < PENDING_RUN_TTL_MS) return true;
     try {
-      const isMetered = await this.deps.meter.hasDeduplicationKey({ organizationId, ...runKey });
-      if (isMetered) admitted.add(runKey.deduplicationKey);
-      return isMetered;
+      return await this.deps.meter.hasDeduplicationKey({ organizationId, ...runKey });
     } catch (error) {
       this.#logger.error({ error, organizationId }, "could not look up the run start's meter key");
       return false;
     }
-  }
-
-  #admittedKeys({ organizationId, now }: { organizationId: string; now: number }): Set<string> {
-    const { month } = scenarioRunMonthOf(now);
-    const known = this.#admittedRuns.get(organizationId);
-    if (known && known.month === month) return known.keys;
-    const keys = new Set<string>();
-    this.#admittedRuns.set(organizationId, { month, keys });
-    return keys;
   }
 
   #pending({ organizationId, now }: { organizationId: string; now: number }): Map<string, number> {
