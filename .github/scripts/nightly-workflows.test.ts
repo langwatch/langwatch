@@ -26,20 +26,37 @@ const ABSORBED: Record<string, string[]> = {
 
 const LEVEL = { none: 0, read: 1, write: 2 } as const;
 
-/** Every `permissions:` map in a file, top-level and per job, merged to the highest level asked per scope. */
+/**
+ * Every `permissions:` map in a file, top-level and per job, merged to the highest level asked per
+ * scope. Throws on a map it cannot read in full, so a stray line never reads as "asks for nothing".
+ */
 const requested = (text: string): Map<string, keyof typeof LEVEL> => {
   const asked = new Map<string, keyof typeof LEVEL>();
-  for (const [, , lines] of text.matchAll(/^( *)permissions:\n((?:\1 +[a-z-]+: [a-z]+\n)+)/gm)) {
-    for (const [, scope, level] of lines.matchAll(/([a-z-]+): ([a-z]+)/g)) {
+  const blocks = [...text.matchAll(/^( *)permissions:\n((?:\1 +.*\n|[ \t]*\n)*)/gm)];
+  const keys = text.match(/^ *permissions:/gm)?.length ?? 0;
+  assert.equal(blocks.length, keys, "a `permissions:` key is not followed by a map this can read");
+  for (const [, , lines] of blocks) {
+    for (const line of lines.split("\n")) {
+      if (line.trim() === "" || line.trim().startsWith("#")) continue;
+      const entry = /^\s+([a-z-]+): (none|read|write)$/.exec(line);
+      assert.ok(entry, `unreadable line in a permissions map: ${line}`);
+      const [, scope, level] = entry;
       const have = asked.get(scope) ?? "none";
-      if (LEVEL[level as keyof typeof LEVEL] > LEVEL[have]) asked.set(scope, level as keyof typeof LEVEL);
+      if (LEVEL[level as keyof typeof LEVEL] > LEVEL[have]) {
+        asked.set(scope, level as keyof typeof LEVEL);
+      }
     }
   }
   return asked;
 };
 
-/** The jobs of nightly.yml that call a reusable workflow: job name -> called file and the job's own grant. */
-const calls = (text: string): { job: string; file: string; granted: Map<string, keyof typeof LEVEL> }[] => {
+/**
+ * The jobs of nightly.yml that call a reusable workflow: job name -> called file and the job's own
+ * grant.
+ */
+const calls = (
+  text: string,
+): { job: string; file: string; granted: Map<string, keyof typeof LEVEL> }[] => {
   const jobs = text.split(/^jobs:\n/m)[1] ?? "";
   return jobs
     .split(/^(?= {2}[\w-]+:\s*$)/m)
