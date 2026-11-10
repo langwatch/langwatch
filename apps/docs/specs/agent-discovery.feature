@@ -22,6 +22,13 @@ Feature: Agents discover the documentation and its skills
     Then the agent card carries the site summary, the docs address and one entry per skill
 
   @unit
+  Scenario: The addresses agents learned from the previous docs host keep answering
+    Given the skills named in the skills pages manifest
+    When the discovery files are generated
+    Then /skill.md is a skill named langwatch that points at llms.txt, the Markdown twins and each installable skill
+    And /.well-known/llms.txt is the same file as /llms.txt
+
+  @unit
   Scenario: Robots.txt declares the content signals
     When the discovery files are generated
     Then robots.txt has the content signal line right after the user agent line

@@ -42,6 +42,17 @@ describe("agent discovery files", () => {
       expect(files[".well-known/agent-skills/tracing/SKILL.md"]).toBe("# Tracing\n");
     });
 
+    /** @scenario "The addresses agents learned from the previous docs host keep answering" */
+    it("publishes a docs-wide skill.md and llms.txt under .well-known", () => {
+      const skill = files["skill.md"] ?? "";
+      expect(skill).toMatch(/^---\nname: langwatch\ndescription: .+\n---\n/);
+      expect(skill).toContain("https://langwatch.ai/docs/llms.txt");
+      expect(skill).toContain(
+        "- [find-traces](https://langwatch.ai/docs/.well-known/agent-skills/find-traces/SKILL.md): Find traces.",
+      );
+      expect(files[".well-known/llms.txt"]).toBe(files["llms.txt"]);
+    });
+
     /** @scenario "The agent card names LangWatch and lists its skills" */
     it("publishes a card with the summary and one entry per skill", () => {
       const card = JSON.parse(files[".well-known/agent-card.json"] ?? "");
