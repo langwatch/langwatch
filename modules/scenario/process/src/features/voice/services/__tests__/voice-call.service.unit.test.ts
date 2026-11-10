@@ -788,7 +788,10 @@ describe("finishVoiceSession", () => {
         await expect(finishVoiceSession({ ports, ...SCENARIO_FINISH })).rejects.toBeInstanceOf(
           LimitExceededError,
         );
-        expect(assertRunAllowed).toHaveBeenCalledWith({ projectId: "p1" });
+        expect(assertRunAllowed).toHaveBeenCalledWith({
+          projectId: "p1",
+          scenarioRunId: expect.any(String),
+        });
         expect(writeCallRun).not.toHaveBeenCalled();
       });
 

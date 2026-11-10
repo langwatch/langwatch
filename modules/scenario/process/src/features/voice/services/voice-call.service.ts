@@ -125,7 +125,7 @@ export interface VoiceSessionInfrastructure {
   }): Promise<void>;
   /** Asks the Free run cap before a fresh "Call it myself" run is written, and counts it.
    *  Throws `LimitExceededError` (`scenarioRuns`) past the cap. */
-  assertRunAllowed(input: { projectId: string }): Promise<void>;
+  assertRunAllowed(input: { projectId: string; scenarioRunId: string }): Promise<void>;
   /** The set a scenario's runs are listed under, so a "Call it myself" run
    *  lands beside its simulated runs. Throws `scenario_not_found` when the
    *  scenario is gone. Absent when the deployment never runs scenario calls. */
@@ -407,7 +407,7 @@ async function finishVoiceSession(
     return terminalRunResult({ scenarioRunId, token, existing });
   }
   // A re-drive finishes a run already counted; only a fresh run asks the cap.
-  if (!existing) await ports.assertRunAllowed({ projectId: input.projectId });
+  if (!existing) await ports.assertRunAllowed({ projectId: input.projectId, scenarioRunId });
 
   // A re-drive reuses the scenario the half-written run already landed under,
   // rather than re-resolving it: a scenario archived between the two attempts

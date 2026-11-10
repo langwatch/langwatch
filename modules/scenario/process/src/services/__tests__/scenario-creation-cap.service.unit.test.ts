@@ -151,6 +151,21 @@ describe("ScenarioCreationCapService", () => {
       });
     });
 
+    describe("when a voice call run is counted at finish", () => {
+      /** @scenario A retried run start is counted once */
+      it("counts it under its start key, so its metered start is not counted again", async () => {
+        const { service, assertScenarioRunAllowed } = capsWith();
+
+        await service.assertCountedRunAllowed({ projectId: "project-1", scenarioRunId: "run-1" });
+
+        expect(assertScenarioRunAllowed).toHaveBeenCalledWith({
+          organizationId: "organization-1",
+          shouldCountRun: true,
+          runKey: { projectId: "project-1", deduplicationKey: "project-1:run-1:startRun" },
+        });
+      });
+    });
+
     describe("when a run is only asked about before it has an id", () => {
       /** @scenario A run queued from the app is counted once */
       it("only asks the run cap, so the run is counted when its start is reported", async () => {

@@ -213,7 +213,10 @@ describe("ScenarioRunCapService", () => {
     ).resolves.toBeUndefined();
     await expect(
       service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("failed") }),
-    ).rejects.toMatchObject({ meta: { current: 100, max: 100 } });
+    ).rejects.toMatchObject({
+      code: "resource_limit_exceeded",
+      meta: { limitType: "scenarioRuns", current: 100, max: 100 },
+    });
   });
 
   /** @scenario A retried run start is counted once */
