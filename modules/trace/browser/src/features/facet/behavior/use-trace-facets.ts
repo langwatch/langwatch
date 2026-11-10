@@ -21,6 +21,20 @@ const EMPTY_RESULT: { facets: never[]; pending: boolean } = {
 
 type DiscoverResult = RouterOutputs["traces"]["discover"] | undefined;
 
+/**
+ * How long until a viewer asks again: every few seconds while its answer is pending. A failed
+ * read keeps its last data, which still says pending; stop, and let focus and the push recover it.
+ */
+export function discoverPollMs({
+  status,
+  data,
+}: {
+  status: "pending" | "error" | "success";
+  data: Pick<NonNullable<DiscoverResult>, "pending"> | undefined;
+}): number | false {
+  return status !== "error" && data?.pending === true ? DISCOVER_PENDING_POLL_MS : false;
+}
+
 // A project switch with no fresh response yet shows the skeleton, so project A's
 // payload never bleeds into project B's render.
 function pickFacetsResult({
@@ -64,12 +78,7 @@ export function useTraceFacets() {
       // the sidebar doesn't flicker. Project switches are gated below by
       // remembering which project the cached response belongs to.
       placeholderData: keepPreviousData,
-      // A failed read keeps its last data, which still says pending; stop, and let focus and
-      // the push recover it.
-      refetchInterval: (query) =>
-        query.state.status !== "error" && query.state.data?.pending === true
-          ? DISCOVER_PENDING_POLL_MS
-          : false,
+      refetchInterval: (query) => discoverPollMs(query.state),
       // needs a read hint: discover computed (a cold miss returns pending: true)
     },
   );

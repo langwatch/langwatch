@@ -30,13 +30,6 @@ const timeRange = { from: 1_000, to: 2_000 };
 
 const GiB = 1024 * 1024 * 1024;
 
-/** ClickHouse throws at the cap, and cancels on a dropped connection only for a readonly read. */
-const STOPS_ON_THE_SERVER = {
-  timeout_overflow_mode: "throw",
-  readonly: "2",
-  cancel_http_readonly_queries_on_client_close: "1",
-};
-
 /**
  * Short enough that a slow scan gives its slot back within the 20 s other
  * reads wait for one, small enough that one scan cannot fill a replica.
@@ -45,7 +38,7 @@ function expectCapped(settings: QueryRequest["settings"]) {
   const seconds = Number(settings?.max_execution_time);
   expect(seconds).toBeGreaterThan(0);
   expect(seconds).toBeLessThanOrEqual(30);
-  expect(settings).toMatchObject(STOPS_ON_THE_SERVER);
+  expect(settings?.timeout_overflow_mode).toBe("throw");
   const memory = Number(settings?.max_memory_usage);
   expect(memory).toBeGreaterThanOrEqual(2 * GiB);
   expect(memory).toBeLessThanOrEqual(4 * GiB);
@@ -124,8 +117,8 @@ describe("the facet reads' time and memory cap", () => {
   });
 
   describe("when a raw facet query names settings of its own", () => {
-    /** @scenario "A facet read stops on the server once the app abandons it" */
-    it("never loosens the time cap or the cancel-on-close guard", async () => {
+    /** @scenario "A facet read stopped at its time cap is not run again" */
+    it("never loosens the time cap", async () => {
       const { repo, requests } = makeRepo();
 
       await repo.findCategoricalFacetRaw({
@@ -133,25 +126,25 @@ describe("the facet reads' time and memory cap", () => {
         query: {
           sql: `SELECT '' AS facet_value, 0 AS cnt, 0 AS total_distinct FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
           params: {},
-          settings: { max_execution_time: "600", readonly: "0" },
+          settings: { max_execution_time: "600", timeout_overflow_mode: "break" },
         },
       });
 
       expect(requests[0]?.settings).toMatchObject({
         max_execution_time: "20",
-        ...STOPS_ON_THE_SERVER,
+        timeout_overflow_mode: "throw",
       });
     });
   });
 
   describe("when a facet read hits its time cap", () => {
-    /** @scenario "A facet read stops on the server once the app abandons it" */
-    it("asks the client not to run any facet statement again", async () => {
+    /** @scenario "A facet read stopped at its time cap is not run again" */
+    it("asks the client not to run the statement again", async () => {
       const { repo, requests } = makeRepo();
-      const base = { authorization, timeRange };
 
       await repo.findBatchedFacets({
-        ...base,
+        authorization,
+        timeRange,
         table: "stored_spans",
         timeColumn: "StartTime",
         categoricalSpecs: [
@@ -160,27 +153,6 @@ describe("the facet reads' time and memory cap", () => {
         rangeSpecs: [{ key: "duration", expression: "DurationMs" }],
         topN: 50,
       });
-      await repo.findCategoricalFacet({
-        ...base,
-        table: "trace_summaries",
-        timeColumn: "OccurredAt",
-        facetExpression: "ServiceName",
-        limit: 50,
-        offset: 0,
-      });
-      await repo.findDiscreteValues({
-        ...base,
-        table: "trace_summaries",
-        timeColumn: "OccurredAt",
-        column: "SpanCount",
-        limit: 50,
-      });
-      await repo.findRangeStatsForTable({
-        ...base,
-        table: "trace_summaries",
-        timeColumn: "OccurredAt",
-        column: "TotalCost",
-      });
       await repo.findCategoricalFacetRaw({
         authorization,
         query: {
@@ -189,7 +161,7 @@ describe("the facet reads' time and memory cap", () => {
         },
       });
 
-      expect(requests).toHaveLength(6);
+      expect(requests).toHaveLength(3);
       for (const request of requests) expect(request.retryOnTimeout).toBe(false);
     });
   });

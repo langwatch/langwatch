@@ -21,6 +21,7 @@ import type {
   FacetDefinition,
 } from "#features/facet/rules/trace-facet-registry.rules";
 
+import { settleCapped } from "../features/facet/rules/facet-read-concurrency.rules.ts";
 import { isExpressionCategorical } from "../features/facet/rules/trace-facet-classification.rules.ts";
 import type { FacetFilterResolver } from "../features/facet/rules/trace-facet-filter.rules.ts";
 import { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
@@ -28,11 +29,10 @@ import type { TraceTopicNamingService } from "../features/topic/services/trace-t
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import {
   discoverCacheKey,
-  discoverLineageKey,
+  discoverPassKey,
   snapToWindowPreset,
   type DiscoverParams,
 } from "../rules/trace-list-cache-key.rules.ts";
-import { TraceDiscoverSchedulerService } from "./trace-discover-scheduler.service.ts";
 import {
   TraceDiscoverTaskService,
   type BatchedRegistrySlots,
@@ -65,22 +65,8 @@ const DISCOVER_CACHE = TraceTtlCacheService.create<CachedDiscover>(DISCOVER_TTL_
 /** ClickHouse statements one pass runs at once; the rest of its reads wait their turn. */
 const DISCOVER_PASS_MAX_CONCURRENT_STATEMENTS = 4;
 
-/**
- * Crash safety only: a refresh releases its key when its pass ends, and this TTL frees a key
- * whose refresher died first. Generous, since a pass of ~16 statements, 4 at a time, each
- * stopped at its 20 s cap, ends well inside it.
- */
-const DISCOVER_REFRESH_LEASE_MS = 3 * 60_000;
-
-/**
- * Refresh lock — a separate cache because the lease needs a short TTL so a
- * crashed refresher self-recovers quickly, while the value cache keeps a long one. Reusing the
- * value cache for locks would mean half an hour of stale data after a refresher crash.
- */
-const DISCOVER_REFRESH_LOCK_CACHE = TraceTtlCacheService.create<number>(DISCOVER_REFRESH_LEASE_MS);
-
-/** The discover lineages with a pass running in this process; no second one starts beside it. */
-const DISCOVER_PASSES_IN_FLIGHT = new Set<string>();
+/** How long a pass that failed holds off the next one for its key. */
+const DISCOVER_PASS_FAILURE_COOLDOWN_MS = 30_000;
 
 const discoverLogger = createLogger("langwatch:app-layer:traces:trace-list-discover");
 
@@ -188,7 +174,6 @@ function collectDiscoverOutcomes(settled: PromiseSettledResult<Outcome>[]): {
 export class TraceDiscoverService {
   private readonly descriptors: TraceFacetDescriptorService;
   private readonly tasks: TraceDiscoverTaskService;
-  private readonly scheduler = TraceDiscoverSchedulerService.create();
   private readonly facets: FacetCatalog;
   private readonly updates: Pick<PresenceApi, "publishProjectEvent">;
 
@@ -228,6 +213,10 @@ export class TraceDiscoverService {
     });
   }
 
+  /** Per-pod: the pass keys with a pass running, and when a failed one may run again. */
+  private readonly discoverRefreshing = new Set<string>();
+  private readonly discoverFailedUntil = new Map<string, number>();
+
   async getDiscover(params: DiscoverParams): Promise<DiscoverResult> {
     // Snap the requested window to a canonical preset BEFORE the cache
     // lookup so two users on the same tenant + window share a slot even
@@ -240,7 +229,7 @@ export class TraceDiscoverService {
       timeRange: { from: snapped.from, to: snapped.to },
     };
     const cacheKey = discoverCacheKey({ authorization: params.authorization, snapped });
-    const lineage = discoverLineageKey({ authorization: params.authorization, snapped });
+    const passKey = discoverPassKey({ authorization: params.authorization, snapped });
     const lookup = await DISCOVER_CACHE.get(cacheKey);
 
     if (lookup.kind === "hit") {
@@ -251,7 +240,7 @@ export class TraceDiscoverService {
       // completion so any open browser invalidates and re-reads from
       // the now-warm cache.
       if (nowInstant().epochMilliseconds - cached.timestamp > DISCOVER_REFRESH_AFTER_MS) {
-        this.refreshDiscoverInBackground({ params: snappedParams, cacheKey, lineage });
+        this.refreshDiscoverInBackground({ params: snappedParams, cacheKey, passKey });
       }
 
       return { facets: cached.value, pending: false };
@@ -262,7 +251,7 @@ export class TraceDiscoverService {
     // `pending` as a loading signal so the curated skeleton renders instead of an
     // empty sidebar (~1-2s for the first viewer); `discover_updated` flips `pending`
     // to false without the user refreshing.
-    this.refreshDiscoverInBackground({ params: snappedParams, cacheKey, lineage });
+    this.refreshDiscoverInBackground({ params: snappedParams, cacheKey, passKey });
 
     return { facets: [], pending: true };
   }
@@ -285,29 +274,27 @@ export class TraceDiscoverService {
   private refreshDiscoverInBackground({
     params,
     cacheKey,
-    lineage,
+    passKey,
   }: {
     params: DiscoverParams;
     cacheKey: string;
-    lineage: string;
+    passKey: string;
   }): void {
-    // One pass per lineage in this process: a live window's key rolls every bucket, and a new
-    // bucket must not start a second pass beside the one still reading. The lock throttles a key.
-    if (DISCOVER_PASSES_IN_FLIGHT.has(lineage)) {
+    // One pass per key in this process: a live window's cache key rolls every bucket, and a new
+    // bucket must not start a second pass beside the one still reading, nor right after one failed.
+    const now = nowInstant().epochMilliseconds;
+    if (
+      this.discoverRefreshing.has(passKey) ||
+      (this.discoverFailedUntil.get(passKey) ?? 0) > now
+    ) {
       return;
     }
 
-    DISCOVER_PASSES_IN_FLIGHT.add(lineage);
+    this.discoverRefreshing.add(passKey);
+    this.discoverFailedUntil.delete(passKey);
 
     void (async () => {
-      let claimed = false;
       try {
-        // A lost claim means another refresh of this key holds it; its write hydrates the cache.
-        claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(cacheKey, nowInstant().epochMilliseconds);
-        if (!claimed) {
-          return;
-        }
-
         const fresh = await this.computeDiscover(params);
         await DISCOVER_CACHE.set(cacheKey, {
           value: fresh,
@@ -338,6 +325,10 @@ export class TraceDiscoverService {
           );
         }
       } catch (err) {
+        this.discoverFailedUntil.set(
+          passKey,
+          nowInstant().epochMilliseconds + DISCOVER_PASS_FAILURE_COOLDOWN_MS,
+        );
         discoverLogger.warn(
           {
             cacheKey,
@@ -346,9 +337,7 @@ export class TraceDiscoverService {
           "Background discover refresh failed; cached value still served",
         );
       } finally {
-        // Released however the pass ended, so the next stale read or retry is never held back.
-        if (claimed) await DISCOVER_REFRESH_LOCK_CACHE.delete(cacheKey);
-        DISCOVER_PASSES_IN_FLIGHT.delete(lineage);
+        this.discoverRefreshing.delete(passKey);
       }
     })();
   }
@@ -396,10 +385,7 @@ export class TraceDiscoverService {
       ...this.tasks.discreteTasks(params, filters),
     ].map(timed);
 
-    const settled = await this.scheduler.settle({
-      tasks,
-      limit: DISCOVER_PASS_MAX_CONCURRENT_STATEMENTS,
-    });
+    const settled = await settleCapped(tasks, DISCOVER_PASS_MAX_CONCURRENT_STATEMENTS);
     this.logSlowDiscover({
       params,
       totalMs: nowInstant().epochMilliseconds - startedAt,

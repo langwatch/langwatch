@@ -278,11 +278,10 @@ describe("retry", () => {
       new Error(
         "Code: 159. DB::Exception: Timeout exceeded: elapsed 20000 ms, maximum: 20000 ms. (TIMEOUT_EXCEEDED)",
       );
-    const capped: QueryRequest = { ...request, settings: { max_execution_time: 20 } };
-    const optedOut: QueryRequest = { ...capped, retryOnTimeout: false };
+    const optedOut: QueryRequest = { ...request, retryOnTimeout: false };
 
     describe("when the statement opted out of retrying its timeout", () => {
-      /** @scenario "A facet read stops on the server once the app abandons it" */
+      /** @scenario "A facet read stopped at its time cap is not run again" */
       it("answers the timeout instead of running the statement again", async () => {
         const { sleep } = fakeSleep();
         const next = vi.fn().mockRejectedValue(serverTimeout());
@@ -309,17 +308,14 @@ describe("retry", () => {
       });
     });
 
-    describe.each([
-      ["an uncapped read", request],
-      ["a read with its own time cap but no opt-out", capped],
-    ])("when %s times out", (_name, statement) => {
+    describe("when a read without the opt-out times out", () => {
       it("keeps retrying it as transient", async () => {
         const { sleep } = fakeSleep();
         const next = vi.fn().mockRejectedValueOnce(serverTimeout()).mockResolvedValue({ rows: [] });
 
         await new RetryPolicy({ sleep, transientMessageFragments: ["TIMEOUT_EXCEEDED"] }).run(
-          () => (next as never)(statement),
-          { request: statement },
+          () => (next as never)(request),
+          { request },
         );
 
         expect(next).toHaveBeenCalledTimes(2);

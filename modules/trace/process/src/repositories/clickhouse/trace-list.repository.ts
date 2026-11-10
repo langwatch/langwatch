@@ -175,23 +175,19 @@ function buildWhereClause({
 const FACET_READ_MAX_EXECUTION_SECONDS = 20;
 
 /**
- * Stops a facet read on the server at its time cap, or as soon as the app drops
- * its connection: ClickHouse cancels on close only for a readonly statement.
- * The sidebar omits a stopped facet. specs/traces-v2/search.feature
+ * Every sidebar facet read: stopped on the server at its time cap and not run again, under a
+ * 2 GiB memory cap. The sidebar omits a stopped facet. specs/traces-v2/search.feature
  */
-const FACET_READ_STOP_SETTINGS: Record<string, string> = {
-  // ClickHouse settings are string-typed over the wire.
-  max_execution_time: String(FACET_READ_MAX_EXECUTION_SECONDS),
-  timeout_overflow_mode: "throw",
-  readonly: "2",
-  cancel_http_readonly_queries_on_client_close: "1",
-};
-
-/** Every sidebar facet read: the stop settings and a 2 GiB memory cap. */
-const FACET_READ_SETTINGS: Record<string, string> = {
-  ...FACET_READ_STOP_SETTINGS,
-  max_memory_usage: String(2 * 1024 * 1024 * 1024),
-};
+const FACET_READ = {
+  clickhouse_settings: {
+    // ClickHouse settings are string-typed over the wire.
+    max_execution_time: String(FACET_READ_MAX_EXECUTION_SECONDS),
+    timeout_overflow_mode: "throw",
+    max_memory_usage: String(2 * 1024 * 1024 * 1024),
+  } as Record<string, string>,
+  retryOnTimeout: false,
+  format: "JSONEachRow",
+} as const;
 
 function buildWhereClauseForTable({
   timeRange,
@@ -663,9 +659,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         offset: params.offset,
         ...(params.prefix ? { prefix: params.prefix } : {}),
       },
-      clickhouse_settings: FACET_READ_SETTINGS,
-      retryOnTimeout: false,
-      format: "JSONEachRow",
+      ...FACET_READ,
     });
 
     const rows = facetRowsSchema.parse(await result.json());
@@ -718,9 +712,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         LIMIT {limit:UInt32}
       `,
       query_params: { ...filter.params, ...queryParams, limit: params.limit },
-      clickhouse_settings: FACET_READ_SETTINGS,
-      retryOnTimeout: false,
-      format: "JSONEachRow",
+      ...FACET_READ,
     });
 
     const rows = discreteValueRowsSchema.parse(await result.json());
@@ -745,14 +737,14 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const result = await client.query({
       query: params.query.sql,
       query_params: params.query.params,
-      // A facet's own memory ceiling overrides the shared one; the stop settings always apply.
+      ...FACET_READ,
+      // A facet's own memory ceiling overrides the shared one; never the time cap.
       clickhouse_settings: {
-        ...FACET_READ_SETTINGS,
+        ...FACET_READ.clickhouse_settings,
         ...params.query.settings,
-        ...FACET_READ_STOP_SETTINGS,
+        max_execution_time: String(FACET_READ_MAX_EXECUTION_SECONDS),
+        timeout_overflow_mode: "throw",
       },
-      retryOnTimeout: false,
-      format: "JSONEachRow",
     });
 
     const rows = facetRowsSchema.parse(await result.json());
@@ -802,9 +794,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           ${filter.sql}
       `,
       query_params: { ...filter.params, ...queryParams },
-      clickhouse_settings: FACET_READ_SETTINGS,
-      retryOnTimeout: false,
-      format: "JSONEachRow",
+      ...FACET_READ,
     });
 
     const rows = rangeRowsSchema.parse(await result.json());
@@ -868,9 +858,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const result = await client.query({
       query,
       query_params: { ...queryParams, topN },
-      clickhouse_settings: FACET_READ_SETTINGS,
-      retryOnTimeout: false,
-      format: "JSONEachRow",
+      ...FACET_READ,
     });
 
     const rows = keyedFacetRowsSchema.parse(await result.json());
@@ -928,9 +916,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const result = await client.query({
       query,
       query_params: queryParams,
-      clickhouse_settings: FACET_READ_SETTINGS,
-      retryOnTimeout: false,
-      format: "JSONEachRow",
+      ...FACET_READ,
     });
 
     const rows = rangeFacetRowsSchema.parse(await result.json());

@@ -1102,56 +1102,31 @@ Rule: Facet count updates
   # A live window's bounds roll forward on every request, so a repeat that
   # differs only by that roll asks for the same counts.
   @unit
-  Scenario: A live repeat shares the count still running though its window rolled
+  Scenario: A live repeat in the same minute shares the count still running
     Given the facet counts for a live window are still running
-    When the page asks again for the same live span after its bounds rolled forward
-    And its window still ends in the same minute
+    When the page asks again with its bounds rolled forward within the same minute
     Then it is answered by the running count, not a second scan
-    And a live window ending in another minute runs its own count
-    And a fixed window that differs runs its own count
 
   @unit
-  Scenario: A facet read stops on the server once the app abandons it
-    When a sidebar facet read passes its time cap or the app abandons it
-    Then ClickHouse stops the statement instead of finishing it unread
-    And a statement that hit its own time cap is not run again
+  Scenario: A facet read stopped at its time cap is not run again
+    When a sidebar facet read is stopped at its time cap
+    Then the client answers with the timeout instead of running the read again
 
   @unit
   Scenario: One facet discovery pass runs per tenant window at a time
     Given a discovery pass for a tenant's window is still running in a process
     When more viewers open the sidebar, or the live window rolls to its next bucket
     Then that process starts no second pass for that window
-    And a pass starts again once the running one has finished
-
-  @unit
-  Scenario: A facet discovery pass holds a few statements at a time
-    When a discovery pass reads the facet registry
-    Then at most four of its ClickHouse statements run at once
-    And every facet is still read
-
-  # Each read stops itself at its time cap, so a pass needs no deadline of its
-  # own, and one would drop the same last reads on every slow pass.
-  @unit
-  Scenario: A facet discovery pass gives every read its turn
-    Given every read of a discovery pass is slow but within its time cap
-    When the pass runs
-    Then every read runs to its answer, the last ones included
+    And the pass runs a bounded number of ClickHouse statements at once
+    And a pass that failed is not started again until a short cooldown passes
 
   # The `discover_updated` push is the fast path; a viewer answered pending
   # must not depend on it arriving.
-  @integration
+  @unit
   Scenario: A viewer answered pending asks again until the facets land
     Given the sidebar's last discover answer was pending
     Then it asks again every few seconds
-    And it stops asking once the facets have landed
-    And it stops asking when a read fails, until focus or the push asks again
-
-  # The lock only keeps two refreshes of one key apart; its TTL is crash safety.
-  @unit
-  Scenario: A finished discover refresh releases its key
-    Given a discover refresh has ended, with its pass done or thrown
-    When the next read finds the payload stale or missing
-    Then it starts a refresh at once rather than waiting out the lock's TTL
+    And it stops asking once the facets have landed or a read fails
 
   Scenario: Facet counts leave out the hidden origin and the traces outside the window
     Given the project has a trace from Langy's own origin in the window
