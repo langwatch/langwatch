@@ -6,7 +6,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronRight, Clock, Zap } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
-import { PASS_RATE_AMBER_COLOR } from "../../../../model/scenario-run-status-config.ts";
+import { PASS_RATE_AMBER_COLOR } from "../../../../model/pass-rate-amber.ts";
 import { formatCost, formatLatency } from "../../../../model/suite/formatters.ts";
 import type { RunGroupSummary } from "../../../../model/suite/run-history-transforms.ts";
 

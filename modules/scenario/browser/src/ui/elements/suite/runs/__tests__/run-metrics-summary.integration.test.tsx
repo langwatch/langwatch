@@ -96,7 +96,7 @@ describe("<RunMetricsSummary/>", () => {
   });
 
   describe("given a run group where half the runs passed", () => {
-    /** @scenario "Accordion header shows only pass rate when no cost/latency data" */
+    /** @scenario "Accordion header circle reads amber for a partial pass rate" */
     it("draws the pass rate circle in the amber of a partial pass rate", () => {
       const summary = computeGroupSummary({
         group: {

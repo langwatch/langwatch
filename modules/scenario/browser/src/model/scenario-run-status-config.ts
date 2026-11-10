@@ -12,9 +12,6 @@ export interface ScenarioRunStatusConfig {
   fgColor: string;
 }
 
-/** The orange a partial pass rate reads in, the one colour of the three no run status reads. */
-export const PASS_RATE_AMBER_COLOR = "orange.solid";
-
 /**
  * What every status of a scenario run reads as, everywhere it is drawn.
  * Only a verdict carries a warm colour — queued/in-progress reads blue, so
