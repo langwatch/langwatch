@@ -151,6 +151,36 @@ describe("runClickHouseStatements", () => {
     });
   });
 
+  describe("when an ALTER of a config-defined named collection fails 107", () => {
+    it("skips that ALTER, but a 107 on any other statement still stops the run", async () => {
+      const ran: string[] = [];
+      const client = fakeClient({
+        ran,
+        rejections: {
+          "ALTER NAMED COLLECTION lwql_postgres SET host = 'pg'": "107",
+          "CREATE OR REPLACE VIEW langwatch.broken AS SELECT 1": "107",
+        },
+      });
+
+      const result = await provisioning(client).runStatements({
+        statements: [
+          "ALTER NAMED COLLECTION lwql_postgres SET host = 'pg'",
+          "CREATE OR REPLACE VIEW langwatch.traces AS SELECT 1",
+        ],
+      });
+      expect(result.skipped.map((s) => [s.kind, s.code])).toEqual([
+        ["ALTER NAMED COLLECTION", 107],
+      ]);
+      expect(ran).toEqual(["CREATE OR REPLACE VIEW langwatch.traces AS SELECT 1"]);
+
+      await expect(
+        provisioning(client).runStatements({
+          statements: ["CREATE OR REPLACE VIEW langwatch.broken AS SELECT 1"],
+        }),
+      ).rejects.toBeInstanceOf(FakeClickHouseError);
+    });
+  });
+
   describe("when a statement fails for any other reason", () => {
     it("rethrows and stops the run", async () => {
       const ran: string[] = [];

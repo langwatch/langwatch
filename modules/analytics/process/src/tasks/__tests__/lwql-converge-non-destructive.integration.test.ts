@@ -18,6 +18,7 @@ import {
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLAccessModelDefinitionService } from "../../services/langwatch-ql-access-model-definition.service.ts";
 import type { LangWatchQLNames } from "../../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import { convergeLwqlAccessModel, type LwqlConvergencePlan } from "../lwql-provision.task.ts";
@@ -183,6 +184,36 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
       expect(await engineTables()).toEqual(ENGINE_TABLES.toSorted());
       const answered = await viewAnswers();
       expect(answered).toHaveLength(POSTGRES_VIEWS.length);
+      expect(answered.every((count) => Number.isInteger(count))).toBe(true);
+    });
+  });
+
+  describe("when sql mode writes the named collection again while engine tables use it", () => {
+    /** @scenario "Sql mode rewrites the named collection while engine tables read it" */
+    it("replaces it in place, and every view still answers", async () => {
+      const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
+      const statements = accessModelDefinition.renderNamedCollectionDdl(
+        accessModelDefinition.build({
+          names,
+          passwordSha256Hex: "a".repeat(64),
+          namedCollection: {
+            collection,
+            host: postgres.container.getIpAddress("bridge"),
+            port: 5432,
+            database: postgres.container.getDatabase(),
+            user: LWQL_POSTGRES_READER_ROLE,
+            password: postgres.readerPassword,
+          },
+          sourceDatabase: names.database,
+        }),
+      );
+
+      await harness.applyAsAdmin(statements);
+      await harness.applyAsAdmin(statements);
+
+      expect(statements.some((statement) => statement.startsWith("DROP"))).toBe(false);
+      expect(await engineTables()).toEqual(ENGINE_TABLES.toSorted());
+      const answered = await viewAnswers();
       expect(answered.every((count) => Number.isInteger(count))).toBe(true);
     });
   });

@@ -221,14 +221,16 @@ export class LangWatchQLAccessModelDefinitionService {
         `lwql provisioning: named collection port must be an integer, got ${namedCollection.port}`,
       );
     }
+    // Never DROP: from ClickHouse 26.2 it refuses while the engine tables use the collection.
+    const values =
+      `host=${clickHouseLiteral(namedCollection.host)}, ` +
+      `port=${namedCollection.port}, ` +
+      `database=${clickHouseLiteral(namedCollection.database)}, ` +
+      `user=${clickHouseLiteral(namedCollection.user)}, ` +
+      `password=${clickHouseLiteral(namedCollection.password)}`;
     return [
-      `DROP NAMED COLLECTION IF EXISTS ${namedCollection.collection}`,
-      `CREATE NAMED COLLECTION ${namedCollection.collection} AS ` +
-        `host=${clickHouseLiteral(namedCollection.host)}, ` +
-        `port=${namedCollection.port}, ` +
-        `database=${clickHouseLiteral(namedCollection.database)}, ` +
-        `user=${clickHouseLiteral(namedCollection.user)}, ` +
-        `password=${clickHouseLiteral(namedCollection.password)}`,
+      `CREATE NAMED COLLECTION IF NOT EXISTS ${namedCollection.collection} AS ${values}`,
+      `ALTER NAMED COLLECTION ${namedCollection.collection} SET ${values}`,
     ];
   }
 
