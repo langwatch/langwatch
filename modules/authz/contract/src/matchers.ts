@@ -5,7 +5,7 @@
 import { permissionSatisfiedBy } from "@langwatch/authorization";
 
 import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "./authz.ts";
-import { builtinRoleGrants, PROJECT_READER_ROLE_KEY } from "./roles.ts";
+import { BILLING_ROLE_KEY, builtinRoleGrants, PROJECT_READER_ROLE_KEY } from "./roles.ts";
 import { audienceMatches, bindingScopeCanGrantPermission } from "./scope.ts";
 
 /**
@@ -75,6 +75,24 @@ function customRoleGrants({
   return permissionSatisfiedBy({ granted: new Set(customPermissions), requested: permission });
 }
 
+/** Billing holds only on the organization, for a user granted it directly, and only its bag. */
+function billingBindingGrants({
+  binding,
+  grants,
+  permission,
+}: {
+  binding: Pick<CollectedBinding, "scopeType" | "viaGroupId">;
+  grants: CollectedGrants;
+  permission: string;
+}): boolean {
+  return (
+    binding.scopeType === "ORGANIZATION" &&
+    !binding.viaGroupId &&
+    grants.principal.type === "user" &&
+    builtinRoleGrants({ role: BILLING_ROLE_KEY, permission })
+  );
+}
+
 export function bindingGrants({
   binding,
   grants,
@@ -94,6 +112,10 @@ export function bindingGrants({
   ) {
     return false;
   }
+
+  // Billing takes no seat, so neither seat cap reads it.
+  if (binding.roleKey === BILLING_ROLE_KEY)
+    return billingBindingGrants({ binding, grants, permission });
 
   if (developerSeatExcludes({ binding, grants })) return false;
   if (liteSeatWithholds({ binding, grants, permission })) return false;

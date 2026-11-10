@@ -1,4 +1,5 @@
-import { startNavigation } from "./navigation.ts";
+import { afterLoad } from "./after-load.ts";
+import { loadSharedSheets, startNavigation } from "./navigation.ts";
 
 import "./islands.css";
 import "../app/docs.css";
@@ -78,14 +79,14 @@ document.addEventListener("click", (event) => {
     { selector: "#try-it-button", name: "playground" },
     { selector: "[data-docs-copy], [data-docs-page-copy], [data-docs-prompt]", name: "copy" },
     { selector: "[role=tab]", name: "tabs" },
-    { selector: "[data-docs-page-menu]", name: "context-menus" },
+    { selector: "[data-docs-page-menu], [data-docs-theme-menu]", name: "context-menus" },
     { selector: "[data-docs-mobile], [data-docs-mobile-close]", name: "menus" },
     { selector: "[data-docs-video]", name: "media" },
     { selector: "[data-scope=accordion] button, [data-docs-tooltip]", name: "disclosures" },
     { selector: ".docs-skill-prompt", name: "skill-prompts" },
     {
       selector:
-        '[data-docs-theme], [data-docs-agent], [aria-label="Dismiss announcement"], [data-docs-dismiss], nav[aria-label="Page navigation"] button[aria-expanded]',
+        '[data-docs-agent], [aria-label="Dismiss announcement"], [data-docs-dismiss], nav[aria-label="Page navigation"] button[aria-expanded]',
       name: "controls",
     },
   ];
@@ -108,8 +109,10 @@ const enhanceReading = () => {
   loadIsland({ name: "tabs" });
   loadIsland({ name: "reading" });
 };
+/* The reading enhancements wait for an idle moment; the shared sheet for the load and a frame. */
 if ("requestIdleCallback" in window) window.requestIdleCallback(enhanceReading, { timeout: 1000 });
 else setTimeout(enhanceReading, 100);
+afterLoad(loadSharedSheets);
 for (const eventName of ["pointerover", "focusin"])
   document.addEventListener(eventName, (event) => {
     const trigger =

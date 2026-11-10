@@ -11,6 +11,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
+import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
 import {
   LangWatchQLExecutorRepository,
   type LangWatchQLExecutionRequest,
@@ -59,6 +60,7 @@ class RecordingExecutor extends LangWatchQLExecutorRepository {
 
 function serviceOver(executor: RecordingExecutor | null) {
   return LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
     executor,
     database: "analytics",
     limits: { maxRows: 100, maxResultBytes: 8_000_000 },

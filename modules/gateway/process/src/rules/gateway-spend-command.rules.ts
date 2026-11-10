@@ -2,6 +2,8 @@
 import type {
   GatewayInternalSpendCommandRecord,
   GatewayPricedSpend,
+  GatewayProviderUsage,
+  SpendUsage,
 } from "@langwatch/gateway-contract";
 
 import { EMPTY_SPEND_USAGE } from "./gateway-spend-projection.rules.ts";
@@ -37,6 +39,49 @@ export function pricedSpendCommandData(input: GatewayPricedSpend): Record<string
     cost_nano_usd: input.costNanoUsd,
     principal_user_id: "",
     team_id: input.teamId,
+  };
+}
+
+/**
+ * The spine's confirmed-outcome shape for a call LangWatch made with stored provider
+ * credentials: no admission and no virtual key, the provider row it ran on, and the price the
+ * registry rated its quantities at. The organization is set, so the debit writer charges it.
+ */
+export function providerUsageCommandData({
+  input,
+  usage,
+  rated,
+  organizationId,
+  teamId,
+  modelProviderId,
+}: {
+  input: GatewayProviderUsage;
+  usage: SpendUsage;
+  rated: { costNanoUsd: number; rateVersion: string };
+  organizationId: string;
+  teamId: string;
+  modelProviderId: string;
+}): Record<string, unknown> {
+  return {
+    gateway_request_id: input.requestId,
+    occurred_at: input.occurredAt,
+    tenantId: input.projectId,
+    model: input.model,
+    model_provider_id: modelProviderId,
+    usage,
+    rate_version: rated.rateVersion,
+    duration_ms: Math.max(0, Math.round(input.durationMs ?? 0)),
+    organization_id: organizationId,
+    virtual_key_id: "",
+    end_user_id: "",
+    trace_id: "",
+    request_type: input.requestType,
+    labels: [],
+    metadata: "",
+    admitted_at: 0,
+    cost_nano_usd: rated.costNanoUsd,
+    principal_user_id: "",
+    team_id: teamId,
   };
 }
 

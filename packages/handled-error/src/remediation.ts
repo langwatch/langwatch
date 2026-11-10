@@ -322,6 +322,10 @@ const registry = {
     tips: ["Revoked keys cannot be reactivated — create a new API key if you need one"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  api_key_expired: {
+    tips: ["An expired key cannot be rotated. Create a new API key instead"],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
   api_key_permission_denied: {
     tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
     docsPath: "/api-reference/api-keys/create-api-key",
@@ -439,7 +443,7 @@ const registry = {
   },
   duplicate_invite: {
     tips: [
-      "A pending invite for this email already exists; revoke it first, or treat this as already done",
+      "A pending invite for this email already exists; resend it, revoke it first, or treat this as already done",
     ],
   },
   scim_token_not_found: {
@@ -991,7 +995,7 @@ const registry = {
   instant_eval_free_budget_exhausted: {
     tips: [
       "Read `meta.spentUsd` against `meta.budgetUsd`; the organization has spent its free Instant Evals allowance across every project",
-      "Upgrade the organization to a paid plan under Settings, Subscription; judged queries and runs are then billed per input token",
+      "Upgrade the organization to a paid plan under Settings, Plan & billing; judged queries and runs are then billed per input token",
     ],
   },
   instant_eval_not_enabled: {

@@ -1,6 +1,6 @@
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import { AutomationDatasetUnavailableError } from "@langwatch/automation-contract";
-import type { DatasetApi, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import type { DatasetApi, DatasetRecord, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 
@@ -108,20 +108,7 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
         readBackExisting: true,
         verifyExisting: true,
       });
-      // DatasetRecord.id is globally unique, but the readback is scoped to this dataset:
-      // an id that already belongs to a different dataset is skipped by skipDuplicates and
-      // never comes back, so the automation would report a row it never added.
-      const requested = new Set(entries.map((entry) => entry.id));
-      const storedById = new Map(written.map((record) => [record.id, record]));
-      const missing = [...requested].filter((id) => !storedById.has(id));
-      if (missing.length > 0) {
-        throw new DispatchError({
-          message:
-            `The dataset write skipped ${missing.length} row(s) whose id already belongs to another ` +
-            `dataset (${missing.slice(0, 3).join(", ")}); retarget this automation's dataset or clear those ids.`,
-          retryable: false,
-        });
-      }
+      assertDatasetRowsWritten(entries, written);
     } catch (error) {
       if (readCode(error) === "dataset_record_conflict") {
         throw new DispatchError({
@@ -150,6 +137,26 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
         cause: error instanceof Error ? error : undefined,
       });
     }
+  }
+}
+
+function assertDatasetRowsWritten(
+  entries: readonly DatasetRecordEntry[],
+  written: readonly DatasetRecord[],
+): void {
+  // DatasetRecord.id is globally unique, but the readback is scoped to this dataset:
+  // an id that already belongs to a different dataset is skipped by skipDuplicates and
+  // never comes back, so the automation would report a row it never added.
+  const requested = new Set(entries.map((entry) => entry.id));
+  const storedById = new Map(written.map((record) => [record.id, record]));
+  const missing = [...requested].filter((id) => !storedById.has(id));
+  if (missing.length > 0) {
+    throw new DispatchError({
+      message:
+        `The dataset write skipped ${missing.length} row(s) whose id already belongs to another ` +
+        `dataset (${missing.slice(0, 3).join(", ")}); retarget this automation's dataset or clear those ids.`,
+      retryable: false,
+    });
   }
 }
 

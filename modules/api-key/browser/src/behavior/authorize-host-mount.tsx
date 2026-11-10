@@ -174,10 +174,11 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
     projectId: activeScope.projectId ?? void 0,
   });
   const sessionActor = session.currentUser();
-  // What the person holds on the project, resolved by the server: the token's ceiling.
+  // What the person holds on the project, the token's ceiling: read only when a token is minted,
+  // since this mount wraps every page and the session already reads grants on each load.
   const standing = apiKeyApi.authz.effectivePermissions.useQuery(
     { projectId: activeScope.projectId ?? "" },
-    { enabled: !!activeScope.projectId },
+    { enabled: false },
   );
   const { refetch: refetchStanding } = standing;
   // As `useMintPersonalToken`: the token is never kept in the mutation cache.
@@ -205,7 +206,9 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
         mintProjectToken: async ({ expiresAt }) => {
           const { organizationId, projectId } = activeScope;
           if (!organizationId || !projectId) return void 0;
-          const held = (standing.data ?? (await refetchStanding()).data)?.permissions ?? [];
+          const read = await refetchStanding();
+          if (!read.data && read.error) throw read.error;
+          const held = read.data?.permissions ?? [];
           const permissions = cappedDeviceFlowPermissions({ held });
           if (permissions.length === 0) {
             throw new ApiKeyScopeViolationError(
@@ -237,7 +240,6 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
     [
       activeScope,
       graph,
-      standing.data,
       refetchStanding,
       sessionActor,
       session,

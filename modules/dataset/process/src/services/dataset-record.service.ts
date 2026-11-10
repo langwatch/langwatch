@@ -30,6 +30,7 @@ import type { DatasetContent } from "../app/dataset.app.ts";
 import type { LockedDatasetRecords } from "../repositories/dataset-record.repository.ts";
 import { assertColumnsCurrent } from "../rules/dataset-columns.rules.ts";
 import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
+import { datasetRecordReadback } from "../rules/dataset-record-retry.rules.ts";
 import {
   assertPageWithinLimit,
   assertWholeReadWithinLimits,
@@ -408,22 +409,15 @@ export class DatasetRecordService {
         skipDuplicates: parsed.skipDuplicates ?? false,
         verifyExisting: parsed.verifyExisting ?? false,
       });
-      if (!parsed.readBackExisting) {
-        return written;
-      }
-
-      // Preserve explicit readback for callers requesting their deterministic ids.
-      const requestedIds = parsed.entries.flatMap((entry) =>
-        entry.id === undefined ? [] : [entry.id],
-      );
-      if (requestedIds.length !== parsed.entries.length) {
+      const readback = datasetRecordReadback(parsed);
+      if (readback.kind === "written") {
         return written;
       }
 
       return records.findByIds({
         datasetId: dataset.id,
         projectId: parsed.projectId,
-        ids: requestedIds,
+        ids: readback.ids,
       });
     });
   }

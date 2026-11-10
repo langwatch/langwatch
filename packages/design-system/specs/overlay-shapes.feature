@@ -23,6 +23,7 @@ Feature: Drawer and dialog shapes
     When the reader presses the submit action or Enter in a field
     Then the overlay's onSubmit runs exactly once
     And a submit action naming a child form's id submits that form instead
+    And a form around the element that opened the overlay is not submitted
 
   @integration
   Scenario: An overlay body shows loading and failure in place of its content

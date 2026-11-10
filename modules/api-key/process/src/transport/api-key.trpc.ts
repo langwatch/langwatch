@@ -37,6 +37,13 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     })
     .handle(({ app, input, actor }) => app.listCallerBindings(input, { id: actor.id }))
 
+    .procedure("grantablePermissions")
+    .noPermission({
+      reason: OWN_KEYS_REASON,
+      allow: MEMBER_ONLY,
+    })
+    .handle(({ app, input, actor }) => app.listGrantablePermissions(input, { id: actor.id }))
+
     .procedure("nameById")
     .noPermission({
       reason: OWN_KEYS_REASON,
@@ -89,6 +96,23 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
       await app.revokeKey(input, { id: actor.id });
 
       return { success: true };
+    })
+
+    .procedure("rotate")
+    .mintsCredential("organization:view")
+    .noPermission({
+      reason: OWN_KEYS_REASON,
+      allow: MEMBER_ONLY,
+    })
+    // The second answer that carries a plaintext token: the new secret, once, with the same
+    // identity `create` answers beside it.
+    .handle(async ({ app, input, actor }) => {
+      const { token, apiKey } = await app.rotateKey(input, actor);
+
+      return {
+        token,
+        apiKey: { id: apiKey.id, name: apiKey.name, createdAt: apiKey.createdAt },
+      };
     })
 
     .procedure("orgProjects")

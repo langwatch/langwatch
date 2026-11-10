@@ -2,6 +2,7 @@ import { isDeepStrictEqual } from "node:util";
 
 import {
   DatasetRecordConflictError,
+  type CreateDatasetRecordsInput,
   type DatasetRecord,
   type DatasetRecordInput,
 } from "@langwatch/dataset-contract";
@@ -43,4 +44,14 @@ export function verifyExistingDatasetRecords(input: {
       byId.set(record.id, record.entry);
     }
   }
+}
+
+/** Read existing rows only when the caller supplied every ID and requested readback. */
+export function datasetRecordReadback(
+  input: CreateDatasetRecordsInput,
+): { kind: "written" } | { kind: "existing"; ids: string[] } {
+  if (!input.readBackExisting) return { kind: "written" };
+
+  const ids = input.entries.flatMap((entry) => (entry.id === void 0 ? [] : [entry.id]));
+  return ids.length === input.entries.length ? { kind: "existing", ids } : { kind: "written" };
 }

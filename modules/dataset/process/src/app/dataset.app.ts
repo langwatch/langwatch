@@ -787,13 +787,17 @@ export class DatasetModule implements DatasetApi {
     return this.#repositories.versions.findRunLinks(input);
   }
 
-  /** The autosave a quiet dataset gets; a dataset archived meanwhile is skipped. */
+  /**
+   * The autosave a quiet dataset gets; a dataset archived meanwhile is skipped,
+   * and so is one still empty with no history, so its first rows become version 1.
+   */
   async autosaveVersion(input: {
     projectId: string;
     datasetId: string;
     editedBy: DatasetVersionAuthor;
   }): Promise<void> {
     try {
+      if (await this.#emptyWithoutHistory(input)) return;
       await this.#versions.snapshot({
         projectId: input.projectId,
         datasetId: input.datasetId,
@@ -848,8 +852,8 @@ export class DatasetModule implements DatasetApi {
   }
 
   /**
-   * Runs an edit: first gives a dataset with no history its version 1 of the
-   * content before the edit, then records the edit for the autosave.
+   * Runs an edit: first gives a dataset with no history and some rows its
+   * version 1 of the content before the edit, then records the edit for the autosave.
    */
   async #edited<T>(
     input: { projectId: string; slugOrId: string } & EditedBy,
@@ -868,11 +872,10 @@ export class DatasetModule implements DatasetApi {
   async #ensureFirstVersion(dataset: Dataset): Promise<void> {
     if (this.#versioned.has(dataset.id) || dataset.status !== "ready") return;
     try {
-      const has = await this.#repositories.versions.hasAny({
-        projectId: dataset.projectId,
-        datasetId: dataset.id,
-      });
-      if (!has) {
+      const address = { projectId: dataset.projectId, datasetId: dataset.id };
+      const has = await this.#repositories.versions.hasAny(address);
+      // An empty dataset has nothing to restore, so its first real save becomes version 1.
+      if (!has && (await this.#versions.hasRows(address))) {
         await this.#versions.snapshot({
           projectId: dataset.projectId,
           datasetId: dataset.id,
@@ -887,6 +890,11 @@ export class DatasetModule implements DatasetApi {
         "Could not save a dataset's first version before an edit; the edit goes ahead",
       );
     }
+  }
+
+  async #emptyWithoutHistory(input: { projectId: string; datasetId: string }): Promise<boolean> {
+    const has = await this.#repositories.versions.hasAny(input);
+    return !has && !(await this.#versions.hasRows(input));
   }
 
   #markVersioned(datasetId: string): void {

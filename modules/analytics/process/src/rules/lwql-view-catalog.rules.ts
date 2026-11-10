@@ -3061,6 +3061,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       _size_bytes: "inherit",
       ExpectedTargetResults: "inherit",
       ExpectedEvaluatorResults: "inherit",
+      Concurrency: "inherit",
     },
   }),
   gateway_budget_ledger: defineTableCatalogue({
@@ -3157,6 +3158,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       TokensInputImage: "inherit",
       TokensOutputImage: "inherit",
       ImageCount: "inherit",
+      WebSearchRequests: "inherit",
     },
   }),
   governance_cost_restatements: defineTableCatalogue({

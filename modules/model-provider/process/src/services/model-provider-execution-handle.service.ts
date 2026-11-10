@@ -14,6 +14,7 @@ import {
   prepareLitellmParams,
 } from "../rules/legacy-model-provider.rules.ts";
 import type { ModelCostProject } from "./model-provider-project-scope.service.ts";
+import type { ModelProviderUsageMeteringService } from "./model-provider-usage-metering.service.ts";
 
 /**
  * The handle a Codex model executes through, via the AI gateway's Responses endpoint — not this
@@ -65,6 +66,8 @@ export type ModelProviderExecutionHandleOptions = {
    * models refuse by name — see {@link ModelProviderCodexHandle}.
    */
   codexHandles?: ModelProviderCodexHandle;
+  /** Writes each answered call's usage to the spend ledger; absent writes nothing (ADR-193). */
+  metering?: Pick<ModelProviderUsageMeteringService, "metered">;
 };
 
 async function resolveModel({
@@ -234,13 +237,21 @@ export class ModelProviderExecutionHandleService {
       projectId,
     });
 
-    return handleForParameters({
+    const handle = handleForParameters({
       providerKey,
       model: model_,
       parameters: litellmParams,
       executionProxyBaseUrl: input.executionProxyBaseUrl,
       internalSecret: input.nlpInternalSecret,
     });
+    return input.metering
+      ? input.metering.metered(handle, {
+          projectId,
+          model: model_,
+          modelProviderId: modelProvider.id,
+          featureKey,
+        })
+      : handle;
   }
 
   resolve(input: ModelProviderExecutionHandleInput): Promise<LanguageModel> {

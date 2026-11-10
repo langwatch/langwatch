@@ -4,6 +4,7 @@ import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryOrganizationMembershipRepository } from "../../repositories/memory/memory.organization-membership.repository.ts";
+import { MemoryOrganizationSeatRepository } from "../../repositories/memory/memory.organization-seat.repository.ts";
 import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import type {
   OrganizationGrantCache,
@@ -11,7 +12,8 @@ import type {
 } from "../organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
 import type { OrganizationCreationNotice } from "../organization-provisioning.service.ts";
-import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
+import { OrganizationSeatLicenseService } from "../organization-seat-license.service.ts";
+import { withSeatHolds } from "./support/seat-holds.ts";
 
 const ORGANIZATION = "org_acme";
 
@@ -44,9 +46,16 @@ beforeEach(() => {
         recorded.push({ department: input });
       },
     },
-    repository: MemoryOrganizationMembershipRepository.create({ memory }),
+    ...withSeatHolds({
+      repository: MemoryOrganizationMembershipRepository.create({ memory }),
+      memory,
+    }),
     creations: createApiFixture<OrganizationCreationNotice>(),
-    seats: createApiFixture<OrganizationSeatLicense>(),
+    seats: OrganizationSeatLicenseService.create({
+      plans: { getActivePlan: () => Promise.reject(new Error("no plan read expected")) },
+      memberships: MemoryOrganizationSeatRepository.create({ memory }),
+      notices: { reached: () => Promise.reject(new Error("no seat notice expected")) },
+    }),
     seatNotices: createApiFixture<OrganizationSeatRevocationNotice>(),
     grantCache: createApiFixture<OrganizationGrantCache>(),
     testArrivals: { standingFor: async () => ({ testing: false }) as const },
@@ -76,6 +85,32 @@ describe("given a member of the organization", () => {
             organizationId: ORGANIZATION,
             userId: "user_ben",
             removedByUserId: "user_ana",
+            heldFullSeat: true,
+          },
+        },
+      ]);
+    });
+  });
+
+  describe("when an administrator removes an external member", () => {
+    /** @scenario "A departure records whether the person held a full seat" */
+    it("records that the person held no full seat", async () => {
+      seedMember("user_ana", OrganizationUserRole.ADMIN);
+      seedMember("user_eve", OrganizationUserRole.EXTERNAL);
+
+      await service.deleteMember({
+        organizationId: ORGANIZATION,
+        userId: "user_eve",
+        actingUserId: "user_ana",
+      });
+
+      expect(recorded).toEqual([
+        {
+          removed: {
+            organizationId: ORGANIZATION,
+            userId: "user_eve",
+            removedByUserId: "user_ana",
+            heldFullSeat: false,
           },
         },
       ]);

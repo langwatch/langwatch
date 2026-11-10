@@ -809,8 +809,7 @@ Rule: pi joins this table as a plugin, which is opencode's shape exactly
   wherever it is present. pi's extension always sends one, so pi's row names no
   variable.
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: pi's row carries a plugin hook target, as opencode's does
     Given the per-agent table that names each agent's tool slug, server agent id, key source types, session id source and hook target
     When the table is read
@@ -818,8 +817,7 @@ Rule: pi joins this table as a plugin, which is opencode's shape exactly
     And that row names no session id variable
     And installing the hooks writes no entries into any file pi shares with the user
 
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: The session-context command accepts a record the pi extension asked for
     Given pi has a row in the table whose hook target is its extension
     When `langwatch ingest hook pi` is run for session "s-1"

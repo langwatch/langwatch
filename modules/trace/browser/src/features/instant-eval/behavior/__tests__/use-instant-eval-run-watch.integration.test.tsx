@@ -17,7 +17,13 @@ const harness = vi.hoisted(() => ({
   discover: vi.fn(),
   newCount: vi.fn(),
   sessions: vi.fn(),
-  invalidate: { list: vi.fn(), sessions: vi.fn(), facetValues: vi.fn(), newCount: vi.fn() },
+  invalidate: {
+    list: vi.fn(),
+    sessions: vi.fn(),
+    facetValues: vi.fn(),
+    newCount: vi.fn(),
+    instantEvalGet: vi.fn(),
+  },
   getResults: [] as { data: unknown; dataUpdatedAt: number }[],
 }));
 
@@ -37,6 +43,7 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
         newCount: { invalidate: harness.invalidate.newCount },
       },
       codingAgents: { sessionGroups: { invalidate: harness.invalidate.sessions } },
+      instantEval: { get: { invalidate: harness.invalidate.instantEvalGet } },
     }),
     useQueries: () => harness.getResults,
   },
@@ -81,7 +88,7 @@ const key = instantEvalRunKey({
   window: { from: 1_000, to: 2_000 },
 });
 
-type RunStatus = "running" | "finished" | "cancelled";
+type RunStatus = "running" | "finished" | "cancelled" | "failed";
 
 function progress({
   status = "running",
@@ -89,12 +96,16 @@ function progress({
   progress: judged,
   matched,
   finishedAtMs = status === "running" ? null : Date.now(),
+  error = null,
+  priceUsd = 0.1,
 }: {
   status?: RunStatus;
   total?: number;
   progress: number;
   matched: number;
   finishedAtMs?: number | null;
+  error?: string | null;
+  priceUsd?: number;
 }) {
   return {
     id: "run-1",
@@ -104,8 +115,8 @@ function progress({
     matched,
     failed: 0,
     skipped: 0,
-    error: null,
-    priceUsd: 0.1,
+    error,
+    priceUsd,
     finishedAtMs,
   };
 }
@@ -332,6 +343,55 @@ describe("given a running run that was asked to stop", () => {
       expect(useInstantEvalRunStore.getState().settled["run-1"]).toBe(true);
       const { result } = renderHook(() => useExplorerCounts());
       expect(result.current.instantEval).toBeNull();
+    });
+  });
+});
+
+describe("given a run that ended", () => {
+  describe("when its first ended answer is stored", () => {
+    /** @scenario "An ended run is read once more without a timer" */
+    it("reads the run once more, and settles when that read answers the same counters", () => {
+      const ended = progress({ status: "failed", progress: 0, matched: 0, priceUsd: 0 });
+      harness.getResults = answer(ended);
+      const { rerender } = renderHook(() => useInstantEvalRunWatch());
+
+      expect(harness.invalidate.instantEvalGet).toHaveBeenCalledTimes(1);
+      expect(harness.invalidate.instantEvalGet).toHaveBeenCalledWith({
+        projectId: "project-1",
+        runId: "run-1",
+      });
+
+      harness.getResults = answer(ended);
+      rerender();
+      rerender();
+      expect(useInstantEvalRunStore.getState().quiet["run-1"]).toBe(true);
+      expect(harness.invalidate.instantEvalGet).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given a run behind the query's eval chip that LangWatch could not reach", () => {
+  describe("when its status turns failed with nothing charged", () => {
+    /** @scenario "A run that fails on the server shows the failure instead of judging" */
+    it("stops reading the run's counters, so nothing says it is still judging", () => {
+      useInstantEvalRunStore.getState().setRun(progress({ progress: 0, matched: 0 }));
+      const { result, rerender } = renderHook(() => useExplorerCounts());
+      expect(result.current.instantEval?.phase).toBe("judging");
+
+      act(() =>
+        useInstantEvalRunStore.getState().setRun(
+          progress({
+            status: "failed",
+            progress: 0,
+            matched: 0,
+            priceUsd: 0,
+            error: "connect_unreachable",
+          }),
+        ),
+      );
+      rerender();
+      expect(result.current.instantEval).toBeNull();
+      expect(result.current.summary).toBe("3 traces");
     });
   });
 });

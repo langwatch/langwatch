@@ -47,7 +47,8 @@ const MAIN_GUARDS: readonly MainGuard[] = [
   { page: "pages/me/sessions", flags: [GOVERNANCE_FLAG] },
   { page: "pages/me/budget/request", flags: [GOVERNANCE_FLAG] },
   { page: "pages/settings", permission: "organization:view" },
-  { page: "pages/settings/roles", permission: "organization:manage" },
+  // Widened from main's organization:manage: every member reads Roles read-only.
+  { page: "pages/settings/roles", permission: "members:view" },
   // Main asked organization:manage; the page now asks the grant its read asks (Alex, 2026-10-11).
   { page: "pages/settings/audit-log", permission: "auditLog:view" },
   { page: "pages/settings/authentication", permission: "sso:view" },

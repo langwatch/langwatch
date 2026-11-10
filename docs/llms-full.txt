@@ -429,14 +429,17 @@ An [ingestion template](/ai-governance/ingestion-templates) mints an ingestion k
     Go to [Settings > API Keys](https://app.langwatch.ai/settings/api-keys) and click **Create new secret key**.
   </Step>
 
-<Step title="Fill in the drawer">
-  - **Key type**: shown to organization admins only. Pick **Personal**. Other members always create
-  a personal key. - **Name**: for example `Local dev` or `MCP key` - **Description**: optional -
-  **Scope**: the projects, teams or the organization the key can access - **Permissions**: **All**
-  gives the key your own permissions on each scope. **Restricted** lets you pick read or write per
-  [permission category](#permission-categories) - **Expiration**: **No expiration**, 7, 30, 60 or 90
-  days, or **Custom**
-</Step>
+  <Step title="Fill in the drawer">
+    - **Key type**: shown to organization admins only, with a picker for the member who owns a personal key. Other members always create a personal key for themselves
+    - **Name**: for example `Local dev` or `MCP key`
+    - **Scope**: the projects, teams or the organization the key can access. The current project is picked for you
+    - **Expiration**: **No expiration** by default, or 7, 30, 60 or 90 days, or **Custom**
+
+    That is all a first key needs: it gets all of its owner's permissions on that scope. The owner is you, or the member an admin picked, and the key never holds more than they do. Open **Advanced** to change the rest:
+
+    - **Description**: optional
+    - **Permissions**: **All** gives the key its owner's permissions on each scope. **Restricted** lets you pick read or write per [permission category](#permission-categories)
+  </Step>
 
   <Step title="Copy the key">
     Click **Create secret key**. The key is shown once, as `sk-lw-<id>_<secret>`, with ready-made `.env`, HTTP header, terminal and MCP snippets whose copy buttons carry the real key. Copy it now; the table never shows it again.
@@ -474,10 +477,12 @@ Service keys are for automated systems: CI/CD pipelines, production services and
 
   <Step title="Fill in the drawer">
     - **Key type**: **Service**
-    - **Name** and optional **Description**
+    - **Name**
     - **Scope**: the projects, teams or the organization the key can access
-    - **Permissions**: **All** gives Admin on every scope you picked. **Restricted** gives only the categories you tick
     - **Expiration**
+    - Under **Advanced**:
+      - **Description**: optional
+      - **Permissions**: **All** gives Admin on every scope you picked. **Restricted** gives only the categories you tick
 
     <Warning>
       A service key scoped to the organization with **All** permissions is an organization-wide Admin. Scope service keys to the projects they serve.
@@ -604,9 +609,12 @@ A service key has no owner. Its permissions come from its scope and permission m
 
 **Settings > API Keys** lists every key with **Name**, **Status**, **Secret Key** (the prefix only), **Created**, **Last Used**, **Type** (the owner's email, or **Service**), **Scope** and **Permissions**. A scope filter above the table narrows the list to one project, team or the organization.
 
+Click a key to open its details: owner, scope, permissions, expiry, creation date and last use. The secret is never shown again after it is created.
+
 The key's owner and organization admins can:
 
 - **Edit** the name, description, permission mode, categories and scope
+- **Rotate** the key to get a new secret with the same settings. After you confirm, the new secret is shown once and the old secret is refused at once; there is no overlap period. The key keeps its name, owner, scope, permissions, expiry and usage history. An expired or revoked key cannot be rotated
 - **Revoke** the key. A revoked key is refused at once and cannot be restored
 
 The **Ingestion keys** table on the same page lists ingestion keys; organization admins revoke them.
@@ -1001,7 +1009,7 @@ Personal workspaces contain one personal team and project, listed under **My Wor
   <img src="/images/access/directory-dark.png" alt="The Directory People tab with organization members and their seat roles" className="hidden dark:block" />
 </Frame>
 
-**Settings > Directory > People** lists every member with their organization role and their access. Opening the page needs `organization:manage`.
+**Settings > Users > People** lists every member with their organization role and their access. Every member can open it read-only (`members:view`); changing anyone needs `organization:manage`.
 
 Each row shows the name, the email, a **Lite Member** or **Developer** badge when the member is on one of those seats, a **Disabled** badge when access is switched off, and the **Access** column: one badge per role binding, as `role on scope`, with `via <group>` when the binding comes from a group.
 
@@ -1036,7 +1044,7 @@ provider:
 | Option | Behavior |
 |--------|----------|
 | **Invite only** | Only people with an invitation can join |
-| **Approval required** | Someone with a verified company address can ask to join. You approve or reject the request in **Settings > Directory > People** |
+| **Approval required** | Someone with a verified company address can ask to join. You approve or reject the request in **Settings > Users > People** |
 | **Automatic joining** | Someone on a domain you verified joins without approval and receives the seat chosen below |
 
 Under the door setting, **Seat for people who join** decides what a person admitted without an invitation lands on: **Member** (the default, a full seat that can be added to shared teams and projects) or **Developer** (a project of their own, with access to no shared team or project). The same choice applies to people your identity provider admits. Invitations always name their own seat and ignore this setting.
@@ -1070,7 +1078,7 @@ The CLI honours the seat too: `langwatch login` offers a Developer their persona
   <img src="/images/access/teams-dark.png" alt="Teams and projects with direct and inherited access" className="hidden dark:block" />
 </Frame>
 
-**Settings > Directory > Teams & projects** shows every team with its projects and members. Click **New team** to create one; you are added as its Admin. The team card shows the members with their team role, which you can change in place, and an **X** to remove the member from the team. Members that come from a group are read only and show `via <group>`.
+**Settings > Users > Teams & projects** shows every team with its projects and members. Click **New team** to create one; you are added as its Admin. The team card shows the members with their team role, which you can change in place, and an **X** to remove the member from the team. Members that come from a group are read only and show `via <group>`.
 
 **Add to team** adds an organization member with a role on this team, and so on every project in it. Under each project, **Add person to this project** gives a role on that project only. For someone already on the team, the page marks the row **override** and shows their team role next to it; the project role adds to the team role, it does not take permissions away. Remove the project role to leave only the team role.
 
@@ -1080,10 +1088,10 @@ Click **Edit** on a team to open its page: rename it (the slug is read only), ed
 
 | Action | Where | Effect |
 |--------|-------|--------|
-| Remove from a team | Settings > Directory > Teams, the **X** on the member row, or the member dialog | The person loses the role on that team and its projects. Project overrides stay until removed |
-| Remove a group member | Settings > Directory > Groups | The person loses every binding that came from the group |
-| Disable | Settings > Directory > People, row menu | Every request from the person is refused until you enable them again. Their role and bindings stay, and their seat is freed. Enabling them again takes a seat |
-| Delete | Settings > Directory > People, row menu | The membership and its bindings are removed. Not available for yourself; removing the last active administrator is refused |
+| Remove from a team | Settings > Users > Teams, the **X** on the member row, or the member dialog | The person loses the role on that team and its projects. Project overrides stay until removed |
+| Remove a group member | Settings > Users > Groups | The person loses every binding that came from the group |
+| Disable | Settings > Users > People, row menu | Every request from the person is refused until you enable them again. Their role and bindings stay, and their seat is freed. Enabling them again takes a seat |
+| Delete | Settings > Users > People, row menu | The membership and its bindings are removed. Not available for yourself; removing the last active administrator is refused |
 
 Deleting a member does not delete the traces, prompts or other work they created.
 
@@ -1190,7 +1198,7 @@ The **Default Models** section on the same page sets the model each feature uses
 
 Click **Add config**, pick the scopes and the models. A project config beats a team config, which beats an organization config. A feature that no config names inherits from the wider scope.
 
-The **Instant Evals** column takes only decision models: LangWatch Instant Preview, the default, or one on your own key. See [Run Instant Evals on your own decision model](/features/instant-evals/own-model).
+The **Instant Evals** column takes only decision models: LangWatch Evals Preview, the default, or one on your own key. See [Run Instant Evals on your own decision model](/features/instant-evals/own-model).
 
 <Frame>
 <img src="/images/platform/model-providers-default-models.png" alt="The Default Models section with one config and the Add config button" />
@@ -1246,7 +1254,7 @@ Every member of the organization has an organization role. A role binding at the
 
 ## Organization roles
 
-Set the organization role per member in **Settings > Directory > People**. The role
+Set the organization role per member in **Settings > Users > People**. The role
 decides what a person can do at the organization level and how their seat is
 counted.
 
@@ -1410,10 +1418,10 @@ the role permits at the selected scope. Select **Create role** to save it.
 
 The permission picker groups resources by product area. The [Roles API](/api-reference/roles/overview) accepts every resource and action in the tables above.
 
-To assign a custom role directly, open **Settings > Directory > People** and edit the
-person's access, or open **Settings > Directory > Teams & projects** and add access to a team or
+To assign a custom role directly, open **Settings > Users > People** and edit the
+person's access, or open **Settings > Users > Teams & projects** and add access to a team or
 project. You can also choose a role while creating an invite, or assign the
-role to a group in **Settings > Directory > Groups**. A custom role can be assigned at
+role to a group in **Settings > Users > Groups**. A custom role can be assigned at
 organization, team or project scope.
 
 An organization Admin who also holds a
@@ -1430,8 +1438,8 @@ assignment is one row: who, which role and which scope. See [Roles & access](/pl
 | Role  | Admin, Member, Viewer, or a custom role    |
 | Scope | The organization, one team, or one project |
 
-You create role assignments for users from **Settings > Directory > People** and
-**Settings > Directory > Teams & projects**, and for groups from **Settings > Directory > Groups**. Open
+You create role assignments for users from **Settings > Users > People** and
+**Settings > Users > Teams & projects**, and for groups from **Settings > Users > Groups**. Open
 **Roles**, then choose **Role assignments** to list every assignment in the
 organization. Filter it by organization, team or project scope. This tab is
 read only.
@@ -1450,7 +1458,7 @@ An API key can hold bindings too. A key with restricted permissions stores its s
 ## Groups
 
 A group gives the same assignments to many people at once. Create a group at
-**Settings > Directory > Groups** (Enterprise), add members, and assign roles at any
+**Settings > Users > Groups** (Enterprise), add members, and assign roles at any
 scope. An assignment on a group applies to every member of the group, and the
 People tab shows it as "via" the group.
 
@@ -1562,7 +1570,7 @@ bindings.
 ## How it works
 
 1. Your identity provider pushes groups to the SCIM `/Groups` endpoint
-2. The groups appear at **Settings > Directory > Groups**
+2. The groups appear at **Settings > Users > Groups**
 3. You bind roles to each group, for example Member on the Engineering team
 4. A user added to the group in the identity provider holds every binding of the group
 5. A user removed from the group, or deprovisioned, loses them
@@ -1577,7 +1585,7 @@ bindings.
 </Frame>
 
 
-**Settings > Directory > Groups** lists every group. Each row shows:
+**Settings > Users > Groups** lists every group. Each row shows:
 
 | Column      | Description                                                          |
 | ----------- | -------------------------------------------------------------------- |
@@ -1613,7 +1621,7 @@ A group can hold several bindings, for example Member on the organization plus A
 
 ## How bindings add up
 
-A user in several groups holds every binding of every group, plus the bindings set on the user directly at **Settings > Directory > People**. Permissions add up: a request is allowed when any binding on the project, its team or the organization grants it, and no binding removes what another one grants.
+A user in several groups holds every binding of every group, plus the bindings set on the user directly at **Settings > Users > People**. Permissions add up: a request is allowed when any binding on the project, its team or the organization grants it, and no binding removes what another one grants.
 
 For example, a user in Group A (Member on the Engineering team) and Group B (Admin on the Engineering team) holds both, and can do everything an Admin can on that team.
 
@@ -1645,7 +1653,7 @@ Both `DELETE` and `PATCH active: false` remove the person's organization members
 
 You can also create groups manually without an identity provider:
 
-1. At **Settings > Directory > Groups**, click **Add a group** below the list
+1. At **Settings > Users > Groups**, click **Add a group** below the list
 2. Enter a group name
 3. Add role bindings and members in the dialog if you want
 4. Click **Create group**
@@ -1694,13 +1702,13 @@ GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
 
 **Users in a group have no access**
 
-- Open the group at **Settings > Directory > Groups**. The **Access granted** section needs at least one binding
+- Open the group at **Settings > Users > Groups**. The **Access granted** section needs at least one binding
 - The user is in the group's **Members** list. A user who was not in the organization when the identity provider pushed the group was skipped; push the group again after the user is provisioned
 
 **A user has more access than expected**
 
 - The user is in several groups. Bindings add up across groups
-- Bindings set on the user at **Settings > Directory > People** add up with the group bindings
+- Bindings set on the user at **Settings > Users > People** add up with the group bindings
 
 **Removing a user from a group in the identity provider has no effect**
 
@@ -2319,6 +2327,31 @@ LangWatch sign-in form. To reach the local sign-in, open
   <img src="/images/access/sso-active-dark.png" alt="An active SAML connection with verified-domain admission and completed setup checks" className="hidden dark:block" />
 </Frame>
 
+### People your provider refuses
+
+When your identity provider refuses someone, for example because they are not
+assigned to the LangWatch app, LangWatch shows a screen saying the company
+sign-in refused them and that their IT team can assign them the app. When the
+organization has no free seat, the screen says they are waiting for a seat
+instead. An administrator then has to free or buy a seat, and the provider may
+still need to assign them the app.
+
+Some providers, Okta included, show their own error page instead of sending
+the person back to LangWatch. The setup page lists an **Access error page**
+address for the connection, in the form
+`https://<your-langwatch>/api/auth/sso/refused/<connection>`. In Okta, open
+the app's **General** tab, click **Edit** in the **App Embed Link** section,
+choose a custom error page under **Application access error page** and paste
+this address. Okta then sends refused people to the LangWatch screen.
+
+This address names no person, so LangWatch does not notify your administrators
+about visits to it.
+
+OIDC apps in Okta show the **App Embed Link** section only after extra setup,
+and Okta Classic Engine does not use the custom error page when a sign-on
+policy denies a custom OIDC app. See Okta's
+[App Embed Link guide](https://support.okta.com/help/s/article/oidc-apps-do-not-have-the-app-embeded-link-section?language=en_US).
+
 To change the provider, open the same page and prepare a replacement. Read the
 state shown on the page before removing the old connection. The removal action
 explains whether the connection is still being prepared, active or already
@@ -2352,7 +2385,7 @@ SCIM `DELETE` or `PATCH active: false`. Those operations revoke the person's
 browser sessions and CLI tokens, remove organization membership and role
 bindings, and keep their LangWatch data.
 
-In **Directory**, **Disable** is reversible: it refuses the person's requests,
+In **Users**, **Disable** is reversible: it refuses the person's requests,
 preserves their role and bindings, and frees their seat. **Remove from
 organization** ends membership and access.
 
@@ -2380,9 +2413,9 @@ people that connection provisioned, and can take on a member that no connector
 has claimed yet. It cannot manage people owned by another connection. Revoke a
 token from the **Provisioning tokens** table when that integration should stop.
 
-SCIM creates an organization Member. Use **Settings > Directory > People** to
+SCIM creates an organization Member. Use **Settings > Users > People** to
 give the person a different organization role or direct access. Use
-**Settings > Directory > Groups** to assign access through a group. A SCIM
+**Settings > Users > Groups** to assign access through a group. A SCIM
 `PATCH` with `active: false` deactivates the account, removes its organization
 membership and role bindings, and revokes browser sessions and CLI tokens. A
 SCIM `DELETE` has the same access and session effects while keeping the
@@ -2439,7 +2472,7 @@ that are already past it.
 | Set up or replace the identity provider | **Settings > Authentication > Identity provider** |
 | Check directory sync or issue a provisioning token | **Settings > Authentication > Connectors** |
 | Change who can join, account lockout or session limits | **Settings > Authentication > Overview > Organization policies** |
-| Edit a person, team or project assignment | **Settings > Directory > People** or **Settings > Directory > Teams & projects** |
+| Edit a person, team or project assignment | **Settings > Users > People** or **Settings > Users > Teams & projects** |
 | Define roles or review assignments | **Settings > Roles > Roles** or **Settings > Roles > Role assignments** |
 
 ---
@@ -19083,6 +19116,8 @@ keywords:
   - coding agent ci telemetry
   - ingest key
   - github actions claude code
+  - pi coding agent ci
+  - grok cli headless
   - agent fleet telemetry
 ---
 
@@ -19095,11 +19130,17 @@ A background agent spends tokens the same way an interactive one does, and needs
 ```bash
 langwatch instrument claude --key ik-lw-...
 langwatch instrument codex --key ik-lw-...
+langwatch instrument pi --key ik-lw-...
+langwatch instrument grok --key ik-lw-...
 ```
 
 GitHub Copilot CLI is different: `langwatch instrument copilot` writes a shell function to your shell's startup file, which a non-interactive bash or zsh shell, such as a CI step or a service, does not load. On those machines, export the Copilot settings in the job or the image instead.
 
 `langwatch ingest install copilot_cli --env-only` prints those settings, but it needs a signed-in device, so run it on a machine where you are signed in and copy the lines, as [Bake it into an image](#bake-it-into-an-image) shows. With an ingest key alone, write the same lines by hand from [Manual OpenTelemetry setup](/coding-agents/github-copilot-cli#manual-opentelemetry-setup).
+
+pi and Grok work the same way: `langwatch instrument pi` and `langwatch instrument grok` each write a shell function, because neither tool reads its export settings from a file. In a CI step or a service, set the variables from [pi manual setup](/coding-agents/pi#manual-setup) or [Grok manual setup](/coding-agents/grok-cli#manual-opentelemetry-setup) in the job instead.
+
+pi also needs its telemetry extension on the machine, so run `langwatch instrument pi --key ik-lw-...` once in the job first, or `langwatch instrument pi` with `LANGWATCH_INGEST_KEY` set: it writes the extension, and pi sends no telemetry without it.
 
 The command reads the same value from the environment, which is how you keep the key out of shell history and provisioning scripts:
 
@@ -19135,15 +19176,37 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
+A job running pi headless writes the extension first, then sets the variables on the step that runs pi:
+
+```yaml
+      - run: npm install -g langwatch @earendil-works/pi-coding-agent
+      - run: langwatch instrument pi
+        env:
+          LANGWATCH_INGEST_KEY: ${{ secrets.LANGWATCH_INGEST_KEY }}
+      - run: pi -p "Update the dependency table in README.md"
+        env:
+          OTEL_TRACES_EXPORTER: otlp
+          OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true"
+          OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+          OTEL_EXPORTER_OTLP_ENDPOINT: https://app.langwatch.ai/api/otel
+          OTEL_EXPORTER_OTLP_HEADERS: Authorization=Bearer ${{ secrets.LANGWATCH_INGEST_KEY }}
+          OTEL_RESOURCE_ATTRIBUTES: service.name=pi
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
 The session appears on the project's [sessions list](/coding-agents/sessions) like any other, and its branch work attributes to [pull requests](/coding-agents/pull-requests) the same way.
 
 For CI jobs that use the LangWatch SDK or CLI itself rather than a coding agent, `langwatch login --api-key <sk-lw-...>` writes a project API key to `.env` non-interactively, and `langwatch login --token <token>` installs a pre-minted device token. Both fail fast on a machine without a terminal instead of hanging on a device-code prompt.
 
 ## Bake it into an image
 
-`langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`, `copilot_cli`. Add `--json` for machine-readable output. The command needs a signed-in device, unlike `--key`.
+`langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`, `copilot_cli`, `grok_cli`, `pi_cli`. Add `--json` for machine-readable output. The command needs a signed-in device, unlike `--key`.
 
 `--env-only` also skips the hooks that report each session's repository and branch. For `copilot_cli`, that is the file `~/.copilot/hooks/langwatch.json`, and without it Copilot sessions reach no pull request. Run the command without `--env-only` to write it. See [GitHub Copilot](/coding-agents/github-copilot-cli#link-sessions-to-their-pull-requests).
+
+For `grok_cli`, the skipped hook file is `~/.grok/hooks/langwatch.json`, so Grok sessions report no repository or branch. For `pi_cli`, the skipped file is pi's telemetry extension, and without it pi sends no telemetry at all.
+
+Write pi's extension when the container starts, not while the image builds: run `langwatch instrument pi` with `LANGWATCH_INGEST_KEY` supplied as a runtime secret. Both commands that write the extension also save the ingest key to the CLI's config file, so running either in a build step leaves the key in an image layer.
 
 ## Roll out to a managed fleet
 
@@ -19951,7 +20014,11 @@ Your agent can read all of this back. See [Explore your usage with your own agen
 
 ## Content and privacy
 
-The extension exports what pi's own span tree describes: model, provider, token counts, cost, timing, and the name and outcome of each tool call. It sends no prompt text, no model response and no tool arguments or results. To control who can open a stored session, see [Privacy](/coding-agents/privacy).
+The extension always exports what pi's own span tree describes: model, provider, token counts, cost, timing, and the name and outcome of each tool call.
+
+With `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true`, it also sends the prompt, each model reply, each tool's arguments and result, and the name you gave the session with `/name`. These give a session its title and fill its Input, Output and Conversation. The shell function sets this switch. Leave it unset to send counts and timing only. Any one value larger than 256 KiB is cut to that size.
+
+To control who can open a stored session, see [Privacy](/coding-agents/privacy).
 
 ## Troubleshooting
 
@@ -19994,6 +20061,7 @@ The extension is required: pi exports no telemetry without it. Run `langwatch in
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=none
 export OTEL_METRICS_EXPORTER=none
+export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
@@ -37432,7 +37500,7 @@ For a golden answer, the test suite declares [fields](/agent-testing/test-suites
 **Edit suite** opens the suite editor. Under **Customize test suite**, **Add evaluator** lists the evaluators of the project, and picking one attaches it with its mappings inferred. When a required input is still unmapped, or the evaluator reads an expected value, the drawer opens on the attachment so you confirm each mapping.
 
 <Frame>
-<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The suite editor with two fields, golden_sql and table_schema, each with a drag handle, and two evaluator chips, SQL Query Equivalence with the required dot and a score judge" />
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" width="616" alt="The suite editor with two fields, golden_sql and table_schema, each with a drag handle, and two evaluator chips, SQL Query Equivalence with the required dot and a score judge" />
 </Frame>
 
 A chip with an amber alert has a required input with no mapping. **Run suite** does not start in that state: it opens the drawer on that evaluator instead.
@@ -40088,6 +40156,7 @@ The **Scenarios** tab lists the test suites of the project under **Test Suites**
   <img
     className="block"
     src="/images/agent-testing/test-suite-rail-menu.png"
+    width="356"
     alt="The test suite rail with the row menu of the Refunds test suite open"
   />
 </Frame>
@@ -40099,7 +40168,7 @@ The row menu of a test suite offers:
 | **New scenario**     | Opens the editor with this test suite preselected.                                            |
 | **Run suite**        | Opens the run dialog with every scenario of the test suite in scope.                          |
 | **Edit**             | Opens the suite editor: the name, the fields and the evaluators. Past runs keep the old name. |
-| **Open recent runs** | Lists the latest runs of this test suite.                                                     |
+| **Open recent runs** | Lists the latest runs of this test suite. It appears when a scenario in it has a result in the selected period. |
 | **Archive suite**    | Archives the test suite and the scenarios in it. Test runs are preserved.                     |
 
 Every project has a **Default** test suite. A scenario saved with **No test suite** goes there.
@@ -40113,7 +40182,7 @@ A test suite reads like a dataset. Beyond the situation and the criteria, it dec
 **Edit suite** opens the suite editor. Under **Customize test suite**, **Add fields** opens the field rows: an identifier and a type each, with **Add field** for the next one. Drag a row by the handle on its left to reorder the fields. The handle appears once the suite declares more than one field, and it takes the arrow keys when it has focus.
 
 <Frame>
-<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The Edit test suite drawer with the field rows golden_sql and table_schema, each with a drag handle, a type of Text and a remove button, and the evaluator chips under them" />
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" width="616" alt="The Edit test suite drawer with the field rows golden_sql and table_schema, each with a drag handle, a type of Text and a remove button, and the evaluator chips under them" />
 </Frame>
 
 The field rows of the `Case lookups` suite, with the drag handle on the left of each.
@@ -40141,6 +40210,7 @@ The evaluators attached to a suite run after every scenario run and report besid
   <img
     className="block"
     src="/images/agent-testing/move-to-test-suite.png"
+    width="448"
     alt="The Move to test suite dialog with the test suites of the project"
   />
 </Frame>
@@ -44115,33 +44185,31 @@ keywords: langwatch, instant evals, decision model, own key, bring your own key,
 description: Run Instant Evals on a decision model in your own provider account, set up Azure, and read the rows your model cannot judge.
 ---
 
-## LangWatch Instant Preview or your own model
+## LangWatch Evals Preview or your own model
 
-Instant Evals run on **LangWatch Instant Preview** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
-
-<Note>
-  This is off by default. Ask LangWatch to turn it on for your organization. Until then, the **Instant Evals** column offers LangWatch Instant Preview only.
-</Note>
+Instant Evals run on **LangWatch Evals Preview** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
 
 ## The models you can pick
 
-| Model in the picker               | Provider to add       | What the provider needs                                                       |
-| --------------------------------- | --------------------- | ----------------------------------------------------------------------------- |
-| OpenAI Decisions API              | OpenAI                | API key. Runs `gpt-6-luna`                                                    |
-| Azure OpenAI Decisions API        | Azure OpenAI          | API key, endpoint and a `gpt-6-luna` deployment on your resource. See [Azure](#azure) |
-| Microsoft Decision 1 (Azure)      | Azure OpenAI          | API key, endpoint and a Microsoft Decision 1 deployment on Azure AI Foundry. See [Azure](#azure) |
-| Inception Mercury Decide          | Inception             | API key                                                                       |
-| Perplexity Decider v1.2           | Perplexity            | API key                                                                       |
-| Perplexity Decider Flash v1.2     | Perplexity            | API key                                                                       |
-| Cloudflare Clef                   | Cloudflare Workers AI | Account id and API token                                                      |
-| Cloudflare Clef Flash             | Cloudflare Workers AI | Account id and API token                                                      |
-| TypeSafe Jev 1.14                 | TypeSafe              | API key                                                                       |
-| Jev 1.14 (OpenRouter)             | OpenRouter            | API key                                                                       |
-| Microsoft Decision 1 (OpenRouter) | OpenRouter            | API key                                                                       |
-| Liquid d1.1 (OpenRouter)          | OpenRouter            | API key                                                                       |
-| Fireworks Rune                    | Fireworks             | API key                                                                       |
+The picker is one list: LangWatch's **Evals Preview** first, then the models on your own keys. Each row shows its provider's logo and a title. OpenAI's and Azure's `gpt-6-luna` both read **Decisions API**, and the logo tells them apart. The other titles name the provider and the model. A model whose provider has no key yet is listed but greyed out, with a line saying which key to add.
 
-OpenAI Decisions API and Azure OpenAI Decisions API need `gpt-6-luna` on that account. The other models need no OpenAI account.
+| Provider to add       | Model in the picker             | What the provider needs                                                                          |
+| --------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| OpenAI                | Decisions API                   | API key. Runs on the OpenAI Decisions API                                                        |
+| Azure OpenAI          | Decisions API                   | API key, endpoint and a `gpt-6-luna` deployment on your resource. See [Azure](#azure)            |
+| Azure OpenAI          | Azure Microsoft Decision 1      | API key, endpoint and a Microsoft Decision 1 deployment on Azure AI Foundry. See [Azure](#azure) |
+| Inception             | Inception Mercury Decide        | API key                                                                                          |
+| Perplexity            | Perplexity Decider v1.2         | API key                                                                                          |
+| Perplexity            | Perplexity Decider Flash v1.2   | API key                                                                                          |
+| Cloudflare Workers AI | Cloudflare Clef                 | Account id and API token                                                                         |
+| Cloudflare Workers AI | Cloudflare Clef Flash           | Account id and API token                                                                         |
+| TypeSafe              | TypeSafe Jev 1.14               | API key                                                                                          |
+| OpenRouter            | OpenRouter Jev 1.14             | API key                                                                                          |
+| OpenRouter            | OpenRouter Microsoft Decision 1 | API key                                                                                          |
+| OpenRouter            | OpenRouter Liquid d1.1          | API key                                                                                          |
+| Fireworks             | Fireworks Rune                  | API key                                                                                          |
+
+`gpt-6-luna` runs on the OpenAI Decisions API, so it needs that model on your OpenAI or Azure account. The other models need no OpenAI account.
 
 ## Set it up
 
@@ -44155,7 +44223,7 @@ OpenAI Decisions API and Azure OpenAI Decisions API need `gpt-6-luna` on that ac
     <Frame>
       <img
         src="/images/instant-evals/own-model-picker.png"
-        alt="Edit default models drawer for the ACME organization, with the Instant Evals picker open on LangWatch Instant Preview and OpenAI Decisions API"
+        alt="Edit default models drawer for the ACME organization, with the Instant Evals picker open: Evals Preview first, then Decisions API on OpenAI ticked, then models whose provider has no key yet"
       />
     </Frame>
   </Step>
@@ -44207,7 +44275,7 @@ Without the deployment, every row is skipped as `classifier_not_configured`.
 
 ## When your model cannot answer
 
-A run on your own model never falls back to LangWatch Instant Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. List them with `langwatch instant-eval results <run-id> --status skipped`.
+A run on your own model never falls back to LangWatch Evals Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. List them with `langwatch instant-eval results <run-id> --status skipped`.
 
 | `error`                           | Why                                                                                                         | Fix                                                                         |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -44222,8 +44290,8 @@ Rate limits and outages are retried before the row is skipped. Refused keys and 
 
 - **Cost.** Your provider bills you. LangWatch does not, and the [free budget](/features/instant-evals/limits-and-cost#the-free-budget) does not apply.
 - **Limits.** The [row, question and text limits](/features/instant-evals/limits-and-cost#limits) still apply.
-- **Data.** Each row's text and your questions go to your provider, under your agreement with it. LangWatch Instant Preview never sees them.
-- **Search bar.** Still runs on LangWatch Instant Preview.
+- **Data.** Each row's text and your questions go to your provider, under your agreement with it. LangWatch Evals Preview never sees them.
+- **Search bar.** Still runs on LangWatch Evals Preview.
 
 ---
 
@@ -65591,7 +65659,7 @@ sign-in and reset are available.
    invitation links must open the same installation your users sign in to.
 3. Apply the configuration to the app and worker deployments, then restart
    them so they read the new settings.
-4. Send an invitation to a test account from **Settings > Directory > People**.
+4. Send an invitation to a test account from **Settings > Users > People**.
    Check delivery and open the link.
 5. For an account allowed to use local passwords, request a password reset
    and complete it. Do this before depending on email for SSO recovery.
@@ -66081,7 +66149,7 @@ Use this for an internal relay, Azure Communication Services, Office 365, Google
 
 ### Sending through an outbound proxy
 
-Deployments whose only egress is a corporate HTTP proxy can set the standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables. The `ses`, `resend` and `sendgrid` gateways all route their API calls through it; `NO_PROXY` entries are honoured, including leading-dot domain suffixes and `*`.
+Deployments whose only egress is a corporate HTTP proxy can set the standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables. The `ses`, `resend` and `sendgrid` gateways all route their API calls through it; `NO_PROXY` entries are honoured, including leading-dot domain suffixes and `*`. Single sign-on setup uses the same variables: see [Single sign-on](/self-hosting/configuration/sso#behind-a-corporate-proxy).
 
 The `smtp` gateway ignores these variables on purpose, because an SMTP relay is normally an internal host that must be reached directly. Point it at your relay's real address, or use a vendor's SMTP endpoint if that is what the proxy allows out.
 
@@ -66848,6 +66916,48 @@ Register the client with the authorization code flow and the `openid`,
 `email` and `profile` scopes. GitHub sign-in is OAuth without OpenID Connect,
 so it cannot be a connection.
 
+### Behind a corporate proxy
+
+If your installation reaches the internet only through an HTTP proxy, set the
+standard `HTTPS_PROXY` (or `HTTP_PROXY`) and `NO_PROXY` variables on the app and
+the workers. When you register or edit a connection, LangWatch fetches the
+discovery document through the proxy, and it fetches the domain verification
+file through the proxy too. It still checks that the address is public first,
+and checks every redirect again.
+
+`NO_PROXY` only chooses a direct connection: it does not lift that check. An
+identity provider inside your network needs its origin in
+`SSO_TRUSTED_IDP_ORIGINS`. LangWatch then reads its discovery document
+directly, never through the proxy, so that read needs no `NO_PROXY` entry. If
+you also turn on Node's environment proxy (below), add the identity provider's
+hosts to `NO_PROXY` so the rest of sign-in reaches them directly too.
+
+The proxy looks up the hostname itself, so LangWatch cannot hold the connection
+to the address it checked. Configure the proxy to refuse every address that is
+not public: loopback (such as `127.0.0.1` and `::1`), private and link-local
+ranges, and cloud metadata addresses (such as `169.254.169.254`).
+
+Only these two requests use the proxy by default, and neither is part of
+signing in. By default, every request made during sign-in goes direct, not
+through `HTTPS_PROXY`:
+
+- the discovery document, read again at every sign-in to learn which addresses
+  your identity provider signs people in from (such as `oauth2.googleapis.com`
+  for Google)
+- the token exchange
+- the signing keys
+- the user info, when the provider has a user info endpoint
+
+So by default the app and workers must reach your identity provider's
+discovery, token, keys and user info endpoints directly for sign-in to work.
+
+If you start the app and workers with `NODE_USE_ENV_PROXY=1` (or
+`--use-env-proxy` in `NODE_OPTIONS`), Node sends these sign-in requests through
+`HTTPS_PROXY` too (unless `NO_PROXY` names the host), and LangWatch reads the
+sign-in discovery document through the proxy to match. Then the proxy must
+allow your identity provider's discovery, token, keys and user info endpoints,
+unless `NO_PROXY` names their hosts.
+
 ### Microsoft Entra ID
 
 - Register LangWatch as an app in Entra ID and add the redirect URI under the
@@ -67116,6 +67226,8 @@ Existing members are never locked out by a seat change; only the next invitation
 ## License renewal
 
 A renewed or reissued license reaches the install in the sync answer. There is no key to receive by email and paste, and **Refresh license** fetches it now.
+
+This also works after the term has ended. An expired license can still sync from the install it is bound to, but only to collect the renewal LangWatch issued for it. It reaches no hosted service until the renewal is applied.
 
 A delivered license that does not verify is not applied. The install keeps the license it has and shows the failure in Settings, Connect.
 
@@ -70477,6 +70589,12 @@ The seat count keeps binding. A license we issued is a record of what was bought
 
 A license we did not issue is a different thing. Its numbers cannot be trusted, so an unreadable or altered key leaves the deployment on the uncapped open-source baseline, exactly as if it had never held a license.
 
+## Renewal
+
+To renew offline, open **Settings > License**, choose **Replace license** and enter the new key or license file. The new license replaces the current one in one step, so the organization keeps its license the whole time. **Remove license** is only for leaving the Enterprise plan: it returns the organization to the open-source plan straight away.
+
+A license file is read by its content, so a file that a mail client renamed (for example to `.txt`) still works.
+
 ## Frequently asked
 
 <AccordionGroup>
@@ -70890,7 +71008,7 @@ organization settings.
 ## Identity and directory support
 
 Organization administrators manage their own provider in **Settings >
-Authentication**, and people and assignments in **Settings > Directory**.
+Authentication**, and people and assignments in **Settings > Users**.
 Use the Backoffice pages when an installation operator needs to investigate
 across organizations.
 
@@ -72039,6 +72157,19 @@ kubectl -n langwatch logs sts/langwatch-clickhouse --tail=50 | grep -i s3
 ```
 
 Ensure the service account has S3 access (IRSA) or static credentials are configured correctly.
+
+### ClickHouse restarts with `NAMED_COLLECTION_ALREADY_EXISTS`
+
+With chart-managed ClickHouse, the chart delivers the LangWatchQL named collections `lwql_postgres` and `lwql_postgres_<database>` as server config. A collection of the same name created by hand with `CREATE NAMED COLLECTION` clashes with it, and the server stops at startup. Before you upgrade, list the collections and drop any whose `source` is `SQL`:
+
+```bash
+kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
+  "SELECT name, source FROM system.named_collections WHERE name LIKE 'lwql_postgres%'"
+kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
+  "DROP NAMED COLLECTION lwql_postgres_langwatch"
+```
+
+Upgrades need no collection created by hand: the upgrade binds the LangWatchQL tables to a collection the server already holds.
 
 ## PostgreSQL Issues
 

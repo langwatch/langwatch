@@ -3,13 +3,12 @@
  * not live. Falsy outputs persist as values; only null/undefined become null.
  */
 
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type {
-  ESBatchEvaluationTarget,
   EvaluationsV3State,
   EvaluationV3EvaluatorResult,
   EvaluationV3Event,
   RecordEvaluatorResultCommandData,
+  ExperimentRunTarget,
   RecordTargetResultCommandData,
 } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
@@ -19,7 +18,11 @@ import {
   promptLoadKey,
   workflowLoadKey,
 } from "../rules/experiment-execution-data.rules.ts";
-import type { LoadedEvaluators, LoadedWorkflow } from "./experiment-execution-data.service.ts";
+import type {
+  LoadedAgent,
+  LoadedEvaluators,
+  LoadedWorkflow,
+} from "./experiment-execution-data.service.ts";
 
 export class ExperimentResultDispatchService {
   static create(): ExperimentResultDispatchService {
@@ -29,9 +32,9 @@ export class ExperimentResultDispatchService {
   private constructor() {}
 
   /**
-   * Build the per-target metadata stored with a run. Model attribution:
-   * edited `localPromptConfig.llm.model` wins over the loaded prompt's.
-   * Exported for unit testing — a regression here blanks the model column.
+   * The per-target metadata a run's start stores, with the prompt version and the agent version a
+   * label resolved to at start. Model attribution: edited `localPromptConfig.llm.model` wins over
+   * the loaded prompt's. Exported for unit testing: a regression here blanks the model column.
    */
   buildTargetMetadata({
     targets,
@@ -42,10 +45,10 @@ export class ExperimentResultDispatchService {
   }: {
     targets: EvaluationsV3State["targets"];
     loadedPrompts: Map<string, VersionedPrompt>;
-    loadedAgents: Map<string, TypedAgent>;
+    loadedAgents: Map<string, LoadedAgent>;
     loadedEvaluators?: LoadedEvaluators;
     loadedWorkflows?: Map<string, LoadedWorkflow>;
-  }): ESBatchEvaluationTarget[] {
+  }): ExperimentRunTarget[] {
     return targets.map((t) => {
       const model = this.targetModel({ target: t, loadedPrompts, loadedEvaluators });
       const name = this.targetName({
@@ -55,15 +58,22 @@ export class ExperimentResultDispatchService {
         loadedEvaluators,
         loadedWorkflows,
       });
+      const loadedPrompt =
+        t.type === "prompt" && t.promptId ? loadedPrompts.get(promptLoadKey(t)) : undefined;
+      const loadedAgent =
+        t.type === "agent" && t.dbAgentId ? loadedAgents.get(agentLoadKey(t)) : undefined;
 
       return {
         id: t.id,
         name: name ?? t.id,
         type: t.type,
-        prompt_id: t.promptId ?? null,
-        prompt_version: t.promptVersionNumber ?? null,
-        agent_id: t.dbAgentId ?? null,
-        evaluator_id: t.targetEvaluatorId ?? null,
+        promptId: t.promptId ?? null,
+        promptVersion: t.promptVersionNumber ?? loadedPrompt?.version ?? null,
+        agentId: t.dbAgentId ?? null,
+        ...(t.type === "agent" && t.agentLabel
+          ? { agentLabel: t.agentLabel, agentVersion: loadedAgent?.version ?? null }
+          : {}),
+        evaluatorId: t.targetEvaluatorId ?? null,
         model,
       };
     });
@@ -121,7 +131,7 @@ export class ExperimentResultDispatchService {
   }: {
     target: EvaluationsV3State["targets"][number];
     loadedPrompts: Map<string, VersionedPrompt>;
-    loadedAgents: Map<string, TypedAgent>;
+    loadedAgents: Map<string, LoadedAgent>;
     loadedEvaluators?: LoadedEvaluators;
     loadedWorkflows?: Map<string, LoadedWorkflow>;
   }): string | null {

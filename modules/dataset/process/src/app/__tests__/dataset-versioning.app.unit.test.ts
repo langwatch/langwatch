@@ -115,7 +115,7 @@ describe("given a dataset with version 1", () => {
 
 describe("given a dataset that was never versioned", () => {
   describe("when the first edit arrives", () => {
-    /** @scenario "Edits that go quiet save a version" */
+    /** @scenario "The first edit of a dataset with rows keeps its content as version 1" */
     it("keeps the content before the edit as version 1", async () => {
       const datasetId = await createDataset();
       await edit(datasetId, "a", "changed");
@@ -125,6 +125,41 @@ describe("given a dataset that was never versioned", () => {
       const page = await app.getVersionPage({ projectId: PROJECT, datasetId, version: 1 });
       expect(page.version.trigger).toBe("initial");
       expect(page.rows.find((row) => row.id === "a")?.entry).toEqual({ input: "first" });
+    });
+  });
+});
+
+describe("given a dataset created with columns and no rows", () => {
+  describe("when a user adds rows and the edits go quiet", () => {
+    /** @scenario "A dataset created empty gets no empty version 1" */
+    it("saves version 1 as the autosave holding those rows", async () => {
+      const datasetId = await createDataset([]);
+      await edit(datasetId, "a", "first");
+      expect(await versionsOf(datasetId)).toEqual([]);
+      await edit(datasetId, "b", "second");
+
+      await app.autosaveVersion({ projectId: PROJECT, datasetId, editedBy: ALICE });
+
+      const versions = await versionsOf(datasetId);
+      expect(versions).toHaveLength(1);
+      expect(versions[0]).toMatchObject({ version: 1, trigger: "autosave", rowCount: 2 });
+    });
+  });
+
+  describe("when the autosave runs before any row is added", () => {
+    /** @scenario "The autosave of a dataset still empty saves nothing" */
+    it("saves nothing, and the first autosave with rows is version 1", async () => {
+      const datasetId = await createDataset([]);
+
+      await app.autosaveVersion({ projectId: PROJECT, datasetId, editedBy: ALICE });
+      expect(await versionsOf(datasetId)).toEqual([]);
+
+      await edit(datasetId, "a", "first");
+      await app.autosaveVersion({ projectId: PROJECT, datasetId, editedBy: ALICE });
+
+      const versions = await versionsOf(datasetId);
+      expect(versions).toHaveLength(1);
+      expect(versions[0]).toMatchObject({ version: 1, trigger: "autosave", rowCount: 1 });
     });
   });
 });
@@ -883,16 +918,15 @@ describe("given datasets created before versioning", () => {
 
   /** @scenario "Existing datasets get version 1 in the background" */
   it("gives each ready dataset version 1, once", async () => {
-    const first = await createDataset();
-    const second = await createDataset([
-      { id: "second-a", input: "first" },
-      { id: "second-b", input: "second" },
-    ]);
+    const first = await createDataset([{ id: "first-a", input: "one" }]);
+    const second = await createDataset([{ id: "second-a", input: "two" }]);
+    const empty = await createDataset([]);
 
     const { report } = await run();
     const again = await run();
 
     expect(report).toMatchObject({ created: 2, failed: 0 });
+    expect(await versionsOf(empty)).toEqual([]);
     expect(again.report).toMatchObject({ created: 0 });
     for (const datasetId of [first, second]) {
       const versions = await versionsOf(datasetId);
@@ -904,6 +938,7 @@ describe("given datasets created before versioning", () => {
   /** @scenario "Existing datasets get version 1 in the background" */
   it("creates nothing and saves no checkpoint on a dry run", async () => {
     const datasetId = await createDataset();
+    await createDataset([]);
 
     const { report, saved } = await run(null, true);
 
@@ -934,6 +969,48 @@ describe("given datasets created before versioning", () => {
     ).rejects.toThrow("datasets got no first version");
 
     expect(saved).toEqual([]);
+  });
+
+  /** @scenario "The first-version step retries a dataset whose rows it could not read" */
+  it("fails and saves no checkpoint when a dataset's rows fail to read", async () => {
+    await app.upsertDataset({
+      projectId: "project-0",
+      name: "unreadable-once",
+      columnTypes: [{ name: "input", type: "string" }],
+      datasetRecords: [{ id: "a", input: "x" }],
+    });
+    vi.spyOn(repositories.records, "findPage").mockRejectedValueOnce(new Error("connection reset"));
+
+    const { saved, checkpoint } = checkpointOf(null);
+    await expect(
+      app.firstVersionsRun()({
+        checkpoint,
+        dryRun: false,
+        signal: new AbortController().signal,
+        log: { info: () => undefined, warn: () => undefined },
+      }),
+    ).rejects.toThrow("datasets got no first version");
+
+    expect(saved).toEqual([]);
+  });
+
+  /** @scenario "The first-version step retries a dataset whose rows it could not read" */
+  it("skips a dataset that stops being ready by the time its rows are read", async () => {
+    const datasetId = await createDataset();
+    const hasAny = repositories.versions.hasAny.bind(repositories.versions);
+    vi.spyOn(repositories.versions, "hasAny").mockImplementationOnce(async (input) => {
+      await repositories.content.update({
+        id: datasetId,
+        projectId: PROJECT,
+        data: { status: "processing" },
+      });
+      return hasAny(input);
+    });
+
+    const { report } = await run();
+
+    expect(report).toMatchObject({ created: 0, skipped: 1, failed: 0 });
+    expect(await versionsOf(datasetId)).toEqual([]);
   });
 
   /** @scenario "The first-version step resumes from its checkpoint" */

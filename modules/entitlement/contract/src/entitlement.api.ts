@@ -11,7 +11,7 @@ import type {
 import type { PlanNextStep } from "./plan-next-step.ts";
 import type { Plan } from "./plan.ts";
 import type { ResolvePlanInput } from "./provider.ts";
-import type { UsageStats } from "./usage.ts";
+import type { UsageMonthBreakdown, UsageStats } from "./usage.ts";
 
 /**
  * What a plan allows, and what has been used and spent against it. One
@@ -21,6 +21,8 @@ import type { UsageStats } from "./usage.ts";
 export interface EntitlementApi {
   getActivePlan(input: ResolvePlanInput): Promise<Plan>;
   getUsage(input: GetUsageInput): Promise<UsageStats>;
+  /** This month day by day and project by project, for the usage page. */
+  getUsageMonthBreakdown(input: { organizationId: string }): Promise<UsageMonthBreakdown>;
   /** Throws `ERR_PLAN_LIMIT` (402) once the organization spent its monthly allowance. */
   assertWithinUsageLimit(input: { organizationId: string }): Promise<void>;
   sendUsageLimitWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning>;

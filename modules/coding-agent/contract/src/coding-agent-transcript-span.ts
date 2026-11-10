@@ -17,9 +17,10 @@ import {
   type SpanEntryAccumulator,
 } from "./coding-agent-transcript-state.ts";
 import { parseMaybeJson, pickModel, pickNumber } from "./coding-agent-transcript-value.ts";
+import type { TranscriptEntry } from "./coding-agent-transcript.ts";
 import { parseMcpToolName, deriveToolName } from "./telemetry/coding-agent-normalization.ts";
 import { pickString } from "./telemetry/coding-agent-span.ts";
-import { isModelCallSpan } from "./telemetry/index.ts";
+import { CODING_AGENT_REGISTRY, isModelCallSpan } from "./telemetry/index.ts";
 
 export function collectSpanEntries(
   spans: SpanDetail[],
@@ -28,9 +29,14 @@ export function collectSpanEntries(
   const accumulator = createSpanEntryAccumulator();
   const hasCodexTurnRollup = spans.some((span) => span.name === "session_task.turn");
   collectRecoveredTurns(spans, accumulator);
+  const sessionPrompts: TranscriptEntry[] = [];
 
   for (const span of spans) {
     if (span.name === CODEX_RECOVERED_CONTENT_SPAN_NAME) continue;
+    if (isSessionRoleSpan(span.name)) {
+      collectSessionPrompt(span, sessionPrompts);
+      continue;
+    }
 
     const isCodexResponseCall =
       !hasCodexTurnRollup &&
@@ -44,7 +50,24 @@ export function collectSpanEntries(
     }
   }
 
+  // A model call that carries its prompt wins, so no prompt shows twice. pi's model calls carry
+  // none: its prompt rides only the run span (ADR-188).
+  if (accumulator.spanPrompts.length === 0) accumulator.spanPrompts.push(...sessionPrompts);
   return accumulator;
+}
+
+/** Whether a span is an agent's declared session root, which holds a run, never a tool. */
+function isSessionRoleSpan(spanName: string): boolean {
+  const operation = spanName.split(" ", 1)[0];
+  return CODING_AGENT_REGISTRY.some((agent) => agent.genAiOperations?.session === operation);
+}
+
+function collectSessionPrompt(span: SpanDetail, prompts: TranscriptEntry[]): void {
+  const text =
+    extractAnsweredPromptText(span.input) ??
+    extractAnsweredPromptText(pickString(span.params, "gen_ai.input.messages"));
+  if (text === null) return;
+  prompts.push({ kind: "user_prompt", atMs: span.startTimeMs, text, chars: text.length });
 }
 
 function collectRecoveredTurns(spans: SpanDetail[], accumulator: SpanEntryAccumulator): void {

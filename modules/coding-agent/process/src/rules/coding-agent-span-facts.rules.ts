@@ -53,6 +53,7 @@ export function liftSpanContribution({
       attributes: span.spanAttributes,
       resourceAttributes: span.resourceAttributes,
     }),
+    ...toolCallFileFacts({ name: span.name, attributes: span.spanAttributes }),
   };
   const serviceVersion = span.resourceAttributes["service.version"];
   if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
@@ -77,6 +78,42 @@ export function liftSpanContribution({
     scopeName: span.instrumentationScope.name || null,
   };
   return { outcome: "contributes", contribution };
+}
+
+/**
+ * Tool spans whose call arguments name the one file the tool read or wrote, and the tools that do:
+ * pi's file tools take it as `path` (pi-coding-agent `dist/core/tools/{read,edit,write}.d.ts`).
+ * Arguments ride a span only with content capture on, so without it no file is touched.
+ */
+const FILE_ARGUMENT_TOOLS: Readonly<Record<string, { tools: ReadonlySet<string>; key: string }>> = {
+  "pi.harness.tool": { tools: new Set(["read", "edit", "write"]), key: "path" },
+};
+
+/** The `file_path` fact a file tool's call arguments name; none for any other span. */
+function toolCallFileFacts({
+  name,
+  attributes,
+}: {
+  name: string;
+  attributes: Record<string, unknown>;
+}): Record<string, string> {
+  const declared = FILE_ARGUMENT_TOOLS[name];
+  const tool = attributes["gen_ai.tool.name"];
+  if (declared === undefined || typeof tool !== "string" || !declared.tools.has(tool)) return {};
+  const raw = attributes["gen_ai.tool.call.arguments"];
+  let args: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      args = JSON.parse(raw);
+    } catch {
+      return {};
+    }
+  }
+  const filePath =
+    typeof args === "object" && args !== null
+      ? (args as Record<string, unknown>)[declared.key]
+      : null;
+  return typeof filePath === "string" && filePath.length > 0 ? { file_path: filePath } : {};
 }
 
 function liftSpanFacts(attrs: Record<string, unknown>): Record<string, string | number | boolean> {

@@ -46,7 +46,7 @@ import {
 import { builtFontPaths, publishMedia } from "./hashed-assets.ts";
 import { optimisePageImages } from "./image-variants.ts";
 import { writeOutputFiles } from "./output-files.ts";
-import { authoredHeroPreload } from "./page-images.ts";
+import { authoredHeroPreload, deferBelowFoldPosters } from "./page-images.ts";
 import { renderCache, renderedPageSchema, type RenderedPage } from "./render-cache.ts";
 import { failOnSkippedPages } from "./render-failures.ts";
 import {
@@ -354,8 +354,11 @@ async function publishPageMedia({
     console.warn(
       `[docs-site] no ffmpeg with libx264 and an AV1 or VP9 encoder: ${videos.unencoded.length} videos published as authored`,
     );
+  const deferred = new Map<string, string>();
+  for (const [target, html] of published.pages)
+    deferred.set(target, deferBelowFoldPosters({ html }));
   return {
-    pages: published.pages,
+    pages: deferred,
     files: output,
     copies: published.copies,
     images: images.sources,

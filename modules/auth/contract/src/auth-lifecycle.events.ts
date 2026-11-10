@@ -40,6 +40,8 @@ const ssoAutoAddedEventDataSchemaDefinition = z.object({
   userId: z.string().min(1),
   organizationId: z.string().min(1),
   organizationName: z.string(),
+  /** The role the person was admitted with; absent on events stored before it was recorded. */
+  role: z.string().optional(),
   occurredAt: z.number().int().nonnegative(),
 });
 export interface SsoAutoAddedEventDataSchema extends Named<

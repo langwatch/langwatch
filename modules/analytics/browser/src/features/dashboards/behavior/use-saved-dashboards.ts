@@ -4,12 +4,18 @@
  * boards other projects own. Failures travel raw to the host (#5984).
  */
 
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import type { DashboardProject, DashboardScope } from "@langwatch/dashboard-contract";
 import { useRef, useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { dashboardsPath, untitledBoardName } from "../model/boards.ts";
+import {
+  dashboardCreated,
+  dashboardDeleted,
+  dashboardEdited,
+} from "../model/dashboard-usage-events.ts";
 import { withBlockPickerOpen } from "./use-block-picker-address.ts";
 
 /** One stored board, as the list answers it. */
@@ -63,6 +69,7 @@ export type CreateBoardOptions = { pin?: boolean; addWidget?: boolean };
 
 export function useSavedDashboards() {
   const host = useAnalyticsHost();
+  const analytics = useUiAnalytics();
   const project = host.project();
   const projectId = project?.id ?? "";
   const projectSlug = project?.slug ?? "";
@@ -106,6 +113,7 @@ export function useSavedDashboards() {
       { projectId, name: untitledBoardName({ existingCount: boards.length }) },
       {
         onSuccess: async (created) => {
+          analytics.track(dashboardCreated({ createdFrom: "blank" }));
           try {
             if (pin) {
               await star
@@ -133,7 +141,10 @@ export function useSavedDashboards() {
     rename.mutate(
       { projectId, dashboardId, name },
       {
-        onSuccess: () => void refresh(),
+        onSuccess: () => {
+          analytics.track(dashboardEdited({ change: "rename" }));
+          void refresh();
+        },
         onError: (error) => host.failed({ error, fallbackTitle: "Couldn't rename the dashboard" }),
       },
     );
@@ -150,6 +161,7 @@ export function useSavedDashboards() {
       { projectId, dashboardId },
       {
         onSuccess: () => {
+          analytics.track(dashboardDeleted());
           void refresh();
           // The plan limit counts dashboards, so a delete frees an allowance.
           void utils.licenseEnforcement.checkLimit.invalidate();

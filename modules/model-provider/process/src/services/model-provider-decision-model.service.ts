@@ -211,7 +211,7 @@ export class ModelProviderDecisionModelService {
     const isOwnModelAllowed = await this.options.isOwnModelAllowed({ organizationId });
     if (!isOwnModelAllowed && picksOwnDecisionModel({ config, stored: stored ?? {} })) {
       throw new ModelDefaultValidationError(
-        "Running Instant Evals on your own decision model is not enabled for this organization. Keep LangWatch Instant Preview, or ask LangWatch to enable it.",
+        "Running Instant Evals on your own decision model is not enabled for this organization. Keep Evals Preview, or ask LangWatch to enable it.",
       );
     }
     if (!isOwnModelAllowed) return;
@@ -222,7 +222,7 @@ export class ModelProviderDecisionModelService {
       const label = findDecisionModel(pick.model)?.label ?? pick.model;
       throw new ModelDefaultValidationError(
         `${label} can't run for every scope of this config: at least one has no enabled key ` +
-          "for it. Add the key at that scope or above, or keep LangWatch Instant Preview.",
+          "for it. Add the key at that scope or above, or keep Evals Preview.",
       );
     }
   }

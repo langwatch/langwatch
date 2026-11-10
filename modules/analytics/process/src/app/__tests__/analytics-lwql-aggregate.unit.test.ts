@@ -21,6 +21,7 @@ import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.an
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { project } from "../../services/__tests__/project.fixture.ts";
 import { AnalyticsModule } from "../analytics.app.ts";
+import { analyticsTestSecrets } from "./analytics-secrets.fixture.ts";
 
 const AGGREGATE = "project_aggregate";
 const MEMBERS = ["project_a", "project_b"];
@@ -67,7 +68,7 @@ async function harness({ keyless = [] }: { keyless?: readonly string[] } = {}) {
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: {} as never,
+    secrets: analyticsTestSecrets(),
   });
 
   const outcome = (run: Promise<unknown>) =>

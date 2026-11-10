@@ -78,6 +78,7 @@ const viewWith = ({
     singleLogoutUrl: "https://app.test/slo",
     entityId: "https://app.test/entity",
     metadataUrl: "https://app.test/metadata",
+    refusalPageUrl: "https://app.test/api/auth/sso/refused/ssoc_1",
   },
 });
 

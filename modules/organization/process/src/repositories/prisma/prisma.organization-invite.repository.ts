@@ -94,6 +94,44 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     return invite !== null;
   }
 
+  async hasPendingInviteForEmail({
+    email,
+    organizationId,
+  }: {
+    email: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const invite = await this.prisma.organizationInvite.findFirst({
+      where: {
+        email: { equals: email.trim(), mode: "insensitive" },
+        organizationId,
+        status: "PENDING",
+        OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+      },
+      select: { id: true },
+    });
+
+    return invite !== null;
+  }
+
+  async deletePaymentPendingInvitesForEmail({
+    email,
+    organizationId,
+  }: {
+    email: string;
+    organizationId: string;
+  }): Promise<number> {
+    const { count } = await this.prisma.organizationInvite.deleteMany({
+      where: {
+        email: { equals: email.trim(), mode: "insensitive" },
+        organizationId,
+        status: "PAYMENT_PENDING",
+      },
+    });
+
+    return count;
+  }
+
   async findMemberEmails({
     organizationId,
     emails,

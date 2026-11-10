@@ -397,7 +397,14 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       });
       await ledger().finishRun({ runId: old.id, outcome: "succeeded", report: {} });
       const applier = fakeApplier({ release: "3.21.0" });
-      const outcome = await run(runnerFor({ release: "3.21.0", applier }));
+      const copyKeys = defineMigrationStep({
+        id: "dataset:copy-keys",
+        kind: "data",
+        mode: "blocking",
+        description: "copies the keys",
+        run: async () => ({ copied: 0 }),
+      });
+      const outcome = await run(runnerFor({ release: "3.21.0", applier, codeSteps: [copyKeys] }));
       expect(outcome).toMatchObject({ exitCode: 0, code: "done" });
       expect(applier.calls).toContain("3.21.0");
     });
