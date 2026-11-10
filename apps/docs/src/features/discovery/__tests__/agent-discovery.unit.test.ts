@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 
 import { frontmatterDescription, readAgentSkills } from "../compile/agent-skills.ts";
 import { discoveryFiles } from "../compile/discovery-files.ts";
@@ -40,6 +41,21 @@ describe("agent discovery files", () => {
         );
       }
       expect(files[".well-known/agent-skills/tracing/SKILL.md"]).toBe("# Tracing\n");
+    });
+
+    /** @scenario "The addresses agents learned from the previous docs host keep answering" */
+    it("publishes a docs-wide skill.md and llms.txt under .well-known", () => {
+      const skill = files["skill.md"] ?? "";
+      const frontmatter = /^---\n([\s\S]*?)\n---\n/.exec(skill)?.[1] ?? "";
+      expect(parse(frontmatter)).toEqual({
+        name: "langwatch",
+        description: expect.stringContaining("LangWatch: tracing"),
+      });
+      expect(skill).toContain("https://langwatch.ai/docs/llms.txt");
+      expect(skill).toContain(
+        "- [find-traces](https://langwatch.ai/docs/.well-known/agent-skills/find-traces/SKILL.md): Find traces.",
+      );
+      expect(files[".well-known/llms.txt"]).toBe(files["llms.txt"]);
     });
 
     /** @scenario "The agent card names LangWatch and lists its skills" */
