@@ -205,6 +205,63 @@ describe("when agents read the whole documentation", () => {
     });
 
     /** @scenario "Split a section too large to read whole by its groups" */
+    it("splits a group still over the budget again, after a file for the pages outside any group", () => {
+      const nested = {
+        site: { name: "LangWatch" },
+        pages: Object.fromEntries(
+          [
+            "obs/overview",
+            "obs/python/setup",
+            "obs/python/reference",
+            "obs/go/setup",
+            "obs/metadata",
+          ].map((slug) => [slug, { title: slug, description: "" }]),
+        ),
+        anchors: [
+          {
+            title: "Observability",
+            icon: "",
+            children: [
+              page("obs/overview"),
+              {
+                type: "group" as const,
+                title: "SDKs",
+                children: [
+                  {
+                    type: "group" as const,
+                    title: "Python",
+                    children: [page("obs/python/setup"), page("obs/python/reference")],
+                  },
+                  { type: "group" as const, title: "Go SDK", children: [page("obs/go/setup")] },
+                  page("obs/metadata"),
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      const pages = Object.keys(nested.pages).map((slug) => ({ slug, markdown: "x".repeat(10) }));
+      const files = llmsSectionFiles({ nav: nested, exports: pages, budget: 25 });
+      expect(Object.keys(files)).toEqual([
+        "llms-full/observability.txt",
+        "llms-full/observability/sdks.txt",
+        "llms-full/observability/sdks/python.txt",
+        "llms-full/observability/sdks/go-sdk.txt",
+      ]);
+      const llms = llmsDirectory({
+        nav: nested,
+        sizes: exportSizes({ exports: pages }),
+        budget: 25,
+      });
+      expect(llms).toContain(
+        "- [Observability: SDKs: Python](https://langwatch.ai/docs/llms-full/observability/sdks/python.txt): 2 pages in one file",
+      );
+      expect(llms).toContain(
+        "- [Observability](https://langwatch.ai/docs/llms-full/observability.txt): 1 page in one file",
+      );
+    });
+
+    /** @scenario "Split a section too large to read whole by its groups" */
     it("keeps a section under the budget as one file", () => {
       const files = llmsSectionFiles({ nav: sectioned, exports, budget: Number.MAX_SAFE_INTEGER });
       expect(Object.keys(files)).toContain("llms-full/api-reference.txt");

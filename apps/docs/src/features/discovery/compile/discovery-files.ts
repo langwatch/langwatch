@@ -30,11 +30,6 @@ function directoryLine({ nav, slug }: { nav: DirectoryNav; slug: string }) {
     every operation stays in the section's own file. */
 export const RESOURCE_LISTED_SECTIONS = new Set(["API Reference"]);
 
-/** A section's own file, holding every one of its pages' Markdown. */
-export function sectionFile({ title }: { title: string }) {
-  return `llms-full/${sectionId({ title })}.txt`;
-}
-
 /** A combined file past this many characters (about 100k tokens) is split by its groups. */
 export const LLMS_FILE_BUDGET = 400_000;
 
