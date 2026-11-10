@@ -136,6 +136,28 @@ export interface CioOrgTraits {
   self_hosted_last_report_at?: number;
   /** Comma list of the signals raised so far, in the order they were raised. */
   self_hosted_signals?: string;
+
+  // Per-email usage, summed over the organization's projects from nurturing's own project fold.
+  prompt_count?: number;
+  evaluator_count?: number;
+  /** Only grows: no event records an archived scenario. */
+  scenario_count?: number;
+  /** Traces over the last 30 days, each counted once. */
+  trace_count?: number;
+  /** Traces over the last 30 days with an error status. */
+  error_count?: number;
+  /** USD over the same 30 days. */
+  total_cost?: number;
+  /** Unix seconds; absent when no trace in the window failed. */
+  last_failed_trace_at?: number;
+  /** Whether any project ran a scenario. */
+  has_scenario_run?: boolean;
+  /** Whether a trace arrived on any of the last 7 UTC days. */
+  active_last_7_days?: boolean;
+  /** Whether a trace arrived on a UTC day after the signup day. */
+  back_since_day_0?: boolean;
+  /** Unix seconds: the organization's creation plus 14 days. */
+  window_end_date?: number;
 }
 
 // ---------------------------------------------------------------------------

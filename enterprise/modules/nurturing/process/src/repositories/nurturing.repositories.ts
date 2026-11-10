@@ -6,6 +6,7 @@ import type {
   NurturingTraceMilestonesRepository,
 } from "./nurturing-milestones.repository.ts";
 import type { NurturingProjectDirectoryRepository } from "./nurturing-project-directory.repository.ts";
+import type { NurturingProjectUsageRepository } from "./nurturing-project-usage.repository.ts";
 
 /** The rows nurturing owns and the owners' project rows it reads (R40), chosen once at boot. */
 export interface NurturingRepositories {
@@ -13,5 +14,7 @@ export interface NurturingRepositories {
     NurturingCodingMilestonesRepository &
     NurturingTraceMilestonesRepository;
   readonly projects: NurturingProjectDirectoryRepository;
+  /** Nurturing's own per-project usage: the peer fold's rows. */
+  readonly projectUsage: NurturingProjectUsageRepository;
   readonly claims: NurturingClaimRepository;
 }

@@ -5115,6 +5115,25 @@ model NurturingOrganization {
   updatedAt            DateTime  @updatedAt
 }
 
+/// Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario
+/// and trace events (ARCHITECTURE §9), summed per organization for the per-email traits.
+model NurturingProjectUsageView {
+  /// The aggregate: the project id.
+  id                String   @id
+  /// The organization placement answered; null until the subscriber placed the project.
+  organizationId    String?
+  /// The project's usage as the fold folded it (NurturingProjectUsageState).
+  folded            Json
+  /// The event ids of the last delivery folded in, so a redelivery folds once.
+  appliedEventIds   String[] @default([])
+  /// A row of another version reads as undecodable and is re-folded from the log.
+  projectionVersion String
+  /// Event-derived, so a replayed row equals the row it rebuilds.
+  updatedAt         DateTime
+
+  @@index([organizationId])
+}
+
 model BillingMeterCheckpoint {
   id                   String   @id @default(cuid())
   organizationId       String

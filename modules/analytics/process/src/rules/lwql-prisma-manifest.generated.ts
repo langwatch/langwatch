@@ -1944,6 +1944,14 @@ export interface LwqlPrismaRows {
     readonly lastTraceAt: "DateTime?";
     readonly updatedAt: "DateTime";
   };
+  readonly NurturingProjectUsageView: {
+    readonly id: "String";
+    readonly organizationId: "String?";
+    readonly folded: "Json";
+    readonly appliedEventIds: "String[]";
+    readonly projectionVersion: "String";
+    readonly updatedAt: "DateTime";
+  };
   readonly BillingMeterCheckpoint: {
     readonly id: "String";
     readonly organizationId: "String";

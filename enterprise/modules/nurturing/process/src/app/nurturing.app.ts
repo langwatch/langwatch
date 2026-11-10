@@ -15,10 +15,12 @@ import { UserApi } from "@langwatch/user-contract";
 import type { NurturingChannels } from "../channels/nurturing.channels.ts";
 import { buildNurturingPipeline, type NurturingPipeline } from "../eventing/nurturing.pipeline.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
+import type { NurturingProjectUsageState } from "../rules/nurturing-project-usage.rules.ts";
 import { NurturingCodingMilestonesService } from "../services/nurturing-coding-milestones.service.ts";
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
 import { NurturingMemberFactsService } from "../services/nurturing-member-facts.service.ts";
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
+import { NurturingOrganizationUsageService } from "../services/nurturing-organization-usage.service.ts";
 import { NurturingService } from "../services/nurturing.service.ts";
 
 type NurturingSetup = FeatureSetup<
@@ -36,10 +38,15 @@ export class NurturingModule implements NurturingApi {
   static readonly secrets = nurturingSecrets;
 
   readonly #pipeline: NurturingPipeline;
+  readonly #organizationUsage: NurturingOrganizationUsageService | undefined;
   #commands: EventingCommands<NurturingPipeline> | undefined;
 
-  private constructor(pipeline: NurturingPipeline) {
+  private constructor(
+    pipeline: NurturingPipeline,
+    organizationUsage: NurturingOrganizationUsageService | undefined,
+  ) {
     this.#pipeline = pipeline;
+    this.#organizationUsage = organizationUsage;
   }
 
   static async create({
@@ -77,6 +84,15 @@ export class NurturingModule implements NurturingApi {
       organizations: dependencies.organizations,
       clock: { nowMs: () => nowInstant().epochMilliseconds },
     });
+    const organizationUsage = customerIo
+      ? NurturingOrganizationUsageService.create({
+          projectUsage: repositories.projectUsage,
+          projects: repositories.projects,
+          milestones: repositories.milestones,
+          sendBatch: (calls) => customerIo.batchOrThrow(calls),
+          clock: { nowMs: () => nowInstant().epochMilliseconds },
+        })
+      : void 0;
     return new NurturingModule(
       buildNurturingPipeline({
         deliver: (input) => delivery.deliver(input),
@@ -87,7 +103,13 @@ export class NurturingModule implements NurturingApi {
         simulationRunsFinished: (input) => milestones.simulationRunsFinished(input),
         codingSessionsStored: (input) => codingMilestones.sessionsStored(input),
       }),
+      organizationUsage,
     );
+  }
+
+  /** A project's usage changed: its organization's traits go to Customer.io, when it is set up. */
+  async organizationUsageChanged(state: NurturingProjectUsageState): Promise<void> {
+    await this.#organizationUsage?.usageChanged(state);
   }
 
   async recordSignal(signal: NurturingSignal): Promise<void> {

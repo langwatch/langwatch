@@ -23,6 +23,28 @@ kind. The signal carries ids plus what the owner's event holds; nurturing
 fetches nothing. The command lands as an event on nurturing's own pipeline,
 keyed by kind and source event, and nurturing's subscriber sends it once.
 
+## Amendment (2026-11-08): nurturing projects owner events
+
+**Status:** Proposed, for Alex's review.
+
+The decision above says owners call `NurturingApi.recordSignal` and "nurturing
+fetches nothing", and that "the process depends on no feature module". The code
+on main already differs: nurturing subscribes to owners' events directly as a
+peer (`nurturing.pipeline.ts`, `.withPeerSubscriber`) and reads project placement
+through the owners' shares (`NurturingProjectDirectoryRepository`, R40).
+
+The rule is now:
+
+> nurturing may subscribe to and project owner events and read placement through
+> shares; it never pulls owner state on a schedule
+
+So the per-email usage is a peer fold in nurturing over the owners' prompt,
+evaluator, scenario and trace events (`nurturing-project-usage.pipeline.ts`),
+kept in nurturing's own `NurturingProjectUsageView` table. Its subscriber places
+the project through shares and sends the organization's sum. The daily pull from
+the owners' Apis (#9382 before this change) is the thing still refused: "We're
+event driven so we don't do that."
+
 ## Public surfaces and transports
 
 Each package has one root export. Nurturing serves no route: the contract's

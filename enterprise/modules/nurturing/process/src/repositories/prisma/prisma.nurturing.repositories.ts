@@ -5,10 +5,12 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { NurturingRepositories } from "../nurturing.repositories.ts";
 import { PrismaNurturingMilestonesRepository } from "./prisma.nurturing-milestones.repository.ts";
 import { PrismaNurturingProjectDirectoryRepository } from "./prisma.nurturing-project-directory.repository.ts";
+import { PrismaNurturingProjectUsageRepository } from "./prisma.nurturing-project-usage.repository.ts";
 
-/** Nurturing's `NurturingOrganization`: the only table it claims. */
+/** Nurturing's `NurturingOrganization` and `NurturingProjectUsageView`: the tables it claims. */
 const ownedRepositories = prismaRepositories({
   milestones: PrismaNurturingMilestonesRepository,
+  projectUsage: PrismaNurturingProjectUsageRepository,
 });
 
 /** Nurturing's own table, and the owners' project rows read through shares without a claim (R40). */
