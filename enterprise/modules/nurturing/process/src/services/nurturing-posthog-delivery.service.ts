@@ -48,27 +48,8 @@ export class NurturingPostHogDeliveryService {
       });
     switch (signal.kind) {
       case "guided_onboarding_paths":
-        return posthog.track(
-          fireGuidedOnboardingPostHog({
-            userId: signal.userId,
-            organizationId: signal.organizationId,
-            event: signal.event,
-            payload: signal.payload ?? {},
-            paths: signal.paths,
-            currentPath: undefined,
-          }),
-        );
       case "guided_onboarding_progress":
-        return posthog.track(
-          fireGuidedOnboardingPostHog({
-            userId: signal.userId,
-            organizationId: signal.organizationId,
-            event: signal.event,
-            payload: signal.payload,
-            paths: signal.state.paths,
-            currentPath: signal.state.currentPath,
-          }),
-        );
+        return this.guidedOnboarding(signal);
       case "onboarding_variant_assigned":
         return posthog.track(fireOnboardingVariantAssignedPostHog(signal));
       case "scenario_created":
@@ -107,6 +88,21 @@ export class NurturingPostHogDeliveryService {
       default:
         return;
     }
+  }
+
+  private guidedOnboarding(
+    signal: NurturingSignalOf<"guided_onboarding_paths" | "guided_onboarding_progress">,
+  ): void {
+    const { userId, organizationId, event } = signal;
+    const rest =
+      signal.kind === "guided_onboarding_progress"
+        ? {
+            payload: signal.payload,
+            paths: signal.state.paths,
+            currentPath: signal.state.currentPath,
+          }
+        : { payload: signal.payload ?? {}, paths: signal.paths, currentPath: undefined };
+    this.posthog.track(fireGuidedOnboardingPostHog({ userId, organizationId, event, ...rest }));
   }
 
   /** Main's checkout webhook: the organization's event, then its group properties. */
