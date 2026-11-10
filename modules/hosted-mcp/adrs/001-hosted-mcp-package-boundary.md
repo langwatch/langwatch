@@ -24,7 +24,9 @@ client for one project they may act on, and no code is issued while an
 operator impersonates a member. Tokens are person-bound and project-capped;
 an expired or unrecognised access token is answered 401 with a challenge.
 
-`POST /mcp/docs` is the one MCP path that takes no credential, and the one
+`POST /mcp/docs` is the one MCP transport path that takes no credential
+(the health probe and the OAuth handshake paths are public too, but serve no
+tools), and the one
 langwatch.ai/docs/mcp forwards to now that the docs site no longer serves its
 own MCP. It serves only `fetch_langwatch_docs` and `fetch_scenario_docs`,
 whose fetch stays locked to https://langwatch.ai/docs/ and /scenario/, and

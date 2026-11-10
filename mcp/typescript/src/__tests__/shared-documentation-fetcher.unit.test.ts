@@ -29,6 +29,7 @@ function fetcherOver({
 
 describe("SharedDocumentationFetcher", () => {
   describe("when the same page is asked for again after its time to live", () => {
+    /** @scenario "A cached docs page is fetched again once its time to live has passed" */
     it("fetches it again", async () => {
       const { fetcher, network, clock } = fetcherOver({});
 
@@ -43,6 +44,7 @@ describe("SharedDocumentationFetcher", () => {
   });
 
   describe("when more pages are cached than the entry limit", () => {
+    /** @scenario "The docs cache drops its oldest page past the entry limit" */
     it("drops the oldest first", async () => {
       const { fetcher, network } = fetcherOver({ maxCacheEntries: 2 });
 
@@ -57,6 +59,7 @@ describe("SharedDocumentationFetcher", () => {
   });
 
   describe("when a page is larger than the whole cache", () => {
+    /** @scenario "A docs page larger than the whole cache is served but not kept" */
     it("serves it without keeping it", async () => {
       const { fetcher, network } = fetcherOver({ maxCacheBytes: 10 });
 
@@ -68,6 +71,7 @@ describe("SharedDocumentationFetcher", () => {
   });
 
   describe("when the URL is outside the docs", () => {
+    /** @scenario "The shared fetcher refuses a URL outside the docs before fetching it" */
     it("refuses it before counting or fetching", async () => {
       const { fetcher, network } = fetcherOver({});
 
