@@ -58,15 +58,13 @@ const calls = (
   text: string,
 ): { job: string; file: string; granted: Map<string, keyof typeof LEVEL> }[] => {
   const jobs = text.split(/^jobs:\n/m)[1] ?? "";
-  return jobs
-    .split(/^(?= {2}[\w-]+:\s*$)/m)
-    .flatMap((block) => {
-      const file = /^ {4}uses: \.\/\.github\/workflows\/(.+)$/m.exec(block)?.[1];
-      const job = /^ {2}([\w-]+):/m.exec(block)?.[1];
-      if (!file || !job) return [];
-      const own = /^ {4}permissions:\n((?: {6}.+\n)+)/m.exec(block)?.[0] ?? "";
-      return [{ job, file, granted: requested(own.replace(/^ {4}/gm, "")) }];
-    });
+  return jobs.split(/^(?= {2}[\w-]+:\s*$)/m).flatMap((block) => {
+    const file = /^ {4}uses: \.\/\.github\/workflows\/(.+)$/m.exec(block)?.[1];
+    const job = /^ {2}([\w-]+):/m.exec(block)?.[1];
+    if (!file || !job) return [];
+    const own = /^ {4}permissions:\n((?: {6}.+\n)+)/m.exec(block)?.[0] ?? "";
+    return [{ job, file, granted: requested(own.replace(/^ {4}/gm, "")) }];
+  });
 };
 
 void describe("given the nightly workflow", () => {
