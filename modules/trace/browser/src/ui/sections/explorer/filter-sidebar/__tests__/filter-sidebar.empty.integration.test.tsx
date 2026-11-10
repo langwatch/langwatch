@@ -317,5 +317,27 @@ describe("<FilterSidebar />", () => {
         expect(screen.getAllByTestId("section-renderer").length).toBeGreaterThan(0);
       });
     });
+
+    describe("when span type was counted and came back empty", () => {
+      /** @scenario "An empty window still falls back to the default sections" */
+      it("falls back to the default minimal facet set (not a blank rail)", () => {
+        mockHasAnyTraces = true;
+        mockFacetsLoading = false;
+        mockDescriptors = [
+          { kind: "categorical", key: "status", label: "Status", topValues: [] },
+          {
+            kind: "categorical",
+            key: "spanType",
+            label: "Span type",
+            topValues: [],
+            deferred: false,
+          },
+        ];
+
+        renderSidebar();
+
+        expect(screen.getAllByTestId("section-renderer").length).toBeGreaterThan(0);
+      });
+    });
   });
 });

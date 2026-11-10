@@ -51,6 +51,7 @@ import {
   mergeFacetDescriptors,
 } from "../../../../../model/explorer/filter-sidebar/merge-facet-descriptors.ts";
 import { routeToggleViaOrGroups } from "../../../../../model/explorer/filter-sidebar/route-toggle-via-or-groups.ts";
+import { isSectionOpen } from "../../../../../model/explorer/filter-sidebar/section-open.ts";
 import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode.ts";
 import { facetLabel, sortBySectionOrder } from "../utils.ts";
 
@@ -392,13 +393,13 @@ export function useFilterSidebarData() {
     [density, activeFields, explicitlyHidden, explicitlyShown],
   );
 
-  // A deferred facet is counted only while its section shows and is open,
-  // with the same open rule as FacetSection: the reader's choice, else a filter.
+  // A deferred facet is counted only while its section shows and is open.
   const deferred = useFilteredTraceFacets({
     facetKeys: deferredFacetKeysToLoad({
       descriptors: merged.descriptors,
       isOpen: (key) =>
-        isSectionVisibleForDensity(key) && (sectionOpen[key] ?? activeFields.has(key)),
+        isSectionVisibleForDensity(key) &&
+        isSectionOpen({ readerChoice: sectionOpen[key], filtered: activeFields.has(key) }),
     }),
   });
   const descriptors = fillDeferredFacets({
@@ -590,19 +591,16 @@ function partitionDescriptors(
 }
 
 /**
- * True when a partition surfaced no renderable section at all — no categoricals, no
- * ranges, no attribute keys. A deferred section with no values and no active filter
- * does not count: discovery lists it on every read, so counting it would keep an empty
- * window from falling back to the default sections.
+ * True when a partition surfaced nothing to show. A deferred section kept with no
+ * values and no filter is not content, counted or not, or an empty window would
+ * never fall back to the default sections.
  */
 function isPartitionEmpty(
   partition: ReturnType<typeof partitionDescriptors>,
   activeFieldSet: ReadonlySet<string>,
 ): boolean {
   return (
-    partition.categoricals.every(
-      (c) => c.deferred === true && c.topValues.length === 0 && !activeFieldSet.has(c.key),
-    ) &&
+    partition.categoricals.every((c) => c.topValues.length === 0 && !activeFieldSet.has(c.key)) &&
     partition.ranges.length === 0 &&
     partition.traceAttributeKeys.length === 0 &&
     partition.metadataAttributeKeys.length === 0 &&

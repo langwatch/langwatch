@@ -533,6 +533,12 @@ export type TracesListReader = Readonly<{
   getSuggestions(params: TraceSuggestionsParams): Promise<string[]>;
   resolveFacetKey(input: { field: string; protections: Protections }): string;
   getDiscover(params: TraceDiscoverReadParams): Promise<DiscoverResult>;
+  /** Deferred facets counted over the discovery window, cached alongside it. */
+  getDeferredDiscoverCounts(params: {
+    authorization: Authorization;
+    timeRange: { from: number; to: number };
+    facetKeys: readonly string[];
+  }): Promise<FacetDescriptor[]>;
   getFacetValues(params: TraceFacetValuesReadParams): Promise<FacetValuesResult>;
 }>;
 
@@ -1944,7 +1950,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     if (field === undefined) {
       return discoverResultSchema.parse(
         await this.#discoverWithDeferredCounted({
-          projectId: input.projectId,
           authorization: input.authorization,
           timeRange,
         }),
@@ -1971,13 +1976,11 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /**
-   * The REST discovery payload promises each facet's top values, so the facets
-   * the sidebar defers are counted here by a keyed read over the same window,
-   * unfiltered like discovery. A deferred facet that read cannot answer stays
-   * listed without values.
+   * The REST payload promises each facet's top values, so the facets the
+   * sidebar defers are counted here over the discovery window. One the count
+   * cannot answer stays listed without values.
    */
   async #discoverWithDeferredCounted(input: {
-    projectId: string;
     authorization: Authorization;
     timeRange: { from: number; to: number };
   }): Promise<DiscoverResult> {
@@ -1990,12 +1993,10 @@ export class TraceModule implements TraceApi, CollectorApp {
       .map((facet) => facet.key);
     if (facetKeys.length === 0) return discovered;
 
-    const counted = await this.#dependencies.traces.list.getFacets({
+    const counted = await this.#dependencies.traces.list.getDeferredDiscoverCounts({
       authorization: input.authorization,
       timeRange: input.timeRange,
-      filterFor: () => undefined,
       facetKeys,
-      filterKey: JSON.stringify([input.projectId, "rest-discover"]),
     });
     const countedByKey = new Map(counted.map((facet) => [facet.key, facet]));
 

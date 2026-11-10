@@ -295,6 +295,61 @@ export class TraceDiscoverService {
     });
   }
 
+  /**
+   * Deferred facets counted unfiltered over the snapped discovery window, kept
+   * as long as a discovery payload stays fresh. A count missing a key is not kept.
+   */
+  getDeferredCounts({
+    params,
+    facetKeys,
+  }: {
+    params: DiscoverParams;
+    facetKeys: readonly string[];
+  }): Promise<FacetDescriptor[]> {
+    const snapped = snapToWindowPreset(params.timeRange);
+    const key = JSON.stringify([
+      discoverCacheKey({ authorization: params.authorization, snapped }),
+      facetKeys,
+    ]);
+    const running = this.deferredCounting.get(key);
+    if (running) return running;
+
+    const run = this.countDeferred({
+      params: { authorization: params.authorization, timeRange: snapped },
+      facetKeys,
+      key,
+    }).finally(() => this.deferredCounting.delete(key));
+    this.deferredCounting.set(key, run);
+    return run;
+  }
+
+  private readonly deferredCounting = new Map<string, Promise<FacetDescriptor[]>>();
+  private readonly deferredCounts =
+    TraceTtlCacheService.create<FacetDescriptor[]>(DISCOVER_REFRESH_AFTER_MS);
+
+  private async countDeferred({
+    params,
+    facetKeys,
+    key,
+  }: {
+    params: DiscoverParams;
+    facetKeys: readonly string[];
+    key: string;
+  }): Promise<FacetDescriptor[]> {
+    const lookup = await this.deferredCounts.get(key);
+    if (lookup.kind === "hit") return lookup.value;
+
+    const counted = await this.getFilteredFacets({
+      params: { authorization: params.authorization, timeRange: params.timeRange },
+      filterFor: () => undefined,
+      facetKeys,
+    });
+    if (facetKeys.every((facetKey) => counted.some((facet) => facet.key === facetKey))) {
+      await this.deferredCounts.set(key, counted);
+    }
+    return counted;
+  }
+
   private refreshDiscoverInBackground({
     params,
     cacheKey,

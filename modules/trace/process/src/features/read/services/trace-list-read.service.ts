@@ -165,6 +165,18 @@ export class TraceListService {
     return this.discover.getDiscover(params);
   }
 
+  /** Deferred facets counted over the discovery window, cached alongside it. */
+  getDeferredDiscoverCounts(params: {
+    authorization: Authorization;
+    timeRange: { from: number; to: number };
+    facetKeys: readonly string[];
+  }): Promise<FacetDescriptor[]> {
+    return this.discover.getDeferredCounts({
+      params: { authorization: params.authorization, timeRange: params.timeRange },
+      facetKeys: params.facetKeys,
+    });
+  }
+
   /** One facet's values, cached, for a sidebar drill-in. */
   /** The facet-store key a REST `field` names, judged against this list's facet catalogue. */
   resolveFacetKey(input: { field: string; protections: Protections }): string {

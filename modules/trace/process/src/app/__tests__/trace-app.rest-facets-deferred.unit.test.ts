@@ -17,7 +17,13 @@ import { createTraceAppHarness } from "./support/trace-app.harness.ts";
 
 type BatchCall = Parameters<TraceListRead["findBatchedFacets"]>[0];
 
-function harness({ projectId, spanTypeFails = false }: { projectId: string; spanTypeFails?: boolean }) {
+function harness({
+  projectId,
+  spanTypeFails = false,
+}: {
+  projectId: string;
+  spanTypeFails?: boolean;
+}) {
   const batched: BatchCall[] = [];
   let refreshed = false;
   const repository = createApiFixture<TraceListRead>({
@@ -69,7 +75,11 @@ function harness({ projectId, spanTypeFails = false }: { projectId: string; span
     await vi.waitFor(() => expect(refreshed).toBe(true));
     return read();
   };
-  return { readWarm, batched };
+  return { read, readWarm, batched };
+}
+
+function keysOf(call: BatchCall): string[] {
+  return call.categoricalSpecs.map((spec) => spec.key);
 }
 
 function spanTypeOf(answer: unknown) {
@@ -93,6 +103,20 @@ describe("TraceModule REST facet discovery", () => {
       expect(keyed.length).toBeGreaterThan(0);
       for (const call of keyed)
         expect(call.categoricalSpecs.map((spec) => spec.key)).toEqual(["spanType"]);
+    });
+  });
+
+  describe("given the listing is read again within the minute", () => {
+    /** @scenario "The REST facet listing still counts span type" */
+    it("serves span type from the cache instead of counting it again", async () => {
+      const { read, readWarm, batched } = harness({ projectId: "project-rest-deferred-repeat" });
+      await readWarm();
+      const countsSoFar = batched.filter((call) => keysOf(call).includes("spanType")).length;
+
+      const spanType = spanTypeOf(await read());
+
+      expect(spanType).toMatchObject({ topValues: [{ value: "llm", count: 4 }] });
+      expect(batched.filter((call) => keysOf(call).includes("spanType"))).toHaveLength(countsSoFar);
     });
   });
 
