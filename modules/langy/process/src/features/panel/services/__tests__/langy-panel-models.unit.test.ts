@@ -63,7 +63,7 @@ describe("LangyPanelModelsService", () => {
     /** @scenario "A model reference without a provider is refused" */
     it("is refused at the wire, before any save", () => {
       expect(
-        langySetModelsAllowedInputSchema.safeParse({ projectId, modelsAllowed: ["gpt-5"] }).success,
+        langySetModelsAllowedInputSchema.validate({ projectId, modelsAllowed: ["gpt-5"] }),
       ).toBe(false);
       expect(
         langySetModelsAllowedInputSchema.parse({ projectId, modelsAllowed: [" openai/gpt-5 "] }),

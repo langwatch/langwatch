@@ -249,7 +249,7 @@ export class LangyService {
     projectId: string;
     actorUserId: string;
     modelsAllowed: readonly string[];
-  }): Promise<string[] | null> {
+  }): Promise<string[]> {
     return this.credentials.setModelsAllowedForProject(input);
   }
 

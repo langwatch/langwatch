@@ -43,6 +43,6 @@ export class LangyPanelModelsService {
       actorUserId: input.caller.userId,
       modelsAllowed: input.modelsAllowed,
     });
-    return { modelsAllowed };
+    return { modelsAllowed: modelsAllowed.length > 0 ? modelsAllowed : null };
   }
 }

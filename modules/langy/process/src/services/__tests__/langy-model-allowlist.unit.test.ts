@@ -124,7 +124,7 @@ describe("LangyCredentialService.setModelsAllowedForProject", () => {
       const { service, store } = setup({ provisioned: true });
       await save(service, ["openai/gpt-5"]);
 
-      await expect(save(service, [])).resolves.toBeNull();
+      await expect(save(service, [])).resolves.toEqual([]);
       expect(store.virtualKeys[0]?.config).toEqual({ modelsAllowed: null });
     });
   });

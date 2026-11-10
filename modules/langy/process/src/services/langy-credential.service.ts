@@ -257,13 +257,13 @@ export class LangyCredentialService {
    * Replaces the models Langy may run on in the project, trimmed and deduplicated; empty allows
    * every model. A project whose Langy key was never minted gets one first, so the list has a
    * key to live on. Refuses rather than answer success when no key took the write. Answers the
-   * list as the enforcement points now read it.
+   * list as the enforcement points now read it, empty meaning every model.
    */
   async setModelsAllowedForProject(input: {
     projectId: string;
     actorUserId: string;
     modelsAllowed: readonly string[];
-  }): Promise<string[] | null> {
+  }): Promise<string[]> {
     const { organizationId } = await this.deps.repository.getProject(input.projectId);
     const unique = [...new Set(input.modelsAllowed.map((model) => model.trim()))].filter(Boolean);
     const target = {
@@ -280,7 +280,7 @@ export class LangyCredentialService {
       if (retried.written === 0) throw new LangyVirtualKeyMissingError(input.projectId);
     }
 
-    return this.findModelsAllowed({ projectId: input.projectId, organizationId });
+    return (await this.findModelsAllowed({ projectId: input.projectId, organizationId })) ?? [];
   }
 
   async resolveMirrorTier({ projectId }: { projectId: string }): Promise<LangyMirrorTier> {
