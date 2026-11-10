@@ -34,7 +34,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -49,6 +49,25 @@ jobs:
           key: docs-site-docs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
             docs-site-docs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      # Measure the site production ships: docs-site.yml's build transcodes every video to a
+      # poster and preload="none". Without ffmpeg each video is published as authored, and one
+      # with no poster loads its whole file while the page's largest image is still arriving.
+      - name: Restore the encoded docs media
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/docs/node_modules/.cache/docs-media
+          key: docs-media-${{ runner.os }}-${{ hashFiles('docs/images/**', 'docs/media/**', 'apps/docs/src/site/image-variants.ts', 'apps/docs/src/site/video-variants.ts') }}
+          restore-keys: |
+            docs-media-${{ runner.os }}-
+      - name: Install ffmpeg
+        timeout-minutes: 10
+        env:
+          APT_OPTS: -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+        run: |
+          command -v ffmpeg || {
+            sudo apt-get $APT_OPTS update
+            sudo apt-get $APT_OPTS install -y --no-install-recommends ffmpeg
+          }
       - name: Read the Playwright version
         id: playwright
         run: |
