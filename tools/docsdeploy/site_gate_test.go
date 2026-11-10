@@ -83,9 +83,8 @@ func workspaceDirs(t *testing.T) map[string]string {
 
 // siteDependencies is the docs build's workspace closure, as apps/docs/src/site/build-inputs.ts
 // walks it: runtime and peer dependencies transitively, and the app's own dev dependencies.
-func siteDependencies(t *testing.T) []string {
+func siteDependencies(t *testing.T, dirs map[string]string) []string {
 	t.Helper()
-	dirs := workspaceDirs(t)
 	found := map[string]bool{"apps/docs": true}
 	pending := []string{"apps/docs"}
 	for len(pending) > 0 {
@@ -161,7 +160,10 @@ func TestSiteFilterCoversEveryPackageTheBuildReads(t *testing.T) {
 	for _, p := range patterns {
 		listed[p] = true
 	}
-	for _, dir := range siteDependencies(t) {
+	dirs := workspaceDirs(t)
+	reads := map[string]bool{}
+	for _, dir := range siteDependencies(t, dirs) {
+		reads[dir] = true
 		if !listed[dir+"/**"] {
 			t.Errorf("the docs build reads %s, but the docs-site filter does not list %s/**", dir, dir)
 		}
@@ -171,12 +173,8 @@ func TestSiteFilterCoversEveryPackageTheBuildReads(t *testing.T) {
 			t.Errorf("the docs-site filter does not list %s", want)
 		}
 	}
-	reads := map[string]bool{}
-	for _, dir := range siteDependencies(t) {
-		reads[dir] = true
-	}
 	packages := map[string]bool{}
-	for _, dir := range workspaceDirs(t) {
+	for _, dir := range dirs {
 		packages[dir] = true
 	}
 	for _, p := range patterns {
