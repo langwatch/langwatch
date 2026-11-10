@@ -324,8 +324,8 @@ password: `default` gets none and is locked, the credentials Secret mounts only
 the cluster secret (replicas) or nothing (one pod), and a `local_admin` password
 is generated at every start into an in-memory `emptyDir` shared with the
 sidecar. The sidecar's `/readyz` gates the pod's readiness. The chart refuses
-the mode with `passwordSecrets`, with `backup.enabled`, or with replicas but no
-`auth.clusterSecretEnabled`. Clients use short-lived tokens, for example a
+the mode with `passwordSecrets`, with replicas but no `auth.clusterSecretEnabled`,
+and with backups unless `backup.mode: sidecar` on one replica. Clients use short-lived tokens, for example a
 projected ServiceAccount token:
 
 ```yaml

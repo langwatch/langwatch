@@ -43,5 +43,5 @@ e2e-access: build ## E2E: tiers, rolling passwords, token logins and dynamic-onl
 	CH_ACCESS_E2E_IMAGE=$(IMAGE):$(TAG) go test -count=1 -v ./tests/accesse2e/
 
 clean: ## Stop and remove test containers
-	@docker rm -f ch-e2e ch-e2e-access ch-e2e-dynamic ch-backup rustfs-backup garage-e2e 2>/dev/null || true
+	@docker rm -f ch-e2e ch-e2e-access ch-e2e-dynamic ch-e2e-default-grants ch-backup rustfs-backup garage-e2e 2>/dev/null || true
 	@docker network rm ch-test-net 2>/dev/null || true
