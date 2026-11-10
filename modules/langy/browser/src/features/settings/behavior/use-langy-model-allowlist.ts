@@ -34,7 +34,7 @@ export function useLangyModelAllowlist({ projectId }: { projectId: string }) {
   });
 
   // Until the stored list has loaded there is nothing to edit, and saving would wipe it.
-  const savedStatus = savedQuery.isSuccess ? "ready" : savedQuery.isError ? "error" : "loading";
+  const savedStatus = statusOf(savedQuery);
   const models = draft ?? savedQuery.data?.modelsAllowed ?? [];
   const defaultModel = defaultQuery.data?.model ?? null;
 
@@ -56,4 +56,10 @@ export function useLangyModelAllowlist({ projectId }: { projectId: string }) {
       save.mutate({ projectId, modelsAllowed: models });
     },
   } as const;
+}
+
+function statusOf(query: { isSuccess: boolean; isError: boolean }) {
+  if (query.isSuccess) return "ready" as const;
+  if (query.isError) return "error" as const;
+  return "loading" as const;
 }
