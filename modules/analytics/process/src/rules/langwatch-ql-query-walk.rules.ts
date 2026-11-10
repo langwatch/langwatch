@@ -89,6 +89,11 @@ type ViolationExtra = Partial<
   >
 >;
 
+/** `capped` means the violation limit was already reached, so nothing was recorded. */
+type ReportResult =
+  | { readonly outcome: "reported"; readonly violation: LangWatchQLViolation }
+  | { readonly outcome: "capped" };
+
 function report({
   ctx,
   frame,
@@ -103,8 +108,8 @@ function report({
   message: string;
   node?: SqlAstNode;
   extra?: ViolationExtra;
-}): LangWatchQLViolation | undefined {
-  if (ctx.violations.length >= MAX_VIOLATIONS) return undefined;
+}): ReportResult {
+  if (ctx.violations.length >= MAX_VIOLATIONS) return { outcome: "capped" };
   const at = node ? extractPosition(node) : undefined;
   const violation: LangWatchQLViolation = {
     code,
@@ -117,7 +122,7 @@ function report({
     ...extra,
   };
   ctx.violations.push(violation);
-  return violation;
+  return { outcome: "reported", violation };
 }
 
 const UNSUPPORTED_SYNTAX_MESSAGE =
@@ -1121,7 +1126,7 @@ function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
   const isAllowedTable = ctx.policy.allowedTables.has(qualified);
   if (!isAllowedTable) {
     const written = reference.database ? `${reference.database}.${reference.name}` : reference.name;
-    const violation = report({
+    const result = report({
       ctx,
       frame,
       code: "TABLE_NOT_ALLOWED",
@@ -1129,7 +1134,9 @@ function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       node,
       extra: { availableViews: ctx.policy.availableViews },
     });
-    if (violation) ctx.refusedViews.push({ violation, table: qualified });
+    if (result.outcome === "reported") {
+      ctx.refusedViews.push({ violation: result.violation, table: qualified });
+    }
     return null;
   }
   addOnce(ctx.tables, qualified);

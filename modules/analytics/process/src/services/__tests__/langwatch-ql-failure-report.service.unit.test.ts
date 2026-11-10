@@ -255,7 +255,10 @@ describe("given the service decides the origin itself", () => {
   });
 });
 
-/** The refusal a real validation throws when the caller's protections hide a view they could be granted. */
+/**
+ * The refusal a real validation throws when the caller's protections hide a view they could be
+ * granted.
+ */
 function callerAccessRefusal(): LangWatchQLNotPermittedError {
   const error = refusalOf({
     sql: STOCK_GATEWAY_SQL,
