@@ -90,7 +90,7 @@ describe("experimentRunActivity", () => {
       await deliver(started(plan));
       await deliver(started(plan));
 
-      expect(await service.resolve({ projectId: PROJECT })).toBe(10);
+      expect(await service.resolve({ projectId: PROJECT, runId: "probe-run" })).toBe(10);
     });
   });
 
@@ -103,7 +103,7 @@ describe("experimentRunActivity", () => {
       await deliver(completed);
       await deliver(completed);
 
-      expect(await service.resolve({ projectId: PROJECT })).toBe(20);
+      expect(await service.resolve({ projectId: PROJECT, runId: "probe-run" })).toBe(20);
     });
   });
 
@@ -113,7 +113,7 @@ describe("experimentRunActivity", () => {
 
       await deliver(started());
 
-      expect(await service.resolve({ projectId: PROJECT })).toBe(20);
+      expect(await service.resolve({ projectId: PROJECT, runId: "probe-run" })).toBe(20);
     });
   });
 });

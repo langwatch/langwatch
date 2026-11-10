@@ -6,11 +6,19 @@ Feature: An experiment run's default concurrency shares a cell budget between ac
   the project, the new run included, and capped by the same split of
   EVAL_V3_GLOBAL_CELL_BUDGET across every project when that is set. The result is
   never below 1 or above 24. It is computed once when the run starts and does not
-  change while the run is in flight. The budget is soft: each new run gets the budget
+  change while the run is in flight. The run is claimed active in the same atomic step
+  that reads the others, pinned or not, so runs started together each see the ones
+  claimed before them. The budget is soft: each new run gets the budget
   divided by the active runs plus itself, runs keep the value they started with, so
   the cells in flight can exceed the budget; the group queue's per-project cap limits
   dispatch. Without EVAL_V3_PROJECT_CELL_BUDGET, or when the
   active runs cannot be read, the default is EVAL_V3_CONCURRENCY.
+
+  Rollout: API, SDK and CI runs that send no concurrency get the dynamic default for
+  every experiment, old or new; the API path never reads the saved workbench setting.
+  Workbench runs of existing experiments keep their saved concurrency (10, saved by
+  the old default) until someone picks Auto; new experiments start on Auto. There is
+  no migration: a picked 10 and a defaulted 10 cannot be told apart.
 
   @unit
   Scenario: An idle project gets the full project budget, capped at 24
@@ -45,10 +53,17 @@ Feature: An experiment run's default concurrency shares a cell budget between ac
     And 44 cells are in flight, more than the budget of 24, which is expected
 
   @integration
+  Scenario: Runs resolved at the same moment each see the ones claimed before them
+    Given a project cell budget of 24 and no run active
+    When three runs resolve their default concurrency at the same moment
+    Then between them they get concurrency 24, 12 and 8
+
+  @integration
   Scenario: A concurrency named by the request wins over the dynamic default
     Given a project cell budget of 20 and no other run active
     When a run is started with concurrency 3
     Then the run gets concurrency 3
+    And it counts as active for the next run, which gets concurrency 10
 
   @integration
   Scenario: Dynamic mode off keeps the fixed default

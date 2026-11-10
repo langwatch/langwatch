@@ -8,6 +8,16 @@ export abstract class ExperimentRunActivityRepository {
   }): Promise<void>;
   /** Stops counting the run. Answers quietly for a run never marked. */
   abstract markInactive(input: { projectId: string; runId: string }): Promise<void>;
+  /**
+   * Marks the run active until `expiresAt` and answers the other runs active in the project and in
+   * every project, in one atomic step so runs claiming at once each see the ones before them.
+   */
+  abstract claim(input: {
+    projectId: string;
+    runId: string;
+    now: number;
+    expiresAt: number;
+  }): Promise<{ project: number; global: number }>;
   /** The active runs in the project and in every project; an entry expired by `now` is dropped. */
   abstract countActive(input: {
     projectId: string;

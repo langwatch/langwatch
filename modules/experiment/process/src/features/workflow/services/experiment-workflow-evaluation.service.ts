@@ -200,7 +200,10 @@ export class WorkflowEvaluationService {
           : { type: "full" },
       },
       data: dataResult,
-      concurrency: await this.dependencies.concurrency.resolve({ projectId: request.tenantId }),
+      concurrency: await this.dependencies.concurrency.resolve({
+        projectId: request.tenantId,
+        runId: request.runId,
+      }),
       origin: "workflow",
       persistResults: false,
       experimentSlug: request.experimentSlug,
