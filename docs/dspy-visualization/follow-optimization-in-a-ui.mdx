@@ -1,0 +1,86 @@
+---
+title: Track DSPy optimization (MIPROv2, GEPA) in a UI
+sidebarTitle: Follow optimization in a UI
+keywords: langwatch, dspy, prompt optimization, ui, miprov2, gepa, copro, bootstrapfewshot, optimizer tracking, experiments, langy
+description: One call to `langwatch.dspy.init` streams every optimizer step to LangWatch, with the score, the instructions, the examples, the LLM calls and the cost.
+---
+
+To follow a DSPy optimization in a UI, you keep running the optimizer in your own code and send each step to a platform that records it. You then watch the score climb step by step and open any candidate to see its instructions, the examples it was scored on and the LLM calls behind it.
+
+LangWatch does that with one line before `compile`, `langwatch.dspy.init`, for MIPROv2, GEPA, COPRO and the BootstrapFewShot optimizers. Your program and your metric stay as they are. To start now, go to [Track a run](#1-track-a-run).
+
+If you'd rather not write DSPy at all, Langy, the assistant built into LangWatch, can optimize a prompt for you against your own dataset and evaluator; see [Optimize from the UI without code](#optimize-from-the-ui-without-code).
+
+## Why a UI for an optimizer
+
+An optimizer run evaluates dozens of candidates, and the terminal shows you a log line per trial. Which instructions won, why the third candidate scored zero, and what the run cost are all in there somewhere, but hard to find.
+
+With every step recorded you can sort that out after the fact, compare one run against the next, and share the run with someone who wasn't watching the notebook.
+
+## 1. Track a run
+
+```bash
+pip install "langwatch[dspy]" "dspy[optuna]"
+```
+
+MIPROv2 needs the `optuna` extra; other optimizers run without it.
+
+Set `LANGWATCH_API_KEY`, or call `langwatch.login()` in a notebook to paste it in. Then add one line before `compile`:
+
+```python
+import dspy
+import langwatch
+
+dspy.configure(lm=dspy.LM("openai/gpt-6-luna"))
+
+optimizer = dspy.MIPROv2(metric=my_metric, auto="light")
+
+langwatch.dspy.init(experiment="support-agent-instructions", optimizer=optimizer)
+
+optimized = optimizer.compile(my_program, trainset=trainset)
+```
+
+`init` prints a link to the run as soon as `compile` starts. The same call tracks `GEPA`, `COPRO`, `BootstrapFewShot` and `BootstrapFewShotWithRandomSearch`. To track a `dspy.Evaluate` instead, pass it as `evaluator=`. For an optimizer outside that list, [log the steps yourself](/dspy-visualization/custom-optimizer) with `langwatch.dspy.log_step`.
+
+To check it worked, open the link `init` printed. The run is under **Experiments** and reads "Waiting for the first completed step to arrive" until the optimizer scores its first candidate; then the first step shows its score. If no link printed, check that `LANGWATCH_API_KEY` is set where the notebook or job runs.
+
+## 2. Read the run
+
+The run opens under **Experiments** and fills in while the optimizer works:
+
+- **The score chart** plots each step's score and the best score so far, so you see whether the run is still improving or has flattened.
+- **Predictors** shows, for the step you pick, each predictor's instructions and the few-shot examples it used. On a GEPA run that is each candidate's rewritten instructions.
+- **Evaluations** lists the training examples the step was scored on, with the prediction and the score of each.
+- **LLM Calls** has every call the step made, with the prompt, the response and the cost, and the step's total cost and tokens.
+
+When a candidate scores badly, open its Evaluations and LLM Calls to see the actual prompts the model received. That usually shows whether the instructions or the metric is at fault.
+
+## 3. Compare runs
+
+Every `compile` with the same `experiment` name is a new run in the same experiment. Shift-click several runs in the run list to plot them on one chart, for example MIPROv2 against GEPA, or the same optimizer with a different metric.
+
+Each run keeps its own steps, so you can go back to the winning candidate of last week's run and copy its instructions.
+
+## Optimize from the UI without code
+
+To improve a single prompt without DSPy, ask Langy, the assistant built into LangWatch, in the Experiments Workbench. Pick **Optimize this prompt** on a prompt column: Langy scores the current prompt with your evaluator on your dataset, writes a candidate, runs both and reports the pass rate and the cost before and after. See [Prompt optimization with Langy](/langy/prompt-optimization).
+
+## Questions about tracking DSPy in LangWatch
+
+### Does LangWatch run the DSPy optimizer
+
+No, the DSPy optimizer runs in your notebook or job, with your models and your keys, and LangWatch receives the steps and shows them. To optimize a prompt from the LangWatch UI instead, ask Langy; see [Optimize from the UI without code](#optimize-from-the-ui-without-code).
+
+### Which DSPy optimizer should I use
+
+[Optimization algorithms](/improve-your-agent/algorithms) compares what each one changes, what it needs and how many metric calls it costs.
+
+### Can LangWatch optimize a whole agent, not just one prompt
+
+Yes. [Optimize with DSPy](/improve-your-agent/optimize-with-dspy) uses scenario tests as the metric, so the optimizer rewrites the agent's instructions and tool descriptions and scores each candidate on full conversations.
+
+### Does LangWatch DSPy tracking work self-hosted
+
+Yes, set `LANGWATCH_ENDPOINT` to the address of your own instance before you call `init`.
+
+Next, add `langwatch.dspy.init` to your next optimizer run and open the link it prints, or start with the small runnable example in the [DSPy visualization quickstart](/dspy-visualization/quickstart).
