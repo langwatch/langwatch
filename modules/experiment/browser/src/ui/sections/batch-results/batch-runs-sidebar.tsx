@@ -5,6 +5,7 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
  */
 import {
   Alert,
+  Badge,
   Box,
   Button,
   chakra,
@@ -29,6 +30,7 @@ import {
   INTERRUPTED_THRESHOLD_MS,
   isRunFinished,
 } from "../../../model/batch-evaluation-results.run-state.ts";
+import { RunConcurrencyBadge } from "../../elements/batch-results/run-concurrency-badge.tsx";
 import { RunDisplayName } from "../../elements/batch-results/run-display-name.tsx";
 import { formatTimeAgo, getColorForString } from "./presentation.tsx";
 
@@ -245,6 +247,7 @@ const RunItem = ({
       <chakra.button
         type="button"
         onClick={onClick}
+        aria-describedby={run.concurrency ? concurrencyExplanationId(run.runId) : undefined}
         display="flex"
         flexDirection="column"
         alignItems="start"
@@ -298,30 +301,56 @@ const RunItem = ({
   );
 };
 
-/** The agent version each label resolved to and the run's concurrency, when it recorded them. */
+/**
+ * Label badges a run entry shows before folding the rest into "+N", so the narrow sidebar stays
+ * two lines.
+ */
+const MAX_LABEL_BADGES = 2;
+
+const concurrencyExplanationId = (runId: string) => `run-concurrency-explanation-${runId}`;
+
+/**
+ * The agent version each label resolved to and the run's concurrency, as badges, when it recorded
+ * them.
+ */
 const RunSettingsLine = ({ run }: { run: BatchRunSummary }) => {
   const labels = runAgentLabelsOf(run.targets);
   if (labels.length === 0 && !run.concurrency) return null;
+  const shown = labels.slice(0, MAX_LABEL_BADGES);
+  const folded = labels.slice(MAX_LABEL_BADGES);
 
   return (
-    <Text color="fg.muted" textStyle="caption" lineClamp={2}>
-      {labels.map((label, index) => (
-        <chakra.span
+    <HStack gap={1} flexWrap="wrap" paddingTop={0.5} maxWidth="full">
+      {shown.map((label) => (
+        <Badge
           key={label.targetId}
+          size="xs"
+          variant="subtle"
+          maxWidth="full"
           title={label.targetName}
           data-testid={`run-agent-label-${run.runId}-${label.targetId}`}
         >
-          {index > 0 ? ", " : ""}
-          {agentLabelText(label)}
-        </chakra.span>
+          <chakra.span truncate>{agentLabelText(label)}</chakra.span>
+        </Badge>
       ))}
-      {run.concurrency ? (
-        <chakra.span data-testid={`run-concurrency-${run.runId}`}>
-          {labels.length > 0 ? " · " : ""}
-          {`Concurrency ${run.concurrency}`}
-        </chakra.span>
+      {folded.length > 0 ? (
+        <Badge
+          size="xs"
+          variant="subtle"
+          title={folded.map((label) => `${label.targetName}: ${agentLabelText(label)}`).join("\n")}
+          data-testid={`run-agent-labels-folded-${run.runId}`}
+        >
+          {`+${folded.length}`}
+        </Badge>
       ) : null}
-    </Text>
+      {run.concurrency ? (
+        <RunConcurrencyBadge
+          concurrency={run.concurrency}
+          explanationId={concurrencyExplanationId(run.runId)}
+          testId={`run-concurrency-${run.runId}`}
+        />
+      ) : null}
+    </HStack>
   );
 };
 
