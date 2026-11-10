@@ -486,6 +486,7 @@ export const APP_ERROR_CODES = [
   "langy_unattended_actor_deactivated",
   "langy_unattended_actor_missing",
   "langy_unattended_no_langy_access",
+  "langy_virtual_key_missing",
   "langy_wait_expired",
   "langy_worker_restarting",
   "langy_worker_spawn_failed",

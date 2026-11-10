@@ -3,6 +3,7 @@
  * @vitest-environment node
  * @see specs/langy/langy-model-allowlist.feature
  */
+import { LangyVirtualKeyMissingError } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
 import { LangyMemoryStore } from "../../repositories/memory/langy-memory.store.ts";
@@ -15,8 +16,17 @@ import {
 const PROJECT_ID = "project_1";
 const ORGANIZATION_ID = "org_1";
 
-/** A gateway stand-in: provisioning adds a live Langy key, a write lands on every live one. */
-function setup({ provisioned }: { provisioned: boolean }) {
+/**
+ * A gateway stand-in: provisioning adds a live Langy key unless a stale secret makes it keep
+ * none, and a write lands on every live one.
+ */
+function setup({
+  provisioned,
+  staleSecret = false,
+}: {
+  provisioned: boolean;
+  staleSecret?: boolean;
+}) {
   const store = LangyMemoryStore.create();
   store.projects.set(PROJECT_ID, {
     teamId: "team_1",
@@ -37,7 +47,7 @@ function setup({ provisioned }: { provisioned: boolean }) {
   const virtualKeys: LangyVirtualKeyService = {
     provision: async ({ projectId }) => {
       provisions.push(projectId);
-      addKey();
+      if (!staleSecret) addKey();
       return "vk-secret";
     },
     setModelsAllowed: async ({ projectId, modelsAllowed }) => {
@@ -83,6 +93,18 @@ describe("LangyCredentialService.setModelsAllowedForProject", () => {
       await expect(service.findModelsAllowedForProject(PROJECT_ID)).resolves.toEqual([
         "openai/gpt-5",
       ]);
+    });
+  });
+
+  describe("given a project whose Langy key was revoked while its secret is still stored", () => {
+    /** @scenario "Saving refuses when no Langy key can hold the list" */
+    it("refuses the save instead of answering success", async () => {
+      const { service, provisions } = setup({ provisioned: false, staleSecret: true });
+
+      await expect(save(service, ["openai/gpt-5"])).rejects.toBeInstanceOf(
+        LangyVirtualKeyMissingError,
+      );
+      expect(provisions).toEqual([PROJECT_ID]);
     });
   });
 

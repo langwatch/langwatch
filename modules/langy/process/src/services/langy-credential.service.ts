@@ -1,5 +1,6 @@
 import {
   LangyCredentialResolutionError,
+  LangyVirtualKeyMissingError,
   langyEgressAllowlistSchema,
   type LangyCredentialSession,
   type LangyMirrorTier,
@@ -255,7 +256,8 @@ export class LangyCredentialService {
   /**
    * Replaces the models Langy may run on in the project, trimmed and deduplicated; empty allows
    * every model. A project whose Langy key was never minted gets one first, so the list has a
-   * key to live on. Answers the list as the enforcement points now read it.
+   * key to live on. Refuses rather than answer success when no key took the write. Answers the
+   * list as the enforcement points now read it.
    */
   async setModelsAllowedForProject(input: {
     projectId: string;
@@ -273,7 +275,9 @@ export class LangyCredentialService {
     const { written } = await this.deps.virtualKeys.setModelsAllowed(target);
     if (written === 0) {
       await this.deps.virtualKeys.provision(target);
-      await this.deps.virtualKeys.setModelsAllowed(target);
+      const retried = await this.deps.virtualKeys.setModelsAllowed(target);
+      // provision() keeps a stored secret whose key was revoked, so nothing may hold the list.
+      if (retried.written === 0) throw new LangyVirtualKeyMissingError(input.projectId);
     }
 
     return this.findModelsAllowed({ projectId: input.projectId, organizationId });

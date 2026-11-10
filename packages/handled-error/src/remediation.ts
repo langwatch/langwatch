@@ -799,6 +799,9 @@ const registry = {
       "This skill is gated by a feature flag that is off for this project — use an available alternative instead of retrying",
     ],
   },
+  langy_virtual_key_missing: {
+    tips: ["Contact support: the project's Langy key was revoked while its secret remains"],
+  },
   langy_model_not_allowed: {
     tips: ["Choose one of the models configured for this project and retry"],
   },

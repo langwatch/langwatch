@@ -33,6 +33,8 @@ if (!window.ResizeObserver) {
 
 const state = vi.hoisted(() => ({
   saved: null as string[] | null,
+  savedReadFails: false,
+  refetch: vi.fn(),
   defaultModel: "openai/gpt-5" as string | null,
   mutate: vi.fn(),
 }));
@@ -46,7 +48,10 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
     useUtils: () => ({ langy: { modelsAllowed: { setData: vi.fn() } } }),
     langy: {
       modelsAllowed: {
-        useQuery: () => ({ data: { modelsAllowed: state.saved }, isLoading: false }),
+        useQuery: () =>
+          state.savedReadFails
+            ? { data: undefined, isSuccess: false, isError: true, refetch: state.refetch }
+            : { data: { modelsAllowed: state.saved }, isSuccess: true, isError: false },
       },
       setModelsAllowed: { useMutation: () => ({ mutate: state.mutate, isPending: false }) },
     },
@@ -129,6 +134,8 @@ const offered = () =>
 
 beforeEach(() => {
   state.saved = null;
+  state.savedReadFails = false;
+  state.refetch.mockReset();
   state.defaultModel = "openai/gpt-5";
   state.mutate.mockReset();
 });
@@ -169,6 +176,23 @@ describe("<LangySettingsScreen/>", () => {
 
       await user.click(screen.getByRole("button", { name: "Save changes" }));
       expect(state.mutate).toHaveBeenCalledWith({ projectId: "project_1", modelsAllowed: [mini] });
+    });
+  });
+
+  describe("given the saved list cannot be read", () => {
+    /** @scenario "The page offers no save until the current list has loaded" */
+    it("says so, offers a retry and no way to save", async () => {
+      state.savedReadFails = true;
+      renderScreen();
+
+      const notice = screen.getByTestId("langy-models-load-error");
+      expect(notice.textContent).toContain("Couldn't load Langy's models");
+      expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+      expect(screen.queryByRole("combobox", { name: "Models Langy may use" })).toBeNull();
+
+      await userEvent.setup().click(within(notice).getByRole("button", { name: "Try again" }));
+      expect(state.refetch).toHaveBeenCalledOnce();
+      expect(state.mutate).not.toHaveBeenCalled();
     });
   });
 

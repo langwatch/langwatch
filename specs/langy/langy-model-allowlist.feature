@@ -53,6 +53,13 @@ Feature: A project admin restricts which models Langy may use
     And the list is written onto it
 
   @unit
+  Scenario: Saving refuses when no Langy key can hold the list
+    Given a project whose Langy key was revoked while its secret is still stored
+    When a project admin saves "openai/gpt-5" as Langy's only model
+    Then the save is refused as the Langy key being missing
+    And the admin is never told the list was saved
+
+  @unit
   Scenario: A model reference without a provider is refused
     When a project admin saves "gpt-5" as Langy's only model
     Then the request is refused as invalid input
@@ -95,3 +102,10 @@ Feature: A project admin restricts which models Langy may use
     When they open Langy settings
     Then they see Langy's current models
     And they cannot change them
+
+  @integration
+  Scenario: The page offers no save until the current list has loaded
+    Given Langy's current models cannot be read
+    When a project admin opens Langy settings
+    Then the page says the list could not be loaded
+    And it offers no way to save a list

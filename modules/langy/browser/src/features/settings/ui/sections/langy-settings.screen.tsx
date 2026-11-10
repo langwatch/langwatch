@@ -6,7 +6,7 @@
 import { Banner } from "@langwatch/design-system/banner";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Button, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { ProviderModelMultiSelector } from "@langwatch/design-system/provider-model-multi-selector";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Bot } from "lucide-react";
@@ -47,6 +47,7 @@ function LangyModelsSection({ projectId }: { projectId: string }) {
   const host = useLangyHost();
   const canManage = host.hasPermission("langy:manage");
   const allowlist = useLangyModelAllowlist({ projectId });
+  const ready = allowlist.savedStatus === "ready";
 
   return (
     <SettingsSection
@@ -54,7 +55,7 @@ function LangyModelsSection({ projectId }: { projectId: string }) {
       title="Models Langy may use"
       hint="Langy only runs on the models you pick. Leave it empty to let Langy use every model your providers serve."
       footer={
-        canManage ? (
+        canManage && ready ? (
           <Button
             size="sm"
             colorPalette="accent"
@@ -67,30 +68,49 @@ function LangyModelsSection({ projectId }: { projectId: string }) {
       }
       data-testid="langy-models-section"
     >
-      <VStack width="full" align="stretch" gap={3}>
-        <ProviderModelMultiSelector
-          aria-label="Models Langy may use"
-          models={allowlist.models}
-          query={allowlist.options}
-          onChange={allowlist.setModels}
-          emptyLabel="Every model your providers serve"
-          disabled={!canManage}
-        />
-        {canManage ? null : (
-          <Text textStyle="sm" color="fg.muted">
-            Only project admins can change which models Langy may use.
-          </Text>
-        )}
-        {allowlist.isDefaultOutsideList ? (
-          <Banner
-            status="warning"
-            title="Langy's default model is not in this list"
-            data-testid="langy-default-model-outside-list"
-          >
-            {`Chats switch to an allowed model, but anything that runs on the default model, ${allowlist.defaultModel ?? ""}, is refused. Add it here or change Langy's default model.`}
-          </Banner>
-        ) : null}
-      </VStack>
+      {allowlist.savedStatus === "loading" ? (
+        <Skeleton height={10} width="full" data-testid="langy-models-loading" />
+      ) : null}
+      {allowlist.savedStatus === "error" ? (
+        <Banner
+          status="error"
+          title="Couldn't load Langy's models"
+          action={
+            <Button size="xs" variant="outline" onClick={allowlist.retryLoad}>
+              Try again
+            </Button>
+          }
+          data-testid="langy-models-load-error"
+        >
+          Nothing can be saved until the current list loads.
+        </Banner>
+      ) : null}
+      {ready ? (
+        <VStack width="full" align="stretch" gap={3}>
+          <ProviderModelMultiSelector
+            aria-label="Models Langy may use"
+            models={allowlist.models}
+            query={allowlist.options}
+            onChange={allowlist.setModels}
+            emptyLabel="Every model your providers serve"
+            disabled={!canManage}
+          />
+          {canManage ? null : (
+            <Text textStyle="sm" color="fg.muted">
+              Only project admins can change which models Langy may use.
+            </Text>
+          )}
+          {allowlist.isDefaultOutsideList ? (
+            <Banner
+              status="warning"
+              title="Langy's default model is not in this list"
+              data-testid="langy-default-model-outside-list"
+            >
+              {`Chats switch to an allowed model, but anything that runs on the default model, ${allowlist.defaultModel ?? ""}, is refused. Add it here or change Langy's default model.`}
+            </Banner>
+          ) : null}
+        </VStack>
+      ) : null}
     </SettingsSection>
   );
 }

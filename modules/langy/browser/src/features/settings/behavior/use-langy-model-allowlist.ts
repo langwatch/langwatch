@@ -19,7 +19,7 @@ export function useLangyModelAllowlist({ projectId }: { projectId: string }) {
     featureKey: LANGY_GATE_FEATURE_KEY,
   });
   // The models the project's providers serve for Langy, as the composer's picker offers them.
-  const { selectOptions } = useLangyModelOptions({
+  const providerModels = useLangyModelOptions({
     options: allModelOptions,
     model: "",
     featureKey: LANGY_GATE_FEATURE_KEY,
@@ -33,21 +33,27 @@ export function useLangyModelAllowlist({ projectId }: { projectId: string }) {
     onError: (error) => host.failed({ error, fallbackTitle: "Couldn't save Langy's models" }),
   });
 
-  const saved = savedQuery.data?.modelsAllowed ?? [];
-  const models = draft ?? saved;
+  // Until the stored list has loaded there is nothing to edit, and saving would wipe it.
+  const savedStatus = savedQuery.isSuccess ? "ready" : savedQuery.isError ? "error" : "loading";
+  const models = draft ?? savedQuery.data?.modelsAllowed ?? [];
   const defaultModel = defaultQuery.data?.model ?? null;
 
   return {
+    savedStatus,
+    retryLoad: () => void savedQuery.refetch(),
     models,
     setModels: setDraft,
     options: {
-      data: selectOptions.map(({ value, label }) => ({ value, label })),
-      isLoading: savedQuery.isLoading,
-      error: savedQuery.error ?? undefined,
+      data: providerModels.selectOptions.map(({ value, label }) => ({ value, label })),
+      isLoading: providerModels.isLoading,
+      error: providerModels.error,
     },
     defaultModel,
     isDefaultOutsideList: isDefaultModelOutsideList({ defaultModel, models }),
     isSaving: save.isPending,
-    save: () => save.mutate({ projectId, modelsAllowed: models }),
-  };
+    save: () => {
+      if (!savedQuery.isSuccess) return;
+      save.mutate({ projectId, modelsAllowed: models });
+    },
+  } as const;
 }
