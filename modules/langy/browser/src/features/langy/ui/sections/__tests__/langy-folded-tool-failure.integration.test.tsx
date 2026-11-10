@@ -316,6 +316,15 @@ describe("a failed step", () => {
     });
   });
 
+  describe("given a stopped turn with a failed step and a step that never finished", () => {
+    it("titles the receipt by the failure, not as still working", () => {
+      renderActivity({ parts: [failA, runningRead], live: false, interrupted: true });
+
+      expect(receiptHeader().textContent).toContain("1 action failed");
+      expect(screen.queryByRole("button", { name: /Working/ })).toBeNull();
+    });
+  });
+
   describe("given the turn ended on a failure with no reply after it", () => {
     /** @scenario "Only the last failed step of an unanswered turn keeps its card" */
     it("keeps the card for the step the turn ended on", () => {
