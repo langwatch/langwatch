@@ -3959,6 +3959,9 @@ importers:
       '@langwatch/enterprise-saas-contract':
         specifier: workspace:*
         version: link:../../saas/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/entitlement/contract
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../../../modules/evaluation/contract

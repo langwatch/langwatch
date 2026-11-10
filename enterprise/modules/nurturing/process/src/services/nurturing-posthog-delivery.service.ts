@@ -11,6 +11,7 @@ import {
   activationTrackInput,
   evaluationsCompletedEvent,
 } from "../rules/nurturing-posthog-activation.rules.ts";
+import { fireScenarioRunCapPostHog } from "../rules/nurturing-scenario-run-cap.rules.ts";
 import { fireOrganizationCreated } from "../rules/nurturing-signup-identification-service.rules.ts";
 import { fireSubscriptionStarted } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import { isoOf } from "../rules/nurturing-time.rules.ts";
@@ -100,6 +101,9 @@ export class NurturingPostHogDeliveryService {
         return fireSubscriptionStarted(signal).forEach((event) => posthog.track(event));
       case "checkout_completed":
         return this.checkoutCompleted(signal);
+      case "scenario_runs_threshold_reached":
+      case "scenario_run_grace_ended":
+        return fireScenarioRunCapPostHog(signal).forEach((event) => posthog.track(event));
       default:
         return;
     }

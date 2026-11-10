@@ -5,6 +5,7 @@ import {
   USAGE_REPORT_RECEIVED_EVENT_TYPE,
   USAGE_REPORT_RECEIVED_EVENT_VERSION,
 } from "@langwatch/enterprise-saas-contract";
+import { SCENARIO_RUNS_THRESHOLD_REACHED_EVENT_TYPE } from "@langwatch/entitlement-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import {
   GUIDED_ONBOARDING_TURN_FAILED_EVENT_TYPE,
@@ -111,6 +112,7 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
     users,
   });
   const pipeline = buildNurturingPipeline({
+    organizationMembers: async () => ["user-1"],
     deliver: (input) => delivery.deliver(input),
     projectCreated: async () => undefined,
     guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
@@ -799,6 +801,48 @@ describe("nurturing's project active day, derived from trace and scenario facts"
           properties: { source: "trace", projectId: "project-1", days_since_signup: 3 },
         },
       ]);
+    });
+  });
+});
+
+describe("nurturing's scenarioRunsThresholdReached peer subscriber", () => {
+  describe("when entitlement records the month's threshold, delivered twice", () => {
+    it("tracks scenario_runs_threshold_reached once for each member", async () => {
+      const { posthog, customerIoFetch, deliverFact } = nurturingOverMemoryPostHog(jane());
+      const fact = {
+        ...userFact(SCENARIO_RUNS_THRESHOLD_REACHED_EVENT_TYPE),
+        aggregateId: "org-1",
+        tenantId: createTenantId("org-1"),
+        data: {
+          organizationId: "org-1",
+          month: "2026-11",
+          occurredAt: 1_000,
+          runs: 80,
+          maxPerMonth: 100,
+          inGrace: false,
+          graceEndsAt: 500,
+        },
+      } as Event;
+
+      await deliverFact(fact);
+      await deliverFact(fact);
+      await settle();
+
+      const properties = { organizationId: "org-1", runs: 80, limit: 100, month: "2026-11" };
+      expect(posthog.tracked).toEqual([
+        {
+          userId: "user-1",
+          event: "scenario_runs_threshold_reached",
+          properties: { ...properties, $groups: { organization: "org-1" } },
+        },
+      ]);
+      expect(customerIoFetch).toHaveBeenCalledTimes(1);
+      const body = customerIoFetch.mock.calls[0]?.[1]?.body;
+      expect(typeof body === "string" ? JSON.parse(body) : body).toMatchObject({
+        userId: "user-1",
+        event: "scenario_runs_threshold_reached",
+        properties,
+      });
     });
   });
 });

@@ -273,6 +273,25 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     plan: id,
   }),
   z.object({
+    /** A Free organization reached the monthly scenario run threshold; once per month. */
+    kind: z.literal("scenario_runs_threshold_reached"),
+    ...signalSource,
+    organizationId: id,
+    memberUserIds: z.array(id),
+    runs: z.number().int().nonnegative(),
+    limit: z.number().int().nonnegative(),
+    month: id,
+  }),
+  z.object({
+    /** A Free organization's grace after its first scenario run ended; once. */
+    kind: z.literal("scenario_run_grace_ended"),
+    ...signalSource,
+    organizationId: id,
+    memberUserIds: z.array(id),
+    graceEndedAt: z.number().int().nonnegative(),
+    runLimit: z.number().int().nonnegative(),
+  }),
+  z.object({
     kind: z.literal("checkout_completed"),
     ...signalSource,
     organizationId: id,

@@ -119,9 +119,9 @@ Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
     Then the scenario runs show no cap until the grace ends in 11 days
 
   @unit
-  Scenario: Reaching 100 runs in a month records the threshold once
+  Scenario: Reaching 80 runs in a month records the threshold once
     Given the organization is on the cloud Free plan
-    And its runs were counted at 100 this month
+    And its runs were counted at 80 this month
     When the runs are counted again at 120 the same month
     Then "scenario_runs_threshold_reached" was recorded once for the month
 
@@ -129,13 +129,13 @@ Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
   Scenario: The threshold is recorded during the grace too
     Given the organization is on the cloud Free plan
     And its first scenario run was 3 days ago
-    When its runs are counted at 100 this month
+    When its runs are counted at 80 this month
     Then "scenario_runs_threshold_reached" is recorded with the grace still running
 
   @unit
   Scenario: The threshold is recorded again the next month
     Given "scenario_runs_threshold_reached" was recorded last month
-    When the runs are counted at 100 this month
+    When the runs are counted at 80 this month
     Then "scenario_runs_threshold_reached" is recorded for this month
 
   @unit
@@ -165,10 +165,16 @@ Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
     Then it says the plan includes 100 scenario runs a month and names the upgrade
 
   @unit
-  Scenario: Nurturing forwards the run notices to Customer.io
-    Given "scenario_runs_threshold_reached" or "scenario_run_grace_ended" was recorded for an organization
+  Scenario: Nurturing tells Customer.io and PostHog when a Free organization nears its scenario run cap
+    Given "scenario_runs_threshold_reached" was recorded for an organization
     When nurturing receives it
-    Then the organization's admin is tracked the matching Customer.io event once
+    Then every member is tracked "scenario_runs_threshold_reached" once with the runs, the limit and the month
+
+  @unit
+  Scenario: Nurturing tells Customer.io and PostHog when a Free organization's scenario run grace ends
+    Given "scenario_run_grace_ended" was recorded for an organization
+    When nurturing receives it
+    Then every member is tracked "scenario_run_grace_ended" once with the grace end and the run limit
 
   @unit
   Scenario: Paid cloud plans are not capped

@@ -80,6 +80,8 @@ export class NurturingModule implements NurturingApi {
     return new NurturingModule(
       buildNurturingPipeline({
         deliver: (input) => delivery.deliver(input),
+        organizationMembers: async (organizationId) =>
+          (await dependencies.organizations.getAllMembers({ organizationId })).map(({ id }) => id),
         projectCreated: (data) => milestones.projectCreated(data),
         guidedTurnFailed: (data) => delivery.deliverGuidedTurnFailed(data),
         usageReportReceived: (input) => delivery.deliverUsageReport(input),
