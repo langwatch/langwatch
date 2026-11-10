@@ -91,6 +91,7 @@ export async function mintSession({
       // Trusted only while no row is saved; a saved row's own vendor id wins (AC13/AC29).
       agentId: props.agentId,
       ...(refs.createdRowId.current ? { agentRowId: refs.createdRowId.current } : {}),
+      ...(props.scenarioId ? { scenarioId: props.scenarioId } : {}),
     });
   } catch (error) {
     const failure = props.sessionClient.describeFailure(error);
