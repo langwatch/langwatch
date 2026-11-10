@@ -304,7 +304,10 @@ describe("given a member opens a From LangWatch board", () => {
       });
 
       await screen.findByRole("heading", { name: "Where my agent breaks" });
-      expect(screen.queryByRole("heading", { name: "Add a widget" })).toBeNull();
+      await screen.findByRole("button", { name: "What do you want to know?" });
+      await expect(
+        screen.findByRole("heading", { name: "Add a widget" }, { timeout: 300 }),
+      ).rejects.toThrow(/Unable to find/);
       expect(host.langyAsks).toEqual([]);
       load();
 

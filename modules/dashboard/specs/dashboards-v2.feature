@@ -1420,7 +1420,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given "Add a widget" is open on a From LangWatch board and the member's dashboards are still loading
     Then the picker is not shown and Langy is asked nothing
     When the dashboards have loaded
-    Then the picker shows, and a new dashboard's name never repeats one of them
+    Then the picker shows, and a new dashboard's name does not repeat one of the loaded dashboards
 
   @integration
   Scenario: From LangWatch: the picker has no I'll build it myself
