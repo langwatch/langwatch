@@ -83,11 +83,15 @@ export class TraceIndexMaterialisationService {
     while (!signal.aborted) {
       const [latest] = await materialisation.find();
       if (!latest) {
-        if (await nothingToStart({ dryRun, started, materialisation })) {
+        if (await nothingLeft({ dryRun, started, materialisation })) {
           return { mutationId: null, partsToDo: 0 };
         }
-        await materialisation.start();
-        started = true;
+        if (!started) {
+          await materialisation.start();
+          started = true;
+          continue;
+        }
+        await wait(this.pollIntervalMs, undefined, { signal }).catch(() => undefined);
         continue;
       }
       progress = { mutationId: latest.mutationId, partsToDo: latest.partsToDo };
@@ -103,8 +107,12 @@ export class TraceIndexMaterialisationService {
   }
 }
 
-/** Started and still unrecorded: the table had nothing to build, so nothing is left. */
-async function nothingToStart({
+/**
+ * Nothing to start or wait on. A table that can say so is done once it holds the build, even
+ * after a start whose mutation is not listed yet; one that cannot is done once started and still
+ * unrecorded, since it had nothing to build.
+ */
+async function nothingLeft({
   dryRun,
   started,
   materialisation,
@@ -113,8 +121,9 @@ async function nothingToStart({
   started: boolean;
   materialisation: Materialisation;
 }): Promise<boolean> {
-  if (dryRun || started) return true;
-  return (await materialisation.built?.()) ?? false;
+  if (dryRun) return true;
+  if (!materialisation.built) return started;
+  return materialisation.built();
 }
 
 function failedMaterialisation({

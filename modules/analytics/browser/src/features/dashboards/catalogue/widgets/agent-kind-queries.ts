@@ -129,6 +129,21 @@ WHERE e.OccurredAt >= ${PREVIOUS_START}
   AND e.Passed IS NOT NULL
   AND e.IsGuardrail = false`;
 
+/**
+ * The verdicts joined to each trace's first `trace_metrics` row, so the unit is picked as
+ * UNIT_VOLUME_SQL picks it (att-table joins the two by unit) and a moved trace joins once.
+ */
+const JUDGED_METRICS_TRACES = `FROM evaluation_metrics AS e
+INNER JOIN (
+  SELECT TraceId, ${METRICS_UNIT} AS unit, OccurredAt AS at
+  FROM trace_metrics
+  WHERE ${inPeriodAndPrevious("OccurredAt")}
+    AND ${firstTraceMetricsRow()}
+) AS t ON t.TraceId = e.TraceId
+WHERE e.OccurredAt >= ${PREVIOUS_START}
+  AND e.Passed IS NOT NULL
+  AND e.IsGuardrail = false`;
+
 export const UNIT_VOLUME_SQL = `WITH ${METRICS_UNIT_KEY}
 SELECT unit_key, ${METRICS_UNIT} AS unit,
   uniqExact(${METRICS_CONVERSATION}) AS conversations,
@@ -162,13 +177,13 @@ ORDER BY cost DESC
 LIMIT 6`;
 
 /** Each unit's judged answers in the period and in the equally long window before it. */
-export const UNIT_PASS_RATES_SQL = `WITH ${UNIT_KEY}
+export const UNIT_PASS_RATES_SQL = `WITH ${METRICS_UNIT_KEY}
 SELECT t.unit AS unit,
   countIf(e.Passed = 1 AND t.at >= ${START}) AS passed,
   countIf(t.at >= ${START}) AS judged,
   countIf(e.Passed = 1 AND t.at < ${START}) AS passed_before,
   countIf(t.at < ${START}) AS judged_before
-${JUDGED_TRACES}
+${JUDGED_METRICS_TRACES}
 GROUP BY unit
 LIMIT 200`;
 

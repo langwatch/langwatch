@@ -47,6 +47,11 @@ const SPLITS = [
   "gen-acceptance/actions",
 ];
 
+/** The moved queries that keep each trace's first trace_metrics row, by the filter's lookup. */
+const FILTERED = BASELINE.map(({ label }) => label).filter((label) =>
+  STOCK.get(label)?.includes("min(OccurredAt)"),
+);
+
 const TENANT = TENANT_A.tenantId;
 /** Topics the Postgres harness seeds for every tenant; the `topics` view reads them. */
 const TOPIC_ONE = `${TENANT}-topic-1`;
@@ -392,15 +397,17 @@ describe("given traces of each source carrying the metadata the widgets read", (
   it("keeps a trace that began before the period out of it", async () => {
     // app_before and chat_before start on days -2 and -1. Day 0.5 is past the period start, so
     // the rows would count each trace in in_previous and in_period, and in the period's buckets.
-    // The split queries keep the trace out; the others still count the inside row (window edge).
+    // The filtered queries keep the trace out; the others still count the inside row (window edge).
     await moveAnchor({ trace: "app_before", days: 2.5 });
     await moveAnchor({ trace: "chat_before", days: 1.5 });
 
     for (const { list } of LISTS) {
       expect(await differing({ list, only: SPLITS }), list.join()).toEqual([]);
     }
+    expect(FILTERED).toEqual(expect.arrayContaining(SPLITS));
     // Under langy nothing differed before this move, so any difference here is the inside row.
-    const unguarded = BASELINE.map(({ label }) => label).filter((label) => !SPLITS.includes(label));
+    const moved = BASELINE.map(({ label }) => label);
+    const unguarded = moved.filter((label) => !FILTERED.includes(label));
     expect(await differing({ list: ["langy"], only: unguarded })).not.toEqual([]);
   });
 
@@ -434,6 +441,55 @@ describe("given traces of each source carrying the metadata the widgets read", (
       expect(Number(total?.conversations), totals).toBe(summed);
     }
   });
+
+  /** @scenario "att-table's pass rates group traces by the units its volumes list" */
+  it("groups att-table's pass rates by the units its volumes list", async () => {
+    const [first] = SEEDS;
+    if (!first) throw new Error("no seed");
+    // A unit only trace_metrics carries: a pass rate that picked units from traces would miss it.
+    const umbrella: Seed = { ...first, trace: "app_umbrella", customer: "umbrella", day: 4 };
+    await harness.admin.insert({
+      table: `${harness.factDatabase}.trace_analytics`,
+      format: "JSONEachRow",
+      values: [analyticsRow(umbrella)],
+    });
+    const judged = [...SEEDS.filter((seed) => seed.origin !== null), umbrella];
+    await harness.admin.insert({
+      table: `${harness.factDatabase}.evaluation_analytics`,
+      format: "JSONEachRow",
+      values: judged.map(evaluationRow),
+    });
+
+    const list = ["application"];
+    const units = await rowsOf({ sql: STOCK.get("att-table/units") ?? "", list });
+    const passRates = await rowsOf({ sql: STOCK.get("att-table/passRates") ?? "", list });
+    const inPeriod = passRates.filter((row) => Number(row.judged) > 0);
+
+    expect(units.map((row) => row.unit)).toContain("umbrella");
+    expect(inPeriod.map((row) => row.unit).toSorted()).toEqual(
+      units.map((row) => row.unit).toSorted(),
+    );
+  });
+
+  /** A passed judge verdict on `seed`, stamped when its trace began, from its trace's origin. */
+  function evaluationRow(seed: Seed): Record<string, unknown> {
+    return {
+      TenantId: TENANT,
+      EvaluationId: `${seed.trace}-judge`,
+      Version: "1",
+      OccurredAt: at(timeOf(seed)),
+      CreatedAt: at(timeOf(seed)),
+      UpdatedAt: at(timeOf(seed)),
+      EvaluatorType: "llm_judge",
+      EvaluatorName: "Quality",
+      Status: "processed",
+      IsGuardrail: false,
+      Passed: true,
+      Score: 1,
+      TraceId: seed.trace,
+      Origin: seed.origin ?? "",
+    };
+  }
 
   /** The query's rows as ClickHouse returns them. */
   async function rowsOf({

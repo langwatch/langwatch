@@ -46,6 +46,15 @@ class IndexlessTable extends TraceIndexMaterialisationRepository {
   }
 }
 
+/** A table whose started column mutation is not listed yet; its parts store them by check 3. */
+class UnlistedColumnsTable extends IndexlessTable {
+  checks = 0;
+  override async countPartsMissingAnalyticsMetadataColumns() {
+    this.checks += 1;
+    return this.checks < 3 ? 2 : 0;
+  }
+}
+
 describe("TraceIndexMaterialisationService", () => {
   /** @scenario "The step finishes once ClickHouse has built the index" */
   it("finishes on a done mutation without starting another", async () => {
@@ -224,6 +233,26 @@ describe("TraceIndexMaterialisationService, for the trace analytics metadata col
     await expect(run()).resolves.toEqual({ mutationId: null, partsToDo: 0 });
     expect(mutations.issuedAnalyticsMetadataColumns()).toBe(0);
     expect(saved).toEqual([]);
+  });
+
+  /** @scenario "The step waits for the columns when its started mutation is not listed yet" */
+  it("keeps polling after the start until every part stores the columns", async () => {
+    const table = new UnlistedColumnsTable();
+    const service = TraceIndexMaterialisationService.create({
+      mutations: table,
+      pollIntervalMs: 0,
+    });
+
+    const result = await service.waitForAnalyticsMetadataColumns({
+      dryRun: false,
+      signal: new AbortController().signal,
+      onPoll: async () => undefined,
+    });
+
+    // Check 1 starts the mutation; check 2 still finds a part missing, so the step is not done.
+    expect(table.started).toBe(1);
+    expect(table.checks).toBe(3);
+    expect(result).toEqual({ mutationId: null, partsToDo: 0 });
   });
 
   /** @scenario "A failed metadata-column mutation fails the step naming the columns" */

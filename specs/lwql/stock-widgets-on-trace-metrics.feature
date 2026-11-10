@@ -60,7 +60,7 @@ Feature: Stock trace widgets read the light trace table
       Given an application trace with a second trace_metrics row a bucket later and past the period's midpoint
       When the moved queries run
       Then the queries that bucket or halve the period count the trace once, at its first OccurredAt
-      And only the queries that sum TotalCost differ from their traces form
+      And the queries that sum TotalCost return the same rows as their traces form
 
     @integration
     Scenario: A second trace_metrics row past the period start keeps the trace before it
@@ -75,6 +75,12 @@ Feature: Stock trace widgets read the light trace table
       When the share widgets read their per-unit rows and their totals
       Then the totals' conversations equal the sum of the per-unit conversations
       And the shares add up to 100%
+
+    @integration
+    Scenario: att-table's pass rates group traces by the units its volumes list
+      Given judged application traces, one of them on a unit only trace_metrics carries
+      When att-table reads its per-unit volumes and its per-unit pass rates
+      Then the units judged in the period are the units its volumes list
 
   Rule: The moved widgets render on the app
 
