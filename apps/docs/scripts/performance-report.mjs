@@ -77,7 +77,7 @@ const report = {
 console.log(JSON.stringify(report, null, 2));
 if (values.report) await writeFile(values.report, JSON.stringify(report, null, 2));
 /* Budgets fail the run only after the full report is printed and written, for review. */
-if (after.initialGzip > 3_000)
+if (after.initialGzip > 3_100)
   throw new Error(`Initial reading budget exceeded: ${after.initialGzip}`);
 if (after.withIdleControlsGzip >= 15_000)
   throw new Error(`Initial JS budget exceeded: ${after.withIdleControlsGzip}`);

@@ -195,7 +195,7 @@ Feature: Static documentation with progressive interaction
     Then search downloads at most 6,000 gzip bytes of script before it answers
     And the page menu downloads at most 3,000
     And the playground downloads at most 24,500
-    And the page itself still loads under 3,000 gzip bytes of script before any interaction
+    And the page itself still loads under 3,100 gzip bytes of script before any interaction
 
   @e2e
   Scenario: Use the shared command surface

@@ -2307,33 +2307,40 @@ body {
   }
 }
 
-/* A page's opening blocks rise in with a short stagger, on first load and on a page change alike.
-   Opacity and transform only: nothing moves the layout, and 0.01 keeps the text an LCP candidate. */
+/* A page swapped in place rises in with a short stagger, covering the swap; a full load shows its
+   content at once (`data-docs-navigated` is set by the first in-place navigation). Opacity and
+   transform only: nothing moves the layout, and 0.01 keeps the text an LCP candidate. */
 @media (prefers-reduced-motion: no-preference) {
-  #content :is(.docs-page-header > *, .docs-prose > :nth-child(-n + 5)) {
+  :root[data-docs-navigated] #content :is(.docs-page-header > *, .docs-prose > :nth-child(-n + 5)) {
     animation: docs-page-in 240ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
-  #content .docs-page-header > :nth-child(2) {
+  :root[data-docs-navigated] #content .docs-page-header > :nth-child(2) {
     animation-delay: 20ms;
   }
-  #content .docs-page-header > :nth-child(3) {
+  :root[data-docs-navigated] #content .docs-page-header > :nth-child(3) {
     animation-delay: 50ms;
   }
-  #content .docs-prose > :nth-child(1) {
+  :root[data-docs-navigated] #content .docs-prose > :nth-child(1) {
     animation-delay: 80ms;
   }
-  #content .docs-prose > :nth-child(2) {
+  :root[data-docs-navigated] #content .docs-prose > :nth-child(2) {
     animation-delay: 100ms;
   }
-  #content .docs-prose > :nth-child(3) {
+  :root[data-docs-navigated] #content .docs-prose > :nth-child(3) {
     animation-delay: 120ms;
   }
-  #content .docs-prose > :nth-child(4) {
+  :root[data-docs-navigated] #content .docs-prose > :nth-child(4) {
     animation-delay: 140ms;
   }
-  #content .docs-prose > :nth-child(5) {
+  :root[data-docs-navigated] #content .docs-prose > :nth-child(5) {
     animation-delay: 160ms;
   }
+}
+/* While a followed link's page is fetched the current one dims, after a beat so a page already
+   prefetched swaps in before it shows. */
+.docs-layout[data-docs-loading] #content {
+  opacity: 0.55;
+  transition: opacity 160ms ease 80ms;
 }
 @keyframes docs-page-in {
   from {

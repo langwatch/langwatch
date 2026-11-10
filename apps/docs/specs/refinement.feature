@@ -80,10 +80,18 @@ Feature: Actionable documentation and restrained reading surfaces
     Then its groups show TypeScript, with the matching panel and filename, before any island loads
   @unit
   Scenario: Fade a page's opening blocks in without holding them back
-    When a page loads or is swapped in place
+    When a page is swapped in place
     Then its header and first content blocks rise in with a short stagger of at most 400ms
     And only opacity and transform change, starting visible enough to count as painted
     And readers who ask for reduced motion see no animation
+    But a page opened by a full load shows its content at once, with no rise
+
+  @unit
+  Scenario: Answer a followed link at once while the next page loads
+    When a reader follows an internal documentation link
+    Then the current page dims while the next one is fetched
+    And a page already fetched swaps in before the dimming shows
+    And the dimming clears if the swap gives way to a full load
   @unit
   Scenario: Open and close every disclosure with a short height and fade
     Given a page has accordions, expandable fields, sidebar groups and native disclosures

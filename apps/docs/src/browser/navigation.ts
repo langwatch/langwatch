@@ -136,6 +136,9 @@ function finishNavigation({ url, restored }: { url: URL; restored: boolean }) {
 async function navigate({ url, restored = false }: { url: URL; restored?: boolean }) {
   const sequence = ++navigating;
   positions.set(current, scrollY);
+  /* The page answers at once: it dims while the next one is fetched (docs.css). */
+  const leaving = document.querySelector(".docs-layout");
+  leaving?.setAttribute("data-docs-loading", "");
   try {
     const fetched = await fetchPage({ url });
     const next = new DOMParser().parseFromString(fetched.html, "text/html");
@@ -151,6 +154,8 @@ async function navigate({ url, restored = false }: { url: URL; restored?: boolea
     document
       .querySelectorAll<HTMLDialogElement>("dialog[open]")
       .forEach((dialog) => dialog.close());
+    /* From the first swap on, a page swapped in rises in; a full load never does. */
+    document.documentElement.setAttribute("data-docs-navigated", "");
     document.querySelector(".docs-layout")?.replaceWith(layout);
     document
       .querySelector("header")
@@ -167,17 +172,18 @@ async function navigate({ url, restored = false }: { url: URL; restored?: boolea
     current = address.href;
     finishNavigation({ url: address, restored });
   } catch {
-    if (sequence === navigating) location.assign(url);
+    if (sequence !== navigating) return;
+    /* Undimmed first, or the back button could restore the dimmed page from the cache. */
+    leaving?.removeAttribute("data-docs-loading");
+    location.assign(url);
   }
 }
 
-/* A press comes some 100ms before its click, more on touch, where no hover prefetches: the
-   fetch starts there and the click reuses it from the page cache. */
-function fetchPressedPage(event: PointerEvent) {
-  if (event.button !== 0 || modifiedClick({ event })) return;
+/** The page a plain main-button press or click on an internal link leads to, if any. */
+function followedPage({ event }: { event: MouseEvent }) {
+  if (event.button !== 0 || modifiedClick({ event })) return null;
   const anchor = event.target instanceof Element ? event.target.closest("a") : null;
-  const url = anchor ? pageUrl({ anchor }) : null;
-  if (url) fetchPage({ url }).catch(() => {});
+  return anchor ? pageUrl({ anchor }) : null;
 }
 
 export function startNavigation() {
@@ -188,15 +194,21 @@ export function startNavigation() {
   status.setAttribute("aria-live", "polite");
   document.body.append(status);
   document.addEventListener("click", (event) => {
-    if (event.defaultPrevented || event.button !== 0 || modifiedClick({ event })) return;
-    const anchor = event.target instanceof Element ? event.target.closest("a") : null;
-    if (!anchor) return;
-    const url = pageUrl({ anchor });
+    const url = event.defaultPrevented ? null : followedPage({ event });
     if (!url) return;
     event.preventDefault();
     void navigate({ url });
   });
-  document.addEventListener("pointerdown", fetchPressedPage, { passive: true });
+  /* A press comes some 100ms before its click, more on touch, where no hover prefetches: the
+     fetch starts there and the click reuses it from the page cache. */
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      const url = followedPage({ event });
+      if (url) fetchPage({ url }).catch(() => {});
+    },
+    { passive: true },
+  );
   document.addEventListener("docs:prefetch", (event) => prefetch({ event }));
   window.addEventListener("popstate", () => {
     void navigate({ url: new URL(location.href), restored: true });
