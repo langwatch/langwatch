@@ -97,8 +97,13 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
     organizationId: string;
     projectIds: readonly string[];
     sinceMs: number;
+    untilMs?: number;
   }): Promise<TraceUsageDay[]> {
     const [first] = input.projectIds;
+    const until =
+      input.untilMs === undefined
+        ? ""
+        : "AND BucketStart < fromUnixTimestamp64Milli({until:Int64})";
     if (first === undefined) return [];
     const result = await this.#clickhouse.query<UsageDayRow>({
       tenantId: first,
@@ -116,10 +121,15 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
         FROM trace_analytics_rollup
         WHERE TenantId IN ({projectIds:Array(String)})
           AND BucketStart >= fromUnixTimestamp64Milli({since:Int64})
+          ${until}
         GROUP BY day
         ORDER BY day
       `,
-      params: { projectIds: [...input.projectIds], since: input.sinceMs },
+      params: {
+        projectIds: [...input.projectIds],
+        since: input.sinceMs,
+        ...(input.untilMs !== undefined && { until: input.untilMs }),
+      },
     });
     return result.rows.map((row) => {
       // maxIf over no failed bucket answers the epoch, which no real trace has.

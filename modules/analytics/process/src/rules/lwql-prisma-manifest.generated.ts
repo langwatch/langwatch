@@ -1960,6 +1960,11 @@ export interface LwqlPrismaRows {
     readonly projectionVersion: "String";
     readonly updatedAt: "DateTime";
   };
+  readonly NurturingProjectTraceSeed: {
+    readonly projectId: "String";
+    readonly days: "Json";
+    readonly seededAt: "DateTime";
+  };
   readonly BillingMeterCheckpoint: {
     readonly id: "String";
     readonly organizationId: "String";

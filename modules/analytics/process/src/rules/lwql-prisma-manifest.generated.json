@@ -20935,6 +20935,43 @@
       ]
     },
     {
+      "name": "NurturingProjectTraceSeed",
+      "tableName": "NurturingProjectTraceSeed",
+      "documentation": "Nurturing's seed of a project's trace days from trace's rollup, taken once: the days before the\nfold's first trace, summed with the fold's rows. The row marks the project seeded.",
+      "primaryKey": [
+        "projectId"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "days",
+          "columnName": "days",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The rollup's days before the cutoff (NurturingTraceDayState[])."
+        },
+        {
+          "name": "seededAt",
+          "columnName": "seededAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "BillingMeterCheckpoint",
       "tableName": "BillingMeterCheckpoint",
       "documentation": "",

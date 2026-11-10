@@ -9,6 +9,7 @@ import type {
 } from "../pipeline/staticBuilder.types.ts";
 import type {
   FoldProjectionDefinition,
+  FoldProjectionOptions,
   FoldProjectionStore,
 } from "../projections/foldProjection.types.ts";
 import { RedisCachedFoldStore } from "../projections/redisCachedFoldStore.ts";
@@ -246,7 +247,19 @@ function widenedFold<State, EventType extends Event>(
     ...(key === undefined
       ? {}
       : { key: (event: Event) => (consumes(event) ? key(event) : event.aggregateId) }),
-    ...(fold.options === undefined ? {} : { options: fold.options }),
+    ...(fold.options === undefined ? {} : { options: widenedFoldOptions(fold.options, consumes) }),
+  };
+}
+
+/** The fold's options over any event: its enqueue filter judges only events the fold consumes. */
+function widenedFoldOptions<EventType extends Event>(
+  { enqueue, ...rest }: FoldProjectionOptions<EventType>,
+  consumes: (event: Event) => event is Event & EventType,
+): FoldProjectionOptions<Event> {
+  const filter = enqueue?.filter;
+  return {
+    ...rest,
+    ...(filter && { enqueue: { filter: (event: Event) => !consumes(event) || filter(event) } }),
   };
 }
 

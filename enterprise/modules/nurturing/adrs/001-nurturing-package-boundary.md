@@ -52,6 +52,14 @@ status, never its body, and its enqueue filter queues root spans only, so a trac
 is one fold job and one row write. Rows older than the 30-day window are deleted when the
 organization syncs.
 
+The fold counts from its deploy, so each project is seeded once, on its
+organization's first sync, from trace's rollup through
+`TraceApi.findTraceUsageByDay({ untilMs })`: the window's minutes before the
+minute its first folded trace was appended (or up to now when the fold has not
+seen it), kept in `NurturingProjectTraceSeed`, whose row marks the project seeded.
+The seed and the fold are summed; the cut-off makes them disjoint, up to a trace
+in flight across that minute.
+
 These folds are keyed across many owner aggregates (a project, a project's day),
 so they set `refoldOnOutOfOrder: false`: the executor's out-of-order re-fold loads
 one aggregate's log and would rebuild the whole row from that aggregate alone.

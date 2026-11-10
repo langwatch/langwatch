@@ -6,7 +6,8 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   their UTC day to one more row per project, at most once a day. Traces are counted by a fifth
   peer fold over trace's span_received, which queues root spans only: a root span is one trace,
   a root span with an error status one failed trace, as trace's own rollup counts them, on one
-  row per project and UTC day of append time, kept 30 days. No span body reaches nurturing. A span carries no price, so the
+  row per project and UTC day of append time, kept 30 days. No span body reaches nurturing. Each
+  project is seeded once from trace's rollup with the traces before the fold's first one. A span carries no price, so the
   window's cost is read from trace's rollup at most once per organization and UTC day. When a
   project's usage changes, or its organization traced (throttled to once per 15 minutes),
   nurturing places it in its organization through the owners' shares, sums the organization's
@@ -91,6 +92,20 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Given a fold whose row sums many owner aggregates, a project or a project's day
     When an event older than the row's newest arrives
     Then it is folded on as it comes, since a re-fold would rebuild the row from one aggregate
+
+  @unit @integration
+  Scenario: A project that traced before the fold started is seeded once from trace's rollup
+    Given a project with traces in the 30-day window that the trace-day fold never saw
+    When its organization first syncs
+    Then trace's per-day rollup of the project is read once and kept as the project's seed
+    And its days are summed with the fold's, and later syncs read the kept seed, not the rollup
+
+  @unit
+  Scenario: The fold's first day counts traces before and after the fold started, each once
+    Given a project's first trace the fold saw was appended at 10:30:20 on a day
+    And the rollup holds 2 of that day's traces before 10:30 and the 3 the fold counted
+    When the project is seeded
+    Then the seed takes the rollup's minutes before 10:30 only, and the day counts 5 traces
 
   @unit
   Scenario: Traces sync an organization at most once per 15 minutes

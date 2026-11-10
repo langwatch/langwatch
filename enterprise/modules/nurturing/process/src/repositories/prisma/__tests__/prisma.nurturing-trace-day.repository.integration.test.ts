@@ -63,6 +63,9 @@ describe.skipIf(!databaseUrl)("given nurturing's trace-day rows", () => {
     await connection.client.nurturingProjectTraceDay.deleteMany({
       where: { projectId: { in: projectIds } },
     });
+    await connection.client.nurturingProjectTraceSeed.deleteMany({
+      where: { projectId: { in: projectIds } },
+    });
     await connection.closeOnce();
   });
 
@@ -103,6 +106,27 @@ describe.skipIf(!databaseUrl)("given nurturing's trace-day rows", () => {
       await repository.pruneBefore({ projectIds, beforeDay: "2026-10-21" });
       const kept = await repository.findForProjects({ projectIds, afterDay: "2000-01-01" });
       expect(kept.map((day) => day.day)).not.toContain("2026-10-01");
+    });
+  });
+
+  describe("when a project is seeded twice", () => {
+    /** @scenario "A project that traced before the fold started is seeded once from trace's rollup" */
+    it("keeps the first seed, and reads its days after the window's start", async () => {
+      await repository.recordSeed({
+        projectId: otherProjectId,
+        seededAt: 1_000,
+        days: [dayOf(otherProjectId, "2026-10-01", 7), dayOf(otherProjectId, "2026-11-01", 2)],
+      });
+      await repository.recordSeed({
+        projectId: otherProjectId,
+        seededAt: 2_000,
+        days: [dayOf(otherProjectId, "2026-11-01", 9)],
+      });
+
+      await expect(repository.findSeeds({ projectIds, afterDay: "2026-10-21" })).resolves.toEqual({
+        seededProjectIds: [otherProjectId],
+        days: [dayOf(otherProjectId, "2026-11-01", 2)],
+      });
     });
   });
 });

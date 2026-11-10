@@ -10,6 +10,8 @@ import {
   foldTraceDay,
   type NurturingTraceDayState,
   type NurturingTraceSpan,
+  seedCutoffOf,
+  seedDaysOf,
   traceCountsOf,
 } from "../nurturing-trace-day.rules.ts";
 
@@ -43,6 +45,7 @@ describe("foldTraceDay()", () => {
       traceCount: 2,
       errorCount: 0,
       lastTraceAt: AT + 1000,
+      firstTraceAt: AT,
       lastFailedTraceAt: null,
       LastEventOccurredAt: AT,
     });
@@ -113,5 +116,51 @@ describe("traceCountsOf()", () => {
       lastFailedTraceAt: null,
       activeDays: [],
     });
+  });
+});
+
+describe("seedCutoffOf()", () => {
+  /** @scenario "The fold's first day counts traces before and after the fold started, each once" */
+  it("ends the seed at the minute of the project's first folded trace", () => {
+    const folded = [
+      { ...emptyTraceDay(), day: "2026-11-20", firstTraceAt: AT + 95_000 },
+      { ...emptyTraceDay(), day: "2026-11-21", firstTraceAt: AT + 86_400_000 },
+    ];
+
+    expect(seedCutoffOf({ folded, now: AT + 2 * 86_400_000 })).toBe(AT + 60_000);
+  });
+
+  it("seeds up to now for a project the fold has not seen", () => {
+    expect(seedCutoffOf({ folded: [], now: AT + 61_500 })).toBe(AT + 60_000);
+  });
+});
+
+describe("seedDaysOf()", () => {
+  it("turns the rollup's days into the project's seed rows", () => {
+    expect(
+      seedDaysOf({
+        projectId: "project-1",
+        days: [
+          {
+            day: "2026-11-19",
+            traceCount: 2,
+            errorCount: 1,
+            totalCost: 0.5,
+            lastTraceAt: AT,
+            lastFailedTraceAt: AT - 1,
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        ...emptyTraceDay(),
+        projectId: "project-1",
+        day: "2026-11-19",
+        traceCount: 2,
+        errorCount: 1,
+        lastTraceAt: AT,
+        lastFailedTraceAt: AT - 1,
+      },
+    ]);
   });
 });

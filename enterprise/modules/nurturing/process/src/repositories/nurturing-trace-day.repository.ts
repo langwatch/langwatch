@@ -27,4 +27,19 @@ export interface NurturingTraceDayRepository {
   ): Promise<NurturingTraceDayState[]>;
   /** Drops the projects' days before `beforeDay`: no read reaches them any more. */
   pruneBefore(input: Readonly<{ projectIds: readonly string[]; beforeDay: string }>): Promise<void>;
+  /** The projects' seeds: which were seeded, and their seed days after `afterDay`. */
+  findSeeds(
+    input: Readonly<{ projectIds: readonly string[]; afterDay: string }>,
+  ): Promise<Readonly<{ seededProjectIds: readonly string[]; days: NurturingTraceDayState[] }>>;
+  /**
+   * Keeps a project's seed, its days from trace's rollup before the fold's first trace; the row is
+   * the durable mark that it was seeded. A project already seeded keeps its first seed.
+   */
+  recordSeed(
+    input: Readonly<{
+      projectId: string;
+      seededAt: number;
+      days: readonly NurturingTraceDayState[];
+    }>,
+  ): Promise<void>;
 }

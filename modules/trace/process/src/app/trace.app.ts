@@ -3168,6 +3168,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     organizationId: string;
     projectIds: readonly string[];
     sinceMs: number;
+    untilMs?: number;
   }): Promise<TraceUsageDay[]> {
     return this.#usageCountRead().findTraceUsageByDay(input);
   }

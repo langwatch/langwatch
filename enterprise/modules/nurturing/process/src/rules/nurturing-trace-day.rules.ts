@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { TraceUsageDay } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 /**
@@ -14,6 +15,8 @@ export const nurturingTraceDayStateSchema = z.object({
   errorCount: z.number(),
   /** Append time of the newest root span, epoch ms. */
   lastTraceAt: z.number().nullable(),
+  /** Append time of the oldest root span folded, epoch ms: where the rollup seed ends. */
+  firstTraceAt: z.number().nullable().default(null),
   /** Append time of the newest erroring root span, epoch ms. */
   lastFailedTraceAt: z.number().nullable(),
   LastEventOccurredAt: z.number(),
@@ -47,6 +50,7 @@ export function emptyTraceDay(): NurturingTraceDayState {
     traceCount: 0,
     errorCount: 0,
     lastTraceAt: null,
+    firstTraceAt: null,
     lastFailedTraceAt: null,
     LastEventOccurredAt: 0,
   };
@@ -73,6 +77,7 @@ export function foldTraceDay(
     ...base,
     traceCount: state.traceCount + 1,
     lastTraceAt: latest(state.lastTraceAt, span.appendedAt),
+    firstTraceAt: Math.min(state.firstTraceAt ?? span.appendedAt, span.appendedAt),
     ...(span.isError && {
       errorCount: state.errorCount + 1,
       lastFailedTraceAt: latest(state.lastFailedTraceAt, span.appendedAt),
@@ -97,4 +102,35 @@ export function traceCountsOf({
     lastFailedTraceAt: latestOf(inWindow.flatMap((day) => day.lastFailedTraceAt ?? [])),
     activeDays: [...new Set(inWindow.map((day) => day.day))].toSorted(),
   };
+}
+
+const MINUTE_MS = 60_000;
+
+/**
+ * Where a project's seed from trace's rollup ends: the minute its first folded trace was appended
+ * in, so the rollup's minutes before it are the traces the fold never saw, and the fold counts
+ * every one after. A project the fold has not seen yet is seeded up to `now`.
+ */
+export function seedCutoffOf({
+  folded,
+  now,
+}: Readonly<{ folded: readonly NurturingTraceDayState[]; now: number }>): number {
+  const first = Math.min(...folded.flatMap((day) => day.firstTraceAt ?? []), now);
+  return first - (first % MINUTE_MS);
+}
+
+/** trace's rollup days of one project, as seed rows summed with the fold's own. */
+export function seedDaysOf({
+  projectId,
+  days,
+}: Readonly<{ projectId: string; days: readonly TraceUsageDay[] }>): NurturingTraceDayState[] {
+  return days.map((day) => ({
+    ...emptyTraceDay(),
+    projectId,
+    day: day.day,
+    traceCount: day.traceCount,
+    errorCount: day.errorCount,
+    lastTraceAt: day.traceCount > 0 ? day.lastTraceAt : null,
+    lastFailedTraceAt: day.lastFailedTraceAt,
+  }));
 }

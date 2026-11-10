@@ -231,6 +231,15 @@ describe("TraceUsageCountClickHouseRepository usage by day", () => {
     expect(() => new TenantGuard().assert(query)).not.toThrow();
   });
 
+  it("keeps only the minutes before untilMs when it is given", async () => {
+    const { queries, repository } = createRepository([]);
+
+    await repository.findTraceUsageByDay({ ...input, untilMs: 2_000 });
+
+    expect(queries[0]?.sql).toContain("AND BucketStart < fromUnixTimestamp64Milli({until:Int64})");
+    expect(queries[0]?.params).toMatchObject({ since: 1_000, until: 2_000 });
+  });
+
   it("asks nothing for an organization with no project", async () => {
     const { queries, repository } = createRepository([]);
 

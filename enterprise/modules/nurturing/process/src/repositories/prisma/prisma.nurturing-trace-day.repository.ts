@@ -6,6 +6,7 @@ import type {
 } from "@langwatch/eventing";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 
 import {
   type NurturingTraceDayState,
@@ -17,7 +18,12 @@ import {
   traceDayOfKey,
 } from "../nurturing-trace-day.repository.ts";
 
-type NurturingTraceDayDatabase = Pick<PrismaClient, "nurturingProjectTraceDay">;
+type NurturingTraceDayDatabase = Pick<
+  PrismaClient,
+  "nurturingProjectTraceDay" | "nurturingProjectTraceSeed"
+>;
+
+const seedDaysSchema = z.array(nurturingTraceDayStateSchema);
 
 type AppliedRead = {
   state: NurturingTraceDayState | null;
@@ -26,12 +32,12 @@ type AppliedRead = {
 };
 
 /**
- * The trace-day fold's Postgres rows (`NurturingProjectTraceDay`): one per project and UTC day,
- * the counts as JSON. A row of another projection version reads as undecodable and is left out
- * of the organization's read.
+ * The trace-day fold's Postgres rows (`NurturingProjectTraceDay`), one per project and UTC day,
+ * and each project's seed from trace's rollup (`NurturingProjectTraceSeed`), one per project. A
+ * fold row of another projection version reads as undecodable and is left out of every read.
  */
 export class PrismaNurturingTraceDayRepository
-  extends PrismaRepository.for("NurturingProjectTraceDay")
+  extends PrismaRepository.for("NurturingProjectTraceDay", "NurturingProjectTraceSeed")
   implements NurturingTraceDayRepository
 {
   static create({
@@ -108,6 +114,34 @@ export class PrismaNurturingTraceDayRepository
     if (projectIds.length === 0) return;
     await this.#database.nurturingProjectTraceDay.deleteMany({
       where: { projectId: { in: [...projectIds] }, day: { lt: beforeDay } },
+    });
+  }
+
+  async findSeeds({
+    projectIds,
+    afterDay,
+  }: Readonly<{ projectIds: readonly string[]; afterDay: string }>) {
+    if (projectIds.length === 0) return { seededProjectIds: [], days: [] };
+    const rows = await this.#database.nurturingProjectTraceSeed.findMany({
+      where: { projectId: { in: [...projectIds] } },
+    });
+    return {
+      seededProjectIds: rows.map((row) => row.projectId),
+      days: rows.flatMap((row) =>
+        seedDaysSchema.parse(row.days).filter((day) => day.day > afterDay),
+      ),
+    };
+  }
+
+  async recordSeed({
+    projectId,
+    seededAt,
+    days,
+  }: Readonly<{ projectId: string; seededAt: number; days: readonly NurturingTraceDayState[] }>) {
+    // The first seed stays: a concurrent second one finds the row and writes nothing.
+    await this.#database.nurturingProjectTraceSeed.createMany({
+      data: [{ projectId, days: [...days], seededAt: new Date(seededAt) }],
+      skipDuplicates: true,
     });
   }
 }

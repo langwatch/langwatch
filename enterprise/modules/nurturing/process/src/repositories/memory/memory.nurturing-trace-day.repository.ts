@@ -18,6 +18,8 @@ export class MemoryNurturingTraceDayRepository implements NurturingTraceDayRepos
 
   readonly #rows = new Map<string, Row>();
 
+  readonly #seeds = new Map<string, readonly NurturingTraceDayState[]>();
+
   readonly store: FoldProjectionStore<NurturingTraceDayState>;
 
   private constructor() {
@@ -60,5 +62,25 @@ export class MemoryNurturingTraceDayRepository implements NurturingTraceDayRepos
     for (const [key, { state }] of this.#rows) {
       if (projectIds.includes(state.projectId) && state.day < beforeDay) this.#rows.delete(key);
     }
+  }
+
+  async findSeeds({
+    projectIds,
+    afterDay,
+  }: Readonly<{ projectIds: readonly string[]; afterDay: string }>) {
+    const seeded = projectIds.filter((projectId) => this.#seeds.has(projectId));
+    return {
+      seededProjectIds: seeded,
+      days: seeded.flatMap((projectId) =>
+        (this.#seeds.get(projectId) ?? []).filter((day) => day.day > afterDay),
+      ),
+    };
+  }
+
+  async recordSeed({
+    projectId,
+    days,
+  }: Readonly<{ projectId: string; seededAt: number; days: readonly NurturingTraceDayState[] }>) {
+    if (!this.#seeds.has(projectId)) this.#seeds.set(projectId, [...days]);
   }
 }

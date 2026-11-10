@@ -5153,6 +5153,15 @@ model NurturingProjectTraceDay {
   @@id([projectId, day])
 }
 
+/// Nurturing's seed of a project's trace days from trace's rollup, taken once: the days before the
+/// fold's first trace, summed with the fold's rows. The row marks the project seeded.
+model NurturingProjectTraceSeed {
+  projectId String   @id
+  /// The rollup's days before the cutoff (NurturingTraceDayState[]).
+  days      Json
+  seededAt  DateTime
+}
+
 model BillingMeterCheckpoint {
   id                   String   @id @default(cuid())
   organizationId       String

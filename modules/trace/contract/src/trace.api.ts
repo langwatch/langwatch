@@ -954,11 +954,13 @@ export interface TraceApi extends TraceOtlpIngestApi {
   /**
    * One organization's projects' traces since `sinceMs`, per UTC day with a span, from the
    * per-minute `trace_analytics_rollup`: one small query, no per-trace scan. Counts and times only.
+   * `untilMs` keeps only the minutes starting before it.
    */
   findTraceUsageByDay(input: {
     organizationId: string;
     projectIds: readonly string[];
     sinceMs: number;
+    untilMs?: number;
   }): Promise<TraceUsageDay[]>;
   /** Whether any trace carrying `attribute` landed for the project at or after `sinceMs`. */
   hasTraceWithAttribute(input: {

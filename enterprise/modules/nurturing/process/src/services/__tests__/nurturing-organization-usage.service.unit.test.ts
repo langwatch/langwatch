@@ -15,6 +15,7 @@ import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/mem
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { traceDayKey } from "../../repositories/nurturing-trace-day.repository.ts";
 import { emptyProjectUsage, foldProjectUsage } from "../../rules/nurturing-project-usage.rules.ts";
+import { utcDayOf } from "../../rules/nurturing-time.rules.ts";
 import {
   emptyTraceDay,
   type NurturingTraceDayState,
@@ -26,30 +27,57 @@ const NOW = Date.UTC(2026, 10, 20, 12);
 
 type TraceRead = Parameters<TraceApi["findTraceUsageByDay"]>[0];
 
-/** Trace's cost read, answering `days` and keeping each read it was asked for. */
-function fakeTraces(days: readonly TraceUsageDay[]) {
+/** One minute of trace's rollup: a project's root spans that started in it. */
+type RollupMinute = Readonly<{
+  projectId: string;
+  at: number;
+  traces?: number;
+  failed?: number;
+  cost?: number;
+}>;
+
+/** Trace's rollup read over `minutes`, per UTC day, keeping each read it was asked for. */
+function fakeTraces(minutes: readonly RollupMinute[]) {
   const reads: TraceRead[] = [];
   return {
     reads,
-    findTraceUsageByDay: async (input: TraceRead) => {
+    /** The once-a-day cost reads: every read but a seed's, which is bounded by `untilMs`. */
+    costReads: () => reads.filter((read) => read.untilMs === undefined),
+    seedReads: () => reads.filter((read) => read.untilMs !== undefined),
+    findTraceUsageByDay: async (input: TraceRead): Promise<TraceUsageDay[]> => {
       reads.push(input);
-      return [...days];
+      const days = new Map<string, TraceUsageDay>();
+      for (const minute of minutes) {
+        if (!input.projectIds.includes(minute.projectId) || minute.at < input.sinceMs) continue;
+        if (input.untilMs !== undefined && minute.at >= input.untilMs) continue;
+        const day = utcDayOf(minute.at);
+        const known = days.get(day);
+        days.set(day, {
+          day,
+          traceCount: (known?.traceCount ?? 0) + (minute.traces ?? 1),
+          errorCount: (known?.errorCount ?? 0) + (minute.failed ?? 0),
+          totalCost: (known?.totalCost ?? 0) + (minute.cost ?? 0),
+          lastTraceAt: Math.max(known?.lastTraceAt ?? 0, minute.at),
+          lastFailedTraceAt: known?.lastFailedTraceAt ?? null,
+        });
+      }
+      return [...days.values()];
     },
   };
 }
 
 async function serviceOver({
   placed,
-  costs = [],
+  rollup = [],
   send = async () => {},
 }: {
   placed: ReadonlyMap<string, string>;
-  costs?: readonly TraceUsageDay[];
+  rollup?: readonly RollupMinute[];
   send?: () => Promise<void>;
 }) {
   const projectUsage = MemoryNurturingProjectUsageRepository.create();
   const traceDays = MemoryNurturingTraceDayRepository.create();
-  const traces = fakeTraces(costs);
+  const traces = fakeTraces(rollup);
   const milestones = MemoryNurturingMilestonesRepository.create();
   await milestones.recordOrganization({
     organizationId: "org-1",
@@ -94,15 +122,6 @@ async function seedTraceDay(
   await traceDays.store.store(state, storeContext(traceDayKey(state)));
 }
 
-const costDay = (day: string, totalCost: number): TraceUsageDay => ({
-  day,
-  traceCount: 1,
-  errorCount: 0,
-  totalCost,
-  lastTraceAt: NOW - DAY_MS,
-  lastFailedTraceAt: null,
-});
-
 describe("NurturingOrganizationUsageService", () => {
   /** @scenario "A changed project sends its organization's traits as one group call on the admin" */
   it("sends one group call on the admin with the organization's summed traits", async () => {
@@ -131,7 +150,7 @@ describe("NurturingOrganizationUsageService", () => {
         },
       ],
     ]);
-    expect(traces.reads).toEqual([]);
+    expect(traces.costReads()).toEqual([]);
   });
 
   /** @scenario "The organization's traits sum its projects' trace days" */
@@ -179,14 +198,17 @@ describe("NurturingOrganizationUsageService", () => {
         ["project-1", "org-1"],
         ["project-2", "org-1"],
       ]),
-      costs: [costDay("2026-11-18", 0.5), costDay("2026-11-19", 0.25)],
+      rollup: [
+        { projectId: "project-1", at: NOW - 2 * DAY_MS, cost: 0.5 },
+        { projectId: "project-2", at: NOW - DAY_MS, cost: 0.25 },
+      ],
     });
     await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-19" });
 
     await service.usageChanged({ projectId: "project-1" });
     await service.usageChanged({ projectId: "project-2" });
 
-    expect(traces.reads).toEqual([
+    expect(traces.costReads()).toEqual([
       {
         organizationId: "org-1",
         projectIds: ["project-1", "project-2"],
@@ -211,7 +233,7 @@ describe("NurturingOrganizationUsageService", () => {
     refuse = false;
     await service.usageChanged({ projectId: "project-1" });
 
-    expect(traces.reads).toHaveLength(2);
+    expect(traces.costReads()).toHaveLength(2);
   });
 
   /** @scenario "Prompt versions, scenario runs and evaluations count toward the habit" */
@@ -229,6 +251,77 @@ describe("NurturingOrganizationUsageService", () => {
     await service.usageChanged({ projectId: "project-1" });
 
     expect(sent[0]?.[0]).toMatchObject({ traits: { has_habit: true } });
+  });
+
+  /** @scenario "A project that traced before the fold started is seeded once from trace's rollup" */
+  it("seeds each project once from the rollup, so traces from before the fold are counted", async () => {
+    const { service, traces, sent } = await serviceOver({
+      placed: new Map([["project-1", "org-1"]]),
+      rollup: [
+        { projectId: "project-1", at: Date.UTC(2026, 10, 15, 9), traces: 2, failed: 1 },
+        { projectId: "project-1", at: Date.UTC(2026, 10, 17, 9) },
+      ],
+    });
+
+    await service.usageChanged({ projectId: "project-1" });
+    await service.usageChanged({ projectId: "project-1" });
+
+    expect(traces.seedReads()).toEqual([
+      {
+        organizationId: "org-1",
+        projectIds: ["project-1"],
+        sinceMs: NOW - 30 * DAY_MS,
+        untilMs: NOW,
+      },
+    ]);
+    expect(traitsOf(sent[0]?.[0])).toMatchObject({ trace_count: 3, error_count: 1 });
+    expect(traitsOf(sent[1]?.[0])).toMatchObject({ trace_count: 3, error_count: 1 });
+  });
+
+  /** @scenario "The fold's first day counts traces before and after the fold started, each once" */
+  it("counts the rollup's traces before the fold's first trace and the fold's after it", async () => {
+    // The fold started 10:30 on 11-20: 2 traces before it, and 3 after it that both count.
+    const foldStart = Date.UTC(2026, 10, 20, 10, 30, 20);
+    const { service, traceDays, traces, sent } = await serviceOver({
+      placed: new Map([["project-1", "org-1"]]),
+      rollup: [
+        { projectId: "project-1", at: Date.UTC(2026, 10, 20, 8) },
+        { projectId: "project-1", at: Date.UTC(2026, 10, 20, 9) },
+        { projectId: "project-1", at: Date.UTC(2026, 10, 20, 10, 30) },
+        { projectId: "project-1", at: Date.UTC(2026, 10, 20, 11) },
+        { projectId: "project-1", at: Date.UTC(2026, 10, 20, 11, 30) },
+      ],
+    });
+    await seedTraceDay(traceDays, {
+      projectId: "project-1",
+      day: "2026-11-20",
+      traceCount: 3,
+      firstTraceAt: foldStart,
+      lastTraceAt: Date.UTC(2026, 10, 20, 11, 30),
+    });
+
+    await service.usageChanged({ projectId: "project-1" });
+
+    expect(traces.seedReads()[0]?.untilMs).toBe(Date.UTC(2026, 10, 20, 10, 30));
+    expect(traitsOf(sent[0]?.[0])).toMatchObject({ trace_count: 5 });
+  });
+
+  /** @scenario "The fold's first day counts traces before and after the fold started, each once" */
+  it("adds nothing from the rollup for a project the fold saw from its first trace", async () => {
+    const { service, traceDays, sent } = await serviceOver({
+      placed: new Map([["project-1", "org-1"]]),
+      rollup: [{ projectId: "project-1", at: Date.UTC(2026, 10, 19, 9), traces: 4 }],
+    });
+    await seedTraceDay(traceDays, {
+      projectId: "project-1",
+      day: "2026-11-19",
+      traceCount: 4,
+      firstTraceAt: Date.UTC(2026, 10, 19, 9, 0, 5),
+    });
+
+    await service.usageChanged({ projectId: "project-1" });
+
+    expect(traitsOf(sent[0]?.[0])).toMatchObject({ trace_count: 4 });
   });
 
   /** @scenario "A project placed in no organization sends nothing" */

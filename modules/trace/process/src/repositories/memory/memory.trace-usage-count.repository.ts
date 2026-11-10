@@ -49,10 +49,17 @@ export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
     organizationId: string;
     projectIds: readonly string[];
     sinceMs: number;
+    untilMs?: number;
   }): Promise<TraceUsageDay[]> {
     const days = new Map<string, TraceUsageDay>();
+    const untilMs = input.untilMs ?? Number.POSITIVE_INFINITY;
     for (const bucket of this.#buckets) {
-      if (!input.projectIds.includes(bucket.tenantId) || bucket.bucketStartMs < input.sinceMs) {
+      const { bucketStartMs } = bucket;
+      if (
+        !input.projectIds.includes(bucket.tenantId) ||
+        bucketStartMs < input.sinceMs ||
+        bucketStartMs >= untilMs
+      ) {
         continue;
       }
       const day = Temporal.Instant.fromEpochMilliseconds(bucket.bucketStartMs)

@@ -14,15 +14,23 @@ import {
   windowStartDayOf,
 } from "../rules/nurturing-project-usage.rules.ts";
 import { utcDayOf } from "../rules/nurturing-time.rules.ts";
-import { traceCountsOf } from "../rules/nurturing-trace-day.rules.ts";
+import {
+  type NurturingTraceDayState,
+  seedCutoffOf,
+  seedDaysOf,
+  traceCountsOf,
+} from "../rules/nurturing-trace-day.rules.ts";
 
 /** Long enough to outlive its UTC day: the key names the day, so a new day claims afresh. */
 const COST_READ_CLAIM_SECONDS = 26 * 60 * 60;
 
 type OrganizationUsageDependencies = Readonly<{
   projectUsage: NurturingProjectUsageReadRepository;
-  traceDays: Pick<NurturingTraceDayRepository, "findForProjects" | "pruneBefore">;
-  /** Trace's read of its rollup, for cost only: a span carries no price. */
+  traceDays: Pick<
+    NurturingTraceDayRepository,
+    "findForProjects" | "pruneBefore" | "findSeeds" | "recordSeed"
+  >;
+  /** Trace's read of its rollup: the daily cost (a span has no price), and each project's seed. */
   traces: Pick<TraceApi, "findTraceUsageByDay">;
   claims: NurturingClaimRepository;
   /** Placement, the organization's projects and its creation, read through the owners' shares. */
@@ -63,12 +71,13 @@ export class NurturingOrganizationUsageService {
     const windowStartDay = windowStartDayOf(now);
     const projectIds = await projects.findProjectIds({ organizationId });
     await traceDays.pruneBefore({ projectIds, beforeDay: windowStartDay });
-    const [usage, days, { organizationCreatedAt }] = await Promise.all([
+    const [usage, folded, { organizationCreatedAt }] = await Promise.all([
       projectUsage.findForProjects({ projectIds }),
       traceDays.findForProjects({ projectIds, afterDay: windowStartDay }),
       projects.getOrganizationCreatedAt({ organizationId }),
     ]);
-    const traces = traceCountsOf({ days, windowStartDay });
+    const seeds = await this.#seededDays({ organizationId, projectIds, folded, now });
+    const traces = traceCountsOf({ days: [...folded, ...seeds], windowStartDay });
     const cost = await this.#claimDailyCost({ organizationId, projectIds, now, traces });
     const traits = organizationUsageTraits({
       projects: usage,
@@ -83,6 +92,47 @@ export class NurturingOrganizationUsageService {
       if (cost.claimKey) await this.dependencies.claims.release(cost.claimKey);
       throw error;
     }
+  }
+
+  /**
+   * The projects' seed days, seeding each project not seeded yet, once: trace's rollup of the
+   * window up to the minute of the fold's first trace, so the seed and the fold never share one.
+   */
+  async #seededDays({
+    organizationId,
+    projectIds,
+    folded,
+    now,
+  }: Readonly<{
+    organizationId: string;
+    projectIds: readonly string[];
+    folded: readonly NurturingTraceDayState[];
+    now: number;
+  }>): Promise<NurturingTraceDayState[]> {
+    const { traceDays, traces } = this.dependencies;
+    const afterDay = windowStartDayOf(now);
+    const known = await traceDays.findSeeds({ projectIds, afterDay });
+    const unseeded = projectIds.filter((id) => !known.seededProjectIds.includes(id));
+    const seeded = await Promise.all(
+      unseeded.map(async (projectId) => {
+        const untilMs = seedCutoffOf({
+          folded: folded.filter((day) => day.projectId === projectId),
+          now,
+        });
+        const days = seedDaysOf({
+          projectId,
+          days: await traces.findTraceUsageByDay({
+            organizationId,
+            projectIds: [projectId],
+            sinceMs: now - PROJECT_USAGE_WINDOW_MS,
+            untilMs,
+          }),
+        });
+        await traceDays.recordSeed({ projectId, seededAt: now, days });
+        return days;
+      }),
+    );
+    return [...known.days, ...seeded.flat()];
   }
 
   /** The window's cost, read once per organization and UTC day; no trace, no read, no cost. */

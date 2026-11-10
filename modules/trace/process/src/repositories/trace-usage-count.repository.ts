@@ -14,11 +14,12 @@ export abstract class TraceUsageCountRepository {
     limit: number;
   }): Promise<string[]>;
   abstract countTracesInLastDay(input: { tenantId: string }): Promise<number>;
-  /** An organization's projects' traces since `sinceMs`, per UTC day with a span, ascending. */
+  /** An organization's projects' traces from `sinceMs` to `untilMs`, per UTC day, ascending. */
   abstract findTraceUsageByDay(input: {
     organizationId: string;
     projectIds: readonly string[];
     sinceMs: number;
+    untilMs?: number;
   }): Promise<TraceUsageDay[]>;
   abstract hasTraceWithAttribute(input: {
     tenantId: string;
