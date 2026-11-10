@@ -67,7 +67,7 @@ eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoye
 | `eval_category(text, instructions, options)` | One of 2 to 255 options, each written `name: meaning` |
 | `eval_category_probs(text, instructions, options)` | A JSON object of each option and its probability |
 
-One query judges at most 1,000 distinct texts. If the text comes from an extraction function, that function's cap also applies, so a query that judges conversations reads at most 200. Eval functions need a run that reads one project, on a project where they are rolled out: see [The eval function is not available to you](/features/langwatchql/common-questions#the-eval-function-is-not-available-to-you).
+One query judges at most 1,000 distinct texts. If the text comes from an extraction function, that function's cap also applies, so a query that judges conversations reads at most 200. Eval functions need a run that reads one project, in an organization where Instant Evals is switched on: see [The eval function is not available to you](/features/langwatchql/common-questions#the-eval-function-is-not-available-to-you).
 
 Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column is null for a row the judge skipped, and the response then includes the `INSTANT_EVAL_SKIPPED` diagnostic.
 

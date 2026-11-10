@@ -326,11 +326,11 @@ describe("given arguments that do not match a signature", () => {
 describe("given a project the feature is not open to", () => {
   describe("when an eval function is called", () => {
     /** @scenario "An eval function is refused while Instant Evals are not enabled for the project" */
-    it("refuses it and says eval functions are not rolled out", () => {
+    it("refuses it and says Instant Evals is not switched on", () => {
       const result = validate("eval(CapturedOutput, 'a') AS x", { isInstantEvalsEnabled: false });
 
       expect(codesOf(result)).toContain("APP_FUNCTION_GATED");
-      expect(messagesOf(result)).toContain("eval functions are rolled out");
+      expect(messagesOf(result)).toContain("Instant Evals is switched on for the organization");
     });
 
     it("still admits an extraction function, which is not gated on it", () => {

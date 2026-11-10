@@ -26,12 +26,12 @@ Check the spelling and the database prefix: `langwatch.` on LangWatch Cloud. On 
 ## The eval function is not available to you
 
 ```text
-The function "<f>" is not available to you. A judgement is charged to one project, so it runs only in a query from one project, and only where eval functions are rolled out. Run the query from one project, ask to have eval functions rolled out, or remove the call.
+The function "<f>" is not available to you. A judgement is charged to one project, so it runs only in a query from one project, and only where Instant Evals is switched on for the organization. Run the query from one project, switch Instant Evals on for the organization, or remove the call.
 ```
 
 First make the run read one project: use a project key, or name the project with `projects` in the request or `--project` on the CLI. In the app, a query cannot call eval functions when it names any project other than the one it runs from, which `projects: "all"` does once you can read another live project in its organization, or when it runs from a project that reads other projects.
 
-If the run already reads one project, eval functions are not rolled out for it. This check reads the `release_instant_evals` feature flag, so the Instant Evals opt-in alone does not open it. On LangWatch Cloud, contact support. If you self-host, set `RELEASE_INSTANT_EVALS=1` or turn on the flag in **Ops > Feature flags**, with a judge configured.
+If the run already reads one project, Instant Evals is not switched on for the organization, or no judge is configured. A self-serve organization switches Instant Evals on from the search bar; a member without organization management rights is asked to turn to an organization admin. On an enterprise plan, ask LangWatch to switch it on. See [Limits and cost](/features/instant-evals/limits-and-cost).
 
 ## The field is not available to you
 

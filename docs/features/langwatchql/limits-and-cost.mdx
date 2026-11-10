@@ -13,7 +13,7 @@ description: How many rows a query returns, how large and long it can be, how ma
 | Rows per response | 10,000. A statement with no `LIMIT` gets `LIMIT 10000` added: after the last clause, or before its `OFFSET` if it has one. | A `LIMIT` above 10,000 is refused with 400 `lwql_not_permitted`, `LIMIT_TOO_HIGH` |
 | Result size | About 8,000,000 bytes | 413 `lwql_result_too_large`, with no partial result |
 | Response size with extraction functions | About 32,000,000 bytes after the content is read | Trailing rows are dropped, and the response includes the `APP_FUNCTION_RESULT_TRUNCATED` diagnostic |
-| Statement length | 50,000 characters | The request is refused |
+| Statement length | 50,000 characters | 422 `validation_error` |
 | Run time | 10 seconds | 504 `query_timeout` |
 | Memory | 1 GB | 422 `query_memory_exceeded` |
 | Data read | 1,000,000,000 rows or 10,000,000,000 bytes | 422 `query_scan_limit_exceeded` |

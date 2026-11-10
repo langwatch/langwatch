@@ -44784,12 +44784,12 @@ Check the spelling and the database prefix: `langwatch.` on LangWatch Cloud. On 
 ## The eval function is not available to you
 
 ```text
-The function "<f>" is not available to you. A judgement is charged to one project, so it runs only in a query from one project, and only where eval functions are rolled out. Run the query from one project, ask to have eval functions rolled out, or remove the call.
+The function "<f>" is not available to you. A judgement is charged to one project, so it runs only in a query from one project, and only where Instant Evals is switched on for the organization. Run the query from one project, switch Instant Evals on for the organization, or remove the call.
 ```
 
 First make the run read one project: use a project key, or name the project with `projects` in the request or `--project` on the CLI. In the app, a query cannot call eval functions when it names any project other than the one it runs from, which `projects: "all"` does once you can read another live project in its organization, or when it runs from a project that reads other projects.
 
-If the run already reads one project, eval functions are not rolled out for it. This check reads the `release_instant_evals` feature flag, so the Instant Evals opt-in alone does not open it. On LangWatch Cloud, contact support. If you self-host, set `RELEASE_INSTANT_EVALS=1` or turn on the flag in **Ops > Feature flags**, with a judge configured.
+If the run already reads one project, Instant Evals is not switched on for the organization, or no judge is configured. A self-serve organization switches Instant Evals on from the search bar; a member without organization management rights is asked to turn to an organization admin. On an enterprise plan, ask LangWatch to switch it on. See [Limits and cost](/features/instant-evals/limits-and-cost).
 
 ## The field is not available to you
 
@@ -44951,7 +44951,7 @@ eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoye
 | `eval_category(text, instructions, options)` | One of 2 to 255 options, each written `name: meaning` |
 | `eval_category_probs(text, instructions, options)` | A JSON object of each option and its probability |
 
-One query judges at most 1,000 distinct texts. If the text comes from an extraction function, that function's cap also applies, so a query that judges conversations reads at most 200. Eval functions need a run that reads one project, on a project where they are rolled out: see [The eval function is not available to you](/features/langwatchql/common-questions#the-eval-function-is-not-available-to-you).
+One query judges at most 1,000 distinct texts. If the text comes from an extraction function, that function's cap also applies, so a query that judges conversations reads at most 200. Eval functions need a run that reads one project, in an organization where Instant Evals is switched on: see [The eval function is not available to you](/features/langwatchql/common-questions#the-eval-function-is-not-available-to-you).
 
 Judging is metered and charged per query, see [Limits and cost](/features/langwatchql/limits-and-cost#what-does-a-query-cost). A judged column is null for a row the judge skipped, and the response then includes the `INSTANT_EVAL_SKIPPED` diagnostic.
 
@@ -45152,7 +45152,7 @@ description: How many rows a query returns, how large and long it can be, how ma
 | Rows per response | 10,000. A statement with no `LIMIT` gets `LIMIT 10000` added: after the last clause, or before its `OFFSET` if it has one. | A `LIMIT` above 10,000 is refused with 400 `lwql_not_permitted`, `LIMIT_TOO_HIGH` |
 | Result size | About 8,000,000 bytes | 413 `lwql_result_too_large`, with no partial result |
 | Response size with extraction functions | About 32,000,000 bytes after the content is read | Trailing rows are dropped, and the response includes the `APP_FUNCTION_RESULT_TRUNCATED` diagnostic |
-| Statement length | 50,000 characters | The request is refused |
+| Statement length | 50,000 characters | 422 `validation_error` |
 | Run time | 10 seconds | 504 `query_timeout` |
 | Memory | 1 GB | 422 `query_memory_exceeded` |
 | Data read | 1,000,000,000 rows or 10,000,000,000 bytes | 422 `query_scan_limit_exceeded` |
@@ -77995,7 +77995,7 @@ Judged columns are `Nullable`. A null means the row was not judged, and the resp
 - `INSTANT_EVAL_SKIPPED` means the row had text but was not judged, before or during classification. The reason rides in `meta`: rate limited, too large even after being cut, no judge configured on this deployment, or the judge was asked and did not answer (`classifier_failed`).
 - `APP_FUNCTION_UNRESOLVED_KEYS` means the extraction produced no text at all, so the row was never sent to the judge.
 
-`GET /api/v1/query/schema` lists every eval function with `kind` set to `eval` and `available` saying whether a run with this key's whole reach may call one. A key that reads several projects always sees `false`, although a run that names one project where eval functions are rolled out can still call them. A call made while it may not is refused with `APP_FUNCTION_GATED`.
+`GET /api/v1/query/schema` lists every eval function with `kind` set to `eval` and `available` saying whether a run with this key's whole reach may call one. A key that reads several projects always sees `false`, although a run that names one project in an organization where Instant Evals is switched on can still call them. A call made while it may not is refused with `APP_FUNCTION_GATED`.
 
 ---
 
