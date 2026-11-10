@@ -74,7 +74,21 @@ const MCP_ACCEPT = "application/json, text/event-stream";
 let server: Server;
 let handler: McpHandler;
 let origin: string;
-let docsFetch: MockInstance;
+let docsFetch: MockInstance<typeof fetch>;
+/** How langwatch.ai answers a docs fetch; a test replaces it to hold or watch fetches. */
+let answerDocs: (signal: AbortSignal | undefined) => Promise<Response>;
+
+function docsPage(): Response {
+  return new Response(DOCS_PAGE, { status: 200, headers: { "content-type": "text/markdown" } });
+}
+
+/** Polls until `ready` holds, so a test can wait on work the server started in the background. */
+async function eventually(ready: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 200 && !ready(); attempt++) {
+    await new Promise((done) => setTimeout(done, 10));
+  }
+  expect(ready()).toBe(true);
+}
 
 function urlOf(input: Parameters<typeof fetch>[0]): string {
   if (typeof input === "string") return input;
@@ -84,7 +98,7 @@ function urlOf(input: Parameters<typeof fetch>[0]): string {
 /** The URLs the docs tools asked for: every fetch that was not this test calling its server. */
 function fetchedDocsUrls(): string[] {
   return docsFetch.mock.calls
-    .map(([input]: Parameters<typeof fetch>) => urlOf(input))
+    .map(([input]) => urlOf(input))
     .filter((url) => !url.startsWith(origin));
 }
 
@@ -92,20 +106,27 @@ async function send({
   path = "/mcp/docs",
   method = "POST",
   body,
+  rawBody,
   headers = {},
+  signal,
 }: {
   path?: string;
   method?: string;
   body?: unknown;
+  /** Sent as is, for a body that is not one JSON document's worth of test data. */
+  rawBody?: string;
   headers?: Record<string, string>;
+  signal?: AbortSignal;
 }) {
+  const payload = rawBody ?? (body === undefined ? undefined : JSON.stringify(body));
   const res = await fetch(`${origin}${path}`, {
     method,
     headers: {
-      ...(body === undefined ? {} : { "content-type": "application/json", accept: MCP_ACCEPT }),
+      ...(payload === undefined ? {} : { "content-type": "application/json", accept: MCP_ACCEPT }),
       ...headers,
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: payload,
+    signal,
   });
   const text = await res.text();
   return {
@@ -188,15 +209,14 @@ beforeEach(() => {
   mockRedis.set.mockResolvedValue("OK");
   mockRedis.smembers.mockResolvedValue([]);
   mockRedis.exists.mockResolvedValue(0);
+  answerDocs = () => Promise.resolve(docsPage());
   // The docs tools fetch langwatch.ai; this test's own requests to its listener pass through.
   const realFetch = globalThis.fetch;
   docsFetch = vi
     .spyOn(globalThis, "fetch")
     .mockImplementation((input: Parameters<typeof fetch>[0], init?: RequestInit) => {
       if (urlOf(input).startsWith(origin)) return realFetch(input, init);
-      return Promise.resolve(
-        new Response(DOCS_PAGE, { status: 200, headers: { "content-type": "text/markdown" } }),
-      );
+      return answerDocs(init?.signal ?? undefined);
     });
 });
 
@@ -339,5 +359,109 @@ describe("when a browser sends a CORS preflight to /mcp/docs", () => {
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
     expect(res.headers.get("access-control-allow-methods")).toContain("POST");
     expect(res.headers.get("access-control-allow-headers")).toContain("Content-Type");
+  });
+});
+
+describe("given a client with no credential that sends more than one message's worth", () => {
+  describe("when it posts a JSON-RPC batch of docs tool calls", () => {
+    /** @scenario "A batch sent to the docs endpoint is refused" */
+    it("answers 400 with a JSON-RPC invalid request error and fetches nothing", async () => {
+      const batch = [
+        callTool("fetch_langwatch_docs", { url: "batch/one" }, 1),
+        callTool("fetch_langwatch_docs", { url: "batch/two" }, 2),
+      ];
+
+      const res = await send({ body: batch });
+
+      expect(res.status).toBe(400);
+      expect(res.json()).toMatchObject({ jsonrpc: "2.0", id: null, error: { code: -32600 } });
+      expect(fetchedDocsUrls()).toEqual([]);
+    });
+  });
+
+  describe("when it posts a body larger than 64 KB", () => {
+    /** @scenario "An oversized body sent to the docs endpoint is refused" */
+    it("answers 413 and fetches nothing", async () => {
+      const oversized = callTool("fetch_langwatch_docs", { url: `big/${"x".repeat(70 * 1024)}` });
+
+      const res = await send({ rawBody: JSON.stringify(oversized) });
+
+      expect(res.status).toBe(413);
+      expect(fetchedDocsUrls()).toEqual([]);
+    });
+  });
+});
+
+describe("given 16 docs fetches from the docs endpoint are still in flight", () => {
+  describe("when another client calls a docs tool for a page not yet fetched", () => {
+    /** @scenario "Docs fetches beyond the endpoint's bound are refused rather than queued" */
+    it("answers a tool error asking it to retry and starts no further fetch", async () => {
+      const releases: (() => void)[] = [];
+      answerDocs = () =>
+        releases.length < 16
+          ? new Promise((resolve) => releases.push(() => resolve(docsPage())))
+          : Promise.resolve(docsPage());
+      const held = Array.from({ length: 16 }, (_, index) =>
+        send({ body: callTool("fetch_langwatch_docs", { url: `bound/held-${index}` }, index) }),
+      );
+      await eventually(() => releases.length === 16);
+
+      const refused = await send({
+        body: callTool("fetch_langwatch_docs", { url: "bound/one-more" }),
+      });
+
+      const outcome = toolOutcomeOf(refused.json());
+      expect(outcome.isError).toBe(true);
+      expect(outcome.text).toMatch(/busy.*Retry/);
+      expect(fetchedDocsUrls()).toHaveLength(16);
+
+      for (const release of releases) release();
+      for (const res of await Promise.all(held)) {
+        expect(toolOutcomeOf(res.json()).isError).toBe(false);
+      }
+    });
+  });
+});
+
+describe("given a client fetched a docs page through the docs endpoint", () => {
+  describe("when another client asks for the same page within a minute", () => {
+    /** @scenario "A repeated docs page is served from the cache" */
+    it("is given the same text without a second fetch", async () => {
+      const page = callTool("fetch_scenario_docs", { url: "cache/repeated-page" });
+
+      const first = await send({ body: page });
+      const second = await send({ body: page });
+
+      expect(toolOutcomeOf(first.json())).toEqual({ isError: false, text: DOCS_PAGE });
+      expect(toolOutcomeOf(second.json())).toEqual({ isError: false, text: DOCS_PAGE });
+      expect(fetchedDocsUrls()).toEqual(["https://langwatch.ai/scenario/cache/repeated-page.md"]);
+    });
+  });
+});
+
+describe("given a client's docs tool call is waiting on a docs page", () => {
+  describe("when the client disconnects", () => {
+    /** @scenario "A client that disconnects stops its docs fetch" */
+    it("aborts the fetch for that page", async () => {
+      let fetchSignal: AbortSignal | undefined;
+      answerDocs = (signal) => {
+        fetchSignal = signal;
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(signal.reason));
+        });
+      };
+      const client = new AbortController();
+      const pending = send({
+        body: callTool("fetch_langwatch_docs", { url: "disconnect/slow-page" }),
+        signal: client.signal,
+      }).catch(() => undefined);
+      await eventually(() => fetchSignal !== undefined);
+
+      client.abort();
+      await pending;
+
+      await eventually(() => fetchSignal?.aborted === true);
+      expect(fetchSignal?.aborted).toBe(true);
+    });
   });
 });

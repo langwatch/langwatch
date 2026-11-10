@@ -31,7 +31,13 @@ whose fetch stays locked to https://langwatch.ai/docs/ and /scenario/, and
 ignores any credential it is sent. It runs the Streamable HTTP transport in
 stateless mode: a fresh server per request, no session id, nothing written to
 any store, so an anonymous caller cannot fill session storage. GET and DELETE
-answer 405. `/mcp` itself is unchanged: MCP clients discover sign-in from its
+answer 405. So that one request cannot fan out into many fetches, a body
+must be a single JSON-RPC message (a batch answers -32600) of at most 64 KB
+(413). Each process runs at most 16 docs fetches at once for this endpoint
+(past that, a tool call answers an error asking it to retry) and serves a
+repeated page from a 60-second cache. A fetch is aborted when its client
+disconnects. There is no per-caller limit: traffic arrives through
+CloudFront, so it would throttle every caller at once. `/mcp` itself is unchanged: MCP clients discover sign-in from its
 401 challenge, so it never answers anonymously. `report_issue` is left out of
 the docs endpoint: it posts to the configured endpoint, so it is not
 config-free, and it would let anyone relay reports through the platform.

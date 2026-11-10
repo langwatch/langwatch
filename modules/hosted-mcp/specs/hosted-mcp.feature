@@ -188,6 +188,41 @@ Feature: Hosted MCP answers main's root paths on the api process
     When a browser sends a CORS preflight to "/mcp/docs"
     Then the endpoint answers 200 with headers allowing any origin
 
+  # --- The docs endpoint cannot be turned into an amplifier ---
+
+  @integration
+  Scenario: A batch sent to the docs endpoint is refused
+    Given a client with no credential
+    When it posts a JSON-RPC batch of docs tool calls to "/mcp/docs"
+    Then the endpoint answers 400 with a JSON-RPC invalid request error
+    And nothing is fetched
+
+  @integration
+  Scenario: An oversized body sent to the docs endpoint is refused
+    Given a client with no credential
+    When it posts a body larger than 64 KB to "/mcp/docs"
+    Then the endpoint answers 413
+    And nothing is fetched
+
+  @integration
+  Scenario: Docs fetches beyond the endpoint's bound are refused rather than queued
+    Given 16 docs fetches from the docs endpoint are still in flight
+    When another client calls a docs tool for a page not yet fetched
+    Then the call answers a tool error asking it to retry
+    And no further fetch is started
+
+  @integration
+  Scenario: A repeated docs page is served from the cache
+    Given a client fetched a docs page through the docs endpoint
+    When another client asks for the same page within a minute
+    Then it is given the same text without a second fetch
+
+  @integration
+  Scenario: A client that disconnects stops its docs fetch
+    Given a client's docs tool call is waiting on a docs page
+    When the client disconnects
+    Then the fetch for that page is aborted
+
   @unit
   Scenario: The docs endpoint is declared public and the MCP transport stays behind a credential
     Given the hosted MCP route policy declarations

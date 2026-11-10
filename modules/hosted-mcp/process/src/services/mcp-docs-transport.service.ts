@@ -8,6 +8,16 @@ import type { McpHttpService } from "./mcp-http.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 
+/** A docs request is one small JSON-RPC message; anything near this is not one. */
+const MAX_DOCS_BODY_BYTES = 64 * 1024;
+
+/** JSON-RPC's invalid-request error; MCP dropped batching in protocol version 2025-06-18. */
+const BATCH_REFUSAL = {
+  jsonrpc: "2.0",
+  id: null,
+  error: { code: -32600, message: "Invalid Request: batch requests are not supported" },
+} as const;
+
 type McpDocsTransportCollaborators = Readonly<{ http: McpHttpService }>;
 
 /**
@@ -28,8 +38,13 @@ export class McpDocsTransportService {
 
   async handlePost(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const { http } = this.#collaborators;
-    const read = await http.readJsonBody(req, res);
+    const read = await http.readJsonBody(req, res, { maxBytes: MAX_DOCS_BODY_BYTES });
     if (read.kind === "answered") return;
+    // One request, one message: a batch would fan one body out into a hundred docs fetches.
+    if (Array.isArray(read.body)) {
+      http.sendJson(res, 400, BATCH_REFUSAL);
+      return;
+    }
 
     const server = createDocsMcpServer();
     const transport = new StreamableHTTPServerTransport({
