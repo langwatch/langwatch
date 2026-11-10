@@ -13,7 +13,7 @@ import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { BillableEventsMeterClickHouseRepository } from "../../repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
-import { DAY_MS } from "../../rules/scenario-run-cap.rules.ts";
+import { DAY_MS, scenarioRunMonthOf } from "../../rules/scenario-run-cap.rules.ts";
 import { ScenarioRunCapService } from "../scenario-run-cap.service.ts";
 
 /** `TEST_CLICKHOUSE_URL` names its own database; `CI_CLICKHOUSE_URL` is the job's migrated one. */
@@ -126,9 +126,9 @@ describe.skipIf(!clickHouseUrl)("ScenarioRunCapService over the ClickHouse meter
 
   /** @scenario The month's runs are counted from the billable events meter */
   it("counts this month's run starts and finds the first run", async () => {
-    const window = { startDate: "2026-11-01T00:00:00.000Z", endDate: "2026-12-01T00:00:00.000Z" };
+    const { startDate, endDate } = scenarioRunMonthOf(now);
     const [runs, firstRunAt] = await Promise.all([
-      meter.countEventType({ organizationId: countedOrg, eventType: STARTED, ...window }),
+      meter.countEventType({ organizationId: countedOrg, eventType: STARTED, startDate, endDate }),
       meter.findFirstEventAt({ organizationId: countedOrg, eventType: STARTED }),
     ]);
 
