@@ -2,6 +2,7 @@ import type { LangWatchQLCatalogueAccess } from "@langwatch/analytics-contract";
 
 import { cataloguePermissions } from "../../rules/lwql-catalogue.rules.ts";
 import { LWQL_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLAccessRefusalService } from "../../services/langwatch-ql-access-refusal.service.ts";
 import { LangWatchQLRunTelemetryService } from "../../services/langwatch-ql-run-telemetry.service.ts";
 import {
   LangWatchQLService,
@@ -18,14 +19,22 @@ export const TEST_RUN_TELEMETRY = LangWatchQLRunTelemetryService.create({
   queryHashKey: new Uint8Array(32).fill(7),
 });
 
+/** The refusal ledger for a suite that builds the LangWatchQL service alone. */
+export const TEST_ACCESS_REFUSALS = LangWatchQLAccessRefusalService.create();
+
 /**
  * The real LangWatchQL service, for a suite that measures a real refusal —
  * built here so a consuming test never names the private service class.
  */
 export function createLangWatchQLService(
-  dependencies: Omit<LangWatchQLServiceDependencies, "runTelemetry">,
+  dependencies: Omit<LangWatchQLServiceDependencies, "runTelemetry" | "accessRefusals"> &
+    Partial<Pick<LangWatchQLServiceDependencies, "accessRefusals">>,
 ): LangWatchQLService {
-  return LangWatchQLService.create({ runTelemetry: TEST_RUN_TELEMETRY, ...dependencies });
+  return LangWatchQLService.create({
+    runTelemetry: TEST_RUN_TELEMETRY,
+    accessRefusals: TEST_ACCESS_REFUSALS,
+    ...dependencies,
+  });
 }
 
 /**

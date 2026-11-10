@@ -8,38 +8,7 @@ import type { LangWatchQLViolation } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
 import { MAX_VIOLATIONS, type RefusedView } from "../langwatch-ql-validation-shape.rules.ts";
-import {
-  hiddenViewTables,
-  isCallerAccessRejection,
-  isGatedAccessRefusal,
-} from "../lwql-caller-access-refusal.rules.ts";
-
-const gated = { code: "GATED_COLUMN", missingGates: ["cost:view"] };
-
-describe("isGatedAccessRefusal", () => {
-  /** @scenario "A caller's own access refusal is neither reported nor counted" */
-  it("is true for a not-permitted refusal whose violations all name their gates", () => {
-    expect(
-      isGatedAccessRefusal({
-        error: { code: "lwql_not_permitted", meta: { violations: [gated] } },
-      }),
-    ).toBe(true);
-  });
-
-  /** @scenario "A built-in failure that is not an access refusal is still reported" */
-  it.each([
-    [
-      "a violation that names no gate",
-      { code: "lwql_not_permitted", meta: { violations: [gated, { code: "TABLE_NOT_ALLOWED" }] } },
-    ],
-    ["another code carrying gates", { code: "lwql_invalid_query", meta: { violations: [gated] } }],
-    ["no meta", { code: "lwql_not_permitted" }],
-    ["a plain error", new Error("boom")],
-    ["nothing", null],
-  ])("is false for %s", (_label, error) => {
-    expect(isGatedAccessRefusal({ error })).toBe(false);
-  });
-});
+import { hiddenViewTables, isCallerAccessRejection } from "../lwql-caller-access-refusal.rules.ts";
 
 describe("isCallerAccessRejection", () => {
   const violation = (extra: Partial<LangWatchQLViolation>): LangWatchQLViolation => ({
@@ -82,17 +51,6 @@ describe("isCallerAccessRejection", () => {
 
     expect(check(gatedViolations(MAX_VIOLATIONS - 1))).toBe(true);
     expect(check(gatedViolations(MAX_VIOLATIONS))).toBe(false);
-  });
-});
-
-describe("isGatedAccessRefusal at the cap", () => {
-  /** @scenario "A refusal cut off at the violation cap is reported" */
-  it("is false when the error carries as many gated violations as the cap", () => {
-    const violations = Array.from({ length: MAX_VIOLATIONS }, () => gated);
-
-    expect(
-      isGatedAccessRefusal({ error: { code: "lwql_not_permitted", meta: { violations } } }),
-    ).toBe(false);
   });
 });
 

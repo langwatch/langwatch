@@ -120,6 +120,7 @@ import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
 import { DashboardWidgetAccessService } from "../services/dashboard-widget-access.service.ts";
 import { FilterService } from "../services/filter.service.ts";
+import { LangWatchQLAccessRefusalService } from "../services/langwatch-ql-access-refusal.service.ts";
 import { LangWatchQLAggregateScopeService } from "../services/langwatch-ql-aggregate-scope.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
 import {
@@ -214,6 +215,11 @@ interface AnalyticsAppDependencies {
    * this app's doors. One instance, so both halves write the same series.
    */
   runTelemetry: LangWatchQLRunTelemetryService;
+  /**
+   * Remembers the caller's own refusals: marked inside `langWatchQL`, read by the failure
+   * report. One instance, so the report sees what the service marked.
+   */
+  accessRefusals: LangWatchQLAccessRefusalService;
   /** One hydration stage, shared by the synchronous query and a run's text pages. */
   hydration: LangWatchQLHydrationService;
   /** The Workbench's rollout gate and its two independent protection sources. */
@@ -543,7 +549,9 @@ export class AnalyticsModule
     const runTelemetry = LangWatchQLRunTelemetryService.create({
       queryHashKey: await queryHashKey(setup.secrets),
     });
+    const accessRefusals = LangWatchQLAccessRefusalService.create();
     const langWatchQL = LangWatchQLServiceClass.create({
+      accessRefusals,
       executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
       database: connection?.database ?? DEFAULT_LWQL_DATABASE,
       hydration,
@@ -558,6 +566,7 @@ export class AnalyticsModule
         filterOptions: FilterService.create({ repository: setup.repositories.filterOptions }),
         langWatchQL,
         runTelemetry,
+        accessRefusals,
         featureFlags: setup.dependencies.featureFlags,
         authz: setup.dependencies.authz,
         dataPrivacy: setup.dependencies.dataPrivacy,
@@ -623,6 +632,7 @@ export class AnalyticsModule
       protections: this.#protections,
     });
     this.#failureReport = LangWatchQLFailureReportService.create({
+      accessRefusals: dependencies.accessRefusals,
       logger: createLogger("langwatch:analytics:lwql:query-failure"),
       failures: counter({
         name: LWQL_QUERY_FAILURE_METRIC_NAME,

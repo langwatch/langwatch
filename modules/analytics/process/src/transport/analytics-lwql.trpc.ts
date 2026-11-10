@@ -62,10 +62,7 @@ export interface AnalyticsLwqlApi {
     parameters?: Readonly<Record<string, unknown>>;
     timeWindow?: LangWatchQLTimeWindow;
   }): Promise<LangWatchQLValidationResult>;
-  executeLangWatchQL(
-    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
-  ): Promise<LangWatchQLQueryResult>;
-  /** `executeLangWatchQL` for this door only: a failure is told by its text, then rethrown. */
+  /** Runs a statement for this door only: a failure is told by its text, then rethrown. */
   executeWorkbenchQuery(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult>;

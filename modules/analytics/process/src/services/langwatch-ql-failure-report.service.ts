@@ -2,7 +2,7 @@ import type { Logger } from "@langwatch/observability";
 import type { CounterHandle } from "@langwatch/observability/metrics";
 
 import { hashStatement, originOfStatement } from "../rules/lwql-statement-origin.rules.ts";
-import { langWatchQLAccessRefusals } from "./langwatch-ql-access-refusal.service.ts";
+import type { LangWatchQLAccessRefusalService } from "./langwatch-ql-access-refusal.service.ts";
 
 /** One message for every built-in failure, so the log pipeline keys them all to one signature. */
 const BUILT_IN_FAILURE_MESSAGE = "built-in LangWatchQL statement failed";
@@ -26,13 +26,26 @@ export class LangWatchQLFailureReportService {
   private constructor(
     private readonly logger: Pick<Logger, "error">,
     private readonly failures: CounterHandle,
+    private readonly accessRefusals: Pick<
+      LangWatchQLAccessRefusalService,
+      "isCallerAccessRefusal" | "isCallerOwnRefusal"
+    >,
   ) {}
 
   static create(options: {
     logger: Pick<Logger, "error">;
     failures: CounterHandle;
+    /** The ledger the throw site writes: the same instance the LangWatchQL service marks into. */
+    accessRefusals: Pick<
+      LangWatchQLAccessRefusalService,
+      "isCallerAccessRefusal" | "isCallerOwnRefusal"
+    >;
   }): LangWatchQLFailureReportService {
-    return new LangWatchQLFailureReportService(options.logger, options.failures);
+    return new LangWatchQLFailureReportService(
+      options.logger,
+      options.failures,
+      options.accessRefusals,
+    );
   }
 
   /** Runs a workbench statement; a failure is reported by its text as sent, then rethrown as is. */
@@ -63,7 +76,7 @@ export class LangWatchQLFailureReportService {
     sql: string;
     error: unknown;
   }): void {
-    if (langWatchQLAccessRefusals.isCallerOwnRefusal({ error })) return;
+    if (this.accessRefusals.isCallerOwnRefusal({ error })) return;
     const origin = originOfStatement({ sql });
     this.failures.inc({ origin }, 1);
     if (origin === "user_written") return;
@@ -84,7 +97,7 @@ export class LangWatchQLFailureReportService {
     source: string;
     error: unknown;
   }): void {
-    if (langWatchQLAccessRefusals.isCallerAccessRefusal({ error })) return;
+    if (this.accessRefusals.isCallerAccessRefusal({ error })) return;
     this.failures.inc({ origin: "built_in" }, 1);
     this.logger.error(
       { origin: "built_in", errorCode: errorCodeOf(error), projectId, source },

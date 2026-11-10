@@ -65,22 +65,11 @@ export function isCallerAccessRejection({
   );
 }
 
-/** Whether a handled error's own violations all name the gates the caller lacks, under the cap. */
-export function isGatedAccessRefusal({ error }: { error: unknown }): boolean {
-  const { code, meta } = (error ?? {}) as { code?: unknown; meta?: { violations?: unknown } };
-  const violations = meta?.violations;
-  return (
-    code === "lwql_not_permitted" &&
-    Array.isArray(violations) &&
-    violations.length < MAX_VIOLATIONS &&
-    findLangWatchQLMissingGates(violations).length > 0
-  );
-}
-
 /** The refusals of the values a caller sent rather than of the statement they sent them with. */
 const CALLER_PARAMETER_REFUSAL_CODES: ReadonlySet<unknown> = new Set<unknown>([
   "lwql_parameter_missing",
   "lwql_granularity_too_fine",
+  "lwql_parameter_invalid",
   "lwql_reserved_parameter_supplied",
 ]);
 

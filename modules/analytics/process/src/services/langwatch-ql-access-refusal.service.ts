@@ -6,7 +6,6 @@ import {
   hiddenViewTables,
   isCallerAccessRejection,
   isCallerParameterRefusal,
-  isGatedAccessRefusal,
 } from "../rules/lwql-caller-access-refusal.rules.ts";
 import type { LwqlCatalogue } from "../rules/lwql-catalogue.rules.ts";
 import {
@@ -87,10 +86,9 @@ export class LangWatchQLAccessRefusalService {
     return derived;
   }
 
-  /** Whether `error` is the caller's own access refused: marked at the throw site, or gated. */
+  /** Whether `error` is the caller's own access refused: marked at the throw site. */
   isCallerAccessRefusal({ error }: { error: unknown }): boolean {
-    if (typeof error === "object" && error !== null && this.#marked.has(error)) return true;
-    return isGatedAccessRefusal({ error });
+    return typeof error === "object" && error !== null && this.#marked.has(error);
   }
 
   /** Whether a workbench failure is the caller's own doing: their access or the values sent. */
@@ -98,6 +96,3 @@ export class LangWatchQLAccessRefusalService {
     return isCallerParameterRefusal({ error }) || this.isCallerAccessRefusal({ error });
   }
 }
-
-/** The one ledger the throw site writes and both report paths read. */
-export const langWatchQLAccessRefusals = LangWatchQLAccessRefusalService.create();

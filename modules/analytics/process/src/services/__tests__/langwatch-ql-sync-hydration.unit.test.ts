@@ -6,7 +6,7 @@
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import { TEST_ACCESS_REFUSALS, TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
 import { DEFAULT_LWQL_HYDRATION_LIMITS } from "../../features/hydration/rules/langwatch-ql-hydration-assembly.rules.ts";
 import {
   LangWatchQLHydrationComputeService,
@@ -99,6 +99,7 @@ function serviceOver({
   });
 
   return LangWatchQLService.create({
+    accessRefusals: TEST_ACCESS_REFUSALS,
     runTelemetry: TEST_RUN_TELEMETRY,
     executor: new KeyAnsweringExecutor(keys),
     database: "analytics",

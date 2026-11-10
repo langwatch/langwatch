@@ -103,10 +103,10 @@ function report({
   message: string;
   node?: SqlAstNode;
   extra?: ViolationExtra;
-}): void {
-  if (ctx.violations.length >= MAX_VIOLATIONS) return;
+}): LangWatchQLViolation | undefined {
+  if (ctx.violations.length >= MAX_VIOLATIONS) return undefined;
   const at = node ? extractPosition(node) : undefined;
-  ctx.violations.push({
+  const violation: LangWatchQLViolation = {
     code,
     clause: frame.isInSubquery ? "subquery" : frame.clause,
     message,
@@ -115,7 +115,9 @@ function report({
     // Derived from the code, so the allowlist can ride on no other refusal nor miss this one.
     ...(code === "FUNCTION_NOT_ALLOWED" ? { allowedFunctions: LWQL_ALLOWED_FUNCTION_NAMES } : {}),
     ...extra,
-  });
+  };
+  ctx.violations.push(violation);
+  return violation;
 }
 
 const UNSUPPORTED_SYNTAX_MESSAGE =
@@ -203,13 +205,14 @@ function applyFieldRule({ rule, value, node, frame, ctx }: FieldArgs & { rule: F
     case "enum":
       return checkEnumValue({ values: rule.values, value, node, frame, ctx });
     case "refuse":
-      return report({
+      report({
         ctx,
         frame,
         code: rule.code,
         message: rule.message,
         node,
       });
+      return;
     case "identifierRef":
       return checkIdentifierRef({ value, node, frame, ctx });
     case "node":
@@ -1118,8 +1121,7 @@ function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
   const isAllowedTable = ctx.policy.allowedTables.has(qualified);
   if (!isAllowedTable) {
     const written = reference.database ? `${reference.database}.${reference.name}` : reference.name;
-    const reported = ctx.violations.length;
-    report({
+    const violation = report({
       ctx,
       frame,
       code: "TABLE_NOT_ALLOWED",
@@ -1127,7 +1129,6 @@ function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       node,
       extra: { availableViews: ctx.policy.availableViews },
     });
-    const violation = ctx.violations[reported];
     if (violation) ctx.refusedViews.push({ violation, table: qualified });
     return null;
   }

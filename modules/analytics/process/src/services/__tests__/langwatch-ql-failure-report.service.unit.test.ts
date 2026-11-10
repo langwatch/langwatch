@@ -10,10 +10,11 @@ import { fileURLToPath } from "node:url";
 import {
   LangWatchQLGranularityTooFineError,
   LangWatchQLInvalidQueryError,
-  LangWatchQLNotPermittedError,
+  LangWatchQLParameterInvalidError,
   LangWatchQLParameterMissingError,
   LangWatchQLReservedParameterSuppliedError,
   LangWatchQLUnknownIdentifierError,
+  type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
 import { counter } from "@langwatch/observability/metrics";
 import {
@@ -23,7 +24,13 @@ import {
 import { createTestLogger, type TestLogLine } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import {
+  createLangWatchQLService,
+  EVERY_CATALOGUE_PERMISSION,
+} from "../../app/__tests__/analytics.fixture.ts";
+import { LangWatchQLAccessRefusalService } from "../langwatch-ql-access-refusal.service.ts";
 import { LangWatchQLFailureReportService } from "../langwatch-ql-failure-report.service.ts";
+import { catalogueWithout } from "./lwql-catalogue-access.fixture.ts";
 
 const FAILURE_METRIC = "lwql_query_failure_total";
 const SQL_MARKER = "SQL_MARKER_7f3a91";
@@ -44,6 +51,9 @@ const STOCK_SQL: string = (
     ),
   ) as { sql: string }[]
 )[0]!.sql;
+/** The one ledger the real service marks into and the reporter reads. */
+const accessRefusals = LangWatchQLAccessRefusalService.create();
+const lwql = createLangWatchQLService({ accessRefusals, executor: null, database: "analytics" });
 
 let meter: RecordingMeterProvider;
 
@@ -72,6 +82,7 @@ function payloadOf(line: TestLogLine | undefined): Record<string, unknown> {
 function reporter() {
   const { logger, lines } = createTestLogger();
   const service = LangWatchQLFailureReportService.create({
+    accessRefusals,
     logger,
     failures: counter({
       name: FAILURE_METRIC,
@@ -240,17 +251,35 @@ describe("given the service decides the origin itself", () => {
   });
 });
 
-/** What a member's own refusal looks like once the policy has refused their statement. */
-function accessRefusal({ missingGates }: { missingGates?: string[] }) {
-  return new LangWatchQLNotPermittedError([
-    {
-      code: "GATED_COLUMN",
-      clause: "select",
-      message: "The field is not available to you.",
-      hint: "Remove the field.",
-      ...(missingGates ? { missingGates } : {}),
-    } as never,
-  ]);
+/** The refusal a real validation throws when the caller's protections hide a view they could be granted. */
+function callerAccessRefusal(): unknown {
+  return refusalOf({
+    sql: STOCK_SQL,
+    protections: { catalogue: catalogueWithout("gatewayUsage:view") },
+  });
+}
+
+/** A policy refusal that is not the caller's access: the view does not exist for anyone. */
+function policyRefusal(): unknown {
+  return refusalOf({
+    sql: "SELECT 1 FROM removed_view LIMIT 1",
+    protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+  });
+}
+
+function refusalOf({
+  sql,
+  protections,
+}: {
+  sql: string;
+  protections: LangWatchQLProtections;
+}): unknown {
+  try {
+    lwql.validate({ projectId: "project-1", protections, sql });
+  } catch (error) {
+    return error;
+  }
+  throw new Error(`expected "${sql}" to be refused`);
 }
 
 describe("given the caller's own access is refused", () => {
@@ -266,7 +295,7 @@ describe("given the caller's own access is refused", () => {
       service.reportFailure({
         projectId: "project-1",
         sql,
-        error: accessRefusal({ missingGates: ["cost:view"] }),
+        error: callerAccessRefusal(),
       });
 
       expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
@@ -281,7 +310,7 @@ describe("given the caller's own access is refused", () => {
     service.reportBuiltInFailure({
       projectId: "project-1",
       source: "gateway",
-      error: accessRefusal({ missingGates: ["cost:view"] }),
+      error: callerAccessRefusal(),
     });
 
     expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
@@ -289,9 +318,9 @@ describe("given the caller's own access is refused", () => {
   });
 
   /** @scenario "A built-in failure that is not an access refusal is still reported" */
-  it("still reports a refusal that names no gate, on both paths", () => {
+  it("still reports a policy refusal that is not the caller's access, on both paths", () => {
     const { lines, service } = reporter();
-    const error = accessRefusal({});
+    const error = policyRefusal();
 
     service.reportFailure({ projectId: "project-1", sql: STOCK_SQL, error });
     service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
@@ -303,7 +332,7 @@ describe("given the caller's own access is refused", () => {
   /** @scenario "A caller's own access refusal is neither reported nor counted" */
   it("rethrows the very same refusal from the workbench path", async () => {
     const { service } = reporter();
-    const refusal = accessRefusal({ missingGates: ["cost:view"] });
+    const refusal = callerAccessRefusal();
 
     const rejection = await service
       .reportingFailures({
@@ -333,6 +362,10 @@ const PARAMETER_REFUSALS = [
         windowSeconds: 31_536_000,
         maxBuckets: 1_000,
       }),
+  },
+  {
+    name: "a bound value of the wrong type",
+    refusal: () => new LangWatchQLParameterInvalidError({ parameter: "start" }),
   },
   {
     name: "a reserved name supplied",

@@ -6,7 +6,7 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import { TEST_ACCESS_REFUSALS, TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
 import {
   LangWatchQLExecutorRepository,
   type LangWatchQLExecutionRequest,
@@ -89,6 +89,7 @@ function run({
 }) {
   const executor = new ScriptedExecutor(answers);
   const service = LangWatchQLService.create({
+    accessRefusals: TEST_ACCESS_REFUSALS,
     runTelemetry: TEST_RUN_TELEMETRY,
     executor,
     database: "analytics",

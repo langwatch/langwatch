@@ -15,7 +15,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import { TEST_ACCESS_REFUSALS, TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
 import {
   LangWatchQLHydrationComputeService,
   type LangWatchQLTraceRenderer,
@@ -192,6 +192,7 @@ function serviceOver({
     },
   });
   const service = LangWatchQLService.create({
+    accessRefusals: TEST_ACCESS_REFUSALS,
     runTelemetry: TEST_RUN_TELEMETRY,
     executor: new ColumnAnsweringExecutor(column, values),
     database: "analytics",

@@ -45,7 +45,7 @@ import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLViewDefinition,
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
-import { langWatchQLAccessRefusals } from "./langwatch-ql-access-refusal.service.ts";
+import type { LangWatchQLAccessRefusalService } from "./langwatch-ql-access-refusal.service.ts";
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLExecutionService } from "./langwatch-ql-execution.service.ts";
@@ -95,6 +95,8 @@ export interface LangWatchQLServiceDependencies {
   readonly stopwatch?: () => number;
   /** Counts each answered run: the instance the app's doors count refused runs on. */
   readonly runTelemetry: Pick<LangWatchQLRunTelemetryService, "recordAnswered" | "fieldsFor">;
+  /** Marks the caller's own access refusals: the ledger the failure report reads. */
+  readonly accessRefusals: Pick<LangWatchQLAccessRefusalService, "markIfCallerAccess">;
 }
 
 export class LangWatchQLService {
@@ -276,7 +278,7 @@ export class LangWatchQLService {
       );
 
       const error = lwqlValidationErrors.forRejection(validation);
-      langWatchQLAccessRefusals.markIfCallerAccess({
+      this.deps.accessRefusals.markIfCallerAccess({
         error,
         rejection: validation,
         database: this.deps.database,

@@ -91,7 +91,7 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
     A refusal of the request's own projects, or of a reserved parameter name it supplies, is
     not the statement failing: it is refused before the report, writes no built-in line and is
     not counted. A refusal of the parameter values the caller sent (a parameter or time window
-    left out, a step too fine for the window, a reserved name supplied) is not either, though it
+    left out, a step too fine for the window, a value of the wrong type, a reserved name supplied) is not either, though it
     is decided inside: on the workbench path it writes no built-in line and is not counted, for
     a built-in and a user-written statement alike. Otherwise anyone could paste stock text, leave
     out the window and page on-call. The server-written path sends its own values, so a parameter
@@ -160,7 +160,7 @@ Feature: A failed LangWatchQL query is told apart by who wrote it
     @unit
     Scenario: A refusal of the caller's own parameter values is neither reported nor counted
       Given a stock statement is sent on the workbench door without its time window, with a step
-        too fine for its window, or with a reserved parameter name supplied
+        too fine for its window, with a value of the wrong type, or with a reserved parameter name supplied
       When the request is refused for those values
       Then no error-level record is written
       And the failure count does not rise, for a built-in and for a user-written statement alike

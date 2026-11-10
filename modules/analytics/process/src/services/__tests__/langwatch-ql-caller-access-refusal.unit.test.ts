@@ -22,7 +22,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
 import { MAX_VIOLATIONS } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
-import { langWatchQLAccessRefusals } from "../langwatch-ql-access-refusal.service.ts";
+import { LangWatchQLAccessRefusalService } from "../langwatch-ql-access-refusal.service.ts";
 import { LangWatchQLFailureReportService } from "../langwatch-ql-failure-report.service.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
 import { catalogueWithout, EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
@@ -39,7 +39,9 @@ const STOCK_GATEWAY_SQL: string = (
     ),
   ) as { label: string; sql: string }[]
 ).find(({ label }) => label === "fd-gateway/present")!.sql;
+const accessRefusals = LangWatchQLAccessRefusalService.create();
 const lwql = LangWatchQLService.create({
+  accessRefusals,
   runTelemetry: TEST_RUN_TELEMETRY,
   executor: null,
   database: "analytics",
@@ -76,6 +78,7 @@ function refusalOf({
 function reporter() {
   const { logger, lines } = createTestLogger();
   const service = LangWatchQLFailureReportService.create({
+    accessRefusals,
     logger,
     failures: counter({ name: FAILURE_METRIC, description: "Failed LangWatchQL queries" }),
   });
@@ -91,7 +94,7 @@ describe("given a view the catalogue holds but the caller's protections hide", (
     service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
     service.reportFailure({ projectId: "project-1", sql: STOCK_GATEWAY_SQL, error });
 
-    expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error })).toBe(true);
+    expect(accessRefusals.isCallerAccessRefusal({ error })).toBe(true);
     expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(0);
   });
@@ -118,7 +121,7 @@ describe("given a view the catalogue does not hold", () => {
       "SELECT 1 FROM gateway_request_spend, removed_view LIMIT 1",
     ]) {
       const error = refusalOf({ sql });
-      expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error })).toBe(false);
+      expect(accessRefusals.isCallerAccessRefusal({ error })).toBe(false);
       service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
     }
 
@@ -136,13 +139,13 @@ describe("given a caller's access refusal wrapped as the cause of another error"
 
     service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error: marked });
     service.reportFailure({ projectId: "project-1", sql: STOCK_GATEWAY_SQL, error: marked });
-    expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error: marked })).toBe(true);
+    expect(accessRefusals.isCallerAccessRefusal({ error: marked })).toBe(true);
     expect(lines.filter((line) => line.level === 50)).toHaveLength(0);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(0);
 
     service.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error: wrapped });
     service.reportFailure({ projectId: "project-1", sql: STOCK_GATEWAY_SQL, error: wrapped });
-    expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error: wrapped })).toBe(false);
+    expect(accessRefusals.isCallerAccessRefusal({ error: wrapped })).toBe(false);
     expect(lines.filter((line) => line.level === 50)).toHaveLength(2);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(2);
   });
@@ -152,6 +155,7 @@ describe("given a caller's access refusal wrapped as the cause of another error"
 describe("given a view no caller could see", () => {
   const gateway = LWQL_VIEW_CATALOG.find((view) => view.name === "gateway_request_spend")!;
   const service = LangWatchQLService.create({
+    accessRefusals,
     runTelemetry: TEST_RUN_TELEMETRY,
     executor: null,
     database: "analytics",
@@ -168,7 +172,7 @@ describe("given a view no caller could see", () => {
     report.reportBuiltInFailure({ projectId: "project-1", source: "gateway", error });
     report.reportFailure({ projectId: "project-1", sql, error });
 
-    expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error })).toBe(false);
+    expect(accessRefusals.isCallerAccessRefusal({ error })).toBe(false);
     expect(lines.filter((line) => line.level === 50)).toHaveLength(1);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(1);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "user_written" })).toBe(1);
@@ -191,7 +195,7 @@ describe("given a refusal cut off at the violation cap", () => {
         ({ code }) => code === "TABLE_NOT_ALLOWED",
       ),
     ).toBe(true);
-    expect(langWatchQLAccessRefusals.isCallerAccessRefusal({ error })).toBe(false);
+    expect(accessRefusals.isCallerAccessRefusal({ error })).toBe(false);
     expect(lines.filter((line) => line.level === 50)).toHaveLength(1);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "built_in" })).toBe(1);
     expect(meter.valueOf(FAILURE_METRIC, { origin: "user_written" })).toBe(1);
