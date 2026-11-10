@@ -18,7 +18,7 @@ var auditedSettings = []string{
 	"log_queries_probability",
 }
 
-// renderTiers writes the four tier roles and their settings profiles (ADR-197).
+// renderTiers writes the four tier roles and their settings profiles (ADR-198).
 // Every profile inherits default. Read tiers run with readonly=2, which lets
 // tools set their own query settings, and constraints stop them raising the caps.
 func renderTiers(input *config.Input, c *config.Computed, usersD string) error {

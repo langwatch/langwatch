@@ -1247,7 +1247,8 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         expect(summaryCall.query_params.toMs).toBe(2_000_000 + TWO_DAYS_MS);
       });
 
-      it("keeps the summary read unbounded when the ids resolve to no rows", async () => {
+      /** @scenario "Traces the resolve finds no filed summary for read only the epoch partition" */
+      it("bounds the summary read to the epoch partition when the ids resolve to no rows", async () => {
         mockClickHouseQuery
           // resolve finds nothing -> min/max default to epoch (0) = "no window"
           .mockResolvedValueOnce({
@@ -1273,11 +1274,12 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         });
 
         const summaryCall = mockClickHouseQuery.mock.calls[1]![0];
-        // No OccurredAt predicate inlined at all, and no window params.
-        expect(summaryCall.query).not.toContain("OccurredAt >=");
-        expect(summaryCall.query).not.toContain("OccurredAt <=");
-        expect(summaryCall.query_params.fromMs).toBeUndefined();
-        expect(summaryCall.query_params.toMs).toBeUndefined();
+        // Only the sentinel rows' epoch partition, in outer scan and inner dedup.
+        expect(
+          summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ?? [],
+        ).toHaveLength(2);
+        expect(summaryCall.query_params.fromMs).toBe(0);
+        expect(summaryCall.query_params.toMs).toBe(0);
       });
 
       it("fails open to the unbounded read when the resolve query errors", async () => {

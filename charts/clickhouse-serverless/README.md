@@ -140,7 +140,7 @@ Shared by cold storage and backups. Required when either `cold.enabled` or `back
 ### Backups
 
 Native ClickHouse `BACKUP`/`RESTORE` to the `backups` disk on the object store,
-full and chained incrementals ([ADR-198](../../dev/docs/adr/198-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md)).
+full and chained incrementals ([ADR-199](../../dev/docs/adr/199-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md)).
 `backup.mode` picks who takes them:
 
 - `cronjob` (default): the full and incremental CronJobs, as before.
@@ -271,7 +271,7 @@ databases), `tier_write` (plus `INSERT`, `ALTER UPDATE`, `ALTER DELETE`, no DDL)
 and `tier_admin`; an access file declares users with one tier each, and a
 sidecar container keeps them current and verifies OIDC token logins on
 `127.0.0.1` inside the pod. `env.CLICKHOUSE_ACCESS_TIERS: "true"` renders the
-tiers alone, for users you write yourself. Design and limits: [ADR-197](../../dev/docs/adr/197-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
+tiers alone, for users you write yourself. Design and limits: [ADR-198](../../dev/docs/adr/198-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
 
 | Name                               | Description                                                                                     | Default          |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------- |

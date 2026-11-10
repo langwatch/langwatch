@@ -66026,7 +66026,7 @@ The image runs the sidecar inside the container in this case.
   real token.
 
 The design and the ClickHouse behaviour it relies on are in
-[ADR-197](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/197-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
+[ADR-198](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/198-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
 
 ---
 

@@ -33,7 +33,7 @@ cold:
 # Backups: native ClickHouse BACKUP/RESTORE to S3 (requires objectStorage)
 backup:
   enabled: false
-  # Who takes the backups (ADR-198):
+  # Who takes the backups (ADR-199):
   #   cronjob          CronJobs below, as before (the default)
   #   sidecar          the ch-config sidecar in every ClickHouse pod, on one
   #                    elected runner; no backup CronJobs render
@@ -287,7 +287,7 @@ lwqlAccess:
 # Accepted so existing values files keep working; removed in the next major.
 users: ""
 
-# Users, tiers and logins from an access file (ADR-197). Off by default: the
+# Users, tiers and logins from an access file (ADR-198). Off by default: the
 # server then has only its default user plus whatever extraVolumes mount.
 # On, a sidecar container keeps the users current and verifies OIDC token
 # logins on 127.0.0.1 inside the pod. See the README's "Access" section.
@@ -307,7 +307,7 @@ access:
   # `<key>.valid_until` (RFC 3339) ends `<key>`. Add a key, move the client,
   # remove the old key: the sidecar applies each change within ~10 seconds.
   passwordSecrets: []
-  # Dynamic-only mode (ADR-197): no static password anywhere in ClickHouse.
+  # Dynamic-only mode (ADR-198): no static password anywhere in ClickHouse.
   # Every person and workload logs in with a short-lived OIDC token; default
   # is locked; the only password is a local admin generated at every start
   # into an in-memory volume, valid from inside the pod only. Needs

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Asserts the backup modes and the sidecar wiring (ADR-198). Pure `helm
+# Asserts the backup modes and the sidecar wiring (ADR-199). Pure `helm
 # template` and grep, no cluster required.
 set -euo pipefail
 

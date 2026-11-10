@@ -10,7 +10,7 @@ ch-config generate /etc/clickhouse-server
 # default, so they get the password ch-config used, and only they do.
 export CLICKHOUSE_SKIP_USER_SETUP=1
 default_password_file="${CLICKHOUSE_PASSWORD_FILE:-}"
-# Dynamic-only mode (ADR-197): default has no password, so initdb logs in as
+# Dynamic-only mode (ADR-198): default has no password, so initdb logs in as
 # the local admin with the password ch-config generated for this start.
 bootstrap_password="${CLICKHOUSE_ACCESS_BOOTSTRAP_DIR:-/run/clickhouse-access}/password"
 initdb_user=""
@@ -41,8 +41,8 @@ fi
 
 # With an access file and no sidecar container of its own (the chart runs one
 # and sets CLICKHOUSE_ACCESS_SIDECAR=external), run it here, restarted if it
-# exits: token logins and password rotation depend on it (ADR-197). Scheduled
-# backups (BACKUP_SIDECAR=run|observe) run in the same process (ADR-198).
+# exits: token logins and password rotation depend on it (ADR-198). Scheduled
+# backups (BACKUP_SIDECAR=run|observe) run in the same process (ADR-199).
 embedded_access=""
 if [ -n "${CLICKHOUSE_ACCESS_FILE:-}" ] && [ "${CLICKHOUSE_ACCESS_SIDECAR:-embedded}" = "embedded" ]; then
     embedded_access=1

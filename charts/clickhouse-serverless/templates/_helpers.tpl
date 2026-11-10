@@ -108,7 +108,7 @@ app.kubernetes.io/component: keeper
   {{- end }}
 {{- end -}}
 
-{{/* True when the pod runs in dynamic-only mode (ADR-197). */}}
+{{/* True when the pod runs in dynamic-only mode (ADR-198). */}}
 {{- define "clickhouse-serverless.dynamicOnly" -}}
 {{- if and .Values.access.enabled .Values.access.dynamicOnly.enabled }}true{{ end }}
 {{- end -}}
@@ -217,7 +217,7 @@ app.kubernetes.io/component: keeper
 {{- end -}}
 
 
-{{/* Backup mode (ADR-198): "cronjob", "sidecar" or "cronjob-observe". */}}
+{{/* Backup mode (ADR-199): "cronjob", "sidecar" or "cronjob-observe". */}}
 {{- define "clickhouse-serverless.backupMode" -}}
 {{- $mode := .Values.backup.mode | default "cronjob" -}}
 {{- if not (has $mode (list "cronjob" "sidecar" "cronjob-observe")) -}}

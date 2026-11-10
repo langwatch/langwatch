@@ -119,7 +119,7 @@ which **only `sql` mode uses**; rendered delivery runs no access DDL. See
 
 ## Access: tiers, rolling passwords and token logins
 
-Design and limits: [ADR-197](../../dev/docs/adr/197-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
+Design and limits: [ADR-198](../../dev/docs/adr/198-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md).
 
 **Tiers.** With `CLICKHOUSE_ACCESS_FILE` set, or `CLICKHOUSE_ACCESS_TIERS=true`
 for users you write yourself, the server renders `users.d/access-tiers.yaml` with
@@ -206,7 +206,7 @@ docker run -d \
 
 `mode: dynamic-only` at the top of the access file leaves ClickHouse with no
 long-lived password. Every person and workload logs in with an OIDC token
-([ADR-197](../../dev/docs/adr/197-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md), section 7).
+([ADR-198](../../dev/docs/adr/198-clickhouse-serverless-access-tiers-rolling-passwords-and-token-logins.md), section 7).
 
 - Leave `CLICKHOUSE_PASSWORD` and `CLICKHOUSE_PASSWORD_FILE` unset. `default`
   is locked: no network may log in as it.
@@ -241,7 +241,7 @@ restarting them together (see [Cluster secret](#cluster-secret)).
 
 ## Backups
 
-With `BACKUP_ENABLED=true` the image renders a `backups` disk (`s3_plain`, under `clickhouse-backup/` on the object store). One Go implementation takes native `BACKUP`s to it, full and incremental, from three places: `ch-config backup run` once, `ch-config sidecar` on a schedule, and `/scripts/backup-data.sh` and `/scripts/restore-data.sh`, which now exec `ch-config backup` with the same env as before. Design and limits: [ADR-198](../../dev/docs/adr/198-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md).
+With `BACKUP_ENABLED=true` the image renders a `backups` disk (`s3_plain`, under `clickhouse-backup/` on the object store). One Go implementation takes native `BACKUP`s to it, full and incremental, from three places: `ch-config backup run` once, `ch-config sidecar` on a schedule, and `/scripts/backup-data.sh` and `/scripts/restore-data.sh`, which now exec `ch-config backup` with the same env as before. Design and limits: [ADR-199](../../dev/docs/adr/199-clickhouse-serverless-backups-run-in-the-ch-config-sidecar.md).
 
 ```bash
 ch-config backup run --mode full                      # or BACKUP_MODE

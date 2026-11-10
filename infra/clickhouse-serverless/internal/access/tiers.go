@@ -1,5 +1,5 @@
 // Package access defines the image's privilege tiers, reads access.yaml, plans
-// the users it declares and verifies their token logins (ADR-197).
+// the users it declares and verifies their token logins (ADR-198).
 package access
 
 import (

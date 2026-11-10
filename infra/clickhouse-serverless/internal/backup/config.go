@@ -150,7 +150,7 @@ func (c Config) Policy() Policy {
 // Credentials picks the login. The sidecar takes a password file only;
 // a one-shot command also takes CLICKHOUSE_PASSWORD, as the scripts did.
 func (c Config) Credentials(allowEnvPassword bool) (chclient.Credentials, error) {
-	// Dynamic-only (ADR-197): the local admin, re-read per request since it
+	// Dynamic-only (ADR-198): the local admin, re-read per request since it
 	// changes at every server start. It logs in from loopback only.
 	if c.isLoopback() {
 		if _, err := os.Stat(filepath.Join(c.BootstrapDir, bootstrap.PasswordFile)); err == nil {

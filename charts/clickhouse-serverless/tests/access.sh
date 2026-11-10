@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Asserts the access sidecar wiring (ADR-197). Pure `helm template` and grep,
+# Asserts the access sidecar wiring (ADR-198). Pure `helm template` and grep,
 # no cluster required.
 set -euo pipefail
 
