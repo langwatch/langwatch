@@ -71,6 +71,7 @@ func TestParse_RefusesInvalidFiles(t *testing.T) {
 		{"injected database", user("{name: a, tier: read, databases: ['d.* TO x; --'], login: {rolling: {dir: /x}}}"), "must match"},
 		{"reserved name", user("{name: default, tier: admin, login: {rolling: {dir: /x}}}"), "name is reserved"},
 		{"local admin name", user("{name: local_admin, tier: admin, login: {rolling: {dir: /x}}}"), "name is reserved"},
+		{"LangWatchQL identity", user("{name: langwatch_lwql, tier: read, databases: [d], login: {rolling: {dir: /x}}}"), "name is reserved"},
 		{"unknown mode", "mode: tokens\n", `unknown mode "tokens"`},
 		{"tier-prefixed name", user("{name: tier_read, tier: read, databases: [d], login: {rolling: {dir: /x}}}"), "name is reserved"},
 		{"dotted name", user("{name: a.b, tier: inspect, login: {rolling: {dir: /x}}}"), "name must match"},

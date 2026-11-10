@@ -1,6 +1,7 @@
 package render_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -298,5 +299,60 @@ func TestRenderAll_ExplicitOptInWinsOverRenderedMode(t *testing.T) {
 	}
 	if _, ok := user["grants"]; ok {
 		t.Error("an opted-in default user must keep the flags, not a grants list")
+	}
+}
+
+// @scenario "The default user's networks fail closed"
+func TestRenderAll_DefaultNetworksKeepLoopback(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.DefaultNetworks = "10.0.0.0/16, 10.1.0.0/16"
+	renderInto(t, input, dir)
+
+	networks := section(t, section(t, section(t, readYAML(t, dir, "users.d/default-password.yaml"), "users"), "default"), "networks")
+	if networks["@replace"] != "replace" {
+		t.Error("the networks list must replace the stock ::/0, not merge with it")
+	}
+	got := fmt.Sprint(networks["ip"])
+	if got != "[127.0.0.1 ::1 10.0.0.0/16 10.1.0.0/16]" {
+		t.Errorf("default networks = %s, want loopback then the listed networks", got)
+	}
+
+	renderInto(t, testInput(), dir)
+	if _, ok := section(t, section(t, readYAML(t, dir, "users.d/default-password.yaml"), "users"), "default")["networks"]; ok {
+		t.Error("without CLICKHOUSE_DEFAULT_NETWORKS the default user's networks must stay as they are")
+	}
+}
+
+// @scenario "Query-log auditing and a per-user query share are opt-in"
+func TestRenderAll_AuditQueryLogAndConcurrencyShare(t *testing.T) {
+	dir := t.TempDir()
+	renderInto(t, testInput(), dir)
+	plain := section(t, section(t, readYAML(t, dir, "users.d/profiles.yaml"), "profiles"), "default")
+	for _, name := range []string{"log_queries_cut_to_length", "max_concurrent_queries_for_user", "constraints"} {
+		if _, ok := plain[name]; ok {
+			t.Errorf("%s rendered without opting in", name)
+		}
+	}
+
+	input := testInput()
+	input.AuditQueryLog = true
+	input.MaxConcurrentQueriesForUser = 120
+	renderInto(t, input, dir)
+	profile := section(t, section(t, readYAML(t, dir, "users.d/profiles.yaml"), "profiles"), "default")
+	if profile["max_concurrent_queries_for_user"] != 120 {
+		t.Errorf("max_concurrent_queries_for_user = %v, want 120", profile["max_concurrent_queries_for_user"])
+	}
+	constraints := section(t, profile, "constraints")
+	for name, want := range map[string]any{
+		"log_queries": 1, "log_queries_min_type": "QUERY_START", "log_queries_min_query_duration_ms": 0,
+		"log_queries_probability": 1, "log_queries_cut_to_length": 0, "log_query_settings": 1, "log_profile_events": 1,
+	} {
+		if profile[name] != want {
+			t.Errorf("%s = %v, want %v", name, profile[name], want)
+		}
+		if _, ok := constraints[name]; !ok {
+			t.Errorf("%s is not const", name)
+		}
 	}
 }

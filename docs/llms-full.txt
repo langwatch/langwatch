@@ -65535,7 +65535,9 @@ clickhouse:
 | Full        | `0 */12 * * *` (every 12h) | Complete database backup            |
 | Incremental | `0 * * * *` (every 1h)     | Only changes since the last backup  |
 
-By default both run as Kubernetes CronJobs (`<release>-clickhouse-backup-full` and `<release>-clickhouse-backup-incremental`). Each job starts its own pod from the ClickHouse image and runs the backup against the first ClickHouse replica over the network. Each incremental is based on the newest backup since the newest full, so restoring it restores the whole chain. An incremental that finds no full stands down and succeeds, so a fresh install has no backup until its first full slot; run the full CronJob once by hand to start sooner.
+By default both run as Kubernetes CronJobs (`<release>-clickhouse-backup-full` and `<release>-clickhouse-backup-incremental`). Each job starts its own pod from the ClickHouse image and runs the backup against the first ClickHouse replica over the network. Each incremental is based on the newest backup since the newest full, so restoring it restores the whole chain.
+
+An incremental that finds no full stands down and succeeds, so a fresh install has no backup until its first full slot; run the full CronJob once by hand to start sooner.
 
 ### Run backups in the ClickHouse pod
 
@@ -65740,7 +65742,7 @@ users:
 
 | User key    | Meaning                                                                            |
 | ----------- | ---------------------------------------------------------------------------------- |
-| `name`      | The ClickHouse user name. `default` and the `tier_*` names are reserved.           |
+| `name`      | The ClickHouse user name. `default`, `local_admin`, `langwatch_lwql` and the `tier_*` names are reserved. |
 | `tier`      | `inspect`, `read`, `write` or `admin`                                              |
 | `databases` | Databases a read or write user can use. `system` and `information_schema` are refused. |
 | `networks`  | Addresses or CIDR ranges the user may log in from                                  |

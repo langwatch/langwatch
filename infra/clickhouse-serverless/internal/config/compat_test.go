@@ -59,3 +59,14 @@ func TestLoad_FindsTheAccessModelAtTheDefaultDirectory(t *testing.T) {
 		t.Errorf("LWQLAccessDir = %q, want LWQL_ACCESS_DIR's value", got)
 	}
 }
+
+// @scenario "The default user's networks fail closed"
+func TestLoad_RefusesAnEmptyDefaultNetworksList(t *testing.T) {
+	t.Setenv("CH_CPU", "2")
+	t.Setenv("CH_RAM", "1Gi")
+	t.Setenv("CLICKHOUSE_PASSWORD", "pw-under-test")
+	t.Setenv("CLICKHOUSE_DEFAULT_NETWORKS", " , ")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load accepted a CLICKHOUSE_DEFAULT_NETWORKS that names no network")
+	}
+}

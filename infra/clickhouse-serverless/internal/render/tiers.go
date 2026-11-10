@@ -16,6 +16,9 @@ var auditedSettings = []string{
 	"log_queries_min_type",
 	"log_queries_min_query_duration_ms",
 	"log_queries_probability",
+	"log_queries_cut_to_length",
+	"log_query_settings",
+	"log_profile_events",
 }
 
 // renderTiers writes the four tier roles and their settings profiles (ADR-198).

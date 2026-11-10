@@ -52,7 +52,7 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 	}
 	for _, s := range []step{
 		{"limits", func() error { return renderLimits(input, computed, configD) }},
-		{"profiles", func() error { return renderProfiles(computed, usersD) }},
+		{"profiles", func() error { return renderProfiles(input, computed, usersD) }},
 		{"password", func() error { return renderDefaultPassword(input, usersD) }},
 		{"logging", func() error { return renderLogging(input, configD) }},
 		{"network", func() error { return renderNetwork(computed, configD) }},

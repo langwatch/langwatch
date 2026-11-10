@@ -101,6 +101,10 @@ var (
 	forbiddenDatabases = map[string]bool{"system": true, "information_schema": true, "INFORMATION_SCHEMA": true}
 )
 
+// LWQLUser is the LangWatchQL restricted identity (ADR-200): a second definition
+// would merge a login and a tier's grants into the one user row policies isolate.
+const LWQLUser = "langwatch_lwql"
+
 // Load reads and validates the access file at path.
 func Load(path string) (*File, error) {
 	raw, err := os.ReadFile(path)
@@ -224,7 +228,7 @@ func (f *File) validate() []string {
 		switch {
 		case !userNameRE.MatchString(u.Name):
 			add(where, "name must match %s", userNameRE)
-		case u.Name == "default" || u.Name == bootstrap.User || strings.HasPrefix(u.Name, "tier_"):
+		case u.Name == "default" || u.Name == bootstrap.User || u.Name == LWQLUser || strings.HasPrefix(u.Name, "tier_"):
 			add(where, "name is reserved")
 		}
 		if seenUsers[u.Name] {

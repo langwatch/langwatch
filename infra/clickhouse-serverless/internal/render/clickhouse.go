@@ -32,13 +32,16 @@ func renderDefaultPassword(input *config.Input, usersD string) error {
 		})
 	}
 	h := sha256.Sum256([]byte(input.Password))
+	user := map[string]any{
+		"password":            map[string]string{"@remove": "1"},
+		"password_sha256_hex": fmt.Sprintf("%x", h),
+	}
+	// Loopback stays: initdb, probes and in-pod helpers log in from the pod itself.
+	if networks := input.DefaultNetworkList(); len(networks) > 0 {
+		user["networks"] = map[string]any{"@replace": "replace", "ip": append([]string{"127.0.0.1", "::1"}, networks...)}
+	}
 	return writeYAML(filepath.Join(usersD, "default-password.yaml"), map[string]any{
-		"users": map[string]any{
-			"default": map[string]any{
-				"password":            map[string]string{"@remove": "1"},
-				"password_sha256_hex": fmt.Sprintf("%x", h),
-			},
-		},
+		"users": map[string]any{"default": user},
 	})
 }
 

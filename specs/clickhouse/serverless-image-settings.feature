@@ -171,3 +171,18 @@ Feature: The clickhouse-serverless image renders every server setting from env
     And DEFAULT_USER_ACCESS_MANAGEMENT is true
     When the renderer writes the server configuration
     Then the default user keeps access_management and named_collection_control
+
+  @unit
+  Scenario: The default user's networks fail closed
+    Given CLICKHOUSE_DEFAULT_NETWORKS lists networks
+    When the renderer writes the server configuration
+    Then the default user may log in only from loopback and those networks
+    And a CLICKHOUSE_DEFAULT_NETWORKS that is set but names no network stops the server starting
+
+  @unit
+  Scenario: Query-log auditing and a per-user query share are opt-in
+    Given CLICKHOUSE_AUDIT_QUERY_LOG is true and CLICKHOUSE_MAX_CONCURRENT_QUERIES_FOR_USER is set
+    When the renderer writes the server configuration
+    Then the default profile pins all seven query-log settings as const
+    And every user gets that share of the server's admission limit
+    And without either, the profile carries neither

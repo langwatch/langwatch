@@ -70,6 +70,14 @@ type Input struct {
 	// true: the flags in both modes. false: neither.
 	DefaultUserAccessManagement *bool `env:"DEFAULT_USER_ACCESS_MANAGEMENT"`
 
+	// AuditQueryLog pins every setting deciding what reaches system.query_log, so no
+	// session can hide its own queries. MaxConcurrentQueriesForUser is each user's
+	// share of the server's admission limit (0: none). DefaultNetworks limits where
+	// default logs in from; loopback is always added, and set-but-empty refuses start.
+	AuditQueryLog               bool   `env:"CLICKHOUSE_AUDIT_QUERY_LOG"`
+	MaxConcurrentQueriesForUser int    `env:"CLICKHOUSE_MAX_CONCURRENT_QUERIES_FOR_USER"`
+	DefaultNetworks             string `env:"CLICKHOUSE_DEFAULT_NETWORKS"`
+
 	// Backups — independent of cold storage, uses same S3-compatible credentials
 	BackupEnabled bool `env:"BACKUP_ENABLED"`
 
@@ -199,6 +207,10 @@ func Load() (*Input, error) {
 		i.Password = strings.TrimSpace(string(data))
 	}
 
+	if raw, set := os.LookupEnv("CLICKHOUSE_DEFAULT_NETWORKS"); set && len(i.DefaultNetworkList()) == 0 {
+		return nil, fmt.Errorf("CLICKHOUSE_DEFAULT_NETWORKS is set but names no network (%q): unset it, or list the networks default may log in from", raw)
+	}
+
 	if i.LWQLAccessDir == "" {
 		if _, err := os.Stat(filepath.Join(DefaultLWQLAccessDir, LWQLAccessFile)); err == nil {
 			i.LWQLAccessDir = DefaultLWQLAccessDir
@@ -238,6 +250,17 @@ func Load() (*Input, error) {
 // RendersTiers reports whether ch-config writes the tier roles and profiles.
 func (i *Input) RendersTiers() bool {
 	return i.AccessFile != "" || i.AccessTiers
+}
+
+// DefaultNetworkList is CLICKHOUSE_DEFAULT_NETWORKS split on commas, blanks dropped.
+func (i *Input) DefaultNetworkList() []string {
+	var out []string
+	for _, n := range strings.Split(i.DefaultNetworks, ",") {
+		if n = strings.TrimSpace(n); n != "" {
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 // GrantsDefaultAccessManagement reports whether ch-config grants the default

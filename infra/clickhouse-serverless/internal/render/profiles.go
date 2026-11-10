@@ -32,8 +32,20 @@ func profilePins() (map[string]any, error) {
 	return doc.Profiles.Default, nil
 }
 
+// auditedQueryLog is what CLICKHOUSE_AUDIT_QUERY_LOG pins on the default profile:
+// every query, from its start, with its settings and profile events, uncut.
+var auditedQueryLog = map[string]any{
+	"log_queries":                       1,
+	"log_queries_min_type":              "QUERY_START",
+	"log_queries_min_query_duration_ms": 0,
+	"log_queries_probability":           1,
+	"log_queries_cut_to_length":         0,
+	"log_query_settings":                1,
+	"log_profile_events":                1,
+}
+
 // renderProfiles writes profiles.yaml with the default user profile settings.
-func renderProfiles(c *config.Computed, usersD string) error {
+func renderProfiles(input *config.Input, c *config.Computed, usersD string) error {
 	profile := map[string]any{
 		"max_memory_usage":                   c.MaxMemoryUsagePerQuery,
 		"max_bytes_before_external_group_by": c.MaxBytesBeforeExternalGroupBy,
@@ -88,6 +100,17 @@ func renderProfiles(c *config.Computed, usersD string) error {
 	if c.MaxRowsToGroupBy != 0 {
 		profile["max_rows_to_group_by"] = c.MaxRowsToGroupBy
 		profile["group_by_overflow_mode"] = c.GroupByOverflowMode
+	}
+	if input.MaxConcurrentQueriesForUser > 0 {
+		profile["max_concurrent_queries_for_user"] = input.MaxConcurrentQueriesForUser
+	}
+	if input.AuditQueryLog {
+		maps.Copy(profile, auditedQueryLog)
+		constraints := map[string]any{}
+		for name := range auditedQueryLog {
+			constraints[name] = map[string]any{"const": ""}
+		}
+		profile["constraints"] = constraints
 	}
 	return writeYAML(filepath.Join(usersD, "profiles.yaml"), map[string]any{
 		"profiles": map[string]any{"default": profile},
