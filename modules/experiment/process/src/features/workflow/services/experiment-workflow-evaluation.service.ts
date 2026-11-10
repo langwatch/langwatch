@@ -51,13 +51,9 @@ type WorkflowEvaluationParameters = Record<string, string | number | boolean>;
 
 const logger = createLogger("langwatch:experiment:workflow-evaluation");
 
-// Stable id for the single workflow target of a workflow experiment.
 const WORKFLOW_TARGET_ID = "workflow-target";
 
-/**
- * Runs a studio workflow as an evaluations-v3 evaluation. The single
- * backend execution path, shared with the evaluations-v3 run API.
- */
+/** Runs a studio workflow as an evaluations-v3 evaluation, the path the v3 run API shares. */
 type WorkflowEvaluationDependencies = {
   experiments: Pick<ExperimentService, "findOrCreateForWorkflow">;
   /** The workflow rows and versions this run reads, which it does not own. */
@@ -191,29 +187,8 @@ export class WorkflowEvaluationService {
       return;
     }
     const { prepared, runUrl } = started;
-    const claim = { projectId: request.tenantId, runId: request.runId };
-    const concurrency = await this.dependencies.concurrency.resolve(claim);
-    try {
-      await this.startPlanned({ request, prepared, runUrl, concurrency });
-    } catch (error) {
-      await this.dependencies.concurrency.release(claim);
-      throw error;
-    }
-  }
-
-  /** Plans the prepared run at its concurrency and sends its start. */
-  private async startPlanned({
-    request,
-    prepared,
-    runUrl,
-    concurrency,
-  }: {
-    request: WorkflowEvaluationRequestedEventData & { tenantId: string };
-    prepared: PreparedEvaluation;
-    runUrl: string;
-    concurrency: number;
-  }): Promise<void> {
     const { state, dataResult } = prepared;
+    const claim = { projectId: request.tenantId, runId: request.runId };
     const plan = ExperimentRunPlanService.create().buildPlan({
       request: {
         state,
@@ -222,29 +197,34 @@ export class WorkflowEvaluationService {
           : { type: "full" },
       },
       data: dataResult,
-      concurrency,
+      concurrency: await this.dependencies.concurrency.resolve(claim),
       origin: "workflow",
       persistResults: false,
       experimentSlug: request.experimentSlug,
       runUrl,
     });
 
-    await this.dependencies.requests.startExperimentRun({
-      tenantId: request.tenantId,
-      occurredAt: nowInstant().epochMilliseconds,
-      runId: request.runId,
-      experimentId: request.experimentId,
-      workflowVersionId: prepared.version.id,
-      total: plan.cells.length,
-      targets: ExperimentResultDispatchService.create().buildTargetMetadata({
-        targets: state.targets,
-        loadedPrompts: dataResult.loadedPrompts,
-        loadedAgents: dataResult.loadedAgents,
-        loadedEvaluators: dataResult.loadedEvaluators,
-        loadedWorkflows: dataResult.loadedWorkflows,
-      }),
-      plan,
-    });
+    await this.dependencies.requests
+      .startExperimentRun({
+        tenantId: request.tenantId,
+        occurredAt: nowInstant().epochMilliseconds,
+        runId: request.runId,
+        experimentId: request.experimentId,
+        workflowVersionId: prepared.version.id,
+        total: plan.cells.length,
+        targets: ExperimentResultDispatchService.create().buildTargetMetadata({
+          targets: state.targets,
+          loadedPrompts: dataResult.loadedPrompts,
+          loadedAgents: dataResult.loadedAgents,
+          loadedEvaluators: dataResult.loadedEvaluators,
+          loadedWorkflows: dataResult.loadedWorkflows,
+        }),
+        plan,
+      })
+      .catch(async (error: unknown) => {
+        await this.dependencies.concurrency.release(claim);
+        throw error;
+      });
     await ExperimentRunDatasetVersionService.create({
       datasets: this.dependencies.services.datasets,
     }).link({
@@ -316,8 +296,7 @@ export class WorkflowEvaluationService {
       parameters,
     });
 
-    // Dataset precedence: caller data, then caller dataset id, then the workflow's attached
-    // dataset — a saved id loads fresh, and an inline one rides as the reference.
+    // Dataset precedence: caller data, then caller dataset id, then the workflow's own dataset.
     const { resolvedDatasetId, datasetRef } =
       data || datasetId
         ? { resolvedDatasetId: datasetId, datasetRef: emptyDatasetRef(workflow.name) }
@@ -450,8 +429,7 @@ export class WorkflowEvaluationService {
   }): EvaluationsV3State {
     return {
       name: workflowName,
-      // The persisted dataset reference reflects what was actually evaluated, so the results page
-      // renders the right columns.
+      // What was actually evaluated, so the results page renders the right columns.
       datasets: [
         persistedDatasetRef({
           workflowName,
