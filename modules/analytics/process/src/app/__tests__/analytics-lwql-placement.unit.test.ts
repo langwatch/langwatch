@@ -30,7 +30,8 @@ import { EVERY_CATALOGUE_PERMISSION } from "./analytics.fixture.ts";
 
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 
-vi.mock("@clickhouse/client", () => ({
+vi.mock("@clickhouse/client", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   createClient: () => ({ query: queryMock, close: async () => undefined }),
 }));
 
