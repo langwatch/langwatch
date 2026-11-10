@@ -97,5 +97,19 @@ describe("startNavigation", () => {
       press({ target: link({ href: "/download.zip" }) });
       expect(fetchMock).not.toHaveBeenCalled();
     });
+
+    /** @scenario "Start fetching a page as the reader presses its link" */
+    it("requests nothing ahead of the click while offline or saving data", () => {
+      const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+      press({ target: link({ href: "/offline/page" }) });
+      online.mockRestore();
+      Object.defineProperty(navigator, "connection", {
+        value: { saveData: true },
+        configurable: true,
+      });
+      press({ target: link({ href: "/save-data/page" }) });
+      Reflect.deleteProperty(navigator, "connection");
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
   });
 });

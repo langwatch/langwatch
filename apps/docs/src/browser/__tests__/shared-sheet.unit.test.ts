@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { afterFirstPaint } from "../after-paint.ts";
+import { afterLoad } from "../after-load.ts";
 import { loadSharedSheets } from "../navigation.ts";
 
 function pendingSheet() {
@@ -10,7 +10,7 @@ function pendingSheet() {
   return document.head.querySelector<HTMLLinkElement>("link[data-docs-style]");
 }
 
-describe("afterFirstPaint(loadSharedSheets)", () => {
+describe("afterLoad(loadSharedSheets)", () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["setTimeout", "requestAnimationFrame"] });
   });
@@ -26,7 +26,7 @@ describe("afterFirstPaint(loadSharedSheets)", () => {
       vi.spyOn(document, "readyState", "get").mockReturnValue("interactive");
       const link = pendingSheet();
 
-      afterFirstPaint(loadSharedSheets);
+      afterLoad(loadSharedSheets);
       vi.runAllTimers();
       expect(link?.getAttribute("href")).toBeNull();
 
@@ -44,7 +44,7 @@ describe("afterFirstPaint(loadSharedSheets)", () => {
       vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
       const link = pendingSheet();
 
-      afterFirstPaint(loadSharedSheets);
+      afterLoad(loadSharedSheets);
       expect(link?.getAttribute("href")).toBeNull();
 
       vi.runAllTimers();

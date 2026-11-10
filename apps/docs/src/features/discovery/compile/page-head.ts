@@ -11,10 +11,12 @@ import { firstSlug, type Organization, ownsSlug, type Section } from "../../navi
  */
 export const FONT_SOURCE = "/src/app/fonts";
 
-/* The body font and the title font paint above the fold on every page; the rest load on demand. */
+/* The body font and both title weights paint above the fold on every page; the rest load on
+   demand. Each is `optional`, so one that arrives after first paint never reflows a heading. */
 const ABOVE_THE_FOLD_FONTS = [
   `${FONT_SOURCE}/Inter-Variable-latin.woff2`,
   `${FONT_SOURCE}/Sentient-Regular.woff2`,
+  `${FONT_SOURCE}/Sentient-Medium.woff2`,
 ];
 
 /** The social card: shared links fetch it by this address, so it keeps its authored name. */

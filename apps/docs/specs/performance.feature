@@ -24,6 +24,7 @@ Feature: Static documentation with progressive interaction
     Then its static HTML is requested before the click completes, on touch screens too
     And following the link reuses that request
     And a modified press, another button or a link that leaves the docs requests nothing
+    And nothing is requested ahead of the click while offline or when the reader asks to save data
 
   @integration
   Scenario: Explain a search that fails to render
@@ -255,6 +256,7 @@ Feature: Static documentation with progressive interaction
     When a reader opens a section index or a guide
     Then the text set in the metric-matched fallback fonts takes the same space as the web fonts
     And the page shifts by no more than 0.01 when the fonts swap in
+    And on a touch screen, where every heading shows its link icon, the page shifts no more either
 
   @e2e
   Scenario: Keep an API reference in place while the page starts
@@ -284,9 +286,10 @@ Feature: Static documentation with progressive interaction
     And a variable face spans exactly the weights its face declares
 
   @unit
-  Scenario: Preload the two fonts every page draws above the fold
+  Scenario: Preload the fonts every page draws above the fold
     When a page head is built
-    Then it preloads the Latin body font and the regular title font, under the site's base path, and no other font
+    Then it preloads the Latin body font and both title weights, under the site's base path, and no other font
+    And each preloaded face draws only if it arrives before first paint, so a late one never moves a heading
 
   @integration
   Scenario: Serve the product tour poster at the size of the screen

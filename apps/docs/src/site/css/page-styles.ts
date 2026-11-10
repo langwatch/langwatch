@@ -13,7 +13,7 @@ import { parseStylesheet, serializeStylesheet, type CssNode } from "./stylesheet
 
 /* The page paints from the rules inlined in its head. The shared sheet (every server and island
    rule) names its address in `data-href`, so the browser does not ask for it until the page has
-   painted; the bootstrap then sets `href` (`afterFirstPaint`). Without JavaScript the
+   loaded; the bootstrap then sets `href` (`afterLoad`). Without JavaScript the
    inlined rules alone style the page. */
 export function styleHead({ css, href }: { css: string; href: string }) {
   return `<style>${css.replaceAll("</style", "<\\/style")}</style><link data-docs-style rel="stylesheet" data-href="${href}">`;

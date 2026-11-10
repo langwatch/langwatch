@@ -87,11 +87,18 @@ Feature: Actionable documentation and restrained reading surfaces
     But a page opened by a full load shows its content at once, with no rise
 
   @unit
+  Scenario: Reserve a heading's link icon room on touch screens
+    Given a touch screen, where a heading shows its link icon after its text
+    Then the heading reserves the icon's room at its end
+    And the icon's margins cancel that room, so the heading breaks its lines as if the icon had no width
+
+  @unit
   Scenario: Answer a followed link at once while the next page loads
     When a reader follows an internal documentation link
     Then the current page dims while the next one is fetched
     And a page already fetched swaps in before the dimming shows
     And the dimming clears if the swap gives way to a full load
+    And with reduced motion the page dims after the same beat, without a fade
   @unit
   Scenario: Open and close every disclosure with a short height and fade
     Given a page has accordions, expandable fields, sidebar groups and native disclosures

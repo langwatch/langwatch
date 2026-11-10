@@ -3,7 +3,7 @@ import { brotliDecompressSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
-/* The Latin font files are subset by hand (README "Binary assets") to the range each face
+/* The Latin font files are subset by hand (README "Web fonts") to the range each face
    declares in docs.css. With `font-display: optional` a glyph the file lacks would silently
    render in the fallback, so this pins the files to the stylesheet. */
 
@@ -117,6 +117,17 @@ const FILES = [
   "Sentient-Medium.woff2",
   "JetBrainsMono-Variable-latin.woff2",
 ];
+
+const PRELOADED = ["Inter-Variable-latin.woff2", "Sentient-Regular.woff2", "Sentient-Medium.woff2"];
+
+describe("the preloaded faces", () => {
+  /** @scenario "Preload the fonts every page draws above the fold" */
+  it("draw only if they arrive before first paint", () => {
+    expect(
+      PRELOADED.map((file) => [file, /font-display:\s*(\w+)/.exec(face({ file }))?.[1]]),
+    ).toEqual(PRELOADED.map((file) => [file, "optional"]));
+  });
+});
 
 describe("the subset Latin web fonts", () => {
   for (const file of FILES) {
