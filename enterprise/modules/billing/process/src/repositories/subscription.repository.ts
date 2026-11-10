@@ -21,6 +21,9 @@ export type BillingSubscriptionRecord = {
   paymentRecoveryInvoiceId?: string | null;
   paymentRecoveryStartedAt?: Instant | null;
   paymentRecoveryNoticeDay?: number | null;
+  /** The over-plan mark: open while `overPlanSince` is set and `overPlanEndedAt` is not. */
+  overPlanSince?: Instant | null;
+  overPlanEndedAt?: Instant | null;
 };
 
 type BillingOrganizationRecord = {

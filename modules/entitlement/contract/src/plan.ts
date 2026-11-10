@@ -15,12 +15,27 @@ const moneyByCurrencySchemaDefinition = z.object({
 export interface MoneyByCurrencySchema extends Named<typeof moneyByCurrencySchemaDefinition> {}
 export const moneyByCurrencySchema: MoneyByCurrencySchema = moneyByCurrencySchemaDefinition;
 
+/**
+ * An organization that fell to Free by cancelling or by an unpaid renewal while holding more
+ * members than Free allows: traces it records from `sinceMs` on are stored but withheld.
+ */
+const overPlanSchemaDefinition = z.object({
+  sinceMs: z.number().int(),
+  members: z.number().int().nonnegative(),
+  maxMembers: z.number().int().nonnegative(),
+});
+export interface OverPlanSchema extends Named<typeof overPlanSchemaDefinition> {}
+export const overPlanSchema: OverPlanSchema = overPlanSchemaDefinition;
+export type OverPlan = z.infer<typeof overPlanSchema>;
+
 const planSchemaDefinition = z.object({
   planSource: planSourceSchema,
   type: z.string(),
   name: z.string(),
   free: z.boolean(),
   visibilityDays: z.number().nullable().optional(),
+  /** Set while over plan (specs/billing/over-plan-trace-withholding.feature). */
+  overPlan: overPlanSchema.nullable().optional(),
   trialDays: z.number().optional(),
   daysSinceCreation: z.number().optional(),
   overrideAddingLimitations: z.boolean().optional(),

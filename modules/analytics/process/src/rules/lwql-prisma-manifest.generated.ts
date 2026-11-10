@@ -1791,6 +1791,8 @@ export interface LwqlPrismaRows {
     readonly paymentRecoveryInvoiceId: "String?";
     readonly paymentRecoveryStartedAt: "DateTime?";
     readonly paymentRecoveryNoticeDay: "Int?";
+    readonly overPlanSince: "DateTime?";
+    readonly overPlanEndedAt: "DateTime?";
   };
   readonly Invoice: {
     readonly id: "String";

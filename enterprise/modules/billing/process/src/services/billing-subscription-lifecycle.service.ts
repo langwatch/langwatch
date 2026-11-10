@@ -28,6 +28,7 @@ import type {
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
 import { BestEffortService } from "./best-effort.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
+import type { OverPlanService } from "./over-plan.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionLifecycle");
@@ -53,6 +54,8 @@ type BillingSubscriptionLifecycleOptions = {
     BillingLifecycleAnnouncerService,
     "subscriptionActivated" | "subscriptionCancelled" | "pricingModelChanged"
   >;
+  /** Marks an organization that cancels into Free with too many members; absent, none is marked. */
+  overPlan?: Pick<OverPlanService, "downgraded">;
 };
 
 /** What a subscription activation asks licensing about a trial's licence, and its removal. */
@@ -70,6 +73,7 @@ export class BillingSubscriptionLifecycleService {
   private readonly itemCalculator: BillingSubscriptionLifecycleOptions["itemCalculator"];
   private readonly host: BillingWebhookHost;
   private readonly announcer: BillingSubscriptionLifecycleOptions["announcer"];
+  private readonly overPlan: BillingSubscriptionLifecycleOptions["overPlan"];
   private readonly bestEffort = BestEffortService.create();
 
   private constructor(options: BillingSubscriptionLifecycleOptions) {
@@ -80,6 +84,7 @@ export class BillingSubscriptionLifecycleService {
     this.itemCalculator = options.itemCalculator;
     this.host = options.host;
     this.announcer = options.announcer;
+    this.overPlan = options.overPlan;
   }
 
   async handleSubscriptionDeleted({
@@ -115,6 +120,7 @@ export class BillingSubscriptionLifecycleService {
     await this.announcer?.subscriptionCancelled({
       organizationId: existingSubscription.organizationId,
     });
+    await this.markIfOverPlan(existingSubscription);
 
     await this.bestEffort.run({
       label: "cancellation notification",
@@ -187,6 +193,24 @@ export class BillingSubscriptionLifecycleService {
   private async cancelSubscriptionRecord(existing: BillingSubscriptionRecord): Promise<void> {
     await this.subscriptionRepository.cancel({ id: existing.id });
     await this.announcer?.subscriptionCancelled({ organizationId: existing.organizationId });
+    await this.markIfOverPlan(existing);
+  }
+
+  /** A cancellation into Free with too many members withholds new traces; nobody is removed. */
+  private async markIfOverPlan(cancelled: BillingSubscriptionRecord): Promise<void> {
+    const overPlan = this.overPlan;
+    if (!overPlan) return;
+    await this.bestEffort.run({
+      label: "over-plan mark",
+      context: { organizationId: cancelled.organizationId },
+      effect: () =>
+        overPlan.downgraded({
+          organizationId: cancelled.organizationId,
+          subscriptionId: cancelled.id,
+          since: nowInstant(),
+          reason: "cancelled",
+        }),
+    });
   }
 
   /** Reconciles the seat and event quantities Stripe now reports, and notifies on activation. */

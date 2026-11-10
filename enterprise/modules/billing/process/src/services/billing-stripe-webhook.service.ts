@@ -22,6 +22,7 @@ import {
   BillingSubscriptionLifecycleService,
   type LicenseClearer,
 } from "./billing-subscription-lifecycle.service.ts";
+import type { OverPlanService } from "./over-plan.service.ts";
 import type { PaymentRecoveryService, RecoveryInvoice } from "./payment-recovery.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
@@ -128,6 +129,8 @@ type WebhookServiceOptions = {
   announcer?: BillingLifecycleAnnouncerService;
   /** Hands the Billing role to a checkout's starter; absent where no authz is composed. */
   billingRoles?: CheckoutBillingRoles;
+  /** Marks a cancellation into Free with too many members; absent, none is marked. */
+  overPlan?: Pick<OverPlanService, "downgraded">;
 };
 
 export class EEWebhookService implements WebhookService {
@@ -159,6 +162,7 @@ export class EEWebhookService implements WebhookService {
     announcer,
     billingRoles,
     recovery,
+    overPlan,
   }: WebhookServiceOptions) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
@@ -188,6 +192,7 @@ export class EEWebhookService implements WebhookService {
       itemCalculator,
       host,
       ...(announcer ? { announcer } : {}),
+      ...(overPlan ? { overPlan } : {}),
     });
   }
 

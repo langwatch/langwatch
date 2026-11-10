@@ -41,6 +41,7 @@ import { Toolbar } from "../toolbar/toolbar.tsx";
 import { TraceTable } from "../trace-table/trace-table.tsx";
 import { EmptyResultsPane } from "./empty-results-pane.tsx";
 import { IntegratePane } from "./integrate-pane.tsx";
+import { OverPlanNotice } from "./over-plan-notice.tsx";
 import { PageKeyboardShortcuts } from "./page-keyboard-shortcuts.tsx";
 import { useDebouncedFilterCommit } from "./use-debounced-filter-commit.ts";
 import {
@@ -420,7 +421,7 @@ function useAuroraRibbon({
 }
 
 const ResultsPane: React.FC = React.memo(() => {
-  const { data } = useTraceListQuery();
+  const { data, withheld } = useTraceListQuery();
   // The selection header's count is the same read the pagination line and the
   // sidebar total show.
   const { totalHits, pageTraceIds } = useExplorerCounts();
@@ -478,6 +479,7 @@ const ResultsPane: React.FC = React.memo(() => {
           explicitly opted into sample preview. Not shown for no-traces
           projects where the CTA card already contextualises the sample rows. */}
       {showSampleBanner && <SampleDataBanner />}
+      <OverPlanNotice withheld={withheld ?? null} />
       <BulkActionBar
         totalHits={totalHits}
         pageTraceIds={pageTraceIds}

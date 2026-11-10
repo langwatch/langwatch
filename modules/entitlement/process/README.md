@@ -111,7 +111,7 @@ Contract `../contract/src/entitlement.trpc.ts:17`, router `src/transport/plan.tr
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof planSchema>; // ../contract/src/plan.ts:38
+type Output = z.infer<typeof planSchema>; // ../contract/src/plan.ts:53
 ```
 
 ### `limits`

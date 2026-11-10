@@ -3,6 +3,13 @@ import { nowInstant } from "@langwatch/time";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** The plan's read gates: the ADR-028 teaser cutoff and the over-plan withholding cutoff. */
+export type VisibilityWindow = {
+  visibilityCutoffMs: number | null;
+  withheldFromMs: number | null;
+  overPlan: { members: number; maxMembers: number } | null;
+};
+
 /**
  * @see dev/docs/adr/028-visibility-blur-teaser-redaction.md
  * Resolves the plan-based visibility cutoff for an organization. Stateless: every call evaluates
@@ -24,14 +31,22 @@ export class VisibilityWindowService {
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<{ visibilityCutoffMs: number | null }> {
+  }): Promise<VisibilityWindow> {
     const plan = await this.planProvider.getActivePlan({ organizationId });
+    const overPlan = plan?.overPlan ?? null;
+    const withholding = {
+      withheldFromMs: overPlan?.sinceMs ?? null,
+      overPlan: overPlan ? { members: overPlan.members, maxMembers: overPlan.maxMembers } : null,
+    };
     const visibilityDays = plan?.visibilityDays;
     if (visibilityDays === null || visibilityDays === undefined) {
-      return { visibilityCutoffMs: null };
+      return { visibilityCutoffMs: null, ...withholding };
     }
 
-    return { visibilityCutoffMs: nowInstant().epochMilliseconds - visibilityDays * DAY_MS };
+    return {
+      visibilityCutoffMs: nowInstant().epochMilliseconds - visibilityDays * DAY_MS,
+      ...withholding,
+    };
   }
 
   /** True when a trace/span started before the cutoff (content must be teased). */

@@ -4701,6 +4701,10 @@ model Subscription {
   paymentRecoveryInvoiceId String?
   paymentRecoveryStartedAt DateTime?
   paymentRecoveryNoticeDay Int?
+  /// The over-plan mark: traces recorded from overPlanSince are withheld while it is open and the
+  /// organization is on Free with more members than Free allows; ended once that no longer holds.
+  overPlanSince         DateTime?
+  overPlanEndedAt       DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]

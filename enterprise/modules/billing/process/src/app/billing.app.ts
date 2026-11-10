@@ -95,6 +95,7 @@ import { CustomerService } from "../services/customer.service.ts";
 import { DeveloperSeatService } from "../services/developer-seat.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
+import { OverPlanService } from "../services/over-plan.service.ts";
 import {
   PaymentRecoveryService,
   type PaymentRecoverySweepOutcome,
@@ -400,6 +401,7 @@ export class BillingModule
       | "gatewaySpend"
       | "projects"
       | "paymentRecovery"
+      | "overPlan"
     >;
     config: Pick<
       BillingServerConfig,
@@ -437,13 +439,24 @@ export class BillingModule
       facts,
       licensing: peers.licensing,
     });
+    const subscriptionPlans = SaaSPlanProviderService.create({
+      subscriptions: repositories.subscriptions,
+      isSaas,
+    });
+    const overPlan = isSaas
+      ? OverPlanService.create({
+          marks: repositories.overPlan,
+          organizations: repositories.organizations,
+          isOnFree: async (organizationId) =>
+            (await subscriptionPlans.getActivePlan(organizationId)).free,
+          ...(lifecycle ? { facts: lifecycle } : {}),
+        })
+      : void 0;
     const gate = {
       authorization: peers.authorization,
       overview,
-      subscriptionPlans: SaaSPlanProviderService.create({
-        subscriptions: repositories.subscriptions,
-        isSaas,
-      }),
+      subscriptionPlans,
+      overPlan,
       isSaas,
       resourceLimitAlerts,
       pricing: OrganizationPricingService.create(repositories.organizationPricing),
@@ -479,6 +492,7 @@ export class BillingModule
             emails: recovery.emails,
             alerts: webhook.host,
             publicBaseUrl: recovery.publicBaseUrl,
+            ...(overPlan ? { overPlan } : {}),
           })
         : void 0;
 
@@ -513,6 +527,7 @@ export class BillingModule
             announcer: lifecycle,
             billingRoles,
             paymentRecovery,
+            overPlan,
           })
         : BillingModule.#undispatchedWebhook(),
       paymentRecovery,
@@ -757,8 +772,10 @@ export class BillingModule
     announcer,
     billingRoles,
     paymentRecovery,
+    overPlan,
   }: {
     paymentRecovery: PaymentRecoveryService | undefined;
+    overPlan: OverPlanService | undefined;
     announcer: BillingLifecycleAnnouncerService | undefined;
     /** The Billing role a completed checkout hands its starter. */
     billingRoles: CheckoutBillingRoles | undefined;
@@ -801,6 +818,7 @@ export class BillingModule
       ...(billingRoles ? { billingRoles } : {}),
       ...(announcer ? { announcer } : {}),
       ...(paymentRecovery ? { recovery: paymentRecovery } : {}),
+      ...(overPlan ? { overPlan } : {}),
     });
     return StripeWebhookReceiptService.create({
       dispatchesEvents: () => isSaas,
@@ -840,9 +858,11 @@ export class BillingModule
   readonly #resourceLimitAlerts: ResourceLimitAlertService;
   readonly #lifecycle: BillingLifecycleAnnouncerService | undefined;
   readonly #paymentRecovery: PaymentRecoveryService | undefined;
+  readonly #overPlan: OverPlanService | undefined;
 
   private constructor({
     paymentRecovery,
+    overPlan,
     stripeWebhook,
     subscriptions,
     connected,
@@ -856,6 +876,8 @@ export class BillingModule
     lifecycle,
   }: {
     paymentRecovery: PaymentRecoveryService | undefined;
+    /** The over-plan state; absent off LangWatch Cloud, where no plan carries it. */
+    overPlan: OverPlanService | undefined;
     lifecycle: BillingLifecycleAnnouncerService | undefined;
     stripeWebhook: StripeWebhookReceiptService;
     subscriptions: SubscriptionDoor | undefined;
@@ -880,6 +902,7 @@ export class BillingModule
     this.#resourceLimitAlerts = resourceLimitAlerts;
     this.#lifecycle = lifecycle;
     this.#paymentRecovery = paymentRecovery;
+    this.#overPlan = overPlan;
   }
 
   notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void> {
@@ -1026,9 +1049,12 @@ export class BillingModule
   }: SubscriptionPlanInput): Promise<PlanInfo> {
     const plan = await this.#subscriptionPlans.getActivePlan(organizationId);
     const impersonatorId = user?.impersonator?.id;
+    const state =
+      plan.free && this.#overPlan ? await this.#overPlan.getState({ organizationId }) : undefined;
 
     return {
       ...plan,
+      ...(state?.kind === "over_plan" ? { overPlan: state.overPlan } : {}),
       overrideAddingLimitations:
         !!impersonatorId &&
         (await this.#authorization.can({
@@ -1185,8 +1211,12 @@ export class BillingModule
 
   /** Sends each open recovery case's notice that is due; nothing where recovery is not composed. */
   async sweepPaymentRecovery(): Promise<PaymentRecoverySweepOutcome> {
-    if (!this.#paymentRecovery) return { notified: 0, closed: 0, failed: 0 };
-    return this.#paymentRecovery.sweep();
+    // The over-plan marks end on the same hourly pass; a mark only records what the plan read
+    // already answers, so a late end hides nothing.
+    const overPlan = await this.#overPlan?.sweep();
+    if (!this.#paymentRecovery) return { notified: 0, closed: 0, failed: overPlan?.failed ?? 0 };
+    const recovery = await this.#paymentRecovery.sweep();
+    return { ...recovery, failed: recovery.failed + (overPlan?.failed ?? 0) };
   }
 
   async paymentRecovery(input: { organizationId: string }): Promise<PaymentRecoverySummary> {

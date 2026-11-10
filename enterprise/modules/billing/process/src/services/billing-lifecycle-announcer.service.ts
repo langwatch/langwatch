@@ -262,6 +262,27 @@ export class BillingLifecycleAnnouncerService {
     });
   }
 
+  /** The organization went over its plan or came back within it (over-plan-trace-withholding.feature). */
+  async overPlanChanged(input: {
+    organizationId: string;
+    subscriptionId: string;
+    state: "started" | "ended";
+    reason: "cancelled" | "payment_recovery" | "within_plan";
+    since: Instant;
+    members: number;
+    maxMembers: number;
+  }): Promise<void> {
+    await this.#connected().recordOverPlanChanged.send({
+      ...this.#rowFact(input.organizationId),
+      subscriptionId: input.subscriptionId,
+      state: input.state,
+      reason: input.reason,
+      since: input.since.epochMilliseconds,
+      members: input.members,
+      maxMembers: input.maxMembers,
+    });
+  }
+
   /** A write's fact throws when it cannot be recorded, so its caller fails rather than loses it. */
   #connected(): EventingCommands<BillingLifecyclePipeline> {
     if (!this.#commands) {

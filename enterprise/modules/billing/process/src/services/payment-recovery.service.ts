@@ -39,6 +39,7 @@ import {
   noticeKindOf,
   type PaymentRecoveryNoticeDay,
 } from "../rules/payment-recovery.rules.ts";
+import type { OverPlanService } from "./over-plan.service.ts";
 
 const logger = createLogger("langwatch:billing:payment-recovery");
 
@@ -85,6 +86,8 @@ type PaymentRecoveryOptions = {
   emails: PaymentRecoveryEmailChannel;
   alerts: Pick<BillingWebhookHost, "sendSlackAccountPaymentFailed">;
   publicBaseUrl: string;
+  /** Marks an organization paused into Free with too many members; absent, none is marked. */
+  overPlan?: Pick<OverPlanService, "downgraded">;
   now?: () => Instant;
 };
 
@@ -303,9 +306,30 @@ export class PaymentRecoveryService {
       to: day,
     });
     if (!advanced) return false;
+    if (kind === "paused") await this.markIfOverPlan(open);
     await this.deliver(mail);
     logger.info({ organizationId: open.organizationId, day, kind }, "Payment recovery notice sent");
     return true;
+  }
+
+  /** Day 21 into Free with too many members withholds traces from day 21; a failure only logs. */
+  private async markIfOverPlan(open: PaymentRecoveryCase): Promise<void> {
+    try {
+      await this.options.overPlan?.downgraded({
+        organizationId: open.organizationId,
+        subscriptionId: open.subscriptionId,
+        since: accessStopsAt({ startedAt: open.startedAt }),
+        reason: "payment_recovery",
+      });
+    } catch (error) {
+      logger.error(
+        {
+          organizationId: open.organizationId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Could not record the over-plan mark at day 21; new traces stay visible",
+      );
+    }
   }
 
   /**

@@ -152,6 +152,27 @@ export class PageTooDeepError extends HandledError {
 }
 
 /**
+ * A trace recorded while the organization is over its plan: stored, not shown until the card is
+ * updated or the members fit (specs/billing/over-plan-trace-withholding.feature).
+ */
+export class TraceWithheldOverPlanError extends HandledError {
+  declare readonly code: "trace_withheld_over_plan";
+
+  constructor(input: { traceId: string; members: number; maxMembers: number }) {
+    super(
+      "trace_withheld_over_plan",
+      "This trace was recorded while the organization is over its plan. It is saved and will show once the card is updated or the members fit the plan.",
+      {
+        httpStatus: 403,
+        meta: { traceId: input.traceId, members: input.members, maxMembers: input.maxMembers },
+        ...remediation("trace_withheld_over_plan"),
+      },
+    );
+    this.name = "TraceWithheldOverPlanError";
+  }
+}
+
+/**
  * A trace- or thread-id array above the plan's bound. Refused rather than
  * silently dropped, so a caller paging through a large export learns the
  * bound at the first oversized request.

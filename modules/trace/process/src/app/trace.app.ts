@@ -200,6 +200,8 @@ import {
   type RouteSearchResult,
   TraceAiQueryUnavailableError,
   type TraceRef,
+  type TraceWithholding,
+  traceWithholdingOf,
 } from "@langwatch/trace-contract";
 import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
@@ -366,6 +368,11 @@ import {
 import { generateAsciiTree } from "../rules/trace-formatting.rules.ts";
 import { tracePath, tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
 import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-readable-span.rules.ts";
+import {
+  clampToWithheld,
+  refuseWithheldTrace,
+  withheldEndDate,
+} from "../rules/trace-withholding.rules.ts";
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
@@ -482,6 +489,7 @@ type TraceListReadParams = {
   cursor?: { sortValue: number; traceId: string };
   filterWhere?: { sql: string; params: Record<string, unknown> };
   visibilityCutoffMs?: number | null;
+  withholding?: TraceWithholding;
 };
 
 type TraceNewCountParams = {
@@ -489,6 +497,7 @@ type TraceNewCountParams = {
   timeRange: { from: number; to: number };
   since: number;
   filterWhere?: { sql: string; params: Record<string, unknown> };
+  withholding?: TraceWithholding;
 };
 
 type TraceSuggestionsParams = {
@@ -1688,6 +1697,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       }),
       query: {
         ...input.query,
+        ...withheldEndDate({ query: input.query, protections: input.protections }),
         ...(pageSize === undefined ? {} : { pageSize }),
       },
     });
@@ -1747,6 +1757,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       withEditOverlay: input.withEditOverlay,
     });
     if (!trace) throw new TraceNotFoundError(input.traceId);
+    refuseWithheldTrace({ trace, protections });
     return trace;
   }
 
@@ -1793,6 +1804,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         pageSize: 200,
         filterWhere,
         visibilityCutoffMs: protections.visibilityCutoffMs,
+        withholding: traceWithholdingOf(protections),
       }),
     );
     const turns = page.items.map((t) =>
@@ -1821,6 +1833,12 @@ export class TraceModule implements TraceApi, CollectorApp {
     const protections = await this.resolveViewerProtections({
       projectId: input.projectId,
       userId: input.viewerUserId,
+    });
+    await this.assertTraceNotWithheld({
+      authorization: input.authorization,
+      traceId: input.traceId,
+      ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
+      protections,
     });
     const [span, rawEvents] = await Promise.all([
       this.findSpan({
@@ -2715,7 +2733,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
     const result = await this.#dependencies.traces.sessionGroups.getSessionGroups({
       authorization: input.authorization,
-      timeRange: input.timeRange,
+      timeRange: clampToWithheld({
+        timeRange: input.timeRange,
+        withholding: traceWithholdingOf(protections),
+      }),
       sort: input.sort,
       pageSize: input.pageSize,
       cursor: input.cursor,
@@ -2771,7 +2792,11 @@ export class TraceModule implements TraceApi, CollectorApp {
 
     const facets = await this.#dependencies.traces.list.getFacets({
       authorization: input.authorization,
-      timeRange: input.timeRange,
+      // Withheld traces stay out of the counts as they stay out of the list.
+      timeRange: clampToWithheld({
+        timeRange: input.timeRange,
+        withholding: input.protections ? traceWithholdingOf(input.protections) : undefined,
+      }),
       filterFor,
       // Everything `filterFor` reads besides the proof and the window.
       filterKey: JSON.stringify([
@@ -2831,6 +2856,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     tenantId?: string | undefined;
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
+    withholding?: TraceWithholding;
     full?: boolean;
   }): Promise<TraceSummaryData> {
     const authorization =
@@ -2845,8 +2871,38 @@ export class TraceModule implements TraceApi, CollectorApp {
       ...(input.visibilityCutoffMs !== undefined
         ? { visibilityCutoffMs: input.visibilityCutoffMs }
         : {}),
+      ...(input.withholding ? { withholding: input.withholding } : {}),
       ...(input.full !== undefined ? { full: input.full } : {}),
     });
+  }
+
+  /**
+   * Refuses a trace the viewer's plan withholds (over-plan, started at or after the cutoff) with
+   * `trace_withheld_over_plan`. Reads the summary only while a withholding is in force.
+   */
+  async assertTraceNotWithheld(input: {
+    authorization: Authorization;
+    traceId: string;
+    tenantId?: string | undefined;
+    occurredAtMs?: number;
+    protections: Protections;
+  }): Promise<void> {
+    const withholding = traceWithholdingOf(input.protections);
+    if (withholding.kind === "none") return;
+    try {
+      await this.readTraceSummary({
+        authorization: input.authorization,
+        traceId: input.traceId,
+        tenantId: input.tenantId,
+        ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
+        withholding,
+        full: false,
+      });
+    } catch (error) {
+      // A trace with no summary yet has nothing to withhold; the read that follows answers for it.
+      if (error instanceof TraceNotFoundError) return;
+      throw error;
+    }
   }
 
   /**
@@ -3607,6 +3663,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       throw err;
     }
     if (!trace) throw new TraceNotFoundError(input.traceId);
+    refuseWithheldTrace({ trace, protections: input.protections });
     return trace;
   }
 
@@ -3646,6 +3703,12 @@ export class TraceModule implements TraceApi, CollectorApp {
   }): Promise<CodingAgentTranscript> {
     const { protections } = input;
     const authorization = input.authorization ?? (await this.#authorizeOwnRead(input));
+    await this.assertTraceNotWithheld({
+      authorization,
+      traceId: input.traceId,
+      ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
+      protections,
+    });
     return this.#transcriptRead.readCodingAgentTranscript({
       reads: this,
       ports: {

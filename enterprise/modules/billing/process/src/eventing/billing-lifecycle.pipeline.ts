@@ -24,6 +24,7 @@ import {
   RecordPricingModelChangedCommand,
   RecordSeatCheckoutPaidCommand,
   RecordSeatCheckoutsAbandonedCommand,
+  RecordOverPlanChangedCommand,
 } from "./billing-lifecycle.commands.ts";
 import {
   billingAuditRecordedEventSchema,
@@ -36,7 +37,9 @@ import {
   pricingModelChangedEventSchema,
   seatCheckoutPaidEventSchema,
   seatCheckoutsAbandonedEventSchema,
+  overPlanChangedEventSchema,
   type BillingLifecycleEvent,
+  type RecordOverPlanChangedCommandData,
   type RecordBillingAuditCommandData,
   type RecordCheckoutCompletedCommandData,
   type RecordSubscriptionChangedCommandData,
@@ -70,6 +73,7 @@ export type BillingLifecyclePipeline = StaticPipelineDefinition<
   | { name: "recordPricingModelChanged"; payload: RecordPricingModelChangedCommandData }
   | { name: "recordSeatCheckoutPaid"; payload: RecordSeatCheckoutPaidCommandData }
   | { name: "recordSeatCheckoutsAbandoned"; payload: RecordSeatCheckoutsAbandonedCommandData }
+  | { name: "recordOverPlanChanged"; payload: RecordOverPlanChangedCommandData }
 >;
 
 /** billing_lifecycle: billing records its facts; peers react from their own side (§9). */
@@ -97,6 +101,7 @@ export function buildBillingLifecyclePipeline({
       pricingModelChangedEventSchema,
       seatCheckoutPaidEventSchema,
       seatCheckoutsAbandonedEventSchema,
+      overPlanChangedEventSchema,
     ])
     .withCommand("recordSubscriptionChanged", RecordSubscriptionChangedCommand)
     .withCommand("recordSubscriptionStarted", RecordSubscriptionStartedCommand)
@@ -108,6 +113,7 @@ export function buildBillingLifecyclePipeline({
     .withCommand("recordPricingModelChanged", RecordPricingModelChangedCommand)
     .withCommand("recordSeatCheckoutPaid", RecordSeatCheckoutPaidCommand)
     .withCommand("recordSeatCheckoutsAbandoned", RecordSeatCheckoutsAbandonedCommand)
+    .withCommand("recordOverPlanChanged", RecordOverPlanChangedCommand)
     .withPeerSubscriber(
       BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
       seatLimitReachedSubscriber({ alerts }),

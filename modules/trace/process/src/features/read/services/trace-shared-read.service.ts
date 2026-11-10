@@ -18,6 +18,7 @@ import {
   sharedTraceDtoSchema,
   TraceNotFoundError,
   traceSummaryDataSchema,
+  traceWithholdingOf,
   type Protections,
   type SharedTraceDto,
   type SpanResourceInfo,
@@ -173,7 +174,12 @@ export class TraceSharedReadService {
     let summary;
     try {
       summary = traceSummaryDataSchema.parse(
-        await reads.readTraceSummary({ authorization, traceId, visibilityCutoffMs }),
+        await reads.readTraceSummary({
+          authorization,
+          traceId,
+          visibilityCutoffMs,
+          withholding: traceWithholdingOf(protections),
+        }),
       );
     } catch (error) {
       if (error instanceof TraceNotFoundError) throw new ShareLinkNotFoundError();

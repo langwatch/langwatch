@@ -2250,6 +2250,8 @@ export const prismaModelFieldCatalogue = {
     "paymentRecoveryInvoiceId",
     "paymentRecoveryStartedAt",
     "paymentRecoveryNoticeDay",
+    "overPlanSince",
+    "overPlanEndedAt",
     "organization",
     "invoices"
   ],

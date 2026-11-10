@@ -60,6 +60,7 @@ const ORGANIZATION_ROW_COMMANDS = [
   "recordPricingModelChanged",
   "recordSeatCheckoutPaid",
   "recordSeatCheckoutsAbandoned",
+  "recordOverPlanChanged",
 ] as const;
 type OrganizationRowCommand = (typeof ORGANIZATION_ROW_COMMANDS)[number];
 
@@ -102,6 +103,7 @@ function recordingAnnouncer(refuse?: OrganizationRowCommand) {
     recordPricingModelChanged: rowSender("recordPricingModelChanged"),
     recordSeatCheckoutPaid: rowSender("recordSeatCheckoutPaid"),
     recordSeatCheckoutsAbandoned: rowSender("recordSeatCheckoutsAbandoned"),
+    recordOverPlanChanged: rowSender("recordOverPlanChanged"),
   });
   return { announcer, sent };
 }
@@ -1587,6 +1589,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       recordPricingModelChanged: { send: async () => {}, ...unused },
       recordSeatCheckoutPaid: { send: async () => {}, ...unused },
       recordSeatCheckoutsAbandoned: { send: async () => {}, ...unused },
+      recordOverPlanChanged: { send: async () => {}, ...unused },
     });
     service = EEWebhookService.create({
       licenses,
