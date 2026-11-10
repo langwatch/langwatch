@@ -114,10 +114,9 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
           toString(toUnixTimestamp64Milli(max(BucketStart))) AS lastTraceAt,
           toString(toUnixTimestamp64Milli(maxIf(BucketStart, ErrorCount > 0))) AS lastFailedTraceAt
         FROM trace_analytics_rollup
-        WHERE TenantId IN {projectIds:Array(String)}
+        WHERE TenantId IN ({projectIds:Array(String)})
           AND BucketStart >= fromUnixTimestamp64Milli({since:Int64})
         GROUP BY day
-        HAVING sum(SpanCount) > 0
         ORDER BY day
       `,
       params: { projectIds: [...input.projectIds], since: input.sinceMs },

@@ -2,7 +2,7 @@
  * Spec: modules/trace/specs/trace-month-trace-ids.feature
  * Spec: modules/trace/specs/trace-usage-by-day.feature
  */
-import type { QueryRequest } from "@langwatch/clickhouse-client";
+import { type QueryRequest, TenantGuard } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
@@ -223,15 +223,20 @@ describe("TraceUsageCountClickHouseRepository usage by day", () => {
       table: "trace_analytics_rollup",
       params: { projectIds: ["project-1", "project-2"], since: 1_000 },
     });
-    expect(queries[0]?.sql).toContain("TenantId IN {projectIds:Array(String)}");
+    const [query] = queries;
+    expect(query).toBeDefined();
+    if (!query) return;
+    expect(query.sql).toContain("WHERE TenantId IN ({projectIds:Array(String)})");
+    // The client runs this guard on every read: a form it refuses would never reach ClickHouse.
+    expect(() => new TenantGuard().assert(query)).not.toThrow();
   });
 
   it("asks nothing for an organization with no project", async () => {
     const { queries, repository } = createRepository([]);
 
-    await expect(repository.findTraceUsageByDay({ ...input, projectIds: [] })).resolves.toEqual(
-      [],
-    );
+    const noProjects = { ...input, projectIds: [] };
+
+    await expect(repository.findTraceUsageByDay(noProjects)).resolves.toEqual([]);
     expect(queries).toEqual([]);
   });
 
@@ -239,14 +244,10 @@ describe("TraceUsageCountClickHouseRepository usage by day", () => {
   it("sums the memory twin's buckets per UTC day of the listed projects", async () => {
     const memory = MemoryTraceUsageCountRepository.create();
     const day = Date.UTC(2026, 10, 19);
-    const bucket = { spanCount: 2, traceCount: 1, errorCount: 0, cost: 0.25 };
+    const bucket = { traceCount: 1, errorCount: 0, cost: 0.25 };
     memory.recordBucket({ ...bucket, tenantId: "project-1", bucketStartMs: day + 60_000 });
-    memory.recordBucket({
-      ...bucket,
-      tenantId: "project-2",
-      bucketStartMs: day + 120_000,
-      errorCount: 1,
-    });
+    const failed = { ...bucket, errorCount: 1 };
+    memory.recordBucket({ ...failed, tenantId: "project-2", bucketStartMs: day + 120_000 });
     memory.recordBucket({ ...bucket, tenantId: "project-9", bucketStartMs: day + 60_000 });
 
     await expect(memory.findTraceUsageByDay(input)).resolves.toEqual([

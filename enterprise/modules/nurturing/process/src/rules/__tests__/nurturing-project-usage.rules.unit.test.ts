@@ -165,7 +165,7 @@ describe("organizationUsageTraits()", () => {
       organizationCreatedAt: NOW - DAY_MS,
     });
 
-    expect(Object.keys(traits).sort()).toEqual([
+    expect(Object.keys(traits).toSorted()).toEqual([
       "evaluator_count",
       "has_scenario_run",
       "prompt_count",

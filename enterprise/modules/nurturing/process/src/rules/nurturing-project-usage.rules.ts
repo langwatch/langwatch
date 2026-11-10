@@ -77,7 +77,7 @@ export function traceUsageTotalsOf(days: readonly TraceUsageDay[]): NurturingTra
     totalCost: days.reduce((sum, day) => sum + day.totalCost, 0),
     lastTraceAt: latestOf(days.map((day) => day.lastTraceAt)),
     lastFailedTraceAt: latestOf(days.flatMap((day) => day.lastFailedTraceAt ?? [])),
-    activeDays: [...new Set(days.map((day) => day.day))].sort(),
+    activeDays: [...new Set(days.map((day) => day.day))].toSorted(),
   };
 }
 
@@ -154,7 +154,7 @@ function withActiveDay(
   const day = utcDayOf(occurredAt);
   const firstDay = utcDayOf(Math.max(state.LastEventOccurredAt - PROJECT_USAGE_WINDOW_MS, 0));
   const days = state.activeDays.includes(day) ? state.activeDays : [...state.activeDays, day];
-  return { ...state, activeDays: days.filter((known) => known >= firstDay).sort() };
+  return { ...state, activeDays: days.filter((known) => known >= firstDay).toSorted() };
 }
 
 function withId(ids: readonly string[], id: string): string[] {

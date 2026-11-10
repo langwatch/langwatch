@@ -9,6 +9,16 @@
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
 import {
+  EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
+  evaluationLifecycleCompletedEventDataSchema,
+} from "@langwatch/evaluation-contract";
+import {
+  EVALUATOR_CREATED_EVENT_TYPE,
+  EVALUATOR_DELETED_EVENT_TYPE,
+  evaluatorCreatedEventDataSchema,
+  evaluatorDeletedEventDataSchema,
+} from "@langwatch/evaluator-contract";
+import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
@@ -19,16 +29,6 @@ import {
   type PeerFoldSubscriberSpec,
   throttledWindow,
 } from "@langwatch/eventing";
-import {
-  EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
-  evaluationLifecycleCompletedEventDataSchema,
-} from "@langwatch/evaluation-contract";
-import {
-  EVALUATOR_CREATED_EVENT_TYPE,
-  EVALUATOR_DELETED_EVENT_TYPE,
-  evaluatorCreatedEventDataSchema,
-  evaluatorDeletedEventDataSchema,
-} from "@langwatch/evaluator-contract";
 import {
   PROMPT_CREATED_EVENT_TYPE,
   PROMPT_DELETED_EVENT_TYPE,
@@ -54,13 +54,13 @@ import {
   type NurturingProjectUsageRepository,
 } from "../repositories/nurturing-project-usage.repository.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
-import { utcDayOf } from "../rules/nurturing-time.rules.ts";
 import {
   emptyProjectUsage,
   foldProjectUsage,
   type NurturingProjectUsageFact,
   type NurturingProjectUsageState,
 } from "../rules/nurturing-project-usage.rules.ts";
+import { utcDayOf } from "../rules/nurturing-time.rules.ts";
 
 /** Hosts nurturing's peer folds and subscribers over the owners' facts; no event of its own. */
 export const NURTURING_PROJECT_USAGE_PIPELINE_NAME = "nurturing_project_usage" as const;
@@ -226,47 +226,52 @@ function nurturingProjectUsageHost({
     makeId: traceSyncKeyOf,
     windowMs: TRACE_USAGE_SYNC_WINDOW_MS,
   });
-  return definePipeline({
-    name: NURTURING_PROJECT_USAGE_PIPELINE_NAME,
-    aggregate: defineAggregate({ type: "nurturing_project_usage_view" }),
-  })
-    .withEvents([])
-    .withPeerFoldProjection(nurturingProjectUsagePeerFold({ owner: "prompt", store }), subscribers)
-    .withPeerFoldProjection(
-      nurturingProjectUsagePeerFold({ owner: "evaluator", store }),
-      subscribers,
-    )
-    .withPeerFoldProjection(
-      nurturingProjectUsagePeerFold({ owner: "scenario", store }),
-      subscribers,
-    )
-    .withPeerFoldProjection(
-      nurturingProjectUsagePeerFold({ owner: "simulation", store }),
-      subscribers,
-    )
-    // Throttled, not debounced: an organization tracing without pause still syncs once per
-    // window, 15 minutes after the window's first trace, so the read sees the whole window.
-    .withPeerSubscriber("traceUsageSync", {
-      eventType: TRACE_RECEIVED_EVENT_TYPE,
-      data: traceSyncDataSchema,
-      options: { delay: traceSync.delay, deduplication: traceSync.dedup },
-      handle: (data) => tracesChanged({ projectId: data.projectId }),
+  return (
+    definePipeline({
+      name: NURTURING_PROJECT_USAGE_PIPELINE_NAME,
+      aggregate: defineAggregate({ type: "nurturing_project_usage_view" }),
     })
-    // Evaluations count only as habit days, which a trace sync reads: no sync of their own.
-    .withPeerSubscriber("evaluationActiveDay", {
-      eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
-      data: evaluationLifecycleCompletedEventDataSchema,
-      options: {
-        deduplication: {
-          makeId: evaluationDayKeyOf,
-          ttlMs: EVALUATION_DAY_DEDUP_TTL_MS,
-          extend: false,
-          replace: false,
-          shouldSurviveDispatch: true,
+      .withEvents([])
+      .withPeerFoldProjection(
+        nurturingProjectUsagePeerFold({ owner: "prompt", store }),
+        subscribers,
+      )
+      .withPeerFoldProjection(
+        nurturingProjectUsagePeerFold({ owner: "evaluator", store }),
+        subscribers,
+      )
+      .withPeerFoldProjection(
+        nurturingProjectUsagePeerFold({ owner: "scenario", store }),
+        subscribers,
+      )
+      .withPeerFoldProjection(
+        nurturingProjectUsagePeerFold({ owner: "simulation", store }),
+        subscribers,
+      )
+      // Throttled, not debounced: an organization tracing without pause still syncs once per
+      // window, 15 minutes after the window's first trace, so the read sees the whole window.
+      .withPeerSubscriber("traceUsageSync", {
+        eventType: TRACE_RECEIVED_EVENT_TYPE,
+        data: traceSyncDataSchema,
+        options: { delay: traceSync.delay, deduplication: traceSync.dedup },
+        handle: (data) => tracesChanged({ projectId: data.projectId }),
+      })
+      // Evaluations count only as habit days, which a trace sync reads: no sync of their own.
+      .withPeerSubscriber("evaluationActiveDay", {
+        eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
+        data: evaluationLifecycleCompletedEventDataSchema,
+        options: {
+          deduplication: {
+            makeId: evaluationDayKeyOf,
+            ttlMs: EVALUATION_DAY_DEDUP_TTL_MS,
+            extend: false,
+            replace: false,
+            shouldSurviveDispatch: true,
+          },
         },
-      },
-      handle: ({ projectId, occurredAt }) => store.recordEvaluationDay({ projectId, occurredAt }),
-    });
+        handle: ({ projectId, occurredAt }) => store.recordEvaluationDay({ projectId, occurredAt }),
+      })
+  );
 }
 
 /** The host pipeline as a TYPE, derived from the builder above. */

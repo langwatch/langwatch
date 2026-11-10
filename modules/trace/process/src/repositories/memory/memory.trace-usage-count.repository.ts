@@ -17,7 +17,6 @@ type CountedTrace = {
 type RollupBucket = {
   tenantId: string;
   bucketStartMs: number;
-  spanCount: number;
   traceCount: number;
   errorCount: number;
   cost: number;
@@ -56,7 +55,6 @@ export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
       if (!input.projectIds.includes(bucket.tenantId) || bucket.bucketStartMs < input.sinceMs) {
         continue;
       }
-      if (bucket.spanCount === 0) continue;
       const day = new Date(bucket.bucketStartMs).toISOString().slice(0, 10);
       const known = days.get(day);
       const failedAt = bucket.errorCount > 0 ? bucket.bucketStartMs : null;

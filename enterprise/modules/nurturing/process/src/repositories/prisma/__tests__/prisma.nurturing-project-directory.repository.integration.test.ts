@@ -110,7 +110,7 @@ describe.skipIf(!databaseUrl)("given project's and organization's tables", () =>
     it("answers every project of its teams, archived included", async () => {
       const projectIds = await repository.findProjectIds({ organizationId });
 
-      expect([...projectIds].sort()).toEqual([archivedProjectId, projectId].sort());
+      expect(projectIds.toSorted()).toEqual([archivedProjectId, projectId].toSorted());
     });
 
     it("answers none for an organization they do not hold", async () => {
