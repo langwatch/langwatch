@@ -233,7 +233,7 @@ describe("a failed step", () => {
     });
 
     /** @scenario "A failed step folds into the record of the work" */
-    it("still explains a coloured error whose raw block shows the codes, not the clean copy", async () => {
+    it("shows a coloured error once, without its colour codes", async () => {
       const user = userEvent.setup();
       const failure = failedStep({
         id: "fail-ansi",
@@ -244,9 +244,29 @@ describe("a failed step", () => {
 
       await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
 
-      expect(container.textContent).toContain(
-        "This step couldn't be completed. failed to open boom",
-      );
+      expect(container.textContent?.split("failed to open boom").length).toBe(2);
+      expect(container.textContent).not.toContain("\u001b");
+    });
+
+    /** @scenario "A failed step folds into the record of the work" */
+    it("shows a CLI text envelope failure as its text, not as the JSON line", async () => {
+      const user = userEvent.setup();
+      const finished = {
+        type: "tool-bash",
+        toolCallId: "fail-env",
+        state: "output-available",
+        input: { command: "langwatch trace list" },
+        output: JSON.stringify({
+          kind: "text",
+          text: "✖ failed to list traces: request timed out",
+        }),
+      } as never;
+      const { container } = renderActivity({ parts: [finished, reply], live: false });
+
+      await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+      expect(container.textContent).not.toContain('{"kind"');
+      expect(container.textContent?.split("failed to list traces").length).toBe(2);
     });
 
     /** @scenario "A failed step folds into the record of the work" */

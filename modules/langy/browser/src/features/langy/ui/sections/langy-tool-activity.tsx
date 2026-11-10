@@ -1032,9 +1032,9 @@ function FailedActivityRow({ failure, devMode }: { failure: FailedToolCall; devM
   const { call, presentation } = failure;
   const described = describeToolCall({ name: call.name, input: call.input });
   const { message, detail } = presentation;
-  // Copy the raw block already carries (a plain error's own text) is not said twice. Compare
-  // against what that block shows (toolResultText, ANSI codes kept), not the stripped presentation.
-  const raw = toolResultText(call) ?? "";
+  // Copy the raw block already carries (a plain error's own text) is not said twice. The block
+  // shows the failure without colour codes, so it agrees with the presentation's raw.
+  const raw = presentation.raw ?? toolResultText(call) ?? "";
   const messageIsNew = !raw.includes(message);
   const detailIsNew = detail === undefined || !raw.includes(detail);
   const explainsBeyondRaw = messageIsNew && detailIsNew;
@@ -1241,6 +1241,14 @@ function RawDataToggle({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => 
  * withhold the disclosure, not to render "nothing".
  */
 function toolResultText(call: ToolCall): string | null {
+  const text = readToolResultText(call);
+  return text === null ? null : text.replace(ANSI_COLOUR, "");
+}
+
+/** Terminal colour codes: the same strip the failure presentation applies to its raw text. */
+const ANSI_COLOUR = /\p{Cc}\[[0-9;]*m/gu;
+
+function readToolResultText(call: ToolCall): string | null {
   if (call.errorText) return call.errorText;
   const raw = call.output;
   if (raw === undefined || raw === null) return null;
