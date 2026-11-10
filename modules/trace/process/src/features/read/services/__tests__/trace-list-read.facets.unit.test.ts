@@ -364,6 +364,7 @@ describe("the sidebar's facet counts", () => {
       ...calls.categorical.map((c) => ({ key: "", expression: c.facetExpression })),
     ];
 
+    /** @scenario "Span type is listed without values on every load" */
     it("leaves the span attribute map out of the default read", async () => {
       const { calls } = await facetsFor({ query: "status:error" });
 
@@ -373,6 +374,7 @@ describe("the sidebar's facet counts", () => {
       expect(spans?.categoricalSpecs.map((s) => s.key)).toEqual(["spanName", "spanStatus"]);
     });
 
+    /** @scenario "Span type is listed without values on every load" */
     it("lists span type without values, for the sidebar to ask for when opened", async () => {
       const { facets } = await facetsFor({ query: "" });
 
@@ -387,6 +389,7 @@ describe("the sidebar's facet counts", () => {
       });
     });
 
+    /** @scenario "Span type is counted only once its section is opened" */
     it("counts span type alone, under the query, when asked for by key", async () => {
       const { facets, calls } = await facetsFor({
         query: "status:error",
@@ -415,7 +418,8 @@ describe("the sidebar's facet counts", () => {
       expect(facets[0]).not.toHaveProperty("deferred");
     });
 
-    it("leaves the span attribute map out of the cached discovery", async () => {
+    /** @scenario "Span type is listed without values on every load" */
+    it("reads no span attribute value in the cached discovery", async () => {
       const { repository, calls } = recordingRepository();
       let refreshed = false;
       const service = TraceListService.create({
@@ -440,6 +444,8 @@ describe("the sidebar's facet counts", () => {
 
       for (const spec of expressionsOf(calls))
         expect(spec.expression).not.toContain("SpanAttributes");
+      // The raw key discovery may list the map's keys, never look a value up.
+      for (const raw of calls.raw) expect(raw.query.sql).not.toMatch(/SpanAttributes\s*\[/);
       expect(facets.find((facet) => facet.key === "spanType")).toMatchObject({ deferred: true });
     });
   });

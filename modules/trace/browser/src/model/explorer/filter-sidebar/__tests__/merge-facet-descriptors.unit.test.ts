@@ -78,6 +78,7 @@ const deferredSpanType: FacetDescriptor = {
 };
 
 describe("given a facet listed without values", () => {
+  /** @scenario "Span type is counted only once its section is opened" */
   it("counts it only while its section is open", () => {
     const descriptors = [categorical("status", 2), deferredSpanType];
 
@@ -85,6 +86,7 @@ describe("given a facet listed without values", () => {
     expect(deferredFacetKeysToLoad({ descriptors, isOpen: () => true })).toEqual(["spanType"]);
   });
 
+  /** @scenario "Span type is counted only once its section is opened" */
   it("takes the values its keyed read counted, still marked as a deferred facet", () => {
     const filled = fillDeferredFacets({
       descriptors: [categorical("status", 2), deferredSpanType],
@@ -98,6 +100,7 @@ describe("given a facet listed without values", () => {
     ]);
   });
 
+  /** @scenario "Span type is counted only once its section is opened" */
   it("keeps it without values while the keyed read answers for another query", () => {
     const descriptors = [deferredSpanType];
 

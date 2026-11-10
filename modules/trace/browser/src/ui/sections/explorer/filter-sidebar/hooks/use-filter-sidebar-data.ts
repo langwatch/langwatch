@@ -333,7 +333,7 @@ function sectionsOf({
   activeFields: ReadonlySet<string>;
 }) {
   const real = partitionDescriptors(descriptors ?? [], activeFields);
-  if (!isPartitionEmpty(real)) return { ...real, isSynthetic: false };
+  if (!isPartitionEmpty(real, activeFields)) return { ...real, isSynthetic: false };
   return {
     ...partitionDescriptors(synthesizeDefaultDescriptors(), activeFields),
     isSynthetic: true,
@@ -591,11 +591,18 @@ function partitionDescriptors(
 
 /**
  * True when a partition surfaced no renderable section at all — no categoricals, no
- * ranges, no attribute keys.
+ * ranges, no attribute keys. A deferred section with no values and no active filter
+ * does not count: discovery lists it on every read, so counting it would keep an empty
+ * window from falling back to the default sections.
  */
-function isPartitionEmpty(partition: ReturnType<typeof partitionDescriptors>): boolean {
+function isPartitionEmpty(
+  partition: ReturnType<typeof partitionDescriptors>,
+  activeFieldSet: ReadonlySet<string>,
+): boolean {
   return (
-    partition.categoricals.length === 0 &&
+    partition.categoricals.every(
+      (c) => c.deferred === true && c.topValues.length === 0 && !activeFieldSet.has(c.key),
+    ) &&
     partition.ranges.length === 0 &&
     partition.traceAttributeKeys.length === 0 &&
     partition.metadataAttributeKeys.length === 0 &&

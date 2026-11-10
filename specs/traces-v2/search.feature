@@ -1047,7 +1047,7 @@ Rule: Facet count updates
   @unit
   Scenario: Facet counts are fetched in a single batched query
     When the user applies a filter
-    Then all facet counts are fetched in one query, not one per facet
+    Then every facet count but the deferred ones is fetched in one query, not one per facet
 
   @integration
   Scenario: A facet value's count equals the table count after selecting it
@@ -1071,8 +1071,34 @@ Rule: Facet count updates
   @unit
   Scenario: Span and evaluation facets count the whole window while no filter is active
     Given no query is active
-    Then the span and evaluation facets count every row in the window
+    Then the span and evaluation facets other than span type count every row in the window
     And they are counted again through the listed traces as soon as a filter is applied
+
+  # Span type reads one key of the span attribute map, and ClickHouse unpacks
+  # the whole map per span to do it: over 100x the cost of span name beside it.
+  # The sidebar lists it on every load and counts it only when asked.
+  @unit
+  Scenario: Span type is listed without values on every load
+    When the sidebar loads its facets, with or without a query
+    Then span type is listed as a deferred facet with no values
+    And neither the default read nor the cached discovery looks up a span attribute value
+
+  @unit
+  @integration
+  Scenario: Span type is counted only once its section is opened
+    Given the span type section is shown and the reader opens it
+    Then span type alone is counted, under the active query
+    And its rows read as pending until that count answers for this query
+
+  @integration
+  Scenario: An active span type filter counts span type
+    Given a span type filter is active and the reader has not closed its section
+    Then span type is counted without the reader opening it
+
+  @integration
+  Scenario: An empty window still falls back to the default sections
+    Given discovery returns no usable facet besides the deferred span type
+    Then the sidebar shows the default sections, not a blank rail
 
   # The sidebar's numbers come from the same predicate the table runs, so the
   # read is never served from the shared discover cache while a query is on.

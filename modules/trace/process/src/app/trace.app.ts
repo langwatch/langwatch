@@ -518,6 +518,8 @@ export type TracesListReader = Readonly<{
     authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     filterFor: FacetFilterResolver;
+    /** Count only these facets, deferred ones included. */
+    facetKeys?: readonly string[];
     /** Names what `filterFor` was built from, so a repeat shares a running count. */
     filterKey: string;
   }): Promise<FacetDescriptor[]>;
@@ -1941,7 +1943,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     };
     if (field === undefined) {
       return discoverResultSchema.parse(
-        await this.readDiscover({ authorization: input.authorization, timeRange }),
+        await this.#discoverWithDeferredCounted({
+          projectId: input.projectId,
+          authorization: input.authorization,
+          timeRange,
+        }),
       );
     }
     const protections = await this.resolveApiKeyProtections({
@@ -1962,6 +1968,41 @@ export class TraceModule implements TraceApi, CollectorApp {
       total: result.totalDistinct,
       hasMore: offset + result.values.length < result.totalDistinct,
     });
+  }
+
+  /**
+   * The REST discovery payload promises each facet's top values, so the facets
+   * the sidebar defers are counted here by a keyed read over the same window,
+   * unfiltered like discovery. A deferred facet that read cannot answer stays
+   * listed without values.
+   */
+  async #discoverWithDeferredCounted(input: {
+    projectId: string;
+    authorization: Authorization;
+    timeRange: { from: number; to: number };
+  }): Promise<DiscoverResult> {
+    const discovered = await this.readDiscover({
+      authorization: input.authorization,
+      timeRange: input.timeRange,
+    });
+    const facetKeys = discovered.facets
+      .filter((facet) => facet.kind === "categorical" && facet.deferred === true)
+      .map((facet) => facet.key);
+    if (facetKeys.length === 0) return discovered;
+
+    const counted = await this.#dependencies.traces.list.getFacets({
+      authorization: input.authorization,
+      timeRange: input.timeRange,
+      filterFor: () => undefined,
+      facetKeys,
+      filterKey: JSON.stringify([input.projectId, "rest-discover"]),
+    });
+    const countedByKey = new Map(counted.map((facet) => [facet.key, facet]));
+
+    return {
+      ...discovered,
+      facets: discovered.facets.map((facet) => countedByKey.get(facet.key) ?? facet),
+    };
   }
 
   /**
