@@ -278,8 +278,8 @@ describe("when docs.json names a tag manager container", () => {
 });
 
 describe("when a page head is built", () => {
-  /** @scenario "Preload the two fonts every page draws above the fold" */
-  it("preloads the Latin body font and the regular title font and no other font", () => {
+  /** @scenario "Preload the fonts every page draws above the fold" */
+  it("preloads the Latin body font and both title weights and no other font", () => {
     const head = pageHead({
       slug: "integration/quick-start",
       title: "Quick Start",
@@ -289,6 +289,7 @@ describe("when a page head is built", () => {
     expect(preloads).toEqual([
       `<link rel="preload" href="${sitePath({ path: "/src/app/fonts/Inter-Variable-latin.woff2" })}" as="font" type="font/woff2" crossorigin>`,
       `<link rel="preload" href="${sitePath({ path: "/src/app/fonts/Sentient-Regular.woff2" })}" as="font" type="font/woff2" crossorigin>`,
+      `<link rel="preload" href="${sitePath({ path: "/src/app/fonts/Sentient-Medium.woff2" })}" as="font" type="font/woff2" crossorigin>`,
     ]);
   });
 });

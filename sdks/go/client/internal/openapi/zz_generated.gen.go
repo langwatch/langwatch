@@ -47122,6 +47122,14 @@ type GetApiExperimentsRunsParams struct {
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
+// GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 defines parameters for GetApiExperimentsRuns.
+type GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 = int
+
+// GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency defines parameters for GetApiExperimentsRuns.
+type GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency struct {
+	union json.RawMessage
+}
+
 // GetApiExperimentsRunsByRunId200JSONResponseBodyStatus defines parameters for GetApiExperimentsRunsByRunId.
 type GetApiExperimentsRunsByRunId200JSONResponseBodyStatus string
 
@@ -47131,12 +47139,26 @@ type GetApiExperimentsRunsByRunIdResultsParams struct {
 	ExperimentSlug *string `form:"experimentSlug,omitempty" json:"experimentSlug,omitempty"`
 }
 
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 = int
+
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency struct {
+	union json.RawMessage
+}
+
 // GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatus defines parameters for GetApiExperimentsRunsByRunIdResults.
 type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatus string
 
 // GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0 defines parameters for GetApiExperimentsRunsByRunIdResults.
 type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0 = []struct {
-	AgentId       *string                                                                                                    `json:"agentId,omitempty"`
+	AgentId *string `json:"agentId,omitempty"`
+
+	// AgentLabel The deploy label an agent target ran at, such as production
+	AgentLabel *string `json:"agentLabel,omitempty"`
+
+	// AgentVersion The agent version the label pointed at when the run started
+	AgentVersion  *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion                             `json:"agentVersion,omitempty"`
 	EvaluatorId   *string                                                                                                    `json:"evaluatorId,omitempty"`
 	Id            string                                                                                                     `json:"id"`
 	Metadata      *map[string]GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_Metadata_AdditionalProperties `json:"metadata,omitempty"`
@@ -47145,6 +47167,14 @@ type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0 = []struct {
 	PromptId      *string                                                                                                    `json:"promptId,omitempty"`
 	PromptVersion *float32                                                                                                   `json:"promptVersion,omitempty"`
 	Type          string                                                                                                     `json:"type"`
+}
+
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 = int
+
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion struct {
+	union json.RawMessage
 }
 
 // GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0Metadata0 defines parameters for GetApiExperimentsRunsByRunIdResults.
@@ -102348,6 +102378,114 @@ func (t PutApiEvaluatorsById200JSONResponseBody_Version) MarshalJSON() ([]byte, 
 }
 
 func (t *PutApiEvaluatorsById200JSONResponseBody_Version) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 returns the union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency as a GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0
+func (t GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) AsGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0() (GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0, error) {
+	var body GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 overwrites any union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency as the provided GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) FromGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0(v GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 performs a merge with any union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency, using the provided GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) MergeGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0(v GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 returns the union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency as a GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0() (GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0, error) {
+	var body GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 overwrites any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency as the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 performs a merge with any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency, using the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 returns the union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion as a GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0() (GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0, error) {
+	var body GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 overwrites any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion as the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 performs a merge with any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion, using the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -168563,9 +168701,11 @@ type GetApiExperimentsRunsResponse struct {
 			TotalHits float32 `json:"totalHits"`
 		} `json:"pagination"`
 		Runs []struct {
-			ExperimentId string   `json:"experimentId"`
-			Progress     *float32 `json:"progress,omitempty"`
-			RunId        string   `json:"runId"`
+			// Concurrency Cells the run executed at once. Null for a run that recorded none.
+			Concurrency  *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency `json:"concurrency,omitempty"`
+			ExperimentId string                                                     `json:"experimentId"`
+			Progress     *float32                                                   `json:"progress,omitempty"`
+			RunId        string                                                     `json:"runId"`
 			Summary      struct {
 				DatasetAverageCost     *float32 `json:"datasetAverageCost,omitempty"`
 				DatasetAverageDuration *float32 `json:"datasetAverageDuration,omitempty"`
@@ -168631,6 +168771,9 @@ type GetApiExperimentsRunsByRunIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Concurrency Cells the run executes at once, as it was fixed when the run started
+		Concurrency *int `json:"concurrency,omitempty"`
+
 		// DomainError The full failure envelope, when the failure carried one
 		DomainError *struct {
 			// Code Stable failure code; branch on this
@@ -168758,6 +168901,9 @@ type GetApiExperimentsRunsByRunIdResultsResponse struct {
 				Received int  `json:"received"`
 			} `json:"evaluations"`
 		} `json:"completeness"`
+
+		// Concurrency Cells the run executed at once. Null for a run that recorded none.
+		Concurrency *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency `json:"concurrency,omitempty"`
 
 		// Dataset One row per dataset entry, with what the target predicted
 		Dataset []struct {
@@ -168896,6 +169042,9 @@ type PostApiExperimentsBySlugRunResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Concurrency Cells this run executes at once: the request's `concurrency`, else the server default
+		Concurrency *int `json:"concurrency,omitempty"`
+
 		// RunId Identifier to poll this run with
 		RunId string `json:"runId"`
 
@@ -201780,9 +201929,11 @@ func ParseGetApiExperimentsRunsResponse(rsp *http.Response) (*GetApiExperimentsR
 				TotalHits float32 `json:"totalHits"`
 			} `json:"pagination"`
 			Runs []struct {
-				ExperimentId string   `json:"experimentId"`
-				Progress     *float32 `json:"progress,omitempty"`
-				RunId        string   `json:"runId"`
+				// Concurrency Cells the run executed at once. Null for a run that recorded none.
+				Concurrency  *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency `json:"concurrency,omitempty"`
+				ExperimentId string                                                     `json:"experimentId"`
+				Progress     *float32                                                   `json:"progress,omitempty"`
+				RunId        string                                                     `json:"runId"`
 				Summary      struct {
 					DatasetAverageCost     *float32 `json:"datasetAverageCost,omitempty"`
 					DatasetAverageDuration *float32 `json:"datasetAverageDuration,omitempty"`
@@ -201850,6 +202001,9 @@ func ParseGetApiExperimentsRunsByRunIdResponse(rsp *http.Response) (*GetApiExper
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Concurrency Cells the run executes at once, as it was fixed when the run started
+			Concurrency *int `json:"concurrency,omitempty"`
+
 			// DomainError The full failure envelope, when the failure carried one
 			DomainError *struct {
 				// Code Stable failure code; branch on this
@@ -201973,6 +202127,9 @@ func ParseGetApiExperimentsRunsByRunIdResultsResponse(rsp *http.Response) (*GetA
 					Received int  `json:"received"`
 				} `json:"evaluations"`
 			} `json:"completeness"`
+
+			// Concurrency Cells the run executed at once. Null for a run that recorded none.
+			Concurrency *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency `json:"concurrency,omitempty"`
 
 			// Dataset One row per dataset entry, with what the target predicted
 			Dataset []struct {
@@ -202103,6 +202260,9 @@ func ParsePostApiExperimentsBySlugRunResponse(rsp *http.Response) (*PostApiExper
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Concurrency Cells this run executes at once: the request's `concurrency`, else the server default
+			Concurrency *int `json:"concurrency,omitempty"`
+
 			// RunId Identifier to poll this run with
 			RunId string `json:"runId"`
 

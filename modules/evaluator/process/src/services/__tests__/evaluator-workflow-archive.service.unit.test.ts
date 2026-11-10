@@ -50,7 +50,7 @@ async function setup(input: { deployed: boolean }) {
       archive: (scope) => repository.archive(scope),
     },
     versions,
-    deletionFacts: {
+    lifecycleFacts: {
       recordEvaluatorDeleted: async ({ evaluatorId }) => {
         deleted.push(evaluatorId);
       },

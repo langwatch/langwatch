@@ -47,6 +47,7 @@ func TestDeployRunsOnlyOnMainAfterTheChecks(t *testing.T) {
 		"github.ref == 'refs/heads/main'",
 		"(github.event_name == 'push' || github.event_name == 'workflow_dispatch')",
 		"vars.DOCS_SITE_BUCKET != ''",
+		"needs.changes.outputs.docs-site == 'true'",
 		"group: docs-deploy",
 		"cancel-in-progress: false",
 		"id-token: write",

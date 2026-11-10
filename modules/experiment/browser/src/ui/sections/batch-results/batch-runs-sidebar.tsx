@@ -19,6 +19,11 @@ import { nowInstant } from "@langwatch/time";
 import { FlaskConical, GitCompare, X } from "lucide-react";
 import { useMemo } from "react";
 
+import {
+  agentLabelText,
+  runAgentLabelsOf,
+  type RunTargetLike,
+} from "../../../model/batch-evaluation-results.agent-label.ts";
 import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 import {
   INTERRUPTED_THRESHOLD_MS,
@@ -45,6 +50,10 @@ export type BatchRunSummary = {
   };
   progress?: number | null;
   total?: number | null;
+  /** Cells the run kept in flight; absent for a run that recorded none. */
+  concurrency?: number | null;
+  /** The run's targets as it recorded them, for the agent label each ran at. */
+  targets?: RunTargetLike[] | null;
   summary: {
     datasetCost?: number | null;
     evaluationsCost?: number | null;
@@ -283,8 +292,36 @@ const RunItem = ({
             </chakra.span>
           )}
         </Text>
+        <RunSettingsLine run={run} />
       </chakra.button>
     </HStack>
+  );
+};
+
+/** The agent version each label resolved to and the run's concurrency, when it recorded them. */
+const RunSettingsLine = ({ run }: { run: BatchRunSummary }) => {
+  const labels = runAgentLabelsOf(run.targets);
+  if (labels.length === 0 && !run.concurrency) return null;
+
+  return (
+    <Text color="fg.muted" textStyle="caption" lineClamp={2}>
+      {labels.map((label, index) => (
+        <chakra.span
+          key={label.targetId}
+          title={label.targetName}
+          data-testid={`run-agent-label-${run.runId}-${label.targetId}`}
+        >
+          {index > 0 ? ", " : ""}
+          {agentLabelText(label)}
+        </chakra.span>
+      ))}
+      {run.concurrency ? (
+        <chakra.span data-testid={`run-concurrency-${run.runId}`}>
+          {labels.length > 0 ? " · " : ""}
+          {`Concurrency ${run.concurrency}`}
+        </chakra.span>
+      ) : null}
+    </Text>
   );
 };
 
