@@ -40,7 +40,6 @@ var auditedQueryLog = map[string]any{
 	"log_queries_min_query_duration_ms": 0,
 	"log_queries_probability":           1,
 	"log_queries_cut_to_length":         0,
-	"log_query_settings":                1,
 	"log_profile_events":                1,
 }
 

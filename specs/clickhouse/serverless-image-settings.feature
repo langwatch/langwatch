@@ -179,10 +179,20 @@ Feature: The clickhouse-serverless image renders every server setting from env
     Then the default user may log in only from loopback and those networks
     And a CLICKHOUSE_DEFAULT_NETWORKS that is set but names no network stops the server starting
 
+  @unit @e2e
+  Scenario: A masked setting's value never reaches a log
+    Given CLICKHOUSE_MASKED_SETTINGS is unset, so the LangWatchQL capability setting is masked
+    And a user whose profile turns log_query_settings off, on a server with query-log auditing on
+    When the user runs a query with the capability in a SETTINGS clause
+    Then neither the server log file, system.text_log, nor system.query_log's query or Settings holds its value
+    And an unmasked setting in the same query does appear in each of those logs
+    And a list in CLICKHOUSE_MASKED_SETTINGS replaces the default, and an empty one masks nothing
+
   @unit
   Scenario: Query-log auditing and a per-user query share are opt-in
     Given CLICKHOUSE_AUDIT_QUERY_LOG is true and CLICKHOUSE_MAX_CONCURRENT_QUERIES_FOR_USER is set
     When the renderer writes the server configuration
-    Then the default profile pins all seven query-log settings as const
+    Then the default profile pins the six query-log settings that decide whether a query is logged, as const
+    And log_query_settings is left to each user's profile
     And every user gets that share of the server's admission limit
     And without either, the profile carries neither

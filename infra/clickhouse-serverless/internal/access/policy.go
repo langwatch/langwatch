@@ -31,7 +31,7 @@ var (
 	}
 	// AuditedSettings decide whether a query reaches system.query_log, so by
 	// default no tier and no user's own settings may change them.
-	AuditedSettings            = []string{"log_queries", "log_queries_min_type", "log_queries_min_query_duration_ms", "log_queries_probability", "log_queries_cut_to_length", "log_query_settings", "log_profile_events"}
+	AuditedSettings            = []string{"log_queries", "log_queries_min_type", "log_queries_min_query_duration_ms", "log_queries_probability", "log_queries_cut_to_length", "log_profile_events"}
 	DefaultRestrictedDatabases = []string{"system", "information_schema", "INFORMATION_SCHEMA"}
 )
 

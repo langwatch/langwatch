@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/access"
@@ -78,6 +79,11 @@ type Input struct {
 	AuditQueryLog               bool   `env:"CLICKHOUSE_AUDIT_QUERY_LOG"`
 	MaxConcurrentQueriesForUser int    `env:"CLICKHOUSE_MAX_CONCURRENT_QUERIES_FOR_USER"`
 	DefaultNetworks             string `env:"CLICKHOUSE_DEFAULT_NETWORKS"`
+	// MaskedSettings are settings whose values query_masking_rules hide from query
+	// text in every log. Unset: the LangWatchQL capability; set-but-empty: none.
+	MaskedSettings []string
+	// AccessPolicy is the access file's policy block, read once by Load.
+	AccessPolicy *access.Policy
 
 	// Backups — independent of cold storage, uses same S3-compatible credentials
 	BackupEnabled bool `env:"BACKUP_ENABLED"`
@@ -211,6 +217,18 @@ func Load() (*Input, error) {
 	if raw, set := os.LookupEnv("CLICKHOUSE_DEFAULT_NETWORKS"); set && len(i.DefaultNetworkList()) == 0 {
 		return nil, fmt.Errorf("CLICKHOUSE_DEFAULT_NETWORKS is set but names no network (%q): unset it, or list the networks default may log in from", raw)
 	}
+	i.MaskedSettings = []string{DefaultMaskedSetting}
+	if raw, set := os.LookupEnv("CLICKHOUSE_MASKED_SETTINGS"); set {
+		i.MaskedSettings = nil
+		for _, name := range strings.Split(raw, ",") {
+			if name = strings.TrimSpace(name); name == "" {
+				continue
+			} else if !maskedSettingRE.MatchString(name) {
+				return nil, fmt.Errorf("CLICKHOUSE_MASKED_SETTINGS: %q is not a setting name", name)
+			}
+			i.MaskedSettings = append(i.MaskedSettings, name)
+		}
+	}
 	for _, n := range i.DefaultNetworkList() {
 		if !isNetwork(n) {
 			return nil, fmt.Errorf("CLICKHOUSE_DEFAULT_NETWORKS: %q is not an IP address or a CIDR network", n)
@@ -230,6 +248,7 @@ func Load() (*Input, error) {
 			return nil, fmt.Errorf("CLICKHOUSE_ACCESS_FILE: %w", err)
 		}
 		i.DynamicOnly = f.DynamicOnly()
+		i.AccessPolicy = &f.Policy
 	}
 
 	for _, f := range []struct {
@@ -268,6 +287,11 @@ func (i *Input) DefaultNetworkList() []string {
 	}
 	return out
 }
+
+// DefaultMaskedSetting carries the LangWatchQL tenant capability (ADR-198).
+const DefaultMaskedSetting = "custom_api_key_hash"
+
+var maskedSettingRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,99}$`)
 
 // isNetwork accepts what ClickHouse's <ip> takes: an address, or a CIDR network.
 func isNetwork(s string) bool {

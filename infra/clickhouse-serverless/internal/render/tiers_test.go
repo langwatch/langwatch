@@ -1,6 +1,7 @@
 package render_test
 
 import (
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/access"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -177,6 +178,11 @@ func TestRenderAll_TierConstraintsFollowThePolicy(t *testing.T) {
 	if err := os.WriteFile(input.AccessFile, append([]byte(policy), raw...), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	f, err := access.Load(input.AccessFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input.AccessPolicy = &f.Policy
 	renderInto(t, input, dir)
 	profile := section(t, section(t, readYAML(t, dir, "users.d/access-tiers.yaml"), "profiles"), "tier_read")
 	constraints := section(t, profile, "constraints")

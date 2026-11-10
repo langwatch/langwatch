@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -87,3 +88,38 @@ func TestLoad_RefusesADefaultNetworkThatIsNotOne(t *testing.T) {
 		t.Errorf("Load refused valid networks: %v", err)
 	}
 }
+
+// @scenario "A masked setting's value never reaches a log"
+func TestLoad_MaskedSettings(t *testing.T) {
+	t.Setenv("CH_CPU", "2")
+	t.Setenv("CH_RAM", "1Gi")
+	t.Setenv("CLICKHOUSE_PASSWORD", "pw-under-test")
+	for _, tc := range []struct {
+		name string
+		raw  *string
+		want []string
+	}{
+		{"unset masks the LangWatchQL capability", nil, []string{DefaultMaskedSetting}},
+		{"a list replaces the default", ptr("custom_a, custom_b"), []string{"custom_a", "custom_b"}},
+		{"set but empty masks nothing", ptr(""), nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.raw != nil {
+				t.Setenv("CLICKHOUSE_MASKED_SETTINGS", *tc.raw)
+			}
+			in, err := Load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Join(in.MaskedSettings, ",") != strings.Join(tc.want, ",") {
+				t.Errorf("MaskedSettings = %v, want %v", in.MaskedSettings, tc.want)
+			}
+		})
+	}
+	t.Setenv("CLICKHOUSE_MASKED_SETTINGS", "custom_a,x'); DROP")
+	if _, err := Load(); err == nil {
+		t.Error("Load accepted a masked setting that is not a setting name")
+	}
+}
+
+func ptr(s string) *string { return &s }

@@ -19,12 +19,8 @@ func renderTiers(input *config.Input, c *config.Computed, usersD string) error {
 	// The access file's policy may add to or replace the protected settings; a
 	// change takes a restart, as the tiers render only at startup.
 	protected := access.AuditedSettings
-	if input.AccessFile != "" {
-		f, err := access.Load(input.AccessFile)
-		if err != nil {
-			return err
-		}
-		protected = f.Policy.Rules().Protected
+	if input.AccessPolicy != nil {
+		protected = input.AccessPolicy.Rules().Protected
 	}
 	for _, tier := range access.Tiers {
 		roles[tier.Name()] = map[string]any{"grants": map[string]any{"query": tier.RoleGrants()}}

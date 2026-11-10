@@ -346,7 +346,7 @@ func TestRenderAll_AuditQueryLogAndConcurrencyShare(t *testing.T) {
 	constraints := section(t, profile, "constraints")
 	for name, want := range map[string]any{
 		"log_queries": 1, "log_queries_min_type": "QUERY_START", "log_queries_min_query_duration_ms": 0,
-		"log_queries_probability": 1, "log_queries_cut_to_length": 0, "log_query_settings": 1, "log_profile_events": 1,
+		"log_queries_probability": 1, "log_queries_cut_to_length": 0, "log_profile_events": 1,
 	} {
 		if profile[name] != want {
 			t.Errorf("%s = %v, want %v", name, profile[name], want)
@@ -355,4 +355,28 @@ func TestRenderAll_AuditQueryLogAndConcurrencyShare(t *testing.T) {
 			t.Errorf("%s is not const", name)
 		}
 	}
+	// Left to each user: the LangWatchQL user turns it off so its capability stays out of query_log.
+	if _, pinned := constraints["log_query_settings"]; pinned {
+		t.Error("log_query_settings is pinned, so no user's profile can keep its settings out of query_log")
+	}
+}
+
+// @scenario "A masked setting's value never reaches a log"
+func TestRenderAll_QueryMaskingFollowsMaskedSettings(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.MaskedSettings = []string{"custom_api_key_hash"}
+	renderInto(t, input, dir)
+	raw, err := os.ReadFile(filepath.Join(dir, "config.d", "query-masking.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`(?i)\b(custom_api_key_hash)\s*=\s*'[^']*'`, `\1 = '[HIDDEN]'`} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("query-masking.yaml lacks %q:\n%s", want, raw)
+		}
+	}
+	input.MaskedSettings = nil
+	renderInto(t, input, dir)
+	assertExists(t, filepath.Join(dir, "config.d", "query-masking.yaml"), false)
 }
