@@ -15,11 +15,11 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
- * 1,540 with `pnpm ensure:built` (#8795); 1,561 with ADR-185 (docs consent reads api-key config).
- * 1,562 with ADR-190 (instant-eval-judge route contract); 1,565 with ADR-192 (Grok OTLP walk).
- * 1,567 with agent and evaluator versions; 1,569 with ADR-188 (pi definition, canonicaliser).
- * 1,570 with the `dataset-version.ts` contract. A ceiling, not a target: lower it when earned. */
-const CEILING = 1_570;
+ * A ceiling, lowered when earned: 1,540 with `pnpm ensure:built` (#8795); 1,561-1,569 ADR-185,
+ * -190, -192, -188 and agent/evaluator versions; 1,570 `dataset-version.ts`; 1,576 seat requests;
+ * 1,578 `langy-call-stopped.ts`, the Grok canonicaliser; 1,583 trace-limit usage cache,
+ * coalescer and `entitlement.errors.ts` (#8980), ingest client-fault telemetry (#8978). */
+const CEILING = 1_583;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {

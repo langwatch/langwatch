@@ -17083,7 +17083,12 @@
                                           "sso:view",
                                           "sso:manage",
                                           "agents:deploy",
-                                          "evaluators:deploy"
+                                          "evaluators:deploy",
+                                          "subscription:upgrade",
+                                          "subscription:manage",
+                                          "seatRequests:view",
+                                          "seatRequests:manage",
+                                          "members:view"
                                         ]
                                       }
                                     ]
@@ -17306,7 +17311,12 @@
                                     "sso:view",
                                     "sso:manage",
                                     "agents:deploy",
-                                    "evaluators:deploy"
+                                    "evaluators:deploy",
+                                    "subscription:upgrade",
+                                    "subscription:manage",
+                                    "seatRequests:view",
+                                    "seatRequests:manage",
+                                    "members:view"
                                   ]
                                 }
                               ]
@@ -17929,7 +17939,12 @@
                                                   "sso:view",
                                                   "sso:manage",
                                                   "agents:deploy",
-                                                  "evaluators:deploy"
+                                                  "evaluators:deploy",
+                                                  "subscription:upgrade",
+                                                  "subscription:manage",
+                                                  "seatRequests:view",
+                                                  "seatRequests:manage",
+                                                  "members:view"
                                                 ]
                                               }
                                             ]
@@ -18152,7 +18167,12 @@
                                             "sso:view",
                                             "sso:manage",
                                             "agents:deploy",
-                                            "evaluators:deploy"
+                                            "evaluators:deploy",
+                                            "subscription:upgrade",
+                                            "subscription:manage",
+                                            "seatRequests:view",
+                                            "seatRequests:manage",
+                                            "members:view"
                                           ]
                                         }
                                       ]
@@ -18596,7 +18616,12 @@
                                         "sso:view",
                                         "sso:manage",
                                         "agents:deploy",
-                                        "evaluators:deploy"
+                                        "evaluators:deploy",
+                                        "subscription:upgrade",
+                                        "subscription:manage",
+                                        "seatRequests:view",
+                                        "seatRequests:manage",
+                                        "members:view"
                                       ]
                                     }
                                   ]
@@ -49289,7 +49314,7 @@
             }
           }
         },
-        "description": "Update a dataset by its slug or id",
+        "description": "Update a dataset by its slug or id. New `columnTypes` re-key every record; send `columnRenames` to say which existing column each renamed column came from, so a save that deletes one column and renames another moves the right values.",
         "requestBody": {
           "required": false,
           "content": {
@@ -49332,6 +49357,28 @@
                         "name",
                         "type"
                       ]
+                    }
+                  },
+                  "columnRenames": {
+                    "description": "Which existing column each renamed column came from, as `{ from, to }` names. Sent, values move by these renames and by unchanged names only. Omitted, columns left over after matching names pair by position.",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "to": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "to"
+                      ],
+                      "additionalProperties": false
                     }
                   }
                 }
@@ -53406,6 +53453,12 @@
                       "type": "number",
                       "description": "Number of cells this run will execute"
                     },
+                    "concurrency": {
+                      "description": "Cells this run executes at once: the request's `concurrency`, else the server default",
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "runUrl": {
                       "description": "Link to the run in the LangWatch app",
                       "type": "string"
@@ -53428,7 +53481,7 @@
             }
           },
           "400": {
-            "description": "The body was not valid JSON, failed input validation, or the experiment has no dataset configured",
+            "description": "The body was not valid JSON, failed input validation, the experiment has no dataset configured, or `dataset_version` was sent while the run reads no saved dataset (no `dataset_id` and an inline active dataset)",
             "content": {}
           },
           "401": {
@@ -53464,7 +53517,8 @@
                     }
                   },
                   "dataset_id": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "dataset_version": {
                     "type": "integer",
@@ -53653,6 +53707,19 @@
                             "type": [
                               "number",
                               "null"
+                            ]
+                          },
+                          "concurrency": {
+                            "description": "Cells the run executed at once. Null for a run that recorded none.",
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
                             ]
                           },
                           "summary": {
@@ -53868,6 +53935,12 @@
                     "total": {
                       "type": "number",
                       "description": "Cells in the run"
+                    },
+                    "concurrency": {
+                      "description": "Cells the run executes at once, as it was fixed when the run started",
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "startedAt": {
                       "description": "Unix milliseconds",
@@ -54177,6 +54250,19 @@
                         "null"
                       ]
                     },
+                    "concurrency": {
+                      "description": "Cells the run executed at once. Null for a run that recorded none.",
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "targets": {
                       "description": "Resolves the targetId each dataset row and evaluation carries",
                       "anyOf": [
@@ -54210,6 +54296,26 @@
                                 "type": [
                                   "string",
                                   "null"
+                                ]
+                              },
+                              "agentLabel": {
+                                "description": "The deploy label an agent target ran at, such as production",
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "agentVersion": {
+                                "description": "The agent version the label pointed at when the run started",
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ]
                               },
                               "evaluatorId": {
@@ -110407,7 +110513,9 @@
                         "langy:view",
                         "agentCache:view",
                         "governanceCost:view",
-                        "sso:view"
+                        "sso:view",
+                        "seatRequests:view",
+                        "members:view"
                       ]
                     }
                   },
@@ -110577,7 +110685,9 @@
                               "langy:view",
                               "agentCache:view",
                               "governanceCost:view",
-                              "sso:view"
+                              "sso:view",
+                              "seatRequests:view",
+                              "members:view"
                             ]
                           }
                         },
@@ -110707,7 +110817,9 @@
                             "langy:view",
                             "agentCache:view",
                             "governanceCost:view",
-                            "sso:view"
+                            "sso:view",
+                            "seatRequests:view",
+                            "members:view"
                           ]
                         },
                         "generation": {
@@ -110820,7 +110932,9 @@
                 "langy:view",
                 "agentCache:view",
                 "governanceCost:view",
-                "sso:view"
+                "sso:view",
+                "seatRequests:view",
+                "members:view"
               ]
             },
             "required": true

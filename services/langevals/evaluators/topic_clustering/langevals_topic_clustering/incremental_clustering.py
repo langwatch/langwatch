@@ -3,6 +3,7 @@ from fastapi import FastAPI
 
 import numpy as np
 from pydantic import BaseModel
+from langevals_topic_clustering.usage import with_usage
 from langevals_topic_clustering.constants import (
     COPHENETIC_DISTANCES_FOR_SUBTOPICS,
     COPHENETIC_DISTANCES_FOR_TOPICS,
@@ -249,6 +250,7 @@ class IncrementalClusteringParams(BaseModel):
 
 def setup_endpoints(app: FastAPI):
     @app.post("/topics/incremental_clustering")
+    @with_usage
     def topics_incremental_clustering(
         params: IncrementalClusteringParams,
     ) -> TopicClusteringResponse:

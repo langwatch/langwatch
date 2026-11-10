@@ -49,14 +49,18 @@ export class ActivationCodeExpiredError extends HandledError {
   }
 }
 
-/** A single-use code another install already claimed. */
+/**
+ * A single-use code that was already claimed. `sameInstall` says whether the
+ * claim was the caller's own install; absent when the claimer is not known.
+ */
 export class ActivationCodeAlreadyRedeemedError extends HandledError {
   declare readonly code: "activation_code_already_redeemed";
 
-  constructor() {
+  constructor({ sameInstall }: { sameInstall?: boolean } = {}) {
     super("activation_code_already_redeemed", "This activation code has already been used", {
       httpStatus: 403,
       fault: "customer",
+      ...(sameInstall === undefined ? {} : { meta: { sameInstall } }),
     });
     this.name = "ActivationCodeAlreadyRedeemedError";
   }

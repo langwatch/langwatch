@@ -54,6 +54,13 @@ interface AdminSubscription {
   maxDashboards: number | null;
   maxCustomGraphs: number | null;
   maxAutomations: number | null;
+  /** The seat quantity billing could not put back at Stripe, flagged once its retries ran out. */
+  seatRepairQuantity?: number | null;
+  /** The seat quantity the last seat change set; a pending write is settled back to it. */
+  seatLineQuantity?: number | null;
+  /** Set once a Stripe seat line write left pending could not be settled after its retries. */
+  seatLineWriteFlaggedAt?: string | null;
+  seatRepairFlaggedAt?: string | null;
   organization?: { id: string; name: string; slug: string };
   createdAt: string;
 }
@@ -182,9 +189,12 @@ export default function SubscriptionsView() {
                   </Badge>
                 </ListTable.Cell>
                 <ListTable.Cell>
-                  <Badge size="sm" colorPalette={statusColor[sub.status]}>
-                    {sub.status}
-                  </Badge>
+                  <HStack gap={1} wrap="wrap">
+                    <Badge size="sm" colorPalette={statusColor[sub.status]}>
+                      {sub.status}
+                    </Badge>
+                    <SeatRepairBadge subscription={sub} />
+                  </HStack>
                 </ListTable.Cell>
                 <ListTable.Cell>{sub.stripeSubscriptionId ?? <EmptyCell />}</ListTable.Cell>
                 <ListTable.Cell>
@@ -221,6 +231,26 @@ export default function SubscriptionsView() {
         onClose={() => setCreating(false)}
       />
     </>
+  );
+}
+
+/** The seat count a flagged seat line should bill: the lift's way back, else the last change's. */
+function flaggedSeatLineQuantity(subscription: AdminSubscription): number | null {
+  if (subscription.seatRepairFlaggedAt) return subscription.seatRepairQuantity ?? null;
+  if (subscription.seatLineWriteFlaggedAt) {
+    return subscription.seatLineQuantity ?? subscription.maxMembers;
+  }
+  return null;
+}
+
+/** Billing's flag for a seat line Stripe still bills wrong after its repair retries. */
+function SeatRepairBadge({ subscription }: { subscription: AdminSubscription }) {
+  const quantity = flaggedSeatLineQuantity(subscription);
+  if (quantity == null) return null;
+  return (
+    <Badge size="sm" colorPalette="red">
+      Seat line needs repair: {quantity} {quantity === 1 ? "seat" : "seats"}
+    </Badge>
   );
 }
 

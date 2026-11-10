@@ -27,7 +27,7 @@ Feature: License Activation UI
     Given the platform is deployed in SaaS mode (IS_SAAS=true)
     When I navigate to the settings page
     Then I do not see "License" in the settings sidebar menu
-    And I see "Subscription" in the settings sidebar menu instead
+    And I see "Plan & billing" in the settings sidebar menu instead
 
   # License activation - dual input method UI
   @e2e @unimplemented

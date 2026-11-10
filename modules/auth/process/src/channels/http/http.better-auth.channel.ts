@@ -51,6 +51,7 @@ import {
   isLockoutCountedPath,
 } from "../../rules/sign-in-identifier-hash.rules.ts";
 import { withSocialProviderBases } from "../../rules/social-provider-bases.rules.ts";
+import { findSsoDiscoveryRefusals } from "../../rules/sso-discovery-refusal.rules.ts";
 import { resolveTrustedOrigins } from "../../rules/trusted-origins.rules.ts";
 import type {
   BetterAuthAnnouncements,
@@ -301,6 +302,20 @@ async function countSignInAttempt({
       { error, refused },
       "could not record how a sign-in attempt went; the attempt itself already answered",
     );
+  }
+}
+
+/** Logs the SSO engine's discovery refusals, which otherwise reach only the browser. */
+export function logSsoDiscoveryRefusal(ctx: {
+  request?: { url?: string };
+  body?: unknown;
+  context?: { returned?: unknown };
+}): void {
+  const url = ctx.request?.url;
+  if (url === undefined) return;
+  const returned = ctx.context?.returned;
+  for (const refusal of findSsoDiscoveryRefusals({ url, body: ctx.body, returned })) {
+    logger.warn(refusal, "an sso sign-in was refused");
   }
 }
 
@@ -894,6 +909,7 @@ export const createAuthOptions = ({
     after: createAuthMiddleware(async (ctx) => {
       await passwordResetSession?.signInAfterPasswordReset(ctx);
       await countSignInAttempt({ ctx, signInLockout });
+      logSsoDiscoveryRefusal(ctx);
       answerAuthRefusalByRegisteredCode(ctx);
     }),
   },

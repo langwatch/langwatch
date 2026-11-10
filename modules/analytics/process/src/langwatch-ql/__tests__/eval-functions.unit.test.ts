@@ -325,7 +325,7 @@ describe("given arguments that do not match a signature", () => {
 
 describe("given a project the feature is not open to", () => {
   describe("when an eval function is called", () => {
-    /** @scenario "An eval function is refused while the flag is off for the project" */
+    /** @scenario "An eval function is refused while Instant Evals are not enabled for the project" */
     it("refuses it and says eval functions are not rolled out", () => {
       const result = validate("eval(CapturedOutput, 'a') AS x", { isInstantEvalsEnabled: false });
 

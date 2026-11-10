@@ -6,7 +6,7 @@
 import { describeError } from "@langwatch/browser-host/errors";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ConnectStatus } from "@langwatch/enterprise-licensing-contract";
-import { act, cleanup, screen } from "@testing-library/react";
+import { act, cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -326,6 +326,18 @@ describe("ConnectScreen", () => {
       const link = screen.getByRole("link", { name: "Open the License page" });
       expect(link.getAttribute("href")).toBe("/settings/license");
     });
+
+    /** @scenario "A member with no license is told to ask an admin" */
+    it("tells a member to ask an organization admin, with no link", () => {
+      renderScreen({
+        status: connected({ licensed: false, enabledServices: [], usage: null }),
+        admin: false,
+      });
+
+      expect(screen.getByText(/Ask an organization admin to activate a license\./)).toBeDefined();
+      expect(screen.queryByRole("link", { name: "Open the License page" })).toBeNull();
+      expect(screen.queryByText(/Activate a license that includes/)).toBeNull();
+    });
   });
 
   describe("given the hosted service refuses the license", () => {
@@ -339,7 +351,31 @@ describe("ConnectScreen", () => {
       const refusal = screen.getByTestId("connect-refusal");
       expect(refusal.textContent).toContain("This license is no longer active");
       expect(refusal.textContent).toContain("Contact LangWatch for a new license");
-      expect(switchOf("instant_evals").checked).toBe(true);
+    });
+
+    /** @scenario "A revoked license shows its refusal once and every service as unavailable" */
+    it("says once that the license is no longer active and marks every service unavailable", () => {
+      renderScreen({
+        explains: true,
+        status: connected({
+          refusal: { code: "connect_license_revoked" },
+          sync: {
+            lastSyncAt: "2026-09-18T06:00:00.000Z",
+            lastError: { code: "connect_license_revoked" },
+          },
+        }),
+      });
+
+      expect(screen.getAllByText(/This license is no longer active/)).toHaveLength(1);
+      expect(screen.queryByTestId("connect-sync-failure")).toBeNull();
+      for (const service of ["instant_evals", "managed_models"]) {
+        expect(switchOf(service).checked).toBe(false);
+        expect(switchOf(service).disabled).toBe(true);
+        expect(
+          within(screen.getByTestId(`connect-service-${service}`)).getByText("Unavailable"),
+        ).toBeDefined();
+      }
+      expect(screen.queryByText("On")).toBeNull();
     });
   });
 });

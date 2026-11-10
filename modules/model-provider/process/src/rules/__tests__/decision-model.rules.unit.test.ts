@@ -5,7 +5,7 @@ import { decisionModelResolutionOf, picksOwnDecisionModel } from "../decision-mo
 const CLEF = "cloudflare/decisions:clef";
 
 describe("decisionModelResolutionOf", () => {
-  /** @scenario "An unset column runs on LangWatch Instant Preview" */
+  /** @scenario "An unset column runs on LangWatch Evals Preview" */
   it("answers langwatch when nothing is stored", () => {
     expect(decisionModelResolutionOf({ model: undefined, row: undefined })).toEqual({
       kind: "langwatch",

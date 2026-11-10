@@ -1,6 +1,7 @@
 import {
   adminEmails,
   Config,
+  isSaas,
   publicBaseUrl,
   signUpAllowedDomains,
   signUpMode,
@@ -19,6 +20,8 @@ export const organizationServerConfig = Config.define(() => ({
     adminEmails,
   },
   publicBaseUrl,
+  /** Whether this is LangWatch Cloud: decides how a seat request is approved (ruling R6). */
+  isSaas,
 }));
 
 export type OrganizationServerConfig = ConfigOf<typeof organizationServerConfig>;

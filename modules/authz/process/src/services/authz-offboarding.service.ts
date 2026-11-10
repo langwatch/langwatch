@@ -31,7 +31,7 @@ export class AuthzOffboardingService {
     userId: string;
     organizationId: string;
   }): Promise<AuthzOffboardOutput> {
-    const removed = await this.repository.offboardUser({
+    const { heldFullSeat, ...removed } = await this.repository.offboardUser({
       userId,
       organizationId,
       actor,
@@ -43,6 +43,7 @@ export class AuthzOffboardingService {
         organizationId,
         userId,
         offboardedByUserId: actor.type === "user" ? actor.id : null,
+        heldFullSeat,
       });
     }
     const [ownedApiKeys, personalTeams] = await Promise.all([

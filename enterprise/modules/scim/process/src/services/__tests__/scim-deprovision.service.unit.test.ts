@@ -4,7 +4,10 @@ import { OffboardIncompleteError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
-import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
+import {
+  MembersFake,
+  OrganizationAdministrationFake,
+} from "../../__tests__/support/organization-administration-fake.ts";
 import { ScimDeprovisionService } from "../scim-deprovision.service.ts";
 import type { ScimSyncLifecycle } from "../scim-sync-lifecycle.service.ts";
 
@@ -33,6 +36,7 @@ describe("ScimDeprovisionService", () => {
       grants,
       lifecycle,
       organization: new OrganizationAdministrationFake(),
+      seats: new MembersFake(),
     });
 
     await service.removeAccess({
@@ -62,6 +66,7 @@ describe("ScimDeprovisionService", () => {
           grants,
           lifecycle,
           organization: new OrganizationAdministrationFake(),
+          seats: new MembersFake(),
         });
 
         await service.removeAccess({
@@ -91,6 +96,7 @@ describe("ScimDeprovisionService", () => {
       grants,
       lifecycle,
       organization: new OrganizationAdministrationFake(),
+      seats: new MembersFake(),
     });
 
     await expect(
@@ -132,6 +138,7 @@ describe("ScimDeprovisionService", () => {
       grants,
       lifecycle,
       organization: new OrganizationAdministrationFake(),
+      seats: new MembersFake(),
     });
 
     const manifest = await service.removeAccess({
@@ -156,6 +163,7 @@ describe("ScimDeprovisionService", () => {
       grants,
       lifecycle,
       organization: new OrganizationAdministrationFake(),
+      seats: new MembersFake(),
     });
 
     await service
@@ -177,7 +185,12 @@ describe("ScimDeprovisionService", () => {
         const lifecycle = new LifecycleFake();
         const organization = new OrganizationAdministrationFake();
         organization.findActiveOrganizationAdministrators.mockResolvedValueOnce([USER_ID]);
-        const service = ScimDeprovisionService.create({ grants, lifecycle, organization });
+        const service = ScimDeprovisionService.create({
+          grants,
+          lifecycle,
+          organization,
+          seats: new MembersFake(),
+        });
 
         await expect(
           service.removeAccess({
@@ -211,7 +224,12 @@ describe("ScimDeprovisionService", () => {
         const grants = new GrantsFake();
         const lifecycle = new LifecycleFake();
         const organization = new OrganizationAdministrationFake();
-        const service = ScimDeprovisionService.create({ grants, lifecycle, organization });
+        const service = ScimDeprovisionService.create({
+          grants,
+          lifecycle,
+          organization,
+          seats: new MembersFake(),
+        });
 
         await service.removeAccess({
           userId: USER_ID,
@@ -224,6 +242,67 @@ describe("ScimDeprovisionService", () => {
           organization.findActiveOrganizationAdministrators.mock.invocationCallOrder[0],
         ).toBeLessThan(grants.offboard.mock.invocationCallOrder[0] ?? 0);
         expect(lifecycle.applyFailed).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a full member a directory offboards", () => {
+    describe("when the directory deprovisions them", () => {
+      /** @scenario "A directory offboarding keeps the seat as a manual removal does" */
+      it("keeps their seat through organization before authz deletes the membership", async () => {
+        const grants = new GrantsFake();
+        const seats = new MembersFake();
+        const service = ScimDeprovisionService.create({
+          grants,
+          lifecycle: new LifecycleFake(),
+          organization: new OrganizationAdministrationFake(),
+          seats,
+        });
+
+        await service.removeAccess({
+          userId: USER_ID,
+          organizationId: ORGANIZATION_ID,
+          connectionId: CONNECTION_ID,
+          op: "delete_user",
+        });
+
+        expect(seats.holdSeatOfDepartingMember).toHaveBeenCalledWith({
+          organizationId: ORGANIZATION_ID,
+          userId: USER_ID,
+        });
+        expect(seats.holdSeatOfDepartingMember.mock.invocationCallOrder[0]).toBeLessThan(
+          grants.offboard.mock.invocationCallOrder[0] ?? 0,
+        );
+      });
+    });
+
+    describe("when keeping the seat fails", () => {
+      /** @scenario "A directory offboarding that cannot keep the seat removes nobody" */
+      it("takes no authority away and records the failure for a retry", async () => {
+        const grants = new GrantsFake();
+        const lifecycle = new LifecycleFake();
+        const seats = new MembersFake();
+        seats.holdSeatOfDepartingMember.mockRejectedValueOnce(new Error("database unavailable"));
+        const service = ScimDeprovisionService.create({
+          grants,
+          lifecycle,
+          organization: new OrganizationAdministrationFake(),
+          seats,
+        });
+
+        await expect(
+          service.removeAccess({
+            userId: USER_ID,
+            organizationId: ORGANIZATION_ID,
+            connectionId: CONNECTION_ID,
+            op: "delete_user",
+          }),
+        ).rejects.toThrow("database unavailable");
+
+        expect(grants.offboard).not.toHaveBeenCalled();
+        expect(lifecycle.applyFailed).toHaveBeenCalledWith(
+          expect.objectContaining({ errorCode: "unknown", retryable: true, userId: USER_ID }),
+        );
       });
     });
   });

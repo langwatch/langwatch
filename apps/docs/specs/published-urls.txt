@@ -613,10 +613,12 @@
 /coding-agents/find-your-context-sweet-spot
 /coding-agents/gemini-cli
 /coding-agents/github-copilot-cli
+/coding-agents/grok-cli
 /coding-agents/headless-and-ci
 /coding-agents/openai-codex
 /coding-agents/opencode
 /coding-agents/overview
+/coding-agents/pi
 /coding-agents/privacy
 /coding-agents/pull-requests
 /coding-agents/quickstart

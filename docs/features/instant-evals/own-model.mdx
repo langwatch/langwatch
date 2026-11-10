@@ -5,33 +5,31 @@ keywords: langwatch, instant evals, decision model, own key, bring your own key,
 description: Run Instant Evals on a decision model in your own provider account, set up Azure, and read the rows your model cannot judge.
 ---
 
-## LangWatch Instant Preview or your own model
+## LangWatch Evals Preview or your own model
 
-Instant Evals run on **LangWatch Instant Preview** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
-
-<Note>
-  This is off by default. Ask LangWatch to turn it on for your organization. Until then, the **Instant Evals** column offers LangWatch Instant Preview only.
-</Note>
+Instant Evals run on **LangWatch Evals Preview** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
 
 ## The models you can pick
 
-| Model in the picker               | Provider to add       | What the provider needs                                                       |
-| --------------------------------- | --------------------- | ----------------------------------------------------------------------------- |
-| OpenAI Decisions API              | OpenAI                | API key. Runs `gpt-6-luna`                                                    |
-| Azure OpenAI Decisions API        | Azure OpenAI          | API key, endpoint and a `gpt-6-luna` deployment on your resource. See [Azure](#azure) |
-| Microsoft Decision 1 (Azure)      | Azure OpenAI          | API key, endpoint and a Microsoft Decision 1 deployment on Azure AI Foundry. See [Azure](#azure) |
-| Inception Mercury Decide          | Inception             | API key                                                                       |
-| Perplexity Decider v1.2           | Perplexity            | API key                                                                       |
-| Perplexity Decider Flash v1.2     | Perplexity            | API key                                                                       |
-| Cloudflare Clef                   | Cloudflare Workers AI | Account id and API token                                                      |
-| Cloudflare Clef Flash             | Cloudflare Workers AI | Account id and API token                                                      |
-| TypeSafe Jev 1.14                 | TypeSafe              | API key                                                                       |
-| Jev 1.14 (OpenRouter)             | OpenRouter            | API key                                                                       |
-| Microsoft Decision 1 (OpenRouter) | OpenRouter            | API key                                                                       |
-| Liquid d1.1 (OpenRouter)          | OpenRouter            | API key                                                                       |
-| Fireworks Rune                    | Fireworks             | API key                                                                       |
+The picker is one list: LangWatch's **Evals Preview** first, then the models on your own keys. Each row shows its provider's logo and a title. OpenAI's and Azure's `gpt-6-luna` both read **Decisions API**, and the logo tells them apart. The other titles name the provider and the model. A model whose provider has no key yet is listed but greyed out, with a line saying which key to add.
 
-OpenAI Decisions API and Azure OpenAI Decisions API need `gpt-6-luna` on that account. The other models need no OpenAI account.
+| Provider to add       | Model in the picker             | What the provider needs                                                                          |
+| --------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| OpenAI                | Decisions API                   | API key. Runs on the OpenAI Decisions API                                                        |
+| Azure OpenAI          | Decisions API                   | API key, endpoint and a `gpt-6-luna` deployment on your resource. See [Azure](#azure)            |
+| Azure OpenAI          | Azure Microsoft Decision 1      | API key, endpoint and a Microsoft Decision 1 deployment on Azure AI Foundry. See [Azure](#azure) |
+| Inception             | Inception Mercury Decide        | API key                                                                                          |
+| Perplexity            | Perplexity Decider v1.2         | API key                                                                                          |
+| Perplexity            | Perplexity Decider Flash v1.2   | API key                                                                                          |
+| Cloudflare Workers AI | Cloudflare Clef                 | Account id and API token                                                                         |
+| Cloudflare Workers AI | Cloudflare Clef Flash           | Account id and API token                                                                         |
+| TypeSafe              | TypeSafe Jev 1.14               | API key                                                                                          |
+| OpenRouter            | OpenRouter Jev 1.14             | API key                                                                                          |
+| OpenRouter            | OpenRouter Microsoft Decision 1 | API key                                                                                          |
+| OpenRouter            | OpenRouter Liquid d1.1          | API key                                                                                          |
+| Fireworks             | Fireworks Rune                  | API key                                                                                          |
+
+`gpt-6-luna` runs on the OpenAI Decisions API, so it needs that model on your OpenAI or Azure account. The other models need no OpenAI account.
 
 ## Set it up
 
@@ -45,7 +43,7 @@ OpenAI Decisions API and Azure OpenAI Decisions API need `gpt-6-luna` on that ac
     <Frame>
       <img
         src="/images/instant-evals/own-model-picker.png"
-        alt="Edit default models drawer for the ACME organization, with the Instant Evals picker open on LangWatch Instant Preview and OpenAI Decisions API"
+        alt="Edit default models drawer for the ACME organization, with the Instant Evals picker open: Evals Preview first, then Decisions API on OpenAI ticked, then models whose provider has no key yet"
       />
     </Frame>
   </Step>
@@ -97,7 +95,7 @@ Without the deployment, every row is skipped as `classifier_not_configured`.
 
 ## When your model cannot answer
 
-A run on your own model never falls back to LangWatch Instant Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. List them with `langwatch instant-eval results <run-id> --status skipped`.
+A run on your own model never falls back to LangWatch Evals Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. List them with `langwatch instant-eval results <run-id> --status skipped`.
 
 | `error`                           | Why                                                                                                         | Fix                                                                         |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -112,5 +110,5 @@ Rate limits and outages are retried before the row is skipped. Refused keys and 
 
 - **Cost.** Your provider bills you. LangWatch does not, and the [free budget](/features/instant-evals/limits-and-cost#the-free-budget) does not apply.
 - **Limits.** The [row, question and text limits](/features/instant-evals/limits-and-cost#limits) still apply.
-- **Data.** Each row's text and your questions go to your provider, under your agreement with it. LangWatch Instant Preview never sees them.
-- **Search bar.** Still runs on LangWatch Instant Preview.
+- **Data.** Each row's text and your questions go to your provider, under your agreement with it. LangWatch Evals Preview never sees them.
+- **Search bar.** Still runs on LangWatch Evals Preview.

@@ -9,6 +9,7 @@ import {
   type LangWatchQLMemberWindow,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
+  type LangWatchQLRunTelemetry,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
@@ -28,6 +29,7 @@ import {
 import type { LangWatchQLViewDefinition } from "./langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
 import type { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
+import type { LangWatchQLRunTelemetryService } from "./langwatch-ql-run-telemetry.service.ts";
 import type { LangWatchQLGranularityResolution } from "./langwatch-ql-time-window.service.ts";
 
 const lwqlDiagnostics = LangWatchQLDiagnosticsService.create();
@@ -43,6 +45,8 @@ type LangWatchQLExecutionDependencies = {
   /** Milliseconds on a monotonic clock, for the elapsed time hydration and judging add. */
   readonly stopwatch: () => number;
   readonly extraction: Pick<LangWatchQLExtractionService, "hydrate">;
+  /** Counts each answered run; the app's one instance, which counts its doors' refusals too. */
+  readonly runTelemetry: Pick<LangWatchQLRunTelemetryService, "recordAnswered" | "fieldsFor">;
 };
 
 type LangWatchQLExecutionInput = {
@@ -58,6 +62,8 @@ type LangWatchQLExecutionInput = {
   /** The window the statement follows, which bounds the origin lookup; absent, none does. */
   readonly timeWindow?: LangWatchQLTimeWindow;
   readonly signal?: AbortSignal;
+  /** Who ran it: the caller and the widget's ids on the log line, the caller on the metrics. */
+  readonly telemetry?: LangWatchQLRunTelemetry | undefined;
 };
 
 export class LangWatchQLExecutionService {
@@ -76,6 +82,7 @@ export class LangWatchQLExecutionService {
     projects,
     protections,
     signal,
+    telemetry,
     ...run
   }: LangWatchQLExecutionInput): Promise<LangWatchQLQueryResult> {
     const { database, views } = this.deps;
@@ -107,8 +114,16 @@ export class LangWatchQLExecutionService {
       ...(answer.appFunctions ? { appFunctions: answer.appFunctions } : {}),
     });
 
+    const outcome = this.deps.runTelemetry.recordAnswered({
+      telemetry,
+      rowsReturned: answer.rows.length,
+      rowsRead: execution.statistics.rowsRead,
+      elapsedMs,
+    });
     logger.info(
       {
+        ...this.deps.runTelemetry.fieldsFor({ telemetry, sql: run.sql }),
+        outcome,
         projectIds: projects.map((project) => project.id),
         tables: validation.tables,
         rowsReturned: answer.rows.length,

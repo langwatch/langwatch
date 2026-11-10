@@ -43,6 +43,18 @@ export abstract class BillingHostApi {
   abstract activeTeamId(): string | undefined;
 
   /**
+   * Whether the reader may invite people. Any member may start a subscription,
+   * but only someone who may invite sends the planned addresses with it.
+   */
+  abstract canInviteMembers(): boolean;
+
+  /** Whether the reader may see the month by day and by project (`organization:manage`). */
+  abstract canReadMonthBreakdown(): boolean;
+
+  /** Whether the reader may list seats held for people who left them (`organization:manage`). */
+  abstract canReadHeldSeats(): boolean;
+
+  /**
    * The query string the page was opened with. Two keys matter: `success`
    * (Stripe appends it after checkout) and `upgraded_from` (a credit was
    * applied) — both notices of something already done, read off the address.
@@ -59,6 +71,9 @@ export abstract class BillingHostApi {
 
   /** Sends the reader somewhere else in the application. */
   abstract navigate(to: string): void;
+
+  /** Swaps the current address for another in the application, adding no history entry. */
+  abstract replace(to: string): void;
 
   /**
    * Leaves the application for a URL it does not serve. A Stripe checkout

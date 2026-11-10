@@ -133,11 +133,18 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "dataset:fill-empty-slugs",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dataset",
+    "description": "Gives each dataset stored without a slug one made from its name."
+  },
+  {
     "id": "dataset:create-first-versions",
     "kind": "data",
     "mode": "background",
     "owner": "dataset",
-    "description": "Saves version 1 of every dataset that has no version history yet."
+    "description": "Saves version 1 of every dataset that has rows and no version history yet."
   },
   {
     "id": "evaluation:fill-id-indexes",
@@ -193,6 +200,14 @@
     "mode": "background",
     "owner": "governance",
     "description": "Records each organisation's coding-assistant billed facts, which trace folds at ingest.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "governance:record-coding-assistant-ingest-source-billing",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Records each organisation's billed facts again, so every ingest source type has one.",
     "needsOldWritersGone": true
   },
   {

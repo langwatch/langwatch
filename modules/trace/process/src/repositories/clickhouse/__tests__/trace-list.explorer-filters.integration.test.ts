@@ -388,6 +388,7 @@ async function sidebarCounts({
   const facets = await service.getFacets({
     authorization: ownProof({ projectId: tenantId }),
     timeRange,
+    filterKey: query,
     filterFor: createFacetFilterResolver({
       queryText: query,
       compile: (text) =>

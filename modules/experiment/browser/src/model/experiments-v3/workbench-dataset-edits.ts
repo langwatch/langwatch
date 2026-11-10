@@ -5,7 +5,11 @@
 import { nowInstant } from "@langwatch/time";
 
 import { convertInlineToRowRecords } from "./dataset-conversion.ts";
-import type { DatasetColumn, DatasetReference, EvaluationsV3State } from "./types.ts";
+import {
+  withoutMappingsToMissingColumns,
+  withRenamedColumnsMappings,
+} from "./stale-column-mappings.ts";
+import type { DatasetColumn, DatasetReference, EvaluationsV3State, SavedRecord } from "./types.ts";
 
 type DatasetsEdit = Pick<EvaluationsV3State, "datasets"> | EvaluationsV3State;
 
@@ -261,7 +265,8 @@ export const withoutSelectedRows = ({
 type DrawerDataset = {
   datasetId: string;
   name: string;
-  columnTypes: { name: string; type: string }[];
+  /** `id` names the workbench column a drawer column was edited from; a new column has none. */
+  columnTypes: { name: string; type: string; id?: string }[];
 };
 
 const columnsFrom = (columnTypes: DrawerDataset["columnTypes"]): DatasetColumn[] =>
@@ -283,10 +288,42 @@ export const savedDatasetUpdate = (saved: DrawerDataset): Partial<DatasetReferen
   columns: columnsFrom(saved.columnTypes),
 });
 
+/** Each edited column paired with the workbench column it came from, if any. */
+const sourceColumnsOf = ({
+  dataset,
+  edited,
+}: {
+  dataset: DatasetReference;
+  edited: DrawerDataset;
+}): (DatasetColumn | undefined)[] =>
+  edited.columnTypes.map((col) =>
+    col.id === undefined ? undefined : dataset.columns.find((c) => c.id === col.id),
+  );
+
+/** Saved records re-keyed from each source column's name to its edited name. */
+const renamedSavedRecords = ({
+  records,
+  columns,
+  sources,
+}: {
+  records: SavedRecord[];
+  columns: DatasetColumn[];
+  sources: (DatasetColumn | undefined)[];
+}): SavedRecord[] =>
+  records.map((record) => ({
+    id: record.id,
+    ...Object.fromEntries(
+      columns.map((column, index) => {
+        const source = sources[index];
+        return [column.name, source ? (record[source.name] ?? "") : ""];
+      }),
+    ),
+  }));
+
 /**
- * A dataset's columns as edited in the drawer. Inline values follow their column
- * by name, and a new column starts empty; a saved dataset was already saved by
- * the drawer, so only the local reference changes.
+ * A dataset's columns as edited in the drawer. Values follow the column they were
+ * edited from, by its id, so a rename keeps them; a new column starts empty. A saved
+ * dataset was saved by the drawer, so only the reference and its cached records change.
  */
 export const editedDatasetUpdate = ({
   dataset,
@@ -298,25 +335,137 @@ export const editedDatasetUpdate = ({
   rowCount: number;
 }): Partial<DatasetReference> => {
   const columns = columnsFrom(edited.columnTypes);
+  const sources = sourceColumnsOf({ dataset, edited });
   if (dataset.type !== "inline") {
-    return { name: edited.name, columns, datasetId: edited.datasetId };
+    return {
+      name: edited.name,
+      columns,
+      datasetId: edited.datasetId,
+      ...(dataset.savedRecords
+        ? {
+            savedRecords: renamedSavedRecords({ records: dataset.savedRecords, columns, sources }),
+          }
+        : {}),
+    };
   }
   const oldRecords = dataset.inline?.records ?? {};
   const records = Object.fromEntries(
-    columns.map((column) => {
-      const oldColumn = dataset.columns.find((c) => c.name === column.name);
-      const oldValues = oldColumn ? oldRecords[oldColumn.id] : undefined;
+    columns.map((column, index) => {
+      const source = sources[index];
+      const oldValues = source ? oldRecords[source.id] : undefined;
       return [column.id, oldValues ?? Array<string>(rowCount).fill("")];
     }),
   );
   return { name: edited.name, columns, inline: { columns, records } };
 };
 
+/** Each renamed column's old name to its new one, and the old names the edit removed. */
+const columnChangesOf = ({
+  dataset,
+  edited,
+}: {
+  dataset: DatasetReference;
+  edited: DrawerDataset;
+}): { renames: Map<string, string>; removed: Set<string> } => {
+  const sources = sourceColumnsOf({ dataset, edited });
+  const renames = new Map<string, string>();
+  sources.forEach((source, index) => {
+    const name = edited.columnTypes[index]?.name;
+    if (source && name !== undefined && source.name !== name) renames.set(source.name, name);
+  });
+  const kept = new Set(sources.flatMap((source) => (source ? [source.id] : [])));
+  const removed = new Set(dataset.columns.filter((c) => !kept.has(c.id)).map((c) => c.name));
+  return { renames, removed };
+};
+
+/** One queued record change re-keyed to the edited columns; deletions pass as they are. */
+const renamedChange = ({
+  change,
+  renames,
+  removed,
+}: {
+  change: Record<string, unknown>;
+  renames: Map<string, string>;
+  removed: Set<string>;
+}): Record<string, unknown> => {
+  if (change._delete === true) return change;
+  const next: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(change)) {
+    const renamed = renames.get(key);
+    if (renamed !== undefined) next[renamed] = value;
+    else if (!removed.has(key)) next[key] = value;
+  }
+  return next;
+};
+
+/** A saved dataset's queued changes following the edit; a change left empty is dropped. */
+const renamedPendingChanges = ({
+  pending,
+  dbDatasetId,
+  renames,
+  removed,
+}: {
+  pending: EvaluationsV3State["pendingSavedChanges"];
+  dbDatasetId: string;
+  renames: Map<string, string>;
+  removed: Set<string>;
+}): EvaluationsV3State["pendingSavedChanges"] => {
+  const changes = pending[dbDatasetId];
+  if (!changes) return pending;
+  const kept = Object.entries(changes).flatMap(([recordId, change]) => {
+    const next = renamedChange({ change, renames, removed });
+    return Object.keys(next).length === 0 ? [] : [[recordId, next] as const];
+  });
+  const rest = { ...pending };
+  delete rest[dbDatasetId];
+  return kept.length === 0 ? rest : { ...rest, [dbDatasetId]: Object.fromEntries(kept) };
+};
+
+/**
+ * The columns drawer's edit applied to the workbench: values, a saved dataset's
+ * queued cell edits and the mappings that read a column all follow it through a
+ * rename, and mappings to a removed column clear.
+ */
+export const withEditedDatasetColumns = ({
+  state,
+  datasetId,
+  edited,
+}: {
+  state: EvaluationsV3State;
+  datasetId: string;
+  edited: DrawerDataset;
+}): Partial<EvaluationsV3State> => {
+  const dataset = state.datasets.find((d) => d.id === datasetId);
+  if (!dataset) return state;
+  const { renames, removed } = columnChangesOf({ dataset, edited });
+  const update = editedDatasetUpdate({ dataset, edited, rowCount: datasetRowCount(dataset) });
+  const editedDataset = { ...dataset, ...update };
+  const renamedWiring = withRenamedColumnsMappings({ wiring: state, datasetId, renames });
+  const wiring = withoutMappingsToMissingColumns({
+    wiring: renamedWiring,
+    datasetId,
+    columnNames: new Set(editedDataset.columns.map((c) => c.name)),
+  });
+  return {
+    datasets: state.datasets.map((d) => (d.id === datasetId ? editedDataset : d)),
+    ...wiring,
+    pendingSavedChanges:
+      dataset.type === "saved" && dataset.datasetId
+        ? renamedPendingChanges({
+            pending: state.pendingSavedChanges,
+            dbDatasetId: dataset.datasetId,
+            renames,
+            removed,
+          })
+        : state.pendingSavedChanges,
+  };
+};
+
 /** What the edit drawer opens with: the columns, and an inline dataset's rows for mapping. */
 export const datasetEditDraft = (dataset: DatasetReference) => ({
   datasetId: dataset.type === "saved" ? dataset.datasetId : undefined,
   name: dataset.name,
-  columnTypes: dataset.columns.map((col) => ({ name: col.name, type: col.type })),
+  columnTypes: dataset.columns.map((col) => ({ id: col.id, name: col.name, type: col.type })),
   ...(dataset.type === "inline" && dataset.inline
     ? { datasetRecords: convertInlineToRowRecords(dataset.inline.columns, dataset.inline.records) }
     : {}),

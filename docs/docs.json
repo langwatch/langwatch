@@ -948,6 +948,20 @@
                 "pages": [
                   "coding-agents/opencode"
                 ]
+              },
+              {
+                "group": "Grok CLI",
+                "icon": "/images/logos/grok.svg",
+                "pages": [
+                  "coding-agents/grok-cli"
+                ]
+              },
+              {
+                "group": "pi",
+                "icon": "terminal",
+                "pages": [
+                  "coding-agents/pi"
+                ]
               }
             ]
           },
@@ -1840,7 +1854,7 @@
       "destination": "/api-reference/projects/get-a-dashboard"
     },
     {
-      "source": "/ci/cache/busted/1793781875",
+      "source": "/ci/cache/busted/1794301376",
       "destination": "/introduction"
     },
     {

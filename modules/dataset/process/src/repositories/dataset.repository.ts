@@ -56,7 +56,8 @@ export type DatasetUpdateInput = {
   projectId: string;
   name: string;
   slug: string;
-  columnTypes: DatasetColumns;
+  /** Absent keeps the stored columns: a column edit writes them under the dataset's lock. */
+  columnTypes?: DatasetColumns;
 };
 
 export interface DatasetRepository {
@@ -93,4 +94,14 @@ export interface DatasetRepository {
   count(input: { projectId: string; slug: string }): Promise<number>;
   /** Archived rows included, ordered by id, strictly after `afterId`. */
   findStoragePage(input: DatasetStoragePageInput): Promise<DatasetStorageEntry[]>;
+  /** A page of a project's datasets stored with an empty slug, archived included, by id. */
+  findEmptySlugPage(input: {
+    projectId: string;
+    afterId?: string;
+    limit: number;
+  }): Promise<{ id: string; name: string }[]>;
+  /** Sets the slug of a dataset whose slug is empty; `taken` when another dataset holds it. */
+  fillEmptySlug(input: { id: string; projectId: string; slug: string }): Promise<EmptySlugFill>;
 }
+
+export type EmptySlugFill = "filled" | "not-empty" | "taken";

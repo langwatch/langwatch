@@ -364,6 +364,7 @@ export interface LwqlClickHouseRows {
     readonly _size_bytes: "UInt32";
     readonly ExpectedTargetResults: "Nullable(UInt32)";
     readonly ExpectedEvaluatorResults: "Nullable(UInt32)";
+    readonly Concurrency: "Nullable(UInt16)";
   };
   readonly gateway_budget_ledger_events: {
     readonly TenantId: "String";
@@ -462,6 +463,7 @@ export interface LwqlClickHouseRows {
     readonly TokensInputImage: "UInt64";
     readonly TokensOutputImage: "UInt64";
     readonly ImageCount: "UInt64";
+    readonly WebSearchRequests: "UInt64";
   };
   readonly goose_db_version: {
     readonly version_id: "Int64";

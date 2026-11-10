@@ -25184,6 +25184,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1LangyManage                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "langy:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1LangyUpdate                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "langy:update"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1LangyView                     GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "langy:view"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1MembersView                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "members:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsManage                     GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "ops:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsView                       GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "ops:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OrganizationDelete            GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "organization:delete"
@@ -25211,6 +25212,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1ScenariosManage               GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "scenarios:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1ScenariosUpdate               GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "scenarios:update"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1ScenariosView                 GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "scenarios:view"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SeatRequestsManage            GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "seatRequests:manage"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SeatRequestsView              GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "seatRequests:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsCreate                 GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "secrets:create"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsDelete                 GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "secrets:delete"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsManage                 GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "secrets:manage"
@@ -25218,6 +25221,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsView                   GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "secrets:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoManage                     GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "sso:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoView                       GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "sso:view"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SubscriptionManage            GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "subscription:manage"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SubscriptionUpgrade           GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "subscription:upgrade"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1TeamManage                    GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "team:manage"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1TeamView                      GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "team:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1TracesCreate                  GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "traces:create"
@@ -25398,6 +25403,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1) Valid()
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1LangyView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1MembersView:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1OpsView:
@@ -25452,6 +25459,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1) Valid()
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1ScenariosView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SeatRequestsManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SeatRequestsView:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsCreate:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SecretsDelete:
@@ -25465,6 +25476,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1) Valid()
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SsoView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SubscriptionManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1SubscriptionUpgrade:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1TeamManage:
 		return true
@@ -25637,6 +25652,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1LangyManage                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "langy:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1LangyUpdate                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "langy:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1LangyView                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "langy:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1MembersView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "members:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "ops:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "ops:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OrganizationDelete            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "organization:delete"
@@ -25664,6 +25680,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1ScenariosManage               GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "scenarios:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1ScenariosUpdate               GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "scenarios:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1ScenariosView                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "scenarios:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SeatRequestsManage            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "seatRequests:manage"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SeatRequestsView              GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "seatRequests:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsCreate                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "secrets:create"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsDelete                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "secrets:delete"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsManage                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "secrets:manage"
@@ -25671,6 +25689,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "secrets:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "sso:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "sso:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SubscriptionManage            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "subscription:manage"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SubscriptionUpgrade           GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "subscription:upgrade"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1TeamManage                    GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "team:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1TeamView                      GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "team:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1TracesCreate                  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "traces:create"
@@ -25851,6 +25871,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1) V
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1LangyView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1MembersView:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1OpsView:
@@ -25905,6 +25927,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1) V
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1ScenariosView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SeatRequestsManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SeatRequestsView:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsCreate:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SecretsDelete:
@@ -25918,6 +25944,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SsoView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SubscriptionManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1SubscriptionUpgrade:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1TeamManage:
 		return true
@@ -26090,6 +26120,7 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1LangyManage                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "langy:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1LangyUpdate                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "langy:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1LangyView                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "langy:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1MembersView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "members:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "ops:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "ops:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OrganizationDelete            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "organization:delete"
@@ -26117,6 +26148,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1ScenariosManage               GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "scenarios:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1ScenariosUpdate               GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "scenarios:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1ScenariosView                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "scenarios:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SeatRequestsManage            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "seatRequests:manage"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SeatRequestsView              GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "seatRequests:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsCreate                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "secrets:create"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsDelete                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "secrets:delete"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsManage                 GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "secrets:manage"
@@ -26124,6 +26157,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsView                   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "secrets:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoManage                     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "sso:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoView                       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "sso:view"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SubscriptionManage            GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "subscription:manage"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SubscriptionUpgrade           GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "subscription:upgrade"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1TeamManage                    GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "team:manage"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1TeamView                      GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "team:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1TracesCreate                  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "traces:create"
@@ -26304,6 +26339,8 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1) V
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1LangyView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1MembersView:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1OpsView:
@@ -26358,6 +26395,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1) V
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1ScenariosView:
 		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SeatRequestsManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SeatRequestsView:
+		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsCreate:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SecretsDelete:
@@ -26371,6 +26412,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoManage:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SsoView:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SubscriptionManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1SubscriptionUpgrade:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1TeamManage:
 		return true
@@ -26663,6 +26708,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1LangyManage                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "langy:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1LangyUpdate                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "langy:update"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1LangyView                     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "langy:view"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1MembersView                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "members:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsManage                     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "ops:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsView                       GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "ops:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OrganizationDelete            GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "organization:delete"
@@ -26690,6 +26736,8 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1ScenariosManage               GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "scenarios:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1ScenariosUpdate               GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "scenarios:update"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1ScenariosView                 GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "scenarios:view"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SeatRequestsManage            GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "seatRequests:manage"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SeatRequestsView              GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "seatRequests:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsCreate                 GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "secrets:create"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsDelete                 GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "secrets:delete"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsManage                 GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "secrets:manage"
@@ -26697,6 +26745,8 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsView                   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "secrets:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoManage                     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "sso:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoView                       GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "sso:view"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SubscriptionManage            GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "subscription:manage"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SubscriptionUpgrade           GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "subscription:upgrade"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1TeamManage                    GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "team:manage"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1TeamView                      GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "team:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1TracesCreate                  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "traces:create"
@@ -26877,6 +26927,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1) Valid() bool {
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1LangyView:
 		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1MembersView:
+		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsManage:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1OpsView:
@@ -26931,6 +26983,10 @@ func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1) Valid() bool {
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1ScenariosView:
 		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SeatRequestsManage:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SeatRequestsView:
+		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsCreate:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SecretsDelete:
@@ -26944,6 +27000,10 @@ func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoManage:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SsoView:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SubscriptionManage:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1SubscriptionUpgrade:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1TeamManage:
 		return true
@@ -27116,6 +27176,7 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1LangyManage                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "langy:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1LangyUpdate                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "langy:update"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1LangyView                     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "langy:view"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1MembersView                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "members:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsManage                     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "ops:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsView                       GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "ops:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OrganizationDelete            GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "organization:delete"
@@ -27143,6 +27204,8 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1ScenariosManage               GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "scenarios:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1ScenariosUpdate               GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "scenarios:update"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1ScenariosView                 GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "scenarios:view"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SeatRequestsManage            GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "seatRequests:manage"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SeatRequestsView              GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "seatRequests:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsCreate                 GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "secrets:create"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsDelete                 GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "secrets:delete"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsManage                 GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "secrets:manage"
@@ -27150,6 +27213,8 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsView                   GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "secrets:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoManage                     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "sso:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoView                       GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "sso:view"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SubscriptionManage            GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "subscription:manage"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SubscriptionUpgrade           GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "subscription:upgrade"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1TeamManage                    GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "team:manage"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1TeamView                      GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "team:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1TracesCreate                  GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "traces:create"
@@ -27330,6 +27395,8 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1) Valid() bool {
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1LangyView:
 		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1MembersView:
+		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsManage:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1OpsView:
@@ -27384,6 +27451,10 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1) Valid() bool {
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1ScenariosView:
 		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SeatRequestsManage:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SeatRequestsView:
+		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsCreate:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SecretsDelete:
@@ -27397,6 +27468,10 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoManage:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SsoView:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SubscriptionManage:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1SubscriptionUpgrade:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1TeamManage:
 		return true
@@ -29968,6 +30043,7 @@ const (
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceGovernanceView        ConfirmStoredObjectUpload200JSONResponseBodyAudience = "governance:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceIngestionSourcesView  ConfirmStoredObjectUpload200JSONResponseBodyAudience = "ingestionSources:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceLangyView             ConfirmStoredObjectUpload200JSONResponseBodyAudience = "langy:view"
+	ConfirmStoredObjectUpload200JSONResponseBodyAudienceMembersView           ConfirmStoredObjectUpload200JSONResponseBodyAudience = "members:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceOpsView               ConfirmStoredObjectUpload200JSONResponseBodyAudience = "ops:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceOrganizationView      ConfirmStoredObjectUpload200JSONResponseBodyAudience = "organization:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudiencePlaygroundView        ConfirmStoredObjectUpload200JSONResponseBodyAudience = "playground:view"
@@ -29975,6 +30051,7 @@ const (
 	ConfirmStoredObjectUpload200JSONResponseBodyAudiencePromptsView           ConfirmStoredObjectUpload200JSONResponseBodyAudience = "prompts:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceRoutingPoliciesView   ConfirmStoredObjectUpload200JSONResponseBodyAudience = "routingPolicies:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceScenariosView         ConfirmStoredObjectUpload200JSONResponseBodyAudience = "scenarios:view"
+	ConfirmStoredObjectUpload200JSONResponseBodyAudienceSeatRequestsView      ConfirmStoredObjectUpload200JSONResponseBodyAudience = "seatRequests:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceSecretsView           ConfirmStoredObjectUpload200JSONResponseBodyAudience = "secrets:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceSsoView               ConfirmStoredObjectUpload200JSONResponseBodyAudience = "sso:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceTeamView              ConfirmStoredObjectUpload200JSONResponseBodyAudience = "team:view"
@@ -30034,6 +30111,8 @@ func (e ConfirmStoredObjectUpload200JSONResponseBodyAudience) Valid() bool {
 		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceLangyView:
 		return true
+	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceMembersView:
+		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceOpsView:
 		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceOrganizationView:
@@ -30047,6 +30126,8 @@ func (e ConfirmStoredObjectUpload200JSONResponseBodyAudience) Valid() bool {
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceRoutingPoliciesView:
 		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceScenariosView:
+		return true
+	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceSeatRequestsView:
 		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceSecretsView:
 		return true
@@ -30094,6 +30175,7 @@ const (
 	GetStoredObjectParamsAudienceGovernanceView        GetStoredObjectParamsAudience = "governance:view"
 	GetStoredObjectParamsAudienceIngestionSourcesView  GetStoredObjectParamsAudience = "ingestionSources:view"
 	GetStoredObjectParamsAudienceLangyView             GetStoredObjectParamsAudience = "langy:view"
+	GetStoredObjectParamsAudienceMembersView           GetStoredObjectParamsAudience = "members:view"
 	GetStoredObjectParamsAudienceOpsView               GetStoredObjectParamsAudience = "ops:view"
 	GetStoredObjectParamsAudienceOrganizationView      GetStoredObjectParamsAudience = "organization:view"
 	GetStoredObjectParamsAudiencePlaygroundView        GetStoredObjectParamsAudience = "playground:view"
@@ -30101,6 +30183,7 @@ const (
 	GetStoredObjectParamsAudiencePromptsView           GetStoredObjectParamsAudience = "prompts:view"
 	GetStoredObjectParamsAudienceRoutingPoliciesView   GetStoredObjectParamsAudience = "routingPolicies:view"
 	GetStoredObjectParamsAudienceScenariosView         GetStoredObjectParamsAudience = "scenarios:view"
+	GetStoredObjectParamsAudienceSeatRequestsView      GetStoredObjectParamsAudience = "seatRequests:view"
 	GetStoredObjectParamsAudienceSecretsView           GetStoredObjectParamsAudience = "secrets:view"
 	GetStoredObjectParamsAudienceSsoView               GetStoredObjectParamsAudience = "sso:view"
 	GetStoredObjectParamsAudienceTeamView              GetStoredObjectParamsAudience = "team:view"
@@ -30160,6 +30243,8 @@ func (e GetStoredObjectParamsAudience) Valid() bool {
 		return true
 	case GetStoredObjectParamsAudienceLangyView:
 		return true
+	case GetStoredObjectParamsAudienceMembersView:
+		return true
 	case GetStoredObjectParamsAudienceOpsView:
 		return true
 	case GetStoredObjectParamsAudienceOrganizationView:
@@ -30173,6 +30258,8 @@ func (e GetStoredObjectParamsAudience) Valid() bool {
 	case GetStoredObjectParamsAudienceRoutingPoliciesView:
 		return true
 	case GetStoredObjectParamsAudienceScenariosView:
+		return true
+	case GetStoredObjectParamsAudienceSeatRequestsView:
 		return true
 	case GetStoredObjectParamsAudienceSecretsView:
 		return true
@@ -30220,6 +30307,7 @@ const (
 	GetStoredObject200JSONResponseBodyCapabilityAudienceGovernanceView        GetStoredObject200JSONResponseBodyCapabilityAudience = "governance:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceIngestionSourcesView  GetStoredObject200JSONResponseBodyCapabilityAudience = "ingestionSources:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceLangyView             GetStoredObject200JSONResponseBodyCapabilityAudience = "langy:view"
+	GetStoredObject200JSONResponseBodyCapabilityAudienceMembersView           GetStoredObject200JSONResponseBodyCapabilityAudience = "members:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceOpsView               GetStoredObject200JSONResponseBodyCapabilityAudience = "ops:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceOrganizationView      GetStoredObject200JSONResponseBodyCapabilityAudience = "organization:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudiencePlaygroundView        GetStoredObject200JSONResponseBodyCapabilityAudience = "playground:view"
@@ -30227,6 +30315,7 @@ const (
 	GetStoredObject200JSONResponseBodyCapabilityAudiencePromptsView           GetStoredObject200JSONResponseBodyCapabilityAudience = "prompts:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceRoutingPoliciesView   GetStoredObject200JSONResponseBodyCapabilityAudience = "routingPolicies:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceScenariosView         GetStoredObject200JSONResponseBodyCapabilityAudience = "scenarios:view"
+	GetStoredObject200JSONResponseBodyCapabilityAudienceSeatRequestsView      GetStoredObject200JSONResponseBodyCapabilityAudience = "seatRequests:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceSecretsView           GetStoredObject200JSONResponseBodyCapabilityAudience = "secrets:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceSsoView               GetStoredObject200JSONResponseBodyCapabilityAudience = "sso:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceTeamView              GetStoredObject200JSONResponseBodyCapabilityAudience = "team:view"
@@ -30286,6 +30375,8 @@ func (e GetStoredObject200JSONResponseBodyCapabilityAudience) Valid() bool {
 		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceLangyView:
 		return true
+	case GetStoredObject200JSONResponseBodyCapabilityAudienceMembersView:
+		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceOpsView:
 		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceOrganizationView:
@@ -30299,6 +30390,8 @@ func (e GetStoredObject200JSONResponseBodyCapabilityAudience) Valid() bool {
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceRoutingPoliciesView:
 		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceScenariosView:
+		return true
+	case GetStoredObject200JSONResponseBodyCapabilityAudienceSeatRequestsView:
 		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceSecretsView:
 		return true
@@ -30364,6 +30457,7 @@ const (
 	GovernanceView        GetStoredObject200JSONResponseBodyMetadataAudiences = "governance:view"
 	IngestionSourcesView  GetStoredObject200JSONResponseBodyMetadataAudiences = "ingestionSources:view"
 	LangyView             GetStoredObject200JSONResponseBodyMetadataAudiences = "langy:view"
+	MembersView           GetStoredObject200JSONResponseBodyMetadataAudiences = "members:view"
 	OpsView               GetStoredObject200JSONResponseBodyMetadataAudiences = "ops:view"
 	OrganizationView      GetStoredObject200JSONResponseBodyMetadataAudiences = "organization:view"
 	PlaygroundView        GetStoredObject200JSONResponseBodyMetadataAudiences = "playground:view"
@@ -30371,6 +30465,7 @@ const (
 	PromptsView           GetStoredObject200JSONResponseBodyMetadataAudiences = "prompts:view"
 	RoutingPoliciesView   GetStoredObject200JSONResponseBodyMetadataAudiences = "routingPolicies:view"
 	ScenariosView         GetStoredObject200JSONResponseBodyMetadataAudiences = "scenarios:view"
+	SeatRequestsView      GetStoredObject200JSONResponseBodyMetadataAudiences = "seatRequests:view"
 	SecretsView           GetStoredObject200JSONResponseBodyMetadataAudiences = "secrets:view"
 	SsoView               GetStoredObject200JSONResponseBodyMetadataAudiences = "sso:view"
 	TeamView              GetStoredObject200JSONResponseBodyMetadataAudiences = "team:view"
@@ -30430,6 +30525,8 @@ func (e GetStoredObject200JSONResponseBodyMetadataAudiences) Valid() bool {
 		return true
 	case LangyView:
 		return true
+	case MembersView:
+		return true
 	case OpsView:
 		return true
 	case OrganizationView:
@@ -30443,6 +30540,8 @@ func (e GetStoredObject200JSONResponseBodyMetadataAudiences) Valid() bool {
 	case RoutingPoliciesView:
 		return true
 	case ScenariosView:
+		return true
+	case SeatRequestsView:
 		return true
 	case SecretsView:
 		return true
@@ -46347,6 +46446,11 @@ type GetApiDatasetBySlugOrId200JSONResponseBodyColumnTypesType string
 
 // PatchApiDatasetBySlugOrIdJSONBody defines parameters for PatchApiDatasetBySlugOrId.
 type PatchApiDatasetBySlugOrIdJSONBody struct {
+	// ColumnRenames Which existing column each renamed column came from, as `{ from, to }` names. Sent, values move by these renames and by unchanged names only. Omitted, columns left over after matching names pair by position.
+	ColumnRenames *[]struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	} `json:"columnRenames,omitempty"`
 	ColumnTypes *[]struct {
 		Name string                                           `json:"name"`
 		Type PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType `json:"type"`
@@ -47018,6 +47122,14 @@ type GetApiExperimentsRunsParams struct {
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
+// GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 defines parameters for GetApiExperimentsRuns.
+type GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 = int
+
+// GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency defines parameters for GetApiExperimentsRuns.
+type GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency struct {
+	union json.RawMessage
+}
+
 // GetApiExperimentsRunsByRunId200JSONResponseBodyStatus defines parameters for GetApiExperimentsRunsByRunId.
 type GetApiExperimentsRunsByRunId200JSONResponseBodyStatus string
 
@@ -47027,12 +47139,26 @@ type GetApiExperimentsRunsByRunIdResultsParams struct {
 	ExperimentSlug *string `form:"experimentSlug,omitempty" json:"experimentSlug,omitempty"`
 }
 
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 = int
+
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency struct {
+	union json.RawMessage
+}
+
 // GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatus defines parameters for GetApiExperimentsRunsByRunIdResults.
 type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatus string
 
 // GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0 defines parameters for GetApiExperimentsRunsByRunIdResults.
 type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0 = []struct {
-	AgentId       *string                                                                                                    `json:"agentId,omitempty"`
+	AgentId *string `json:"agentId,omitempty"`
+
+	// AgentLabel The deploy label an agent target ran at, such as production
+	AgentLabel *string `json:"agentLabel,omitempty"`
+
+	// AgentVersion The agent version the label pointed at when the run started
+	AgentVersion  *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion                             `json:"agentVersion,omitempty"`
 	EvaluatorId   *string                                                                                                    `json:"evaluatorId,omitempty"`
 	Id            string                                                                                                     `json:"id"`
 	Metadata      *map[string]GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_Metadata_AdditionalProperties `json:"metadata,omitempty"`
@@ -47041,6 +47167,14 @@ type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0 = []struct {
 	PromptId      *string                                                                                                    `json:"promptId,omitempty"`
 	PromptVersion *float32                                                                                                   `json:"promptVersion,omitempty"`
 	Type          string                                                                                                     `json:"type"`
+}
+
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 = int
+
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion struct {
+	union json.RawMessage
 }
 
 // GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0Metadata0 defines parameters for GetApiExperimentsRunsByRunIdResults.
@@ -102243,6 +102377,114 @@ func (t PutApiEvaluatorsById200JSONResponseBody_Version) MarshalJSON() ([]byte, 
 }
 
 func (t *PutApiEvaluatorsById200JSONResponseBody_Version) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 returns the union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency as a GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0
+func (t GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) AsGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0() (GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0, error) {
+	var body GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 overwrites any union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency as the provided GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) FromGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0(v GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0 performs a merge with any union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency, using the provided GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) MergeGetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0(v GetApiExperimentsRuns200JSONResponseBodyRunsConcurrency0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 returns the union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency as a GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0() (GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0, error) {
+	var body GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 overwrites any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency as the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 performs a merge with any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency, using the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 returns the union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion as a GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0() (GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0, error) {
+	var body GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 overwrites any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion as the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0 performs a merge with any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion, using the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0AgentVersion0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets_0_AgentVersion) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -168458,9 +168700,11 @@ type GetApiExperimentsRunsResponse struct {
 			TotalHits float32 `json:"totalHits"`
 		} `json:"pagination"`
 		Runs []struct {
-			ExperimentId string   `json:"experimentId"`
-			Progress     *float32 `json:"progress,omitempty"`
-			RunId        string   `json:"runId"`
+			// Concurrency Cells the run executed at once. Null for a run that recorded none.
+			Concurrency  *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency `json:"concurrency,omitempty"`
+			ExperimentId string                                                     `json:"experimentId"`
+			Progress     *float32                                                   `json:"progress,omitempty"`
+			RunId        string                                                     `json:"runId"`
 			Summary      struct {
 				DatasetAverageCost     *float32 `json:"datasetAverageCost,omitempty"`
 				DatasetAverageDuration *float32 `json:"datasetAverageDuration,omitempty"`
@@ -168526,6 +168770,9 @@ type GetApiExperimentsRunsByRunIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Concurrency Cells the run executes at once, as it was fixed when the run started
+		Concurrency *int `json:"concurrency,omitempty"`
+
 		// DomainError The full failure envelope, when the failure carried one
 		DomainError *struct {
 			// Code Stable failure code; branch on this
@@ -168653,6 +168900,9 @@ type GetApiExperimentsRunsByRunIdResultsResponse struct {
 				Received int  `json:"received"`
 			} `json:"evaluations"`
 		} `json:"completeness"`
+
+		// Concurrency Cells the run executed at once. Null for a run that recorded none.
+		Concurrency *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency `json:"concurrency,omitempty"`
 
 		// Dataset One row per dataset entry, with what the target predicted
 		Dataset []struct {
@@ -168791,6 +169041,9 @@ type PostApiExperimentsBySlugRunResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
+		// Concurrency Cells this run executes at once: the request's `concurrency`, else the server default
+		Concurrency *int `json:"concurrency,omitempty"`
+
 		// RunId Identifier to poll this run with
 		RunId string `json:"runId"`
 
@@ -201675,9 +201928,11 @@ func ParseGetApiExperimentsRunsResponse(rsp *http.Response) (*GetApiExperimentsR
 				TotalHits float32 `json:"totalHits"`
 			} `json:"pagination"`
 			Runs []struct {
-				ExperimentId string   `json:"experimentId"`
-				Progress     *float32 `json:"progress,omitempty"`
-				RunId        string   `json:"runId"`
+				// Concurrency Cells the run executed at once. Null for a run that recorded none.
+				Concurrency  *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency `json:"concurrency,omitempty"`
+				ExperimentId string                                                     `json:"experimentId"`
+				Progress     *float32                                                   `json:"progress,omitempty"`
+				RunId        string                                                     `json:"runId"`
 				Summary      struct {
 					DatasetAverageCost     *float32 `json:"datasetAverageCost,omitempty"`
 					DatasetAverageDuration *float32 `json:"datasetAverageDuration,omitempty"`
@@ -201745,6 +202000,9 @@ func ParseGetApiExperimentsRunsByRunIdResponse(rsp *http.Response) (*GetApiExper
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Concurrency Cells the run executes at once, as it was fixed when the run started
+			Concurrency *int `json:"concurrency,omitempty"`
+
 			// DomainError The full failure envelope, when the failure carried one
 			DomainError *struct {
 				// Code Stable failure code; branch on this
@@ -201868,6 +202126,9 @@ func ParseGetApiExperimentsRunsByRunIdResultsResponse(rsp *http.Response) (*GetA
 					Received int  `json:"received"`
 				} `json:"evaluations"`
 			} `json:"completeness"`
+
+			// Concurrency Cells the run executed at once. Null for a run that recorded none.
+			Concurrency *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency `json:"concurrency,omitempty"`
 
 			// Dataset One row per dataset entry, with what the target predicted
 			Dataset []struct {
@@ -201998,6 +202259,9 @@ func ParsePostApiExperimentsBySlugRunResponse(rsp *http.Response) (*PostApiExper
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
+			// Concurrency Cells this run executes at once: the request's `concurrency`, else the server default
+			Concurrency *int `json:"concurrency,omitempty"`
+
 			// RunId Identifier to poll this run with
 			RunId string `json:"runId"`
 

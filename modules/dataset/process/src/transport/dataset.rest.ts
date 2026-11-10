@@ -451,7 +451,10 @@ export function createDatasetRest(): Readonly<{
       .withPermission("datasets:manage")
       .withMiddlewareContext(projectRequestContext)
       .withOutput(datasetRestSummarySchema)
-      .withDocs({ description: "Update a dataset by its slug or id" })
+      .withDocs({
+        description:
+          "Update a dataset by its slug or id. New `columnTypes` re-key every record; send `columnRenames` to say which existing column each renamed column came from, so a save that deletes one column and renames another moves the right values.",
+      })
       .handle(async ({ app, input, scope }, project) => {
         // Naming the dataset by slug is enough: the application resolves it and
         // takes the name and columns this patch did not send from the row it is
@@ -461,6 +464,7 @@ export function createDatasetRest(): Readonly<{
           slugOrId: input.slugOrId,
           name: input.name,
           columnTypes: input.columnTypes as DatasetColumns | undefined,
+          ...(input.columnRenames ? { columnRenames: input.columnRenames } : {}),
         });
 
         return {

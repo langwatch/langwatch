@@ -1776,6 +1776,11 @@
           "name": "ExpectedEvaluatorResults",
           "type": "Nullable(UInt32)",
           "comment": ""
+        },
+        {
+          "name": "Concurrency",
+          "type": "Nullable(UInt16)",
+          "comment": ""
         }
       ]
     },
@@ -2252,6 +2257,11 @@
         },
         {
           "name": "ImageCount",
+          "type": "UInt64",
+          "comment": ""
+        },
+        {
+          "name": "WebSearchRequests",
           "type": "UInt64",
           "comment": ""
         }
