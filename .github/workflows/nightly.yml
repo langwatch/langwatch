@@ -62,9 +62,12 @@ jobs:
 
   gateway-matrix:
     uses: ./.github/workflows/gateway-matrix.yaml
+    # id-token: the matrix job assumes its Bedrock role by OIDC, and a called
+    # workflow can't ask for more than this job grants.
     permissions:
       contents: read
       pull-requests: read
+      id-token: write
     secrets: inherit
 
   # ---------------------------------------------------------------------------
