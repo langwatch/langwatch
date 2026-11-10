@@ -333,7 +333,9 @@ const RunConcurrencyBadge = ({ runId, concurrency }: { runId: string; concurrenc
 );
 
 const concurrencyTooltip = (concurrency: number) =>
-  concurrency === 1 ? "Ran one row at a time" : `Ran up to ${concurrency} rows at the same time`;
+  concurrency === 1
+    ? "Ran one cell at a time. A cell is one row against one target."
+    : `Ran up to ${concurrency} cells at once. A cell is one row against one target.`;
 
 export function BatchRunsSidebar({
   runs,
