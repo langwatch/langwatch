@@ -305,6 +305,23 @@ describe("a failed step", () => {
     });
 
     /** @scenario "A failed step folds into the record of the work" */
+    it("keeps a successful CLI read with an indented Error field label as completed", () => {
+      const finished = {
+        type: "tool-bash",
+        toolCallId: "ok-error-field",
+        state: "output-available",
+        input: { command: "langwatch simulation-run get abc" },
+        output: JSON.stringify({
+          kind: "text",
+          text: "Run abc\n    Error:    judge timed out",
+        }),
+      } as never;
+      renderActivity({ parts: [finished, reply], live: false });
+
+      expect(receiptHeader().textContent).toContain("1 action completed");
+    });
+
+    /** @scenario "A failed step folds into the record of the work" */
     it("opens its raw payload in developer mode", async () => {
       devMode = true;
       const user = userEvent.setup();

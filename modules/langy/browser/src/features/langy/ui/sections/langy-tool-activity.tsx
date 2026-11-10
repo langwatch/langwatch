@@ -181,9 +181,10 @@ function partToCall(part: ToolPartLike, name: string): CapabilityToolCall {
 
 /**
  * A line that ANNOUNCES a failure — anchored to the start of one on purpose.
+ * `Error:` must be unindented: successful reads indent it as a field label.
  */
 const CLI_FAILURE_LINE =
-  /^[\s>]*(?:✖|error:|failed to\b|request failed\b|self_signed_cert_in_chain\b)/im;
+  /^[\s>]*(?:✖|failed to\b|request failed\b|self_signed_cert_in_chain\b)|^error:/im;
 
 /** The raw text an output carries, bare or in the `{ text }` envelope. */
 function outputText(output: unknown): string | undefined {
