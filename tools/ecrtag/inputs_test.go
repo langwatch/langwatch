@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -216,4 +217,120 @@ func TestGlobsAndJSONFormSources(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"Dockerfile", "modules/catalog/model-catalog.json", "modules/catalog/model-catalog.overlay.json"}, files)
+}
+
+// A row without a context hashes exactly as it did before rows could name one:
+// the value is pinned from the planner as it was, so no image built from the
+// repository root rebuilds for the change.
+func TestARowWithoutAContextHashesAsBefore(t *testing.T) {
+	in := inputsOf(goTree(), goDockerfile)
+	in.Build = `[{"job":"build-and-push"}]`
+	row := `{"image":"langwatch-gateway","dockerfile":"infra/docker/Dockerfile.go","arch":"arm64","platform":"linux/arm64/v8","runner":"ubuntu-24.04-arm"}`
+
+	for _, r := range []string{row, strings.Replace(row, `"arch"`, `"context":"","arch"`, 1)} {
+		h, err := in.Hash(context.Background(), spec(t, r))
+		require.NoError(t, err)
+		if r == row {
+			assert.Equal(t, "9e8ac8a6356b4a79a828f238670380b21226b97bd3aa9380293f63ed44cc65d2", h)
+		}
+		files, err := in.FilesIn(context.Background(), spec(t, r).Context, "infra/docker/Dockerfile.go")
+		require.NoError(t, err)
+		root, err := in.Files(context.Background(), "infra/docker/Dockerfile.go")
+		require.NoError(t, err)
+		assert.Equal(t, root, files, "an empty context is the repository root")
+	}
+}
+
+const contextDockerfile = `FROM golang:1 AS builder
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd/ ./cmd/
+COPY internal/ ./internal/
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /ch-config ./cmd/x
+
+FROM clickhouse
+COPY --from=builder /ch-config /usr/local/bin/ch-config
+COPY scripts/ /scripts/
+`
+
+// contextTree has the image's own directory, and files at the repository
+// root with the same names, which a build from that directory never reads.
+func contextTree() ecrtag.Tree {
+	return ecrtag.Tree{
+		".dockerignore": "di", "cmd/x/main.go": "rootcmd", "scripts/s.sh": "rootscript",
+		"infra/ch/Dockerfile": "df", "infra/ch/.dockerignore": "cdi",
+		"infra/ch/go.mod": "m", "infra/ch/go.sum": "s",
+		"infra/ch/cmd/x/main.go": "c", "infra/ch/internal/a/a.go": "a",
+		"infra/ch/scripts/s.sh": "sh", "infra/ch/README.md": "doc",
+	}
+}
+
+func contextInputs(tree ecrtag.Tree, dockerfile string) ecrtag.Inputs {
+	return ecrtag.Inputs{
+		Tree: tree,
+		Read: func(string) (string, error) { return dockerfile, nil },
+		GoDeps: func(_ context.Context, dir, pkg string) ([]string, error) {
+			if dir != "infra/ch" || pkg != "./cmd/x" {
+				return nil, errors.New("unexpected go build " + dir + " " + pkg)
+			}
+			return []string{"infra/ch/cmd/x/main.go", "infra/ch/internal/a/a.go"}, nil
+		},
+	}
+}
+
+// @scenario "An image built from its own directory reads its inputs there"
+func TestAnImageBuiltFromItsOwnContextReadsItsInputsThere(t *testing.T) {
+	ctx := context.Background()
+	files, err := contextInputs(contextTree(), contextDockerfile).FilesIn(ctx, "infra/ch", "infra/ch/Dockerfile")
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"infra/ch/.dockerignore", "infra/ch/Dockerfile", "infra/ch/cmd/x/main.go", "infra/ch/go.mod",
+		"infra/ch/go.sum", "infra/ch/internal/a/a.go", "infra/ch/scripts/s.sh",
+	}, files, "sources resolve in the context, and the context's .dockerignore replaces the root one")
+
+	row := `{"image":"ch","dockerfile":"infra/ch/Dockerfile","context":"infra/ch"}`
+	hash := func(tree ecrtag.Tree) string {
+		h, err := contextInputs(tree, contextDockerfile).Hash(ctx, spec(t, row))
+		require.NoError(t, err)
+		return h
+	}
+	base := hash(contextTree())
+	changed := func(path, blob string) ecrtag.Tree {
+		tree := contextTree()
+		tree[path] = blob
+		return tree
+	}
+	assert.Equal(t, base, hash(changed(".dockerignore", "di'")), "the root .dockerignore")
+	assert.Equal(t, base, hash(changed("cmd/x/main.go", "rootcmd'")), "a root file of the same name")
+	assert.NotEqual(t, base, hash(changed("infra/ch/.dockerignore", "cdi'")), "the context's .dockerignore")
+	assert.NotEqual(t, base, hash(changed("infra/ch/scripts/s.sh", "sh'")), "a copied script")
+}
+
+func TestAGoModuleAtTheContextRootReadsOnlyWhatItBuilds(t *testing.T) {
+	tree := contextTree()
+	tree["infra/ch/cmd/tool/main.go"] = "t"
+	dockerfile := "FROM golang\nWORKDIR /src\nCOPY . .\nRUN go build ./cmd/x\n"
+	files, err := contextInputs(tree, dockerfile).FilesIn(context.Background(), "infra/ch/", "infra/ch/Dockerfile")
+	require.NoError(t, err)
+
+	assert.Contains(t, files, "infra/ch/internal/a/a.go")
+	assert.NotContains(t, files, "infra/ch/cmd/tool/main.go", "a package the binary does not import")
+	assert.NotContains(t, files, "infra/ch/README.md", "a file of the module that no build reads")
+}
+
+func TestASourceOutsideTheContextFails(t *testing.T) {
+	for name, c := range map[string]struct{ buildContext, dockerfile string }{
+		"a COPY above the context":       {"infra/ch", "FROM node\nCOPY ../../cmd ./cmd\n"},
+		"a bind mount above the context": {"infra/ch", "FROM node\nRUN --mount=type=bind,source=../x,target=/x true\n"},
+		"a go build after cd above it":   {"infra/ch", "FROM golang\nCOPY . .\nRUN cd .. && go build ./ch/cmd/x\n"},
+		"a context above the repository": {"../elsewhere", "FROM node\nCOPY . .\n"},
+		"an absolute context":            {"/infra/ch", "FROM node\nCOPY . .\n"},
+		"a COPY above the root context":  {"", "FROM node\nCOPY ../cmd ./cmd\n"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := contextInputs(contextTree(), c.dockerfile).FilesIn(context.Background(), c.buildContext, "infra/ch/Dockerfile")
+			assert.Error(t, err)
+		})
+	}
 }

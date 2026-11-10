@@ -16,6 +16,9 @@ type ImageSpec struct {
 	Row string
 	// Platform is the row's platform, "" for the workflow's default.
 	Platform string
+	// Context is the row's build context, a directory of the repository; ""
+	// is the repository root, which every row without one builds from.
+	Context string
 }
 
 // UnmarshalJSON reads a build table row.
@@ -27,6 +30,7 @@ func (s *ImageSpec) UnmarshalJSON(b []byte) error {
 	s.Image, _ = row["image"].(string)
 	s.Dockerfile, _ = row["dockerfile"].(string)
 	s.Platform, _ = row["platform"].(string)
+	s.Context, _ = row["context"].(string)
 	canonical, err := json.Marshal(row)
 	if err != nil {
 		return err
