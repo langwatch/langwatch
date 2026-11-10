@@ -13,7 +13,7 @@ import {
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
 import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
-import { EventLogRetention } from "@langwatch/eventing/server";
+import { EventLogRetention, RETENTION_RAISE_ONLY_ROW_FILTER } from "@langwatch/eventing/server";
 import { z } from "zod";
 
 import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
@@ -61,6 +61,16 @@ const keepForeverRowsSchema = z.array(
 const tenantFilterSql = "position(command, {tenantFilterNeedle:String}) > 0";
 
 const tableNameRowsSchema = z.array(z.object({ name: z.string() }));
+// `uniqExact` is UInt64, which ClickHouse's JSON output sends as a string.
+const countRowsSchema = z.array(z.object({ total: z.coerce.number() }));
+const DAY_MS = 86_400_000;
+
+/** Each category's main table, the id one stored item is counted by, and its TTL time column. */
+const PAST_RETENTION_COUNT_SOURCE = {
+  traces: { table: "trace_summaries", id: "TraceId", time: "OccurredAt" },
+  scenarios: { table: "simulation_runs", id: "ScenarioRunId", time: "StartedAt" },
+  experiments: { table: "experiment_runs", id: "RunId", time: "StartedAt" },
+} as const satisfies Record<RetentionCategory, { table: string; id: string; time: string }>;
 const tenantRowsSchema = z.array(z.object({ TenantId: z.string() }));
 
 // ClickHouse stores the command as `WHERE (TenantId = '..')` (25.x), so the needle omits WHERE.
@@ -105,10 +115,27 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     return this.eventLogRetention.tables.includes(table);
   }
 
-  async triggerUpdate(input: {
+  triggerUpdate(input: {
     projectId: string;
     category: RetentionCategory;
     newRetentionDays: number;
+  }): Promise<{ tables: string[] }> {
+    return this.rewrite({ ...input, raiseOnly: false });
+  }
+
+  raiseRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+  }): Promise<{ tables: string[] }> {
+    return this.rewrite({ ...input, raiseOnly: true });
+  }
+
+  private async rewrite(input: {
+    projectId: string;
+    category: RetentionCategory;
+    newRetentionDays: number;
+    raiseOnly: boolean;
   }): Promise<{ tables: string[] }> {
     const categoryTables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
       .filter(([, category]) => category === input.category)
@@ -132,11 +159,14 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     }
 
     // Once for both of eventing's tables: it raises its own index where the target holds it.
-    const eventingTables = await this.eventLogRetention.retainCategory({
+    const eventLogRewrite = {
       tenantId: input.projectId,
       category: input.category,
       retentionDays: input.newRetentionDays,
-    });
+    };
+    const eventingTables = input.raiseOnly
+      ? await this.eventLogRetention.raiseCategory(eventLogRewrite)
+      : await this.eventLogRetention.retainCategory(eventLogRewrite);
     // A later migration creates each index, so a target without one yet skips it.
     const heldIndexes = await this.findHeldTables({
       tenantId: input.projectId,
@@ -154,7 +184,9 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
           `ALTER TABLE ${table} ` +
           "UPDATE _retention_days = {retentionDays:UInt16} " +
           "WHERE TenantId = {tenantId:String} " +
-          "AND _retention_days != {retentionDays:UInt16}",
+          (input.raiseOnly
+            ? `AND ${RETENTION_RAISE_ONLY_ROW_FILTER}`
+            : "AND _retention_days != {retentionDays:UInt16}"),
         params: {
           tenantId: input.projectId,
           retentionDays: input.newRetentionDays,
@@ -181,6 +213,34 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     }
 
     return { tables: [...new Set([...categoryTables, ...heldIndexes, ...eventingTables])] };
+  }
+
+  async countPastRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    retentionDays: number;
+    nowMs: number;
+  }): Promise<number> {
+    if (input.retentionDays === 0) return 0;
+    const { table, id, time } = PAST_RETENTION_COUNT_SOURCE[input.category];
+    const { rows } = await this.clickhouse.query<unknown>({
+      tenantId: input.projectId,
+      table,
+      kind: "read",
+      sql: `
+        SELECT uniqExact(${id}) AS total
+        FROM ${table}
+        WHERE TenantId = {tenantId:String}
+          AND ${time} < fromUnixTimestamp64Milli({cutoffMs:Int64})
+          AND (_retention_days = 0 OR _retention_days > {retentionDays:UInt16})
+      `,
+      params: {
+        tenantId: input.projectId,
+        retentionDays: input.retentionDays,
+        cutoffMs: input.nowMs - input.retentionDays * DAY_MS,
+      },
+    });
+    return countRowsSchema.parse(rows)[0]?.total ?? 0;
   }
 
   async findMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {

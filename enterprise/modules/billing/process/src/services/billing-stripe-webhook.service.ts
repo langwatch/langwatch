@@ -8,20 +8,23 @@ import type Stripe from "stripe";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
-import type {
-  LicenseRenewalOutcome,
-  RenewalInvoice,
-} from "../features/license-purchase/services/license-renewal.service.ts";
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
 import { BestEffortService } from "./best-effort.service.ts";
 import { BillingCheckoutCompletionService } from "./billing-checkout-completion.service.ts";
+import {
+  BillingLicenseWebhookService,
+  type LicensePurchaseHandler,
+  type LicenseRenewalHandler,
+} from "./billing-license-webhook.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import type { CheckoutBillingRoles } from "./billing-starter-role.service.ts";
 import {
   BillingSubscriptionLifecycleService,
   type LicenseClearer,
 } from "./billing-subscription-lifecycle.service.ts";
+import type { OverPlanService } from "./over-plan.service.ts";
+import type { PaymentRecoveryService, RecoveryInvoice } from "./payment-recovery.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:webhookService");
@@ -31,23 +34,6 @@ const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 type ItemCalculator = Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
   readonly prices: StripePriceMap;
 };
-
-/**
- * License purchase events originate from a specific Stripe payment link and
- * target self-hosted buyers who have no organization in the SaaS database.
- * The webhook service routes these before any org lookup.
- */
-export interface LicensePurchaseHandler {
-  handle(params: {
-    checkoutSession: Stripe.Checkout.Session;
-    stripeSubscriptions: Pick<StripeSubscriptionsChannel, "listCheckoutLineItems">;
-  }): Promise<void>;
-}
-
-/** Mints the next term's licence for a renewed self-serve licence subscription. */
-export interface LicenseRenewalHandler {
-  handleInvoice(input: { invoice: RenewalInvoice }): Promise<LicenseRenewalOutcome>;
-}
 
 /** Stripe webhooks can arrive before subscription state is fully consistent. */
 const STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS = 2000;
@@ -81,6 +67,27 @@ type WebhookService = {
   handleSubscriptionUpdated(params: { subscription: Stripe.Subscription }): Promise<void>;
 };
 
+/** Failed payment recovery's reactions to invoice events (ADR-002). */
+export type PaymentRecoveryHandler = Pick<
+  PaymentRecoveryService,
+  "paymentFailed" | "invoicePaid" | "invoiceClosedUnpaid"
+>;
+
+/** The invoice fields recovery reads, from Stripe's object. */
+function recoveryInvoiceOf(invoice: Stripe.Invoice): RecoveryInvoice {
+  const { subscription } = invoice;
+  return {
+    id: invoice.id,
+    subscriptionId: typeof subscription === "string" ? subscription : (subscription?.id ?? null),
+    collectionMethod: invoice.collection_method ?? null,
+    billingReason: invoice.billing_reason ?? null,
+    amountDue: invoice.amount_due,
+    currency: invoice.currency,
+    number: invoice.number ?? null,
+    created: invoice.created,
+  };
+}
+
 /** A finalized invoice of a connected self-hosted customer completes a waiting renewal. */
 export interface ConnectedBillingInvoiceEvents {
   /** Throws connected_billing_not_onboarded for a LangWatch Cloud customer. */
@@ -88,16 +95,36 @@ export interface ConnectedBillingInvoiceEvents {
   completeRenewalIfDue(input: { organizationId: string }): Promise<unknown>;
 }
 
+type WebhookServiceOptions = {
+  /** Failed payment recovery; absent where a suite composes none. */
+  recovery?: PaymentRecoveryHandler;
+  subscriptionRepository: BillingWebhookSubscriptionRepository;
+  organizationRepository: BillingWebhookOrganizationRepository;
+  stripeSubscriptions: StripeSubscriptionsChannel;
+  itemCalculator: ItemCalculator;
+  /** Clears a trial's licence once its subscription activates; organization owns the row. */
+  licenses: LicenseClearer;
+  licensePurchaseHandler?: LicensePurchaseHandler;
+  licensePaymentLinkId?: string;
+  licenseRenewal?: LicenseRenewalHandler;
+  host: BillingWebhookHost;
+  connectedBilling?: ConnectedBillingInvoiceEvents;
+  /** Records the checkout and subscription changes for peers; absent where none is composed. */
+  announcer?: BillingLifecycleAnnouncerService;
+  /** Hands the Billing role to a checkout's starter; absent where no authz is composed. */
+  billingRoles?: CheckoutBillingRoles;
+  /** Marks a cancellation into Free with too many members; absent, none is marked. */
+  overPlan?: Pick<OverPlanService, "downgraded">;
+};
+
 export class EEWebhookService implements WebhookService {
   private readonly subscriptionRepository: BillingWebhookSubscriptionRepository;
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
-  private readonly stripeSubscriptions: StripeSubscriptionsChannel;
   private readonly itemCalculator: ItemCalculator;
-  private readonly licensePurchaseHandler?: LicensePurchaseHandler;
-  private readonly licensePaymentLinkId?: string;
-  private readonly licenseRenewal?: LicenseRenewalHandler;
+  private readonly license: BillingLicenseWebhookService;
   private readonly host: BillingWebhookHost;
   private readonly connectedBilling?: ConnectedBillingInvoiceEvents;
+  private readonly recovery?: PaymentRecoveryHandler;
   private readonly bestEffort = BestEffortService.create();
   private readonly lifecycle: BillingSubscriptionLifecycleService;
   private readonly checkout: BillingCheckoutCompletionService;
@@ -115,32 +142,21 @@ export class EEWebhookService implements WebhookService {
     connectedBilling,
     announcer,
     billingRoles,
-  }: {
-    subscriptionRepository: BillingWebhookSubscriptionRepository;
-    organizationRepository: BillingWebhookOrganizationRepository;
-    stripeSubscriptions: StripeSubscriptionsChannel;
-    itemCalculator: ItemCalculator;
-    /** Clears a trial's licence once its subscription activates; organization owns the row. */
-    licenses: LicenseClearer;
-    licensePurchaseHandler?: LicensePurchaseHandler;
-    licensePaymentLinkId?: string;
-    licenseRenewal?: LicenseRenewalHandler;
-    host: BillingWebhookHost;
-    connectedBilling?: ConnectedBillingInvoiceEvents;
-    /** Records the checkout and subscription changes for peers; absent where none is composed. */
-    announcer?: BillingLifecycleAnnouncerService;
-    /** Hands the Billing role to a checkout's starter; absent where no authz is composed. */
-    billingRoles?: CheckoutBillingRoles;
-  }) {
+    recovery,
+    overPlan,
+  }: WebhookServiceOptions) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
-    this.stripeSubscriptions = stripeSubscriptions;
     this.itemCalculator = itemCalculator;
-    this.licensePurchaseHandler = licensePurchaseHandler;
-    this.licensePaymentLinkId = licensePaymentLinkId;
-    this.licenseRenewal = licenseRenewal;
+    this.license = BillingLicenseWebhookService.create({
+      stripeSubscriptions,
+      ...(licensePurchaseHandler ? { licensePurchaseHandler } : {}),
+      ...(licensePaymentLinkId ? { licensePaymentLinkId } : {}),
+      ...(licenseRenewal ? { licenseRenewal } : {}),
+    });
     this.host = host;
     this.connectedBilling = connectedBilling;
+    this.recovery = recovery;
     this.checkout = BillingCheckoutCompletionService.create({
       subscriptionRepository,
       organizationRepository,
@@ -159,41 +175,23 @@ export class EEWebhookService implements WebhookService {
       itemCalculator,
       host,
       ...(announcer ? { announcer } : {}),
+      ...(overPlan ? { overPlan } : {}),
     });
   }
 
-  static create(options: {
-    subscriptionRepository: BillingWebhookSubscriptionRepository;
-    organizationRepository: BillingWebhookOrganizationRepository;
-    stripeSubscriptions: StripeSubscriptionsChannel;
-    itemCalculator: ItemCalculator;
-    licenses: LicenseClearer;
-    licensePurchaseHandler?: LicensePurchaseHandler;
-    licensePaymentLinkId?: string;
-    licenseRenewal?: LicenseRenewalHandler;
-    host: BillingWebhookHost;
-    connectedBilling?: ConnectedBillingInvoiceEvents;
-    announcer?: BillingLifecycleAnnouncerService;
-    billingRoles?: CheckoutBillingRoles;
-  }): EEWebhookService {
+  static create(options: WebhookServiceOptions): EEWebhookService {
     return new EEWebhookService(options);
   }
 
   async handleEvent(event: Stripe.Event): Promise<HandleEventResult> {
     try {
       if (event.type === "checkout.session.completed") {
-        const licenseResult = await this.tryRouteLicensePurchase(event);
-        if (licenseResult) {
-          return licenseResult;
-        }
+        const purchase = await this.license.routePurchase(event);
+        if (purchase.outcome === "handled") return purchase.result;
       }
 
-      if (event.type === "invoice.paid" || event.type === "invoice.payment_succeeded") {
-        const renewalResult = await this.tryRouteLicenseRenewal(event);
-        if (renewalResult) {
-          return renewalResult;
-        }
-      }
+      const settled = await this.routeSettledInvoice(event);
+      if (settled) return settled;
 
       if (
         event.type === "checkout.session.completed" ||
@@ -240,63 +238,22 @@ export class EEWebhookService implements WebhookService {
   }
 
   /**
-   * Returns a result when the session is a license purchase, otherwise null
-   * so `handleEvent` falls through to the subscription flow.
+   * A paid, voided or written-off invoice: licence renewal first, then failed payment recovery.
+   * Null lets `invoice.payment_succeeded` go on to the subscription sync.
    */
-  private async tryRouteLicensePurchase(
-    event: Stripe.Event & { type: "checkout.session.completed" },
-  ): Promise<HandleEventResult | null> {
-    const checkoutSession = event.data.object as Stripe.Checkout.Session;
-
-    const paymentLinkId =
-      typeof checkoutSession.payment_link === "string"
-        ? checkoutSession.payment_link
-        : checkoutSession.payment_link?.id;
-
-    if (!this.licensePaymentLinkId || paymentLinkId !== this.licensePaymentLinkId) {
-      return null;
+  private async routeSettledInvoice(event: Stripe.Event): Promise<HandleEventResult | null> {
+    if (event.type === "invoice.paid" || event.type === "invoice.payment_succeeded") {
+      const renewal = await this.license.routeRenewal(event);
+      if (renewal.outcome === "handled") return renewal.result;
+      // Both paid events of one invoice arrive; only the write that closes the case mails.
+      await this.recovery?.invoicePaid({ invoice: recoveryInvoiceOf(event.data.object) });
+      return event.type === "invoice.paid" ? { status: "ok" } : null;
     }
-
-    if (!this.licensePurchaseHandler) {
-      logger.error(
-        { eventId: event.id },
-        "[stripeWebhook] License purchase handler is not configured",
-      );
-
-      return {
-        status: "error",
-        httpStatus: 500,
-        message: "License generation error: handler not configured",
-      };
+    if (event.type === "invoice.voided" || event.type === "invoice.marked_uncollectible") {
+      await this.recovery?.invoiceClosedUnpaid({ invoice: recoveryInvoiceOf(event.data.object) });
+      return { status: "ok" };
     }
-
-    await this.licensePurchaseHandler.handle({
-      checkoutSession,
-      stripeSubscriptions: this.stripeSubscriptions,
-    });
-
-    return { status: "ok" };
-  }
-
-  /**
-   * A paid renewal of a licence subscription gets its next term's licence;
-   * anything else returns null and goes on. Both paid events of one invoice
-   * arrive: the per-invoice claim lets only the first mint.
-   */
-  private async tryRouteLicenseRenewal(
-    event: Stripe.Event & { type: "invoice.paid" | "invoice.payment_succeeded" },
-  ): Promise<HandleEventResult | null> {
-    if (!this.licenseRenewal) return null;
-    const outcome = await this.licenseRenewal.handleInvoice({ invoice: event.data.object });
-    if (outcome === "not_license_renewal") return null;
-    if (outcome === "in_flight") {
-      logger.warn(
-        { eventId: event.id, eventType: event.type },
-        "[stripeWebhook] License renewal for this invoice is in flight; asking Stripe to retry",
-      );
-      return { status: "error", httpStatus: 500, message: "License renewal in progress" };
-    }
-    return { status: "ok" };
+    return null;
   }
 
   private async routeConnectedInvoiceFinalized(
@@ -387,6 +344,9 @@ export class EEWebhookService implements WebhookService {
 
       case "invoice.payment_failed":
         await this.handleInvoicePaymentFailed({ subscriptionId });
+        await this.recovery?.paymentFailed({
+          invoice: recoveryInvoiceOf(event.data.object as Stripe.Invoice),
+        });
         return { status: "ok" };
     }
   }

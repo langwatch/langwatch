@@ -237,6 +237,23 @@ describe("given the visibility window service", () => {
       const service = makeService({ free: false, visibilityDays: null });
       await expect(service.getVisibilityWindow({ organizationId: "org-1" })).resolves.toEqual({
         visibilityCutoffMs: null,
+        withheldFromMs: null,
+        overPlan: null,
+      });
+    });
+  });
+
+  describe("when the organization is over its plan", () => {
+    it("answers the withholding start and the member counts", async () => {
+      const service = makeService({
+        free: false,
+        visibilityDays: null,
+        overPlan: { sinceMs: 1_700_000_000_000, members: 7, maxMembers: 5 },
+      });
+      await expect(service.getVisibilityWindow({ organizationId: "org-1" })).resolves.toEqual({
+        visibilityCutoffMs: null,
+        withheldFromMs: 1_700_000_000_000,
+        overPlan: { members: 7, maxMembers: 5 },
       });
     });
   });

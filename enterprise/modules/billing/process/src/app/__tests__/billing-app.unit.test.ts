@@ -105,6 +105,7 @@ function lifecycleRecording() {
     recordPricingModelChanged: ignored(),
     recordSeatCheckoutPaid: ignored(),
     recordSeatCheckoutsAbandoned: ignored(),
+    recordOverPlanChanged: ignored(),
   });
   return { lifecycle, audited };
 }

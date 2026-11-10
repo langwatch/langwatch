@@ -4,7 +4,14 @@ import {
   projectIdsReadBy,
 } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
-import { deriveTraceTimestamp, teaserOf, TraceNotFoundError } from "@langwatch/trace-contract";
+import {
+  deriveTraceTimestamp,
+  isTraceWithheld,
+  teaserOf,
+  TraceNotFoundError,
+  TraceWithheldOverPlanError,
+  type TraceWithholding,
+} from "@langwatch/trace-contract";
 
 import type { SpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
 import type {
@@ -30,6 +37,8 @@ interface TraceSummaryFullResolutionDeps {
 type GetByTraceIdParams = FindByTraceIdParams & {
   /** Summaries that occurred before this cutoff are teaser-redacted; omitted or null = ungated. */
   visibilityCutoffMs?: number | null;
+  /** A summary the over-plan cutoff withholds is refused; omitted = nothing withheld. */
+  withholding?: TraceWithholding;
   /** Resolve offloaded (ADR-022) input/output back to the full value; single-trace reads only. */
   full?: boolean;
 };
@@ -85,6 +94,7 @@ export class TraceSummaryService {
 
   async getByTraceId({
     visibilityCutoffMs,
+    withholding,
     full,
     ...read
   }: GetByTraceIdParams): Promise<TraceSummaryRead> {
@@ -99,6 +109,16 @@ export class TraceSummaryService {
       occurredAt: result.occurredAt,
       storageAnchorMs: result.storageAnchorMs,
     });
+    if (
+      withholding?.kind === "over_plan" &&
+      isTraceWithheld({ startedAtMs: tracedAt, withheldFromMs: withholding.fromMs })
+    ) {
+      throw new TraceWithheldOverPlanError({
+        traceId: read.traceId,
+        members: withholding.members,
+        maxMembers: withholding.maxMembers,
+      });
+    }
     if (cutoff !== null && cutoff !== undefined && tracedAt < cutoff) {
       // Gated reads get a teaser regardless — resolving the full value only
       // to redact it would be a wasted spans + event_log read.

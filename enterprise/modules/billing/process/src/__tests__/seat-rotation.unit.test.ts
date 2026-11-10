@@ -161,6 +161,7 @@ describe("Growth seat changes", () => {
       host: {
         sendSlackSubscriptionEvent: vi.fn(),
         sendSlackBillingThresholdFailureAlert: vi.fn(),
+        sendSlackAccountPaymentFailed: vi.fn(),
       },
     });
   });

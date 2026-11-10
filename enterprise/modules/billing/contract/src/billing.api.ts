@@ -17,6 +17,7 @@ import type {
   ConnectedRenewRequest,
 } from "./connected-billing.schemas.ts";
 import type { RenewalCompletion } from "./connected-billing.ts";
+import type { RetentionStorageOutcome, RetentionStorageReport } from "./growth-seat-event.ts";
 import type { Currency } from "./pricing.ts";
 import type { SubscriptionBillingInterval } from "./subscription.trpc.ts";
 
@@ -104,7 +105,14 @@ export interface BillingApi {
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
     customerEmail: string | null;
+    retentionDays?: number;
   }): Promise<{ url: string | null; subscriptionId: string }>;
+  /**
+   * Bills the storage an organization keeps beyond the 90 days Growth includes: the metered line
+   * follows the longest retention, and a measurement goes to the meter as that day's share of a
+   * GB-month. Answers what it did; an organization with no Growth seat subscription is skipped.
+   */
+  recordRetentionStorage(input: RetentionStorageReport): Promise<RetentionStorageOutcome>;
 }
 
 export const BillingApi = moduleApi<BillingApi>()("billing");

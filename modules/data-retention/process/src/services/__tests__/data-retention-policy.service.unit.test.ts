@@ -33,6 +33,11 @@ class StubDirectory implements DataRetentionDirectoryReader {
   async findScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return [];
   }
+  async findOrganizationCreatedAt(): ReturnType<
+    DataRetentionDirectoryReader["findOrganizationCreatedAt"]
+  > {
+    return [];
+  }
 }
 
 class StubPlans implements Pick<RetentionPlanService, "getPlan"> {

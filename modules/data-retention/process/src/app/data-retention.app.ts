@@ -4,10 +4,13 @@ import {
   DataRetentionApi,
   INDEFINITE_RETENTION_DAYS,
   resolvePlatformDefaultRetentionDays,
+  retentionCategories,
   type DataRetentionApi as DataRetentionApiContract,
   type DataRetentionServerConfig,
   type IdIndexRetentionRaiseInput,
   type KillRetroactiveMutationInput,
+  type OrganizationRetention,
+  type OrganizationStorageEstimate,
   type PinTraceInput,
   type PinnedTrace,
   type ResolvedRetention,
@@ -20,17 +23,32 @@ import {
   type RetroactiveMutationProjectInput,
   type ScopeAssignment,
   type StorageMeterTenantInput,
+  type StoredPastRetention,
   type StorageMeterTenantsInput,
   type UnpinTraceInput,
 } from "@langwatch/data-retention-contract";
+import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EventingCommands } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
+import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
 import {
   buildDataRetentionSeatPolicyPipeline,
   type DataRetentionSeatPolicyPipeline,
 } from "../eventing/data-retention-seat-policy.pipeline.ts";
+import { ApplyRetentionExtensionCommand } from "../eventing/retention-extension.commands.ts";
+import {
+  buildRetentionExtensionPipeline,
+  type RetentionExtensionPipelineDefinition,
+} from "../eventing/retention-extension.pipeline.ts";
+import { ReportRetentionStorageCommand } from "../eventing/retention-storage-report.commands.ts";
+import {
+  buildRetentionStorageReportPipeline,
+  type RetentionStorageReportPipelineDefinition,
+} from "../eventing/retention-storage-report.pipeline.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
 import {
   DataRetentionPolicyService,
@@ -38,11 +56,21 @@ import {
 } from "../services/data-retention-policy.service.ts";
 import { DataRetentionSnapshotService } from "../services/data-retention-snapshot.service.ts";
 import { DataRetentionService } from "../services/data-retention.service.ts";
+import { OrganizationStorageEstimateService } from "../services/organization-storage-estimate.service.ts";
+import { RetentionExtensionService } from "../services/retention-extension.service.ts";
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
 import { RetentionPlanService } from "../services/retention-plan.service.ts";
+import {
+  RetentionStorageReportRequestService,
+  type RetentionStorageRequestOutcome,
+} from "../services/retention-storage-report-request.service.ts";
+import { RetentionStorageReportService } from "../services/retention-storage-report.service.ts";
 import { SeatRetentionPolicyService } from "../services/seat-retention-policy.service.ts";
 import { StorageMeterScopeService } from "../services/storage-meter-scope.service.ts";
 import { StorageMeterService } from "../services/storage-meter.service.ts";
+import { StoredPastRetentionService } from "../services/stored-past-retention.service.ts";
+
+const logger = createLogger("langwatch:data-retention:retention-storage");
 
 /** A project's place in the organization chain, plus the name it renders under. */
 export type RetentionProjectLineage = Readonly<{
@@ -86,6 +114,9 @@ export interface DataRetentionDirectoryReader {
     organizationId: string;
     scope: ScopeAssignment;
   }): Promise<readonly { id: string; teamId: string }[]>;
+
+  /** When the organization was created; an empty answer when there is no such organization. */
+  findOrganizationCreatedAt(input: { organizationId: string }): Promise<readonly Instant[]>;
 }
 
 type DataRetentionSetup = FeatureSetup<
@@ -100,6 +131,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     permissions: AuthzApi,
     users: UserApi,
     entitlement: EntitlementApi,
+    billing: BillingApi,
   };
   static readonly config = dataRetentionConfig;
 
@@ -107,7 +139,11 @@ export class DataRetentionModule implements DataRetentionApiContract {
   readonly #policy: DataRetentionPolicyService;
   readonly #snapshots: DataRetentionSnapshotService;
   readonly #scopeMeter: StorageMeterScopeService;
-  readonly #seatPolicies: SeatRetentionPolicyService;
+  readonly #extensions: RetentionExtensionService;
+  readonly #storedPastRetention: StoredPastRetentionService;
+  readonly #storageEstimates: OrganizationStorageEstimateService;
+  readonly #storageReport: RetentionStorageReportService;
+  readonly #storageRequests: RetentionStorageReportRequestService;
   readonly #users: UserApi;
 
   private constructor(services: {
@@ -115,14 +151,22 @@ export class DataRetentionModule implements DataRetentionApiContract {
     policy: DataRetentionPolicyService;
     snapshots: DataRetentionSnapshotService;
     scopeMeter: StorageMeterScopeService;
-    seatPolicies: SeatRetentionPolicyService;
+    extensions: RetentionExtensionService;
+    storedPastRetention: StoredPastRetentionService;
+    storageEstimates: OrganizationStorageEstimateService;
+    storageReport: RetentionStorageReportService;
+    storageRequests: RetentionStorageReportRequestService;
     users: UserApi;
   }) {
     this.#retention = services.retention;
     this.#policy = services.policy;
     this.#snapshots = services.snapshots;
     this.#scopeMeter = services.scopeMeter;
-    this.#seatPolicies = services.seatPolicies;
+    this.#extensions = services.extensions;
+    this.#storedPastRetention = services.storedPastRetention;
+    this.#storageEstimates = services.storageEstimates;
+    this.#storageReport = services.storageReport;
+    this.#storageRequests = services.storageRequests;
     this.#users = services.users;
   }
 
@@ -153,6 +197,13 @@ export class DataRetentionModule implements DataRetentionApiContract {
       }),
     });
 
+    const storageReport = RetentionStorageReportService.create({
+      policies: repositories.policies,
+      projects: retention,
+      meter: repositories.storageMeter,
+      billing: dependencies.billing,
+    });
+
     return new DataRetentionModule({
       retention,
       policy,
@@ -167,14 +218,82 @@ export class DataRetentionModule implements DataRetentionApiContract {
         directory: repositories.directory,
         permissions,
       }),
-      seatPolicies: SeatRetentionPolicyService.create({ rules: retention }),
+      extensions: RetentionExtensionService.create({
+        seatPolicies: SeatRetentionPolicyService.create({ rules: retention }),
+        projects: retention,
+      }),
+      storedPastRetention: StoredPastRetentionService.create({
+        retention,
+        retroactive: repositories.retroactive,
+        directory: repositories.directory,
+        permissions,
+      }),
+      storageEstimates: OrganizationStorageEstimateService.create({
+        meter: storageMeter,
+        directory: repositories.directory,
+        retention,
+      }),
+      storageReport,
+      storageRequests: RetentionStorageReportRequestService.create({
+        organizations: storageReport,
+      }),
       users: dependencies.users,
     });
   }
 
   /** The pipeline `data_retention_seat_policy` registers, over billing's activation fact. */
   seatPolicyPipeline(): DataRetentionSeatPolicyPipeline {
-    return buildDataRetentionSeatPolicyPipeline({ seatPolicies: this.#seatPolicies });
+    return buildDataRetentionSeatPolicyPipeline({ extensions: this.#extensions });
+  }
+
+  /** The `data_retention_extension` pipeline: the activation's extension, raised per project. */
+  retentionExtensionPipeline(
+    deps: { applyRetryDelayMs?: (params: { attempt: number }) => number } = {},
+  ): RetentionExtensionPipelineDefinition {
+    return buildRetentionExtensionPipeline({
+      applyCommand: ApplyRetentionExtensionCommand.create({ retention: this.#retention }),
+      extensions: this.#extensions,
+      ...deps,
+    });
+  }
+
+  connectRetentionExtensionCommands(
+    commands: EventingCommands<RetentionExtensionPipelineDefinition>,
+  ): void {
+    this.#extensions.connect({
+      record: (data) => commands.recordRetentionExtension.send(data),
+      request: (data) => commands.requestStoredRetentionApply.send(data),
+      apply: (data) => commands.applyRetentionExtension.send(data),
+    });
+  }
+
+  /** The `data_retention_storage_report` pipeline: daily clock, measure command and bill. */
+  storageReportPipeline(deps: {
+    deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
+  }): RetentionStorageReportPipelineDefinition {
+    return buildRetentionStorageReportPipeline({
+      reportCommand: ReportRetentionStorageCommand.create({ measurer: this.#storageReport }),
+      sweep: {
+        request: ({ at }) => this.#storageRequests.requestAll({ at }),
+        deleteDispatchedBefore: deps.deleteDispatchedBefore,
+      },
+      bill: (measured) => this.#storageReport.bill(measured),
+    });
+  }
+
+  connectStorageReportCommands(
+    commands: EventingCommands<RetentionStorageReportPipelineDefinition>,
+  ): void {
+    this.#storageRequests.connect((data) => commands.reportRetentionStorage.send(data));
+  }
+
+  /** Sends today's measure command for one organization, or for every one with rules. */
+  requestRetentionStorageReport(input: {
+    organizationId?: string;
+  }): Promise<RetentionStorageRequestOutcome> {
+    return input.organizationId
+      ? this.#storageRequests.requestOrganization({ organizationId: input.organizationId })
+      : this.#storageRequests.requestAll();
   }
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {
@@ -271,6 +390,16 @@ export class DataRetentionModule implements DataRetentionApiContract {
     });
   }
 
+  getOrganizationStorageEstimate(input: {
+    organizationId: string;
+  }): Promise<OrganizationStorageEstimate> {
+    return this.#storageEstimates.getEstimate(input);
+  }
+
+  getOrganizationRetention(input: { organizationId: string }): Promise<OrganizationRetention> {
+    return this.#storageEstimates.getRetention(input);
+  }
+
   /**
    * The door has asked the target's permission; this refuses a target outside the named
    * organization, so the preview never leaks another organization's resolved default.
@@ -307,12 +436,75 @@ export class DataRetentionModule implements DataRetentionApiContract {
       await this.#policy.assertCanDisableRetention({ actor });
     }
 
-    return this.#retention.setForScope({
+    const { policy, lengthens } = await this.#retention.saveForScope({
       organizationId,
       scope,
       category: input.category,
       retentionDays: input.retentionDays,
     });
+    await this.#syncStorageLine(organizationId);
+    if (lengthens) await this.#extendFromSave({ organizationId, scope, policy });
+    return policy;
+  }
+
+  /** Stored items the scope's readable projects keep past their period, per category. */
+  async getStoredPastRetention(
+    input: { projectId: string; scope: ScopeAssignment } & RetentionCallerInput,
+  ): Promise<StoredPastRetention> {
+    return this.#storedPastRetention.getForScope({
+      projectId: input.projectId,
+      scope: input.scope,
+      actor: await this.#actor(input.userId),
+      nowMs: nowInstant().epochMilliseconds,
+    });
+  }
+
+  /**
+   * Records the ask; the worker then rewrites every project under the scope to the period it
+   * resolves to, one command per project and category, so a shorter period deletes rows.
+   */
+  async applyScopeRetentionToStoredData(
+    input: { organizationId?: string; scope: ScopeAssignment } & RetentionCallerInput,
+  ): Promise<void> {
+    const actor = await this.#actor(input.userId);
+    const { organizationId, scope } = await this.#scopeTarget(input);
+    await this.#retention.assertScopeInOrganization({ organizationId, scope });
+    await this.#policy.assertPlanForScope({ actor, organizationId });
+    const at = nowInstant().epochMilliseconds;
+    await this.#extensions.requestApply({
+      organizationId,
+      scope,
+      categories: retentionCategories,
+      requestId: `apply:${scope.scopeType}:${scope.scopeId}:${at}`,
+      at,
+    });
+  }
+
+  /** The rule is saved; a failed record is logged, and an Apply on the page still reaches it. */
+  async #extendFromSave({
+    organizationId,
+    scope,
+    policy,
+  }: {
+    organizationId: string;
+    scope: ScopeAssignment;
+    policy: RetentionPolicy;
+  }): Promise<void> {
+    try {
+      await this.#extensions.extendFromSave({
+        organizationId,
+        scope,
+        category: policy.category,
+        retentionDays: policy.retentionDays,
+        extensionId: `save:${policy.id}:${policy.updatedAt.getTime()}`,
+        at: policy.updatedAt.getTime(),
+      });
+    } catch (error) {
+      logger.error(
+        { organizationId, error: error instanceof Error ? error.message : String(error) },
+        "Lengthened retention could not be recorded for stored data",
+      );
+    }
   }
 
   async removeForScope(
@@ -331,6 +523,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
       scope,
       category: input.category,
     });
+    await this.#syncStorageLine(organizationId);
   }
 
   /**
@@ -363,6 +556,21 @@ export class DataRetentionModule implements DataRetentionApiContract {
       projectId: input.projectId,
       mutationId: input.mutationId,
     });
+  }
+
+  /**
+   * Adds or removes the storage line after a rule change. The rule is already saved, so a billing
+   * failure is logged rather than undoing it; the daily report aligns the line again.
+   */
+  async #syncStorageLine(organizationId: string): Promise<void> {
+    try {
+      await this.#storageReport.syncLine({ organizationId });
+    } catch (error) {
+      logger.error(
+        { organizationId, error: error instanceof Error ? error.message : String(error) },
+        "Retention storage line could not follow the rule change",
+      );
+    }
   }
 
   /**

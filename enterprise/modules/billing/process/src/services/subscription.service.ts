@@ -211,6 +211,7 @@ export class BillingSubscriptionService {
     currency,
     billingInterval,
     startedByUserId,
+    retentionDays,
   }: {
     organizationId: string;
     baseUrl: string;
@@ -222,6 +223,8 @@ export class BillingSubscriptionService {
     billingInterval?: BillingInterval;
     /** Carried on the checkout so its completion can give this person the Billing role. */
     startedByUserId?: string;
+    /** Only a Growth seat checkout offers a retention choice. */
+    retentionDays?: number;
   }): Promise<{ url: string | null }> {
     if (isGrowthSeatEventPlan(plan) && this.seatEventService) {
       const pricingModel = await this.organizationRepository.findPricingModel(organizationId);
@@ -236,6 +239,7 @@ export class BillingSubscriptionService {
         membersToAdd,
         isUpgradeFromTiered: pricingModel === "TIERED",
         ...(startedByUserId ? { startedByUserId } : {}),
+        ...(retentionDays === undefined ? {} : { retentionDays }),
       });
       return { url };
     }
@@ -315,6 +319,7 @@ export class BillingSubscriptionService {
     customerId,
     currency,
     billingInterval,
+    retentionDays,
   }: {
     organizationId: string;
     baseUrl: string;
@@ -322,6 +327,7 @@ export class BillingSubscriptionService {
     customerId: string;
     currency?: Currency;
     billingInterval?: BillingInterval;
+    retentionDays?: number;
   }): Promise<{ url: string | null; subscriptionId: string }> {
     if (!this.seatEventService) {
       throw new SeatBillingUnavailableError();
@@ -337,6 +343,7 @@ export class BillingSubscriptionService {
       billingInterval: billingInterval ?? "monthly",
       membersToAdd,
       isUpgradeFromTiered: pricingModel === "TIERED",
+      ...(retentionDays === undefined ? {} : { retentionDays }),
     });
   }
 

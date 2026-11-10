@@ -20,6 +20,9 @@ import {
   type SubscriptionBillingInterval,
   type CurrencyRequest,
   type DetectedCurrency,
+  type PaymentRecoveryDetails,
+  type PaymentRecoveryPayLink,
+  type PaymentRecoverySummary,
   type ConnectedBillingAccountView,
   type ConnectedBillingOverview,
   ConnectedBillingUnavailableError,
@@ -30,6 +33,8 @@ import {
   type RenewalCompletion,
   type ReportUsageForMonthCommandData,
   type ResourceLimitNotifierInput,
+  type RetentionStorageOutcome,
+  type RetentionStorageReport,
   type SubscriptionPlanInput,
   type BillingPricingModel,
 } from "@langwatch/enterprise-billing-contract";
@@ -49,6 +54,7 @@ import type { BillingSubscriptionNotifier } from "../channels/billing-subscripti
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { BillingChannels } from "../channels/billing.channels.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
+import type { PaymentRecoveryEmailChannel } from "../channels/payment-recovery-email.channel.ts";
 import { SlackBillingSubscriptionNotifierChannel } from "../channels/slack/slack.billing-subscription-notifier.channel.ts";
 import { SlackBillingWebhookHostChannel } from "../channels/slack/slack.billing-webhook-host.channel.ts";
 import type { BillingLifecyclePipeline } from "../eventing/billing-lifecycle.pipeline.ts";
@@ -76,22 +82,26 @@ import {
   resourceLimitCooldown,
 } from "../services/billing-alert-cooldown.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
+import type { LicensePurchaseHandler } from "../services/billing-license-webhook.service.ts";
 import { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
 import type { CheckoutBillingRoles } from "../services/billing-starter-role.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
-import {
-  EEWebhookService,
-  type LicensePurchaseHandler,
-} from "../services/billing-stripe-webhook.service.ts";
+import { EEWebhookService } from "../services/billing-stripe-webhook.service.ts";
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { CurrencyService } from "../services/currency.service.ts";
 import { CustomerService } from "../services/customer.service.ts";
 import { DeveloperSeatService } from "../services/developer-seat.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
+import { OverPlanService } from "../services/over-plan.service.ts";
+import {
+  PaymentRecoveryService,
+  type PaymentRecoverySweepOutcome,
+} from "../services/payment-recovery.service.ts";
 import { PlanLimitAlertService } from "../services/plan-limit-alert.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
+import { RetentionStorageBillingService } from "../services/retention-storage-billing.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import {
   type SeatLineRepairOutcome,
@@ -156,6 +166,15 @@ type StripeWebhookComposition = Readonly<{
   licenseRenewal?: Pick<LicensePurchaseService, "mintRenewal" | "sendRenewal">;
   /** Clears a trial's licence once its subscription activates; licensing owns it. */
   licenses: Pick<LicensingApi, "removeLicense" | "getLicenseStatus">;
+  /** Failed payment recovery's mail and links; absent, a failed renewal opens no case. */
+  recovery?: PaymentRecoveryComposition;
+}>;
+
+type PaymentRecoveryComposition = Readonly<{
+  emails: PaymentRecoveryEmailChannel;
+  publicBaseUrl: string;
+  /** Billing role holders are told too; absent, admins only. */
+  billingMembers?: Pick<AuthzApi, "listBillingMembers">;
 }>;
 
 type SubscriptionComposition = Readonly<{
@@ -169,6 +188,7 @@ type SubscriptionDoor = Readonly<{
   subscriptions: BillingSubscriptionService;
   seatLines: SeatLineRepairService;
   developerSeats: DeveloperSeatService;
+  retentionStorage: RetentionStorageBillingService;
 }>;
 
 type ConnectedBilling = Readonly<{
@@ -248,6 +268,11 @@ export class BillingModule
         licenses: setup.dependencies.licensing,
         licensePurchase,
         licenseRenewal: licensePurchase,
+        recovery: {
+          emails: channels.paymentRecoveryEmail,
+          publicBaseUrl: setup.config.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
+          billingMembers: setup.dependencies.authorization,
+        },
       },
       subscription: {
         notifier: SlackBillingSubscriptionNotifierChannel.create({ notices }),
@@ -373,6 +398,8 @@ export class BillingModule
       | "organizations"
       | "gatewaySpend"
       | "projects"
+      | "paymentRecovery"
+      | "overPlan"
     >;
     config: Pick<
       BillingServerConfig,
@@ -410,13 +437,24 @@ export class BillingModule
       facts,
       licensing: peers.licensing,
     });
+    const subscriptionPlans = SaaSPlanProviderService.create({
+      subscriptions: repositories.subscriptions,
+      isSaas,
+    });
+    const overPlan = isSaas
+      ? OverPlanService.create({
+          marks: repositories.overPlan,
+          organizations: repositories.organizations,
+          isOnFree: async (organizationId) =>
+            (await subscriptionPlans.getActivePlan(organizationId)).free,
+          ...(lifecycle ? { facts: lifecycle } : {}),
+        })
+      : void 0;
     const gate = {
       authorization: peers.authorization,
       overview,
-      subscriptionPlans: SaaSPlanProviderService.create({
-        subscriptions: repositories.subscriptions,
-        isSaas,
-      }),
+      subscriptionPlans,
+      overPlan,
       isSaas,
       resourceLimitAlerts,
       pricing: OrganizationPricingService.create(repositories.organizationPricing),
@@ -436,8 +474,25 @@ export class BillingModule
         connected: void 0,
         stripeWebhook: BillingModule.#undispatchedWebhook(),
         subscriptions: void 0,
+        paymentRecovery: void 0,
       });
     }
+
+    const recovery = webhook?.recovery;
+    const paymentRecovery =
+      webhook && recovery && isSaas
+        ? PaymentRecoveryService.create({
+            recoveries: repositories.paymentRecovery,
+            subscriptions: repositories.webhookSubscriptions,
+            organizations: repositories.organizations,
+            ...(recovery.billingMembers ? { billingMembers: recovery.billingMembers } : {}),
+            invoices: stripe.channels.invoices,
+            emails: recovery.emails,
+            alerts: webhook.host,
+            publicBaseUrl: recovery.publicBaseUrl,
+            ...(overPlan ? { overPlan } : {}),
+          })
+        : void 0;
 
     const invoicing = stripe.channels.connectedInvoicing;
     const { licensing } = peers;
@@ -469,8 +524,11 @@ export class BillingModule
             connectedBilling: billing,
             announcer: lifecycle,
             billingRoles,
+            paymentRecovery,
+            overPlan,
           })
         : BillingModule.#undispatchedWebhook(),
+      paymentRecovery,
       subscriptions:
         subscription && isSaas
           ? BillingModule.#composeSubscriptions({
@@ -530,9 +588,10 @@ export class BillingModule
       "subscriptions" | "organizations" | "seatEventSubscriptions"
     >;
   }): SubscriptionDoor {
-    const prices = BillingPriceCatalogue.create(
+    const catalogue = BillingPriceCatalogue.create(
       getStripeEnvironmentFromNodeEnv(nodeEnvironment),
-    ).prices;
+    );
+    const { prices } = catalogue;
     const stripeErrors = StripeErrorTranslatorService.create();
     const { customers, subscriptions: stripeSubscriptions } = stripe.channels;
     return {
@@ -564,6 +623,13 @@ export class BillingModule
         subscriptions: repositories.seatEventSubscriptions,
         prices,
         unitAmountOf: (priceId) => stripePricesFile.prices[priceId]?.unitAmount ?? null,
+      }),
+      retentionStorage: RetentionStorageBillingService.create({
+        subscriptions: repositories.seatEventSubscriptions,
+        stripeSubscriptions,
+        meters: stripe.channels.meters,
+        prices,
+        isMeterProvisioned: catalogue.meters.RETENTION_STORAGE_GB !== undefined,
       }),
     };
   }
@@ -608,6 +674,7 @@ export class BillingModule
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
     startedByUserId?: string;
+    retentionDays?: number;
   }): Promise<{ url: string | null }> {
     return this.#subscriptionDoor.subscriptions.createOrUpdateSubscription(input);
   }
@@ -671,6 +738,7 @@ export class BillingModule
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
     customerEmail: string | null;
+    retentionDays?: number;
   }): Promise<{ url: string | null; subscriptionId: string }> {
     const { customerEmail, ...checkout } = input;
     const customerId = await this.getOrCreateCustomerId({
@@ -678,6 +746,12 @@ export class BillingModule
       organizationId: input.organizationId,
     });
     return this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId });
+  }
+
+  /** Off Cloud, or where no payment provider is composed, nothing is billed for storage. */
+  async recordRetentionStorage(input: RetentionStorageReport): Promise<RetentionStorageOutcome> {
+    if (!this.#subscriptions) return { line: "skipped", reportedGbMonths: null };
+    return this.#subscriptions.retentionStorage.record(input);
   }
 
   async listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]> {
@@ -695,7 +769,11 @@ export class BillingModule
     connectedBilling,
     announcer,
     billingRoles,
+    paymentRecovery,
+    overPlan,
   }: {
+    paymentRecovery: PaymentRecoveryService | undefined;
+    overPlan: OverPlanService | undefined;
     announcer: BillingLifecycleAnnouncerService | undefined;
     /** The Billing role a completed checkout hands its starter. */
     billingRoles: CheckoutBillingRoles | undefined;
@@ -737,6 +815,8 @@ export class BillingModule
       connectedBilling,
       ...(billingRoles ? { billingRoles } : {}),
       ...(announcer ? { announcer } : {}),
+      ...(paymentRecovery ? { recovery: paymentRecovery } : {}),
+      ...(overPlan ? { overPlan } : {}),
     });
     return StripeWebhookReceiptService.create({
       dispatchesEvents: () => isSaas,
@@ -775,8 +855,12 @@ export class BillingModule
   readonly #reporting: BillingReportingPipeline;
   readonly #resourceLimitAlerts: ResourceLimitAlertService;
   readonly #lifecycle: BillingLifecycleAnnouncerService | undefined;
+  readonly #paymentRecovery: PaymentRecoveryService | undefined;
+  readonly #overPlan: OverPlanService | undefined;
 
   private constructor({
+    paymentRecovery,
+    overPlan,
     stripeWebhook,
     subscriptions,
     connected,
@@ -789,6 +873,9 @@ export class BillingModule
     resourceLimitAlerts,
     lifecycle,
   }: {
+    paymentRecovery: PaymentRecoveryService | undefined;
+    /** The over-plan state; absent off LangWatch Cloud, where no plan carries it. */
+    overPlan: OverPlanService | undefined;
     lifecycle: BillingLifecycleAnnouncerService | undefined;
     stripeWebhook: StripeWebhookReceiptService;
     subscriptions: SubscriptionDoor | undefined;
@@ -812,6 +899,8 @@ export class BillingModule
     this.#reporting = reporting;
     this.#resourceLimitAlerts = resourceLimitAlerts;
     this.#lifecycle = lifecycle;
+    this.#paymentRecovery = paymentRecovery;
+    this.#overPlan = overPlan;
   }
 
   notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void> {
@@ -958,9 +1047,12 @@ export class BillingModule
   }: SubscriptionPlanInput): Promise<PlanInfo> {
     const plan = await this.#subscriptionPlans.getActivePlan(organizationId);
     const impersonatorId = user?.impersonator?.id;
+    const state =
+      plan.free && this.#overPlan ? await this.#overPlan.getState({ organizationId }) : undefined;
 
     return {
       ...plan,
+      ...(state?.kind === "over_plan" ? { overPlan: state.overPlan } : {}),
       overrideAddingLimitations:
         !!impersonatorId &&
         (await this.#authorization.can({
@@ -1113,6 +1205,43 @@ export class BillingModule
   async repairSeatLines(): Promise<SeatLineRepairOutcome> {
     if (!this.#subscriptions) return { repaired: 0, pending: 0, failed: 0, flagged: 0 };
     return this.#subscriptions.seatLines.repairSeatLines();
+  }
+
+  /** Sends each open recovery case's notice that is due; nothing where recovery is not composed. */
+  async sweepPaymentRecovery(): Promise<PaymentRecoverySweepOutcome> {
+    // The over-plan marks end on the same hourly pass; a mark only records what the plan read
+    // already answers, so a late end hides nothing.
+    const overPlan = await this.#overPlan?.sweep();
+    if (!this.#paymentRecovery) return { notified: 0, closed: 0, failed: overPlan?.failed ?? 0 };
+    const recovery = await this.#paymentRecovery.sweep();
+    return { ...recovery, failed: recovery.failed + (overPlan?.failed ?? 0) };
+  }
+
+  async paymentRecovery(input: { organizationId: string }): Promise<PaymentRecoverySummary> {
+    if (!this.#paymentRecovery) return { state: "none" };
+    return this.#paymentRecovery.summary(input);
+  }
+
+  async paymentRecoveryDetails(input: { organizationId: string }): Promise<PaymentRecoveryDetails> {
+    if (!this.#paymentRecovery) {
+      return {
+        state: "none",
+        startedAt: null,
+        accessStopsAt: null,
+        invoiceNumber: null,
+        amountDue: null,
+        currency: null,
+        card: null,
+      };
+    }
+    return this.#paymentRecovery.details(input);
+  }
+
+  async paymentRecoveryPayLink(input: { organizationId: string }): Promise<PaymentRecoveryPayLink> {
+    if (!this.#paymentRecovery) {
+      return { url: `${DEFAULT_PUBLIC_BASE_URL}/settings/subscription`, isFallback: true };
+    }
+    return this.#paymentRecovery.payLink(input);
   }
 
   /** Every row it reads and every invoice it raises is Cloud's: an install runs nothing. */

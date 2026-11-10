@@ -41,20 +41,22 @@ function renderDrawer(props: Partial<React.ComponentProps<typeof AddOverrideDraw
 describe("AddOverrideDrawer plan-gated behavior", () => {
   afterEach(cleanup);
 
-  describe("given the apply-to-existing toggle", () => {
-    /** @scenario "Applying a change to existing data is opt-in, not automatic" */
-    it("defaults OFF, so saving a new policy never triggers a rewrite unasked", () => {
+  describe("when a new policy is created", () => {
+    /** @scenario "Saving a policy from the editor never rewrites stored data by itself" */
+    it("hands over only the scopes and the period, with no switch to rewrite stored data", () => {
       const onSave = vi.fn();
       // Add mode defaults the scope to the current project and the retention to
       // the first plan preset, so Create is enabled without further input.
       renderDrawer({ isEnterprise: true, onSave });
+      expect(screen.queryByText("Apply this change to existing data")).toBeNull();
 
       fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
       expect(onSave).toHaveBeenCalledTimes(1);
-      expect(onSave.mock.calls[0]?.[0]).toMatchObject({
-        applyToExisting: false,
-      });
+      expect(Object.keys(onSave.mock.calls[0]?.[0] ?? {}).toSorted()).toEqual([
+        "retentionDays",
+        "scopes",
+      ]);
     });
   });
 
@@ -62,7 +64,7 @@ describe("AddOverrideDrawer plan-gated behavior", () => {
     const legacyTarget: RetentionEditTarget = {
       scope: { scopeType: "ORGANIZATION", scopeId: "org-1" },
       scopeName: "Acme",
-      retentionDays: 371, // enterprise-only value, not on the paid menu
+      retentionDays: 1827, // enterprise-only value, not on the paid menu
     };
 
     /** @scenario "A grandfathered value is shown but never silently changed" */
@@ -71,7 +73,7 @@ describe("AddOverrideDrawer plan-gated behavior", () => {
       renderDrawer({ isEnterprise: false, editTarget: legacyTarget, onSave });
       // The label shows in both the selected-value readout and the option list,
       // so assert at least one occurrence rather than a unique match.
-      expect(screen.getAllByText("Current: 371 days (legacy)").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Current: 1827 days (legacy)").length).toBeGreaterThan(0);
       // Grandfathering: never coerce or silently shorten. Save is clickable, says why it
       // cannot save the read-only legacy value, and never reaches onSave.
       const save = screen.getByRole("button", { name: "Save changes" });

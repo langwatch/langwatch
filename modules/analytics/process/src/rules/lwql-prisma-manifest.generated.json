@@ -19215,6 +19215,51 @@
           "documentation": ""
         },
         {
+          "name": "paymentRecoveryInvoiceId",
+          "columnName": "paymentRecoveryInvoiceId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "An open failed payment recovery case: the unpaid renewal invoice, day 0 (its first failed\ncharge) and the last notice sent (3, 7, 14 or 21). Cleared when the case closes."
+        },
+        {
+          "name": "paymentRecoveryStartedAt",
+          "columnName": "paymentRecoveryStartedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "paymentRecoveryNoticeDay",
+          "columnName": "paymentRecoveryNoticeDay",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "overPlanSince",
+          "columnName": "overPlanSince",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The over-plan mark: traces recorded from overPlanSince are withheld while it is open and the\norganization is on Free with more members than Free allows; ended once that no longer holds."
+        },
+        {
+          "name": "overPlanEndedAt",
+          "columnName": "overPlanEndedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "organization",
           "columnName": "organization",
           "type": "Organization",

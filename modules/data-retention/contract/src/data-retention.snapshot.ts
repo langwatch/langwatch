@@ -89,3 +89,51 @@ export interface RetentionStorageUsageSchema extends Named<
 export const retentionStorageUsageSchema: RetentionStorageUsageSchema =
   retentionStorageUsageSchemaDefinition;
 export type RetentionStorageUsage = z.infer<typeof retentionStorageUsageSchema>;
+
+/**
+ * Stored rows a scope's projects keep past their resolved retention, per category: what applying
+ * the period to stored data would delete. `retentionDays` is null when the projects differ.
+ */
+const storedPastRetentionSchemaDefinition = z.object({
+  categories: z.array(
+    z.object({
+      category: retentionCategorySchema,
+      rows: z.number().int().nonnegative(),
+      retentionDays: z.number().int().nonnegative().nullable(),
+    }),
+  ),
+  projectCount: z.number().int().nonnegative(),
+});
+export interface StoredPastRetentionSchema extends Named<
+  typeof storedPastRetentionSchemaDefinition
+> {}
+export const storedPastRetentionSchema: StoredPastRetentionSchema =
+  storedPastRetentionSchemaDefinition;
+export type StoredPastRetention = z.infer<typeof storedPastRetentionSchema>;
+
+/**
+ * What an organization stores today and how many days of data that is, so the upgrade dialog
+ * can price a longer retention before the buyer picks it.
+ */
+const organizationStorageEstimateSchemaDefinition = z.object({
+  totalBytes: z.number().nonnegative(),
+  /** The organization's traces retention, or its age in days when it is younger than that. */
+  coveredDays: z.number().int().positive(),
+});
+export interface OrganizationStorageEstimateSchema extends Named<
+  typeof organizationStorageEstimateSchemaDefinition
+> {}
+export const organizationStorageEstimateSchema: OrganizationStorageEstimateSchema =
+  organizationStorageEstimateSchemaDefinition;
+export type OrganizationStorageEstimate = z.infer<typeof organizationStorageEstimateSchema>;
+
+/** The traces retention the organization keeps, as the plan card names it; 0 keeps it forever. */
+const organizationRetentionSchemaDefinition = z.object({
+  retentionDays: z.number().int().nonnegative(),
+});
+export interface OrganizationRetentionSchema extends Named<
+  typeof organizationRetentionSchemaDefinition
+> {}
+export const organizationRetentionSchema: OrganizationRetentionSchema =
+  organizationRetentionSchemaDefinition;
+export type OrganizationRetention = z.infer<typeof organizationRetentionSchema>;

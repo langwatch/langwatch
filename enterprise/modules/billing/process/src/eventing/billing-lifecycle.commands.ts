@@ -9,6 +9,7 @@ import {
   PRICING_MODEL_CHANGED_EVENT_TYPE,
   SEAT_CHECKOUT_PAID_EVENT_TYPE,
   SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE,
+  OVER_PLAN_CHANGED_EVENT_TYPE,
   SUBSCRIPTION_CHANGED_EVENT_TYPE,
   SUBSCRIPTION_STARTED_EVENT_TYPE,
   USAGE_BILLING_CHANGED_EVENT_TYPE,
@@ -57,6 +58,10 @@ import {
   type SeatCheckoutsAbandonedEvent,
   type RecordSeatCheckoutsAbandonedCommandData,
   recordSeatCheckoutsAbandonedCommandDataSchema,
+  RECORD_OVER_PLAN_CHANGED_COMMAND_TYPE,
+  type OverPlanChangedEvent,
+  type RecordOverPlanChangedCommandData,
+  recordOverPlanChangedCommandDataSchema,
 } from "./billing-lifecycle.events.ts";
 
 /** Records that an organization's subscription state changed. */
@@ -401,6 +406,39 @@ export class RecordSeatCheckoutsAbandonedCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordSeatCheckoutsAbandonedCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records that an organization went over its plan or came back within it; keyed by the mark. */
+export class RecordOverPlanChangedCommand implements CommandHandler<
+  Command<RecordOverPlanChangedCommandData>,
+  OverPlanChangedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_OVER_PLAN_CHANGED_COMMAND_TYPE,
+    recordOverPlanChangedCommandDataSchema,
+    "Record that an organization went over its plan or came back within it",
+  );
+
+  handle(command: Command<RecordOverPlanChangedCommandData>): OverPlanChangedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<OverPlanChangedEvent>({
+        aggregateType: BILLING_LIFECYCLE_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: OVER_PLAN_CHANGED_EVENT_TYPE,
+        version: BILLING_LIFECYCLE_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:over_plan_${data.state}:${data.subscriptionId}:${data.since}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordOverPlanChangedCommandData): string {
     return payload.organizationId;
   }
 }

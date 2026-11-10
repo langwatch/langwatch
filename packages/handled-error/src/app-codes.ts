@@ -859,6 +859,7 @@ export const APP_ERROR_CODES = [
   "trace_page_size_too_large",
   "trace_project_required",
   "trace_sharing_disabled",
+  "trace_withheld_over_plan",
   "tracked_event_invalid",
   "trigger_action_immutable",
   "trigger_action_params_unknown_fields",

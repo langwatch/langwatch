@@ -1,5 +1,6 @@
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -84,6 +85,12 @@ export class MemoryRetentionDirectory implements DataRetentionDirectoryReader {
 
   async findScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return [{ id: this.graph.projectId, teamId: this.graph.teamId }];
+  }
+
+  async findOrganizationCreatedAt(): ReturnType<
+    DataRetentionDirectoryReader["findOrganizationCreatedAt"]
+  > {
+    return [];
   }
 }
 
@@ -172,6 +179,13 @@ function testPlan(plan: Readonly<{ free: boolean; type: string }>): Plan {
   };
 }
 
+/** Billing that holds no Growth subscription: every storage report is skipped. */
+export function createDataRetentionTestBilling(): BillingApi {
+  return createApiFixture<BillingApi>({
+    recordRetentionStorage: async () => ({ line: "skipped", reportedGbMonths: null }),
+  });
+}
+
 export function createDataRetentionTestApp(
   input: Readonly<{
     repositories?: DataRetentionRepositories;
@@ -180,6 +194,7 @@ export function createDataRetentionTestApp(
       permissions: AuthzApi;
       users: UserApi;
       entitlement: EntitlementApi;
+      billing: BillingApi;
     }>;
     platformDefaultRetentionDays?: number;
   }> = {},
@@ -194,6 +209,7 @@ export function createDataRetentionTestApp(
       permissions: input.dependencies?.permissions ?? createDataRetentionTestAuthz(),
       users: input.dependencies?.users ?? createDataRetentionTestUsers(),
       entitlement: input.dependencies?.entitlement ?? createDataRetentionTestEntitlement(),
+      billing: input.dependencies?.billing ?? createDataRetentionTestBilling(),
     },
     config: {
       platformDefaultDays: input.platformDefaultRetentionDays?.toString(),

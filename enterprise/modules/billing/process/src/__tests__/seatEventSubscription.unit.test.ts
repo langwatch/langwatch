@@ -1165,6 +1165,23 @@ describe("seatEventSubscription", () => {
           expect.objectContaining({ currency: "eur" }),
         );
       });
+
+      /** @scenario "The pending subscription keeps the picked retention" */
+      it("records the picked retention on the pending subscription", async () => {
+        await service.createSeatEventCheckout({
+          organizationId: "org_1",
+          customerId: "cus_1",
+          baseUrl: "https://app.test",
+          currency: "EUR" as any,
+          billingInterval: "monthly",
+          membersToAdd: 2,
+          retentionDays: 182,
+        });
+
+        expect(subscriptions.createPendingSeatCheckout).toHaveBeenCalledWith(
+          expect.objectContaining({ organizationId: "org_1", maxRetentionDays: 182 }),
+        );
+      });
     });
 
     describe("when the provider rate-limits the currency lookup", () => {

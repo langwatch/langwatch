@@ -49,6 +49,13 @@ type DataRetentionServiceOptions = Readonly<{
   storageMeter: StorageMeterService;
 }>;
 
+/** Whether moving a rule from `from` days (none when undefined) to `to` may keep rows longer. */
+function lengthensRetention({ from, to }: { from: number | undefined; to: number }): boolean {
+  if (from === undefined) return true;
+  if (from === 0) return false;
+  return to === 0 || to > from;
+}
+
 /** Projects whose placements one retention lookup reads at once. */
 const RETENTION_LOOKUP_CHUNK = 1_000;
 
@@ -159,10 +166,31 @@ export class DataRetentionService {
     category: RetentionCategory;
     retentionDays: number;
   }): Promise<RetentionPolicy> {
+    return (await this.saveForScope(input)).policy;
+  }
+
+  /**
+   * As `setForScope`, also saying whether the save may lengthen what stored rows keep: no rule
+   * before, or one keeping fewer days. A raise where it did not is a no-op, so this errs to true.
+   */
+  async saveForScope(input: {
+    organizationId: string;
+    scope: ScopeAssignment;
+    category: RetentionCategory;
+    retentionDays: number;
+  }): Promise<{ policy: RetentionPolicy; lengthens: boolean }> {
     const retentionDays = retentionDaysInputSchema.parse(input.retentionDays);
     await this.assertScopeInOrganization(input);
+    const previous = (
+      await this.options.policies.findAllInOrganization({ organizationId: input.organizationId })
+    ).find(
+      (row) =>
+        row.scopeType === input.scope.scopeType &&
+        row.scopeId === input.scope.scopeId &&
+        row.category === input.category,
+    );
 
-    const row = await this.options.policies.upsertForScope({
+    const policy = await this.options.policies.upsertForScope({
       organizationId: input.organizationId,
       scope: input.scope,
       category: input.category,
@@ -170,7 +198,10 @@ export class DataRetentionService {
     });
     await this.invalidateForScope(input);
 
-    return row;
+    return {
+      policy,
+      lengthens: lengthensRetention({ from: previous?.retentionDays, to: retentionDays }),
+    };
   }
 
   async removeForScope(input: {
@@ -246,6 +277,57 @@ export class DataRetentionService {
     return this.options.retroactive.triggerUpdate(parsed);
   }
 
+  /**
+   * Raises one project's stored rows in `category` to the retention its cascade resolves to now,
+   * never lowering a row; answers the tables rewritten and the days applied.
+   */
+  async raiseStoredRetention({
+    projectId,
+    category,
+  }: {
+    projectId: string;
+    category: RetentionCategory;
+  }): Promise<{ tables: string[]; retentionDays: number }> {
+    const retentionDays = await this.getRetentionDays({ projectId, category });
+    const { tables } = await this.options.retroactive.raiseRetention({
+      projectId,
+      category,
+      newRetentionDays: retentionDays,
+    });
+    return { tables, retentionDays };
+  }
+
+  /**
+   * Rewrites one project's stored rows in `category` to exactly the retention its cascade resolves
+   * to now, shortening included; answers the tables rewritten and the days applied.
+   */
+  async applyStoredRetention({
+    projectId,
+    category,
+  }: {
+    projectId: string;
+    category: RetentionCategory;
+  }): Promise<{ tables: string[]; retentionDays: number }> {
+    const retentionDays = await this.getRetentionDays({ projectId, category });
+    const { tables } = await this.options.retroactive.triggerUpdate({
+      projectId,
+      category,
+      newRetentionDays: retentionDays,
+    });
+    return { tables, retentionDays };
+  }
+
+  /** Every project the scope reaches, archived included: their stored rows are still kept. */
+  findScopeProjectIds({
+    organizationId,
+    scope,
+  }: {
+    organizationId: string;
+    scope: ScopeAssignment;
+  }): Promise<string[]> {
+    return this.findAffectedProjectIds({ organizationId, scope });
+  }
+
   async getRetroactiveMutationProgress(
     input: RetroactiveMutationProjectInput,
   ): Promise<RetroactiveMutationProgress[]> {
@@ -272,7 +354,7 @@ export class DataRetentionService {
       indexes: held,
     });
     // The marker rows sit under the empty tenant, which is no project.
-    const retentionByTenant = await this.resolveForProjects({
+    const retentionByTenant = await this.getResolvedForProjects({
       projectIds: tenantIds.filter((tenantId) => tenantId !== ""),
     });
     const tables = await this.options.retroactive.raiseIdIndexRetention({
@@ -296,7 +378,7 @@ export class DataRetentionService {
    * then their organisations' rules. A project with no row is left out, as `getResolvedForProject`
    * refuses it.
    */
-  private async resolveForProjects({
+  async getResolvedForProjects({
     projectIds,
   }: {
     projectIds: readonly string[];

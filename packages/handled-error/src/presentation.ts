@@ -433,6 +433,11 @@ const presentations = {
     describe: () =>
       "This project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in. Facet a named field instead, such as model, status or evaluator, or call the facets endpoint with no field to see what this project has.",
   },
+  trace_withheld_over_plan: {
+    title: "Trace held until your plan is sorted",
+    describe: () =>
+      "This trace was recorded while your organization has more members than its plan covers. It is saved and will show once you update your card or remove members.",
+  },
   trace_id_ambiguous: {
     title: "Trace ID is ambiguous",
     describe: () => "That prefix matches more than one trace. Use a longer prefix.",

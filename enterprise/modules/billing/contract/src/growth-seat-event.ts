@@ -1,3 +1,7 @@
+import { GROWTH_INCLUDED_RETENTION_DAYS } from "@langwatch/data-retention-contract";
+import type { Named } from "@langwatch/module";
+import { z } from "zod";
+
 import { InvalidSeatCountError } from "./billing.errors.ts";
 import { GROWTH_SEAT_PLAN_TYPES } from "./plan-types.ts";
 import type { Currency } from "./pricing.ts";
@@ -131,26 +135,58 @@ export const isGrowthInstantEvalPriceProvisioned = ({
   prices: StripePriceMap;
 }): boolean => Boolean(prices.GROWTH_INSTANT_EVAL_USD);
 
+const RETENTION_STORAGE_PRICE_NAMES = [
+  "RETENTION_STORAGE_EUR_MONTHLY",
+  "RETENTION_STORAGE_EUR_ANNUAL",
+  "RETENTION_STORAGE_USD_MONTHLY",
+  "RETENTION_STORAGE_USD_ANNUAL",
+] as const satisfies readonly StripePriceName[];
+
+/** The metered price for storage above 90 days in this currency and interval, when provisioned. */
+export const pickRetentionStoragePriceId = ({
+  currency,
+  interval,
+  prices,
+}: {
+  currency: Currency;
+  interval: BillingInterval;
+  prices: StripePriceMap;
+}): string | undefined =>
+  prices[`RETENTION_STORAGE_${currency}_${interval.toUpperCase()}` as StripePriceName];
+
+/** Whether a subscription line bills storage above the included retention. */
+export const isRetentionStoragePrice = (priceId: string, prices: StripePriceMap): boolean =>
+  RETENTION_STORAGE_PRICE_NAMES.some((name) => prices[name] === priceId);
+
+/** A retention above what Growth includes bills the storage it keeps beyond 90 days. */
+export const retentionBillsStorage = (retentionDays: number | undefined): boolean =>
+  retentionDays !== undefined && retentionDays > GROWTH_INCLUDED_RETENTION_DAYS;
+
 /**
- * Stripe checkout line items for a Growth subscription: a seat item (quantity
- * = coreMembers), a metered events item, and where provisioned a metered
- * Instant Evals one. Neither metered item carries a quantity.
+ * Stripe checkout line items for Growth: a seat item (quantity = coreMembers), metered events,
+ * metered Instant Evals where provisioned, and metered storage above 90 days of retention.
+ * No metered item carries a quantity.
  */
 export const createCheckoutLineItems = ({
   coreMembers,
   currency,
   interval,
   prices,
+  retentionDays,
 }: {
   coreMembers: number;
   currency: Currency;
   interval: BillingInterval;
   prices: StripePriceMap;
+  retentionDays?: number;
 }): { price: string; quantity?: number }[] => {
   if (coreMembers < 1) {
     throw new InvalidSeatCountError(coreMembers);
   }
   const instantEvalPriceId = pickGrowthInstantEvalPriceId({ currency, prices });
+  const storagePriceId = retentionBillsStorage(retentionDays)
+    ? pickRetentionStoragePriceId({ currency, interval, prices })
+    : undefined;
 
   return [
     {
@@ -161,6 +197,7 @@ export const createCheckoutLineItems = ({
       price: resolveGrowthEventsPriceId({ currency, interval, prices }),
     },
     ...(instantEvalPriceId ? [{ price: instantEvalPriceId }] : []),
+    ...(storagePriceId ? [{ price: storagePriceId }] : []),
   ];
 };
 
@@ -193,3 +230,61 @@ export const developerSeatOfferFor = ({
 /** Whether a subscription line bills Developer seats. */
 export const isDeveloperSeatPrice = (priceId: string, prices: StripePriceMap): boolean =>
   DEVELOPER_SEAT_PRICE_NAMES.some((name) => prices[name] === priceId);
+
+/** What data retention tells billing about storage past the included retention. */
+const retentionStorageReportSchemaDefinition = z
+  .object({
+    organizationId: z.string().min(1),
+    /** The longest retention any of the organization's rules keeps; 0 keeps forever. */
+    longestRetentionDays: z.number().int().nonnegative(),
+    /**
+     * The bytes stored in rows older than the included 90 days, measured now. Absent when the
+     * retention changed and only the subscription line has to follow it.
+     */
+    bytesAboveIncluded: z.number().finite().nonnegative().optional(),
+    /** When the bytes were measured, in epoch milliseconds; it names the day the share covers. */
+    measuredAt: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+export interface RetentionStorageReportSchema extends Named<
+  typeof retentionStorageReportSchemaDefinition
+> {}
+export const retentionStorageReportSchema: RetentionStorageReportSchema =
+  retentionStorageReportSchemaDefinition;
+export type RetentionStorageReport = z.infer<typeof retentionStorageReportSchema>;
+
+/** What recording one organization's storage did. */
+export type RetentionStorageOutcome = Readonly<{
+  /** `skipped`: no Growth seat subscription, or the storage price is not provisioned here. */
+  line: "added" | "kept" | "removed" | "absent" | "skipped";
+  /** The GB-month share sent to the meter, when a measurement was sent. */
+  reportedGbMonths: number | null;
+}>;
+
+/** The storage meter's identifier: one per organization and UTC day, so a day bills once. */
+export function retentionStorageMeterIdentifier({
+  organizationId,
+  day,
+}: {
+  organizationId: string;
+  day: string;
+}): string {
+  return `retention-storage:${organizationId}:${day}`;
+}
+
+/** Bytes in one GB, as storage is priced. */
+export const BYTES_PER_GB = 1_000_000_000;
+
+/**
+ * One day's share of a GB-month: the GB stored that day over the days in its month. The meter
+ * sums the daily shares, so a month reported every day bills the month's average GB.
+ */
+export function dailyGbMonthShare({
+  bytes,
+  daysInMonth,
+}: {
+  bytes: number;
+  daysInMonth: number;
+}): number {
+  return bytes / BYTES_PER_GB / daysInMonth;
+}

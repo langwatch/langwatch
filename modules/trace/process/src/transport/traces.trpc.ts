@@ -14,6 +14,7 @@ import {
   facetValuesResultSchema,
   TraceApi,
   traceListPageSchema,
+  traceWithholdingOf,
   traceSummaryReadSchema,
   tracesEvaluationRunsSchema,
   tracesTrpc,
@@ -40,6 +41,12 @@ import {
 } from "../rules/trace-view-gates.rules.ts";
 
 const evaluationsSchema = evaluationSchema.array();
+
+/** The trace a detail read names, for the over-plan withholding check. */
+const withheldCheckOf = (input: { traceId: string; occurredAtMs?: number | undefined }) => ({
+  traceId: input.traceId,
+  ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
+});
 
 export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesTrpc> =
   defineTrpcRouter(TraceApi, tracesTrpc)
@@ -331,6 +338,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           cursor: input.cursor,
           filterWhere,
           visibilityCutoffMs: protections.visibilityCutoffMs,
+          withholding: traceWithholdingOf(protections),
         }),
       );
 
@@ -355,15 +363,16 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
     .procedure("newCount")
     .withPermission("traces:view")
     .handle(async ({ app, input, actor, authorization }) => {
+      const protections = await app.resolveViewerProtections({
+        projectId: input.projectId,
+        userId: actor.id,
+        authorization,
+      });
       const filterWhere = await app.compileExplorerTraceFilter({
         query: input.query ?? "",
         tenantId: input.projectId,
         timeRange: input.timeRange,
-        protections: await app.resolveViewerProtections({
-          projectId: input.projectId,
-          userId: actor.id,
-          authorization,
-        }),
+        protections,
         evalRuns: await app.findExplorerEvalRuns({
           projectId: input.projectId,
           evalRuns: input.evalRuns,
@@ -374,6 +383,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         timeRange: input.timeRange,
         since: input.since,
         filterWhere,
+        withholding: traceWithholdingOf(protections),
       });
 
       return { count };
@@ -520,6 +530,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           tenantId: input.tenantId,
           occurredAtMs: input.occurredAtMs,
           visibilityCutoffMs: protections.visibilityCutoffMs,
+          withholding: traceWithholdingOf(protections),
           full: input.full,
         }),
       );
@@ -584,6 +595,12 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
+      await app.assertTraceNotWithheld({
+        authorization,
+        traceId: input.traceId,
+        occurredAtMs: input.occurredAtMs,
+        protections,
+      });
       const rows = await app.readTraceLogRecords({
         projectId: input.projectId,
         traceId: input.traceId,
@@ -613,6 +630,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
+      await app.assertTraceNotWithheld({ ...withheldCheckOf(input), authorization, protections });
       const page = await app.readSpansPage({
         authorization,
         traceId: input.traceId,
@@ -648,6 +666,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
+      await app.assertTraceNotWithheld({ ...withheldCheckOf(input), authorization, protections });
       const sinceSpans = await app.readSpansSince({
         authorization,
         traceId: input.traceId,
@@ -683,6 +702,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
+      await app.assertTraceNotWithheld({ ...withheldCheckOf(input), authorization, protections });
 
       return app.readSpanTreePage({
         ...input,
@@ -704,6 +724,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
+      await app.assertTraceNotWithheld({ ...withheldCheckOf(input), authorization, protections });
 
       return app.readSpanTreeDelta({
         ...input,
@@ -730,6 +751,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
+      await app.assertTraceNotWithheld({ ...withheldCheckOf(input), authorization, protections });
       const rows = await app.readSpanSummaries({
         authorization,
         traceId: input.traceId,
@@ -773,6 +795,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
+      await app.assertTraceNotWithheld({ ...withheldCheckOf(input), authorization, protections });
       const storedSpans = await app.readSpans({
         authorization,
         traceId: input.traceId,
@@ -826,11 +849,14 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
-      const rows = await app.readSpanResources({
-        authorization,
-        traceId: input.traceId,
-        occurredAtMs: input.occurredAtMs,
-      });
+      const [, rows] = await Promise.all([
+        app.assertTraceNotWithheld({ ...withheldCheckOf(input), authorization, protections }),
+        app.readSpanResources({
+          authorization,
+          traceId: input.traceId,
+          occurredAtMs: input.occurredAtMs,
+        }),
+      ]);
       const resourceSpans = rows.map((r) => ({
         spanId: r.spanId,
         parentSpanId: r.parentSpanId,
@@ -867,6 +893,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
+      await app.assertTraceNotWithheld({ ...withheldCheckOf(input), authorization, protections });
       const events = await app.readTraceEvents({
         authorization,
         traceId: input.traceId,

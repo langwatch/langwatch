@@ -22,6 +22,9 @@ const (
 	catalog    = "../../../enterprise/modules/billing/contract/src/stripe-catalog.json"
 	seatPrice  = "price_1SzP11IMsTw08cudRhGETYNa" // GROWTH_SEAT_USD_MONTHLY, 3200 usd
 	eventsMtr  = "mtr_test_61UBL0fe0hM4Csg7x41IMsTw08cudQaG"
+	storageMtr = "mtr_test_61VjKmnOYgbfwXOun41IMsTw08cudHtw"
+	// RETENTION_STORAGE_EUR_MONTHLY, 300 eur per GB-month
+	storagePrice = "price_1UZwpSIMsTw08cud1AbkINGw"
 )
 
 var epoch = time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
@@ -208,9 +211,16 @@ func TestCatalogSeedsRealPriceIDs(t *testing.T) {
 		t.Fatalf("product not expanded: %v", seat["product"])
 	}
 	_, meters := g.stripe(http.MethodGet, "/v1/billing/meters", "limit=10")
-	m := meters["data"].([]any)[0].(map[string]any)
-	if m["id"] != eventsMtr || m["event_name"] != "langwatch_billable_events" {
-		t.Fatalf("meter %v", m)
+	events := map[string]any{}
+	for _, m := range meters["data"].([]any) {
+		events[m.(map[string]any)["id"].(string)] = m.(map[string]any)["event_name"]
+	}
+	if events[eventsMtr] != "langwatch_billable_events" || events[storageMtr] != "langwatch_retention_storage_gb" {
+		t.Fatalf("meters %v", events)
+	}
+	storage, _ := found[storagePrice]["recurring"].(map[string]any)
+	if storage == nil || storage["usage_type"] != "metered" || storage["meter"] != storageMtr {
+		t.Fatalf("storage price %v", found[storagePrice])
 	}
 }
 

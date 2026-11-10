@@ -12,4 +12,5 @@ export class MemoryBillingWebhookHostChannel extends BillingWebhookHost {
 
   async sendSlackSubscriptionEvent(): Promise<void> {}
   async sendSlackBillingThresholdFailureAlert(): Promise<void> {}
+  async sendSlackAccountPaymentFailed(): Promise<void> {}
 }

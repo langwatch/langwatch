@@ -5,6 +5,7 @@
  */
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate, type Instant } from "@langwatch/time";
 
 import {
   type DataRetentionDirectoryReader,
@@ -116,5 +117,17 @@ export class PrismaDataRetentionDirectoryRepository implements DataRetentionDire
       where,
       select: { id: true, teamId: true },
     });
+  }
+
+  async findOrganizationCreatedAt({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<readonly Instant[]> {
+    const organization = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { createdAt: true },
+    });
+    return organization ? [fromDate(organization.createdAt)] : [];
   }
 }

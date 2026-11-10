@@ -8,8 +8,11 @@ import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  organizationRetentionSchema,
+  organizationStorageEstimateSchema,
   retentionPolicySnapshotSchema,
   retentionStorageUsageSchema,
+  storedPastRetentionSchema,
 } from "./data-retention.snapshot.ts";
 import {
   killRetroactiveMutationInputSchema,
@@ -136,4 +139,23 @@ export const dataRetentionTrpc = defineTrpcContract("dataRetention")
   .query("getScopeStorageUsage")
   .withInput(retentionScopeTargetInputSchema)
   .withOutput(retentionStorageUsageSchema)
+
+  /** Stored rows the scope's readable projects keep past their period, per category. */
+  .query("getStoredPastRetention")
+  .withInput(retentionScopeTargetInputSchema)
+  .withOutput(storedPastRetentionSchema)
+
+  /** Rewrite every project's stored rows under the scope to its resolved period, in the worker. */
+  .mutation("applyScopeRetentionToStoredData")
+  .withInput(retentionScopeWriteInputSchema)
+
+  /** The organization's stored bytes and the days they cover, for the upgrade dialog's price. */
+  .query("getOrganizationStorageEstimate")
+  .withInput(z.object({ organizationId: z.string().min(1) }))
+  .withOutput(organizationStorageEstimateSchema)
+
+  /** The organization's traces retention, for the plan card. */
+  .query("getOrganizationRetention")
+  .withInput(z.object({ organizationId: z.string().min(1) }))
+  .withOutput(organizationRetentionSchema)
   .build();

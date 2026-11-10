@@ -6,7 +6,7 @@ The server half of [data-retention](../README.md). Data retention: the retention
 
 ## Installation
 
-`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionSeatPolicyEventing).withMigrations(…)`, `src/data-retention.module.ts:18`.
+`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionSeatPolicyEventing).withEventing(retentionExtensionEventing).withEventing(retentionStorageReportEventing).withTasks(…).withMigrations(…)`, `src/data-retention.module.ts:21`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The callable server boundary for retention policy, pins, and metering.
 
-Peers call these through the token, declared at `../contract/src/data-retention.api.ts:28`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/data-retention.api.ts:34`; nothing else in this package is public.
 
 #### `getPlatformDefaultRetentionDays`
 
@@ -138,6 +138,36 @@ getPolicySnapshot(input: { projectId: string } & RetentionCallerInput): Promise<
 getScopeStorageUsage(input: { projectId: string; scope: ScopeAssignment } & RetentionCallerInput): Promise<RetentionStorageUsage>;
 ```
 
+#### `getStoredPastRetention`
+
+```typescript
+getStoredPastRetention(input: { projectId: string; scope: ScopeAssignment } & RetentionCallerInput): Promise<StoredPastRetention>;
+```
+
+#### `applyScopeRetentionToStoredData`
+
+Asks the worker to rewrite every project's stored rows under the scope to its period.
+
+```typescript
+applyScopeRetentionToStoredData(input: { organizationId?: string; scope: ScopeAssignment } & RetentionCallerInput): Promise<void>;
+```
+
+#### `getOrganizationStorageEstimate`
+
+Asked `subscription:upgrade` at the door; the total spans all the organization's projects.
+
+```typescript
+getOrganizationStorageEstimate(input: { organizationId: string; }): Promise<OrganizationStorageEstimate>;
+```
+
+#### `getOrganizationRetention`
+
+Asked `organization:view` at the door: the organization rule's traces days, or the default.
+
+```typescript
+getOrganizationRetention(input: { organizationId: string }): Promise<OrganizationRetention>;
+```
+
 #### `previewScopeRemoval`
 
 ```typescript
@@ -178,29 +208,33 @@ None: this module declares no REST family.
 
 ### `dataRetention`
 
-Contract `../contract/src/data-retention.trpc.ts:79`, router `src/transport/data-retention.trpc.ts:28`.
+Contract `../contract/src/data-retention.trpc.ts:82`, router `src/transport/data-retention.trpc.ts:28`.
 
-| Procedure                                | Kind     | Gate                        | Input                                    | Output                                   |
-| ---------------------------------------- | -------- | --------------------------- | ---------------------------------------- | ---------------------------------------- |
-| `dataRetention.getRules`                 | query    | Permission `project:view`   | `retentionProjectScopeSchema`            | `retentionPolicySnapshotSchema`          |
-| `dataRetention.setForScope`              | mutation | Gate ≈ `WRITE_ON_SCOPE`     | inline                                   | `retentionPolicySchema`                  |
-| `dataRetention.previewScopeRemoval`      | query    | Gate ≈ `WRITE_ON_SCOPE`     | `retentionScopeWriteInputSchema`         | `resolvedRetentionSchema`                |
-| `dataRetention.removeForScope`           | mutation | Gate ≈ `WRITE_ON_SCOPE`     | inline                                   | –                                        |
-| `dataRetention.triggerRetroactiveUpdate` | mutation | Permission `project:update` | `retentionTriggerRetroactiveInputSchema` | `retroactiveRetentionUpdateResultSchema` |
-| `dataRetention.getMutationProgress`      | query    | Permission `traces:view`    | `retroactiveMutationProjectInputSchema`  | inline                                   |
-| `dataRetention.killMutation`             | mutation | Permission `project:update` | `killRetroactiveMutationInputSchema`     | –                                        |
-| `dataRetention.getScopeStorageUsage`     | query    | Permission `traces:view`    | `retentionScopeTargetInputSchema`        | `retentionStorageUsageSchema`            |
+| Procedure                                       | Kind     | Gate                              | Input                                    | Output                                   |
+| ----------------------------------------------- | -------- | --------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| `dataRetention.getRules`                        | query    | Permission `project:view`         | `retentionProjectScopeSchema`            | `retentionPolicySnapshotSchema`          |
+| `dataRetention.setForScope`                     | mutation | Gate ≈ `WRITE_ON_SCOPE`           | inline                                   | `retentionPolicySchema`                  |
+| `dataRetention.previewScopeRemoval`             | query    | Gate ≈ `WRITE_ON_SCOPE`           | `retentionScopeWriteInputSchema`         | `resolvedRetentionSchema`                |
+| `dataRetention.removeForScope`                  | mutation | Gate ≈ `WRITE_ON_SCOPE`           | inline                                   | –                                        |
+| `dataRetention.triggerRetroactiveUpdate`        | mutation | Permission `project:update`       | `retentionTriggerRetroactiveInputSchema` | `retroactiveRetentionUpdateResultSchema` |
+| `dataRetention.getMutationProgress`             | query    | Permission `traces:view`          | `retroactiveMutationProjectInputSchema`  | inline                                   |
+| `dataRetention.killMutation`                    | mutation | Permission `project:update`       | `killRetroactiveMutationInputSchema`     | –                                        |
+| `dataRetention.getScopeStorageUsage`            | query    | Permission `traces:view`          | `retentionScopeTargetInputSchema`        | `retentionStorageUsageSchema`            |
+| `dataRetention.getStoredPastRetention`          | query    | Permission `traces:view`          | `retentionScopeTargetInputSchema`        | `storedPastRetentionSchema`              |
+| `dataRetention.applyScopeRetentionToStoredData` | mutation | Gate ≈ `WRITE_ON_SCOPE`           | `retentionScopeWriteInputSchema`         | –                                        |
+| `dataRetention.getOrganizationStorageEstimate`  | query    | Permission `subscription:upgrade` | inline                                   | `organizationStorageEstimateSchema`      |
+| `dataRetention.getOrganizationRetention`        | query    | Permission `organization:view`    | inline                                   | `organizationRetentionSchema`            |
 
 ```typescript
 // dataRetention.getRules
-// Input: retentionProjectScopeSchema, ../contract/src/data-retention.trpc.ts:32
+// Input: retentionProjectScopeSchema, ../contract/src/data-retention.trpc.ts:35
 interface Input {
   projectId: string;
 }
 type Output = z.infer<typeof retentionPolicySnapshotSchema>; // ../contract/src/data-retention.snapshot.ts:75
 
 // dataRetention.setForScope
-// Input: inline, ../contract/src/data-retention.trpc.ts:96
+// Input: inline, ../contract/src/data-retention.trpc.ts:99
 interface Input {
   projectId: string;
   scope: {
@@ -211,7 +245,7 @@ interface Input {
   category: "traces" | "scenarios" | "experiments";
   retentionDays: 0 | number;
 }
-// Output: retentionPolicySchema, ../contract/src/data-retention.ts:237
+// Output: retentionPolicySchema, ../contract/src/data-retention.ts:282
 interface Output {
   id: string;
   organizationId: string;
@@ -224,7 +258,7 @@ interface Output {
 }
 
 // dataRetention.previewScopeRemoval
-// Input: retentionScopeWriteInputSchema, ../contract/src/data-retention.trpc.ts:67
+// Input: retentionScopeWriteInputSchema, ../contract/src/data-retention.trpc.ts:70
 interface Input {
   projectId: string;
   scope: {
@@ -233,7 +267,7 @@ interface Input {
   };
   organizationId?: string;
 }
-// Output: resolvedRetentionSchema, ../contract/src/data-retention.ts:260
+// Output: resolvedRetentionSchema, ../contract/src/data-retention.ts:305
 interface Output {
   traces: number;
   scenarios: number;
@@ -241,7 +275,7 @@ interface Output {
 }
 
 // dataRetention.removeForScope
-// Input: inline, ../contract/src/data-retention.trpc.ts:116
+// Input: inline, ../contract/src/data-retention.trpc.ts:119
 interface Input {
   projectId: string;
   scope: {
@@ -253,23 +287,23 @@ interface Input {
 }
 
 // dataRetention.triggerRetroactiveUpdate
-// Input: retentionTriggerRetroactiveInputSchema, ../contract/src/data-retention.trpc.ts:77
+// Input: retentionTriggerRetroactiveInputSchema, ../contract/src/data-retention.trpc.ts:80
 interface Input {
   projectId: string;
   category: "traces" | "scenarios" | "experiments";
 }
-// Output: retroactiveRetentionUpdateResultSchema, ../contract/src/data-retention.ts:329
+// Output: retroactiveRetentionUpdateResultSchema, ../contract/src/data-retention.ts:374
 interface Output {
   tables: string[];
   appliedRetentionDays: number;
 }
 
 // dataRetention.getMutationProgress
-// Input: retroactiveMutationProjectInputSchema, ../contract/src/data-retention.ts:175
+// Input: retroactiveMutationProjectInputSchema, ../contract/src/data-retention.ts:220
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/data-retention.trpc.ts:126
+// Output: inline, ../contract/src/data-retention.trpc.ts:129
 type Output = {
   mutationId: string;
   table: string;
@@ -280,14 +314,14 @@ type Output = {
 }[];
 
 // dataRetention.killMutation
-// Input: killRetroactiveMutationInputSchema, ../contract/src/data-retention.ts:206
+// Input: killRetroactiveMutationInputSchema, ../contract/src/data-retention.ts:251
 interface Input {
   projectId: string;
   mutationId: string;
 }
 
 // dataRetention.getScopeStorageUsage
-// Input: retentionScopeTargetInputSchema, ../contract/src/data-retention.trpc.ts:53
+// Input: retentionScopeTargetInputSchema, ../contract/src/data-retention.trpc.ts:56
 interface Input {
   projectId: string;
   scope: {
@@ -299,6 +333,42 @@ interface Input {
 interface Output {
   totalBytes: number;
   projectCount: number;
+}
+
+// dataRetention.getStoredPastRetention
+type Input = z.infer<typeof retentionScopeTargetInputSchema>; // ../contract/src/data-retention.trpc.ts:56
+// Output: storedPastRetentionSchema, ../contract/src/data-retention.snapshot.ts:111
+interface Output {
+  categories: {
+    category: "traces" | "scenarios" | "experiments";
+    rows: number;
+    retentionDays: number | null;
+  }[];
+  projectCount: number;
+}
+
+// dataRetention.applyScopeRetentionToStoredData
+type Input = z.infer<typeof retentionScopeWriteInputSchema>; // ../contract/src/data-retention.trpc.ts:70
+
+// dataRetention.getOrganizationStorageEstimate
+// Input: inline, ../contract/src/data-retention.trpc.ts:154
+interface Input {
+  organizationId: string;
+}
+// Output: organizationStorageEstimateSchema, ../contract/src/data-retention.snapshot.ts:127
+interface Output {
+  totalBytes: number;
+  coveredDays: number;
+}
+
+// dataRetention.getOrganizationRetention
+// Input: inline, ../contract/src/data-retention.trpc.ts:159
+interface Input {
+  organizationId: string;
+}
+// Output: organizationRetentionSchema, ../contract/src/data-retention.snapshot.ts:138
+interface Output {
+  retentionDays: number;
 }
 ```
 
@@ -315,6 +385,35 @@ Declared at `src/eventing/data-retention-seat-policy.pipeline.ts:32`.
 | Kind            | Name                          | Handles                                                                                         | Declared at                                              |
 | --------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | peer subscriber | `dataRetentionSeatActivation` | `lw.billing.subscription_started` from [billing](../../../enterprise/modules/billing/README.md) | `src/eventing/data-retention-seat-policy.pipeline.ts:38` |
+
+### Pipeline `data_retention_extension` (aggregate `data_retention_extension`)
+
+Declared at `src/eventing/retention-extension.pipeline.ts:49`. Events: `retentionExtendedEventSchema`, `retentionAppliedEventSchema`, `storedRetentionApplyRequestedEventSchema`.
+
+| Kind            | Name                          | Handles                            | Declared at                                       |
+| --------------- | ----------------------------- | ---------------------------------- | ------------------------------------------------- |
+| command         | `recordRetentionExtension`    | –                                  | `src/eventing/retention-extension.pipeline.ts:58` |
+| command         | `requestStoredRetentionApply` | –                                  | `src/eventing/retention-extension.pipeline.ts:59` |
+| command         | –                             | –                                  | `src/eventing/retention-extension.pipeline.ts:60` |
+| process manager | `retentionExtensionApply`     | intents `applyToProjects` (outbox) | `src/eventing/retention-extension.pipeline.ts:65` |
+
+### Pipeline `data_retention_storage_report` (aggregate `data_retention_storage`)
+
+Declared at `src/eventing/retention-storage-report.pipeline.ts:55`. Events: `retentionStorageMeasuredEventSchema`.
+
+| Kind            | Name                      | Handles                                                                                            | Declared at                                            |
+| --------------- | ------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| command         | –                         | –                                                                                                  | `src/eventing/retention-storage-report.pipeline.ts:60` |
+| process manager | `retentionStorageReport`  | every 1 d (`RETENTION_STORAGE_REPORT_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/retention-storage-report.pipeline.ts:65` |
+| process manager | `retentionStorageBilling` | intents `bill` (outbox)                                                                            | `src/eventing/retention-storage-report.pipeline.ts:78` |
+
+### Tasks
+
+Run by the tasks process, before serve.
+
+| Task                       | Class                        | Declared at                                     |
+| -------------------------- | ---------------------------- | ----------------------------------------------- |
+| `retention-storage-report` | `RetentionStorageReportTask` | `src/tasks/retention-storage-report.task.ts:15` |
 
 ## Configuration
 

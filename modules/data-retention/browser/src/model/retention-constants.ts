@@ -1,4 +1,5 @@
 import {
+  GROWTH_RETENTION_OPTIONS,
   INDEFINITE_RETENTION_DAYS,
   type RetentionCategory,
   type RetentionScopeType,
@@ -41,22 +42,20 @@ export const retentionUnitCollection = createListCollection({
 
 export type RetentionPreset = { value: string; label: string; days: number };
 
-// Presets round up to cover the full period plus buffer. Plan-gated by tier:
-// PAID → {35, 63}; ENTERPRISE → full list + custom. Server re-enforces at
-// the mutation boundary; these lists only shape the UI.
+// Presets round up to cover the full period plus buffer. Plan-gated by tier: PAID → the
+// Growth options (35, 63, 91, 182, 371); ENTERPRISE → full list + custom. Server re-enforces
+// at the mutation boundary; these lists only shape the UI.
 
-/** Paid (non-enterprise) menu: "~1 month" / "~2 months" only. */
-export const PAID_RETENTION_PRESETS: RetentionPreset[] = [
-  { value: "35", label: "1 month", days: 35 },
-  { value: "63", label: "2 months", days: 63 },
-];
+/** Paid (non-enterprise) menu: the Growth options offered at upgrade, up to 1 year. */
+export const PAID_RETENTION_PRESETS: RetentionPreset[] = GROWTH_RETENTION_OPTIONS.map((option) => ({
+  value: String(option.days),
+  label: option.label,
+  days: option.days,
+}));
 
-/** Enterprise / self-hosted menu: the paid short options plus longer windows. */
+/** Enterprise / self-hosted menu: the paid options plus longer windows. */
 export const ENTERPRISE_RETENTION_PRESETS: RetentionPreset[] = [
-  { value: "35", label: "1 month", days: 35 },
-  { value: "63", label: "2 months", days: 63 },
-  { value: "91", label: "3 months", days: 91 },
-  { value: "371", label: "1 year", days: 371 },
+  ...PAID_RETENTION_PRESETS,
   { value: "1827", label: "5 years", days: 1827 },
 ];
 

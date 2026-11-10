@@ -21,6 +21,11 @@ export async function partsAfterPartitionPruning({
   return partsInExplain(rows.map((row) => String(Reflect.get(Object(row), "explain"))));
 }
 
+/** A plan line without its indent or the tree drawing newer servers put before nested steps. */
+function withoutTreeDrawing(line: string): string {
+  return line.replace(/^[\s│├└─]+/u, "").trim();
+}
+
 /** The pruned part count of each `ReadFromMergeTree` in an EXPLAIN, from its Partition stage. */
 export function partsInExplain(lines: readonly string[]): number {
   let total = 0;
@@ -33,7 +38,7 @@ export function partsInExplain(lines: readonly string[]): number {
     pruned = undefined;
   };
   for (const line of lines) {
-    const text = line.trim();
+    const text = withoutTreeDrawing(line);
     if (text.startsWith("ReadFromMergeTree")) {
       settle();
       continue;

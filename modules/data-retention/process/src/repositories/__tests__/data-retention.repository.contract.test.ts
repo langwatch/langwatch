@@ -10,6 +10,7 @@ import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaQueryGuard,
+  PrismaTenancyGuardService,
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
@@ -220,6 +221,23 @@ function contractCases(backend: Backend): void {
       expect(named).toEqual([expect.objectContaining({ organizationId: other(), ...team() })]);
       expect(unnamed).toEqual([]);
     });
+
+    it("names each organization holding a rule once, for the daily storage report", async () => {
+      const repository = backend.repository();
+      for (const category of ["traces", "scenarios"] as const) {
+        await repository.upsertForScope({
+          organizationId: other(),
+          scope: team(),
+          category,
+          retentionDays: 182,
+        });
+      }
+
+      const ids = await repository.findOrganizationIdsWithRules();
+
+      expect(ids.filter((id) => id === other())).toEqual([other()]);
+      expect(ids).not.toContain(acme());
+    });
   });
 }
 
@@ -268,6 +286,47 @@ describe.skipIf(!databaseUrl)("given the Postgres data retention repository", ()
   contractCases({
     repository: () => PrismaDataRetentionRepository.create({ prisma: database() }),
     namespace: () => namespace,
+  });
+
+  describe("when the production tenancy guard sits in front of the database", () => {
+    const guarded = databaseUrl
+      ? PrismaConnectionService.create({
+          guard: PrismaTenancyGuardService.create(),
+          logger: createLogger("data-retention-guarded-test"),
+        }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
+      : null;
+
+    afterAll(async () => {
+      await guarded?.client.$disconnect();
+    });
+
+    it("names the organizations holding a rule without a tenant refusal", async () => {
+      const organizationId = `org_other_${namespace}`;
+      await PrismaDataRetentionRepository.create({ prisma: database() }).upsertForScope({
+        organizationId,
+        scope: { scopeType: "TEAM", scopeId: `team_${namespace}` },
+        category: "traces",
+        retentionDays: 182,
+      });
+      if (!guarded) throw new Error("LANGWATCH_TEST_DATABASE_URL is required here");
+
+      const ids = await PrismaDataRetentionRepository.create({
+        prisma: guarded.client,
+      }).findOrganizationIdsWithRules();
+
+      expect(ids).toContain(organizationId);
+    });
+
+    it("refuses the same enumeration written as an unscoped Prisma read", async () => {
+      if (!guarded) throw new Error("LANGWATCH_TEST_DATABASE_URL is required here");
+
+      await expect(
+        guarded.client.retentionPolicy.findMany({
+          distinct: ["organizationId"],
+          select: { organizationId: true },
+        }),
+      ).rejects.toThrow(/findMany action on the RetentionPolicy model/);
+    });
   });
 });
 import { createLogger } from "@langwatch/observability";

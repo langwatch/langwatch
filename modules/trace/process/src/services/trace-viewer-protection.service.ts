@@ -16,7 +16,10 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { Protections } from "@langwatch/trace-contract";
 
 import { policyProjectIdsOf } from "../rules/policy-project-ids.rules.ts";
-import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
+import {
+  type VisibilityWindow,
+  VisibilityWindowService,
+} from "./trace-visibility-window.service.ts";
 
 export type TraceViewerProtectionOptions = Readonly<{
   authz: AuthzApi;
@@ -43,8 +46,14 @@ export class TraceViewerProtectionService {
     this.now = options.now ?? Date.now;
   }
 
-  async getVisibilityWindow(projectId: string): Promise<{ visibilityCutoffMs: number | null }> {
+  /** Failing closed teases old content but withholds nothing: an outage never hides new traces. */
+  async getVisibilityWindow(projectId: string): Promise<VisibilityWindow> {
     const dayMs = 24 * 60 * 60 * 1000;
+    const failClosed = (): VisibilityWindow => ({
+      visibilityCutoffMs: this.now() - this.options.fallbackVisibilityDays * dayMs,
+      withheldFromMs: null,
+      overPlan: null,
+    });
     try {
       const project = await this.options.projects.findWithTeam(projectId);
       const organizationId = project?.team?.organizationId;
@@ -53,7 +62,7 @@ export class TraceViewerProtectionService {
           { projectId },
           "visibility window failing closed: project resolves to no organization",
         );
-        return { visibilityCutoffMs: this.now() - this.options.fallbackVisibilityDays * dayMs };
+        return failClosed();
       }
       return await this.window.getVisibilityWindow({ organizationId });
     } catch (error) {
@@ -61,7 +70,7 @@ export class TraceViewerProtectionService {
         { projectId, error },
         "visibility window failing closed: plan resolution failed",
       );
-      return { visibilityCutoffMs: this.now() - this.options.fallbackVisibilityDays * dayMs };
+      return failClosed();
     }
   }
 
@@ -106,7 +115,7 @@ export class TraceViewerProtectionService {
       authorization?: Authorization;
     }>,
   ): Promise<Protections> {
-    const [canSeeCosts, isMember, isAdmin, canWriteTraces, isProjectOwner, { visibilityCutoffMs }] =
+    const [canSeeCosts, isMember, isAdmin, canWriteTraces, isProjectOwner, window] =
       await Promise.all([
         this.permitted(input, "cost:view"),
         this.permitted(input, "traces:view"),
@@ -137,7 +146,7 @@ export class TraceViewerProtectionService {
         capturedOutputVisibleTo: null,
         contentCategories: uniformContentCategories(false),
         hiddenAttributes: [{ pattern: "*", visibleTo: "members of this project" }],
-        visibilityCutoffMs,
+        ...window,
       };
     }
 
@@ -169,7 +178,7 @@ export class TraceViewerProtectionService {
         visibleTo: "members of this project",
         canSee: false,
       })),
-      visibilityCutoffMs,
+      ...window,
     };
   }
 

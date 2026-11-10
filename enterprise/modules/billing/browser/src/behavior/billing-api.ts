@@ -5,6 +5,10 @@
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type {
+  OrganizationRetention,
+  OrganizationStorageEstimate,
+} from "@langwatch/data-retention-contract";
+import type {
   Currency,
   currencyTrpc,
   SubscriptionBillingInterval,
@@ -58,8 +62,19 @@ export type PendingInviteRead = {
   displayStatus: string;
 };
 
-/** Procedures from features not yet split: plan, license, organization, invite. */
+/** Procedures from features not yet split: plan, license, organization, invite, data retention. */
 type BorrowedProcedures = {
+  dataRetention: {
+    /** The organization's stored bytes, for the upgrade dialog's storage estimate. */
+    getOrganizationStorageEstimate: {
+      query: { input: OrganizationScope; output: OrganizationStorageEstimate };
+    };
+    /** The organization's traces retention, for the current plan card. */
+    getOrganizationRetention: {
+      query: { input: OrganizationScope; output: OrganizationRetention };
+    };
+  };
+
   plan: {
     getActivePlan: { query: { input: OrganizationScope; output: ActivePlan } };
   };
@@ -113,6 +128,7 @@ type BorrowedProcedures = {
           billingInterval?: SubscriptionBillingInterval;
           totalSeats: number;
           invites: { email: string; role: OrganizationUserRole }[];
+          retentionDays?: number;
         };
         output: { url: string | null };
       };

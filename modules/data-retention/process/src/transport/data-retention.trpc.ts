@@ -100,4 +100,36 @@ export const dataRetentionTrpcTransport: TrpcRouterDeclaration<
       userId: actor.id,
     }),
   )
+
+  .procedure("getStoredPastRetention")
+  .withPermission("traces:view")
+  .handle(async ({ app, input, actor }) =>
+    app.getStoredPastRetention({
+      projectId: input.projectId,
+      scope: input.scope,
+      userId: actor.id,
+    }),
+  )
+
+  .procedure("applyScopeRetentionToStoredData")
+  .withPermission(WRITE_ON_SCOPE)
+  .handle(async ({ app, input, actor }) => {
+    await app.applyScopeRetentionToStoredData({
+      organizationId: input.organizationId,
+      scope: input.scope,
+      userId: actor.id,
+    });
+  })
+
+  .procedure("getOrganizationStorageEstimate")
+  .withPermission("subscription:upgrade")
+  .handle(async ({ app, input }) =>
+    app.getOrganizationStorageEstimate({ organizationId: input.organizationId }),
+  )
+
+  .procedure("getOrganizationRetention")
+  .withPermission("organization:view")
+  .handle(async ({ app, input }) =>
+    app.getOrganizationRetention({ organizationId: input.organizationId }),
+  )
   .build();

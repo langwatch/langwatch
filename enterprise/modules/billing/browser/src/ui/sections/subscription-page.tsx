@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import type { OrganizationStorageEstimate } from "@langwatch/data-retention-contract";
 /**
  * Cloud-only Subscription Page; lets org admins manage plans and users.
  * @see specs/licensing/subscription-page.feature
@@ -26,6 +27,7 @@ import {
   parseGrowthSeatPlanType,
 } from "../../model/billing-plans.ts";
 import { shouldShowPlanLimits } from "../../model/plan-management-url.ts";
+import type { RetentionEstimateState } from "../../model/retention-choice.ts";
 import { billedSeatsWhileKept } from "../../model/seat-change-summary.ts";
 import type { SeatPrice } from "../../model/seat-purchase.ts";
 import {
@@ -58,6 +60,14 @@ import {
   type SeatDrawerMode,
   UserManagementDrawer,
 } from "./user-management-drawer.tsx";
+
+function retentionEstimateOf(query: {
+  data?: OrganizationStorageEstimate | undefined;
+  isError: boolean;
+}): RetentionEstimateState {
+  if (query.data) return { status: "ready", estimate: query.data };
+  return query.isError ? { status: "failed" } : { status: "loading" };
+}
 
 function deploymentIsSaaS(host: ReturnType<typeof useBillingHost>): boolean {
   return host.isDeploymentSettled() && host.isSaaS();
@@ -94,12 +104,15 @@ function currentPlanFeaturesFor({
   isEnterprisePlan,
   isHeldCapabilityPlan,
   isDeveloperPlan,
+  retentionDays,
 }: {
   plan: PlanInfo;
   currency: Currency;
   isEnterprisePlan: boolean;
   isHeldCapabilityPlan: boolean;
   isDeveloperPlan: boolean;
+  /** The traces retention the organization keeps; the card says 90 days until it loads. */
+  retentionDays?: number;
 }): string[] | undefined {
   if (isEnterprisePlan) return buildEnterprisePlanFeatures(plan);
   if (isHeldCapabilityPlan) {
@@ -113,7 +126,7 @@ function currentPlanFeaturesFor({
   }
   // The Growth offer below the card lists what the upgrade adds; the Free card shows usage instead.
   if (isDeveloperPlan) return undefined;
-  return getGrowthFeatures(currency);
+  return getGrowthFeatures(currency, retentionDays);
 }
 
 /**
@@ -358,6 +371,16 @@ export function SubscriptionPage() {
     onChanged: refreshSeats,
   });
   const openUpgrade = () => setIsUpgradeDialogOpen(true);
+  // Read only while the dialog is open: the first read of a cold organization can take seconds.
+  const storageEstimate = billingApi.dataRetention.getOrganizationStorageEstimate.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: isUpgradeDialogOpen && !!organization?.id, retry: false, staleTime: 300_000 },
+  );
+  const retentionEstimate = retentionEstimateOf(storageEstimate);
+  const organizationRetention = billingApi.dataRetention.getOrganizationRetention.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization?.id, retry: false },
+  );
 
   const isPlanLoading = !organization || activePlan.isLoading || isCurrencyLoading;
   const { isUpgradePlanRequired, updateRequired } = subscriptionChangesRequired({
@@ -413,6 +436,9 @@ export function SubscriptionPage() {
     isEnterprisePlan,
     isHeldCapabilityPlan: isLicenseOverride || isTieredLegacyPaidPlan,
     isDeveloperPlan,
+    ...(organizationRetention.data
+      ? { retentionDays: organizationRetention.data.retentionDays }
+      : {}),
   });
 
   const isSelfManagedPaidPlan = !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride;
@@ -546,7 +572,8 @@ export function SubscriptionPage() {
         onClose={() => setIsUpgradeDialogOpen(false)}
         minimumSeats={upgradeBillingSeats}
         price={seatPrice}
-        onContinue={(seats) => void handleUpgrade({ seats })}
+        retentionEstimate={retentionEstimate}
+        onContinue={({ seats, retentionDays }) => void handleUpgrade({ seats, retentionDays })}
         isLoading={isUpgradeLoading}
       />
     </>

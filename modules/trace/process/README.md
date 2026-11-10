@@ -694,7 +694,7 @@ findPromptStudioSpan(input: { projectId: string; spanId: string; protections: un
 #### `readTraceList`
 
 ```typescript
-readTraceList(params: { authorization: Authorization; timeRange: { from: number; to: number }; sort: { columnId: string; direction: "asc" | "desc" }; page?: number; pageSize: number; cursor?: { sortValue: number; traceId: string }; filterWhere?: { sql: string; params: Record<string, unknown> }; visibilityCutoffMs?: number | null; }): Promise<TraceListPage>;
+readTraceList(params: { authorization: Authorization; timeRange: { from: number; to: number }; sort: { columnId: string; direction: "asc" | "desc" }; page?: number; pageSize: number; cursor?: { sortValue: number; traceId: string }; filterWhere?: { sql: string; params: Record<string, unknown> }; visibilityCutoffMs?: number | null; /** Over-plan withholding: later rows are left out and counted on `withheld`. */ withholding?: TraceWithholding; }): Promise<TraceListPage>;
 ```
 
 #### `readSessionGroups`
@@ -772,7 +772,15 @@ authorizationForTrace(input: { authorization: Authorization; traceId: string; te
 #### `readTraceSummary`
 
 ```typescript
-readTraceSummary(input: { authorization: Authorization; traceId: string; /** The member the header named; narrows an aggregate's proof (ADR-177 block F). */ tenantId?: string | undefined; occurredAtMs?: number; visibilityCutoffMs?: number | null; full?: boolean; }): Promise<unknown>;
+readTraceSummary(input: { authorization: Authorization; traceId: string; /** The member the header named; narrows an aggregate's proof (ADR-177 block F). */ tenantId?: string | undefined; occurredAtMs?: number; visibilityCutoffMs?: number | null; /** Refuses a summary the over-plan cutoff withholds (`trace_withheld_over_plan`). */ withholding?: TraceWithholding; full?: boolean; }): Promise<unknown>;
+```
+
+#### `assertTraceNotWithheld`
+
+Throws `trace_withheld_over_plan` when the viewer's plan withholds this trace.
+
+```typescript
+assertTraceNotWithheld(input: { authorization: Authorization; traceId: string; tenantId?: string | undefined; occurredAtMs?: number; protections: Protections; }): Promise<void>;
 ```
 
 #### `isTraceWindowRedacted`
@@ -1433,7 +1441,7 @@ type Input = z.infer<typeof traceScopeSchema>; // ../contract/src/features/edit-
 
 ### `traces`
 
-Contract `../contract/src/traces.trpc.ts:179`, router `src/transport/traces.trpc.ts:45`.
+Contract `../contract/src/traces.trpc.ts:179`, router `src/transport/traces.trpc.ts:52`.
 
 | Procedure                              | Kind         | Gate                       | Input                    | Output                             |
 | -------------------------------------- | ------------ | -------------------------- | ------------------------ | ---------------------------------- |
@@ -1661,11 +1669,11 @@ type Output = z.infer<typeof tracesConversationContextSchema>; // ../contract/sr
 
 // traces.discover
 // Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, query: z.string().nullish()… (inline, ../contract/src/traces.trpc.ts:363)
-type Output = z.infer<typeof discoverResultSchema>; // ../contract/src/features/list/trace-list-view.ts:165
+type Output = z.infer<typeof discoverResultSchema>; // ../contract/src/features/list/trace-list-view.ts:173
 
 // traces.facets
 // Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, query: z.string().nullish()… (inline, ../contract/src/traces.trpc.ts:375)
-type Output = z.infer<typeof discoverResultSchema>; // ../contract/src/features/list/trace-list-view.ts:165
+type Output = z.infer<typeof discoverResultSchema>; // ../contract/src/features/list/trace-list-view.ts:173
 
 // traces.onDiscoverUpdate
 // Input: inline, ../contract/src/traces.trpc.ts:390
@@ -1689,7 +1697,7 @@ interface Input {
   limit?: number;
   offset?: number;
 }
-// Output: facetValuesResultSchema, ../contract/src/features/list/trace-list-view.ts:175
+// Output: facetValuesResultSchema, ../contract/src/features/list/trace-list-view.ts:183
 interface Output {
   values: {
     value: string;

@@ -90,6 +90,8 @@ export class BillingLifecycleAnnouncerService {
     organizationId: string;
     subscriptionId: string;
     plan: string;
+    /** The retention the buyer picked at checkout, when the checkout offered one. */
+    retentionDays?: number;
   }): Promise<void> {
     const { organizationId } = input;
     await this.#subscriptionChanged({
@@ -257,6 +259,27 @@ export class BillingLifecycleAnnouncerService {
     await this.#connected().recordSeatCheckoutsAbandoned.send({
       ...this.#rowFact(input.organizationId),
       subscriptionIds: [...input.subscriptionIds],
+    });
+  }
+
+  /** The organization went over its plan or came back within it (over-plan-trace-withholding.feature). */
+  async overPlanChanged(input: {
+    organizationId: string;
+    subscriptionId: string;
+    state: "started" | "ended";
+    reason: "cancelled" | "payment_recovery" | "within_plan";
+    since: Instant;
+    members: number;
+    maxMembers: number;
+  }): Promise<void> {
+    await this.#connected().recordOverPlanChanged.send({
+      ...this.#rowFact(input.organizationId),
+      subscriptionId: input.subscriptionId,
+      state: input.state,
+      reason: input.reason,
+      since: input.since.epochMilliseconds,
+      members: input.members,
+      maxMembers: input.maxMembers,
     });
   }
 

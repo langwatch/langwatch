@@ -19,6 +19,7 @@ export const CHECKOUT_CURRENCY_SELECTED_EVENT_TYPE =
 export const PRICING_MODEL_CHANGED_EVENT_TYPE = "lw.billing.pricing_model_changed" as const;
 export const SEAT_CHECKOUT_PAID_EVENT_TYPE = "lw.billing.seat_checkout_paid" as const;
 export const SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE = "lw.billing.seat_checkouts_abandoned" as const;
+export const OVER_PLAN_CHANGED_EVENT_TYPE = "lw.billing.over_plan_changed" as const;
 export const BILLING_LIFECYCLE_EVENT_VERSION = "2026-09-30" as const;
 
 /** An organization gained or lost its subscription, with the members who carry the fact. */
@@ -44,6 +45,8 @@ const subscriptionStartedEventDataSchemaDefinition = z.object({
   subscriptionId: z.string().min(1),
   plan: z.string().min(1),
   memberUserIds: z.array(z.string().min(1)),
+  /** The retention the buyer picked at checkout; absent on checkouts that offered none. */
+  retentionDays: z.number().int().positive().optional(),
 });
 export interface SubscriptionStartedEventDataSchema extends Named<
   typeof subscriptionStartedEventDataSchemaDefinition
@@ -183,3 +186,25 @@ export interface SeatCheckoutsAbandonedEventDataSchema extends Named<
 export const seatCheckoutsAbandonedEventDataSchema: SeatCheckoutsAbandonedEventDataSchema =
   seatCheckoutsAbandonedEventDataSchemaDefinition;
 export type SeatCheckoutsAbandonedEventData = z.infer<typeof seatCheckoutsAbandonedEventDataSchema>;
+
+/**
+ * The organization went over its plan (fell to Free holding more members than Free allows) or
+ * came back within it; traces recorded from `since` are withheld while it is over.
+ * Spec: specs/billing/over-plan-trace-withholding.feature
+ */
+const overPlanChangedEventDataSchemaDefinition = z.object({
+  ...organizationRowFactSchema.shape,
+  subscriptionId: z.string().min(1),
+  state: z.enum(["started", "ended"]),
+  reason: z.enum(["cancelled", "payment_recovery", "within_plan"]),
+  /** Epoch ms of the cutoff: traces recorded from it on are withheld while over plan. */
+  since: z.number().int().nonnegative(),
+  members: z.number().int().nonnegative(),
+  maxMembers: z.number().int().nonnegative(),
+});
+export interface OverPlanChangedEventDataSchema extends Named<
+  typeof overPlanChangedEventDataSchemaDefinition
+> {}
+export const overPlanChangedEventDataSchema: OverPlanChangedEventDataSchema =
+  overPlanChangedEventDataSchemaDefinition;
+export type OverPlanChangedEventData = z.infer<typeof overPlanChangedEventDataSchema>;

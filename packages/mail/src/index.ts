@@ -65,3 +65,7 @@ export {
   sendSsoDomainProofWaveringEmail,
 } from "./templates/sso-domain-proof-emails.tsx";
 export { sendUsageLimitEmail } from "./templates/usage-limit-email.tsx";
+export {
+  sendPaymentRecoveryEmail,
+  type PaymentRecoveryEmailProps,
+} from "./templates/payment-recovery-email.tsx";

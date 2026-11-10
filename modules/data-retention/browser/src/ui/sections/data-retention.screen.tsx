@@ -41,6 +41,7 @@ import {
   removeRetentionScope,
   retentionPolicySaver,
 } from "../../behavior/retention-policy-save.ts";
+import { useStoredRetentionApply } from "../../behavior/stored-retention-apply.ts";
 import {
   RETENTION_SCOPE_QUERY_KEY,
   useDataRetentionHost,
@@ -54,10 +55,11 @@ import {
 } from "../../model/retention-grouping.ts";
 import { retentionRemovalPreviewQuery } from "../../model/retention-removal-preview.ts";
 import { AddOverrideDrawer, type RetentionEditTarget } from "../blocks/add-override-drawer.tsx";
-import { ApplyToExistingConfirmDialog } from "../blocks/apply-to-existing-confirm-dialog.tsx";
+import { ApplyStoredRetentionDialog } from "../blocks/apply-stored-retention-dialog.tsx";
 import { RemoveScopeConfirmDialog } from "../blocks/remove-scope-confirm-dialog.tsx";
 import { RetentionAndUsageCard } from "../blocks/retention-and-usage-card.tsx";
 import { RetroactiveProgressCard } from "../blocks/retroactive-progress-card.tsx";
+import { StoredRetentionNote } from "../blocks/stored-retention-note.tsx";
 
 const RETENTION_DOCS_HREF = "https://langwatch.ai/docs/platform/data-retention";
 
@@ -200,20 +202,14 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   // single notice at the call site instead of one per mutation.
   const removeForScope = dataRetentionApi.dataRetention.removeForScope.useMutation();
 
-  // Retroactive apply: stamp the project's EXISTING ClickHouse rows with the
-  // effective retention. We don't know the stored _retention_days values
-  // without an extra query (they could still be the migration default), so we
-  // always route through the confirm dialog before mutating CH — the action is
-  // irreversible if it contracts.
-  const [pendingConfirm, setPendingConfirm] = useState<{
-    retentionDays: number;
-    /** True when the user saved at least one scope beyond the current project
-     *  (org/team or a different project). Retroactive apply only ever runs on
-     *  the current project; surfacing this in the dialog prevents a user from
-     *  expecting an org-wide save to retro-stamp every child project. */
-    savedScopeWiderThanCurrentProject: boolean;
-    onConfirm: () => void | Promise<void>;
-  } | null>(null);
+  const storedApply = useStoredRetentionApply({
+    projectId,
+    organizationId: () => organizationOf(organizationId),
+    viewedScope: storageScope,
+    notices: host,
+    canApply:
+      !!rulesQuery.data?.canConfigureRetention && hasWritableScope(rulesQuery.data?.available),
+  });
 
   const projectIsWritable =
     rulesQuery.data?.available.projects.some((project) => project.id === projectId) ?? false;
@@ -225,14 +221,6 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
     },
   );
   const activeMutations = progressQuery.data ?? [];
-
-  // Per-call toasts intentionally omitted — the drawer flow fans this out one
-  // call per category. Call sites emit a single aggregated notice.
-  const triggerUpdate = dataRetentionApi.dataRetention.triggerRetroactiveUpdate.useMutation({
-    onSuccess: () => {
-      void progressQuery.refetch();
-    },
-  });
 
   const killMutation = dataRetentionApi.dataRetention.killMutation.useMutation({
     onSuccess: () => {
@@ -273,7 +261,6 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   };
 
   const savePolicy = retentionPolicySaver({
-    projectId,
     notices: host,
     write: ({ scope, category, retentionDays }) =>
       setForScope.mutateAsync({
@@ -283,10 +270,9 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
         category,
         retentionDays,
       }),
-    trigger: (category) => triggerUpdate.mutateAsync({ projectId, category }),
     afterWrite: () => void invalidate(),
+    afterSave: (saved) => void storedApply.offer(saved.scopes),
     close: closeDrawer,
-    confirm: setPendingConfirm,
   });
 
   const hierarchy = scopeHierarchyOf(filterAvailable);
@@ -356,6 +342,14 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
           />
         )}
 
+        {snapshot && storedApply.viewed && (
+          <StoredRetentionNote
+            rows={storedApply.viewed.rows}
+            canApply={canWrite}
+            onApply={storedApply.offerViewed}
+          />
+        )}
+
         {snapshot && (
           <RetentionPolicyList
             ruleCount={snapshot.rules.length}
@@ -383,7 +377,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
             currentProjectId={projectId}
             isPlatformAdmin={isPlatformAdmin}
             isEnterprise={isEnterprise}
-            isSaving={setForScope.isPending || triggerUpdate.isPending}
+            isSaving={setForScope.isPending}
             scopePicker={({ value, onChange }) => (
               <ScopeChipPicker
                 value={value}
@@ -429,16 +423,11 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
           }}
         />
 
-        <ApplyToExistingConfirmDialog
-          pending={pendingConfirm}
-          isApplying={triggerUpdate.isPending || setForScope.isPending}
-          onCancel={() => setPendingConfirm(null)}
-          onConfirm={async () => {
-            if (!pendingConfirm) return;
-            const confirm = pendingConfirm.onConfirm;
-            setPendingConfirm(null);
-            await confirm();
-          }}
+        <ApplyStoredRetentionDialog
+          pending={storedApply.pending}
+          isApplying={storedApply.isApplying}
+          onDismiss={storedApply.dismiss}
+          onApply={storedApply.apply}
         />
       </VStack>
     </>

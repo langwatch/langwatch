@@ -198,6 +198,7 @@ export class OrganizationInvitationDoorService {
       membersToAdd: input.totalSeats,
       ...(input.currency === undefined ? {} : { currency: input.currency }),
       ...(input.billingInterval === undefined ? {} : { billingInterval: input.billingInterval }),
+      ...(input.retentionDays === undefined ? {} : { retentionDays: input.retentionDays }),
       customerEmail: by.email ?? null,
     });
     if (invites.length > 0) {

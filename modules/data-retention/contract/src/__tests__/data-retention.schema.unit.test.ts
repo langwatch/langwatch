@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
+  estimateBytesAboveIncludedRetention,
+  GROWTH_RETENTION_OPTIONS,
   INDEFINITE_RETENTION_DAYS,
   MAX_RETENTION_DAYS,
   MIN_RETENTION_DAYS,
@@ -120,8 +122,8 @@ describe("plan-tier retention constants", () => {
     expect(ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS).toBe(49);
   });
 
-  it("has both paid presets whole-week aligned and persistable by the schema", () => {
-    expect(PAID_RETENTION_PRESET_DAYS).toEqual([35, 63]);
+  it("has every paid preset whole-week aligned and persistable by the schema", () => {
+    expect(PAID_RETENTION_PRESET_DAYS).toEqual([35, 63, 91, 182, 371]);
     for (const days of PAID_RETENTION_PRESET_DAYS) {
       expect(days % RETENTION_WEEK_DAYS).toBe(0);
       expect(retentionDaysSchema.validate(days)).toBe(true);
@@ -132,6 +134,26 @@ describe("plan-tier retention constants", () => {
     // This is the whole point of dropping the schema floor: 35 must be a legal
     // stored value even though it is under the 49-day recovery floor.
     expect(PAID_RETENTION_PRESET_DAYS[0]).toBeLessThan(ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS);
+  });
+});
+
+describe("Growth retention options", () => {
+  it("keeps each round label at least as long as it says, within one week", () => {
+    for (const option of GROWTH_RETENTION_OPTIONS) {
+      const [count = "", unit = ""] = option.label.split(" ");
+      const labelDays = Number.parseInt(count, 10) * (unit.startsWith("year") ? 365 : 1);
+      expect(option.days % RETENTION_WEEK_DAYS).toBe(0);
+      expect(option.days).toBeGreaterThanOrEqual(labelDays);
+      expect(option.days - labelDays).toBeLessThan(RETENTION_WEEK_DAYS);
+      expect(PAID_RETENTION_PRESET_DAYS).toContain(option.days);
+    }
+  });
+
+  it("prices only the days above the 91 Growth includes", () => {
+    const perDay = { totalBytes: 49e9, coveredDays: 49 };
+    expect(estimateBytesAboveIncludedRetention({ ...perDay, retentionDays: 35 })).toBe(0);
+    expect(estimateBytesAboveIncludedRetention({ ...perDay, retentionDays: 91 })).toBe(0);
+    expect(estimateBytesAboveIncludedRetention({ ...perDay, retentionDays: 182 })).toBe(91e9);
   });
 });
 
