@@ -4,6 +4,19 @@ import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 
 import type { BillableEventRecord } from "../repositories/billable-events-meter.repository.ts";
+import { scenarioRunMeterKey } from "../rules/scenario-run-cap.rules.ts";
+
+function runStartKey({ event, key }: { event: Event; key: string }): string {
+  const data: unknown = event.data;
+  const setId =
+    typeof data === "object" && data !== null && "scenarioSetId" in data
+      ? data.scenarioSetId
+      : undefined;
+  return scenarioRunMeterKey({
+    key,
+    scenarioSetId: typeof setId === "string" ? setId : undefined,
+  });
+}
 
 /**
  * Experiment-run event types as literals: their constant lives in experiment's process
@@ -41,7 +54,9 @@ export class BillableEventsMeterProjection {
    * `${tenantId}:${evaluationId}:reported`, billed once however often reported), else `event.id`.
    */
   static deduplicationKey(event: Event): string {
-    return event.idempotencyKey ?? event.id;
+    const key = event.idempotencyKey ?? event.id;
+    if (event.type !== SIMULATION_RUN_EVENT_TYPES.STARTED) return key;
+    return runStartKey({ event, key });
   }
 
   build(): MapProjectionDefinition<BillableEventRecord, Event> {

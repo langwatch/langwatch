@@ -2808,8 +2808,7 @@ const presentations = {
       const creationLabel = CREATION_LIMIT_LABELS[limitType];
       if (limitType === "scenarioRuns") {
         const max = num(error, "max", 0);
-        const included =
-          max > 0 ? `${max} scenario runs a month` : "a monthly number of scenario runs";
+        const included = max > 0 ? `${max} ${creationLabel}` : "a monthly number of scenario runs";
         return `Your plan includes ${included} and this month's are used. Upgrade your plan to keep running scenarios, or wait for the count to start again next month.`;
       }
       if (creationLabel) {

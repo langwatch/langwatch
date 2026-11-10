@@ -4,9 +4,22 @@ import {
   BillableEventsMeterRepository,
   type BillableEventRecord,
   type DayMeterCount,
+  type EventTypeFilter,
   type MeterWindow,
   type ProjectMeterCount,
 } from "../billable-events-meter.repository.ts";
+
+function matchesFilter({
+  row,
+  filter,
+}: {
+  row: BillableEventRecord;
+  filter: EventTypeFilter;
+}): boolean {
+  return (
+    row.eventType === filter.eventType && !row.deduplicationKey.startsWith(filter.excludedKeyPrefix)
+  );
+}
 
 /** In-memory twin: deduplicates on read, as the ClickHouse count does. */
 export class MemoryBillableEventsMeterRepository extends BillableEventsMeterRepository {
@@ -33,22 +46,17 @@ export class MemoryBillableEventsMeterRepository extends BillableEventsMeterRepo
     return new Set(keys).size;
   }
 
-  async countEventType(
-    input: { organizationId: string; eventType: string } & MeterWindow,
-  ): Promise<number> {
+  async countEventType(input: EventTypeFilter & MeterWindow): Promise<number> {
     const keys = this.#inWindow({ organizationId: input.organizationId, window: input })
-      .filter((row) => row.eventType === input.eventType)
+      .filter((row) => matchesFilter({ row, filter: input }))
       .map((row) => row.deduplicationKey);
     return new Set(keys).size;
   }
 
-  async findFirstEventAt(input: {
-    organizationId: string;
-    eventType: string;
-  }): Promise<number | null> {
+  async findFirstEventAt(input: EventTypeFilter): Promise<number | null> {
     const times = this.rows
       .filter((row) => row.organizationId === input.organizationId)
-      .filter((row) => row.eventType === input.eventType)
+      .filter((row) => matchesFilter({ row, filter: input }))
       .map((row) => row.eventTimestamp);
     return times.length > 0 ? Math.min(...times) : null;
   }

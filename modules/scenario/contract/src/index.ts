@@ -25,6 +25,7 @@ export * from "./features/run/scenario-run-category.ts";
 export * from "./features/run/scenario-run-export.ts";
 export * from "./features/run/scenario-run-data.ts";
 export * from "./features/run/scenario-set-id.ts";
+export * from "./features/run/counted-scenario-set.ts";
 export * from "./scenario-tab-events.ts";
 export * from "./scenario-tab-presence.ts";
 export * from "./features/simulation/streaming-event-codec.ts";

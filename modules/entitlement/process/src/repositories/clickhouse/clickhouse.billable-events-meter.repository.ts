@@ -5,6 +5,7 @@ import {
   BillableEventsMeterRepository,
   type BillableEventRecord,
   type DayMeterCount,
+  type EventTypeFilter,
   type MeterWindow,
   type ProjectMeterCount,
 } from "../billable-events-meter.repository.ts";
@@ -78,9 +79,7 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
     return numberOf(result.rows[0]?.total);
   }
 
-  async countEventType(
-    input: { organizationId: string; eventType: string } & MeterWindow,
-  ): Promise<number> {
+  async countEventType(input: EventTypeFilter & MeterWindow): Promise<number> {
     const result = await this.#clickhouse.query<TotalRow>({
       tenantId: "",
       organizationId: input.organizationId,
@@ -89,12 +88,14 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
         FROM ${TABLE_NAME}
         WHERE OrganizationId = {organizationId:String}
           AND EventType = {eventType:String}
+          AND NOT startsWith(DeduplicationKey, {excludedKeyPrefix:String})
           AND EventTimestamp >= {startDate:DateTime64(3)}
           AND EventTimestamp < {endDate:DateTime64(3)}
       `,
       params: {
         organizationId: input.organizationId,
         eventType: input.eventType,
+        excludedKeyPrefix: input.excludedKeyPrefix,
         startDate: input.startDate,
         endDate: input.endDate,
       },
@@ -104,10 +105,7 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
     return numberOf(result.rows[0]?.total);
   }
 
-  async findFirstEventAt(input: {
-    organizationId: string;
-    eventType: string;
-  }): Promise<number | null> {
+  async findFirstEventAt(input: EventTypeFilter): Promise<number | null> {
     const result = await this.#clickhouse.query<FirstRow>({
       tenantId: "",
       organizationId: input.organizationId,
@@ -116,8 +114,13 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
         FROM ${TABLE_NAME}
         WHERE OrganizationId = {organizationId:String}
           AND EventType = {eventType:String}
+          AND NOT startsWith(DeduplicationKey, {excludedKeyPrefix:String})
       `,
-      params: { organizationId: input.organizationId, eventType: input.eventType },
+      params: {
+        organizationId: input.organizationId,
+        eventType: input.eventType,
+        excludedKeyPrefix: input.excludedKeyPrefix,
+      },
       // The organization's meter counts every project the organization owns.
       SKIP_TENANT_CHECK: true,
     });

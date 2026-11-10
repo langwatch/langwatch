@@ -1,10 +1,9 @@
 import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import { planCreationCap, type EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ScenarioEventType } from "@langwatch/scenario-contract";
+import { isCountedScenarioSet, ScenarioEventType } from "@langwatch/scenario-contract";
 
 import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
-import { isCountedScenarioSet } from "../rules/scenario-set-cap.rules.ts";
 
 type ScenarioCreationCapDependencies = Readonly<{
   plans: Pick<EntitlementApi, "getActivePlan" | "assertScenarioRunAllowed">;

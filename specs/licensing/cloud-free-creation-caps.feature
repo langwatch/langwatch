@@ -97,6 +97,16 @@ Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
     Then the run is accepted
 
   @unit
+  Scenario: Platform-owned runs do not use up the monthly cap
+    Given the organization is on the cloud Free plan
+    And its first scenario run was 20 days ago
+    And it ran 99 scenarios this month plus agent test, voice call and internal runs
+    When a run starts
+    Then the run is accepted
+    And the month's counted runs are 99
+    And a platform-owned run alone does not start the grace
+
+  @unit
   Scenario: An unknown run count does not block runs
     Given the organization is on the cloud Free plan
     And its scenario run history cannot be read

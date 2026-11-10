@@ -1,9 +1,9 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import type {
   ScenarioRunGraceEndedEventData,
   ScenarioRunsThresholdReachedEventData,
 } from "@langwatch/entitlement-contract";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { Temporal } from "@langwatch/time";
 
 import type { PostHogEventInput } from "../channels/posthog.channel.ts";

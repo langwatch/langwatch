@@ -114,7 +114,7 @@ export const scenarioRunsCountedEventDataSchema: ScenarioRunsCountedEventDataSch
   scenarioRunsCountedEventDataSchemaDefinition;
 export type ScenarioRunsCountedEventData = z.infer<typeof scenarioRunsCountedEventDataSchema>;
 
-/** A Free organization reached its monthly scenario run cap; recorded once per month. */
+/** A Free organization reached the heads-up share of its monthly run cap; once per month. */
 const scenarioRunsThresholdReachedEventDataSchemaDefinition = z.object({
   ...envelope,
   runs: z.number().int().nonnegative(),

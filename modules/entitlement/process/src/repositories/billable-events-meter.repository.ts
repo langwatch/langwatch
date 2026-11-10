@@ -8,6 +8,13 @@ export interface BillableEventRecord {
   eventTimestamp: number;
 }
 
+/** One event type of an organization's meter, minus keys starting with `excludedKeyPrefix`. */
+export type EventTypeFilter = Readonly<{
+  organizationId: string;
+  eventType: string;
+  excludedKeyPrefix: string;
+}>;
+
 /** A `[start, end)` window as ClickHouse `DateTime64(3)` literals. */
 export type MeterWindow = Readonly<{ startDate: string; endDate: string }>;
 
@@ -28,15 +35,10 @@ export abstract class BillableEventsMeterRepository {
     projectIds: readonly string[];
     window: MeterWindow;
   }): Promise<ProjectMeterCount[]>;
-  /** Distinct deduplication keys of one event type metered for the organization in the window. */
-  abstract countEventType(
-    input: { organizationId: string; eventType: string } & MeterWindow,
-  ): Promise<number>;
-  /** Epoch ms of the organization's earliest metered event of one type; null when it has none. */
-  abstract findFirstEventAt(input: {
-    organizationId: string;
-    eventType: string;
-  }): Promise<number | null>;
+  /** Distinct keys of one event type in the window, leaving out keys that start with the prefix. */
+  abstract countEventType(input: EventTypeFilter & MeterWindow): Promise<number>;
+  /** Epoch ms of the earliest matching event of one type; null when it has none. */
+  abstract findFirstEventAt(input: EventTypeFilter): Promise<number | null>;
   /** Approximate distinct keys per UTC day across the named projects; a day with none is absent. */
   abstract countByDay(input: {
     organizationId: string;

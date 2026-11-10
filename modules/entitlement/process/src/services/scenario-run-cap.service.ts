@@ -12,10 +12,16 @@ import { Temporal } from "@langwatch/time";
 
 import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
 import {
+  UNCOUNTED_RUN_KEY_PREFIX,
   isRunRefused,
   scenarioRunMonthOf,
   scenarioRunUsageOf,
 } from "../rules/scenario-run-cap.rules.ts";
+
+const RUN_STARTS = {
+  eventType: SIMULATION_RUN_EVENT_TYPES.STARTED,
+  excludedKeyPrefix: UNCOUNTED_RUN_KEY_PREFIX,
+} as const;
 
 const defaultLogger = createLogger("langwatch:entitlement:scenario-run-cap");
 
@@ -114,14 +120,11 @@ export class ScenarioRunCapService {
     const [runs, firstRunAt] = await Promise.all([
       this.deps.meter.countEventType({
         organizationId: input.organizationId,
-        eventType: SIMULATION_RUN_EVENT_TYPES.STARTED,
+        ...RUN_STARTS,
         startDate: window.startDate,
         endDate: window.endDate,
       }),
-      this.deps.meter.findFirstEventAt({
-        organizationId: input.organizationId,
-        eventType: SIMULATION_RUN_EVENT_TYPES.STARTED,
-      }),
+      this.deps.meter.findFirstEventAt({ organizationId: input.organizationId, ...RUN_STARTS }),
     ]);
     return {
       ...input,
@@ -141,7 +144,6 @@ export class ScenarioRunCapService {
     cached: boolean;
   }): Promise<{ runs: number; firstRunAt: number | null }> {
     const { month, startDate, endDate } = scenarioRunMonthOf(now);
-    const eventType = SIMULATION_RUN_EVENT_TYPES.STARTED;
     const known = this.#monthRuns.get(organizationId);
     const firstKnown = this.#firstRuns.get(organizationId);
     const isFresh = known !== undefined && known.month === month && known.expiresAt > now;
@@ -149,10 +151,10 @@ export class ScenarioRunCapService {
       return { runs: known.runs, firstRunAt: firstKnown };
     }
     const [runs, firstRunAt] = await Promise.all([
-      this.deps.meter.countEventType({ organizationId, eventType, startDate, endDate }),
+      this.deps.meter.countEventType({ organizationId, ...RUN_STARTS, startDate, endDate }),
       firstKnown !== undefined
         ? Promise.resolve(firstKnown)
-        : this.deps.meter.findFirstEventAt({ organizationId, eventType }),
+        : this.deps.meter.findFirstEventAt({ organizationId, ...RUN_STARTS }),
     ]);
     if (firstRunAt !== null) this.#firstRuns.set(organizationId, firstRunAt);
     const counted = known && known.month === month ? Math.max(runs, known.runs) : runs;

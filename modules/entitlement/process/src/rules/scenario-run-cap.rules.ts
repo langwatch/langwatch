@@ -1,9 +1,25 @@
 import type { PlanScenarioRunCap, ScenarioRunUsage } from "@langwatch/entitlement-contract";
+import { isCountedScenarioSet } from "@langwatch/scenario-contract";
 import { Temporal } from "@langwatch/time";
 
 import type { MeterWindow } from "../repositories/billable-events-meter.repository.ts";
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Marks a metered run start of a platform-owned set, which the run cap never counts. */
+export const UNCOUNTED_RUN_KEY_PREFIX = "uncounted-run:";
+
+/** The meter's deduplication key for a run start: marked when its set is never capped. */
+export function scenarioRunMeterKey({
+  key,
+  scenarioSetId,
+}: {
+  key: string;
+  scenarioSetId: string | undefined;
+}): string {
+  const isCounted = scenarioSetId === undefined || isCountedScenarioSet(scenarioSetId);
+  return isCounted ? key : `${UNCOUNTED_RUN_KEY_PREFIX}${key}`;
+}
 
 type Capped = Extract<PlanScenarioRunCap, { capped: true }>;
 
