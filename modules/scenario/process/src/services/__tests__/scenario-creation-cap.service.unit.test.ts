@@ -88,7 +88,10 @@ describe("ScenarioCreationCapService", () => {
 
         await service.assertRunStartAllowed(runStarted("d"));
 
-        expect(assertScenarioRunAllowed).toHaveBeenCalledWith({ organizationId: "organization-1" });
+        expect(assertScenarioRunAllowed).toHaveBeenCalledWith({
+          organizationId: "organization-1",
+          shouldCountRun: true,
+        });
       });
 
       /** @scenario A run reported through the SDK past the run cap is refused with the limit shape */
@@ -109,21 +112,37 @@ describe("ScenarioCreationCapService", () => {
 
         await service.assertRunStartAllowed({
           projectId: "project-1",
-          event: { type: ScenarioEventType.MESSAGE_SNAPSHOT, scenarioSetId: "d" },
+          event: { type: ScenarioEventType.MESSAGE_SNAPSHOT },
         });
 
         expect(assertScenarioRunAllowed).not.toHaveBeenCalled();
       });
     });
 
-    describe("when a platform-owned set starts a run", () => {
-      it("does not ask the run cap", async () => {
+    describe("when an agent test or voice call run starts", () => {
+      /** @scenario App runs, agent tests and voice calls count toward the monthly cap */
+      it("asks and counts the run cap like any other run", async () => {
         const { service, assertScenarioRunAllowed } = capsWith();
 
         await service.assertRunStartAllowed(runStarted("voice-calls"));
         await service.assertRunStartAllowed(runStarted("my-agent__agent-test"));
+        await service.assertRunStartAllowed(runStarted("__internal__project-1__on-platform"));
 
-        expect(assertScenarioRunAllowed).not.toHaveBeenCalled();
+        expect(assertScenarioRunAllowed).toHaveBeenCalledTimes(3);
+      });
+    });
+
+    describe("when a run is queued from the app", () => {
+      /** @scenario A run queued from the app is counted once */
+      it("only asks the run cap, so the run is counted when its start is reported", async () => {
+        const { service, assertScenarioRunAllowed } = capsWith();
+
+        await service.assertRunAllowed({ projectId: "project-1" });
+
+        expect(assertScenarioRunAllowed).toHaveBeenCalledWith({
+          organizationId: "organization-1",
+          shouldCountRun: false,
+        });
       });
     });
 

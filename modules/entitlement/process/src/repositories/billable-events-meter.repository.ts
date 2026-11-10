@@ -8,11 +8,10 @@ export interface BillableEventRecord {
   eventTimestamp: number;
 }
 
-/** One event type of an organization's meter, minus keys starting with `excludedKeyPrefix`. */
+/** One event type of an organization's meter. */
 export type EventTypeFilter = Readonly<{
   organizationId: string;
   eventType: string;
-  excludedKeyPrefix: string;
 }>;
 
 /** A `[start, end)` window as ClickHouse `DateTime64(3)` literals. */

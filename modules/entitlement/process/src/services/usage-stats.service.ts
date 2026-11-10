@@ -59,7 +59,7 @@ type UsageStatsSources = {
   counter: UsageCounter;
   plans: PlanProvider;
   /** Absent where no plan caps scenario runs (self-hosted). */
-  scenarioRuns?: Pick<ScenarioRunCapService, "usage">;
+  scenarioRuns?: Pick<ScenarioRunCapService, "computeUsage">;
 };
 
 /**
@@ -74,7 +74,7 @@ export class UsageStatsService {
   private readonly seats: MemberSeatRepository;
   private readonly counter: UsageCounter;
   private readonly planProvider: PlanProvider;
-  private readonly scenarioRuns: Pick<ScenarioRunCapService, "usage"> | undefined;
+  private readonly scenarioRuns: Pick<ScenarioRunCapService, "computeUsage"> | undefined;
 
   private constructor(options: UsageStatsSources) {
     this.scenarioRuns = options.scenarioRuns;
@@ -171,7 +171,7 @@ export class UsageStatsService {
     // `currentMonthMessagesCount` above is null, and that is the field the
     // page reads before deciding whether to show a number at all.
     const scenarioRuns = this.scenarioRuns
-      ? await this.scenarioRuns.usage({ organizationId, plan: activePlan })
+      ? ((await this.scenarioRuns.computeUsage({ organizationId, plan: activePlan })) ?? null)
       : null;
 
     const messageLimitInfo = UsageStatsService.buildMessageLimitInfo(

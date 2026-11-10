@@ -16,9 +16,7 @@ function matchesFilter({
   row: BillableEventRecord;
   filter: EventTypeFilter;
 }): boolean {
-  return (
-    row.eventType === filter.eventType && !row.deduplicationKey.startsWith(filter.excludedKeyPrefix)
-  );
+  return row.eventType === filter.eventType;
 }
 
 /** In-memory twin: deduplicates on read, as the ClickHouse count does. */

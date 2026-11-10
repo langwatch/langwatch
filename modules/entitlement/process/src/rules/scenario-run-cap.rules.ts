@@ -1,37 +1,21 @@
 import type { PlanScenarioRunCap, ScenarioRunUsage } from "@langwatch/entitlement-contract";
-import { isCountedScenarioSet } from "@langwatch/scenario-contract";
 import { Temporal } from "@langwatch/time";
 
 import type { MeterWindow } from "../repositories/billable-events-meter.repository.ts";
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Marks a metered run start of a platform-owned set, which the run cap never counts. */
-export const UNCOUNTED_RUN_KEY_PREFIX = "uncounted-run:";
-
-/** The meter's deduplication key for a run start: marked when its set is never capped. */
-export function scenarioRunMeterKey({
-  key,
-  scenarioSetId,
-}: {
-  key: string;
-  scenarioSetId: string | undefined;
-}): string {
-  const isCounted = scenarioSetId === undefined || isCountedScenarioSet(scenarioSetId);
-  return isCounted ? key : `${UNCOUNTED_RUN_KEY_PREFIX}${key}`;
-}
-
 type Capped = Extract<PlanScenarioRunCap, { capped: true }>;
 
-/** When the grace after the first run ends; null before any run is metered. */
-export function graceEndsAtOf({
+/** When the grace after the first run ends; undefined before any run is metered. */
+export function deriveGraceEndsAt({
   firstRunAt,
   cap,
 }: {
   firstRunAt: number | null;
   cap: Pick<Capped, "graceDays">;
-}): number | null {
-  return firstRunAt === null ? null : firstRunAt + cap.graceDays * DAY_MS;
+}): number | undefined {
+  return firstRunAt === null ? undefined : firstRunAt + cap.graceDays * DAY_MS;
 }
 
 /** Whether the cap applies yet: never before the first run, nor while its grace runs. */
@@ -44,8 +28,8 @@ export function isInGrace({
   cap: Pick<Capped, "graceDays">;
   now: number;
 }): boolean {
-  const graceEndsAt = graceEndsAtOf({ firstRunAt, cap });
-  return graceEndsAt === null || now < graceEndsAt;
+  const graceEndsAt = deriveGraceEndsAt({ firstRunAt, cap });
+  return graceEndsAt === undefined || now < graceEndsAt;
 }
 
 /** The UTC calendar month an instant falls in, as the events meter keys it, and its window. */
@@ -89,7 +73,7 @@ export function scenarioRunUsageOf({
   cap: Capped;
   now: number;
 }): ScenarioRunUsage {
-  const graceEndsAt = graceEndsAtOf({ firstRunAt, cap });
+  const graceEndsAt = deriveGraceEndsAt({ firstRunAt, cap }) ?? null;
   const inGrace = isInGrace({ firstRunAt, cap, now });
   const base = { current: runs, max: cap.maxPerMonth, inGrace, graceEndsAt };
   if (graceEndsAt === null) {

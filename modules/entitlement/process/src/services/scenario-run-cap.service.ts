@@ -12,16 +12,13 @@ import { Temporal } from "@langwatch/time";
 
 import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
 import {
-  UNCOUNTED_RUN_KEY_PREFIX,
   isRunRefused,
   scenarioRunMonthOf,
   scenarioRunUsageOf,
 } from "../rules/scenario-run-cap.rules.ts";
 
-const RUN_STARTS = {
-  eventType: SIMULATION_RUN_EVENT_TYPES.STARTED,
-  excludedKeyPrefix: UNCOUNTED_RUN_KEY_PREFIX,
-} as const;
+/** Every run start counts, from the platform or from code: the cap is on how much an org runs. */
+const RUN_STARTS = { eventType: SIMULATION_RUN_EVENT_TYPES.STARTED } as const;
 
 const defaultLogger = createLogger("langwatch:entitlement:scenario-run-cap");
 
@@ -32,7 +29,7 @@ type ScenarioRunCapDependencies = Readonly<{
   meter: Pick<BillableEventsMeterRepository, "countEventType" | "findFirstEventAt">;
   plans: { getActivePlan(input: { organizationId: string }): Promise<Plan> };
   now: () => number;
-  logger?: Pick<Logger, "warn">;
+  logger?: Pick<Logger, "error">;
 }>;
 
 /**
@@ -43,7 +40,7 @@ type ScenarioRunCapDependencies = Readonly<{
 export class ScenarioRunCapService {
   readonly #firstRuns = new Map<string, number>();
   readonly #monthRuns = new Map<string, { month: string; runs: number; expiresAt: number }>();
-  readonly #logger: Pick<Logger, "warn">;
+  readonly #logger: Pick<Logger, "error">;
 
   private constructor(private readonly deps: ScenarioRunCapDependencies) {
     this.#logger = deps.logger ?? defaultLogger;
@@ -53,8 +50,18 @@ export class ScenarioRunCapService {
     return new ScenarioRunCapService(deps);
   }
 
-  /** @throws LimitExceededError (`scenarioRuns`) once the month's runs reach an applying cap. */
-  async assertRunAllowed({ organizationId }: { organizationId: string }): Promise<void> {
+  /**
+   * Counts the run unless `shouldCountRun` is false, so a run asked about at queue time and
+   * again when its start is reported is counted once. Best-effort across instances.
+   * @throws LimitExceededError (`scenarioRuns`) once the month's runs reach an applying cap.
+   */
+  async assertRunAllowed({
+    organizationId,
+    shouldCountRun = true,
+  }: {
+    organizationId: string;
+    shouldCountRun?: boolean | undefined;
+  }): Promise<void> {
     const plan = await this.deps.plans.getActivePlan({ organizationId });
     const cap = planScenarioRunCap({ plan });
     if (!cap.capped) return;
@@ -64,7 +71,7 @@ export class ScenarioRunCapService {
     try {
       reading = await this.#read({ organizationId, now, cached: true });
     } catch (error) {
-      this.#logger.warn(
+      this.#logger.error(
         { error, organizationId, plan: plan.name },
         "scenario run usage is unavailable, allowing the run",
       );
@@ -73,27 +80,28 @@ export class ScenarioRunCapService {
     if (isRunRefused({ ...reading, cap, now })) {
       throw new LimitExceededError(SCENARIO_RUNS_LIMIT_TYPE, reading.runs, cap.maxPerMonth);
     }
+    if (!shouldCountRun) return;
     // Run starts reach the meter asynchronously, so an accepted run is counted at once.
     this.#accept(organizationId);
     if (reading.firstRunAt === null) this.#firstRuns.set(organizationId, now);
   }
 
-  /** The month's runs for the usage page; null on a plan with no run cap. */
-  async usage({
+  /** The month's runs for the usage page; undefined on a plan with no run cap. */
+  async computeUsage({
     organizationId,
     plan,
   }: {
     organizationId: string;
     plan: Plan;
-  }): Promise<ScenarioRunUsage | null> {
+  }): Promise<ScenarioRunUsage | undefined> {
     const cap = planScenarioRunCap({ plan });
-    if (!cap.capped) return null;
+    if (!cap.capped) return undefined;
     const now = this.deps.now();
     try {
       const reading = await this.#read({ organizationId, now, cached: false });
       return scenarioRunUsageOf({ ...reading, cap, now });
     } catch (error) {
-      this.#logger.warn({ error, organizationId }, "scenario run usage is unavailable");
+      this.#logger.error({ error, organizationId }, "scenario run usage is unavailable");
       const firstRunAt = this.#firstRuns.get(organizationId) ?? null;
       return scenarioRunUsageOf({ runs: null, firstRunAt, cap, now });
     }
@@ -105,15 +113,15 @@ export class ScenarioRunCapService {
     return planScenarioRunCap({ plan }).capped;
   }
 
-  /** Counts a capped organization's month for its fact event; null on a plan with no cap. */
-  async count(input: {
+  /** Counts a capped organization's month for its fact event; undefined on a plan with no cap. */
+  async computeMonthCount(input: {
     organizationId: string;
     month: string;
     occurredAt: number;
-  }): Promise<ScenarioRunsCountedEventData | null> {
+  }): Promise<ScenarioRunsCountedEventData | undefined> {
     const plan = await this.deps.plans.getActivePlan({ organizationId: input.organizationId });
     const cap = planScenarioRunCap({ plan });
-    if (!cap.capped) return null;
+    if (!cap.capped) return undefined;
     const window = scenarioRunMonthOf(
       Temporal.Instant.from(`${input.month}-01T00:00:00Z`).epochMilliseconds,
     );

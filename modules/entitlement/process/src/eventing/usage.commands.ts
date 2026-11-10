@@ -169,19 +169,19 @@ export class CountScenarioRunsCommand implements CommandHandler<
     "Count an organization's scenario runs for the month",
   );
 
-  private constructor(private readonly runs: Pick<ScenarioRunCapService, "count">) {}
+  private constructor(private readonly runs: Pick<ScenarioRunCapService, "computeMonthCount">) {}
 
   static create({
     runs,
   }: {
-    runs: Pick<ScenarioRunCapService, "count">;
+    runs: Pick<ScenarioRunCapService, "computeMonthCount">;
   }): CountScenarioRunsCommand {
     return new CountScenarioRunsCommand(runs);
   }
 
   async handle(command: Command<CountScenarioRunsCommandData>): Promise<UsageEvent[]> {
     const { organizationId, month, occurredAt } = command.data;
-    const data = await this.runs.count({ organizationId, month, occurredAt });
+    const data = await this.runs.computeMonthCount({ organizationId, month, occurredAt });
     if (!data || data.firstRunAt === null) return [];
     return [
       EventUtils.createEvent<UsageEvent>({

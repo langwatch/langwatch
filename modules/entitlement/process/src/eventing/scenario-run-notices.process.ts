@@ -10,7 +10,7 @@ import { z } from "zod";
 import {
   decideGraceNotice,
   isThresholdReached,
-  graceEndsAtOf,
+  deriveGraceEndsAt,
 } from "../rules/scenario-run-cap.rules.ts";
 import type {
   recordScenarioRunGraceEndedCommandDataSchema,
@@ -86,7 +86,7 @@ export const scenarioRunsCounted: EventHandler<
   let next = known;
   const isNewMonth = state.thresholdMonth === null || data.month > state.thresholdMonth;
   if (isNewMonth && isThresholdReached({ runs: data.runs, cap: data.cap })) {
-    const graceEndsAt = graceEndsAtOf({ firstRunAt: known.firstRunAt, cap: data.cap });
+    const graceEndsAt = deriveGraceEndsAt({ firstRunAt: known.firstRunAt, cap: data.cap }) ?? null;
     next = { ...next, thresholdMonth: data.month };
     intents.push(
       ctx.intent("recordScenarioRunsThreshold", `${data.organizationId}:${data.month}`, {

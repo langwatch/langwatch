@@ -3,16 +3,12 @@
  * @see specs/licensing/cloud-free-creation-caps.feature
  */
 import type { Plan } from "@langwatch/entitlement-contract";
-import { AGENT_TEST_SET_SUFFIX, SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
+import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { MemoryBillableEventsMeterRepository } from "../../repositories/memory/memory.billable-events-meter.repository.ts";
-import {
-  DAY_MS,
-  scenarioRunMeterKey,
-  scenarioRunMonthOf,
-} from "../../rules/scenario-run-cap.rules.ts";
+import { DAY_MS, scenarioRunMonthOf } from "../../rules/scenario-run-cap.rules.ts";
 import { ScenarioRunCapService } from "../scenario-run-cap.service.ts";
 
 const now = Date.UTC(2026, 10, 20, 12);
@@ -30,21 +26,13 @@ class UnreachableMeter extends MemoryBillableEventsMeterRepository {
   }
 }
 
-function seedRun({
-  meter,
-  at,
-  scenarioSetId = "checkout-suite",
-}: {
-  meter: MemoryBillableEventsMeterRepository;
-  at: number;
-  scenarioSetId?: string;
-}) {
+function seedRun({ meter, at }: { meter: MemoryBillableEventsMeterRepository; at: number }) {
   meter.rows.push({
     organizationId: "org-1",
     tenantId: "project-1",
     eventId: `run-${meter.rows.length}`,
     eventType: STARTED,
-    deduplicationKey: scenarioRunMeterKey({ key: `run-${meter.rows.length}`, scenarioSetId }),
+    deduplicationKey: `run-${meter.rows.length}`,
     eventTimestamp: at,
   });
 }
@@ -82,7 +70,7 @@ function serviceOver({
     meter: counting,
     plans: { getActivePlan: async () => plan },
     now: () => now,
-    logger: { warn: () => undefined },
+    logger: { error: () => undefined },
   });
   return { service, reads, meter };
 }
@@ -91,9 +79,9 @@ describe("ScenarioRunCapService", () => {
   /** @scenario Scenario sets are not capped */
   it("accepts a run for a new scenario set below the monthly cap after the grace", async () => {
     const { service, meter } = serviceOver({ plan: free, runs: 0, firstRunAt: now - 20 * DAY_MS });
-    for (let i = 0; i < 10; i++) seedRun({ meter, at: now - 1000, scenarioSetId: `set-${i % 8}` });
+    for (let i = 0; i < 10; i++) seedRun({ meter, at: now - 1000 });
     await expect(service.assertRunAllowed({ organizationId: "org-1" })).resolves.toBeUndefined();
-    const counted = await service.count({
+    const counted = await service.computeMonthCount({
       organizationId: "org-1",
       month: "2026-11",
       occurredAt: now,
@@ -116,22 +104,23 @@ describe("ScenarioRunCapService", () => {
 
   it("refuses the 101st run after the grace", async () => {
     const { service } = serviceOver({ plan: free, runs: 100, firstRunAt: now - 20 * DAY_MS });
-    await expect(service.assertRunAllowed({ organizationId: "org-1" })).rejects.toBeInstanceOf(
-      Error,
-    );
+    await expect(service.assertRunAllowed({ organizationId: "org-1" })).rejects.toMatchObject({
+      code: "resource_limit_exceeded",
+      meta: { limitType: "scenarioRuns", current: 100, max: 100 },
+    });
   });
 
   /** @scenario The usage page shows the month's runs against the cap */
   it("reads the month's runs against the cap", async () => {
     const { service } = serviceOver({ plan: free, runs: 87, firstRunAt: now - 20 * DAY_MS });
-    const usage = await service.usage({ organizationId: "org-1", plan: free });
+    const usage = await service.computeUsage({ organizationId: "org-1", plan: free });
     expect(usage?.message).toBe("87 of 100 runs this month");
   });
 
   /** @scenario The usage page says when the grace ends */
   it("says the cap starts when the grace ends", async () => {
     const { service } = serviceOver({ plan: free, runs: 3, firstRunAt: now - 3 * DAY_MS });
-    const usage = await service.usage({ organizationId: "org-1", plan: free });
+    const usage = await service.computeUsage({ organizationId: "org-1", plan: free });
     expect(usage).toMatchObject({ inGrace: true });
     expect(usage?.message).toBe("No run cap for 11 more days, then 100 runs a month.");
   });
@@ -140,34 +129,22 @@ describe("ScenarioRunCapService", () => {
   it("counts nothing for a paid organization, so no notice is recorded", async () => {
     const { service } = serviceOver({ plan: paid, runs: 500, firstRunAt: 0 });
     expect(
-      await service.count({ organizationId: "org-1", month: "2026-11", occurredAt: now }),
-    ).toBeNull();
+      await service.computeMonthCount({
+        organizationId: "org-1",
+        month: "2026-11",
+        occurredAt: now,
+      }),
+    ).toBeUndefined();
   });
 
-  /** @scenario Platform-owned runs do not use up the monthly cap */
-  it("leaves platform-owned runs out of the month's count", async () => {
-    const { service, meter } = serviceOver({ plan: free, runs: 99, firstRunAt: now - 20 * DAY_MS });
-    for (const scenarioSetId of [`p1${AGENT_TEST_SET_SUFFIX}`, "voice-calls", "__internal__x"]) {
-      seedRun({ meter, at: now - 1000, scenarioSetId });
-    }
+  /** @scenario A run queued from the app is counted once */
+  it("passes run 100 at queue time and at its start, then refuses run 101 once", async () => {
+    const { service } = serviceOver({ plan: free, runs: 99, firstRunAt: now - 20 * DAY_MS });
+    const ask = { organizationId: "org-1", shouldCountRun: false };
+    await expect(service.assertRunAllowed(ask)).resolves.toBeUndefined();
     await expect(service.assertRunAllowed({ organizationId: "org-1" })).resolves.toBeUndefined();
-    const counted = await service.count({
-      organizationId: "org-1",
-      month: "2026-11",
-      occurredAt: now,
+    await expect(service.assertRunAllowed(ask)).rejects.toMatchObject({
+      meta: { limitType: "scenarioRuns", current: 100, max: 100 },
     });
-    expect(counted?.runs).toBe(99);
-  });
-
-  /** @scenario Platform-owned runs do not use up the monthly cap */
-  it("does not start the grace on a platform-owned run", async () => {
-    const { service, meter } = serviceOver({ plan: free, runs: 0, firstRunAt: null });
-    seedRun({ meter, at: now - 20 * DAY_MS, scenarioSetId: "voice-calls" });
-    const counted = await service.count({
-      organizationId: "org-1",
-      month: "2026-11",
-      occurredAt: now,
-    });
-    expect(counted).toMatchObject({ runs: 0, firstRunAt: null });
   });
 });

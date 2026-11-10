@@ -13,11 +13,7 @@ import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { BillableEventsMeterClickHouseRepository } from "../../repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
-import {
-  DAY_MS,
-  scenarioRunMonthOf,
-  UNCOUNTED_RUN_KEY_PREFIX,
-} from "../../rules/scenario-run-cap.rules.ts";
+import { DAY_MS, scenarioRunMonthOf } from "../../rules/scenario-run-cap.rules.ts";
 import { ScenarioRunCapService } from "../scenario-run-cap.service.ts";
 
 /** `TEST_CLICKHOUSE_URL` names its own database; `CI_CLICKHOUSE_URL` is the job's migrated one. */
@@ -135,14 +131,12 @@ describe.skipIf(!clickHouseUrl)("ScenarioRunCapService over the ClickHouse meter
       meter.countEventType({
         organizationId: countedOrg,
         eventType: STARTED,
-        excludedKeyPrefix: UNCOUNTED_RUN_KEY_PREFIX,
         startDate,
         endDate,
       }),
       meter.findFirstEventAt({
         organizationId: countedOrg,
         eventType: STARTED,
-        excludedKeyPrefix: UNCOUNTED_RUN_KEY_PREFIX,
       }),
     ]);
 

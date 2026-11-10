@@ -26,7 +26,9 @@ function build({ saas }: { saas: boolean }) {
     getProjectPlacement: refuse,
   };
   return buildUsagePipeline({
-    countScenarioRuns: CountScenarioRunsCommand.create({ runs: { count: async () => null } }),
+    countScenarioRuns: CountScenarioRunsCommand.create({
+      runs: { computeMonthCount: async () => undefined },
+    }),
     recordScenarioRunGraceEnded: RecordScenarioRunGraceEndedCommand.create({
       runs: { isCapped: async () => false },
     }),

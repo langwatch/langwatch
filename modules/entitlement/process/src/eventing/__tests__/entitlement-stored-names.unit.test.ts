@@ -72,7 +72,9 @@ function metering({ send }: { send?: Parameters<typeof buildUsagePipeline>[0]["s
     getProjectPlacement: async () => ({ kind: "placed" as const, organizationId: ORGANIZATION }),
   };
   return buildUsagePipeline({
-    countScenarioRuns: CountScenarioRunsCommand.create({ runs: { count: async () => null } }),
+    countScenarioRuns: CountScenarioRunsCommand.create({
+      runs: { computeMonthCount: async () => undefined },
+    }),
     recordScenarioRunGraceEnded: RecordScenarioRunGraceEndedCommand.create({
       runs: { isCapped: async () => false },
     }),

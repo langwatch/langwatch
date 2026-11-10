@@ -1,7 +1,7 @@
 import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import { planCreationCap, type EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { isCountedScenarioSet, ScenarioEventType } from "@langwatch/scenario-contract";
+import { ScenarioEventType } from "@langwatch/scenario-contract";
 
 import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
 
@@ -42,32 +42,32 @@ export class ScenarioCreationCapService {
   }
 
   /**
-   * Asks the entitlement run cap before a RUN_STARTED is accepted. Platform-owned
-   * sets are never capped; an unknown run count lets the run through.
+   * Asks the entitlement run cap before a RUN_STARTED is accepted and counts the run. Every
+   * run start counts, whichever set it belongs to; an unknown run count lets the run through.
    * @throws LimitExceededError (`scenarioRuns`)
    */
   async assertRunStartAllowed(input: {
     projectId: string;
-    event: { type: string; scenarioSetId?: string | undefined };
+    event: { type: string };
   }): Promise<void> {
     if (input.event.type !== ScenarioEventType.RUN_STARTED) return;
-    await this.assertRunAllowed({
-      projectId: input.projectId,
-      scenarioSetId: input.event.scenarioSetId,
-    });
+    await this.#askRunCap({ projectId: input.projectId, shouldCountRun: true });
   }
 
   /**
    * Asks the run cap before a run is queued, so the caller that started it gets the refusal.
+   * Only asks: the run is counted once, when its RUN_STARTED is reported.
    * @throws LimitExceededError (`scenarioRuns`)
    */
-  async assertRunAllowed(input: {
-    projectId: string;
-    scenarioSetId?: string | undefined;
-  }): Promise<void> {
-    if (input.scenarioSetId && !isCountedScenarioSet(input.scenarioSetId)) return;
+  async assertRunAllowed(input: { projectId: string }): Promise<void> {
+    await this.#askRunCap({ projectId: input.projectId, shouldCountRun: false });
+  }
 
+  async #askRunCap(input: { projectId: string; shouldCountRun: boolean }): Promise<void> {
     const organizationId = await this.deps.projects.getOrganizationId(input.projectId);
-    await this.deps.plans.assertScenarioRunAllowed({ organizationId });
+    await this.deps.plans.assertScenarioRunAllowed({
+      organizationId,
+      shouldCountRun: input.shouldCountRun,
+    });
   }
 }

@@ -15,7 +15,7 @@ const TABLE_NAME = "billable_events" as const;
 type TotalRow = { total: string | number };
 type ProjectRow = { projectId: string; total: string | number };
 type DayRow = { day: string; total: string | number };
-type FirstRow = { firstAt: string | null; total: string | number };
+type FirstRow = { firstAt: string | number | null; total: string | number };
 
 /** ClickHouse twin of the meter, moved from billing under the same table and row shape. */
 export class BillableEventsMeterClickHouseRepository extends BillableEventsMeterRepository {
@@ -88,14 +88,12 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
         FROM ${TABLE_NAME}
         WHERE OrganizationId = {organizationId:String}
           AND EventType = {eventType:String}
-          AND NOT startsWith(DeduplicationKey, {excludedKeyPrefix:String})
           AND EventTimestamp >= {startDate:DateTime64(3)}
           AND EventTimestamp < {endDate:DateTime64(3)}
       `,
       params: {
         organizationId: input.organizationId,
         eventType: input.eventType,
-        excludedKeyPrefix: input.excludedKeyPrefix,
         startDate: input.startDate,
         endDate: input.endDate,
       },
@@ -110,23 +108,21 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
       tenantId: "",
       organizationId: input.organizationId,
       sql: `
-        SELECT toString(min(EventTimestamp)) as firstAt, count() as total
+        SELECT toUnixTimestamp64Milli(min(EventTimestamp)) as firstAt, count() as total
         FROM ${TABLE_NAME}
         WHERE OrganizationId = {organizationId:String}
           AND EventType = {eventType:String}
-          AND NOT startsWith(DeduplicationKey, {excludedKeyPrefix:String})
       `,
       params: {
         organizationId: input.organizationId,
         eventType: input.eventType,
-        excludedKeyPrefix: input.excludedKeyPrefix,
       },
       // The organization's meter counts every project the organization owns.
       SKIP_TENANT_CHECK: true,
     });
     const row = result.rows[0];
-    if (!row || numberOf(row.total) === 0 || !row.firstAt) return null;
-    return Temporal.Instant.from(`${row.firstAt.replace(" ", "T")}Z`).epochMilliseconds;
+    if (!row || numberOf(row.total) === 0 || row.firstAt === null) return null;
+    return numberOf(row.firstAt);
   }
 
   /** Billing's former `findByProjectApprox`, kept `uniq` so enforcement's numbers do not move. */

@@ -116,7 +116,7 @@ const logger = createLogger("langwatch:usage");
 
 /** Self-hosted registers the commands with nothing to count: no plan caps runs there. */
 const noScenarioRunCap = {
-  count: async () => null,
+  computeMonthCount: async () => undefined,
   isCapped: async () => false,
 };
 
@@ -408,7 +408,10 @@ export class EntitlementModule implements EntitlementApiContract {
     });
   }
 
-  async assertScenarioRunAllowed(input: { organizationId: string }): Promise<void> {
+  async assertScenarioRunAllowed(input: {
+    organizationId: string;
+    shouldCountRun?: boolean | undefined;
+  }): Promise<void> {
     await this.#scenarioRuns?.assertRunAllowed(input);
   }
 

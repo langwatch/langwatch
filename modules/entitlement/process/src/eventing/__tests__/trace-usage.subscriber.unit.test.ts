@@ -38,7 +38,9 @@ function compose({ placed = true } = {}) {
         : { kind: "unplaced" as const },
   };
   const pipeline = buildUsagePipeline({
-    countScenarioRuns: CountScenarioRunsCommand.create({ runs: { count: async () => null } }),
+    countScenarioRuns: CountScenarioRunsCommand.create({
+      runs: { computeMonthCount: async () => undefined },
+    }),
     recordScenarioRunGraceEnded: RecordScenarioRunGraceEndedCommand.create({
       runs: { isCapped: async () => false },
     }),

@@ -1,10 +1,11 @@
 Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
 
   The cloud Free plan includes 3 scenarios and 3 custom evaluators, as the
-  pricing page says. Scenario runs (Scenario SDK and platform simulation runs)
-  have no cap for the first 14 days after the organization's first run; after
+  pricing page says. Scenario runs have no cap for the first 14 days after the organization's first run; after
   that, Free allows 100 runs per UTC calendar month, the clock the events meter
-  uses. Scenario sets (test suites) are not capped. Paid cloud plans are
+  uses. Every run a member causes counts: Run in the app, runs reported from
+  code through the Scenario SDK, agent tests and voice calls. Scenario sets
+  (test suites) are not capped. Paid cloud plans are
   uncapped and bill runs as events. Self-hosted deployments are uncapped with or without a license: the
   caps live on the cloud Free plan and are never read from a signed license.
 
@@ -97,14 +98,22 @@ Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
     Then the run is accepted
 
   @unit
-  Scenario: Platform-owned runs do not use up the monthly cap
+  Scenario: App runs, agent tests and voice calls count toward the monthly cap
     Given the organization is on the cloud Free plan
     And its first scenario run was 20 days ago
-    And it ran 99 scenarios this month plus agent test, voice call and internal runs
-    When a run starts
-    Then the run is accepted
-    And the month's counted runs are 99
-    And a platform-owned run alone does not start the grace
+    And it ran 99 runs this month from the app, agent tests and voice calls
+    When one more agent test or voice call run starts
+    Then the run is refused with limit type "scenarioRuns"
+    And an agent test or voice call run alone starts the grace
+
+  @unit
+  Scenario: A run queued from the app is counted once
+    Given the organization is on the cloud Free plan
+    And its first scenario run was 20 days ago
+    And it ran 99 scenarios this month
+    When a member clicks Run and the queued run later reports its start
+    Then the 100th run passes the check at queue time and when its start is reported
+    And the 101st run is refused once, before it is queued
 
   @unit
   Scenario: An unknown run count does not block runs

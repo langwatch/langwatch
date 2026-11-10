@@ -894,10 +894,7 @@ export class ScenarioModule implements ScenarioApi {
    * metadata, which is the only channel that carries them into execution.
    */
   async queueSimulationRun(input: QueueSimulationRunInput): Promise<void> {
-    await this.#dependencies.creationCaps.assertRunAllowed({
-      projectId: input.projectId,
-      scenarioSetId: input.setId,
-    });
+    await this.#dependencies.creationCaps.assertRunAllowed({ projectId: input.projectId });
     const target = await this.#dependencies.connectedTargets.resolve({
       projectId: input.projectId,
       target: input.target,
