@@ -37,8 +37,10 @@ Make them cheap instead:
 2. The generator is written out inline and the 2.5% and 97.5% quantiles are found by
    selection instead of a full sort. The per-variant intervals are unchanged to the
    last digit.
-3. Pairs that recorded at least 90% of the run's recorded rows share ONE resampling of
-   those rows per metric. A pair's replicate is the mean difference over the drawn
+3. Pairs that recorded at least 90% of the run's rows share ONE resampling of every
+   row per metric, restricted to the columns those pairs read. Both the threshold and
+   the draw are measured against the whole run, never against the rows other variants
+   recorded, so a variant joining the run cannot move another pair's interval. A pair's replicate is the mean difference over the drawn
    rows both sides recorded. For a pair that recorded every row this is the same
    paired bootstrap as before under a different seed; for one that missed a few rows
    the usable row count varies slightly between replicates, which widens the interval

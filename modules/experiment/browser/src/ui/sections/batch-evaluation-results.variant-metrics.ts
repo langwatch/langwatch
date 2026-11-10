@@ -95,7 +95,7 @@ const pairedDifferenceCI = ({
 };
 
 /**
- * Share of the run's recorded rows a pair must have in common to join the shared
+ * Share of the run's rows a pair must have in common to join the shared
  * resampling. Above it the interval widens by under 1% of itself, inside the Monte
  * Carlo noise; below it the pair is resampled on its own as before (experiment ADR-002).
  */
@@ -111,15 +111,6 @@ const sharedRowCount = (a: (number | null)[], b: (number | null)[]): number => {
     if (isRecorded(a[r]) && isRecorded(b[r])) shared++;
   }
   return shared;
-};
-
-/** Rows some variant recorded. The rest (still running, never priced) are no pair's evidence. */
-const recordedRowsOf = (columns: (number | null)[][]): number[] => {
-  const recorded: number[] = [];
-  for (let r = 0; r < (columns[0]?.length ?? 0); r++) {
-    if (columns.some((column) => isRecorded(column[r]))) recorded.push(r);
-  }
-  return recorded;
 };
 
 type Pair = { left: number; right: number; sharedRows: number };
@@ -169,10 +160,12 @@ const pairedDifferenceCIs = ({
   seed: number;
 }): Record<string, Record<string, [number, number]>> => {
   const columns = variantIds.map((id) => valuesByRow[id]!);
-  const recordedRows = recordedRowsOf(columns);
+  // Measured against every row of the run, never the rows other variants recorded:
+  // otherwise a variant joining the run could move a pair across the threshold, or
+  // change the draw's size, and shift an interval that only involves the other two.
+  const runRows = columns[0]?.length ?? 0;
   const pairs = unorderedPairs(columns);
-  const sharesTheRun = (pair: Pair) =>
-    pair.sharedRows >= SHARED_RESAMPLING_MIN_OVERLAP * recordedRows.length;
+  const sharesTheRun = (pair: Pair) => pair.sharedRows >= SHARED_RESAMPLING_MIN_OVERLAP * runRows;
 
   // Insertion order follows `pairs`, so the result's key order does not depend on
   // which pairs shared the resampling.
@@ -182,9 +175,13 @@ const pairedDifferenceCIs = ({
   const sharedPairs = pairs.filter(
     (pair) => sharesTheRun(pair) && pair.sharedRows >= MIN_PRICED_ROWS,
   );
+  // Only the columns a shared pair reads go into the draw; a column's replicate sums
+  // do not depend on its neighbours, so leaving the rest out changes no interval.
+  const drawnColumns = [...new Set(sharedPairs.flatMap(({ left, right }) => [left, right]))];
+  const positionOf = new Map(drawnColumns.map((column, position) => [column, position]));
   const sharedIntervals = bootstrapPairedDifferenceCIs({
-    columns: columns.map((column) => recordedRows.map((r) => column[r] ?? null)),
-    pairs: sharedPairs.map(({ left, right }) => [left, right]),
+    columns: drawnColumns.map((column) => columns[column]!),
+    pairs: sharedPairs.map(({ left, right }) => [positionOf.get(left)!, positionOf.get(right)!]),
     seed,
   });
   sharedPairs.forEach((pair, k) => intervals.set(pair, sharedIntervals[k] ?? null));
