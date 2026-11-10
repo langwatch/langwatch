@@ -73,7 +73,6 @@ describe("VoiceSessionService.compose", () => {
         ],
         startedAt: 1_000,
         endedAt: 5_000,
-        isCutAtLimit: false,
         userId: "user_1",
       });
 
