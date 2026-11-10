@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -210,6 +211,11 @@ func Load() (*Input, error) {
 	if raw, set := os.LookupEnv("CLICKHOUSE_DEFAULT_NETWORKS"); set && len(i.DefaultNetworkList()) == 0 {
 		return nil, fmt.Errorf("CLICKHOUSE_DEFAULT_NETWORKS is set but names no network (%q): unset it, or list the networks default may log in from", raw)
 	}
+	for _, n := range i.DefaultNetworkList() {
+		if !isNetwork(n) {
+			return nil, fmt.Errorf("CLICKHOUSE_DEFAULT_NETWORKS: %q is not an IP address or a CIDR network", n)
+		}
+	}
 
 	if i.LWQLAccessDir == "" {
 		if _, err := os.Stat(filepath.Join(DefaultLWQLAccessDir, LWQLAccessFile)); err == nil {
@@ -261,6 +267,14 @@ func (i *Input) DefaultNetworkList() []string {
 		}
 	}
 	return out
+}
+
+// isNetwork accepts what ClickHouse's <ip> takes: an address, or a CIDR network.
+func isNetwork(s string) bool {
+	if _, _, err := net.ParseCIDR(s); err == nil {
+		return true
+	}
+	return net.ParseIP(s) != nil
 }
 
 // GrantsDefaultAccessManagement reports whether ch-config grants the default

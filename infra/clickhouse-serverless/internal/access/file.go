@@ -53,6 +53,11 @@ type User struct {
 	Databases []string `yaml:"databases"`
 	Networks  []string `yaml:"networks"`
 	Login     Login    `yaml:"login"`
+	// Settings, Quota and Grants narrow or extend the tier for this user alone:
+	// its own profile inheriting the tier's, its own quota, and read grants.
+	Settings map[string]any `yaml:"settings"`
+	Quota    *Quota         `yaml:"quota"`
+	Grants   []string       `yaml:"grants"`
 }
 
 // Login holds exactly one login kind.
@@ -101,7 +106,7 @@ var (
 	forbiddenDatabases = map[string]bool{"system": true, "information_schema": true, "INFORMATION_SCHEMA": true}
 )
 
-// LWQLUser is the LangWatchQL restricted identity (ADR-200): a second definition
+// LWQLUser is the LangWatchQL restricted identity: a second definition
 // would merge a login and a tier's grants into the one user row policies isolate.
 const LWQLUser = "langwatch_lwql"
 
@@ -255,6 +260,7 @@ func (f *File) validate() []string {
 			}
 			seenDBs[db] = true
 		}
+		checkExtras(u, add, where)
 		for _, n := range u.Networks {
 			if _, err := netip.ParsePrefix(n); err != nil {
 				if _, err := netip.ParseAddr(n); err != nil {

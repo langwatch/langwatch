@@ -70,3 +70,20 @@ func TestLoad_RefusesAnEmptyDefaultNetworksList(t *testing.T) {
 		t.Fatal("Load accepted a CLICKHOUSE_DEFAULT_NETWORKS that names no network")
 	}
 }
+
+// @scenario "The default user's networks fail closed"
+func TestLoad_RefusesADefaultNetworkThatIsNotOne(t *testing.T) {
+	t.Setenv("CH_CPU", "2")
+	t.Setenv("CH_RAM", "1Gi")
+	t.Setenv("CLICKHOUSE_PASSWORD", "pw-under-test")
+	for _, bad := range []string{"10.0.0.0/33", "10.0.0.0/8;", "office-vpn"} {
+		t.Setenv("CLICKHOUSE_DEFAULT_NETWORKS", "10.0.0.0/8,"+bad)
+		if _, err := Load(); err == nil {
+			t.Errorf("Load accepted %q as a default network", bad)
+		}
+	}
+	t.Setenv("CLICKHOUSE_DEFAULT_NETWORKS", "10.0.0.0/8, 192.168.1.4, fd00::/8")
+	if _, err := Load(); err != nil {
+		t.Errorf("Load refused valid networks: %v", err)
+	}
+}

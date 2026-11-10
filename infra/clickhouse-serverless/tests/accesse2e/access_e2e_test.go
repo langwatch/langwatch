@@ -27,6 +27,8 @@ import (
 
 const container = "ch-e2e-access"
 
+const opsPassword = "ops-password-0123456789"
+
 type harness struct {
 	t        *testing.T
 	secrets  string
@@ -106,6 +108,32 @@ func TestAccessAgainstRealClickHouse(t *testing.T) {
 		}, "the expired password still logs in")
 	})
 
+	// @scenario "A user narrows its tier with its own settings and quota, and adds named read grants"
+	t.Run("a user's own settings, quota and grants hold on the server", func(t *testing.T) {
+		if out, err := h.query("ops", opsPassword, "SELECT getSetting('max_execution_time')"); err != nil || out != "10" {
+			t.Errorf("ops max_execution_time: %q, %v; want its own 10", out, err)
+		}
+		if _, err := h.query("ops", opsPassword, "SELECT count() FROM system.query_log"); err != nil {
+			t.Errorf("ops was refused the system table it was granted: %v", err)
+		}
+		if _, err := h.query("ops", opsPassword, "SELECT count() FROM system.processes"); err == nil {
+			t.Error("ops read a system table it was not granted")
+		}
+		if _, err := h.query("ops", opsPassword, "SELECT 1 SETTINGS log_queries = 0"); err == nil {
+			t.Error("ops changed an audited setting through its own profile")
+		}
+		// ClickHouse counts only queries that read something, so not SELECT 1.
+		var quotaErr error
+		for range 8 {
+			if _, quotaErr = h.query("ops", opsPassword, "SELECT count() FROM system.query_log"); quotaErr != nil {
+				break
+			}
+		}
+		if quotaErr == nil || !strings.Contains(quotaErr.Error(), "QUOTA_EXCEEDED") {
+			t.Errorf("ops ran past its quota of 6 queries an hour: %v", quotaErr)
+		}
+	})
+
 	t.Run("a fresh token logs in over HTTP and native, others are refused", func(t *testing.T) {
 		token := h.token("alice@example.com", time.Now().Add(10*time.Minute))
 		if len(token) < 500 {
@@ -141,11 +169,25 @@ func start(t *testing.T, image string) *harness {
 	}
 	h.writeSecret("first", "first-password-0123456789")
 	h.writeSecret("second", "second-password-0123456789")
+	opsDir := filepath.Join(root, "secrets", "ops")
+	if err := os.MkdirAll(opsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(opsDir, "current"), []byte(opsPassword+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	access := fmt.Sprintf(`issuers:
   - {name: staff, url: '%s', username_claim: email, required_claims: {email_verified: true}}
 users:
   - {name: metabase, tier: read, databases: [analytics], login: {rolling: {dir: /access/secrets/metabase}}}
   - {name: alice, tier: read, databases: [analytics], login: {token: {issuer: staff, subject: alice@example.com}}}
+  - name: ops
+    tier: read
+    databases: [analytics]
+    login: {rolling: {dir: /access/secrets/ops}}
+    settings: {max_execution_time: 10}
+    quota: {duration_seconds: 3600, limits: {queries: 6}}
+    grants: ["SELECT ON system.query_log"]
 `, h.issuer.URL)
 	if err := os.WriteFile(filepath.Join(root, "access.yaml"), []byte(access), 0o644); err != nil {
 		t.Fatal(err)

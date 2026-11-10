@@ -54,6 +54,22 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
     And the write user may also insert, update and delete there, but not run DDL
     And each user runs under its tier's profile and network list
 
+  @unit @e2e
+  Scenario: A user narrows its tier with its own settings and quota, and adds named read grants
+    Given an ops user of the read tier with its own max_execution_time, a quota of queries an hour, and a SELECT grant on system.query_log
+    When the access users are planned and the server loads them
+    Then the user runs under its own profile, which inherits the read tier's and wins over it
+    And the quota refuses queries past its limit
+    And the user reads system.query_log but no other system table
+
+  @unit
+  Scenario: A user's own settings, quota and grants cannot widen the tier past its guarantees
+    Given a user whose settings change a query-log setting, set readonly to 0 on a read tier, or replace the profile or constraints
+    Or whose quota names an unknown limit or no positive duration
+    Or whose grants name anything but a read privilege on one database's tables, or every table of system
+    When ch-config loads the access file
+    Then it fails with an error naming the offending entry
+
   @unit
   Scenario: Two passwords in a rolling directory are valid at once
     Given a rolling user whose directory holds two password files

@@ -65727,6 +65727,14 @@ users:
     networks: [10.0.0.0/8]            # default: any address
     login:
       token: { issuer: staff, subject: alice@example.com }
+  - name: ops
+    tier: read
+    databases: [langwatch]
+    login:
+      rolling: { dir: /etc/clickhouse-access/secrets/ops-passwords }
+    settings: { max_execution_time: 30 }
+    quota: { duration_seconds: 3600, limits: { queries: 600 } }
+    grants: ["SELECT ON system.query_log"]
 ```
 
 | Issuer key        | Meaning                                                                                       |
@@ -65747,6 +65755,13 @@ users:
 | `databases` | Databases a read or write user can use. `system` and `information_schema` are refused. |
 | `networks`  | Addresses or CIDR ranges the user may log in from                                  |
 | `login`     | Exactly one of `rolling` or `token`                                                |
+| `settings`  | Query settings for this user only, on top of its tier's. Query-log settings are refused. |
+| `quota`     | `duration_seconds` and `limits` (`queries`, `errors`, `read_bytes` and the other ClickHouse quota limits) |
+| `grants`    | Extra read grants, such as `SELECT ON system.query_log`. A whole `system` database is refused. |
+
+A user's settings cannot raise its tier's caps: the tier's constraints still
+apply. ClickHouse counts only queries that read data against a quota's
+`queries` limit, so `SELECT 1` does not use it up.
 
 Do not also define an access user in your own `users.d` files.
 

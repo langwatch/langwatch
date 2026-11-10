@@ -51,6 +51,8 @@ func GatherEach(f *File) (Inputs, map[string]error) {
 // next without any input changing (the earliest future valid_until).
 type Planned struct {
 	Users      map[string]any
+	Profiles   map[string]any
+	Quotas     map[string]any
 	Warnings   []string
 	NextChange *time.Time
 }
@@ -58,13 +60,13 @@ type Planned struct {
 // Plan computes the access users as ClickHouse config at instant now. Pure:
 // the same file, inputs and instant always give the same document.
 func Plan(f *File, in Inputs, now time.Time) Planned {
-	p := Planned{Users: map[string]any{}}
+	p := Planned{Users: map[string]any{}, Profiles: map[string]any{}, Quotas: map[string]any{}}
 	for _, u := range f.Users {
 		user := map[string]any{
 			"networks": map[string]any{"ip": u.Networks},
 			"profile":  u.Tier.Name(),
-			"grants":   map[string]any{"query": u.Tier.UserGrants(u.Databases)},
 		}
+		planExtras(&p, u, user)
 		switch {
 		case u.Login.Token != nil:
 			user["http_authentication"] = map[string]any{"server": AuthServerName, "scheme": "basic"}
@@ -98,7 +100,14 @@ func Plan(f *File, in Inputs, now time.Time) Planned {
 
 // UsersYAML is the users.d file for the planned users.
 func (p Planned) UsersYAML() ([]byte, error) {
-	return yaml.Marshal(map[string]any{"users": p.Users})
+	doc := map[string]any{"users": p.Users}
+	if len(p.Profiles) > 0 {
+		doc["profiles"] = p.Profiles
+	}
+	if len(p.Quotas) > 0 {
+		doc["quotas"] = p.Quotas
+	}
+	return yaml.Marshal(doc)
 }
 
 // UserNames lists the planned users, sorted.
