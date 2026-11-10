@@ -26,7 +26,7 @@ The image is public. Whatever replaces the scripts must stay generic (no cloud-s
 - A same-mode backup in flight blocks the run. An incremental stands down for a full in flight; a full never yields. Standing down is the one success that writes nothing, because the full covers it and reports its own result.
 - A `CREATING_BACKUP` entry blocks a same-mode run at any age. `system.backups` lives in memory and a server restart clears it, so an entry there is a live backup. An age cutoff only postponed the double start: the CronJob deadline kills the client, not the server's `BACKUP ... ASYNC`, so a full outliving the cutoff got a second one beside it. `STALE_BACKUP_HOURS` (default 12, chart `backup.staleHours`) is now an alert threshold only. A one-shot run stops waiting past it and exits non-zero; the sidecar logs a warning, keeps waiting, and sets `clickhouse_backup_overrunning`.
 - The base comes from `system.backup_log`, which survives restarts. With `BACKUP_CLUSTER`, it is read from every replica with `clusterAllReplicas(...)` and `skip_unavailable_shards = 1`, since all replicas share the backups disk.
-- A base is at most `BACKUP_RETENTION_DAYS` less one day old, with a 12 hour floor. Fulls that all expired fail the run; no full ever is a clean no-op.
+- An incremental's full is at most 26 hours old (two default full intervals and margin), or `BACKUP_RETENTION_DAYS` less one day with a 12 hour floor when that is shorter. The lifecycle rule expires a full at most 26 hours before the last incremental on it, so every backup restores for at least the expiry less 26 hours. A longer limit let an incremental outlive its full by days and restore to nothing. With no full that recent the run fails, so stopped fulls also stop incrementals and alert; no full ever is a clean no-op.
 - Each incremental chains on the newest backup since the newest valid full. Only an incremental started after that full ended counts, so one that overlapped the full, and roots in the previous full, never becomes a base.
 - `max_backup_bandwidth` reaches the statement.
 
@@ -62,7 +62,7 @@ The sidecar logs in with `BACKUP_USER` and a password file (`BACKUP_PASSWORD_FIL
 
 ### 8. Retention stays with the object store
 
-The earlier public script pruned with `DROP BACKUP`, which ClickHouse does not have, with its errors discarded, so it never removed a backup. We do not replace it. Deleting the right objects safely means knowing every live chain, and an object-store lifecycle rule on the backups prefix, which every S3-compatible store offers, already expires them. `BACKUP_RETENTION_DAYS` must match that rule; the base age limit keeps every chain inside it.
+The earlier public script pruned with `DROP BACKUP`, which ClickHouse does not have, with its errors discarded, so it never removed a backup. We do not replace it. Deleting the right objects safely means knowing every live chain, and an object-store lifecycle rule on the backups prefix, which every S3-compatible store offers, already expires them. `BACKUP_RETENTION_DAYS` must match that rule. The 26 hour limit on a chain's full keeps every backup restorable for the rule's length less 26 hours, so the rule is set two days longer than the window an operator needs.
 
 ### 9. Chart modes
 

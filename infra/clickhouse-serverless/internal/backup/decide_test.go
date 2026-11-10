@@ -70,18 +70,20 @@ func TestDecide_InFlightBlocksAtAnyAge(t *testing.T) {
 	}
 }
 
-// @scenario "A base older than retention less a day is never used"
+// @scenario "An incremental only chains on a full from about the last day"
 func TestDecide_BaseMaxAge(t *testing.T) {
 	for _, tc := range []struct {
 		days int
 		want time.Duration
-	}{{7, 144 * time.Hour}, {2, 24 * time.Hour}, {1, 12 * time.Hour}} {
+	}{{30, 26 * time.Hour}, {7, 26 * time.Hour}, {3, 26 * time.Hour}, {2, 24 * time.Hour}, {1, 12 * time.Hour}} {
 		if got := (Policy{RetentionDays: tc.days}).BaseMaxAge(); got != tc.want {
 			t.Errorf("retention %dd: base max age %s, want %s", tc.days, got, tc.want)
 		}
 	}
 
-	expired := created(Full, "langwatch_full_20261017T050000Z", ago(145*time.Hour), ago(144*time.Hour+time.Minute))
+	// Inside the 7-day lifecycle, but too old to root a chain: an incremental on
+	// it would outlive it by days and restore to nothing.
+	expired := created(Full, "langwatch_full_20261022T080000Z", ago(28*time.Hour), ago(27*time.Hour))
 	newInc := created(Incremental, "langwatch_incremental_20261023T113000Z", ago(61*time.Minute), ago(60*time.Minute))
 	d := Decide(Incremental, State{Created: []Backup{expired, newInc}, FullsEver: 4}, policy, now, false)
 	if d.Action != Fail || !strings.Contains(d.Reason, "expired") {

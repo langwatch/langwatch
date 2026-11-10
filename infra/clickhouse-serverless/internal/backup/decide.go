@@ -36,10 +36,15 @@ type Policy struct {
 	StaleHours    int // a backup in flight for longer is overrunning: alerted, still live
 }
 
-// BaseMaxAge is how old a base may be: retention less a day of margin, at
-// least 12h. A base the lifecycle rule has expired restores to nothing.
+// MaxChainRootAge caps how old an incremental's full may be: two default full
+// intervals plus margin. Every backup then restores for at least the lifecycle
+// expiry less this, since its full expires at most this much before it (ADR-199).
+const MaxChainRootAge = 26 * time.Hour
+
+// BaseMaxAge is how old an incremental's full may be: MaxChainRootAge, or less
+// for a lifecycle under three days (expiry less a day, at least 12h).
 func (p Policy) BaseMaxAge() time.Duration {
-	return max(time.Duration(p.RetentionDays*24-24)*time.Hour, 12*time.Hour)
+	return min(MaxChainRootAge, max(time.Duration(p.RetentionDays*24-24)*time.Hour, 12*time.Hour))
 }
 
 // Action is what a run does.
@@ -126,7 +131,7 @@ func Decide(mode Mode, st State, p Policy, now time.Time, adopt bool) Decision {
 	if root == nil {
 		if st.FullsEver > 0 {
 			d.Action = Fail
-			d.Reason = fmt.Sprintf("no full backup within %s to base this incremental on; the newest one has expired from the backups disk", maxAge)
+			d.Reason = fmt.Sprintf("no full backup within %s to base this incremental on; the newest one has expired or is too old to root a chain", maxAge)
 			return d
 		}
 		d.Action = StandDown

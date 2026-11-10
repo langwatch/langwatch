@@ -48,10 +48,11 @@ Feature: clickhouse-serverless takes chained native backups from CronJobs or its
     And without a cluster it reads this server's system.backup_log
 
   @unit
-  Scenario: A base older than retention less a day is never used
-    Given every full backup completed longer ago than BACKUP_RETENTION_DAYS less one day, with a 12 hour floor
+  Scenario: An incremental only chains on a full from about the last day
+    Given every full backup completed more than 26 hours ago, or longer ago than BACKUP_RETENTION_DAYS less one day with a 12 hour floor when that is shorter
     When an incremental is due
-    Then it fails, saying the newest full has expired
+    Then it fails, saying no full is recent enough
+    And so every backup's full expires at most 26 hours before it does
 
   @unit
   Scenario: An incremental with no full ever is a clean no-op

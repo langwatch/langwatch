@@ -47,8 +47,9 @@ backup:
   passwordSecret:
     name: ""
     key: ""
-  # How long the backups prefix is kept (the object store's lifecycle rule),
-  # which bounds how old a base may be. Set it to match that rule.
+  # How long the backups prefix is kept (the object store's lifecycle rule).
+  # Set it to match that rule. Every backup restores for at least this less
+  # 26 hours, so set the rule two days longer than the window you need.
   retentionDays: 7
   # Sidecar mode: max_backup_bandwidth in bytes per second (0 = unlimited).
   maxBandwidth: 0
