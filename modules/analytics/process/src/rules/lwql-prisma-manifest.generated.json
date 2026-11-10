@@ -19221,7 +19221,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "An open failed payment recovery case: the unpaid renewal invoice, day 0 (its first failed\ncharge) and the last notice sent (0, 3, 7, 14 or 21). Cleared when the case closes."
+          "documentation": "An open failed payment recovery case: the unpaid renewal invoice, day 0 (its first failed\ncharge) and the last notice sent (3, 7, 14 or 21). Cleared when the case closes."
         },
         {
           "name": "paymentRecoveryStartedAt",

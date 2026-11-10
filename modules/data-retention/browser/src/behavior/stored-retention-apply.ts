@@ -40,10 +40,9 @@ export function useStoredRetentionApply({
   );
   const applyScope = dataRetentionApi.dataRetention.applyScopeRetentionToStoredData.useMutation();
 
-  const viewedRows =
-    viewedQuery.data?.categories.reduce((total, each) => total + each.rows, 0) ?? 0;
-  const viewedDays =
-    viewedQuery.data?.categories.find((each) => each.category === "traces")?.retentionDays ?? null;
+  const viewedTraces = viewedQuery.data?.categories.find((each) => each.category === "traces");
+  const viewedRows = viewedTraces?.rows ?? 0;
+  const viewedDays = viewedTraces?.retentionDays ?? null;
 
   /** After a save: count what the new period would delete, never the cached old period's count. */
   const offer = async (scopes: ScopeAssignment[]) => {

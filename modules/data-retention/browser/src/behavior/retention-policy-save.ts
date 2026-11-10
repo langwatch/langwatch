@@ -117,7 +117,7 @@ export function retentionPolicySaver({
 }
 
 /**
- * Stored items past the new period summed over the saved scopes, for the apply prompt; null
+ * Stored traces past the new period summed over the saved scopes, for the apply prompt; null
  * when any count failed, so the prompt says it could not count rather than "0".
  */
 export async function countStoredPastRetention({
@@ -135,10 +135,7 @@ export async function countStoredPastRetention({
     const days = new Set(traces.map((each) => each.retentionDays));
     const [only] = [...days];
     return {
-      rows: answers.reduce(
-        (sum, answer) => sum + answer.categories.reduce((total, each) => total + each.rows, 0),
-        0,
-      ),
+      rows: traces.reduce((sum, each) => sum + each.rows, 0),
       retentionDays: days.size === 1 && only !== undefined ? only : null,
     };
   } catch {

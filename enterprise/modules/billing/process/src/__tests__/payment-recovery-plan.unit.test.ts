@@ -161,6 +161,14 @@ describe("Failed payment recovery and the plan", () => {
       expect(store.subscriptions[0]).toMatchObject({ status: "ACTIVE", maxMembers: 12 });
     });
 
+    /** @scenario "A paused organization still reads its older traces in full" */
+    it("answers no visibility window, unlike the Free plan", async () => {
+      at(21 * 24);
+
+      expect(getFreePlanLimits().visibilityDays).toBe(14);
+      expect((await plans.getActivePlan("org_1")).visibilityDays).toBeUndefined();
+    });
+
     /** @scenario "The pause takes effect at day 21 even when the sweep is late" */
     it("answers Free limits at day 21 and one hour with no sweep run", async () => {
       at(21 * 24 - 1);

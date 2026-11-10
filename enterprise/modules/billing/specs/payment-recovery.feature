@@ -168,6 +168,12 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     Then it answers the Free plan limits
 
   @unit
+  Scenario: A paused organization still reads its older traces in full
+    Given an organization with an open recovery case that reached day 21
+    When its plan is resolved
+    Then the plan carries no Free visibility window over stored traces
+
+  @unit
   Scenario: The paused email goes out once on day 21
     Given an organization with an open recovery case that reached day 21
     When the recovery sweep runs twice

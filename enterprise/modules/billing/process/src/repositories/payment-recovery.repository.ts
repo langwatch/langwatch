@@ -10,7 +10,7 @@ export type PaymentRecoveryCase = {
   invoiceId: string;
   /** Day 0: the first failed charge of the invoice. */
   startedAt: Instant;
-  /** The last notice sent (0, 3, 7, 14 or 21); null before the first. */
+  /** The last notice sent (3, 7, 14 or 21); null before the first. */
   noticeDay: number | null;
 };
 

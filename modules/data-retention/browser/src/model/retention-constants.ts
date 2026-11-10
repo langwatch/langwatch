@@ -42,9 +42,9 @@ export const retentionUnitCollection = createListCollection({
 
 export type RetentionPreset = { value: string; label: string; days: number };
 
-// Presets round up to cover the full period plus buffer. Plan-gated by tier:
-// PAID → {35, 63}; ENTERPRISE → full list + custom. Server re-enforces at
-// the mutation boundary; these lists only shape the UI.
+// Presets round up to cover the full period plus buffer. Plan-gated by tier: PAID → the
+// Growth options (35, 63, 91, 182, 371); ENTERPRISE → full list + custom. Server re-enforces
+// at the mutation boundary; these lists only shape the UI.
 
 /** Paid (non-enterprise) menu: the Growth options offered at upgrade, up to 1 year. */
 export const PAID_RETENTION_PRESETS: RetentionPreset[] = GROWTH_RETENTION_OPTIONS.map((option) => ({

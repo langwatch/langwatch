@@ -79,7 +79,8 @@ export class SaaSPlanProviderService extends BillingService {
       };
     }
 
-    // Unpaid past day 21: Free limits refuse new additions; nothing is removed or deleted.
+    // Unpaid past day 21: Free limits refuse new additions; nothing is removed, deleted or
+    // hidden, so the Free visibility window does not apply to what is already stored.
     if (
       isPlanPausedForRecovery({
         startedAt: activeSubscription.paymentRecoveryStartedAt,
@@ -87,7 +88,8 @@ export class SaaSPlanProviderService extends BillingService {
         now: nowInstant(),
       })
     ) {
-      return { ...getFreePlanLimits(), overrideAddingLimitations };
+      const { visibilityDays: _freeWindow, ...freeLimits } = getFreePlanLimits();
+      return { ...freeLimits, overrideAddingLimitations };
     }
 
     const subscriptionPlan = activeSubscription.plan as string | undefined;
