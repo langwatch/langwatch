@@ -466,8 +466,8 @@ describe("given traces of each source carrying the metadata the widgets read", (
     const inPeriod = passRates.filter((row) => Number(row.judged) > 0);
 
     expect(units.map((row) => row.unit)).toContain("umbrella");
-    expect(inPeriod.map((row) => row.unit).toSorted()).toEqual(
-      units.map((row) => row.unit).toSorted(),
+    expect(inPeriod.map((row) => String(row.unit)).toSorted()).toEqual(
+      units.map((row) => String(row.unit)).toSorted(),
     );
   });
 
