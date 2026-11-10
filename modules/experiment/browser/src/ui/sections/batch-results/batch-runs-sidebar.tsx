@@ -301,12 +301,18 @@ const RunItem = ({
   );
 };
 
-/** Label badges a run entry shows before folding the rest into "+N", so the narrow sidebar stays two lines. */
+/**
+ * Label badges a run entry shows before folding the rest into "+N", so the narrow sidebar stays
+ * two lines.
+ */
 const MAX_LABEL_BADGES = 2;
 
 const concurrencyExplanationId = (runId: string) => `run-concurrency-explanation-${runId}`;
 
-/** The agent version each label resolved to and the run's concurrency, as badges, when it recorded them. */
+/**
+ * The agent version each label resolved to and the run's concurrency, as badges, when it recorded
+ * them.
+ */
 const RunSettingsLine = ({ run }: { run: BatchRunSummary }) => {
   const labels = runAgentLabelsOf(run.targets);
   if (labels.length === 0 && !run.concurrency) return null;
