@@ -35,21 +35,47 @@ func readManifest(t *testing.T, dir string) manifest {
 	return m
 }
 
-// workspaceDirs maps each workspace package name under apps/ and packages/ to its directory.
+// workspaceGlobs are the package globs pnpm-workspace.yaml lists under `packages:`.
+func workspaceGlobs(t *testing.T) []string {
+	t.Helper()
+	_, block, found := strings.Cut("\n"+readRepoFile(t, "pnpm-workspace.yaml"), "\npackages:\n")
+	if !found {
+		t.Fatal("pnpm-workspace.yaml lists no packages")
+	}
+	var globs []string
+	for line := range strings.SplitSeq(block, "\n") {
+		glob, ok := strings.CutPrefix(line, "  - ")
+		if !ok {
+			break
+		}
+		globs = append(globs, strings.Trim(glob, "'\""))
+	}
+
+	return globs
+}
+
+// workspaceDirs maps each workspace package name to its directory, through pnpm-workspace.yaml.
 func workspaceDirs(t *testing.T) map[string]string {
 	t.Helper()
 	dirs := map[string]string{}
-	for _, parent := range []string{"apps", "packages"} {
-		entries, err := os.ReadDir(filepath.Join(repoRoot, parent))
+	for _, glob := range workspaceGlobs(t) {
+		if strings.HasPrefix(glob, "!") {
+			continue
+		}
+		matches, err := filepath.Glob(filepath.Join(repoRoot, glob, "package.json"))
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("workspace glob %q: %v", glob, err)
 		}
-		for _, entry := range entries {
-			dir := parent + "/" + entry.Name()
-			if _, err := os.Stat(filepath.Join(repoRoot, dir, "package.json")); err == nil {
-				dirs[readManifest(t, dir).Name] = dir
+		for _, match := range matches {
+			dir, err := filepath.Rel(repoRoot, filepath.Dir(match))
+			if err != nil {
+				t.Fatal(err)
 			}
+			dirs[readManifest(t, filepath.ToSlash(dir)).Name] = filepath.ToSlash(dir)
 		}
+	}
+	if len(dirs) == 0 {
+		t.Fatal("pnpm-workspace.yaml's globs match no package")
 	}
 
 	return dirs
@@ -72,8 +98,16 @@ func siteDependencies(t *testing.T) []string {
 		}
 		for _, deps := range specs {
 			for name, spec := range deps {
+				if !strings.HasPrefix(spec, "workspace:") || testOnlyPackages[name] {
+					continue
+				}
 				target, ok := dirs[name]
-				if !ok || testOnlyPackages[name] || !strings.HasPrefix(spec, "workspace:") || found[target] {
+				if !ok {
+					t.Errorf("%s depends on %s, which no pnpm-workspace.yaml glob reaches", dir, name)
+
+					continue
+				}
+				if found[target] {
 					continue
 				}
 				found[target] = true
@@ -137,8 +171,19 @@ func TestSiteFilterCoversEveryPackageTheBuildReads(t *testing.T) {
 			t.Errorf("the docs-site filter does not list %s", want)
 		}
 	}
-	if listed["packages/design-system-internal/**"] {
-		t.Error("the docs-site filter lists packages/design-system-internal, which the site build never reads")
+	reads := map[string]bool{}
+	for _, dir := range siteDependencies(t) {
+		reads[dir] = true
+	}
+	packages := map[string]bool{}
+	for _, dir := range workspaceDirs(t) {
+		packages[dir] = true
+	}
+	for _, p := range patterns {
+		dir := strings.TrimSuffix(p, "/**")
+		if packages[dir] && !reads[dir] {
+			t.Errorf("the docs-site filter lists %s, a workspace package the site build never reads", p)
+		}
 	}
 }
 
