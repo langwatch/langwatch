@@ -50,7 +50,7 @@ describe("workflowEvaluationRequested redelivery", () => {
         services: createApiFixture<ExecutionDataServices>({}, "services"),
         concurrency: ExperimentRunConcurrencyService.create({
           activity: MemoryExperimentRunActivityRepository.create(),
-          config: { runConcurrency: 1 },
+          config: { runConcurrency: 1, projectCellBudget: 1 },
         }),
         folds,
         refusals: {},

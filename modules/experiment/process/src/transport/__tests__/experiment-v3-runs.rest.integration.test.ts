@@ -202,7 +202,7 @@ async function harness({
   folded: held = [],
   concurrency = ExperimentRunConcurrencyService.create({
     activity: MemoryExperimentRunActivityRepository.create(),
-    config: { runConcurrency: 10 },
+    config: { runConcurrency: 10, projectCellBudget: 10 },
   }),
 }: Harness = {}) {
   const pipeline = runPipeline({ worker, redis, ownership, registers, concurrency });

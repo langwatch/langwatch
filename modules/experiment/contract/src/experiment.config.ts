@@ -19,7 +19,7 @@ const optionalPositiveInt = z.preprocess(
 export const experimentConfig = Config.define((c) => ({
   blockLocalHttpCalls,
   allowedProxyHosts,
-  /** Cells of one run in flight at once when the request names no limit (main's knob). */
+  /** A run's concurrency when the active runs can't be read to share the budget. */
   runConcurrency: c.env("EVAL_V3_CONCURRENCY", z.coerce.number().int().positive().default(10)),
   /** Soft cell budget a project's runs split at start (runs keep it; total can exceed it). */
   projectCellBudget: c.env(

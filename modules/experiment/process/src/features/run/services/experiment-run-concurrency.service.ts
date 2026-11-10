@@ -1,6 +1,6 @@
 /**
  * The concurrency a run starts with: the one it names, else a share of the cell budgets split
- * between the active runs, else the fixed EVAL_V3_CONCURRENCY. Spec:
+ * between the active runs; EVAL_V3_CONCURRENCY only when active runs can't be read. Spec:
  * specs/experiment-run-dynamic-concurrency.feature.
  */
 import type { ExperimentServerConfig } from "@langwatch/experiment-contract";
@@ -15,8 +15,8 @@ import {
 
 type ExperimentRunConcurrencyDeps = Readonly<{
   activity: ExperimentRunActivityRepository;
-  config: Pick<ExperimentServerConfig, "runConcurrency"> &
-    Partial<Pick<ExperimentServerConfig, "projectCellBudget" | "globalCellBudget">>;
+  config: Pick<ExperimentServerConfig, "runConcurrency" | "projectCellBudget"> &
+    Partial<Pick<ExperimentServerConfig, "globalCellBudget">>;
   now?: () => number;
   logger?: Logger;
 }>;
@@ -34,14 +34,9 @@ export class ExperimentRunConcurrencyService {
     this.logger = deps.logger ?? createLogger("langwatch:experiment:run-concurrency");
   }
 
-  /** Whether the default is shared between active runs, which only a project budget turns on. */
-  get isDynamic(): boolean {
-    return this.deps.config.projectCellBudget !== undefined;
-  }
-
   /**
-   * The concurrency a run starts with, computed once; the requested one wins. Where the default is
-   * dynamic the run is claimed active in the same step, pinned or not, since it holds cells too.
+   * The concurrency a run starts with, computed once; the requested one wins. The run is claimed
+   * active in the same step, pinned or not, since it holds cells too.
    */
   async resolve({
     projectId,
@@ -53,7 +48,6 @@ export class ExperimentRunConcurrencyService {
     requested?: number | undefined;
   }): Promise<number> {
     const { runConcurrency, projectCellBudget, globalCellBudget } = this.deps.config;
-    if (projectCellBudget === undefined) return requested ?? runConcurrency;
     const fallback = requested ?? runConcurrency;
     try {
       const now = this.now();
@@ -95,7 +89,6 @@ export class ExperimentRunConcurrencyService {
 
   /** Gives back a claim whose run never started; a failed release only logs, the claim expires. */
   async release({ projectId, runId }: { projectId: string; runId: string }): Promise<void> {
-    if (!this.isDynamic) return;
     try {
       await this.deps.activity.markInactive({ projectId, runId });
     } catch (error) {
@@ -106,7 +99,7 @@ export class ExperimentRunConcurrencyService {
     }
   }
 
-  /** Counts a started run as active for the activity window, where the default is dynamic. */
+  /** Counts a started run as active for the activity window. */
   async recordStarted({
     projectId,
     runId,
@@ -116,7 +109,6 @@ export class ExperimentRunConcurrencyService {
     runId: string;
     startedAt: number;
   }): Promise<void> {
-    if (!this.isDynamic) return;
     await this.deps.activity.markActive({
       projectId,
       runId,
@@ -124,15 +116,8 @@ export class ExperimentRunConcurrencyService {
     });
   }
 
-  /**
-   * Stops counting a run once it completed, however it ended, even where this process has no
-   * budget: the api that claimed it may have one. Without a budget a failure is ignored.
-   */
+  /** Stops counting a run once it completed, however it ended. */
   async recordCompleted({ projectId, runId }: { projectId: string; runId: string }): Promise<void> {
-    try {
-      await this.deps.activity.markInactive({ projectId, runId });
-    } catch (error) {
-      if (this.isDynamic) throw error;
-    }
+    await this.deps.activity.markInactive({ projectId, runId });
   }
 }

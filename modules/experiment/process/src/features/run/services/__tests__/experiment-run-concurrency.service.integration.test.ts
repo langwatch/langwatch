@@ -25,13 +25,13 @@ function behavesOver(
     projectCellBudget,
   }: {
     activity: ExperimentRunActivityRepository;
-    projectCellBudget?: number;
+    projectCellBudget: number;
   }) =>
     ExperimentRunConcurrencyService.create({
       activity,
       config: {
         runConcurrency: 7,
-        ...(projectCellBudget !== undefined ? { projectCellBudget } : {}),
+        projectCellBudget,
       },
       now: () => NOW,
     });
@@ -87,22 +87,6 @@ function behavesOver(
     });
   });
 
-  describe("when a worker without a budget sees a run claimed by an api with one complete", () => {
-    it("still stops counting it", async () => {
-      const { activity, projectId } = store();
-      await serviceOver({ activity, projectCellBudget: 20 }).resolve({
-        projectId,
-        runId: "api-run",
-      });
-
-      await serviceOver({ activity }).recordCompleted({ projectId, runId: "api-run" });
-
-      expect(
-        await activity.claim({ projectId, runId: "probe", now: NOW, expiresAt: NOW + 1 }),
-      ).toMatchObject({ project: 0 });
-    });
-  });
-
   describe("when a run's start throws after its concurrency was claimed", () => {
     it("gives the claim back and rethrows", async () => {
       const { activity, projectId } = store();
@@ -114,19 +98,6 @@ function behavesOver(
         }),
       ).rejects.toThrow("plan failed");
       expect(await service.resolve({ projectId, runId: "next-run" })).toBe(20);
-    });
-  });
-
-  describe("when no project budget is set", () => {
-    /** @scenario "A concurrency service built without a project budget keeps the fixed default" */
-    it("answers EVAL_V3_CONCURRENCY whatever is active", async () => {
-      const { activity, projectId } = store();
-      for (const runId of ["run-a", "run-b"]) {
-        await activity.markActive({ projectId, runId, expiresAt: NOW + 60_000 });
-      }
-      const service = serviceOver({ activity });
-
-      expect(await service.resolve({ projectId, runId: "run-c" })).toBe(7);
     });
   });
 

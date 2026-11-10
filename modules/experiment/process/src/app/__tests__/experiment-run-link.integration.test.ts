@@ -50,7 +50,7 @@ async function bootWith({
         blockLocalHttpCalls: false,
         allowedProxyHosts: [],
         runConcurrency: 10,
-        projectCellBudget: undefined,
+        projectCellBudget: 24,
         globalCellBudget: undefined,
         publicBaseUrl,
         legacyPublicBaseUrl,
