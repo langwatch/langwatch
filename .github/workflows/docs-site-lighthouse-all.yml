@@ -17,6 +17,8 @@ on:
     paths:
       - "apps/docs/**"
       - "docs/**"
+      - "packages/design-system/**"
+      - "packages/time/**"
       - ".github/workflows/docs-site-lighthouse-all.yml"
       - ".github/actions/docs-media-encoders/**"
   schedule:
