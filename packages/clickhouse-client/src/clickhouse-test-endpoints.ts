@@ -140,16 +140,19 @@ export async function startTestClickHouseEndpoints({
   suite,
   names,
   environment,
+  image = TEST_CLICKHOUSE_IMAGE,
 }: {
   suite: string;
   names: string[];
   /** The test process's environment, read once by the caller (native server or containers). */
   environment: Readonly<Record<string, string | undefined>>;
+  /** The container image when no native server is configured; the shared default otherwise. */
+  image?: string;
 }): Promise<TestClickHouseEndpoint[]> {
   const baseUrl = nativeClickHouseBaseUrl(environment);
   return baseUrl
     ? startNativeEndpoints({ suite, names, baseUrl })
-    : startContainerEndpoints({ suite, names });
+    : startContainerEndpoints({ suite, names, image });
 }
 
 /** One database per endpoint on the shared native server. */
@@ -182,14 +185,16 @@ async function startNativeEndpoints({
 async function startContainerEndpoints({
   suite,
   names,
+  image,
 }: {
   suite: string;
   names: string[];
+  image: string;
 }): Promise<TestClickHouseEndpoint[]> {
   const started = await Promise.all(
     names.map(async (name): Promise<[string, StartedClickHouseContainer]> => [
       name,
-      await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
+      await new ClickHouseContainer(image)
         .withLabels({
           "langwatch.test": "true",
           [`langwatch.test.${suite}`]: name,

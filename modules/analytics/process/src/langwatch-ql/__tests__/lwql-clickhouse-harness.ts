@@ -12,7 +12,6 @@ import { fileURLToPath } from "node:url";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import type { LangWatchQLResourceLimits } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
@@ -26,6 +25,7 @@ import {
 } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import { LangWatchQLPostgresViewsService } from "../../features/provisioning/services/langwatch-ql-postgres-views.service.ts";
 import { CLICKHOUSE_CONFIG_STORE_ERROR_CODE } from "../../rules/langwatch-ql-config-store.rules.ts";
+import { withTenantCapability } from "../../rules/langwatch-ql-tenant-capability.rules.ts";
 import { LWQL_PRISMA_MANIFEST } from "../../rules/lwql-prisma-manifest.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../services/langwatch-ql-access-model-definition.service.ts";
@@ -68,8 +68,8 @@ export const TEST_POSTGRES_IMAGE = "postgres:17";
  * container sets `CLICKHOUSE_USER`, and the official image's entrypoint then *removes*
  * `default` and creates this user instead.
  */
-const ADMIN_USER = "test";
-const ADMIN_PASSWORD = "test";
+export const ADMIN_USER = "test";
+export const ADMIN_PASSWORD = "test";
 
 /** Password of the restricted identity. Never leaves the harness. */
 const RESTRICTED_PASSWORD = "lwql-reader-test-password";
@@ -231,7 +231,10 @@ export interface LangWatchQLClickHouseHarness {
    * setting at all, which is the path that exercises the profile default. Passing `""` sends an
    * explicit empty one. The two are different requests and the proof pins both.
    */
-  restrictedClient(options?: { keyHash?: string }): Promise<ClickHouseClient>;
+  restrictedClient(options?: {
+    keyHash?: string;
+    projectIds?: readonly string[];
+  }): Promise<ClickHouseClient>;
   /**
    * The restricted identity's credentials, for a caller that must build its own client rather
    * than borrow one — the REST endpoint suite, which drives the shipped executor and therefore
@@ -281,6 +284,46 @@ function writeConfigFile(directory: string, name: string, contents: string): str
   return path;
 }
 
+/** A statement ending in its own SETTINGS clause probes that clause, and is sent as written. */
+const OWN_SETTINGS_CLAUSE = /\bSETTINGS\s+[A-Za-z_]\w*\s*=[^()]*$/i;
+
+/**
+ * Sends every query with the capability in the executor's own trailing SETTINGS clause, so each
+ * suite runs the production transport (ADR-200) and never a URL setting.
+ */
+function carryCapability({
+  client,
+  setting,
+  capability,
+  projectIds,
+}: {
+  client: ClickHouseClient;
+  setting: string;
+  capability: string;
+  projectIds: readonly string[];
+}): void {
+  const query = client.query.bind(client);
+  client.query = ((params: Parameters<ClickHouseClient["query"]>[0]) =>
+    query({
+      ...params,
+      query: OWN_SETTINGS_CLAUSE.test(params.query)
+        ? params.query
+        : withTenantCapability({ sql: params.query, setting, capability, projectIds }),
+    })) as ClickHouseClient["query"];
+}
+
+/**
+ * The ClickHouse every LangWatchQL suite runs: the version the LangWatchQL server image builds on
+ * (`infra/clickhouse-serverless/Dockerfile`, #9458), not the repo-wide test default (ADR-200).
+ */
+export const LWQL_ISOLATION_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:26.8.34.13";
+
+/**
+ * A well-formed capability no key-map row holds. The executor refuses anything but lowercase hex
+ * before it sends, so this is the only garbage that can reach the server.
+ */
+export const UNMAPPED_KEY_HASH = "0".repeat(64);
+
 /**
  * Starts ClickHouse with the server-level prerequisites installed, then applies
  * the shipped provisioning and seeds two tenants' rows.
@@ -289,9 +332,12 @@ export async function startLangWatchQLClickHouse({
   suite,
   facts = "fixture",
   extraConfigFiles = [],
+  image = LWQL_ISOLATION_CLICKHOUSE_IMAGE,
 }: {
   suite: string;
   facts?: LangWatchQLFactTableMode;
+  /** The server image; LangWatchQL's own 26.8 unless a suite pins another. */
+  image?: string;
   /** Extra server config files to install before ClickHouse starts. */
   extraConfigFiles?: { name: string; target: string; contents: string }[];
 }): Promise<LangWatchQLClickHouseHarness> {
@@ -310,7 +356,7 @@ export async function startLangWatchQLClickHouse({
     .slice(0, 16);
 
   const configDirectory = mkdtempSync(join(tmpdir(), "lwql-config-"));
-  const container = await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
+  const container = await new ClickHouseContainer(image)
     .withUsername(ADMIN_USER)
     .withPassword(ADMIN_PASSWORD)
     .withLabels({
@@ -432,10 +478,15 @@ export async function startLangWatchQLClickHouse({
         url: httpUrl,
         username: names.restrictedUser,
         password: RESTRICTED_PASSWORD,
-        ...(keyHash === undefined
-          ? {}
-          : { clickhouse_settings: { [names.tenantSetting]: keyHash } }),
       });
+      if (keyHash !== undefined) {
+        carryCapability({
+          client,
+          setting: names.tenantSetting,
+          capability: keyHash,
+          projectIds: options?.projectIds ?? ["lwql-harness"],
+        });
+      }
       openedClients.push(client);
       await expectRestrictedIdentity({ client, names });
       return client;

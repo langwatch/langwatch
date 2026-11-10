@@ -20,13 +20,14 @@ import {
   selectRows,
   selectScalar,
   startLangWatchQLClickHouse,
+  UNMAPPED_KEY_HASH,
 } from "./lwql-clickhouse-harness.ts";
 import { LangWatchQLAccessAuditService } from "./support/langwatch-ql-access-audit.service.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 const accessAudit = LangWatchQLAccessAuditService.create();
 
-describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 server", () => {
+describe("given the LangWatchQL analytics setup applied to a ClickHouse 26.8 server", () => {
   let harness: LangWatchQLClickHouseHarness;
   /** The restricted identity carrying tenant-a's valid key-hash context. */
   let tenantA: ClickHouseClient;
@@ -148,7 +149,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
     it("returns zero rows for a garbage context without erroring", async () => {
       await expectZeroRowsWithControl({
         harness,
-        keyHash: "not-a-real-key-hash",
+        keyHash: UNMAPPED_KEY_HASH,
         table: "traces",
         tenantColumn: "TenantId",
         context: "garbage key context",
@@ -320,6 +321,37 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
       });
     });
 
+    /** @scenario "Row policy holds across UNION ALL branches" */
+    it.each([
+      // Both sides scoped: only tenant A's ids are common to the two tables.
+      ["INTERSECT", "INTERSECT SELECT TenantId FROM {db}.spans"],
+      // The left side scoped: removing nothing leaves tenant A's ids alone.
+      ["EXCEPT", "EXCEPT SELECT TenantId FROM {db}.spans WHERE TenantId = 'no-such-tenant'"],
+    ])("scopes the sides of %s", async (operator, rightSide) => {
+      await expectTenantScopedRead({
+        harness,
+        client: tenantA,
+        table: "traces",
+        tenantColumn: "TenantId",
+        context: operator,
+        query: `SELECT TenantId FROM ${database}.traces ` + rightSide.replace("{db}", database),
+      });
+    });
+
+    /** @scenario "Row policy holds across UNION ALL branches" */
+    it("scopes every branch of a parenthesised UNION", async () => {
+      await expectTenantScopedRead({
+        harness,
+        client: tenantA,
+        table: "traces",
+        tenantColumn: "TenantId",
+        context: "parenthesised UNION",
+        query:
+          `(SELECT TenantId FROM ${database}.traces) ` +
+          `UNION ALL (SELECT TenantId FROM ${database}.spans)`,
+      });
+    });
+
     /** @scenario "Row policy holds on both sides of a JOIN" */
     it("scopes both sides of a JOIN", async () => {
       await recordSeedControl({
@@ -441,8 +473,8 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
   });
 
   describe("when the server's query log is inspected", () => {
-    /** @scenario "Key hash is auditable in the query log without exposing the raw key" */
-    it("records the key hash and never the raw secret", async () => {
+    /** @scenario "The capability never appears in a request URL or a server log" */
+    it("keeps the capability out of the logged settings and the raw secret out of every column", async () => {
       // Pins the construction the audit depends on: only a digest is ever sent.
       // The expected value is written out rather than recomputed, so this stays
       // an independent check — recomputing it here would only restate whatever
@@ -471,19 +503,14 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
       ).toBeGreaterThan(0);
 
       for (const entry of entries) {
+        // ADR-200: the profile pins `log_query_settings = 0`, so the Settings column, which no
+        // masking rule reaches, never holds the capability.
         const settings = entry.Settings as Record<string, string>;
-        expect(
-          settings[harness.names.tenantSetting],
-          "the key hash is what makes a LangWatchQL query auditable",
-        ).toBe(accessAudit.auditedSettingValue(harness.tenantA.keyHash));
+        expect(settings[harness.names.tenantSetting]).toBeUndefined();
 
         // Serialised whole, so the check covers every column rather than the
         // handful someone thought to name.
         const serialised = JSON.stringify(entry);
-        expect(
-          serialised.includes(harness.tenantA.keyHash),
-          "sanity: the hash should be findable in the serialised row",
-        ).toBe(true);
         expect(
           serialised.includes(harness.tenantA.rawSecret),
           "the raw LangWatchQL key reached ClickHouse — only its hash may ever be sent",
