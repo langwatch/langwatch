@@ -30,7 +30,7 @@ const read = ({
 
 describe("paymentRecoveryBanner", () => {
   describe("when a payment failed", () => {
-    it("tells a reader who can pay the date access stops, in orange", () => {
+    it("tells a reader who can pay the date to update the card by, in orange", () => {
       expect(read({ state: "failing", canPay: true })).toEqual({
         status: "warning",
         title: "Your payment failed.",
@@ -39,10 +39,10 @@ describe("paymentRecoveryBanner", () => {
       });
     });
 
-    it("turns red in the last week", () => {
+    it("turns red in the last week and names the day it moves to the Free plan", () => {
       expect(read({ state: "failing", canPay: true, now: daysBeforeStop(7) })).toMatchObject({
         status: "error",
-        body: "Access stops on 30 November 2026. Update your card to keep your plan.",
+        body: "On 30 November 2026 you move to the Free plan. Traces over the limit will stop being saved. Existing data stays stored.",
       });
     });
 
@@ -55,8 +55,8 @@ describe("paymentRecoveryBanner", () => {
     it("gives a reader who can pay the Pay now button", () => {
       expect(read({ state: "paused", canPay: true })).toEqual({
         status: "error",
-        title: "ACME is paused for non-payment.",
-        body: "Free plan limits apply until the invoice is paid. Your data is safe.",
+        title: "You're on the Free plan now.",
+        body: "Traces over the limit aren't being saved. Update your card to get Growth back.",
         action: "Pay now",
       });
     });
@@ -64,8 +64,8 @@ describe("paymentRecoveryBanner", () => {
     it("tells a plain member to ask an admin, with no button", () => {
       expect(read({ state: "paused", canPay: false })).toEqual({
         status: "warning",
-        title: "ACME is on Free plan limits for now.",
-        body: "Ask an admin to update billing.",
+        title: "ACME is on the Free plan now.",
+        body: "Traces over the limit aren't being saved. Ask an admin to update billing.",
         action: null,
       });
     });

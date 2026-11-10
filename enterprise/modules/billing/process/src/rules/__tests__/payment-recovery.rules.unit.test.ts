@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * The recovery clock: day 0 at the failed charge, notices on 0, 3, 7, 14 and 21, paused from 21.
+ * The recovery clock: day 0 at the failed charge, emails on 3, 7, 14 and 21, paused from 21.
  */
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -31,10 +31,17 @@ describe("accessStopsAt", () => {
 });
 
 describe("dueNotice", () => {
-  it("answers the day 0 notice for a new case", () => {
-    expect(dueNotice({ startedAt: DAY_0, noticeDay: null, now: at(0) })).toEqual({
+  it("answers nothing for a new case before day 3", () => {
+    expect(dueNotice({ startedAt: DAY_0, noticeDay: null, now: at(0) })).toEqual({ kind: "none" });
+    expect(dueNotice({ startedAt: DAY_0, noticeDay: null, now: at(2, 23) })).toEqual({
+      kind: "none",
+    });
+  });
+
+  it("answers the day 3 email as a new case's first", () => {
+    expect(dueNotice({ startedAt: DAY_0, noticeDay: null, now: at(3) })).toEqual({
       kind: "due",
-      day: 0,
+      day: 3,
     });
   });
 
@@ -56,9 +63,8 @@ describe("dueNotice", () => {
 
 describe("noticeKindOf", () => {
   it("maps each notice day to its email", () => {
-    expect([0, 3, 7, 14, 21].map((day) => noticeKindOf(day as 0))).toEqual([
+    expect([3, 7, 14, 21].map((day) => noticeKindOf(day as 3))).toEqual([
       "failed",
-      "reminder",
       "reminder",
       "final",
       "paused",

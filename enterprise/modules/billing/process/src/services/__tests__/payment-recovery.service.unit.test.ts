@@ -1,8 +1,8 @@
 /**
  * @vitest-environment node
  *
- * Failed payment recovery over memory twins: a failed renewal opens one case, notices go out on
- * days 0, 3, 7, 14 and 21, a paid invoice closes it with one restored email.
+ * Failed payment recovery over memory twins: a failed renewal opens one case, emails go out on
+ * days 3, 7, 14 and 21, a paid invoice closes it with one restored email once one went out.
  * @see ../../../../specs/payment-recovery.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -151,14 +151,14 @@ describe("given an organization on an active paid subscription", () => {
 
   describe("when Stripe reports a failed charge on its renewal invoice", () => {
     /** @scenario "The first failed charge opens a payment recovery case dated day 0" */
-    it("opens a case for that invoice dated at the failed charge, stopping access 21 days later", async () => {
+    it("opens a case for that invoice dated at the failed charge, moving to Free 21 days later", async () => {
       await world.service.paymentFailed({ invoice: RENEWAL });
 
       expect(world.row()).toMatchObject({
         status: "ACTIVE",
         paymentRecoveryInvoiceId: "in_renewal",
         paymentRecoveryStartedAt: DAY_0,
-        paymentRecoveryNoticeDay: 0,
+        paymentRecoveryNoticeDay: null,
       });
       const details = await world.service.details({ organizationId: "org_1" });
       expect(details).toMatchObject({
@@ -172,30 +172,21 @@ describe("given an organization on an active paid subscription", () => {
       });
     });
 
-    it("mails the admins and the billing member once each, not the plain member", async () => {
+    /** @scenario "No email goes out on the day a payment fails" */
+    it("mails nobody on day 0, nor on a sweep before day 3", async () => {
       await world.service.paymentFailed({ invoice: RENEWAL });
+      world.at(dayOf(2, 23));
+      await world.service.sweep();
 
-      expect(world.emails.sent.map((sent) => sent.to).toSorted()).toEqual([
-        "ana@acme.test",
-        "bo@acme.test",
-        "cy@acme.test",
-      ]);
-      expect(world.emails.sent[0]!.email).toMatchObject({
-        kind: "failed",
-        organizationName: "ACME",
-        amount: "€280.72",
-        invoiceNumber: "LW-0042",
-        accessStopsOn: "23 November 2026",
-        card: { brand: "Visa", last4: "4242" },
-        actionUrl: `${BASE}/settings/subscription?updateCard=1`,
-      });
+      expect(world.emails.sent).toEqual([]);
+      expect(world.row().paymentRecoveryNoticeDay).toBeNull();
     });
   });
 });
 
 describe("given an open recovery case for an invoice that failed 5 days ago", () => {
   /** @scenario "Stripe's later retries of the same invoice keep day 0 where it was" */
-  it("keeps day 0 and sends no second day 0 email on another failed charge", async () => {
+  it("keeps day 0 and sends no email on another failed charge", async () => {
     const world = setUp();
     await world.service.paymentFailed({ invoice: RENEWAL });
     world.at(dayOf(5));
@@ -203,7 +194,7 @@ describe("given an open recovery case for an invoice that failed 5 days ago", ()
     await world.service.paymentFailed({ invoice: RENEWAL });
 
     expect(world.row().paymentRecoveryStartedAt).toEqual(DAY_0);
-    expect(world.kinds()).toEqual(["failed", "failed", "failed"]);
+    expect(world.emails.sent).toEqual([]);
   });
 
   /** @scenario "A redelivered payment failure event changes nothing" */
@@ -215,7 +206,7 @@ describe("given an open recovery case for an invoice that failed 5 days ago", ()
     await world.service.paymentFailed({ invoice: RENEWAL });
 
     expect(world.row()).toEqual(before);
-    expect(world.emails.sent).toHaveLength(3);
+    expect(world.emails.sent).toEqual([]);
   });
 });
 
@@ -227,9 +218,12 @@ describe("given an open recovery case", () => {
     world.emails.sent.length = 0;
   });
 
-  describe.each([3, 7])("when the sweep runs on day %i", (day) => {
-    /** @scenario "A reminder goes out on day <day> with the access stop date" */
-    it("sends the reminder once with the access stop date and the update card link", async () => {
+  describe.each([
+    [3, "failed"],
+    [7, "reminder"],
+  ] as const)("when the sweep runs on day %i", (day, kind) => {
+    /** @scenario "An email goes out on day <day> with the Free plan date" */
+    it(`sends the ${kind} email once to the admins and the billing member`, async () => {
       if (day === 7) {
         world.at(dayOf(3));
         await world.service.sweep();
@@ -240,9 +234,18 @@ describe("given an open recovery case", () => {
       await world.service.sweep();
       await world.service.sweep();
 
-      expect(world.kinds()).toEqual(["reminder", "reminder", "reminder"]);
+      expect(world.emails.sent.map((sent) => sent.to).toSorted()).toEqual([
+        "ana@acme.test",
+        "bo@acme.test",
+        "cy@acme.test",
+      ]);
+      expect(world.kinds()).toEqual([kind, kind, kind]);
       expect(world.emails.sent[0]!.email).toMatchObject({
+        organizationName: "ACME",
+        amount: "€280.72",
+        invoiceNumber: "LW-0042",
         accessStopsOn: "23 November 2026",
+        card: { brand: "Visa", last4: "4242" },
         actionUrl: `${BASE}/settings/subscription?updateCard=1`,
       });
       expect(world.row().paymentRecoveryNoticeDay).toBe(day);
@@ -344,12 +347,12 @@ describe("given an open recovery case", () => {
 
   describe.each([
     ["day 0", 0],
-    ["day 5, after one reminder", 5],
+    ["day 5, after the first email", 5],
     ["day 21, while paused", 21],
     ["day 40, while paused", 40],
   ])("when Stripe reports the invoice paid on %s", (_stage, day) => {
     /** @scenario "Paying the invoice on <stage> restores the paid plan at once" */
-    it("closes the case and sends no further reminder", async () => {
+    it("closes the case and sends no further notice", async () => {
       world.at(dayOf(day));
       await world.service.sweep();
       world.emails.sent.length = 0;
@@ -360,16 +363,36 @@ describe("given an open recovery case", () => {
 
       expect(await world.recoveries.findOpen()).toEqual([]);
       expect(world.row().paymentRecoveryStartedAt).toBeNull();
-      expect(world.kinds()).toEqual(["restored", "restored", "restored"]);
+      const restored = day === 0 ? [] : ["restored", "restored", "restored"];
+      expect(world.kinds()).toEqual(restored);
       expect(await world.service.summary({ organizationId: "org_1" })).toEqual({ state: "none" });
     });
   });
 
-  describe("when the invoice is paid", () => {
-    /** @scenario "Every recovery sends one restored email" */
-    it("sends one restored email per person, linking the app", async () => {
+  describe("when the invoice is paid on day 2, before any email", () => {
+    /** @scenario "A payment that settles before day 3 sends no email at all" */
+    it("closes the case and mails nobody", async () => {
       world.at(dayOf(2));
 
+      await world.service.invoicePaid({ invoice: RENEWAL });
+      world.at(dayOf(3));
+      await world.service.sweep();
+
+      expect(await world.recoveries.findOpen()).toEqual([]);
+      expect(world.emails.sent).toEqual([]);
+    });
+  });
+
+  describe("when the invoice is paid after the day 3 email", () => {
+    beforeEach(async () => {
+      world.at(dayOf(3));
+      await world.service.sweep();
+      world.emails.sent.length = 0;
+      world.at(dayOf(4));
+    });
+
+    /** @scenario "Every recovery after an email sends one restored email" */
+    it("sends one restored email per person, linking the app", async () => {
       await world.service.invoicePaid({ invoice: RENEWAL });
 
       expect(world.emails.sent).toHaveLength(3);
@@ -391,7 +414,7 @@ describe("given an open recovery case", () => {
 
   describe("when a separate seat change invoice is paid", () => {
     /** @scenario "A paid invoice for a different invoice leaves the case open" */
-    it("keeps the case open with its access stop date", async () => {
+    it("keeps the case open with its Free plan date", async () => {
       await world.service.invoicePaid({
         invoice: { ...RENEWAL, id: "in_seat_change", billingReason: "subscription_update" },
       });
@@ -410,7 +433,7 @@ describe("given an open recovery case", () => {
       await world.service.sweep();
 
       expect(await world.recoveries.findOpen()).toHaveLength(1);
-      expect(world.kinds()).toEqual(["reminder", "reminder", "reminder"]);
+      expect(world.kinds()).toEqual(["failed", "failed", "failed"]);
     });
   });
 
@@ -434,8 +457,11 @@ describe("given an open recovery case", () => {
     });
 
     it("closes a case whose paid event never arrived with one restored email", async () => {
-      world.settle("paid");
       world.at(dayOf(3));
+      await world.service.sweep();
+      world.emails.sent.length = 0;
+      world.settle("paid");
+      world.at(dayOf(4));
 
       await world.service.sweep();
 
@@ -531,7 +557,7 @@ describe("given a database that cannot be reached", () => {
     await world.service.paymentFailed({ invoice: RENEWAL });
 
     expect(await world.recoveries.findOpen()).toHaveLength(1);
-    expect(world.kinds()).toEqual(["failed", "failed", "failed"]);
+    expect(world.emails.sent).toEqual([]);
   });
 
   describe("when the people who can pay cannot be read during a sweep", () => {
@@ -546,14 +572,14 @@ describe("given a database that cannot be reached", () => {
       const first = await world.service.sweep();
 
       expect(first).toEqual({ notified: 0, closed: 0, failed: 1 });
-      expect(world.row().paymentRecoveryNoticeDay).toBe(0);
+      expect(world.row().paymentRecoveryNoticeDay).toBeNull();
       expect(world.emails.sent).toHaveLength(0);
 
       const second = await world.service.sweep();
 
       expect(second.notified).toBe(1);
       expect(world.row().paymentRecoveryNoticeDay).toBe(3);
-      expect(world.kinds()).toEqual(["reminder", "reminder", "reminder"]);
+      expect(world.kinds()).toEqual(["failed", "failed", "failed"]);
     });
   });
 
@@ -562,6 +588,8 @@ describe("given a database that cannot be reached", () => {
     it("fails the delivery with the case open, and the redelivery restores once", async () => {
       const world = setUp();
       await world.service.paymentFailed({ invoice: RENEWAL });
+      world.at(dayOf(3));
+      await world.service.sweep();
       world.emails.sent.length = 0;
       world.refuseBillingMembersOnce();
 
@@ -574,24 +602,6 @@ describe("given a database that cannot be reached", () => {
 
       expect(await world.recoveries.findOpen()).toEqual([]);
       expect(world.kinds()).toEqual(["restored", "restored", "restored"]);
-    });
-  });
-
-  describe("when the day 0 email cannot find its recipients", () => {
-    it("fails the delivery, and the next sweep sends the day 0 email", async () => {
-      const world = setUp();
-      world.refuseBillingMembersOnce();
-
-      await expect(world.service.paymentFailed({ invoice: RENEWAL })).rejects.toThrow(
-        "authorization is unreachable",
-      );
-      expect(world.row().paymentRecoveryNoticeDay).toBeNull();
-
-      world.at(dayOf(0, 1));
-      await world.service.sweep();
-
-      expect(world.row().paymentRecoveryNoticeDay).toBe(0);
-      expect(world.kinds()).toEqual(["failed", "failed", "failed"]);
     });
   });
 });
@@ -619,29 +629,51 @@ describe("given an organization paused on day 21 whose paid event never arrived"
 });
 
 describe("given an organization with an older open case on another subscription", () => {
-  /** @scenario "The day 0 email belongs to the subscription that failed" */
-  it("records the day 0 email on the failing subscription and leaves the older case alone", async () => {
+  /** @scenario "The first email belongs to the subscription that failed" */
+  it("records the day 3 email on the failing subscription and the older case's own notice on it", async () => {
     const world = setUp();
     world.store.subscriptions.push({
       ...world.row(),
       id: "sub_db_old",
       stripeSubscriptionId: "sub_stripe_old",
     });
+    world.invoices.seed({
+      invoice: {
+        id: "in_old",
+        customerId: "cus_1",
+        number: "LW-0041",
+        created: dayOf(-4).epochMilliseconds / 1000,
+        amountDue: RENEWAL.amountDue,
+        currency: RENEWAL.currency,
+        status: "open",
+        pdfUrl: null,
+        hostedUrl: null,
+      },
+      card: null,
+    });
     await world.recoveries.open({
       subscriptionId: "sub_db_old",
       invoiceId: "in_old",
       startedAt: dayOf(-4),
     });
-    await world.recoveries.advanceNotice({ subscriptionId: "sub_db_old", from: null, to: 0 });
-    await world.recoveries.advanceNotice({ subscriptionId: "sub_db_old", from: 0, to: 3 });
+    await world.recoveries.advanceNotice({ subscriptionId: "sub_db_old", from: null, to: 3 });
 
     await world.service.paymentFailed({ invoice: RENEWAL });
+    world.at(dayOf(3, 1));
+    await world.service.sweep();
 
-    expect(world.row().paymentRecoveryNoticeDay).toBe(0);
+    expect(world.row().paymentRecoveryNoticeDay).toBe(3);
     expect(world.store.subscriptions[1]).toMatchObject({
       paymentRecoveryInvoiceId: "in_old",
-      paymentRecoveryNoticeDay: 3,
+      paymentRecoveryNoticeDay: 7,
     });
-    expect(world.kinds()).toEqual(["failed", "failed", "failed"]);
+    expect(world.kinds().toSorted()).toEqual([
+      "failed",
+      "failed",
+      "failed",
+      "reminder",
+      "reminder",
+      "reminder",
+    ]);
   });
 });

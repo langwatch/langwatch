@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The failed payment recovery clock (adrs/002-failed-payment-recovery.md): day 0 is the first
- * failed charge, notices go on days 0, 3, 7, 14 and 21, and access stops 21 days in.
+ * failed charge, emails go on days 3, 7, 14 and 21, and the organization moves to the Free plan
+ * 21 days in. Day 0 sends nothing: many failed charges settle on their own within days.
  */
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** The day access stops and the organization runs on Free plan limits. */
+/** The day the organization moves to the Free plan; nothing is deleted. */
 export const PAYMENT_RECOVERY_PAUSE_DAY = 21;
 
 /** The notice days, in order; each one is sent at most once per case. */
-export const PAYMENT_RECOVERY_NOTICE_DAYS = [0, 3, 7, 14, 21] as const;
+export const PAYMENT_RECOVERY_NOTICE_DAYS = [3, 7, 14, 21] as const;
 
 export type PaymentRecoveryNoticeDay = (typeof PAYMENT_RECOVERY_NOTICE_DAYS)[number];
 
@@ -34,7 +35,7 @@ export function accessStopsAt({ startedAt }: { startedAt: Instant }): Instant {
   );
 }
 
-/** Paused is derived from the clock, never stored, so access stops on time without a sweep. */
+/** Paused is derived from the clock, never stored, so the Free plan applies on time without a sweep. */
 export function isRecoveryPaused({
   startedAt,
   now,
@@ -76,8 +77,9 @@ export function dueNotice({
   return latest === undefined ? { kind: "none" } : { kind: "due", day: latest };
 }
 
+/** Day 3 is the first email, so it tells the failure; day 7 reminds. */
 export function noticeKindOf(day: PaymentRecoveryNoticeDay): PaymentRecoveryNoticeKind {
-  if (day === 0) return "failed";
+  if (day === 3) return "failed";
   if (day === 14) return "final";
   if (day === 21) return "paused";
   return "reminder";

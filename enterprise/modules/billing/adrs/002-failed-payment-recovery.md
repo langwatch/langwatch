@@ -21,35 +21,37 @@ its own schedule, and before this change:
 
 Billing owns recovery. The state is three nullable columns on `Subscription`:
 `paymentRecoveryInvoiceId`, `paymentRecoveryStartedAt` (day 0) and `paymentRecoveryNoticeDay` (the
-last notice sent: 0, 3, 7, 14 or 21). A closed case clears all three; the case is open while
+last notice sent: 3, 7, 14 or 21; null before the first). A closed case clears all three; the case is open while
 `paymentRecoveryStartedAt` is set.
 
 ```
-none --charge fails--> failing(day 0) --day 3/7 reminders, day 14 final--> failing --day 21--> paused
-failing|paused --invoice paid--> none (restored email)
+none --charge fails--> failing(day 0, banner only) --day 3 first email, day 7 reminder, day 14 final--> failing --day 21--> paused
+failing|paused --invoice paid--> none (restored email, only when an email went out)
 failing|paused --voided, uncollectible, deleted--> none (no email)
 ```
 
 - **Opening.** The first failed charge of a renewal invoice on an `ACTIVE`, card-collected,
-  non-Enterprise subscription opens the case with a conditional write; only the write that opens it
-  sends the day 0 email. Later retries of the same invoice keep day 0.
+  non-Enterprise subscription opens the case with a conditional write and sends no email: many
+  failed charges settle within a couple of days (a top-up, a Stripe retry), so day 0 shows only
+  the in-app banner to admins and Billing members. Later retries of the same invoice keep day 0.
 - **Paused is derived, never stored.** `getActivePlan` answers Free limits once
-  `paymentRecoveryStartedAt + 21 days` has passed and the case is open, so access stops on time even
-  when the sweep is late. Nothing is deleted; limits only refuse new additions.
+  `paymentRecoveryStartedAt + 21 days` has passed and the case is open, so the Free plan applies on
+  time even when the sweep is late. Nothing is deleted and members keep signing in so they can
+  pay; traces over the Free limit stop being saved and limits refuse new additions.
 - **Notices.** A scheduled process manager on billing's pipeline wakes hourly, finds open cases and
   sends the latest notice due, advancing `paymentRecoveryNoticeDay` with a compare-and-set, so two
   sweeps or a missed day send one notice. The recipients and the invoice are read before that
   write, so a failed lookup leaves the notice due for the next sweep instead of dropping it.
 - **Closing.** `invoice.paid` for the case's invoice clears it with a conditional write; the write
-  that clears it sends one email. `past_due` and `unpaid` updates no longer cancel the row.
+  that clears it sends one email, unless the case closed before its day 3 email. `past_due` and `unpaid` updates no longer cancel the row.
 - **Self-healing.** Every sweep reads each open case's invoice from Stripe, notice due or not, and
   closes a case whose invoice is paid, void or uncollectible. A lost `invoice.paid` event therefore
   restores a paused organization within an hour.
-- **Mail.** Five transactional emails (failed on day 0, reminder on days 3 and 7, final on day 14,
+- **Mail.** Five transactional emails (failed on day 3, reminder on day 7, final on day 14,
   paused on day 21, restored on payment) go through billing's own mail channel over
   `@langwatch/mail`, to the organization's admins and Billing role holders (authz
   `listBillingMembers`). Nurturing and Customer.io are not used: the mail must go regardless of
-  marketing consent and carry the exact stop date. One refused address does not stop the others;
+  marketing consent and carry the exact date of the move to the Free plan. One refused address does not stop the others;
   a notice with no recipients still counts as sent.
 - **Enterprise.** A failed charge on an Enterprise subscription opens no case and alerts the account
   team in Slack instead.

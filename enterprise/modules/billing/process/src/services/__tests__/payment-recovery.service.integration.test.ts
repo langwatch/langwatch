@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @see ../../../../specs/payment-recovery.feature
  * The recovery service over the Prisma repositories and the production tenancy guard: a paused
- * case heals on the sweep, and a day 0 notice lands on the subscription that failed.
+ * case heals on the sweep, and the day 3 email lands on the subscription that failed.
  */
 import { randomUUID } from "node:crypto";
 
@@ -125,6 +125,8 @@ describe.skipIf(!DB_URL)("PaymentRecoveryService over Postgres", () => {
     /** @scenario "A paused case whose paid event never arrived closes on the next sweep" */
     it("closes the row on the next sweep and sends one restored email", async () => {
       await service.paymentFailed({ invoice: renewal() });
+      now = dayOf(3, 1);
+      await service.sweep();
       now = dayOf(21, 1);
       await service.sweep();
       expect(await service.summary({ organizationId })).toEqual({ state: "paused" });
@@ -147,8 +149,8 @@ describe.skipIf(!DB_URL)("PaymentRecoveryService over Postgres", () => {
   });
 
   describe("given an older open case on another subscription of the organization", () => {
-    /** @scenario "The day 0 email belongs to the subscription that failed" */
-    it("records day 0 on the failing subscription and leaves the older case's notice day", async () => {
+    /** @scenario "The first email belongs to the subscription that failed" */
+    it("records day 3 on the failing subscription and leaves the older case's notice day", async () => {
       const older = await prisma.subscription.create({
         data: {
           organizationId,
@@ -162,14 +164,15 @@ describe.skipIf(!DB_URL)("PaymentRecoveryService over Postgres", () => {
         invoiceId: "in_old",
         startedAt: dayOf(-4),
       });
-      await recoveries.advanceNotice({ subscriptionId: older.id, from: null, to: 0 });
-      await recoveries.advanceNotice({ subscriptionId: older.id, from: 0, to: 3 });
+      await recoveries.advanceNotice({ subscriptionId: older.id, from: null, to: 3 });
 
       await service.paymentFailed({ invoice: renewal() });
+      now = dayOf(3, 1);
+      await service.sweep();
 
       const [current] = await recoveries.findOpenForSubscription(subscriptionId);
       const [previous] = await recoveries.findOpenForSubscription(older.id);
-      expect(current).toMatchObject({ invoiceId: renewal().id, noticeDay: 0 });
+      expect(current).toMatchObject({ invoiceId: renewal().id, noticeDay: 3 });
       expect(previous).toMatchObject({ invoiceId: "in_old", noticeDay: 3 });
       expect(emails.sent.map((sent) => sent.email.kind)).toEqual(["failed"]);
     });

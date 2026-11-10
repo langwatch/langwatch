@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Failed payment recovery (adrs/002-failed-payment-recovery.md): a renewal charge that fails
- * opens a case, people who can pay are told and reminded, the plan pauses to Free limits on
- * day 21, and paying the invoice closes the case at once.
+ * opens a case, people who can pay are told on day 3 and reminded, the organization moves to the
+ * Free plan on day 21, and paying the invoice closes the case at once.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -101,7 +101,7 @@ export class PaymentRecoveryService {
     this.now = options.now ?? nowInstant;
   }
 
-  /** A failed charge: opens the case for a card-collected renewal; only the opening write mails. */
+  /** A failed charge opens the case for a card-collected renewal; the first email waits for day 3. */
   async paymentFailed({ invoice }: { invoice: RecoveryInvoice }): Promise<void> {
     if (!invoice.subscriptionId) return;
     if (invoice.collectionMethod !== "charge_automatically") return;
@@ -121,27 +121,22 @@ export class PaymentRecoveryService {
       return;
     }
 
-    const startedAt = this.now();
     const opened = await this.options.recoveries.open({
       subscriptionId: subscription.id,
       invoiceId: invoice.id,
-      startedAt,
+      startedAt: this.now(),
     });
     if (!opened) return;
-
-    const open: PaymentRecoveryCase = {
-      subscriptionId: subscription.id,
-      organizationId: subscription.organizationId,
-      plan: subscription.plan,
-      stripeSubscriptionId: invoice.subscriptionId,
-      invoiceId: invoice.id,
-      startedAt,
-      noticeDay: null,
-    };
-    await this.sendNotice({ open, day: 0, fallback: invoice });
+    logger.info(
+      { organizationId: subscription.organizationId, invoiceId: invoice.id },
+      "Payment recovery case opened",
+    );
   }
 
-  /** A paid invoice closes its case; the closing write alone sends the restored email. */
+  /**
+   * A paid invoice closes its case; the closing write alone sends the restored email, and only
+   * when an email about the failure went out first.
+   */
   async invoicePaid({ invoice }: { invoice: RecoveryInvoice }): Promise<void> {
     const subscription = invoice.subscriptionId
       ? await this.options.subscriptions.findByStripeId(invoice.subscriptionId)
@@ -149,7 +144,7 @@ export class PaymentRecoveryService {
     if (!subscription) return;
     const [open] = await this.options.recoveries.findOpenForSubscription(subscription.id);
     if (!open || open.invoiceId !== invoice.id) return;
-    const restored = await this.restoredMail({ open, fallback: invoice });
+    const restored = await this.restoredMails({ open, fallback: invoice });
     const result = await this.options.recoveries.close({
       subscriptionId: subscription.id,
       invoiceId: invoice.id,
@@ -159,7 +154,7 @@ export class PaymentRecoveryService {
       { organizationId: result.closed.organizationId, invoiceId: invoice.id },
       "Payment recovery case closed by payment",
     );
-    await this.deliver(restored);
+    for (const mail of restored) await this.deliver(mail);
   }
 
   /** Voided or marked uncollectible by staff: the case closes, the plan stays, nothing is mailed. */
@@ -259,7 +254,7 @@ export class PaymentRecoveryService {
   private async sweepCase(open: PaymentRecoveryCase): Promise<"notified" | "closed" | "none"> {
     const invoice = await this.options.invoices.getInvoice({ invoiceId: open.invoiceId });
     if (invoice.status === "paid") {
-      const restored = await this.restoredMail({ open, invoice });
+      const restored = await this.restoredMails({ open, invoice });
       const result = await this.options.recoveries.close({
         subscriptionId: open.subscriptionId,
         invoiceId: open.invoiceId,
@@ -269,7 +264,7 @@ export class PaymentRecoveryService {
         { organizationId: open.organizationId, invoiceId: open.invoiceId },
         "Payment recovery case closed by a sweep that found the invoice paid",
       );
-      await this.deliver(restored);
+      for (const mail of restored) await this.deliver(mail);
       return "closed";
     }
     if (invoice.status === "void" || invoice.status === "uncollectible") {
@@ -285,25 +280,22 @@ export class PaymentRecoveryService {
   }
 
   /**
-   * Reads the invoice and recipients first, so a failed lookup leaves the notice day unmoved for
-   * the next sweep; then moves the notice day and mails. False when another sweep sent it.
+   * Reads the recipients first, so a failed lookup leaves the notice day unmoved for the next
+   * sweep; then moves the notice day and mails. False when another sweep sent it.
    */
   private async sendNotice({
     open,
     day,
     invoice,
-    fallback,
   }: {
     open: PaymentRecoveryCase;
     day: PaymentRecoveryNoticeDay;
-    invoice?: BillingInvoiceDetail;
-    fallback?: RecoveryInvoice;
+    invoice: BillingInvoiceDetail;
   }): Promise<boolean> {
-    const read = invoice ?? (await this.readInvoice({ invoiceId: open.invoiceId, fallback }));
     const kind = noticeKindOf(day);
     const mail = await this.prepareMail({
       organizationId: open.organizationId,
-      email: (organizationName) => this.emailOf({ kind, organizationName, open, invoice: read }),
+      email: (organizationName) => this.emailOf({ kind, organizationName, open, invoice }),
     });
     const advanced = await this.options.recoveries.advanceNotice({
       subscriptionId: open.subscriptionId,
@@ -316,8 +308,11 @@ export class PaymentRecoveryService {
     return true;
   }
 
-  /** The restored email, ready before the case closes so the closing write never loses it. */
-  private async restoredMail({
+  /**
+   * The restored email, ready before the case closes so the closing write never loses it; none
+   * for a case that closed before its first email.
+   */
+  private async restoredMails({
     open,
     invoice,
     fallback,
@@ -325,13 +320,15 @@ export class PaymentRecoveryService {
     open: PaymentRecoveryCase;
     invoice?: BillingInvoiceDetail;
     fallback?: RecoveryInvoice;
-  }): Promise<PreparedMail> {
+  }): Promise<PreparedMail[]> {
+    if (open.noticeDay === null) return [];
     const read = invoice ?? (await this.readInvoice({ invoiceId: open.invoiceId, fallback }));
-    return this.prepareMail({
+    const mail = await this.prepareMail({
       organizationId: open.organizationId,
       email: (organizationName) =>
         this.emailOf({ kind: "restored", organizationName, open, invoice: read }),
     });
+    return [mail];
   }
 
   /** The invoice as Stripe answers it now, else the webhook's copy without the card. */

@@ -18,12 +18,12 @@ export const paymentRecoverySummarySchema: PaymentRecoverySummarySchema =
   paymentRecoverySummarySchemaDefinition;
 export type PaymentRecoverySummary = z.infer<typeof paymentRecoverySummarySchema>;
 
-/** What people who manage the subscription read: the invoice, its amount and the stop date. */
+/** What people who manage the subscription read: the invoice, its amount and the Free plan date. */
 const paymentRecoveryDetailsSchemaDefinition = z.object({
   state: paymentRecoveryStateSchema,
   /** ISO instant of day 0, the first failed charge. */
   startedAt: z.string().nullable(),
-  /** ISO instant access stops: day 0 plus 21 days. */
+  /** ISO instant the organization moves to the Free plan: day 0 plus 21 days. */
   accessStopsAt: z.string().nullable(),
   invoiceNumber: z.string().nullable(),
   /** The invoice total including VAT, in the currency's minor unit. */

@@ -1,12 +1,15 @@
 Feature: A paid organization whose card fails is told, reminded, paused and restored
 
   When a renewal charge fails, Stripe retries it on its own schedule and nothing
-  else changes for the customer. This flow tells the people who can pay, reminds
-  them with the date access stops, warns them a week before, drops the
-  organization to Free plan limits on day 21 without deleting anything, and
-  restores the paid plan the moment the invoice is paid. Day 0 is the first
-  failed charge of the oldest unpaid invoice. The people who can pay are the
-  organization's admins and its Billing role holders.
+  else changes for the customer. Many failed charges settle on their own within a
+  couple of days (a top-up, a retry that succeeds), so day 0 sends no email: only
+  the in-app banner tells the people who can pay. If the invoice is still unpaid
+  on day 3 they get the first email, a reminder on day 7 and a warning on day 14,
+  each with the date they move to the Free plan. On day 21 the organization moves
+  to the Free plan (traces over the limit stop being saved, existing data stays
+  stored), and the paid plan comes back the moment the invoice is paid. Day 0 is
+  the first failed charge of the oldest unpaid invoice. The people who can pay
+  are the organization's admins and its Billing role holders.
   Design: enterprise/modules/billing/adrs/002-failed-payment-recovery.md
 
   # Day 0: the first failure
@@ -22,20 +25,34 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     Given an organization on an active paid subscription with no open recovery case
     When Stripe reports a failed charge on its renewal invoice
     Then a recovery case opens for that invoice, dated at the failed charge
-    And access is due to stop 21 days after that date
+    And the move to the Free plan is due 21 days after that date
+
+  @unit
+  Scenario: No email goes out on the day a payment fails
+    Given an organization on an active paid subscription
+    When Stripe reports a failed charge on its renewal invoice
+    And the recovery sweep runs before day 3
+    Then nobody gets an email
+
+  @unit
+  Scenario: A payment that settles before day 3 sends no email at all
+    Given an open recovery case on day 2 with no email sent
+    When Stripe reports the invoice as paid
+    Then the case closes
+    And nobody gets an email, not even the restored one
 
   @unit
   Scenario: Stripe's later retries of the same invoice keep day 0 where it was
     Given an open recovery case for an invoice that failed 5 days ago
     When Stripe reports another failed charge on the same invoice
-    Then the case keeps its original day 0 and its access stop date
-    And no second day 0 email is sent
+    Then the case keeps its original day 0 and its Free plan date
+    And no email is sent
 
   @unit
   Scenario: A redelivered payment failure event changes nothing
     Given a payment failure event that has already been handled
     When Stripe delivers the identical event again
-    Then the recovery case is unchanged and no email is sent twice
+    Then the recovery case is unchanged and no email is sent
 
   @unit
   Scenario: A past due subscription update keeps the paid plan during recovery
@@ -51,16 +68,17 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     Then one recovery case is open, dated at the failed charge
 
   @unit @integration
-  Scenario: The day 0 email belongs to the subscription that failed
+  Scenario: The first email belongs to the subscription that failed
     Given an organization with an older open recovery case on another subscription
     When Stripe reports a failed renewal charge on its current subscription
-    Then the day 0 email is recorded on the current subscription's case
-    And the older case keeps its own notice day
+    And the recovery sweep runs on the new case's day 3
+    Then the day 3 email is recorded on the current subscription's case
+    And the older case records only its own notice day
 
   @integration @unimplemented
-  Scenario: Admins and billing members get the day 0 email
+  Scenario: Admins and billing members get the first email on day 3
     Given an organization with two admins, one billing member and three plain members
-    When its renewal payment fails
+    When its renewal payment is still unpaid on day 3
     Then the admins and the billing member each get one "Your LangWatch payment failed" email
     And the email names the amount, the card and an "Update card" button
     And the plain members get nothing
@@ -69,39 +87,39 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
   Scenario: A member who can pay sees the payment failed banner
     Given an organization with an open recovery case
     When an admin or a billing member opens any page
-    Then a banner says the payment failed and names the date access stops
+    Then a banner says the payment failed and names the date to update the card by
     And the banner's button opens the page to pay the open invoice
 
   @integration
-  Scenario: A plain member sees no banner before access stops
+  Scenario: A plain member sees no banner before the move to the Free plan
     Given an organization with an open recovery case on day 4
     When a member without billing permission opens any page
     Then no payment banner is shown
 
-  # Days 3 and 7: reminders, day 14: the final warning
+  # Day 3: the first email, day 7: a reminder, day 14: the final warning
 
   @unit
-  Scenario Outline: A reminder goes out on day <day> with the access stop date
+  Scenario Outline: An email goes out on day <day> with the Free plan date
     Given an organization with an open recovery case that reached day <day>
     When the recovery sweep runs
-    Then the people who can pay get the "payment is still due" reminder once
-    And it names the date access stops and links the page to update the card
+    Then the people who can pay get the "<subject>" email once
+    And it names the date the organization moves to the Free plan and links the page to update the card
 
     Examples:
-      | day |
-      | 3   |
-      | 7   |
+      | day | subject                                       |
+      | 3   | Your LangWatch payment failed                 |
+      | 7   | Reminder: your LangWatch payment is still due |
 
   @unit
   Scenario: A final warning goes out on day 14 with the Free plan limits
     Given an organization with an open recovery case that reached day 14
     When the recovery sweep runs twice
-    Then the people who can pay get one "Your LangWatch plan pauses on" email
+    Then the people who can pay get one "Your LangWatch plan moves to Free on" email
     And it lists the Free plan limits and links the page to pay the invoice
 
   @unit
   Scenario: A sweep that missed a day sends only the latest reminder due
-    Given an open recovery case on day 8 whose day 3 reminder was sent
+    Given an open recovery case on day 8 whose day 3 email was sent
     And no sweep ran on day 7
     When the recovery sweep runs
     Then only the day 7 reminder is sent
@@ -114,7 +132,7 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
 
   @unit
   Scenario: A reminder that fails to send for one person still reaches the others
-    Given an open recovery case due its day 3 reminder for three people
+    Given an open recovery case due its day 3 email for three people
     And the mail provider refuses one of the addresses
     When the recovery sweep runs
     Then the other two get the reminder and the reminder counts as sent
@@ -122,7 +140,7 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
 
   @unit
   Scenario: A reminder whose recipients cannot be read goes out on the next sweep
-    Given an open recovery case due its day 3 reminder
+    Given an open recovery case due its day 3 email
     And the people who can pay cannot be read on the first sweep
     When the recovery sweep runs twice
     Then the first sweep leaves the reminder unsent
@@ -153,7 +171,7 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
   Scenario: The paused email goes out once on day 21
     Given an organization with an open recovery case that reached day 21
     When the recovery sweep runs twice
-    Then the people who can pay get one "Your plan is paused" email with a "Pay now" button
+    Then the people who can pay get one "You're on the Free plan now" email with a "Pay now" button
 
   @unit @unimplemented
   Scenario: The pause is recorded once for peers
@@ -165,14 +183,14 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
   Scenario: An admin of a paused organization sees the paused notice with a pay button
     Given an organization paused for an unpaid invoice
     When an admin or a billing member opens any page
-    Then a notice says the organization is on Free limits until the invoice is paid
+    Then a notice says the organization is on the Free plan and traces over the limit are not being saved
     And its button opens the page to pay the open invoice
 
   @integration
   Scenario: A plain member of a paused organization is told to ask an admin
     Given an organization paused for an unpaid invoice
     When a member without billing permission opens any page
-    Then a notice says the organization is on Free limits and an admin can restore it
+    Then a notice says the organization is on the Free plan and an admin can restore it
     And it shows no pay button
 
   @unit @unimplemented
@@ -192,15 +210,15 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
     And no further reminder is sent
 
     Examples:
-      | stage                       |
-      | day 0                       |
-      | day 5, after one reminder   |
-      | day 21, while paused        |
-      | day 40, while paused        |
+      | stage                        |
+      | day 0                        |
+      | day 5, after the first email |
+      | day 21, while paused         |
+      | day 40, while paused         |
 
   @unit
-  Scenario: Every recovery sends one restored email
-    Given an organization with an open recovery case at any stage
+  Scenario: Every recovery after an email sends one restored email
+    Given an organization with an open recovery case whose day 3 email went out
     When the invoice is paid
     Then the case closes
     And the people who can pay get one "Thanks, you're back" email
@@ -221,7 +239,7 @@ Feature: A paid organization whose card fails is told, reminded, paused and rest
   Scenario: A paid invoice for a different invoice leaves the case open
     Given a recovery case for the renewal invoice
     When Stripe reports a separate seat change invoice as paid
-    Then the case stays open with its original access stop date
+    Then the case stays open with its original Free plan date
 
   @unit
   Scenario: A new card alone does not close the case

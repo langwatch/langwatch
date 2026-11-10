@@ -15,7 +15,8 @@ import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 /**
  * The failed payment recovery mail (enterprise/modules/billing/specs/payment-recovery.feature):
- * day 0, the day 3 and 7 reminders, the day 14 warning, the day 21 pause and the restore.
+ * the day 3 first email ("failed"), the day 7 reminder, the day 14 warning, the day 21 move to
+ * the Free plan and the restore. Day 0 sends none.
  */
 export const paymentRecoveryEmailKinds = [
   "failed",
@@ -34,7 +35,7 @@ export const paymentRecoveryEmailProps = z.object({
   invoiceNumber: z.string().min(1).optional(),
   /** When the invoice was issued, as a reader's date. */
   invoiceDate: z.string().min(1),
-  /** The date access stops: day 0 plus 21 days. */
+  /** The date the organization moves to the Free plan: day 0 plus 21 days. */
   accessStopsOn: z.string().min(1),
   card: z.object({ brand: z.string().min(1), last4: z.string().min(1) }).optional(),
   /** What Free allows, for the day 14 warning. */
@@ -58,9 +59,9 @@ export const paymentRecoveryEmailSubject = ({
     case "reminder":
       return "Reminder: your LangWatch payment is still due";
     case "final":
-      return `Your LangWatch plan pauses on ${accessStopsOn}`;
+      return `Your LangWatch plan moves to Free on ${accessStopsOn}`;
     case "paused":
-      return "Your plan is paused";
+      return "You're on the Free plan now";
     case "restored":
       return `Thanks, you're back on ${planName}`;
     default:
@@ -81,7 +82,7 @@ const headingOf = ({ kind, organizationName, planName }: PaymentRecoveryEmailPro
     case "final":
       return `One week left to keep your ${planName} plan`;
     case "paused":
-      return `${organizationName} is paused for non-payment`;
+      return `${organizationName}'s invoice is still unpaid`;
     case "restored":
       return "Thanks, you're back";
     default:
@@ -91,6 +92,16 @@ const headingOf = ({ kind, organizationName, planName }: PaymentRecoveryEmailPro
 
 const invoiceRows = (props: PaymentRecoveryEmailProps) =>
   props.invoiceNumber ? [{ label: "Invoice", value: props.invoiceNumber }] : [];
+
+/** The day 21 date and what moving to Free means, for every notice before it. */
+const FreePlanCallout = ({ on }: { on: string }) => (
+  <>
+    <TintPanel>
+      <TintText>{`On ${on} you move to the Free plan`}</TintText>
+    </TintPanel>
+    <Paragraph>Traces over the limit will stop being saved. Existing data stays stored.</Paragraph>
+  </>
+);
 
 const Body = (props: PaymentRecoveryEmailProps) => {
   const { kind, organizationName, planName, amount, invoiceDate, accessStopsOn, card } = props;
@@ -111,6 +122,7 @@ const Body = (props: PaymentRecoveryEmailProps) => {
               { label: "Date", value: invoiceDate },
             ]}
           />
+          <FreePlanCallout on={accessStopsOn} />
         </>
       );
     case "reminder":
@@ -118,16 +130,14 @@ const Body = (props: PaymentRecoveryEmailProps) => {
         <>
           <Paragraph>{`${organizationName}'s invoice of ${amount} from ${invoiceDate} is unpaid.`}</Paragraph>
           <Paragraph>{`To keep your ${planName} plan, update your card before ${accessStopsOn}.`}</Paragraph>
-          <TintPanel>
-            <TintText>{`Access stops on ${accessStopsOn}`}</TintText>
-          </TintPanel>
+          <FreePlanCallout on={accessStopsOn} />
         </>
       );
     case "final":
       return (
         <>
-          <Paragraph>{`The invoice of ${amount} is still unpaid. On ${accessStopsOn}, ${organizationName} moves to Free plan limits.`}</Paragraph>
-          <Paragraph>Your data stays safe. Nothing is deleted.</Paragraph>
+          <Paragraph>{`The invoice of ${amount} is still unpaid.`}</Paragraph>
+          <FreePlanCallout on={accessStopsOn} />
           {props.freeLimits && (
             <>
               <Muted>Free plan limits</Muted>
@@ -150,8 +160,7 @@ const Body = (props: PaymentRecoveryEmailProps) => {
     case "paused":
       return (
         <>
-          <Paragraph>{`The invoice from ${invoiceDate} is still unpaid, so Free plan limits apply. Nothing is deleted.`}</Paragraph>
-          <Paragraph>Pay it and everything comes back right away.</Paragraph>
+          <Paragraph>{`You're on the Free plan now. Traces over the limit aren't being saved. Update your card to get ${planName} back.`}</Paragraph>
           <DetailTable
             rows={[
               ...invoiceRows(props),
@@ -218,7 +227,7 @@ export const paymentRecoveryEmailTemplate = defineTemplate({
   id: "payment-recovery",
   title: "Failed payment recovery",
   sentWhen:
-    "A renewal charge fails, on days 3, 7, 14 and 21 while it stays unpaid, and when it is paid. Sent to admins and Billing members.",
+    "On days 3, 7, 14 and 21 while a failed renewal charge stays unpaid, and when it is paid after one of those. Sent to admins and Billing members.",
   schema: paymentRecoveryEmailProps,
   subject: paymentRecoveryEmailSubject,
   Component: PaymentRecoveryEmail,

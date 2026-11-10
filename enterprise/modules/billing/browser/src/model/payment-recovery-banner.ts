@@ -27,7 +27,7 @@ export function paymentRecoveryBanner({
   state: PaymentRecoveryState;
   canPay: boolean;
   organizationName: string;
-  /** ISO instant access stops, when the reader may read the case's details. */
+  /** ISO instant of the move to the Free plan, when the reader may read the case's details. */
   accessStopsAt: string | null;
   /** Epoch milliseconds. */
   now: number;
@@ -36,14 +36,14 @@ export function paymentRecoveryBanner({
     return canPay
       ? {
           status: "error",
-          title: `${organizationName} is paused for non-payment.`,
-          body: "Free plan limits apply until the invoice is paid. Your data is safe.",
+          title: "You're on the Free plan now.",
+          body: "Traces over the limit aren't being saved. Update your card to get Growth back.",
           action: "Pay now",
         }
       : {
           status: "warning",
-          title: `${organizationName} is on Free plan limits for now.`,
-          body: "Ask an admin to update billing.",
+          title: `${organizationName} is on the Free plan now.`,
+          body: "Traces over the limit aren't being saved. Ask an admin to update billing.",
           action: null,
         };
   }
@@ -62,7 +62,7 @@ export function paymentRecoveryBanner({
     status: isFinalWeek ? "error" : "warning",
     title: "Your payment failed.",
     body: isFinalWeek
-      ? `Access stops on ${stopsOn}. Update your card to keep your plan.`
+      ? `On ${stopsOn} you move to the Free plan. Traces over the limit will stop being saved. Existing data stays stored.`
       : `Update your card by ${stopsOn} to keep your plan.`,
     action: "Update card",
   };

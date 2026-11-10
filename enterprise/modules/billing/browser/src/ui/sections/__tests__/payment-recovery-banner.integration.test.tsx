@@ -75,7 +75,7 @@ afterEach(() => cleanup());
 describe("PaymentRecoveryBanner", () => {
   describe("when the organization's payment failed", () => {
     /** @scenario "A member who can pay sees the payment failed banner" */
-    it("tells a member who can pay the stop date and opens the invoice page", () => {
+    it("tells a member who can pay the date to update the card by and opens the invoice page", () => {
       recovery.state = "failing";
 
       renderBanner();
@@ -88,7 +88,7 @@ describe("PaymentRecoveryBanner", () => {
       expect(leaveTo).toHaveBeenCalledWith("https://invoice.stripe.test/i/acme");
     });
 
-    /** @scenario "A plain member sees no banner before access stops" */
+    /** @scenario "A plain member sees no banner before the move to the Free plan" */
     it("shows a plain member nothing", () => {
       recovery.state = "failing";
       reader.canPay = false;
@@ -101,13 +101,13 @@ describe("PaymentRecoveryBanner", () => {
 
   describe("when the organization is paused", () => {
     /** @scenario "An admin of a paused organization sees the paused notice with a pay button" */
-    it("gives a member who can pay the Free limits notice and Pay now", () => {
+    it("gives a member who can pay the Free plan notice and Pay now", () => {
       recovery.state = "paused";
 
       renderBanner();
 
       expect(screen.getByTestId("payment-recovery-banner").textContent).toContain(
-        "Free plan limits apply until the invoice is paid.",
+        "You're on the Free plan now.",
       );
       fireEvent.click(screen.getByRole("button", { name: "Pay now" }));
       expect(leaveTo).toHaveBeenCalledWith("https://invoice.stripe.test/i/acme");
@@ -121,7 +121,7 @@ describe("PaymentRecoveryBanner", () => {
       renderBanner();
 
       expect(screen.getByTestId("payment-recovery-banner").textContent).toContain(
-        "Ask an admin to update billing.",
+        "Traces over the limit aren't being saved. Ask an admin to update billing.",
       );
       expect(screen.queryByRole("button")).toBeNull();
     });

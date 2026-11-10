@@ -5,7 +5,7 @@ import { z } from "zod";
 export const PAYMENT_RECOVERY_PIPELINE_NAME = "billing_payment_recovery";
 export const PAYMENT_RECOVERY_PROCESS_NAME = "paymentRecovery";
 
-/** Hourly: each notice goes out within an hour of its day, and access stops on time without it. */
+/** Hourly: each notice goes out within an hour of its day, and the Free plan applies on time without it. */
 export const PAYMENT_RECOVERY_INTERVAL_MS = 60 * 60 * 1000;
 
 export const paymentRecoverySweepSchema = z.object({ scheduledFor: z.number().int() });
