@@ -317,8 +317,25 @@ describe("a failed step", () => {
   });
 
   describe("given a stopped turn with a failed step and a step that never finished", () => {
+    /** @scenario "A stopped turn keeps its failures folded while it is the latest turn" */
     it("titles the receipt by the failure, not as still working", () => {
       renderActivity({ parts: [failA, runningRead], live: false, interrupted: true });
+
+      expect(receiptHeader().textContent).toContain("1 action failed");
+      expect(screen.queryByRole("button", { name: /Working/ })).toBeNull();
+    });
+
+    /** @scenario "A stopped turn keeps its failures folded while it is the latest turn" */
+    it("titles the receipt by the failure when the stopped turn is still streaming", () => {
+      renderActivity({ parts: [failA, runningRead], live: true, interrupted: true });
+
+      expect(receiptHeader().textContent).toContain("1 action failed");
+      expect(screen.queryByRole("button", { name: /Working/ })).toBeNull();
+    });
+
+    /** @scenario "A stopped turn keeps its failures folded while it is the latest turn" */
+    it("titles the receipt by the failure when a reload ends the turn on an unfinished step", () => {
+      renderActivity({ parts: [failA, runningRead], live: false, interrupted: false });
 
       expect(receiptHeader().textContent).toContain("1 action failed");
       expect(screen.queryByRole("button", { name: /Working/ })).toBeNull();

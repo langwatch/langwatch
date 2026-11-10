@@ -109,6 +109,7 @@ Feature: Langy's cards read at the right attention weight
     Given a turn I stopped right after a step failed, still the latest turn in this session
     When I read the turn
     Then that failure stays folded in the record of the work
+    And the record of the work is titled by its failures, not as still working
 
   @integration
   Scenario: A receipt the reader only passes over still closes

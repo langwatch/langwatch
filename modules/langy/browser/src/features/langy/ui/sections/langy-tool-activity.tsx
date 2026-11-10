@@ -644,7 +644,7 @@ export function LangyActivityParts({
                 failures={receiptFailures}
                 heldFailures={heldFailure ? [heldFailure] : []}
                 cardSteps={capabilityCalls.length}
-                runningSteps={live ? runningGroups.length + pending.length : 0}
+                runningSteps={live && !interrupted ? runningGroups.length + pending.length : 0}
                 reasoningTitles={reasoningTitles}
                 devMode={devMode}
               />
