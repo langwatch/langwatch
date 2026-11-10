@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import {
   LangWatchQLGranularityTooFineError,
   LangWatchQLInvalidQueryError,
+  LangWatchQLNotPermittedError,
   LangWatchQLParameterInvalidError,
   LangWatchQLParameterMissingError,
   LangWatchQLReservedParameterSuppliedError,
@@ -40,17 +41,20 @@ const WINDOW_PARAMETERS = ["dashboard_context_period_end", "dashboard_context_pe
 const PINO_BASE_FIELDS = new Set(["level", "time", "pid", "hostname", "msg"]);
 /** A statement no stock widget holds, so the server reads it as user-written. */
 const USER_SQL = `SELECT '${SQL_MARKER}' AS marker FROM trace_metrics WHERE TraceId = {trace:String}`;
-/** A stock widget statement as a saved widget sends it, so the server reads it as built in. */
-const STOCK_SQL: string = (
-  JSON.parse(
-    readFileSync(
-      fileURLToPath(
-        new URL("../../langwatch-ql/__tests__/fixtures/stock-widget-queries.json", import.meta.url),
-      ),
-      "utf8",
+/** The stock widget statements as saved widgets send them, so the server reads each as built in. */
+const STOCK_STATEMENTS = JSON.parse(
+  readFileSync(
+    fileURLToPath(
+      new URL("../../langwatch-ql/__tests__/fixtures/stock-widget-queries.json", import.meta.url),
     ),
-  ) as { sql: string }[]
-)[0]!.sql;
+    "utf8",
+  ),
+) as { label: string; sql: string }[];
+const STOCK_SQL: string = STOCK_STATEMENTS[0]!.sql;
+/** The stock gateway widget's statement: it needs gatewayUsage:view, so hiding that refuses it. */
+const STOCK_GATEWAY_SQL: string = STOCK_STATEMENTS.find(
+  ({ label }) => label === "fd-gateway/present",
+)!.sql;
 /** The one ledger the real service marks into and the reporter reads. */
 const accessRefusals = LangWatchQLAccessRefusalService.create();
 const lwql = createLangWatchQLService({ accessRefusals, executor: null, database: "analytics" });
@@ -252,19 +256,23 @@ describe("given the service decides the origin itself", () => {
 });
 
 /** The refusal a real validation throws when the caller's protections hide a view they could be granted. */
-function callerAccessRefusal(): unknown {
-  return refusalOf({
-    sql: STOCK_SQL,
+function callerAccessRefusal(): LangWatchQLNotPermittedError {
+  const error = refusalOf({
+    sql: STOCK_GATEWAY_SQL,
     protections: { catalogue: catalogueWithout("gatewayUsage:view") },
   });
+  expect(accessRefusals.isCallerAccessRefusal({ error })).toBe(true);
+  return error;
 }
 
 /** A policy refusal that is not the caller's access: the view does not exist for anyone. */
-function policyRefusal(): unknown {
-  return refusalOf({
+function policyRefusal(): LangWatchQLNotPermittedError {
+  const error = refusalOf({
     sql: "SELECT 1 FROM removed_view LIMIT 1",
     protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
   });
+  expect(accessRefusals.isCallerAccessRefusal({ error })).toBe(false);
+  return error;
 }
 
 function refusalOf({
@@ -273,11 +281,14 @@ function refusalOf({
 }: {
   sql: string;
   protections: LangWatchQLProtections;
-}): unknown {
+}): LangWatchQLNotPermittedError {
   try {
     lwql.validate({ projectId: "project-1", protections, sql });
   } catch (error) {
-    return error;
+    if (error instanceof LangWatchQLNotPermittedError && error.code === "lwql_not_permitted") {
+      return error;
+    }
+    throw error;
   }
   throw new Error(`expected "${sql}" to be refused`);
 }
