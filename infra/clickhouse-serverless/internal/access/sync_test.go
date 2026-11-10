@@ -90,7 +90,7 @@ func TestSyncer_KeepsTheLastGoodFile(t *testing.T) {
 		if fx.loads != loads {
 			t.Error("an invalid access file reached the token verifier")
 		}
-		if fx.logs.FilterMessage("access file not applied, keeping the last rendered users").Len() == 0 {
+		if fx.logs.FilterMessage("access file not applied, keeping the last good one").Len() == 0 {
 			t.Error("the failure was not logged")
 		}
 	})
@@ -236,4 +236,56 @@ func TestSyncer_KeepsTheServersMode(t *testing.T) {
 			t.Errorf("a dynamic-only server got a rolling password without a restart:\n%s", got)
 		}
 	})
+}
+
+// @scenario "A token user rebound to another identity logs in only once its new rights are loaded"
+func TestSyncer_LoadsTheVerifierOnlyAfterTheWrite(t *testing.T) {
+	fx := newSyncFixture(t)
+	fx.syncer.Sync()
+	if fx.loads != 1 {
+		t.Fatalf("first sync loaded the verifier %d times, want 1", fx.loads)
+	}
+
+	usersD := filepath.Dir(fx.usersFile)
+	if err := os.Chmod(usersD, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(usersD, 0o755) })
+	fx.writeAccess("users:\n  - {name: metabase, tier: write, databases: [analytics], login: {rolling: {dir: " + fx.secrets + "}}}\n")
+	fx.syncer.Sync()
+	if fx.loads != 1 {
+		t.Errorf("the verifier took a file whose users were never written (%d loads)", fx.loads)
+	}
+
+	if err := os.Chmod(usersD, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fx.syncer.Sync()
+	if fx.loads != 2 {
+		t.Errorf("the verifier did not take the file once it was written (%d loads)", fx.loads)
+	}
+}
+
+// @scenario "A password past its valid_until expires while the access file is broken"
+func TestSyncer_ExpiresPasswordsWhileTheAccessFileIsBroken(t *testing.T) {
+	fx := newSyncFixture(t)
+	writeFiles(t, fx.secrets, map[string]string{
+		"leaving":             "leaving-password-0123",
+		"leaving.valid_until": now.Add(time.Minute).Format(time.RFC3339),
+	})
+	fx.syncer.Sync()
+	if !strings.Contains(fx.rendered(), sha("leaving-password-0123")) {
+		t.Fatal("the password was not rendered before its valid_until")
+	}
+
+	fx.writeAccess("users:\n  - {name: metabase, tier: owner}\n")
+	fx.syncer.Now = func() time.Time { return now.Add(2 * time.Minute) }
+	fx.syncer.Sync()
+	got := fx.rendered()
+	if strings.Contains(got, sha("leaving-password-0123")) {
+		t.Error("a password past its valid_until stayed valid while the access file was broken")
+	}
+	if !strings.Contains(got, sha("current-password-0123")) {
+		t.Error("the user lost its other password while the access file was broken")
+	}
 }

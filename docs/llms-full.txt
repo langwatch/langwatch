@@ -65535,7 +65535,7 @@ clickhouse:
 | Full        | `0 */12 * * *` (every 12h) | Complete database backup            |
 | Incremental | `0 * * * *` (every 1h)     | Only changes since the last backup  |
 
-By default both run as Kubernetes CronJobs (`<release>-clickhouse-backup-full` and `<release>-clickhouse-backup-incremental`). Each job starts its own pod from the ClickHouse image and runs the backup against the first ClickHouse replica over the network. Each incremental is based on the newest backup since the newest full, so restoring it restores the whole chain.
+By default both run as Kubernetes CronJobs (`<release>-clickhouse-backup-full` and `<release>-clickhouse-backup-incremental`). Each job starts its own pod from the ClickHouse image and runs the backup against the first ClickHouse replica over the network. Each incremental is based on the newest backup since the newest full, so restoring it restores the whole chain. An incremental that finds no full stands down and succeeds, so a fresh install has no backup until its first full slot; run the full CronJob once by hand to start sooner.
 
 ### Run backups in the ClickHouse pod
 
@@ -65557,6 +65557,8 @@ clickhouse:
     monitoring:
       enabled: true
 ```
+
+With more than one replica the sidecar reads every replica's backup log, so it needs `auth.clusterSecretEnabled: true`; the chart refuses to render without it.
 
 To try the sidecar without changing who takes backups, use `mode: cronjob-observe`: the CronJobs keep backing up, and the sidecar reports what it would do and alerts on the CronJobs' backups. Switch to `sidecar` once its alerts look right.
 
@@ -65589,7 +65591,7 @@ kubectl exec -n langwatch langwatch-clickhouse-0 -c clickhouse -- sh -c \
     WHERE status = '\''BACKUP_CREATED'\'' ORDER BY end_time DESC"'
 ```
 
-The name to restore is the path after `Disk('backups', ...)`. Replace `default` with your `clusterName` if you changed it.
+The name to restore is the path after `Disk('backups', ...)`. Replace `default` with your `clusterName` if you changed it. With more than one replica and no `auth.clusterSecretEnabled`, the replicas refuse this query; read `system.backup_log` on each pod instead.
 
 <Warning>
   A restore adds the backup's rows to the tables in the target database; it does not replace what is
@@ -73319,6 +73321,10 @@ description: "How to upgrade a self-hosted LangWatch to the latest version: what
 3. **Test in a staging environment** before upgrading production
 4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. To replace it, follow [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) as a separate change, not during an upgrade
 5. **Write the version 2 queue format first.** This release reads only version 2 GroupQueue jobs and drops a job an older release wrote in the earlier format. Before upgrading, set `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` on the running release and roll it out, or pause traffic and let the queue drain. After the upgrade, remove that variable and `ES_FOLD_TRUST_ABSENT_MISS`: this release reads neither
+
+### The ClickHouse `default` user on chart-managed installs
+
+The bundled ClickHouse now gives `default` the right to manage users, roles and named collections only when LangWatchQL runs in `sql` mode. A Helm install runs it in rendered mode, so after the upgrade `default` can no longer create or grant users, or create, alter or drop named collections; it keeps every other right. If you manage your own ClickHouse users through `default`, or set `LWQL_ACCESS_MODEL_MODE=sql` on a chart-managed ClickHouse, set `clickhouse.env.DEFAULT_USER_ACCESS_MANAGEMENT: "true"` before upgrading.
 
 ### Database privileges
 

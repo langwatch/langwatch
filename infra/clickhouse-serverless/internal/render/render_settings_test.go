@@ -280,3 +280,23 @@ func TestRenderAll_LeavesForeignFilesAlone(t *testing.T) {
 		}
 	}
 }
+
+// @scenario "An explicit opt-in keeps the default user's access DDL in rendered mode"
+func TestRenderAll_ExplicitOptInWinsOverRenderedMode(t *testing.T) {
+	dir := t.TempDir()
+	on := true
+	input := testInput()
+	input.LWQLAccessDir = lwqlDir(t)
+	input.DefaultUserAccessManagement = &on
+	renderInto(t, input, dir)
+
+	user := section(t, section(t, readYAML(t, dir, "users.d/zz-access-management.yaml"), "users"), "default")
+	for _, flag := range []string{"access_management", "named_collection_control"} {
+		if user[flag] != 1 {
+			t.Errorf("%s = %v with DEFAULT_USER_ACCESS_MANAGEMENT=true in rendered mode, want 1", flag, user[flag])
+		}
+	}
+	if _, ok := user["grants"]; ok {
+		t.Error("an opted-in default user must keep the flags, not a grants list")
+	}
+}

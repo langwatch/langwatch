@@ -114,7 +114,24 @@ test_dynamic_only() {
   if helm template t . -f tests/values-dynamic-only.yaml "${BASE[@]}" --set backup.mode=sidecar --set lwqlAccess.secretName=lwql >/dev/null 2>&1; then
     fail "dynamic-only should refuse the LangWatchQL access model: its user logs in with a static password"
   fi
+  if helm template t . -f tests/values-dynamic-only.yaml "${BASE[@]}" --set backup.mode=sidecar \
+    --set replicas=3 --set auth.clusterSecretEnabled=true >/dev/null 2>&1; then
+    fail "dynamic-only should refuse backups with replicas > 1: the other replicas refuse the local admin"
+  fi
   echo "PASS: dynamic-only refuses CronJobs and backs up from the sidecar"
+}
+
+# @scenario "A replicated backup sidecar needs the cluster secret"
+test_replicated_sidecar_needs_secret() {
+  local mode
+  for mode in sidecar cronjob-observe; do
+    if helm template t . "${BASE[@]}" --set backup.mode=$mode --set replicas=3 >/dev/null 2>&1; then
+      fail "backup.mode=$mode with replicas > 1 should need auth.clusterSecretEnabled: the replicas refuse each other's queries"
+    fi
+    helm template t . "${BASE[@]}" --set backup.mode=$mode --set replicas=3 --set auth.clusterSecretEnabled=true >/dev/null \
+      || fail "backup.mode=$mode with replicas > 1 and the cluster secret should render"
+  done
+  echo "PASS: a replicated backup sidecar needs the cluster secret"
 }
 
 echo "--- backup sidecar assertions ---"
@@ -123,3 +140,4 @@ test_sidecar_mode
 test_observe_mode
 test_sidecar_alerts
 test_dynamic_only
+test_replicated_sidecar_needs_secret

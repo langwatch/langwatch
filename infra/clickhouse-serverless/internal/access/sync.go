@@ -34,8 +34,8 @@ func Render(f *File, in Inputs, now time.Time, usersD string) (Planned, bool, er
 }
 
 // Syncer keeps users.d/access-users.yaml current with the access file and the
-// password directories. An access file that cannot be read keeps the last
-// good users file. Each password directory loads on its own: one that cannot
+// password directories. An access file that cannot be applied keeps the last
+// good one in force. Each password directory loads on its own: one that cannot
 // be read keeps its user's last good passwords from this process, re-planned
 // each pass so valid_until still applies, or else renders that user with none.
 type Syncer struct {
@@ -43,10 +43,11 @@ type Syncer struct {
 	UsersD     string
 	Log        *zap.Logger
 	Now        func() time.Time
-	// OnLoad receives each newly loaded, valid access file (token verification).
+	// OnLoad receives each newly loaded, valid access file once its users are written.
 	OnLoad func(*File)
 
 	lastRaw      []byte
+	lastFile     *File
 	lastWarnings string
 	// lastIn holds each user's last passwords read, lastDirs where they came from.
 	lastIn   map[string][]Password
@@ -56,31 +57,22 @@ type Syncer struct {
 // Sync runs one pass and returns how long to wait before the next.
 func (s *Syncer) Sync() time.Duration {
 	now := s.Now()
-	f, err := Load(s.AccessFile)
-	if err != nil {
-		s.Log.Error("access file not applied, keeping the last rendered users", zap.Error(err))
+	f, fresh := s.current()
+	if f == nil {
 		return SyncInterval
-	}
-	// The server fixed its mode at start (default's lock, the local admin).
-	// A file switching it live would leave the two out of step: in standard
-	// mode the sidecar would render passwords onto a dynamic-only server.
-	if server := s.serverDynamicOnly(); f.DynamicOnly() != server {
-		s.Log.Error("access file not applied: its mode differs from the one the server started in; "+
-			"restart the server to change mode, keeping the last rendered users",
-			zap.Bool("file_dynamic_only", f.DynamicOnly()), zap.Bool("server_dynamic_only", server))
-		return SyncInterval
-	}
-	if !bytes.Equal(f.Raw, s.lastRaw) {
-		s.lastRaw = f.Raw
-		if s.OnLoad != nil {
-			s.OnLoad(f)
-		}
 	}
 	in := s.gather(f)
 	p, changed, err := Render(f, in, now, s.UsersD)
 	if err != nil {
 		s.Log.Error("writing the access users failed", zap.Error(err))
 		return SyncInterval
+	}
+	// Only after the write: the verifier never accepts a binding whose rights are not on disk.
+	if fresh && !bytes.Equal(f.Raw, s.lastRaw) {
+		s.lastRaw = f.Raw
+		if s.OnLoad != nil {
+			s.OnLoad(f)
+		}
 	}
 	if warnings := strings.Join(p.Warnings, "\n"); changed || warnings != s.lastWarnings {
 		s.lastWarnings = warnings
@@ -92,6 +84,27 @@ func (s *Syncer) Sync() time.Duration {
 		s.Log.Info("access users updated", zap.Strings("users", p.UserNames()))
 	}
 	return nextDelay(p, now)
+}
+
+// current loads the access file. One that cannot be applied leaves the last
+// good file in force, re-planned each pass so valid_until and removed password
+// files still take effect; with none yet the rendered users stay as they are.
+func (s *Syncer) current() (*File, bool) {
+	f, err := Load(s.AccessFile)
+	if err != nil {
+		s.Log.Error("access file not applied, keeping the last good one", zap.Error(err))
+		return s.lastFile, false
+	}
+	// The server fixed its mode at start (default's lock, the local admin);
+	// a file switching it live would leave the two out of step.
+	if server := s.serverDynamicOnly(); f.DynamicOnly() != server {
+		s.Log.Error("access file not applied: its mode differs from the one the server started in; "+
+			"restart the server to change mode, keeping the last good one",
+			zap.Bool("file_dynamic_only", f.DynamicOnly()), zap.Bool("server_dynamic_only", server))
+		return s.lastFile, false
+	}
+	s.lastFile = f
+	return f, true
 }
 
 // gather reads each rolling user's directory. A user whose directory fails

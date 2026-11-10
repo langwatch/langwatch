@@ -429,6 +429,7 @@ deploy_sql_mode_and_metrics_key() {
     --set workers.replicaCount=1 \
     --set app.extraEnvs[0].name=LWQL_ACCESS_MODEL_MODE \
     --set app.extraEnvs[0].value=sql \
+    --set-string clickhouse.env.DEFAULT_USER_ACCESS_MANAGEMENT=true \
     --set app.resources.requests.memory=512Mi \
     --set app.resources.limits.memory=2Gi \
     --set app.telemetry.metrics.enabled=true \
@@ -894,6 +895,7 @@ test_lwql_replicas_sql_refused() {
     --set-string 'clickhouse.podAnnotations.langwatch\.com/lwql-access-catalog=e2e-upgrade' \
     --set app.extraEnvs[0].name=LWQL_ACCESS_MODEL_MODE \
     --set app.extraEnvs[0].value=sql \
+    --set-string clickhouse.env.DEFAULT_USER_ACCESS_MANAGEMENT=true \
     --set app.resources.requests.memory=512Mi \
     --set app.resources.limits.memory=2Gi \
     --wait --timeout "${TIMEOUT}s"

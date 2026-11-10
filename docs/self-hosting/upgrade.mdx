@@ -15,6 +15,10 @@ description: "How to upgrade a self-hosted LangWatch to the latest version: what
 4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. To replace it, follow [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) as a separate change, not during an upgrade
 5. **Write the version 2 queue format first.** This release reads only version 2 GroupQueue jobs and drops a job an older release wrote in the earlier format. Before upgrading, set `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` on the running release and roll it out, or pause traffic and let the queue drain. After the upgrade, remove that variable and `ES_FOLD_TRUST_ABSENT_MISS`: this release reads neither
 
+### The ClickHouse `default` user on chart-managed installs
+
+The bundled ClickHouse now gives `default` the right to manage users, roles and named collections only when LangWatchQL runs in `sql` mode. A Helm install runs it in rendered mode, so after the upgrade `default` can no longer create or grant users, or create, alter or drop named collections; it keeps every other right. If you manage your own ClickHouse users through `default`, or set `LWQL_ACCESS_MODEL_MODE=sql` on a chart-managed ClickHouse, set `clickhouse.env.DEFAULT_USER_ACCESS_MANAGEMENT: "true"` before upgrading.
+
 ### Database privileges
 
 The upgrade keeps its ledger in its own Postgres schema, `<schema>_upgrade_ledger`, beside the installation's. The `DATABASE_URL` role needs `CREATE` on the database to create it, or you can create that schema beforehand, owned by the role. Without either, the api and the worker refuse to start and name the missing privilege.

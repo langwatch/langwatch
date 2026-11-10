@@ -67,13 +67,21 @@ type verifierState struct {
 	file  *File
 	keys  map[string]*keySource // by issuer name
 	cache *tokenCache
+	// heldUntil refuses a user whose token binding changed until ClickHouse has
+	// loaded the rights rendered for the new binding.
+	heldUntil map[string]time.Time
 }
+
+// RebindHold outlasts ClickHouse's users.d reload (2 s by default) several times over.
+const RebindHold = 30 * time.Second
 
 // SetFile switches to a newly loaded access file. Verified tokens are
 // forgotten, so a removed user or a changed subject takes effect at once.
+// Call it only once the users file for f is written.
 func (v *Verifier) SetFile(ctx context.Context, f *File) {
 	old := v.state.Load()
-	st := &verifierState{file: f, keys: map[string]*keySource{}, cache: &tokenCache{entries: map[[32]byte]time.Time{}}}
+	st := &verifierState{file: f, keys: map[string]*keySource{}, cache: &tokenCache{entries: map[[32]byte]time.Time{}},
+		heldUntil: rebound(old, f, v.Now())}
 	for _, is := range f.Issuers {
 		// Keep fetched keys when the issuer itself is unchanged.
 		if old != nil {
@@ -132,6 +140,37 @@ func orDuration(a, b time.Duration) time.Duration {
 	return b
 }
 
+// rebound holds every token user whose binding differs from the previous file's,
+// and keeps holds that have not yet run out.
+func rebound(old *verifierState, f *File, now time.Time) map[string]time.Time {
+	held := map[string]time.Time{}
+	if old == nil {
+		return held
+	}
+	for name, until := range old.heldUntil {
+		if now.Before(until) {
+			held[name] = until
+		}
+	}
+	for _, u := range f.Users {
+		prev, ok := old.file.User(u.Name)
+		if ok && prev.Login.Token != nil && tokenBinding(old.file, *prev) != tokenBinding(f, u) {
+			held[u.Name] = now.Add(RebindHold)
+		}
+	}
+	return held
+}
+
+// tokenBinding is everything that decides which tokens may log in as u.
+func tokenBinding(f *File, u User) string {
+	if u.Login.Token == nil {
+		return ""
+	}
+	is, _ := f.Issuer(u.Login.Token.Issuer)
+	return fmt.Sprintf("%s|%s|%s|%s|%s|%s|%v", u.Login.Token.Subject, is.Name, is.URL, is.JWKSURL,
+		is.Audience, is.UsernameClaim, is.RequiredClaims)
+}
+
 func sameIssuer(a, b Issuer) bool {
 	return a.URL == b.URL && a.JWKSURL == b.JWKSURL && a.CAFile == b.CAFile
 }
@@ -147,10 +186,13 @@ func (v *Verifier) Verify(ctx context.Context, user, token string) error {
 	if !ok || u.Login.Token == nil {
 		return refuse("not_token_user", "%q is not a token user", user)
 	}
+	now := v.Now()
+	if until, held := st.heldUntil[user]; held && now.Before(until) {
+		return refuse("rebinding", "%q changed its token binding; logins resume at %s", user, until.UTC().Format(time.RFC3339))
+	}
 	if len(token) > MaxTokenBytes {
 		return refuse("too_large", "token of %d bytes exceeds %d", len(token), MaxTokenBytes)
 	}
-	now := v.Now()
 	cacheKey := sha256.Sum256([]byte(user + "\x00" + token))
 	if st.cache.valid(cacheKey, now) {
 		return nil

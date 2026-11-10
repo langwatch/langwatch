@@ -66,7 +66,8 @@ type Input struct {
 	// uses DefaultLWQLAccessDir when the model is mounted there.
 	LWQLAccessDir string `env:"LWQL_ACCESS_DIR"`
 
-	// nil means true: default gets access_management and named_collection_control.
+	// Unset: the access flags in sql mode, the rendered-mode grants with LWQL_ACCESS_DIR.
+	// true: the flags in both modes. false: neither.
 	DefaultUserAccessManagement *bool `env:"DEFAULT_USER_ACCESS_MANAGEMENT"`
 
 	// Backups — independent of cold storage, uses same S3-compatible credentials

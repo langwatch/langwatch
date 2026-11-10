@@ -528,3 +528,45 @@ func TestVerifier_WarmRetriesUntilTheIssuerAnswers(t *testing.T) {
 		t.Error("ready without getting past the issuer's failures")
 	}
 }
+
+// @scenario "A token user rebound to another identity logs in only once its new rights are loaded"
+func TestVerifier_HoldsAReboundUser(t *testing.T) {
+	fx := newVerifyFixture(t)
+	file := func(aliceSubject string) string {
+		return `
+issuers:
+  - {name: staff, url: '` + fx.issuer.server.URL + `', username_claim: email}
+users:
+  - {name: alice, tier: write, databases: [analytics], login: {token: {issuer: staff, subject: ` + aliceSubject + `}}}
+  - {name: dave, tier: read, databases: [analytics], login: {token: {issuer: staff, subject: dave@example.com}}}
+`
+	}
+	as := func(email string) string {
+		return sign(t, fx.key, fx.claims(func(c map[string]any) { c["email"] = email }))
+	}
+	fx.load(file("alice@example.com"))
+	fx.load(file("bob@example.com"))
+
+	for _, email := range []string{"alice@example.com", "bob@example.com"} {
+		if code := codeOf(fx.verifier.Verify(context.Background(), "alice", as(email))); code != "rebinding" {
+			t.Errorf("%s logged in as the rebound alice during the hold: code %q", email, code)
+		}
+	}
+	if err := fx.verifier.Verify(context.Background(), "dave", as("dave@example.com")); err != nil {
+		t.Errorf("an unchanged user was held: %v", err)
+	}
+
+	// A reload during the hold keeps it; only time ends it.
+	fx.load(file("bob@example.com") + "\n")
+	if code := codeOf(fx.verifier.Verify(context.Background(), "alice", as("bob@example.com"))); code != "rebinding" {
+		t.Errorf("a reload dropped the hold: code %q", code)
+	}
+
+	fx.setClock(fx.now().Add(RebindHold))
+	if err := fx.verifier.Verify(context.Background(), "alice", as("bob@example.com")); err != nil {
+		t.Errorf("the new subject was refused after the hold: %v", err)
+	}
+	if code := codeOf(fx.verifier.Verify(context.Background(), "alice", as("alice@example.com"))); code != "wrong_subject" {
+		t.Errorf("the old subject after the hold: code %q, want wrong_subject", code)
+	}
+}

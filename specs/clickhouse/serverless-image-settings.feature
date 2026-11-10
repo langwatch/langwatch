@@ -156,3 +156,18 @@ Feature: The clickhouse-serverless image renders every server setting from env
     Then error_log, crash_log and the query detail logs it keeps expire after SYSTEM_LOG_TTL_DAYS
     And backup_log gets no TTL, because the backup sidecar finds a backup's base there
     And without SYSTEM_LOG_TTL_ALL none of them gets a TTL
+
+  @integration
+  Scenario: A real ClickHouse gives the default user access DDL only in sql mode
+    Given the image runs once with a mounted LangWatchQL model, once without, and once opted out
+    When the default user creates engine tables, users and named collections
+    Then with the model mounted it uses only the lwql_postgres collections and every access DDL is refused
+    And without the model it creates users and named collections
+    And opted out it can create neither, though the stock users.xml grants both
+
+  @unit
+  Scenario: An explicit opt-in keeps the default user's access DDL in rendered mode
+    Given LWQL_ACCESS_DIR names a mounted LangWatchQL access model
+    And DEFAULT_USER_ACCESS_MANAGEMENT is true
+    When the renderer writes the server configuration
+    Then the default user keeps access_management and named_collection_control

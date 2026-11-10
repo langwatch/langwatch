@@ -92,6 +92,9 @@ app.kubernetes.io/component: keeper
   {{- if and .Values.access.enabled (not .Values.access.existingConfigMap) (empty .Values.access.config) }}
     {{- fail "access.enabled needs access.config or access.existingConfigMap" }}
   {{- end }}
+  {{- if and (include "clickhouse-serverless.backupSidecar" .) (gt (int .Values.replicas) 1) (not .Values.auth.clusterSecretEnabled) }}
+    {{- fail "backup.mode sidecar or cronjob-observe with replicas > 1 needs auth.clusterSecretEnabled: the sidecar reads every replica's backup log, and without the secret the replicas refuse each other's queries" }}
+  {{- end }}
   {{- if .Values.access.dynamicOnly.enabled }}
     {{- if not .Values.access.enabled }}
       {{- fail "access.dynamicOnly.enabled needs access.enabled: token logins are verified by the access sidecar" }}
@@ -101,6 +104,9 @@ app.kubernetes.io/component: keeper
     {{- end }}
     {{- if and .Values.backup.enabled (ne (include "clickhouse-serverless.backupMode" .) "sidecar") }}
       {{- fail "access.dynamicOnly.enabled cannot run the backup CronJobs: they log in as default with the static password, which this mode removes. Set backup.mode=sidecar: the sidecar logs in as the per-boot local admin" }}
+    {{- end }}
+    {{- if and .Values.backup.enabled (gt (int .Values.replicas) 1) }}
+      {{- fail "access.dynamicOnly.enabled with replicas > 1 cannot run backups: the sidecar logs in as the per-boot local admin, which the other replicas refuse, so it cannot read their backup history or poll a restore" }}
     {{- end }}
     {{- if .Values.access.passwordSecrets }}
       {{- fail "access.dynamicOnly.enabled refuses access.passwordSecrets: rolling passwords are long-lived, use token logins" }}

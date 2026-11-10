@@ -81,6 +81,13 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
     And once the input is readable again the next sync applies it
 
   @unit
+  Scenario: A password past its valid_until expires while the access file is broken
+    Given a rolling user with a password whose valid_until is a minute away
+    When the access file becomes invalid and the minute passes
+    Then the next sync removes that password, re-planning the last good file
+    And the user's other passwords keep working
+
+  @unit
   Scenario: A password past its valid_until expires while another user's directory is malformed
     Given the sidecar has rendered a password with a valid_until, and another user's password
     When the other user's directory becomes malformed and the valid_until passes
@@ -100,6 +107,14 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
     Given a token user bound to an issuer and a subject
     When ClickHouse asks the sidecar about a token signed by that issuer for that subject and audience
     Then the sidecar answers 200
+
+  @unit
+  Scenario: A token user rebound to another identity logs in only once its new rights are loaded
+    Given a token user whose subject, issuer or required claims change in the access file
+    When the sidecar syncs the file
+    Then it writes the user's new rights before the verifier takes the new binding
+    And a failed write leaves the verifier on the old file
+    And neither the old nor the new identity logs in as that user until ClickHouse has reloaded
 
   @unit
   Scenario: A token is refused unless every check passes

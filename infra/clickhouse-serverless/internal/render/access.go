@@ -42,14 +42,15 @@ var renderedCollectionGrants = []string{
 // renderAccessManagement: sql mode gets the access-DDL flags; rendered mode
 // (LWQL_ACCESS_DIR) gets a grants list instead, and ClickHouse refuses one
 // beside the flags, so they are removed; DEFAULT_USER_ACCESS_MANAGEMENT=false
-// sets both to 0. show_named_collections_secrets is never granted: it would
-// expose the collection's plaintext PostgreSQL password through SHOW CREATE.
+// sets both to 0, and =true keeps the flags even in rendered mode. The secrets
+// grant is never given: it would expose the PostgreSQL password via SHOW CREATE.
 func renderAccessManagement(input *config.Input, usersD string) error {
 	var user map[string]any
+	explicit := input.DefaultUserAccessManagement != nil
 	switch {
 	case !input.GrantsDefaultAccessManagement():
 		user = map[string]any{"access_management": 0, "named_collection_control": 0}
-	case input.LWQLAccessDir != "":
+	case input.LWQLAccessDir != "" && !explicit:
 		remove := map[string]string{"@remove": "1"}
 		user = map[string]any{
 			"access_management":        remove,

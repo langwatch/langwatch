@@ -3,6 +3,9 @@
 replicas: 3
 autogen:
   enabled: true
+# The sidecar reads every replica's backup log: replicas must accept each other.
+auth:
+  clusterSecretEnabled: true
 objectStorage:
   bucket: "example-backups"
   region: "eu-central-1"

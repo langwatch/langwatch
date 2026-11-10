@@ -113,7 +113,7 @@ clickhouse:
 | Full        | `0 */12 * * *` (every 12h) | Complete database backup            |
 | Incremental | `0 * * * *` (every 1h)     | Only changes since the last backup  |
 
-By default both run as Kubernetes CronJobs (`<release>-clickhouse-backup-full` and `<release>-clickhouse-backup-incremental`). Each job starts its own pod from the ClickHouse image and runs the backup against the first ClickHouse replica over the network. Each incremental is based on the newest backup since the newest full, so restoring it restores the whole chain.
+By default both run as Kubernetes CronJobs (`<release>-clickhouse-backup-full` and `<release>-clickhouse-backup-incremental`). Each job starts its own pod from the ClickHouse image and runs the backup against the first ClickHouse replica over the network. Each incremental is based on the newest backup since the newest full, so restoring it restores the whole chain. An incremental that finds no full stands down and succeeds, so a fresh install has no backup until its first full slot; run the full CronJob once by hand to start sooner.
 
 ### Run backups in the ClickHouse pod
 
@@ -135,6 +135,8 @@ clickhouse:
     monitoring:
       enabled: true
 ```
+
+With more than one replica the sidecar reads every replica's backup log, so it needs `auth.clusterSecretEnabled: true`; the chart refuses to render without it.
 
 To try the sidecar without changing who takes backups, use `mode: cronjob-observe`: the CronJobs keep backing up, and the sidecar reports what it would do and alerts on the CronJobs' backups. Switch to `sidecar` once its alerts look right.
 
@@ -167,7 +169,7 @@ kubectl exec -n langwatch langwatch-clickhouse-0 -c clickhouse -- sh -c \
     WHERE status = '\''BACKUP_CREATED'\'' ORDER BY end_time DESC"'
 ```
 
-The name to restore is the path after `Disk('backups', ...)`. Replace `default` with your `clusterName` if you changed it.
+The name to restore is the path after `Disk('backups', ...)`. Replace `default` with your `clusterName` if you changed it. With more than one replica and no `auth.clusterSecretEnabled`, the replicas refuse this query; read `system.backup_log` on each pod instead.
 
 <Warning>
   A restore adds the backup's rows to the tables in the target database; it does not replace what is

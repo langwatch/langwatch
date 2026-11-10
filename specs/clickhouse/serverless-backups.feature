@@ -174,6 +174,14 @@ Feature: clickhouse-serverless takes chained native backups from CronJobs or its
     When the chart is rendered in cronjob or cronjob-observe mode
     Then it is refused, since a CronJob has no password to log in with
     And in sidecar mode the access container runs backups with the local admin's directory and no static password
+    And with more than one replica it is refused, since the other replicas refuse the local admin
+
+  @unit
+  Scenario: A replicated backup sidecar needs the cluster secret
+    Given backups enabled in sidecar or cronjob-observe mode and more than one replica
+    When the chart is rendered without auth.clusterSecretEnabled
+    Then it is refused, since the replicas refuse the sidecar's reads of each other's backup log
+    And with the cluster secret it renders
 
   @integration
   Scenario: A real ClickHouse takes, chains and restores backups, and the sidecar survives a restart mid-backup

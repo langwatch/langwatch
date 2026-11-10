@@ -311,8 +311,9 @@ access:
   # Every person and workload logs in with a short-lived OIDC token; default
   # is locked; the only password is a local admin generated at every start
   # into an in-memory volume, valid from inside the pod only. Needs
-  # access.enabled, token users only (no passwordSecrets), backup.enabled off,
-  # and auth.clusterSecretEnabled when replicas > 1. The chart adds
+  # access.enabled, token users only (no passwordSecrets), and
+  # auth.clusterSecretEnabled when replicas > 1. Backups run only as
+  # backup.mode=sidecar and only with replicas: 1. The chart adds
   # `mode: dynamic-only` to access.config; with existingConfigMap, set it there.
   # Clients mount a projected service-account token and re-read it for every
   # connection, for example:
