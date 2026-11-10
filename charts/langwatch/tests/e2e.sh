@@ -1212,6 +1212,114 @@ test_lwql_single_node_upgrade_converges() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SUITE: LangWatchQL tenant isolation on the deployed stack (ADR-200)
+# Two projects in two organisations, each with its own traces and key: each key
+# counts only its own traces, and a key naming the other project is refused.
+# Organisation B copies the seeded rows with new ids, naming only unique columns.
+# ─────────────────────────────────────────────────────────────────────────────
+LWQL_E2E_ORG_B="e2e-lwql-isolation-org-b"
+LWQL_E2E_TEAM_B="e2e-lwql-isolation-team-b"
+LWQL_E2E_PROJECT_A="local-dev-project"
+LWQL_E2E_PROJECT_B="e2e-lwql-isolation-project-b"
+
+# lwql_post <app-pod> <key> <json-body>: echoes the body, then the status on its own line.
+lwql_post() {
+  local pod="$1" key="$2" body="$3"
+  kc exec "$pod" -- curl -s -w '\n%{http_code}' -X POST http://localhost:5560/api/v1/query \
+    -H 'Content-Type: application/json' -H "X-Auth-Token: $key" -d "$body"
+}
+
+# lwql_trace_count <app-pod> <key>: the key's own LangWatchQL count of traces, or "none".
+lwql_trace_count() {
+  local reply n
+  reply=$(lwql_post "$1" "$2" '{"sql":"SELECT count() AS n FROM traces"}')
+  n=$(sed '$d' <<<"$reply" | sed -n 's/.*"n":"\{0,1\}\([0-9][0-9]*\).*/\1/p' | head -1)
+  echo "${n:-none}"
+}
+
+# send_e2e_traces <app-pod> <key> <prefix> <count>: one collector POST per trace, stamped now
+# (a fixed past instant would be born outside the retention window).
+send_e2e_traces() {
+  local pod="$1" key="$2" prefix="$3" count="$4" i code started_at
+  started_at=$(( $(date +%s) * 1000 ))
+  for i in $(seq 1 "$count"); do
+    code=$(kc exec "$pod" -- curl -s -o /dev/null -w '%{http_code}' \
+      -X POST http://localhost:5560/api/collector \
+      -H 'Content-Type: application/json' -H "X-Auth-Token: $key" \
+      -d "{\"trace_id\":\"${prefix}-${i}\",\"spans\":[{\"type\":\"llm\",\"span_id\":\"${prefix}-span-${i}\",\"trace_id\":\"${prefix}-${i}\",\"name\":\"lwql-isolation\",\"model\":\"gpt-5-mini\",\"input\":{\"type\":\"text\",\"value\":\"hello\"},\"output\":{\"type\":\"text\",\"value\":\"hello back\"},\"timestamps\":{\"started_at\":${started_at},\"finished_at\":$((started_at + 1000))}}]}")
+    assert_eq "Collector accepted ${prefix}-${i}" "$code" "200"
+  done
+}
+
+# @scenario "On a deployed stack, each project's key reads only its own rows"
+test_lwql_tenant_isolation() {
+  sep; info "Suite: LangWatchQL tenant isolation (two projects, two organisations)"
+
+  local app_pod pg_pod ch_pod
+  app_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-app")
+  pg_pod=$(ready_pod "app.kubernetes.io/component=postgresql")
+  ch_pod=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||' | head -1)
+  # Generated per run, so no key is ever written into the repository.
+  local key_a key_b
+  key_a="e2e-lwql-isolation-key-a$(openssl rand -hex 12)"
+  key_b="e2e-lwql-isolation-key-b$(openssl rand -hex 12)"
+
+  info "Seeding organisation A (the static seed)..."
+  kc exec "$app_pod" -- \
+    sh -c "cd /app/packages/prisma-client && HOME=/tmp LANGWATCH_API_KEY=$key_a pnpm run db:seed" \
+    >/dev/null || fail "db:seed did not seed organisation A"
+  pass "Organisation A seeded"
+
+  info "Copying it as organisation B with its own ids and key..."
+  kc exec -i "$pg_pod" -- sh -c 'PGPASSWORD=e2etest psql -U postgres -d langwatch -v ON_ERROR_STOP=1 -q' <<SQL \
+    || fail "Organisation B could not be created"
+BEGIN;
+CREATE TEMP TABLE e2e_org AS SELECT * FROM "Organization" WHERE id = 'local-dev-organization';
+UPDATE e2e_org SET id = '${LWQL_E2E_ORG_B}', slug = '${LWQL_E2E_ORG_B}', "ssoDomain" = NULL, "stripeCustomerId" = NULL;
+INSERT INTO "Organization" SELECT * FROM e2e_org ON CONFLICT DO NOTHING;
+CREATE TEMP TABLE e2e_license AS SELECT * FROM "OrganizationLicense" WHERE "organizationId" = 'local-dev-organization';
+UPDATE e2e_license SET "organizationId" = '${LWQL_E2E_ORG_B}';
+INSERT INTO "OrganizationLicense" SELECT * FROM e2e_license ON CONFLICT DO NOTHING;
+CREATE TEMP TABLE e2e_team AS SELECT * FROM "Team" WHERE id = 'local-dev-team';
+UPDATE e2e_team SET id = '${LWQL_E2E_TEAM_B}', slug = '${LWQL_E2E_TEAM_B}', "organizationId" = '${LWQL_E2E_ORG_B}';
+INSERT INTO "Team" SELECT * FROM e2e_team ON CONFLICT DO NOTHING;
+CREATE TEMP TABLE e2e_project AS SELECT * FROM "Project" WHERE id = '${LWQL_E2E_PROJECT_A}';
+UPDATE e2e_project SET id = '${LWQL_E2E_PROJECT_B}', slug = '${LWQL_E2E_PROJECT_B}', "apiKey" = '${key_b}', "teamId" = '${LWQL_E2E_TEAM_B}', "lwqlKey" = gen_random_uuid()::text;
+INSERT INTO "Project" SELECT * FROM e2e_project ON CONFLICT DO NOTHING;
+COMMIT;
+SQL
+  pass "Organisation B created with project ${LWQL_E2E_PROJECT_B}"
+
+  send_e2e_traces "$app_pod" "$key_a" "e2e-lwql-a" 2
+  send_e2e_traces "$app_pod" "$key_b" "e2e-lwql-b" 3
+
+  # Ingestion is asynchronous, and B's key-map row arrives with the reconvergence
+  # pass (every 5 minutes), so wait for both counts rather than sleeping.
+  local count_a="none" count_b="none" waited=0
+  while (( waited < 420 )); do
+    count_a=$(lwql_trace_count "$app_pod" "$key_a")
+    count_b=$(lwql_trace_count "$app_pod" "$key_b")
+    [[ "$count_a" == "2" && "$count_b" == "3" ]] && break
+    sleep 10; waited=$((waited + 10))
+  done
+  assert_eq "Project B has a key-map row" \
+    "$(ch_query "$ch_pod" "SELECT count() > 0 FROM langwatch.lwql_api_key_tenant_map WHERE TenantId = '${LWQL_E2E_PROJECT_B}'")" "1"
+  assert_eq "Project A's key counts only its own traces" "$count_a" "2"
+  assert_eq "Project B's key counts only its own traces" "$count_b" "3"
+
+  local reply code
+  reply=$(lwql_post "$app_pod" "$key_a" \
+    "{\"sql\":\"SELECT count() AS n FROM traces\",\"projectId\":\"${LWQL_E2E_PROJECT_B}\"}")
+  code=$(tail -n 1 <<<"$reply")
+  assert_eq "Project A's key naming project B is refused as not found" "$code" "404"
+  if sed '$d' <<<"$reply" | grep -q 'project_not_found'; then
+    pass "Project A's key naming project B is refused with project_not_found"
+  else
+    fail "Project A's key naming project B: expected project_not_found, got $(sed '$d' <<<"$reply")"
+  fi
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SUITE: Workers health check
 # Runs after deploy_app_and_workers and verifies the pod reaches Ready.
 # The worker serves one HTTP listener (the metrics port, 2999): /metrics behind
@@ -1554,6 +1662,7 @@ main() {
   test_app
   test_workers
   test_lwql
+  test_lwql_tenant_isolation
   deploy_sql_mode_and_metrics_key
   test_lwql_sql_mode_single_node
   test_metrics_plain_key
