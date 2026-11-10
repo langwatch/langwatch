@@ -29,7 +29,7 @@ export type ModelPickerQuery = {
   error?: unknown;
 };
 
-type ModelOption = ModelPickerOption & { icon: React.ReactNode };
+export type ModelOption = ModelPickerOption & { icon: React.ReactNode };
 
 /** Sentinel value emitted when the user picks the "Inherit" entry. The
  *  caller maps this back to "clear the override" (which writes nothing
@@ -37,7 +37,7 @@ type ModelOption = ModelPickerOption & { icon: React.ReactNode };
 export const INHERIT_SENTINEL = "__inherit__";
 
 /** Keeps the options whose label or value matches `search` (case-insensitive). */
-function filterModels(models: ModelOption[], search: string): ModelOption[] {
+export function filterModels(models: ModelOption[], search: string): ModelOption[] {
   const needle = search.toLowerCase();
   return models.filter(
     (item) =>
@@ -45,7 +45,7 @@ function filterModels(models: ModelOption[], search: string): ModelOption[] {
   );
 }
 
-type SelectorSize = "sm" | "md" | "full";
+export type SelectorSize = "sm" | "md" | "full";
 
 const TRIGGER_WIDTHS: Record<SelectorSize, string> = {
   full: "100%",
@@ -61,7 +61,7 @@ const SELECT_SIZES: Record<SelectorSize, "sm" | "md" | undefined> = {
 };
 
 /** The dark-safe provider mark for a model id, prefixed (`openai/gpt-5`) or bare (`gpt-5`). */
-function providerIconFor(model: string, size: string = MODEL_ICON_SIZE): React.ReactNode {
+export function providerIconFor(model: string, size: string = MODEL_ICON_SIZE): React.ReactNode {
   const provider = inferProvider(model);
   return provider ? <ProviderIconGlyph provider={provider} size={size} /> : null;
 }
@@ -194,7 +194,7 @@ function InheritItem({
  * ellipsis. A described row is a named entry (a decision model, an alias) and reads in the body
  * font; a bare model id reads in mono.
  */
-function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
+export function ModelItem({ item, size }: { item: ModelOption; size: SelectorSize }) {
   const isDescribed = !!item.subtitle;
   const hint = item.hint ? (
     <Text
