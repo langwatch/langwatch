@@ -15,7 +15,9 @@ import {
   discoveryFiles,
   FONT_SOURCE,
   llmsFull,
+  llmsSectionFiles,
   PAGE_EXPORT_EXTENSIONS,
+  type PageExport,
   pageHead,
   pageMarkdown,
   readAgentSkills,
@@ -233,7 +235,7 @@ function assemble({ slugs, outcomes }: { slugs: string[]; outcomes: Map<string, 
   const pages = new Map<string, string>();
   const files = new Map<string, string | Uint8Array>();
   const searchIndex: unknown[] = [];
-  const markdown: string[] = [];
+  const markdown: PageExport[] = [];
   const skipped: { slug: string; reason: string }[] = [];
   for (const slug of slugs) {
     const outcome = outcomes.get(slug) ?? { error: "not rendered" };
@@ -245,7 +247,8 @@ function assemble({ slugs, outcomes }: { slugs: string[]; outcomes: Map<string, 
     if (outcome.result.search) searchIndex.push(outcome.result.search);
     const exported = exportsOf({ slug });
     for (const [name, contents] of exported) files.set(name, contents);
-    if (exported.length > 0) markdown.push(pageMarkdown({ docsRoot, slug, instructions: "" }));
+    if (exported.length > 0)
+      markdown.push({ slug, markdown: pageMarkdown({ docsRoot, slug, instructions: "" }) });
     for (const target of slug === "404" ? ["404.html"] : pageTargets({ slug }))
       pages.set(target, outcome.result.page);
   }
@@ -393,6 +396,10 @@ async function generate() {
   ))
     files.set(name, contents);
   files.set("llms-full.txt", llmsFull({ nav: context.nav, exports: markdown }));
+  for (const [name, contents] of Object.entries(
+    llmsSectionFiles({ nav: context.nav, exports: markdown }),
+  ))
+    files.set(name, contents);
   const searchJson = publishSearchIndex({ entries: searchIndex });
   files.set("search-index.json", searchJson);
   for (const [name, contents] of await compressedSearchIndex({

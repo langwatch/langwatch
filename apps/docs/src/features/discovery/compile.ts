@@ -4,6 +4,8 @@ export {
   discoveryFiles,
   exportSlug,
   llmsFull,
+  llmsSectionFiles,
+  type PageExport,
 } from "./compile/discovery-files.ts";
 export { pageMarkdown } from "./compile/markdown-export.ts";
 export {

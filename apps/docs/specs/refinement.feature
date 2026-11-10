@@ -20,6 +20,19 @@ Feature: Actionable documentation and restrained reading surfaces
     And the sitemap dates each page by its last commit when the full history is available
     And llms-full.txt holds every page's Markdown in reading order, after the agent guidance
   @unit
+  Scenario: Split the documentation into one file per section
+    Given llms-full.txt is too large for an agent to read whole
+    When the discovery files are generated
+    Then each top-level section's pages are one file under llms-full/, in reading order, after the agent guidance
+    And llms.txt names every section file, with its page count, before the page directory
+    And a page reached only through its section file still counts as listed in llms.txt
+  @unit
+  Scenario: List the API reference once per resource
+    Given the API reference holds one page per operation
+    When llms.txt is generated
+    Then each API resource is one entry, linking its overview and giving its page count
+    And its operations are left to the API reference section file
+  @unit
   Scenario: Describe every page to search engines
     Given an API page whose page and operation both lack a description
     When its head is rendered

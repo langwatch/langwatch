@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { robotsIssues } from "../../../site/audit/agent-readiness.ts";
 import budgets from "../../../site/audit/budgets.json" with { type: "json" };
-import { AI_CRAWLERS, discoveryFiles, llmsFull } from "../compile/discovery-files.ts";
+import {
+  AI_CRAWLERS,
+  discoveryFiles,
+  llmsDirectory,
+  llmsFull,
+  llmsSectionFiles,
+} from "../compile/discovery-files.ts";
 
 describe("documentation discovery", () => {
   /** @scenario "Discover page exports and crawlable documentation" */
@@ -64,7 +70,7 @@ describe("documentation discovery", () => {
     expect(llms).toContain("- [Spans](https://langwatch.ai/docs/tracing/spans.md)");
     expect(llms).toContain("## More pages\n\n- [Orphan]");
     expect(llms).not.toContain("## Again");
-    expect(llms?.match(/^- \[/gm)).toHaveLength(3);
+    expect(llms?.match(/^- \[.*\.md\)/gm)).toHaveLength(3);
   });
 });
 
@@ -93,7 +99,13 @@ describe("when agents read the whole documentation", () => {
 
   /** @scenario "Discover page exports and crawlable documentation" */
   it("puts the agent guidance first, then every export in the order given", () => {
-    const full = llmsFull({ nav, exports: ["# Introduction\n", "# Spans\n"] });
+    const full = llmsFull({
+      nav,
+      exports: [
+        { slug: "introduction", markdown: "# Introduction\n" },
+        { slug: "tracing/spans", markdown: "# Spans\n" },
+      ],
+    });
     expect(full.indexOf("npx langwatch report")).toBeLessThan(full.indexOf("# Introduction"));
     expect(full).toContain("# Introduction\n\n---\n\n# Spans\n");
   });
@@ -101,7 +113,7 @@ describe("when agents read the whole documentation", () => {
   /** @scenario "Discover page exports and crawlable documentation" */
   it("drops each page's pointer to llms.txt, which the file names once", () => {
     const page = "# Spans\n\n> Page: https://langwatch.ai/docs/spans\n> Index of all pages: x\n";
-    const full = llmsFull({ nav, exports: [page] });
+    const full = llmsFull({ nav, exports: [{ slug: "spans", markdown: page }] });
     expect(full).toContain("> Page: https://langwatch.ai/docs/spans\n");
     expect(full).not.toContain("> Index of all pages");
   });
@@ -118,5 +130,71 @@ describe("when agents read the whole documentation", () => {
       "User-agent: CCBot\nContent-Signal: ai-train=yes, search=yes, ai-input=yes\nAllow: /",
     );
     expect(robots).toContain("Sitemap: https://langwatch.ai/docs/sitemap.xml");
+  });
+
+  describe("when a section is split into its own file", () => {
+    const page = (slug: string) => ({ type: "page" as const, slug, title: slug });
+    const sectioned = {
+      site: { name: "LangWatch" },
+      pages: {
+        introduction: { title: "Introduction", description: "" },
+        "api-reference/traces/overview": { title: "Traces", description: "" },
+        "api-reference/traces/search": { title: "Search traces", description: "" },
+        "api-reference/traces/get-trace": { title: "Get a trace", description: "" },
+      },
+      anchors: [
+        { title: "Platform", icon: "", children: [page("introduction")] },
+        {
+          title: "API Reference",
+          icon: "",
+          children: [
+            {
+              type: "group" as const,
+              title: "Traces",
+              children: [
+                page("api-reference/traces/overview"),
+                page("api-reference/traces/search"),
+                page("api-reference/traces/get-trace"),
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const exports = Object.keys(sectioned.pages).map((slug) => ({
+      slug,
+      markdown: `# ${slug}\n\n> Page: https://langwatch.ai/docs/${slug}\n`,
+    }));
+
+    /** @scenario "Split the documentation into one file per section" */
+    it("writes each section's pages to its own file, in reading order", () => {
+      const files = llmsSectionFiles({ nav: sectioned, exports });
+      expect(Object.keys(files)).toEqual(["llms-full/platform.txt", "llms-full/api-reference.txt"]);
+      const api = files["llms-full/api-reference.txt"] ?? "";
+      expect(api.indexOf("# api-reference/traces/overview")).toBeLessThan(
+        api.indexOf("# api-reference/traces/get-trace"),
+      );
+      expect(api).not.toContain("# introduction");
+      expect(api.indexOf("npx langwatch report")).toBeLessThan(api.indexOf("# api-reference"));
+    });
+
+    /** @scenario "Split the documentation into one file per section" */
+    it("names every section file in llms.txt, with its page count", () => {
+      const llms = llmsDirectory({ nav: sectioned });
+      expect(llms).toContain(
+        "- [API Reference](https://langwatch.ai/docs/llms-full/api-reference.txt): 3 pages in one file",
+      );
+      expect(llms.indexOf("Sections in one file each")).toBeLessThan(llms.indexOf("## Platform"));
+    });
+
+    /** @scenario "List the API reference once per resource" */
+    it("lists an API resource once, by its overview, and none of its operations", () => {
+      const llms = llmsDirectory({ nav: sectioned });
+      expect(llms).toContain(
+        "- [Traces](https://langwatch.ai/docs/api-reference/traces/overview.md): 3 pages",
+      );
+      expect(llms).not.toContain("search.md");
+      expect(llms).not.toContain("get-trace.md");
+    });
   });
 });
