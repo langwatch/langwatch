@@ -19116,6 +19116,8 @@ keywords:
   - coding agent ci telemetry
   - ingest key
   - github actions claude code
+  - pi coding agent ci
+  - grok cli headless
   - agent fleet telemetry
 ---
 
@@ -19128,11 +19130,17 @@ A background agent spends tokens the same way an interactive one does, and needs
 ```bash
 langwatch instrument claude --key ik-lw-...
 langwatch instrument codex --key ik-lw-...
+langwatch instrument pi --key ik-lw-...
+langwatch instrument grok --key ik-lw-...
 ```
 
 GitHub Copilot CLI is different: `langwatch instrument copilot` writes a shell function to your shell's startup file, which a non-interactive bash or zsh shell, such as a CI step or a service, does not load. On those machines, export the Copilot settings in the job or the image instead.
 
 `langwatch ingest install copilot_cli --env-only` prints those settings, but it needs a signed-in device, so run it on a machine where you are signed in and copy the lines, as [Bake it into an image](#bake-it-into-an-image) shows. With an ingest key alone, write the same lines by hand from [Manual OpenTelemetry setup](/coding-agents/github-copilot-cli#manual-opentelemetry-setup).
+
+pi and Grok work the same way: `langwatch instrument pi` and `langwatch instrument grok` each write a shell function, because neither tool reads its export settings from a file. In a CI step or a service, set the variables from [pi manual setup](/coding-agents/pi#manual-setup) or [Grok manual setup](/coding-agents/grok-cli#manual-opentelemetry-setup) in the job instead.
+
+pi also needs its telemetry extension on the machine, so run `langwatch instrument pi --key ik-lw-...` once in the job first, or `langwatch instrument pi` with `LANGWATCH_INGEST_KEY` set: it writes the extension, and pi sends no telemetry without it.
 
 The command reads the same value from the environment, which is how you keep the key out of shell history and provisioning scripts:
 
@@ -19168,15 +19176,37 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
+A job running pi headless writes the extension first, then sets the variables on the step that runs pi:
+
+```yaml
+      - run: npm install -g langwatch @earendil-works/pi-coding-agent
+      - run: langwatch instrument pi
+        env:
+          LANGWATCH_INGEST_KEY: ${{ secrets.LANGWATCH_INGEST_KEY }}
+      - run: pi -p "Update the dependency table in README.md"
+        env:
+          OTEL_TRACES_EXPORTER: otlp
+          OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true"
+          OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+          OTEL_EXPORTER_OTLP_ENDPOINT: https://app.langwatch.ai/api/otel
+          OTEL_EXPORTER_OTLP_HEADERS: Authorization=Bearer ${{ secrets.LANGWATCH_INGEST_KEY }}
+          OTEL_RESOURCE_ATTRIBUTES: service.name=pi
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
 The session appears on the project's [sessions list](/coding-agents/sessions) like any other, and its branch work attributes to [pull requests](/coding-agents/pull-requests) the same way.
 
 For CI jobs that use the LangWatch SDK or CLI itself rather than a coding agent, `langwatch login --api-key <sk-lw-...>` writes a project API key to `.env` non-interactively, and `langwatch login --token <token>` installs a pre-minted device token. Both fail fast on a machine without a terminal instead of hanging on a device-code prompt.
 
 ## Bake it into an image
 
-`langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`, `copilot_cli`. Add `--json` for machine-readable output. The command needs a signed-in device, unlike `--key`.
+`langwatch ingest install <tool> --env-only` prints the export lines without writing any config file, which is the form you want in a Dockerfile or a provisioning script. Supported tools: `claude_code`, `codex`, `gemini`, `opencode`, `copilot_cli`, `grok_cli`, `pi_cli`. Add `--json` for machine-readable output. The command needs a signed-in device, unlike `--key`.
 
 `--env-only` also skips the hooks that report each session's repository and branch. For `copilot_cli`, that is the file `~/.copilot/hooks/langwatch.json`, and without it Copilot sessions reach no pull request. Run the command without `--env-only` to write it. See [GitHub Copilot](/coding-agents/github-copilot-cli#link-sessions-to-their-pull-requests).
+
+For `grok_cli`, the skipped hook file is `~/.grok/hooks/langwatch.json`, so Grok sessions report no repository or branch. For `pi_cli`, the skipped file is pi's telemetry extension, and without it pi sends no telemetry at all.
+
+Write pi's extension when the container starts, not while the image builds: run `langwatch instrument pi` with `LANGWATCH_INGEST_KEY` supplied as a runtime secret. Both commands that write the extension also save the ingest key to the CLI's config file, so running either in a build step leaves the key in an image layer.
 
 ## Roll out to a managed fleet
 
@@ -19984,7 +20014,11 @@ Your agent can read all of this back. See [Explore your usage with your own agen
 
 ## Content and privacy
 
-The extension exports what pi's own span tree describes: model, provider, token counts, cost, timing, and the name and outcome of each tool call. It sends no prompt text, no model response and no tool arguments or results. To control who can open a stored session, see [Privacy](/coding-agents/privacy).
+The extension always exports what pi's own span tree describes: model, provider, token counts, cost, timing, and the name and outcome of each tool call.
+
+With `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true`, it also sends the prompt, each model reply, each tool's arguments and result, and the name you gave the session with `/name`. These give a session its title and fill its Input, Output and Conversation. The shell function sets this switch. Leave it unset to send counts and timing only. Any one value larger than 256 KiB is cut to that size.
+
+To control who can open a stored session, see [Privacy](/coding-agents/privacy).
 
 ## Troubleshooting
 
@@ -20027,6 +20061,7 @@ The extension is required: pi exports no telemetry without it. Run `langwatch in
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=none
 export OTEL_METRICS_EXPORTER=none
+export OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true
 export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
@@ -37465,7 +37500,7 @@ For a golden answer, the test suite declares [fields](/agent-testing/test-suites
 **Edit suite** opens the suite editor. Under **Customize test suite**, **Add evaluator** lists the evaluators of the project, and picking one attaches it with its mappings inferred. When a required input is still unmapped, or the evaluator reads an expected value, the drawer opens on the attachment so you confirm each mapping.
 
 <Frame>
-<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The suite editor with two fields, golden_sql and table_schema, each with a drag handle, and two evaluator chips, SQL Query Equivalence with the required dot and a score judge" />
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" width="616" alt="The suite editor with two fields, golden_sql and table_schema, each with a drag handle, and two evaluator chips, SQL Query Equivalence with the required dot and a score judge" />
 </Frame>
 
 A chip with an amber alert has a required input with no mapping. **Run suite** does not start in that state: it opens the drawer on that evaluator instead.
@@ -40121,6 +40156,7 @@ The **Scenarios** tab lists the test suites of the project under **Test Suites**
   <img
     className="block"
     src="/images/agent-testing/test-suite-rail-menu.png"
+    width="356"
     alt="The test suite rail with the row menu of the Refunds test suite open"
   />
 </Frame>
@@ -40132,7 +40168,7 @@ The row menu of a test suite offers:
 | **New scenario**     | Opens the editor with this test suite preselected.                                            |
 | **Run suite**        | Opens the run dialog with every scenario of the test suite in scope.                          |
 | **Edit**             | Opens the suite editor: the name, the fields and the evaluators. Past runs keep the old name. |
-| **Open recent runs** | Lists the latest runs of this test suite.                                                     |
+| **Open recent runs** | Lists the latest runs of this test suite. It appears when a scenario in it has a result in the selected period. |
 | **Archive suite**    | Archives the test suite and the scenarios in it. Test runs are preserved.                     |
 
 Every project has a **Default** test suite. A scenario saved with **No test suite** goes there.
@@ -40146,7 +40182,7 @@ A test suite reads like a dataset. Beyond the situation and the criteria, it dec
 **Edit suite** opens the suite editor. Under **Customize test suite**, **Add fields** opens the field rows: an identifier and a type each, with **Add field** for the next one. Drag a row by the handle on its left to reorder the fields. The handle appears once the suite declares more than one field, and it takes the arrow keys when it has focus.
 
 <Frame>
-<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The Edit test suite drawer with the field rows golden_sql and table_schema, each with a drag handle, a type of Text and a remove button, and the evaluator chips under them" />
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" width="616" alt="The Edit test suite drawer with the field rows golden_sql and table_schema, each with a drag handle, a type of Text and a remove button, and the evaluator chips under them" />
 </Frame>
 
 The field rows of the `Case lookups` suite, with the drag handle on the left of each.
@@ -40174,6 +40210,7 @@ The evaluators attached to a suite run after every scenario run and report besid
   <img
     className="block"
     src="/images/agent-testing/move-to-test-suite.png"
+    width="448"
     alt="The Move to test suite dialog with the test suites of the project"
   />
 </Frame>
@@ -72120,6 +72157,19 @@ kubectl -n langwatch logs sts/langwatch-clickhouse --tail=50 | grep -i s3
 ```
 
 Ensure the service account has S3 access (IRSA) or static credentials are configured correctly.
+
+### ClickHouse restarts with `NAMED_COLLECTION_ALREADY_EXISTS`
+
+With chart-managed ClickHouse, the chart delivers the LangWatchQL named collections `lwql_postgres` and `lwql_postgres_<database>` as server config. A collection of the same name created by hand with `CREATE NAMED COLLECTION` clashes with it, and the server stops at startup. Before you upgrade, list the collections and drop any whose `source` is `SQL`:
+
+```bash
+kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
+  "SELECT name, source FROM system.named_collections WHERE name LIKE 'lwql_postgres%'"
+kubectl -n langwatch exec sts/langwatch-clickhouse -- clickhouse-client -q \
+  "DROP NAMED COLLECTION lwql_postgres_langwatch"
+```
+
+Upgrades need no collection created by hand: the upgrade binds the LangWatchQL tables to a collection the server already holds.
 
 ## PostgreSQL Issues
 

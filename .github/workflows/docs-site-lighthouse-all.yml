@@ -63,6 +63,9 @@ jobs:
       - name: Install build browser
         run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
       - name: Build the documentation under /docs
+        env:
+          # Signs the star count read, which GitHub refuses from shared runner addresses.
+          GITHUB_TOKEN: ${{ github.token }}
         run: pnpm --filter @langwatch/docs-site build --base-path /docs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

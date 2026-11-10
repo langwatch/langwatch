@@ -74,6 +74,8 @@ export type BillingSubscriptionPreviewChange = Omit<BillingSubscriptionChange, "
 export type BillingInvoicePreview = Readonly<{
   total: number;
   amountDue: number;
+  /** The tax inside `total`, added on top or included; absent when there is none. */
+  tax?: number;
   currency: string | null;
 }>;
 

@@ -518,6 +518,8 @@ export type TracesListReader = Readonly<{
     authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     filterFor: FacetFilterResolver;
+    /** Names what `filterFor` was built from, so a repeat shares a running count. */
+    filterKey: string;
   }): Promise<FacetDescriptor[]>;
   getNewCount(params: TraceNewCountParams): Promise<number>;
   getTraceRefs(params: {
@@ -2771,6 +2773,13 @@ export class TraceModule implements TraceApi, CollectorApp {
       authorization: input.authorization,
       timeRange: input.timeRange,
       filterFor,
+      // Everything `filterFor` reads besides the proof and the window.
+      filterKey: JSON.stringify([
+        input.projectId,
+        input.query,
+        input.evalRuns ?? [],
+        input.protections ?? null,
+      ]),
     });
 
     return { facets, pending: false };

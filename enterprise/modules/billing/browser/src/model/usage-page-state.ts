@@ -8,6 +8,7 @@ import type { UsageDay } from "@langwatch/entitlement-contract";
 import numeral from "numeral";
 
 import {
+  EXCLUDING_VAT,
   formatPrice,
   GROWTH_INCLUDED_EVENTS,
   growthOverageCentsPer100k,
@@ -73,7 +74,11 @@ export function planStrip({
       cents: seatPriceCents * plan.maxMembers,
       currency: growth.currency,
     });
-    return { title: planTitle(plan), summary: `${total}${period} · ${seats}`, action: "manage" };
+    return {
+      title: planTitle(plan),
+      summary: `${total}${period} ${EXCLUDING_VAT} · ${seats}`,
+      action: "manage",
+    };
   }
   return { title: planTitle(plan), summary: seats, action: "manage" };
 }

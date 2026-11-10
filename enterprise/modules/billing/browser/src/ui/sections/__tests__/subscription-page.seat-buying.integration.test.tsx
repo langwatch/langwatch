@@ -397,6 +397,26 @@ describe("<SubscriptionPage/> buying seats", () => {
       expect(total.getByText("3 seats × €29")).toBeInTheDocument();
     });
 
+    /** @scenario "The seat dialog says its total excludes VAT" */
+    it("says the total excludes VAT", async () => {
+      givenFree(1);
+      renderPage();
+
+      const total = within(within(await openSeatDialog()).getByTestId("upgrade-seats-total"));
+      expect(total.getByText("€29/mo")).toBeInTheDocument();
+      expect(total.getByText("excl. VAT")).toBeInTheDocument();
+    });
+
+    /** @scenario "The Growth offer says its price excludes VAT" */
+    it("says the Growth offer's price excludes VAT", async () => {
+      givenFree(2);
+      renderPage();
+
+      const offer = await screen.findByTestId("upgrade-total");
+      expect(offer).toHaveTextContent("€58/mo for 2 seats");
+      expect(offer).toHaveTextContent("excl. VAT");
+    });
+
     /** @scenario "The seat dialog never goes below the people already in the organization" */
     it("starts at the people in the organization and cannot go lower", async () => {
       givenFree(3);
@@ -755,6 +775,35 @@ describe("<SubscriptionPage/> buying seats", () => {
         "qux@acme.example gets the invite as soon as the seat is added.",
       );
       expect(confirm.getByRole("button", { name: "Pay €24.17 and add" })).toBeEnabled();
+    });
+
+    /** @scenario "The seat change confirm splits VAT out of the charge today" */
+    it("charges the VAT-inclusive amount today and splits the VAT out", async () => {
+      mockPreviewProration.mockImplementation(() => ({
+        data: {
+          ...addQuote,
+          amountDueCents: 2924,
+          formattedAmountDue: "€29.24",
+          taxCents: 507,
+          formattedAmountDueExcludingTax: "€24.17",
+          formattedTax: "€5.07",
+        },
+        isLoading: false,
+        isError: false,
+      }));
+      givenGrowth({ paid: 3, inUse: 3 });
+      renderPage();
+      await openManageSeats();
+
+      addPerson("qux@acme.example");
+      fireEvent.click(lastButton("Add 1 seat · €29/mo"));
+
+      const confirm = within(await screen.findByTestId("seat-confirm-dialog"));
+      expect(confirm.getByText("€29.24")).toBeInTheDocument();
+      expect(confirm.getByText("€24.17 + €5.07 VAT")).toBeInTheDocument();
+      expect(confirm.getByText("€116/mo")).toBeInTheDocument();
+      expect(confirm.getByText("excl. VAT")).toBeInTheDocument();
+      expect(confirm.getByRole("button", { name: "Pay €29.24 and add" })).toBeEnabled();
     });
 
     /** @scenario "Confirming the added seat changes the subscription and sends the invite" */

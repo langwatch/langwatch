@@ -217,6 +217,11 @@ export function CurrentPlanBlock({
             <SettingRow label="Price" data-testid="plan-price">
               <Text textStyle="bodySm" fontWeight={600} fontVariantNumeric="tabular-nums">
                 {pricing.total}
+                {pricing.note && (
+                  <Text as="span" fontSize="xs" fontWeight="normal" color="fg.muted">
+                    {` ${pricing.note}`}
+                  </Text>
+                )}
               </Text>
               {pricing.breakdown && (
                 <Text textStyle="bodySm" color="fg.subtle" fontVariantNumeric="tabular-nums">

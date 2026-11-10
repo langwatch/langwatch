@@ -26,6 +26,7 @@ export type CodeStepId =
   | "experiment:fill-second-id-indexes"
   | "gateway:fill-id-indexes"
   | "governance:record-coding-assistant-billing"
+  | "governance:record-coding-assistant-ingest-source-billing"
   | "governance:migrate-anomaly-webhook-destinations"
   | "governance:replay-cost-charges"
   | "identity:identifier-backfill"

@@ -45,7 +45,11 @@ describe("planStrip", () => {
         currency: "USD",
         seatPriceCents: 2900,
       }),
-    ).toEqual({ title: "Growth plan", summary: "$87/mo · 3 full seats", action: "manage" });
+    ).toEqual({
+      title: "Growth plan",
+      summary: "$87/mo excl. VAT · 3 full seats",
+      action: "manage",
+    });
   });
 
   it("names another paid plan after itself and lists its seats", () => {

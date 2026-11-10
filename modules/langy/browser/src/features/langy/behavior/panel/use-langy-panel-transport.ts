@@ -12,7 +12,12 @@ import {
   type LangyTrpcClient,
 } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
-import { type LangyContextChip, useLangyStore } from "../../../../behavior/langy.store.ts";
+import {
+  isTurnInPanelScope,
+  type LangyContextChip,
+  type LangyScope,
+  useLangyStore,
+} from "../../../../behavior/langy.store.ts";
 import { navigateDedupKey, reserveNavigate } from "../../../../model/langy-navigate-dedup.ts";
 import { executeUiAction } from "../../../../model/ui-actions/execute-ui-action.ts";
 import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
@@ -240,6 +245,8 @@ export interface LangyPanelTurnRefs {
   resumedTurnIdRef: RefObject<string | null>;
   /** Told once which conversation a queued kickoff's send created, then cleared. */
   kickoffNamedRef: RefObject<((conversationId: string) => void) | null>;
+  /** Clears the question a send left on screen once it turns out to belong elsewhere. */
+  sendStrandedRef: RefObject<(() => void) | null>;
 }
 
 /**
@@ -259,6 +266,8 @@ export function useLangyPanelTransport({
   const router = useRouter();
   const turnContextRef = useRef<LangyTurnRequestContext | null>(null);
   const lastSentTextRef = useRef<string | null>(null);
+  const sentScopeRef = useRef<LangyScope | null>(null);
+  const sendStrandedRef = useRef<(() => void) | null>(null);
   // Instructions already acted on, reset per turn in `onIds`: a stream-tail
   // replay after a reconnect could hand the same instruction twice.
   const navigatedInstructionsRef = useRef<Set<string>>(new Set());
@@ -291,17 +300,36 @@ export function useLangyPanelTransport({
           if (!ctx) throw new Error("Langy turn context not ready");
           return ctx;
         },
-        onIds: ({ conversationId, turnId }) => {
-          useLangyStore.getState().beginTurn({ conversationId, turnId });
+        onSendStart: () => {
+          sentScopeRef.current = useLangyStore.getState().activeConversationScope;
+        },
+        onIds: ({ conversationId, turnId, projectId: sentFrom }) => {
+          // The conversation exists either way, so a kickoff still learns which one it made.
+          const named = kickoffNamedRef.current;
+          kickoffNamedRef.current = null;
+          named?.(conversationId);
+          const store = useLangyStore.getState();
+          // Adopted here, the other project's conversation reads as not found and its turn
+          // pins the composer on "working" (the scope change already settled this one).
+          const inScope = isTurnInPanelScope({
+            sentScope: sentScopeRef.current,
+            scope: store.activeConversationScope,
+            projectId: sentFrom,
+          });
+          if (!inScope) {
+            // Its turn runs where it was sent, so the words are not handed back as a draft here.
+            lastSentTextRef.current = null;
+            sendStrandedRef.current?.();
+            return false;
+          }
+          store.beginTurn({ conversationId, turnId });
           dispatchedTurnIdRef.current = turnId;
           // The words are a bubble on screen now, so they are no longer a
           // draft to hand back.
           lastSentTextRef.current = null;
           navigatedInstructionsRef.current = new Set();
           uiActionSeenRef.current = new Set();
-          const named = kickoffNamedRef.current;
-          kickoffNamedRef.current = null;
-          named?.(conversationId);
+          return true;
         },
         getResumeTarget: () => currentResumeTarget(turnContextRef.current?.projectId),
         onNavigate: (entry) =>
@@ -336,6 +364,7 @@ export function useLangyPanelTransport({
     dispatchedTurnIdRef,
     resumedTurnIdRef,
     kickoffNamedRef,
+    sendStrandedRef,
   };
   return { transport, refs };
 }
