@@ -8,7 +8,11 @@ import { BillableEventsMeterAppendService } from "../../services/billable-events
 import { TraceUsageService } from "../../services/trace-usage.service.ts";
 import { UsageCountingService } from "../../services/usage-counting.service.ts";
 import { BILLABLE_EVENTS_METER_PROJECTION_NAME } from "../billable-events-meter.projection.ts";
-import { CountMonthCommand } from "../usage.commands.ts";
+import {
+  CountMonthCommand,
+  CountScenarioRunsCommand,
+  RecordScenarioRunGraceEndedCommand,
+} from "../usage.commands.ts";
 import { buildUsagePipeline } from "../usage.pipeline.ts";
 
 /** Building asks no peer, so every peer here refuses if it is ever called. */
@@ -22,6 +26,10 @@ function build({ saas }: { saas: boolean }) {
     getProjectPlacement: refuse,
   };
   return buildUsagePipeline({
+    countScenarioRuns: CountScenarioRunsCommand.create({ runs: { count: async () => null } }),
+    recordScenarioRunGraceEnded: RecordScenarioRunGraceEndedCommand.create({
+      runs: { isCapped: async () => false },
+    }),
     countMonth: CountMonthCommand.create({
       counting: UsageCountingService.create({
         meter,

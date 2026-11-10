@@ -8,9 +8,14 @@ import {
 } from "@langwatch/entitlement-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
+import { Temporal } from "@langwatch/time";
 
 import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
-import { isRunRefused, scenarioRunMonthOf, scenarioRunUsageOf } from "../rules/scenario-run-cap.rules.ts";
+import {
+  isRunRefused,
+  scenarioRunMonthOf,
+  scenarioRunUsageOf,
+} from "../rules/scenario-run-cap.rules.ts";
 
 const defaultLogger = createLogger("langwatch:entitlement:scenario-run-cap");
 
@@ -42,7 +47,7 @@ export class ScenarioRunCapService {
     return new ScenarioRunCapService(deps);
   }
 
-  /** @throws LimitExceededError (`scenarioRuns`) once the month's runs reached a cap that applies. */
+  /** @throws LimitExceededError (`scenarioRuns`) once the month's runs reach an applying cap. */
   async assertRunAllowed({ organizationId }: { organizationId: string }): Promise<void> {
     const plan = await this.deps.plans.getActivePlan({ organizationId });
     const cap = planScenarioRunCap({ plan });
@@ -68,9 +73,13 @@ export class ScenarioRunCapService {
   }
 
   /** The month's runs for the usage page; null on a plan with no run cap. */
-  async usage({ organizationId, plan }: { organizationId: string; plan: Plan }): Promise<
-    ScenarioRunUsage | null
-  > {
+  async usage({
+    organizationId,
+    plan,
+  }: {
+    organizationId: string;
+    plan: Plan;
+  }): Promise<ScenarioRunUsage | null> {
     const cap = planScenarioRunCap({ plan });
     if (!cap.capped) return null;
     const now = this.deps.now();
@@ -99,7 +108,9 @@ export class ScenarioRunCapService {
     const plan = await this.deps.plans.getActivePlan({ organizationId: input.organizationId });
     const cap = planScenarioRunCap({ plan });
     if (!cap.capped) return null;
-    const window = scenarioRunMonthOf(Date.parse(`${input.month}-01T00:00:00Z`));
+    const window = scenarioRunMonthOf(
+      Temporal.Instant.from(`${input.month}-01T00:00:00Z`).epochMilliseconds,
+    );
     const [runs, firstRunAt] = await Promise.all([
       this.deps.meter.countEventType({
         organizationId: input.organizationId,
@@ -133,7 +144,8 @@ export class ScenarioRunCapService {
     const eventType = SIMULATION_RUN_EVENT_TYPES.STARTED;
     const known = this.#monthRuns.get(organizationId);
     const firstKnown = this.#firstRuns.get(organizationId);
-    if (cached && known && known.month === month && known.expiresAt > now && firstKnown) {
+    const isFresh = known !== undefined && known.month === month && known.expiresAt > now;
+    if (cached && isFresh && firstKnown) {
       return { runs: known.runs, firstRunAt: firstKnown };
     }
     const [runs, firstRunAt] = await Promise.all([

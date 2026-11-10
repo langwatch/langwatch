@@ -171,7 +171,11 @@ export class CountScenarioRunsCommand implements CommandHandler<
 
   private constructor(private readonly runs: Pick<ScenarioRunCapService, "count">) {}
 
-  static create({ runs }: { runs: Pick<ScenarioRunCapService, "count"> }): CountScenarioRunsCommand {
+  static create({
+    runs,
+  }: {
+    runs: Pick<ScenarioRunCapService, "count">;
+  }): CountScenarioRunsCommand {
     return new CountScenarioRunsCommand(runs);
   }
 
@@ -237,7 +241,9 @@ export class RecordScenarioRunsThresholdCommand implements CommandHandler<
     return payload.organizationId;
   }
 
-  static getSpanAttributes(payload: RecordScenarioRunsThresholdCommandData): Record<string, string> {
+  static getSpanAttributes(
+    payload: RecordScenarioRunsThresholdCommandData,
+  ): Record<string, string> {
     return {
       "payload.organization.id": payload.organizationId,
       "payload.usage.month": payload.month,
@@ -288,7 +294,9 @@ export class RecordScenarioRunGraceEndedCommand implements CommandHandler<
     return payload.organizationId;
   }
 
-  static getSpanAttributes(payload: RecordScenarioRunGraceEndedCommandData): Record<string, string> {
+  static getSpanAttributes(
+    payload: RecordScenarioRunGraceEndedCommandData,
+  ): Record<string, string> {
     return { "payload.organization.id": payload.organizationId };
   }
 }

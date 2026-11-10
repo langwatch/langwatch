@@ -28,7 +28,7 @@ export abstract class BillableEventsMeterRepository {
     projectIds: readonly string[];
     window: MeterWindow;
   }): Promise<ProjectMeterCount[]>;
-  /** Distinct deduplication keys of one event type the organization was metered for in the window. */
+  /** Distinct deduplication keys of one event type metered for the organization in the window. */
   abstract countEventType(
     input: { organizationId: string; eventType: string } & MeterWindow,
   ): Promise<number>;

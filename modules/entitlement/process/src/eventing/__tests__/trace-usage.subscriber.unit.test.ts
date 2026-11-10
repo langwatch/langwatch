@@ -13,7 +13,11 @@ import { MemoryTraceCountRepository } from "../../repositories/memory/memory.tra
 import type { TenancyRepository } from "../../repositories/tenancy.repository.ts";
 import { TraceUsageService } from "../../services/trace-usage.service.ts";
 import { UsageCountingService } from "../../services/usage-counting.service.ts";
-import { CountMonthCommand } from "../usage.commands.ts";
+import {
+  CountMonthCommand,
+  CountScenarioRunsCommand,
+  RecordScenarioRunGraceEndedCommand,
+} from "../usage.commands.ts";
 import { buildUsagePipeline } from "../usage.pipeline.ts";
 
 const ORGANIZATION = "organization-1";
@@ -34,6 +38,10 @@ function compose({ placed = true } = {}) {
         : { kind: "unplaced" as const },
   };
   const pipeline = buildUsagePipeline({
+    countScenarioRuns: CountScenarioRunsCommand.create({ runs: { count: async () => null } }),
+    recordScenarioRunGraceEnded: RecordScenarioRunGraceEndedCommand.create({
+      runs: { isCapped: async () => false },
+    }),
     countMonth: CountMonthCommand.create({
       counting: UsageCountingService.create({
         meter: MemoryBillableEventsMeterRepository.create(),

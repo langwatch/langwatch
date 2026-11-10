@@ -14,8 +14,8 @@ import type {
 import type { MemberSeatRepository } from "../repositories/member-seat.repository.ts";
 import type { UsageMembershipRepository } from "../repositories/usage-membership.repository.ts";
 import { buildSeatLimitInfo } from "../rules/seat-limit.rules.ts";
-import { USAGE_UNKNOWN, type UsageCounter } from "./usage-enforcement.service.ts";
 import type { ScenarioRunCapService } from "./scenario-run-cap.service.ts";
+import { USAGE_UNKNOWN, type UsageCounter } from "./usage-enforcement.service.ts";
 
 /**
  * The message allowance a plan states when it means "we do not cap this". Stated rather than

@@ -105,7 +105,12 @@ export const scenarioRunsCounted: EventHandler<
   const grace = graceStep(next, now);
   if (grace.ended) {
     intents.push(
-      graceEndedIntent({ ctx, key: data.organizationId, grace: { ...grace, ended: grace.ended }, now }),
+      graceEndedIntent({
+        ctx,
+        key: data.organizationId,
+        grace: { ...grace, ended: grace.ended },
+        now,
+      }),
     );
   }
   return { state: grace.state, nextWakeAt: grace.nextWakeAt, intents };
@@ -119,7 +124,9 @@ export const scenarioRunGraceWake: WakeHandler<ScenarioRunNoticesState, Intents>
   return {
     state: grace.state,
     nextWakeAt: null,
-    intents: [graceEndedIntent({ ctx, key: ctx.key, grace: { ...grace, ended: grace.ended }, now })],
+    intents: [
+      graceEndedIntent({ ctx, key: ctx.key, grace: { ...grace, ended: grace.ended }, now }),
+    ],
   };
 };
 

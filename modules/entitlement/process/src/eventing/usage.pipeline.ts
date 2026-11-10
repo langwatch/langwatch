@@ -25,12 +25,6 @@ import {
   REFUSED_ORGANIZATIONS_PROCESS_NAME,
   refusedOrganizationWake,
 } from "./refused-organizations.process.ts";
-import {
-  TRACE_USAGE_MONTH_IDS_SUBSCRIBER_NAME,
-  TRACE_USAGE_SPAN_SUBSCRIBER_NAME,
-  traceUsageMonthIdsSubscriber,
-  traceUsageSpanSubscriber,
-} from "./trace-usage.subscriber.ts";
 import { scenarioRunCountSubscriber } from "./scenario-run-count.subscriber.ts";
 import {
   initialScenarioRunNoticesState,
@@ -39,6 +33,12 @@ import {
   scenarioRunNoticesStateSchema,
   scenarioRunsCounted,
 } from "./scenario-run-notices.process.ts";
+import {
+  TRACE_USAGE_MONTH_IDS_SUBSCRIBER_NAME,
+  TRACE_USAGE_SPAN_SUBSCRIBER_NAME,
+  traceUsageMonthIdsSubscriber,
+  traceUsageSpanSubscriber,
+} from "./trace-usage.subscriber.ts";
 import { usageMeterCountSubscriber } from "./usage-meter-count.subscriber.ts";
 import {
   CountMonthCommand,
@@ -163,7 +163,8 @@ export function buildUsagePipeline({
       options: {
         delay: 30_000,
         deduplication: {
-          makeId: (p: CountScenarioRunsCommandData) => `scenario-runs:${p.organizationId}:${p.month}`,
+          makeId: (p: CountScenarioRunsCommandData) =>
+            `scenario-runs:${p.organizationId}:${p.month}`,
           ttlMs: 35_000,
         },
       },

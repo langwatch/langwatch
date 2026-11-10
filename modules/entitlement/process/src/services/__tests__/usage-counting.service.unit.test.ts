@@ -63,6 +63,14 @@ class WarningLog {
 class UnreachableMeter extends BillableEventsMeterRepository {
   async insert(): Promise<void> {}
 
+  async countEventType(): Promise<never> {
+    throw new Error("ClickHouse is unreachable");
+  }
+
+  async findFirstEventAt(): Promise<never> {
+    throw new Error("ClickHouse is unreachable");
+  }
+
   async findTotal(): Promise<number> {
     throw new Error("ClickHouse is unreachable");
   }

@@ -15,25 +15,27 @@ import { MemoryBillingStore } from "../../repositories/memory/memory.billing.sto
 import { MemoryBillingSubscriptionRepository } from "../../repositories/memory/memory.subscription.repository.ts";
 import { SaaSPlanProviderService } from "../plan-provider.service.ts";
 
-const creationLimits = ["scenarios", "scenarioSets", "evaluators"] as const;
+const creationLimits = ["scenarios", "evaluators"] as const;
 
 const noSubscription = MemoryBillingSubscriptionRepository.create(new MemoryBillingStore());
 
 describe("cloud Free creation caps", () => {
   describe("given the cloud Free plan", () => {
-    it("caps scenarios, simulations and custom evaluators at 3", () => {
+    it("caps scenarios and custom evaluators at 3, and scenario runs at 100 a month after a 14-day grace", () => {
       expect(PLAN_LIMITS[PlanTypes.FREE]).toMatchObject({
         maxScenarios: 3,
-        maxScenarioSets: 3,
         maxEvaluators: 3,
+        maxScenarioRunsPerMonth: 100,
+        scenarioRunGraceDays: 14,
       });
     });
 
     it("keeps the caps in one place", () => {
       expect(FREE_PLAN_CREATION_CAPS).toEqual({
         maxScenarios: 3,
-        maxScenarioSets: 3,
         maxEvaluators: 3,
+        maxScenarioRunsPerMonth: 100,
+        scenarioRunGraceDays: 14,
       });
     });
 
