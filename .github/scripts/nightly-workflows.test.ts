@@ -37,7 +37,8 @@ const requested = (text: string): Map<string, keyof typeof LEVEL> => {
   assert.equal(blocks.length, keys, "a `permissions:` key is not followed by a map this can read");
   for (const [, , lines] of blocks) {
     for (const line of lines.split("\n")) {
-      if (line.trim() === "" || line.trim().startsWith("#")) continue;
+      const trimmed = line.trim();
+      if (trimmed === "" || trimmed.startsWith("#")) continue;
       const entry = /^\s+([a-z-]+): (none|read|write)$/.exec(line);
       assert.ok(entry, `unreadable line in a permissions map: ${line}`);
       const [, scope, level] = entry;
