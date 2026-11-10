@@ -108,7 +108,7 @@ mobile drawer and command bar are overlays with bounded scrolling.
 ## Verification and budgets
 
 `pnpm --filter @langwatch/docs-site size --out-dir <build> --before <baseline>`
-reports raw and gzipped sizes and fails above 3,100 bytes for initial reading or
+reports raw and gzipped sizes and fails above 3,200 bytes for initial reading or
 15,000 bytes for bootstrap plus idle controls. The build drops Vite's modulepreload polyfill
 (every target browser reads modulepreload) and inlines imported constants, so a `/docs` build's
 bootstrap imports no shared config chunk. It also reports deferred reading,

@@ -164,12 +164,25 @@ export function pageImages({ html }: { html: string }): PageImage[] {
 export function deferBelowFoldPosters({ html }: { html: string }) {
   const later = scanArticle({ html }).posters.filter((video) => !video.aboveFold);
   let out = html;
-  for (const { start, tag } of later.toReversed())
+  for (const { start, tag } of later.toReversed()) {
+    const close = out.indexOf("</video>", start);
+    if (close < 0) continue;
+    const end = close + "</video>".length;
+    const scripted =
+      tag.replace(/\sposter="/, ' data-docs-poster="') + out.slice(start + tag.length, end);
     out =
       out.slice(0, start) +
-      tag.replace(/\sposter="/, ' data-docs-poster="') +
-      out.slice(start + tag.length);
+      scripted +
+      noScriptCopy({ video: out.slice(start, end) }) +
+      out.slice(end);
+  }
   return out;
+}
+
+/* Without scripts the deferred copy is hidden and this one, poster and all, takes its place;
+   with scripts a browser never parses it, so it costs no fetch. */
+function noScriptCopy({ video }: { video: string }) {
+  return `<noscript><style>video[data-docs-poster]{display:none}</style>${video}</noscript>`;
 }
 
 /** The largest WebP encoding, which an `<img>` names so the original need not be published. */

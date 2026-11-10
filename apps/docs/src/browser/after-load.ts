@@ -1,10 +1,26 @@
+/* The build leaves a poster only on a first-screen video and marks the hero image high priority,
+   so these are the first screen's pictures. Decoded, their paint is at most a frame away. */
+const FIRST_SCREEN = "video[poster],img[fetchpriority=high]";
+
+function firstScreenDecoded() {
+  const shown = document.querySelectorAll<HTMLImageElement | HTMLVideoElement>(FIRST_SCREEN);
+  return Promise.all(
+    [...shown].map((element) => {
+      const image = new Image();
+      image.src = element instanceof HTMLVideoElement ? element.poster : element.currentSrc;
+      return image.decode().catch(() => {});
+    }),
+  );
+}
+
 /**
- * Runs `run` once the window has loaded (every image and poster too) and drawn a frame after it:
- * a frame callback runs just before the paint, and a task queued from it runs after. The shared
- * stylesheet waits this way so it never competes with the page's own bytes.
+ * Runs `run` once the window has loaded, the first screen's images and posters are decoded and a
+ * frame has drawn them: a frame callback runs just before the paint, and a task queued from it
+ * runs after. The shared stylesheet waits this way so it never competes with the first screen.
  */
 export function afterLoad(run: () => void) {
-  const start = () => requestAnimationFrame(() => setTimeout(run, 0));
+  const start = () =>
+    void firstScreenDecoded().then(() => requestAnimationFrame(() => setTimeout(run, 0)));
   if (document.readyState === "complete") start();
   else addEventListener("load", start, { once: true });
 }

@@ -253,7 +253,7 @@ pnpm --filter @langwatch/docs-site test:performance --out-dir "$TMPDIR/docs-perf
 pnpm --filter @langwatch/docs-site test:layout --out-dir "$TMPDIR/docs-performance" --screenshots "$TMPDIR/docs-layout"
 ```
 
-`size` fails above 3,100 bytes gzipped for initial reading and above 15 KB for the bootstrap, inline theme setup, idle
+`size` fails above 3,200 bytes gzipped for initial reading and above 15 KB for the bootstrap, inline theme setup, idle
 controls combined. It separately reports the full search and
 playground interaction costs, including shared React/Zod. `test:performance`
 checks static reading, navigation, prefetch and credential isolation. `test:layout` checks 1280, 1440, 1670 and 390 pixel widths
