@@ -26,7 +26,10 @@ const defaultLogger = createLogger("langwatch:entitlement:scenario-run-cap");
 const RUN_COUNT_CACHE_TTL_MS = 30_000;
 
 type ScenarioRunCapDependencies = Readonly<{
-  meter: Pick<BillableEventsMeterRepository, "countEventType" | "findFirstEventAt">;
+  meter: Pick<
+    BillableEventsMeterRepository,
+    "countEventType" | "findFirstEventAt" | "hasDeduplicationKey"
+  >;
   plans: { getActivePlan(input: { organizationId: string }): Promise<Plan> };
   now: () => number;
   logger?: Pick<Logger, "error">;
@@ -40,6 +43,8 @@ type ScenarioRunCapDependencies = Readonly<{
 export class ScenarioRunCapService {
   readonly #firstRuns = new Map<string, number>();
   readonly #monthRuns = new Map<string, { month: string; runs: number; expiresAt: number }>();
+  /** Run start keys this instance admitted, per organization, for the month they count in. */
+  readonly #admittedRuns = new Map<string, { month: string; keys: Set<string> }>();
   readonly #logger: Pick<Logger, "error">;
 
   private constructor(private readonly deps: ScenarioRunCapDependencies) {
@@ -51,22 +56,26 @@ export class ScenarioRunCapService {
   }
 
   /**
-   * Counts the run unless `shouldCountRun` is false, so a run asked about at queue time and
-   * again when its start is reported is counted once. Best-effort across instances.
+   * Counts the run unless `shouldCountRun` is false. A run already admitted or metered under
+   * its `runKey` passes without counting again, so a retried start is counted once.
+   * Best-effort across instances.
    * @throws LimitExceededError (`scenarioRuns`) once the month's runs reach an applying cap.
    */
   async assertRunAllowed({
     organizationId,
     shouldCountRun = true,
+    runKey,
   }: {
     organizationId: string;
     shouldCountRun?: boolean | undefined;
+    runKey?: { projectId: string; deduplicationKey: string } | undefined;
   }): Promise<void> {
     const plan = await this.deps.plans.getActivePlan({ organizationId });
     const cap = planScenarioRunCap({ plan });
     if (!cap.capped) return;
 
     const now = this.deps.now();
+    if (runKey && (await this.#isAdmitted({ organizationId, runKey, now }))) return;
     let reading: { runs: number; firstRunAt: number | null };
     try {
       reading = await this.#read({ organizationId, now, cached: true });
@@ -83,6 +92,7 @@ export class ScenarioRunCapService {
     if (!shouldCountRun) return;
     // Run starts reach the meter asynchronously, so an accepted run is counted at once.
     this.#accept(organizationId);
+    if (runKey) this.#admittedKeys({ organizationId, now }).add(runKey.deduplicationKey);
     if (reading.firstRunAt === null) this.#firstRuns.set(organizationId, now);
   }
 
@@ -172,6 +182,36 @@ export class ScenarioRunCapService {
       expiresAt: now + RUN_COUNT_CACHE_TTL_MS,
     });
     return { runs: counted, firstRunAt };
+  }
+
+  async #isAdmitted({
+    organizationId,
+    runKey,
+    now,
+  }: {
+    organizationId: string;
+    runKey: { projectId: string; deduplicationKey: string };
+    now: number;
+  }): Promise<boolean> {
+    const admitted = this.#admittedKeys({ organizationId, now });
+    if (admitted.has(runKey.deduplicationKey)) return true;
+    try {
+      const isMetered = await this.deps.meter.hasDeduplicationKey({ organizationId, ...runKey });
+      if (isMetered) admitted.add(runKey.deduplicationKey);
+      return isMetered;
+    } catch (error) {
+      this.#logger.error({ error, organizationId }, "could not look up the run start's meter key");
+      return false;
+    }
+  }
+
+  #admittedKeys({ organizationId, now }: { organizationId: string; now: number }): Set<string> {
+    const { month } = scenarioRunMonthOf(now);
+    const known = this.#admittedRuns.get(organizationId);
+    if (known && known.month === month) return known.keys;
+    const keys = new Set<string>();
+    this.#admittedRuns.set(organizationId, { month, keys });
+    return keys;
   }
 
   #accept(organizationId: string): void {

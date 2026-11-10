@@ -411,6 +411,7 @@ export class EntitlementModule implements EntitlementApiContract {
   async assertScenarioRunAllowed(input: {
     organizationId: string;
     shouldCountRun?: boolean | undefined;
+    runKey?: { projectId: string; deduplicationKey: string } | undefined;
   }): Promise<void> {
     await this.#scenarioRuns?.assertRunAllowed(input);
   }

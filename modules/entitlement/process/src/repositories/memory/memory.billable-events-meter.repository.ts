@@ -41,6 +41,19 @@ export class MemoryBillableEventsMeterRepository extends BillableEventsMeterRepo
     return new Set(keys).size;
   }
 
+  async hasDeduplicationKey(input: {
+    organizationId: string;
+    projectId: string;
+    deduplicationKey: string;
+  }): Promise<boolean> {
+    return this.rows.some(
+      (row) =>
+        row.organizationId === input.organizationId &&
+        row.tenantId === input.projectId &&
+        row.deduplicationKey === input.deduplicationKey,
+    );
+  }
+
   async findFirstEventAt(input: EventTypeFilter): Promise<number | null> {
     const times = this.rows
       .filter((row) => row.organizationId === input.organizationId)

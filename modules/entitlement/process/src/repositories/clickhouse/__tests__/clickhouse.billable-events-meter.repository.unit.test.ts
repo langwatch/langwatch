@@ -99,3 +99,40 @@ describe("BillableEventsMeterClickHouseRepository.countByDay", () => {
     });
   });
 });
+
+describe("BillableEventsMeterClickHouseRepository.hasDeduplicationKey", () => {
+  describe("given a run start already metered under its key", () => {
+    it("finds the key by its hash in the project's rows of the organization", async () => {
+      const { meter, organizationsResolved, statements } = meterOver([{ total: "1" }]);
+
+      const found = await meter.hasDeduplicationKey({
+        organizationId: "org_1",
+        projectId: "project_a",
+        deduplicationKey: "project_a:run_1:startRun",
+      });
+
+      expect(found).toBe(true);
+      expect(organizationsResolved).toEqual(["org_1"]);
+      expect(statements[0]?.query).toContain("cityHash64({deduplicationKey:String})");
+      expect(statements[0]?.query_params).toMatchObject({
+        organizationId: "org_1",
+        projectId: "project_a",
+        deduplicationKey: "project_a:run_1:startRun",
+      });
+    });
+  });
+
+  describe("given no row under the key", () => {
+    it("answers false", async () => {
+      const { meter } = meterOver([{ total: "0" }]);
+
+      await expect(
+        meter.hasDeduplicationKey({
+          organizationId: "org_1",
+          projectId: "project_a",
+          deduplicationKey: "project_a:run_2:startRun",
+        }),
+      ).resolves.toBe(false);
+    });
+  });
+});

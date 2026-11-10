@@ -125,6 +125,16 @@ Feature: Cloud Free plan caps scenarios, custom evaluators and scenario runs
     And the 101st run is refused once, before it is queued
 
   @unit
+  Scenario: A retried run start is counted once
+    Given the organization is on the cloud Free plan
+    And its first scenario run was 20 days ago
+    And it ran 98 scenarios this month
+    When one run's start is reported twice and another run starts
+    Then both runs pass and the month holds 100 runs
+    And a start already recorded for its run passes again at the cap
+    And a new run at the cap is refused
+
+  @unit
   Scenario: An unknown run count does not block runs
     Given the organization is on the cloud Free plan
     And its scenario run history cannot be read

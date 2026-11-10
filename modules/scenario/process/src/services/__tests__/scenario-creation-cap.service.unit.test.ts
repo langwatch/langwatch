@@ -51,7 +51,10 @@ function capsWith({
 }
 
 function runStarted(scenarioSetId: string) {
-  return { projectId: "project-1", event: { type: ScenarioEventType.RUN_STARTED, scenarioSetId } };
+  return {
+    projectId: "project-1",
+    event: { type: ScenarioEventType.RUN_STARTED, scenarioSetId, scenarioRunId: "run-1" },
+  };
 }
 
 describe("ScenarioCreationCapService", () => {
@@ -91,6 +94,7 @@ describe("ScenarioCreationCapService", () => {
         expect(assertScenarioRunAllowed).toHaveBeenCalledWith({
           organizationId: "organization-1",
           shouldCountRun: true,
+          runKey: { projectId: "project-1", deduplicationKey: "project-1:run-1:startRun" },
         });
       });
 
@@ -112,7 +116,7 @@ describe("ScenarioCreationCapService", () => {
 
         await service.assertRunStartAllowed({
           projectId: "project-1",
-          event: { type: ScenarioEventType.MESSAGE_SNAPSHOT },
+          event: { type: ScenarioEventType.MESSAGE_SNAPSHOT, scenarioRunId: "run-1" },
         });
 
         expect(assertScenarioRunAllowed).not.toHaveBeenCalled();
@@ -132,7 +136,22 @@ describe("ScenarioCreationCapService", () => {
       });
     });
 
-    describe("when a run is queued from the app", () => {
+    describe("when a run is queued from the app with its run id", () => {
+      /** @scenario A run queued from the app is counted once */
+      it("admits and counts the run under its start key, so its start is not refused", async () => {
+        const { service, assertScenarioRunAllowed } = capsWith();
+
+        await service.assertRunAllowed({ projectId: "project-1", scenarioRunId: "run-1" });
+
+        expect(assertScenarioRunAllowed).toHaveBeenCalledWith({
+          organizationId: "organization-1",
+          shouldCountRun: true,
+          runKey: { projectId: "project-1", deduplicationKey: "project-1:run-1:startRun" },
+        });
+      });
+    });
+
+    describe("when a run is only asked about before it has an id", () => {
       /** @scenario A run queued from the app is counted once */
       it("only asks the run cap, so the run is counted when its start is reported", async () => {
         const { service, assertScenarioRunAllowed } = capsWith();

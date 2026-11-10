@@ -27,11 +27,13 @@ export interface EntitlementApi {
   assertWithinUsageLimit(input: { organizationId: string }): Promise<void>;
   /**
    * Throws `LimitExceededError` (`scenarioRuns`) once a capped plan's month of runs is spent.
-   * `shouldCountRun: false` only asks (a run queued now is counted when its start is reported).
+   * `shouldCountRun: false` only asks. `runKey` is the run start's meter key: a run already
+   * admitted or metered under it passes again without being counted twice.
    */
   assertScenarioRunAllowed(input: {
     organizationId: string;
     shouldCountRun?: boolean | undefined;
+    runKey?: { projectId: string; deduplicationKey: string } | undefined;
   }): Promise<void>;
   sendUsageLimitWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning>;
   listOrganizationSpend(input: ListOrganizationSpendInput): Promise<ProjectSpendRollup[]>;

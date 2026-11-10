@@ -65,6 +65,8 @@ function serviceOver({
       reads.push("first");
       return meter.findFirstEventAt(input);
     },
+    hasDeduplicationKey: (input: Parameters<typeof meter.hasDeduplicationKey>[0]) =>
+      meter.hasDeduplicationKey(input),
   };
   const service = ScenarioRunCapService.create({
     meter: counting,
@@ -146,5 +148,42 @@ describe("ScenarioRunCapService", () => {
     await expect(service.assertRunAllowed(ask)).rejects.toMatchObject({
       meta: { limitType: "scenarioRuns", current: 100, max: 100 },
     });
+  });
+
+  /** @scenario A retried run start is counted once */
+  it("counts a run admitted under the same run key once, however often its start arrives", async () => {
+    const { service } = serviceOver({ plan: free, runs: 98, firstRunAt: now - 20 * DAY_MS });
+    const runKey = (id: string) => ({ projectId: "project-1", deduplicationKey: `key-${id}` });
+    await service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("a") });
+    await service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("a") });
+    await expect(
+      service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("b") }),
+    ).resolves.toBeUndefined();
+    await expect(
+      service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("c") }),
+    ).rejects.toMatchObject({ meta: { limitType: "scenarioRuns", current: 100, max: 100 } });
+    await expect(
+      service.assertRunAllowed({ organizationId: "org-1", runKey: runKey("a") }),
+    ).resolves.toBeUndefined();
+  });
+
+  /** @scenario A retried run start is counted once */
+  it("passes a start already metered under its run key at the cap without counting it", async () => {
+    const { service, meter } = serviceOver({
+      plan: free,
+      runs: 100,
+      firstRunAt: now - 20 * DAY_MS,
+    });
+    const metered = meter.rows.at(-1)!;
+    const runKey = { projectId: metered.tenantId, deduplicationKey: metered.deduplicationKey };
+    await expect(
+      service.assertRunAllowed({ organizationId: "org-1", runKey }),
+    ).resolves.toBeUndefined();
+    await expect(
+      service.assertRunAllowed({
+        organizationId: "org-1",
+        runKey: { projectId: "project-1", deduplicationKey: "new-run" },
+      }),
+    ).rejects.toMatchObject({ meta: { limitType: "scenarioRuns", current: 100, max: 100 } });
   });
 });

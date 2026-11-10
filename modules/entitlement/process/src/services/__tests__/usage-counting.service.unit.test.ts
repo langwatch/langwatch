@@ -71,6 +71,10 @@ class UnreachableMeter extends BillableEventsMeterRepository {
     throw new Error("ClickHouse is unreachable");
   }
 
+  async hasDeduplicationKey(): Promise<never> {
+    throw new Error("ClickHouse is unreachable");
+  }
+
   async findTotal(): Promise<number> {
     throw new Error("ClickHouse is unreachable");
   }
