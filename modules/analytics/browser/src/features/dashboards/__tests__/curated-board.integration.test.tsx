@@ -180,7 +180,7 @@ describe("given a member opens a From LangWatch board", () => {
   });
 
   describe("when a member who may create dashboards clicks its ask bar", () => {
-    /** @scenario "From LangWatch: the ask bar opens \"Add a widget\" for a member who may create dashboards" */
+    /** @scenario "From LangWatch: the ask bar opens Add a widget for a member who may create dashboards" */
     it("opens Add a widget, with nothing stored and Langy asked nothing", async () => {
       const user = userEvent.setup();
       const { host, server } = openCurated({ templateId: "breaks" });
@@ -192,7 +192,7 @@ describe("given a member opens a From LangWatch board", () => {
       expect(server.calls.filter(({ path }) => WRITES.test(path))).toEqual([]);
     });
 
-    /** @scenario "From LangWatch: the picker has no \"I'll build it myself\"" */
+    /** @scenario "From LangWatch: the picker has no I'll build it myself" */
     it("offers no I'll build it myself", async () => {
       openCurated({ templateId: "breaks", query: PICKER_OPEN });
 

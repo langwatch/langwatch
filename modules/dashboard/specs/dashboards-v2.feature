@@ -1400,7 +1400,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # The board's header has no such button: the sidebar menu is the only place
 
   @integration
-  Scenario: From LangWatch: the ask bar opens "Add a widget" for a member who may create dashboards
+  Scenario: From LangWatch: the ask bar opens Add a widget for a member who may create dashboards
     Given a member who may create dashboards
     When the member clicks the ask bar on a From LangWatch board
     Then "Add a widget" opens
@@ -1416,7 +1416,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And "dashboards.created.dashboard" is sent with createdFrom "widget_curated" and the From LangWatch board's templateId
 
   @integration
-  Scenario: From LangWatch: the picker has no "I'll build it myself"
+  Scenario: From LangWatch: the picker has no I'll build it myself
     Given "Add a widget" is open on a From LangWatch board
     Then there is no "I'll build it myself" button
     And Langy stays reachable in the picker
