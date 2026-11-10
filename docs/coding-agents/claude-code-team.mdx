@@ -25,7 +25,7 @@ From a monthly invoice you get the total. Once every machine reports, you can al
 | --- | --- |
 | What did each engineer's sessions cost, and on which model? | [Sessions](/coding-agents/sessions), per person or per project |
 | What did this pull request cost, across everyone who worked on it? | [Pull requests](/coding-agents/pull-requests) |
-| How does spend split across teams? | **Governance > Teams**, with each member's spend one click further |
+| How does spend split across teams and people? | **Governance > Teams** for each team's total, **Governance > People** for each person |
 | Why was one session so expensive? | The session's **Usage** tab: peak context, cache misses and the call that rebuilt the cache |
 
 Codex, GitHub Copilot, Gemini CLI, opencode, Grok CLI and pi report the same way, so a team that mixes agents reads one set of numbers.
@@ -83,7 +83,7 @@ On the API key path every call is a gateway request, so the gateway's [budgets](
 Engineers will ask who can read their sessions, so the answer belongs in the rollout email. By default the setup sends prompts and tool activity along with the numbers, so each engineer can replay their own sessions. Then:
 
 - **Their sessions land in a project only they own.** Teammates see them only in a team project the tool was pinned to.
-- **Admins see spend as numbers.** Cost per person, team and department, with no conversation content in it.
+- **Admins see spend as numbers.** Cost per person and per team, with no conversation content in it.
 - **Reading a session as an admin is never silent.** It goes through one audited path that shows a banner for the whole visit, and the engineer can read the audit log.
 - **The organization can drop the content entirely.** Set input, output and system instructions to **Drop** in the [data privacy policy](/platform/data-privacy), and LangWatch strips the content before it is stored. Cost and token numbers keep working. See [no-spy mode](/ai-governance/no-spy-mode).
 

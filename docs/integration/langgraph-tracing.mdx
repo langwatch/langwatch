@@ -48,9 +48,15 @@ def answer(question: str) -> str:
 
 `@langwatch.trace` opens one trace per call, and the callback records everything the graph does inside it. The same `config` works for `ainvoke`, `stream` and `astream`.
 
-Put the callback on the graph run, as above. A callback attached only to the model inside one node records that model's calls and nothing else, so the tool nodes, the plain Python nodes and the order they ran in never appear.
+Put the callback on the graph run, as above. A callback attached only to the model inside one node records only that model's calls, so the tool nodes, the plain Python nodes and the order they ran in never appear.
 
-For TypeScript, install `langwatch` and attach the handler to the compiled graph:
+For TypeScript, install the SDK:
+
+```bash
+npm install langwatch
+```
+
+Then attach the handler to the compiled graph:
 
 ```typescript
 import { setupObservability } from "langwatch/observability/node";
@@ -82,6 +88,15 @@ Each `invoke` is its own trace. A chat agent that runs the graph once per user m
 LangGraph's own `thread_id` in `configurable` does not group them: LangWatch groups conversations by its own `thread_id` metadata. Set it to the same value:
 
 ```python
+import langwatch
+from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
+
+from my_app.graph import agent  # your compiled StateGraph
+
+langwatch.setup()
+
+
 @langwatch.trace(name="support-agent")
 def answer(thread_id: str, user_id: str, question: str) -> str:
     trace = langwatch.get_current_trace()

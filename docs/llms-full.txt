@@ -5418,7 +5418,7 @@ The LangWatch AI Gateway does this for OpenAI, Anthropic, Azure OpenAI, AWS Bedr
 
 ## Why a virtual key per app
 
-With one shared provider key, the provider bill tells you the total and nothing else. You can't say which team spent it, and you can't stop one runaway agent without cutting off everyone using that key.
+With one shared provider key, the provider bill tells you only the total. You can't say which team spent it, and you can't stop one runaway agent without cutting off everyone using that key.
 
 A virtual key stands in for the provider key. The provider keys stay in LangWatch, and each key you hand out can only reach the providers you allow. You can rotate, disable or revoke it without touching the provider account.
 
@@ -5444,7 +5444,7 @@ langwatch vk create \
 
 ## 2. Point your code at the gateway
 
-Your code changes two values and nothing else: the API key becomes the virtual key, and the base URL becomes the gateway. The request body stays the same:
+Your code changes only two values: the API key becomes the virtual key, and the base URL becomes the gateway. The request body stays the same:
 
 ```python
 from openai import OpenAI
@@ -5499,7 +5499,7 @@ Treat a budget as a cap with a small margin, for three reasons:
 
 **Can I run the gateway myself?** Yes, it ships in the LangWatch Helm chart next to the app. See [Helm chart](/ai-gateway/self-hosting/helm).
 
-**How is spend calculated?** From the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected, and requests that failed at the provider, cost nothing.
+**How is spend calculated?** From the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected, and requests that failed at the provider, are not charged.
 
 Next, follow the [Quickstart](/ai-gateway/quickstart) to send a first request and see its trace and its spend, or read [Budgets](/ai-gateway/budgets) for every scope and window.
 
@@ -16368,7 +16368,7 @@ For a request made by a person, LangWatch uses the first of these that is set: t
 
 A request that matches none of these is counted under **Unassigned**.
 
-The person always wins over the project, so a developer's personal AI use and the agents their team runs can land in the same department. The department breakdown on **Governance > Analytics** is in preview; spend per team and per member is on **Governance > Teams** today.
+The person always wins over the project, so a developer's personal AI use and the agents their team runs can land in the same department. The department breakdown on **Governance > Analytics** is in preview; spend per team is on **Governance > Teams** and spend per person on **Governance > People** today.
 
 ## Archive a department
 
@@ -17469,7 +17469,7 @@ From a monthly invoice you get the total. Once every machine reports, you can al
 | --- | --- |
 | What did each engineer's sessions cost, and on which model? | [Sessions](/coding-agents/sessions), per person or per project |
 | What did this pull request cost, across everyone who worked on it? | [Pull requests](/coding-agents/pull-requests) |
-| How does spend split across teams? | **Governance > Teams**, with each member's spend one click further |
+| How does spend split across teams and people? | **Governance > Teams** for each team's total, **Governance > People** for each person |
 | Why was one session so expensive? | The session's **Usage** tab: peak context, cache misses and the call that rebuilt the cache |
 
 Codex, GitHub Copilot, Gemini CLI, opencode, Grok CLI and pi report the same way, so a team that mixes agents reads one set of numbers.
@@ -17527,7 +17527,7 @@ On the API key path every call is a gateway request, so the gateway's [budgets](
 Engineers will ask who can read their sessions, so the answer belongs in the rollout email. By default the setup sends prompts and tool activity along with the numbers, so each engineer can replay their own sessions. Then:
 
 - **Their sessions land in a project only they own.** Teammates see them only in a team project the tool was pinned to.
-- **Admins see spend as numbers.** Cost per person, team and department, with no conversation content in it.
+- **Admins see spend as numbers.** Cost per person and per team, with no conversation content in it.
 - **Reading a session as an admin is never silent.** It goes through one audited path that shows a banner for the whole visit, and the engineer can read the audit log.
 - **The organization can drop the content entirely.** Set input, output and system instructions to **Drop** in the [data privacy policy](/platform/data-privacy), and LangWatch strips the content before it is stored. Cost and token numbers keep working. See [no-spy mode](/ai-governance/no-spy-mode).
 
@@ -21131,7 +21131,7 @@ See the [coding agents API reference](/api-reference/coding-agents/overview).
 
 ## For admins
 
-**Governance > Teams** at `/governance/teams` lists every team's spend and requests over the last 30 days, and each team opens to its members, where a member's page shows that person's spend, personal AI use included. To count spend by cost center, assign people, teams and projects to departments on [People](/ai-governance/people).
+**Governance > Teams** at `/governance/teams` lists every team's spend and requests over the last 30 days. **Governance > People** at `/governance/people` ranks each person by spend, and a person's row opens their page, personal AI use included. To count spend by cost center, assign people, teams and projects to departments on [People](/ai-governance/people).
 
 **Also check:** [Sessions](/coding-agents/sessions) for the per-session detail behind these rollups, and [Compare provider costs](/coding-agents/compare-provider-costs) to price your real usage mix against other providers.
 
@@ -38467,7 +38467,7 @@ Use evaluations for the parts inside the agent. Use agent testing to check the a
 # FILE: ./agent-testing/red-team-open-source.mdx
 
 ---
-title: Red team an AI agent with an open-source multi-turn attacker
+title: Red team AI agents with an open-source multi-turn attacker
 sidebarTitle: Red team with an open-source attacker
 keywords: langwatch, scenario, red teaming, open source, ai agent security, multi-turn attacks, crescendo, goat, jailbreak, prompt injection, pytest
 description: Scenario, LangWatch's open-source testing library, attacks your agent over dozens of turns inside pytest or vitest and fails the test when it breaks.
@@ -43471,7 +43471,7 @@ description: One call to `langwatch.dspy.init` streams every optimizer step to L
 
 To follow a DSPy optimization in a UI, you keep running the optimizer in your own code and send each step to a platform that records it. You then watch the score climb step by step and open any candidate to see its instructions, the examples it was scored on and the LLM calls behind it.
 
-LangWatch does that with one line before `compile`, `langwatch.dspy.init`, for MIPROv2, GEPA, COPRO and the BootstrapFewShot optimizers. Nothing about your program or your metric changes. To start now, go to [Track a run](#1-track-a-run).
+LangWatch does that with one line before `compile`, `langwatch.dspy.init`, for MIPROv2, GEPA, COPRO and the BootstrapFewShot optimizers. Your program and your metric stay as they are. To start now, go to [Track a run](#1-track-a-run).
 
 If you'd rather not write DSPy at all, Langy, the assistant built into LangWatch, can optimize a prompt for you against your own dataset and evaluator; see [Without code](#without-code).
 
@@ -43503,6 +43503,8 @@ optimized = optimizer.compile(my_program, trainset=trainset)
 ```
 
 `init` prints a link to the run as soon as `compile` starts. The same call tracks `GEPA`, `COPRO`, `BootstrapFewShot` and `BootstrapFewShotWithRandomSearch`. To track a `dspy.Evaluate` instead, pass it as `evaluator=`. For an optimizer outside that list, [log the steps yourself](/dspy-visualization/custom-optimizer) with `langwatch.dspy.log_step`.
+
+To check it worked, open the link `init` printed. The run is under **Experiments** and reads "Waiting for the first completed step to arrive" until the optimizer scores its first candidate; then the first step shows its score. If no link printed, check that `LANGWATCH_API_KEY` is set where the notebook or job runs.
 
 ## 2. Read the run
 

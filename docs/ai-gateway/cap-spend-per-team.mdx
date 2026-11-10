@@ -11,7 +11,7 @@ The LangWatch AI Gateway does this for OpenAI, Anthropic, Azure OpenAI, AWS Bedr
 
 ## Why a virtual key per app
 
-With one shared provider key, the provider bill tells you the total and nothing else. You can't say which team spent it, and you can't stop one runaway agent without cutting off everyone using that key.
+With one shared provider key, the provider bill tells you only the total. You can't say which team spent it, and you can't stop one runaway agent without cutting off everyone using that key.
 
 A virtual key stands in for the provider key. The provider keys stay in LangWatch, and each key you hand out can only reach the providers you allow. You can rotate, disable or revoke it without touching the provider account.
 
@@ -37,7 +37,7 @@ langwatch vk create \
 
 ## 2. Point your code at the gateway
 
-Your code changes two values and nothing else: the API key becomes the virtual key, and the base URL becomes the gateway. The request body stays the same:
+Your code changes only two values: the API key becomes the virtual key, and the base URL becomes the gateway. The request body stays the same:
 
 ```python
 from openai import OpenAI
@@ -92,6 +92,6 @@ Treat a budget as a cap with a small margin, for three reasons:
 
 **Can I run the gateway myself?** Yes, it ships in the LangWatch Helm chart next to the app. See [Helm chart](/ai-gateway/self-hosting/helm).
 
-**How is spend calculated?** From the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected, and requests that failed at the provider, cost nothing.
+**How is spend calculated?** From the token counts the provider reports and the LangWatch pricing catalog. Requests the gateway rejected, and requests that failed at the provider, are not charged.
 
 Next, follow the [Quickstart](/ai-gateway/quickstart) to send a first request and see its trace and its spend, or read [Budgets](/ai-gateway/budgets) for every scope and window.

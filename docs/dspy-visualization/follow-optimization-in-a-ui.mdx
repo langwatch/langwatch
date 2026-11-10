@@ -7,7 +7,7 @@ description: One call to `langwatch.dspy.init` streams every optimizer step to L
 
 To follow a DSPy optimization in a UI, you keep running the optimizer in your own code and send each step to a platform that records it. You then watch the score climb step by step and open any candidate to see its instructions, the examples it was scored on and the LLM calls behind it.
 
-LangWatch does that with one line before `compile`, `langwatch.dspy.init`, for MIPROv2, GEPA, COPRO and the BootstrapFewShot optimizers. Nothing about your program or your metric changes. To start now, go to [Track a run](#1-track-a-run).
+LangWatch does that with one line before `compile`, `langwatch.dspy.init`, for MIPROv2, GEPA, COPRO and the BootstrapFewShot optimizers. Your program and your metric stay as they are. To start now, go to [Track a run](#1-track-a-run).
 
 If you'd rather not write DSPy at all, Langy, the assistant built into LangWatch, can optimize a prompt for you against your own dataset and evaluator; see [Without code](#without-code).
 
@@ -39,6 +39,8 @@ optimized = optimizer.compile(my_program, trainset=trainset)
 ```
 
 `init` prints a link to the run as soon as `compile` starts. The same call tracks `GEPA`, `COPRO`, `BootstrapFewShot` and `BootstrapFewShotWithRandomSearch`. To track a `dspy.Evaluate` instead, pass it as `evaluator=`. For an optimizer outside that list, [log the steps yourself](/dspy-visualization/custom-optimizer) with `langwatch.dspy.log_step`.
+
+To check it worked, open the link `init` printed. The run is under **Experiments** and reads "Waiting for the first completed step to arrive" until the optimizer scores its first candidate; then the first step shows its score. If no link printed, check that `LANGWATCH_API_KEY` is set where the notebook or job runs.
 
 ## 2. Read the run
 
