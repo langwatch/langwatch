@@ -8,7 +8,7 @@ import {
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { PROJECT_READER_ROLE_KEY } from "./roles.ts";
+import { BILLING_ROLE_KEY, PROJECT_READER_ROLE_KEY } from "./roles.ts";
 
 /** Portable AuthZ vocabulary. Persisted and transport values validate here. */
 export const teamUserRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
@@ -158,9 +158,13 @@ export const bindingRoleKeySchema = z.custom<BindingRoleKey>(
 export type SharedRoleKey = typeof PROJECT_READER_ROLE_KEY;
 const sharedRoleKeySchema = z.custom<SharedRoleKey>((value) => value === PROJECT_READER_ROLE_KEY);
 
+/** The Billing role's key (specs/licensing/billing-role.feature); no legacy role carries it. */
+export type BillingRoleKey = typeof BILLING_ROLE_KEY;
+const billingRoleKeySchema = z.custom<BillingRoleKey>((value) => value === BILLING_ROLE_KEY);
+
 const collectedBindingSchemaDefinition = z
   .object({
-    roleKey: bindingRoleKeySchema.or(sharedRoleKeySchema),
+    roleKey: bindingRoleKeySchema.or(sharedRoleKeySchema).or(billingRoleKeySchema),
     scopeType: grantScopeTierSchema,
     scopeId: z.string(),
     viaGroupId: z.string().nullable().optional(),

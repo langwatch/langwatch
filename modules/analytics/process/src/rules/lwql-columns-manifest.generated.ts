@@ -462,6 +462,7 @@ export interface LwqlClickHouseRows {
     readonly TokensInputImage: "UInt64";
     readonly TokensOutputImage: "UInt64";
     readonly ImageCount: "UInt64";
+    readonly WebSearchRequests: "UInt64";
   };
   readonly goose_db_version: {
     readonly version_id: "Int64";

@@ -23,6 +23,8 @@ export type AgentRow = {
   hostLabel?: string | null;
   identityKey?: string | null;
   lastSeenAt?: Date | null;
+  createdById?: string | null;
+  updatedById?: string | null;
 };
 
 export function mapAgentRow(row: AgentRow): Agent {
@@ -43,6 +45,8 @@ export function mapAgentRow(row: AgentRow): Agent {
     hostLabel: row.hostLabel ?? null,
     identityKey: row.identityKey ?? null,
     lastSeenAt: row.lastSeenAt ?? null,
+    createdById: row.createdById ?? null,
+    updatedById: row.updatedById ?? null,
     ...(row._count ? { copyCount: row._count.copiedAgents } : {}),
   };
   return agentSchema.parse(agent);

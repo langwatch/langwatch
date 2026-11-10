@@ -86,7 +86,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     Scenario: A self-hosted install is told why from its judge and its license, and the plan is not read
       Given a self-hosted install
       When the popover asks what to offer
-      Then an install whose license does not include Instant Evals, or that holds no license, is told its license does not include them
+      Then an install whose license does not include Instant Evals, or that holds no license, is told Instant Evals are part of LangWatch Enterprise
       And an install whose admin switched hosted judging off is told where to switch it back on
       And an install with Connect switched off, or that holds no credential to present, is told it is not connected to LangWatch
       And an install that has judging turned off is told to ask whoever runs it
@@ -95,7 +95,10 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     Scenario: Each self-hosted refusal says what to do about it
       Given an eval chip refused on a self-hosted install
       When the popover opens
-      Then a license without Instant Evals offers to contact us to add them
+      Then an install without Instant Evals in its license, or with no license, says "Instant Evals is part of LangWatch Enterprise"
+      And an organization admin is offered "Activate a license" and "Get a license", both leading to Settings > License
+      And a member is told "Ask an organization admin to activate a license." with no button
+      And it never says the license doesn't include them when no license is installed
       And a switched-off organization names Settings, Connect, and offers no "Contact us"
       And an install that is not connected to LangWatch names connect.langwatch.ai and gateway.langwatch.ai and links "Read more"
       And an install that has judging turned off offers no "Contact us"
@@ -106,6 +109,32 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       When the judge can't be reached for an eval chip
       Then the "can't run right now" popover names connect.langwatch.ai and gateway.langwatch.ai
       And it still offers to contact us
+
+  Rule: A project on its own decision model is released by that model, whatever the release says
+
+    # ADR-182. Its key, its bill: `release_instant_evals` and the license govern LangWatch's model
+    # only. The resolver answers "own" only under the own-model flag with a usable key.
+
+    @unit
+    Scenario: An own decision model releases Instant Evals without the flag or a license
+      Given a self-hosted install with no license, no classifier and the release flag off
+      And a project whose Instant Evals column is its own decision model, ready to run
+      When the project asks whether it may judge
+      Then it may, and neither the flag, the license nor the classifier is read
+      And LangWatch's own model is still not released
+
+    @unit
+    Scenario: An own decision model that cannot run releases nothing
+      Given a self-hosted install with no license and the release flag off
+      And a project whose own decision model has no usable key
+      When the project asks whether it may judge
+      Then it may not
+
+    @unit
+    Scenario: The popover reports LangWatch's model apart from an own one
+      Given a project released by its own decision model alone
+      When the explorer asks for its Instant Evals access
+      Then it is released, and LangWatch's own model is not
 
   Rule: The switch is the organization's, and the first click is the one that counts
 

@@ -22,6 +22,8 @@ export type LangyPermissionVerdict =
  * guardrail actions (attach/detach) bounded by caller's own access.
  */
 const DELEGABLE_ACTIONS = new Set([
+  // Moving a deploy label is bounded by the caller's own `agents:deploy` / `evaluators:deploy`.
+  "deploy",
   "view",
   "create",
   "update",
@@ -106,6 +108,7 @@ const AUTH_SCOPE_FAMILIES: Record<string, string> = {
  * anomalyRules, aiTools, activityMonitor, gatewaySpend, governanceCost, ingestionSources.
  */
 const FULL_ACCESS_FAMILIES = new Set([
+  "agents",
   "analytics",
   "annotations",
   "anomalyRules",
@@ -114,6 +117,7 @@ const FULL_ACCESS_FAMILIES = new Set([
   "cost",
   "datasets",
   "evaluations",
+  "evaluators",
   "experiments",
   "gatewayBudgets",
   "gatewayCacheRules",

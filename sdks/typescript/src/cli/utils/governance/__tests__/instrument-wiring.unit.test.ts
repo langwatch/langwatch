@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { appSettingsTargetFor } from "../app-settings";
 import { installTelemetryWiring } from "../instrument-wiring";
+import { piExtensionSource } from "../pi-extension-source";
+import { PI_EXTENSION_FILE_NAME } from "../pi-plugin";
 import { runningCodeRestartNotice } from "../running-code";
 import { baseCfg, installTempHomeAndCwd } from "./telemetry-refresh-test-helpers";
 
@@ -238,6 +240,57 @@ describe("installTelemetryWiring", () => {
       expect(rc).toContain("gemini()");
       expect(rc).toContain(ENDPOINT);
       expect(rc).toContain(TOKEN);
+    });
+  });
+
+  describe("when the tool is pi", () => {
+    const extensionFile = () =>
+      path.join(temp.home, ".pi", "agent", "extensions", PI_EXTENSION_FILE_NAME);
+    const install = () =>
+      installTelemetryWiring({ cfg: baseCfg(), tool: "pi", endpoint: ENDPOINT, token: TOKEN });
+
+    let origAgentDir: string | undefined;
+
+    beforeEach(() => {
+      origAgentDir = process.env.PI_CODING_AGENT_DIR;
+      delete process.env.PI_CODING_AGENT_DIR;
+    });
+
+    afterEach(() => {
+      if (origAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+      else process.env.PI_CODING_AGENT_DIR = origAgentDir;
+    });
+
+    /** @scenario "Instrumenting pi writes the extension beside the shell function" */
+    it("writes the scoped pi function and the extension pi needs to send anything", () => {
+      const result = install();
+
+      expect(result.requiredFailures).toEqual([]);
+      expect(fs.readFileSync(path.join(temp.home, ".zshrc"), "utf8")).toContain("pi()");
+      expect(fs.readFileSync(extensionFile(), "utf8")).toBe(piExtensionSource());
+      expect(result.labels).toEqual([
+        "~/.zshrc",
+        `~/.pi/agent/extensions/${PI_EXTENSION_FILE_NAME}`,
+      ]);
+    });
+
+    describe("given a file of the user's at the extension's path", () => {
+      const theirs = "// my own pi extension\n";
+
+      beforeEach(() => {
+        fs.mkdirSync(path.dirname(extensionFile()), { recursive: true });
+        fs.writeFileSync(extensionFile(), theirs);
+      });
+
+      /** @scenario "Instrumenting pi over a file of the user's says pi sends no telemetry" */
+      it("leaves it alone and reports that pi sessions send no telemetry", () => {
+        const result = install();
+
+        expect(fs.readFileSync(extensionFile(), "utf8")).toBe(theirs);
+        expect(result.requiredFailures).toHaveLength(1);
+        expect(result.requiredFailures[0]).toContain("pi sessions send no telemetry");
+        expect(result.requiredFailures[0]).toContain("langwatch instrument pi");
+      });
     });
   });
 

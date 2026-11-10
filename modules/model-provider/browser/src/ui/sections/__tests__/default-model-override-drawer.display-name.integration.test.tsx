@@ -18,6 +18,11 @@ const mockListAllForProjectForFrontend = vi.fn();
 const mockSave = vi.fn();
 const mockInvalidate = vi.fn();
 
+// The drawer asks the judge router flag; off unless a case turns it on.
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     closeDrawer: mockCloseDrawer,
@@ -28,10 +33,6 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
     currentDrawer: undefined,
   }),
   useDrawerParams: () => ({}),
-}));
-
-vi.mock("@langwatch/feature-flag-client", () => ({
-  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 
 // Orthogonal to display-name threading and pulls in its own data hooks.
@@ -55,6 +56,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
       getInheritedValuesForScopes: {
         useQuery: () => mockGetInheritedValues(),
       },
+      listDecisionModelsForScopes: { useQuery: () => ({ data: [], isLoading: false }) },
       listAllForProjectForFrontend: {
         useQuery: () => mockListAllForProjectForFrontend(),
       },

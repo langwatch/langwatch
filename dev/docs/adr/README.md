@@ -104,7 +104,14 @@ Reusable framework decisions live with their packages:
 | [185](./185-docs-session-credentials.md)                                       | Short-lived credentials for the documentation playground                                                                   | Accepted                  |
 | [186](./186-test-changed-runs-the-tests-an-edit-reaches.md)                    | `test:changed` runs the tests an edit reaches, from a kept import graph                                                    | Proposed                  |
 | [187](./187-async-inserts-waiting-for-a-slot-share-a-statement.md)             | Async inserts waiting for a statement slot share one statement                                                             | Proposed                  |
+| [188](./188-pi-as-a-natively-instrumented-coding-agent.md)                     | pi as a natively instrumented coding agent                                                                                 | Proposed                  |
 | [190](./190-instant-evals-routed-judgement-is-priced-from-summed-call-cost.md) | A routed Instant Evals judgement is priced from the summed cost of its calls, at the one published markup                  | Proposed                  |
+| [191](./191-capitalised-names-get-a-second-person-pass.md)                     | A name written in capitals gets a second person pass                                                                       | Proposed                  |
+| [192](./192-grok-as-a-natively-instrumented-coding-agent.md)                   | Grok is a natively instrumented coding agent, read from its own OTLP logs and metrics                                      | Proposed                  |
+| [193](./193-platform-calls-on-stored-credentials-report-usage.md)              | Platform calls on stored credentials report their usage to the spend ledger                                                | Accepted                  |
+| [195](./195-outbound-proxy-in-the-egress-fence.md)                             | The egress fence carries a request through the outbound proxy                                                              | Proposed                  |
+| [196](./196-vitest-transform-cache-is-shared-across-checkouts.md)              | Vitest's transform cache is shared across checkouts                                                                        | Proposed                  |
+| [197](./197-routed-reads-are-sent-read-only-so-an-abandoned-read-stops.md)     | Routed reads are sent read-only, so an abandoned read stops                                                                | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

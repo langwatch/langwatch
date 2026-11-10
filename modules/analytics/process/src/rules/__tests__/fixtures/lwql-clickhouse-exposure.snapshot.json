@@ -545,7 +545,8 @@
     "TokensOutputAudio <- TokensOutputAudio",
     "TokensInputImage <- TokensInputImage",
     "TokensOutputImage <- TokensOutputImage",
-    "ImageCount <- ImageCount"
+    "ImageCount <- ImageCount",
+    "WebSearchRequests <- WebSearchRequests"
   ],
   "governance_cost_restatements <- governance_cost_rollup_restatement_index": [
     "TenantId <- TenantId",

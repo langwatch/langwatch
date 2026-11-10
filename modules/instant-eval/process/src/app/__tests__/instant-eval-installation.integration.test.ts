@@ -249,7 +249,7 @@ function installation({
         "feature-flag": createApiFixture<FeatureFlagApi>({
           isEnabled: async () => isReleased,
         }),
-        // A project runs on LangWatch Instant Preview unless a test names its own model (ADR-182).
+        // A project runs on LangWatch Evals Preview unless a test names its own model (ADR-182).
         "model-provider": createApiFixture<ModelProviderApi>({
           resolveDecisionModel: async () => decisionModel,
         }),
@@ -659,6 +659,7 @@ const OWN_DECISION_MODEL: DecisionModelResolution = {
   wire: "jev",
   providerModel: "mercury-decide",
   endpoint: "https://api.inceptionlabs.ai/v1/decisions",
+  authHeader: "bearer",
   apiKey: "customer-key",
 };
 
@@ -743,7 +744,12 @@ describe("given an organization's own Instant Evals switch", () => {
         api.getOptInAccess({ projectId: PROJECT, userId: "member-1" }),
       );
 
-      expect(access).toEqual({ released: false, offer: "enable", viaConnect: false });
+      expect(access).toEqual({
+        released: false,
+        hostedReleased: false,
+        offer: "enable",
+        viaConnect: false,
+      });
     });
   });
 
@@ -771,7 +777,12 @@ describe("given an organization's own Instant Evals switch", () => {
         (api) => api.optIn({ projectId: PROJECT, userId: "member-1" }),
       );
 
-      expect(access).toEqual({ released: true, offer: "enable", viaConnect: false });
+      expect(access).toEqual({
+        released: true,
+        hostedReleased: true,
+        offer: "enable",
+        viaConnect: false,
+      });
       expect(recorded).toEqual([{ organizationId: ORGANIZATION, userId: "member-1" }]);
     });
   });
@@ -789,7 +800,7 @@ describe("given an organization's own Instant Evals switch", () => {
 
       expect(access).toEqual({
         isEnabled: false,
-        offer: { released: false, offer: "enable", viaConnect: false },
+        offer: { released: false, hostedReleased: false, offer: "enable", viaConnect: false },
       });
     });
   });

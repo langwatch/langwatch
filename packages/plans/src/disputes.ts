@@ -11,6 +11,7 @@ export const PLAN_DISPUTE_IDS = [
   "automation-ceiling-three-ways",
   "free-plan-two-definitions",
   "growth-copy-volume",
+  "growth-seat-member-ceiling",
   "pro-volume-below-free",
 ] as const;
 
@@ -45,7 +46,8 @@ export const planDisputeSchema = z.object({
 export type PlanDispute = z.infer<typeof planDisputeSchema>;
 
 /**
- * Counted on feat/strict-feature-layout-v0, 2026-09-07. Alex decides each of
+ * Counted on feat/strict-feature-layout-v0, 2026-09-07; growth-seat-member-ceiling
+ * added 2026-11-07. Alex decides each of
  * these; the catalogue does not resolve one by picking a side quietly.
  */
 export const PLAN_DISPUTES: readonly PlanDispute[] = Object.freeze([
@@ -101,6 +103,28 @@ export const PLAN_DISPUTES: readonly PlanDispute[] = Object.freeze([
       {
         states: "200,000 events included",
         source: "enterprise/modules/billing/browser/src/model/billing-plans.ts:89",
+      },
+    ],
+  },
+  {
+    id: "growth-seat-member-ceiling",
+    field: "members",
+    subjects: [
+      "GROWTH_SEAT_EUR_MONTHLY",
+      "GROWTH_SEAT_EUR_ANNUAL",
+      "GROWTH_SEAT_USD_MONTHLY",
+      "GROWTH_SEAT_USD_ANNUAL",
+    ],
+    summary:
+      "The seat plans carry a 20-member ceiling that applies when a subscription states no seat count, while the plan copy sells seats past 20 at a volume discount.",
+    chosen: {
+      states: "20 members, 20 seats",
+      source: "packages/plans/src/catalogue-data.ts:102",
+    },
+    alternatives: [
+      {
+        states: "Volume discounts above 20 users",
+        source: "enterprise/modules/billing/browser/src/model/billing-plans.ts:47",
       },
     ],
   },

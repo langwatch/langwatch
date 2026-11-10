@@ -26,6 +26,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "lucide-react": "catalog:",

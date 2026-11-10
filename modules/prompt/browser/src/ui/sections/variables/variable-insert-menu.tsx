@@ -1,16 +1,16 @@
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-import { MenuQueryHeader } from "./menu-query-header.tsx";
 import type {
   AvailableSource,
   FieldType,
   RenderSourceIcon,
   SourceType,
-} from "./variable-mapping-input.tsx";
+} from "@langwatch/design-system/variable-mapping";
+import { Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { MenuQueryHeader } from "./menu-query-header.tsx";
 import { VariableTypeBadge, VariableTypeIcon } from "./variable-type/index.ts";
 
 // ============================================================================

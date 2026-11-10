@@ -418,14 +418,15 @@ await it("styles a page, dark mode, search and navigation from inlined styles", 
         assert.match(html, /<style>@layer /);
         assert.doesNotMatch(
           html.replace(/<noscript>[\s\S]*?<\/noscript>/g, ""),
-          /<link(?![^>]*media="print")[^>]*rel="stylesheet"/,
+          /<link(?=[^>]*\srel="stylesheet")(?=[^>]*\shref=)[^>]*>/,
         );
         assert.equal(
           await page.locator(".docs-layout").evaluate((node) => getComputedStyle(node).display),
           "grid",
         );
         const light = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-        await page.getByRole("button", { name: "Switch color theme" }).first().click();
+        await page.getByRole("button", { name: "Color theme" }).first().click();
+        await page.getByRole("menuitemradio", { name: "Dark", exact: true }).click();
         await page.waitForFunction(
           (before) =>
             document.documentElement.classList.contains("dark") &&

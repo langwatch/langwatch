@@ -78,14 +78,14 @@ document.addEventListener("click", (event) => {
     { selector: "#try-it-button", name: "playground" },
     { selector: "[data-docs-copy], [data-docs-page-copy], [data-docs-prompt]", name: "copy" },
     { selector: "[role=tab]", name: "tabs" },
-    { selector: "[data-docs-page-menu]", name: "context-menus" },
+    { selector: "[data-docs-page-menu], [data-docs-theme-menu]", name: "context-menus" },
     { selector: "[data-docs-mobile], [data-docs-mobile-close]", name: "menus" },
     { selector: "[data-docs-video]", name: "media" },
     { selector: "[data-scope=accordion] button, [data-docs-tooltip]", name: "disclosures" },
     { selector: ".docs-skill-prompt", name: "skill-prompts" },
     {
       selector:
-        '[data-docs-theme], [data-docs-agent], [aria-label="Dismiss announcement"], [data-docs-dismiss], nav[aria-label="Page navigation"] button[aria-expanded]',
+        '[data-docs-agent], [aria-label="Dismiss announcement"], [data-docs-dismiss], nav[aria-label="Page navigation"] button[aria-expanded]',
       name: "controls",
     },
   ];

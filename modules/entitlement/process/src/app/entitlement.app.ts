@@ -19,6 +19,7 @@ import {
   type ResolvePlanInput,
   type SendUsageLimitWarningInput,
   type UsageLimitWarning,
+  type UsageMonthBreakdown,
   type UsageStats,
   type PricingModel,
   PlanLimitExceededError,
@@ -53,6 +54,7 @@ import { SubscriptionPlanService } from "../services/subscription-plan.service.t
 import { TraceUsageService } from "../services/trace-usage.service.ts";
 import { UsageCountingService } from "../services/usage-counting.service.ts";
 import { UsageService, type UsageCounter } from "../services/usage-enforcement.service.ts";
+import { UsageMonthBreakdownService } from "../services/usage-month-breakdown.service.ts";
 import { UsageStatsService } from "../services/usage-stats.service.ts";
 import { UsageWarningService, type UsageWarning } from "../services/usage-warning.service.ts";
 
@@ -127,10 +129,13 @@ type EntitlementDependencies = EntitlementSetup["dependencies"];
  */
 type EntitlementCallerLookup = Pick<EntitlementDependencies, "billing">;
 
-/** The repositories the app reads directly; the meters reach it only through its usage pipeline. */
+/**
+ * The repositories the app reads directly. Most meters reach it through its usage pipeline; the
+ * billable-events meter is read directly for the month breakdown.
+ */
 type EntitlementReadRepositories = Pick<
   EntitlementRepositories,
-  "membership" | "seats" | "spend" | "tenancy"
+  "membership" | "seats" | "spend" | "tenancy" | "billableEvents"
 >;
 
 /** The usage pipeline over the senders its process manager and subscriber call back through. */
@@ -147,6 +152,7 @@ export class EntitlementModule implements EntitlementApiContract {
 
   #plans: EntitlementService;
   #usage: UsageStatsService;
+  #month: UsageMonthBreakdownService;
   #counter: UsageCounter;
   #nextStep: PlanNextStepService;
   #warnings: UsageWarning;
@@ -178,6 +184,11 @@ export class EntitlementModule implements EntitlementApiContract {
       plans: this.#plans,
     });
     this.#counter = infrastructure.counter;
+    this.#month = UsageMonthBreakdownService.create({
+      counter: infrastructure.counter,
+      meter: repositories.billableEvents,
+      tenancy: repositories.tenancy,
+    });
     this.#nextStep = PlanNextStepService.create({
       catalogue: SelfServePlanCatalogueService.create(),
     });
@@ -209,6 +220,7 @@ export class EntitlementModule implements EntitlementApiContract {
       tenancy: repositories.tenancy,
       meter: repositories.billableEvents,
       traceMeter: repositories.traces,
+      caches: { counts: repositories.usageCounts, decisions: repositories.usageDecisions },
     });
     const warnings = UsageWarningService.create({
       // The module is built below; the warning records only once its pipeline is connected.
@@ -335,6 +347,10 @@ export class EntitlementModule implements EntitlementApiContract {
     const user = this.#resolveCaller(input);
 
     return this.#usage.getUsageStats(input.organizationId, user);
+  }
+
+  getUsageMonthBreakdown(input: { organizationId: string }): Promise<UsageMonthBreakdown> {
+    return this.#month.getMonthBreakdown(input);
   }
 
   sendUsageLimitWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning> {

@@ -125,6 +125,7 @@ function GuidedCredentialInput({
           type={field.secret ? "password" : "text"}
           autoComplete="off"
           disabled={disabled}
+          aria-invalid={error ? true : undefined}
           w="full"
           bg="transparent"
           outline="none"

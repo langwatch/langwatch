@@ -108,7 +108,7 @@ function growthSeatPlan({ period, type }: { period: "monthly" | "annual"; type: 
     },
     gates: NO_ENTERPRISE_GATES,
     selfServe: { ladder: "SEAT_EVENT", rung: GROWTH_SEAT_RUNG, order: 0 },
-    disputed: [],
+    disputed: ["growth-seat-member-ceiling"],
   };
 }
 

@@ -12,7 +12,9 @@ import {
 } from "@langwatch/stored-object-contract";
 import { z } from "zod";
 
+import { DATASET_VERSION_PAGE_LIMIT_MAX, datasetVersionListItemSchema } from "./dataset-version.ts";
 import {
+  datasetColumnRenamesSchema,
   appendStoredObjectToDatasetInputSchema,
   createDatasetFromStoredObjectInputSchema,
   DATASET_PAGE_LIMIT_MAX,
@@ -41,6 +43,11 @@ export const datasetRestCreateSchema: DatasetRestCreateSchema = datasetRestCreat
 const datasetRestUpdateSchemaDefinition = z.object({
   name: z.string().min(1).optional(),
   columnTypes: z.array(columnTypeSchema).optional(),
+  columnRenames: datasetColumnRenamesSchema
+    .optional()
+    .describe(
+      "Which existing column each renamed column came from, as `{ from, to }` names. Sent, values move by these renames and by unchanged names only. Omitted, columns left over after matching names pair by position.",
+    ),
 });
 export interface DatasetRestUpdateSchema extends Named<typeof datasetRestUpdateSchemaDefinition> {}
 export const datasetRestUpdateSchema: DatasetRestUpdateSchema = datasetRestUpdateSchemaDefinition;
@@ -304,3 +311,53 @@ export interface DatasetRestRecordsDeletedSchema extends Named<
 > {}
 export const datasetRestRecordsDeletedSchema: DatasetRestRecordsDeletedSchema =
   datasetRestRecordsDeletedSchemaDefinition;
+
+const datasetRestVersionParamsSchemaDefinition = z.object({
+  slugOrId: z.string(),
+  version: z.coerce.number().int().positive(),
+});
+export interface DatasetRestVersionParamsSchema extends Named<
+  typeof datasetRestVersionParamsSchemaDefinition
+> {}
+export const datasetRestVersionParamsSchema: DatasetRestVersionParamsSchema =
+  datasetRestVersionParamsSchemaDefinition;
+
+const datasetRestVersionPageQuerySchemaDefinition = z.object({
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(DATASET_VERSION_PAGE_LIMIT_MAX)
+    .optional()
+    .default(50),
+});
+export interface DatasetRestVersionPageQuerySchema extends Named<
+  typeof datasetRestVersionPageQuerySchemaDefinition
+> {}
+export const datasetRestVersionPageQuerySchema: DatasetRestVersionPageQuerySchema =
+  datasetRestVersionPageQuerySchemaDefinition;
+
+const datasetRestSaveVersionSchemaDefinition = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+});
+export interface DatasetRestSaveVersionSchema extends Named<
+  typeof datasetRestSaveVersionSchemaDefinition
+> {}
+export const datasetRestSaveVersionSchema: DatasetRestSaveVersionSchema =
+  datasetRestSaveVersionSchemaDefinition;
+
+/** An action that takes no body. */
+const datasetRestNoBodySchemaDefinition = z.object({});
+export interface DatasetRestNoBodySchema extends Named<typeof datasetRestNoBodySchemaDefinition> {}
+export const datasetRestNoBodySchema: DatasetRestNoBodySchema = datasetRestNoBodySchemaDefinition;
+
+const datasetRestVersionListSchemaDefinition = z.object({
+  data: z.array(datasetVersionListItemSchema),
+  restorable: z.boolean(),
+});
+export interface DatasetRestVersionListSchema extends Named<
+  typeof datasetRestVersionListSchemaDefinition
+> {}
+export const datasetRestVersionListSchema: DatasetRestVersionListSchema =
+  datasetRestVersionListSchemaDefinition;

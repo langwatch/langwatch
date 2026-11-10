@@ -48,6 +48,16 @@ Feature: Join before create - the choice happens before an organization is minte
     And creating a new organization is there as the explicit secondary choice
     And "acme" is named with a rounded count of colleagues, nothing more
 
+  # Customer report: a domain had one team of four and eight one-person
+  # organizations colleagues made on their own; the team was listed sixth.
+  @unit
+  Scenario: The team with the most colleagues leads the list
+    Given several organizations open to requests from "acme.com"
+    And one of them has more members than the others
+    When "sam" completes verification
+    Then the organization with the most members is offered first
+    And organizations of the same size are offered oldest first
+
   @integration
   Scenario: With nothing to offer, sign-up continues exactly as before
     Given no organization is open to "acme.com"

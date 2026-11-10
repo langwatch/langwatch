@@ -8,6 +8,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "agent:backfill-versions",
+    "kind": "data",
+    "mode": "background",
+    "owner": "agent",
+    "description": "Records version 1 of every agent written before versions existed, with its creator from the audit log.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "analytics:fill-lwql-project-keys",
     "kind": "data",
     "mode": "background",
@@ -125,6 +133,20 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "dataset:fill-empty-slugs",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dataset",
+    "description": "Gives each dataset stored without a slug one made from its name."
+  },
+  {
+    "id": "dataset:create-first-versions",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dataset",
+    "description": "Saves version 1 of every dataset that has no version history yet."
+  },
+  {
     "id": "evaluation:fill-id-indexes",
     "kind": "data",
     "mode": "background",
@@ -139,6 +161,14 @@
     "owner": "evaluation",
     "description": "Fills the second id index of evaluation runs (by trace id) from older rows, then marks it ready on each ClickHouse target.",
     "needsOldWritersGone": false
+  },
+  {
+    "id": "evaluator:backfill-versions",
+    "kind": "data",
+    "mode": "background",
+    "owner": "evaluator",
+    "description": "Records version 1 of every evaluator written before versions existed, with its creator from the audit log.",
+    "needsOldWritersGone": true
   },
   {
     "id": "experiment:fill-id-indexes",
@@ -170,6 +200,14 @@
     "mode": "background",
     "owner": "governance",
     "description": "Records each organisation's coding-assistant billed facts, which trace folds at ingest.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "governance:record-coding-assistant-ingest-source-billing",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Records each organisation's billed facts again, so every ingest source type has one.",
     "needsOldWritersGone": true
   },
   {

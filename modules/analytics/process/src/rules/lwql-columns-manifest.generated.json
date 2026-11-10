@@ -2254,6 +2254,11 @@
           "name": "ImageCount",
           "type": "UInt64",
           "comment": ""
+        },
+        {
+          "name": "WebSearchRequests",
+          "type": "UInt64",
+          "comment": ""
         }
       ]
     },

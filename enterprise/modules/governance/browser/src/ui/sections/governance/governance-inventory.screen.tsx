@@ -222,9 +222,9 @@ function resolvePullConfig(
       "Workspace URL is required, plus a way to sign in: either a workspace token, or a service principal's client ID and secret together.",
     ],
     copilot_studio_dataverse: [
-      () => buildCopilotStudioDataversePullConfig(composer),
+      () => buildCopilotStudioDataversePullConfig(composer, { shouldRequireCredentials }),
       "Missing required Copilot Studio fields",
-      "The environment URL is required, plus all three parts of the app registration: tenant ID, client ID and client secret.",
+      copilotStudioRefusalCopy(composer, { shouldRequireCredentials }),
     ],
     openai_admin: [
       () => buildOpenAiAdminPullConfig(composer, { shouldRequireCredentials }),
@@ -262,6 +262,42 @@ function resolvePullConfig(
     return { pullConfig: pullConfig as Record<string, unknown> };
   }
   return { pullConfig: pullAdapter ? { adapter: pullAdapter } : null };
+}
+
+/**
+ * Why `buildCopilotStudioDataversePullConfig` refused, in the form's own field names. The billing
+ * pair is named on its own: typed without the app registration it would replace the stored
+ * credentials with half of them, and a refusal naming only the registration hides why.
+ */
+export function copilotStudioRefusalCopy(
+  c: ComposerState,
+  { shouldRequireCredentials }: { shouldRequireCredentials: boolean },
+): string {
+  if (shouldRequireCredentials) {
+    return "The environment URL is required, plus all three parts of the app registration: tenant ID, client ID and client secret.";
+  }
+  const p = c.parserConfig;
+  if (!normalizeEnvironmentUrl(p.environmentUrl ?? "")) return "The environment URL is required.";
+  const registration: readonly (readonly [string | undefined, string])[] = [
+    [p.credentialsTenantId, "tenant ID"],
+    [p.credentialsClientId, "client ID"],
+    [p.credentialsClientSecret, "client secret"],
+  ];
+  const missing = registration
+    .filter(([value]) => (value ?? "").trim().length === 0)
+    .map(([, label]) => label);
+  if (
+    missing.length === registration.length &&
+    Object.keys(copilotAzureBillingFrom(p).credentials).length > 0
+  ) {
+    return "The billing app registration client ID and secret are stored together with the app registration, so enter them with the tenant ID, client ID and client secret, or clear both billing fields to keep the current credentials.";
+  }
+  return `The app registration is missing its ${joinFieldLabels(missing)}. Leave the tenant ID, client ID and client secret all blank to keep the current app registration, or enter all three to replace it.`;
+}
+
+function joinFieldLabels(labels: readonly string[]): string {
+  if (labels.length <= 1) return labels.join("");
+  return `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
 }
 
 function InventoryHeader() {
@@ -1640,11 +1676,14 @@ export function isBackfillStartLocked({
 export function lockedParserKeys({
   hasPulled,
   report,
+  sourceType,
 }: {
   hasPulled: boolean;
   report: string | undefined;
+  sourceType?: SourceType;
 }): string[] {
   const keys: string[] = [];
+  if (isEnvironmentLocked({ hasPulled, sourceType })) keys.push("environmentUrl");
   if (isBackfillStartLocked({ hasPulled, report })) keys.push("startingAt");
   if (hasPulled && typeof report === "string" && report.length > 0) {
     keys.push("report");
@@ -1676,11 +1715,18 @@ export function lockedParserKeys({
 export function editSourceNotes({
   hasPulled,
   report,
+  sourceType,
 }: {
   hasPulled: boolean;
   report: string | undefined;
+  sourceType?: SourceType;
 }): string[] {
   const notes: string[] = [];
+  if (isEnvironmentLocked({ hasPulled, sourceType })) {
+    notes.push(
+      "The environment is fixed once a source has read conversations from it. To read another environment, archive this source and create a new one.",
+    );
+  }
   if (lockedParserKeys({ hasPulled, report }).includes("report")) {
     notes.push(
       "The report is fixed once a source has pulled: usage and cost describe the same spend, so recording both for one source would count it twice. To switch, archive this source and create a new one.",
@@ -1697,6 +1743,17 @@ export function editSourceNotes({
     );
   }
   return notes;
+}
+
+/** A conversation source's cursor is a position in one environment's history. */
+function isEnvironmentLocked({
+  hasPulled,
+  sourceType,
+}: {
+  hasPulled: boolean;
+  sourceType?: SourceType;
+}): boolean {
+  return hasPulled && sourceType === "copilot_studio_dataverse";
 }
 
 /**
@@ -1722,15 +1779,13 @@ function PullConfigEditFields({
   /**
    * The destination picker, when this source type routes conversations, so it
    * joins the cadence in the one Advanced group instead of opening a second.
-   * No type reaches here with one today — the two that route conversations
-   * are both absent from `EDITABLE_PULL_CONFIG_SOURCE_TYPES` — but the day
-   * one does, the drawer must not sprout a second collapsible for it.
    */
   destinationField?: ReactNode;
 }) {
   const lockedKeys = lockedParserKeys({
     hasPulled,
     report: parserConfig.report,
+    sourceType,
   });
   return (
     <ParserConfigFields
@@ -1854,6 +1909,7 @@ export function SourceEditDrawer({
   const lockNotes = editSourceNotes({
     hasPulled,
     report: form.parserConfig.report,
+    sourceType,
   });
 
   if (!source) return null;
@@ -2031,6 +2087,12 @@ interface FieldDef {
    * that matters.
    */
   secret?: boolean;
+  /**
+   * What a secret field says on the edit form, where it opens blank. Absent
+   * means the one-key hint: blank keeps it, a value replaces it. A secret that
+   * is only replaced together with others says so here instead.
+   */
+  editHint?: string;
   /**
    * True for fields most admins never need: rendered inside a collapsed
    * "Advanced" group so the form leads with the required path. Leaving
@@ -2446,6 +2508,16 @@ function azureOneAppChosen(values: Record<string, string>): boolean {
   });
 }
 
+/**
+ * The Copilot Studio secrets' edit hints. The app registration is stored as
+ * one sealed set, so it is kept or replaced whole (#9275): the generic "leave
+ * blank to keep the current key" would invite replacing one value of three.
+ */
+const COPILOT_REGISTRATION_EDIT_HINT =
+  "Leave the tenant ID, client ID and client secret all blank to keep the current app registration. To replace it, enter all three together, and enter the billing client ID and secret again if the bill has its own app registration.";
+const COPILOT_BILLING_EDIT_HINT =
+  "Leave blank to keep the current billing app registration. It is stored with the main app registration, so to change it, also enter the tenant ID, client ID and client secret.";
+
 export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   // No parser-config fields for generic OTel sources today - the
   // receiver accepts any well-formed OTLP/HTTP body. (Earlier copy
@@ -2526,6 +2598,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "00000000-0000-0000-0000-000000000000",
       required: true,
       secret: true,
+      editHint: COPILOT_REGISTRATION_EDIT_HINT,
       group: "Connection",
     },
     {
@@ -2546,6 +2619,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "00000000-0000-0000-0000-000000000000",
       required: true,
       secret: true,
+      editHint: COPILOT_REGISTRATION_EDIT_HINT,
       group: "Conversation access",
     },
     {
@@ -2555,6 +2629,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       hint: "The app needs a Dataverse application user in this environment with read access to the conversation transcript and bot tables. No directory permission is required.",
       required: true,
       secret: true,
+      editHint: COPILOT_REGISTRATION_EDIT_HINT,
       group: "Conversation access",
     },
     {
@@ -2585,6 +2660,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "00000000-0000-0000-0000-000000000000",
       hint: "A second app registration, used only to read the subscription's bill. Grant it the Cost Management Reader role on the subscription: it needs no Dataverse or directory permission. If the first read fails right after granting, wait a couple of minutes: the role takes a moment to spread.",
       secret: true,
+      editHint: COPILOT_BILLING_EDIT_HINT,
       group: "Billing",
       visibleWhen: (values) => !azureOneAppChosen(values),
     },
@@ -2593,6 +2669,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       label: "Billing app registration client secret",
       placeholder: "(value pasted from the Azure portal)",
       secret: true,
+      editHint: COPILOT_BILLING_EDIT_HINT,
       group: "Billing",
       visibleWhen: (values) => !azureOneAppChosen(values),
     },
@@ -3227,18 +3304,27 @@ function normalizeStartingAt(raw: string): string | null | undefined {
  */
 export function buildCopilotStudioDataversePullConfig(
   c: ComposerState,
+  { shouldRequireCredentials = true }: { shouldRequireCredentials?: boolean } = {},
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
-  const environmentUrl = (p.environmentUrl ?? "").trim().replace(/\/+$/, "");
+  const environmentUrl = normalizeEnvironmentUrl(p.environmentUrl ?? "");
   const tenantId = (p.credentialsTenantId ?? "").trim();
   const clientId = (p.credentialsClientId ?? "").trim();
   const clientSecret = (p.credentialsClientSecret ?? "").trim();
+  if (!environmentUrl) return null;
 
   // All three or none: two thirds of an app registration is not a sign-in,
-  // and accepting it would save a source that cannot run.
-  if (!environmentUrl || !tenantId || !clientId || !clientSecret) return null;
+  // and accepting it would save a source that cannot run. On edit, none
+  // means "keep the stored registration", so the key is omitted entirely.
+  const registration = [tenantId, clientId, clientSecret];
+  const isComplete = registration.every((value) => value.length > 0);
+  const isBlank = registration.every((value) => value.length === 0);
+  if (!isComplete && (shouldRequireCredentials || !isBlank)) return null;
 
   const billing = copilotAzureBillingFrom(p);
+  // A billing pair typed without the registration would replace the whole
+  // sealed subtree with half of it.
+  if (isBlank && Object.keys(billing.credentials).length > 0) return null;
   return {
     adapter: "copilot_studio_dataverse",
     environmentUrl,
@@ -3265,8 +3351,21 @@ export function buildCopilotStudioDataversePullConfig(
       value: p.readDirectory,
       defaultOn: READ_DIRECTORY_DEFAULT_ON,
     }),
-    credentials: { tenantId, clientId, clientSecret, ...billing.credentials },
+    ...(isComplete
+      ? { credentials: { tenantId, clientId, clientSecret, ...billing.credentials } }
+      : {}),
   };
+}
+
+/**
+ * The environment address as the adapter reads it: trailing slashes dropped,
+ * and `https://` put in front of a bare host name, which is how the address is
+ * most often pasted. Stored without it, the source failed every pull (#9273).
+ */
+export function normalizeEnvironmentUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  if (!trimmed || /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
 }
 
 /**
@@ -3460,7 +3559,8 @@ export function parserFieldPresentation({
     // form would suggest they have to — and re-typing a key they do not have
     // to hand is how a working source gets archived and recreated instead.
     hint: keepsStoredSecret
-      ? "Leave blank to keep the current key. Enter a new one only to replace it."
+      ? (field.editHint ??
+        "Leave blank to keep the current key. Enter a new one only to replace it.")
       : field.hint,
     placeholder: keepsStoredSecret ? "Unchanged" : field.placeholder,
   };
@@ -4180,9 +4280,30 @@ export function seedComposerParserConfig({
     }
     const stored = storedParserConfig[field.key];
     if (stored == null) continue;
-    values[field.key] = typeof stored === "string" ? stored : JSON.stringify(stored);
+    values[field.key] = seededFieldValue(stored);
+  }
+  for (const key of BUILDER_INPUTS_WITHOUT_FIELD[sourceType] ?? []) {
+    const stored = storedParserConfig[key];
+    if (stored != null) values[key] = seededFieldValue(stored);
   }
   return values;
+}
+
+/**
+ * Builder inputs the form renders no field for. Seeded so an edit rebuilds them as stored: the
+ * agent list is set through the API, and without this an edit would clear it to "every agent".
+ */
+const BUILDER_INPUTS_WITHOUT_FIELD: Partial<Record<SourceType, readonly string[]>> = {
+  copilot_studio_dataverse: ["botIds"],
+};
+
+/** A stored value as its text field types it: a list the way the builder splits it. */
+function seededFieldValue(stored: unknown): string {
+  if (typeof stored === "string") return stored;
+  if (Array.isArray(stored) && stored.every((item) => typeof item === "string")) {
+    return stored.join(", ");
+  }
+  return JSON.stringify(stored);
 }
 
 /**
@@ -4235,6 +4356,9 @@ const EDITABLE_PULL_CONFIG_SOURCE_TYPES: readonly SourceType[] = [
   // Answers the blank-secret question the same way: one credential, so a
   // blank field can only mean "keep the stored key".
   "openai_admin",
+  // Three credentials, answered together: all blank keeps the stored app
+  // registration, all three replace it, anything between is refused (#9275).
+  "copilot_studio_dataverse",
 ];
 
 /**
@@ -4406,9 +4530,8 @@ export function buildEditSubmission({
       toaster,
       { shouldRequireCredentials: false },
     );
-    // Refusing here is the whole point of the builder: nothing validates this
-    // server-side, so a bad value saved now surfaces as a failing pull an hour
-    // later.
+    // Refusing here names the field before a round trip; the server runs the
+    // adapter's schema on save as well.
     if (!resolved?.pullConfig) return null;
     rebuiltPullConfig = resolved.pullConfig;
   }

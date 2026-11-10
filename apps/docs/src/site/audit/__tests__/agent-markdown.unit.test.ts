@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { approximateTokens, checkPageMarkdown } from "../agent-markdown.ts";
+import { approximateTokens } from "../../../lib/page-tokens.ts";
+import { checkPageMarkdown } from "../agent-markdown.ts";
 
 const FENCE = "```";
 const HEADER = [

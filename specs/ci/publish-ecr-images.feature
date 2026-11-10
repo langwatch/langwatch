@@ -5,12 +5,12 @@ Feature: Publish every deployable image to the artifacts registry
 
   # These scenarios describe .github/workflows/publish-docker-ecr.yml, and the
   # last one .github/workflows/publish-docker-private.yml. How a Lambda image
-  # gets its tag is cmd/ecrtag, bound by tools/ecrtag/lambda_test.go. The path filters
-  # are bound by .github/scripts/__tests__/publish-ecr-filters.test.sh, and where a Lambda
-  # image starts by tools/ciguard/lambdaworkdir_test.go. That a release
-  # publishes nothing is bound by tools/ciguard/publishshape_test.go, and where a
-  # push run's change set starts by tools/ecrtag/diffbase_test.go and
-  # tools/ciguard/ecrdiffbase_test.go. The rest is the
+  # gets its tag is cmd/ecrtag, bound by tools/ecrtag/lambda_test.go. Which
+  # images a push run builds is bound by tools/ecrtag/inputs_test.go,
+  # tools/ecrtag/select_test.go and tools/ciguard/ecrinputs_test.go, and where
+  # a Lambda image starts by tools/ciguard/lambdaworkdir_test.go. That a
+  # release publishes nothing is bound by tools/ciguard/publishshape_test.go.
+  # The rest is the
   # workflow's own build steps, which no test suite can run: those scenarios
   # are @unimplemented and are proved by the first run on main.
 
@@ -41,13 +41,27 @@ Feature: Publish every deployable image to the artifacts registry
     When publish-docker-ecr re-tags that image for a commit that did not change it, Lambda or service image alike
     Then the commit tag names the image of the nearest commit on its first-parent history, never one reached only through a merged branch
 
+  # An image's inputs are the files its Dockerfile copies or bind-mounts from
+  # the build context, its Dockerfile and .dockerignore, read from the
+  # Dockerfile itself. Their git blob ids, with the image's row of the build
+  # table and the workflow's build steps, hash to the org.langwatch.inputs
+  # label every build records; the commit tag and the revision label stay the
+  # image's identity.
+
+  @unit
+  Scenario: A Go image reads only the packages its binary builds from
+    Given a merge to main changes a CI tool under cmd/ and a package under pkg/ that no image imports
+    When publish-docker-ecr selects the images to build
+    Then no Go image is rebuilt, because a stage that runs go build reads from the Go modules it copies only the packages that build compiles, their go.mod and go.sum, and any profile it builds with
+    And a change to a package the binary imports, shared or not, rebuilds every image whose binary imports it
+
   @unit
   Scenario: A commit whose run was replaced while it waited still rebuilds what it changed
     Given merges B and C land while the run for an earlier merge A builds
     And the waiting run for B is replaced by the run for C, so B publishes nothing
     And B changed an image that C did not
     When publish-docker-ecr selects the images to build for C
-    Then its change set starts at A, the commit whose image a re-tag of C would copy
+    Then it compares that image's inputs at C with the inputs recorded on A's image, the one a re-tag of C would copy
     And that image is rebuilt for C rather than re-tagged from A's image
 
   @unit
@@ -55,15 +69,36 @@ Feature: Publish every deployable image to the artifacts registry
     Given merge B changed the app and the evaluators, the app was published at B and an evaluator's build failed, so it stays at A
     And merge C reverts B
     When publish-docker-ecr selects the images to build for C
-    Then its change set starts at A, the oldest commit an image's re-tag would copy
-    And the app is rebuilt for C even though A..C shows no change, because its re-tag would copy B's reverted image
-    And an image whose re-tag would copy A's image follows the A..C diff
+    Then the app is rebuilt for C, because B's image, which its re-tag would copy, records B's inputs, not C's
+    And an evaluator whose re-tag would copy A's image, built from the inputs C has again, is re-tagged
 
   @unit
   Scenario: A .dockerignore change rebuilds every image
     Given a merge to main changes .dockerignore
     When publish-docker-ecr selects the images to build
-    Then every image is rebuilt, because every build reads the repository root as its context
+    Then every image built from the repository root is rebuilt, because each reads that root as its context
+
+  @unit
+  Scenario: An image built from its own directory reads its inputs there
+    Given the build table gives langwatch-clickhouse-serverless the context infra/clickhouse-serverless
+    When publish-docker-ecr selects the images to build and builds that image
+    Then its Dockerfile's sources and its .dockerignore are read from that directory, and a change to the root .dockerignore does not rebuild it
+    And a source outside that directory makes its inputs unreadable
+    And every image whose row names no context hashes its inputs as it did before rows could name one
+
+  @unit
+  Scenario: A change to how the workflow builds rebuilds every image
+    Given a merge to main adds a build argument to, or changes the platform of, a docker/build-push-action step that pushes
+    When publish-docker-ecr selects the images to build
+    Then every image is rebuilt, with no version to bump by hand
+    And an edit to the workflow outside its pushing build steps rebuilds nothing
+
+  @unit
+  Scenario: An image whose inputs cannot be read is rebuilt
+    Given a Dockerfile with a step the inputs reader cannot follow, such as a go build of an import path or with -tags, go generate, GOFLAGS, cgo or a platform other than linux/arm64, a Go module copied to another path than its own, a go build on a stage that read the build context, or a heredoc
+    When publish-docker-ecr selects the images to build
+    Then that image is built, with a warning, rather than re-tagged
+    And the CI guard fails on that Dockerfile, so it does not rebuild on every commit unnoticed
 
   @unimplemented
   Scenario: A failed Lambda build does not hold back the service images
@@ -184,3 +219,23 @@ Feature: Publish every deployable image to the artifacts registry
     When it is dispatched again
     Then with a tag recording that commit it skips the build and succeeds
     And with a tag recording another commit, or none, it fails and asks for a new tag
+
+  # How Cloud's LangWatchQL access render Job knows whether an app image
+  # changes the rendered access model (langwatch-saas infrastructure/lwql.tf).
+  # Bound by tools/ecrtag/lwqlaccess_test.go, and that the workflow makes both
+  # calls by tools/ciguard/ecrskip_test.go.
+  @unit
+  Scenario: An app image records the fingerprint of the access model it renders
+    Given publish-docker-ecr built the langwatch-app image for a commit
+    When it renders the image's access model offline from two fixed sets of placeholder inputs
+    Then the per-arch manifest and the index get the tag lwql-access-<fingerprint>-<tag>
+    And the fingerprint is the same for two images that render the same files, and differs when either set renders a different file
+    And a render that writes other files, or no sums, records nothing
+
+  @unit
+  Scenario: A re-tagged app image keeps the fingerprint of the image it copies
+    Given the commit did not change the app, so its index is re-tagged from an ancestor's
+    When publish-docker-ecr publishes the commit tag
+    Then the new index gets lwql-access-<fingerprint>-<tag> with the ancestor's fingerprint
+    And an image with no fingerprint to copy is published without one, with a warning, and Cloud re-renders on every release of it
+

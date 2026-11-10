@@ -94,6 +94,12 @@ describe("the dataset tRPC declaration", () => {
         ["getLimits", "query", "datasets:view"],
         ["createAttachmentUpload", "mutation", "datasets:update"],
         ["retryNormalize", "mutation", "datasets:manage"],
+        ["versions", "query", "datasets:view"],
+        ["saveVersion", "mutation", "datasets:update"],
+        ["versionPage", "query", "datasets:view"],
+        ["compareVersion", "query", "datasets:view"],
+        ["restoreVersion", "mutation", "datasets:manage"],
+        ["runVersions", "query", "datasets:view"],
       ]);
     });
 

@@ -37,7 +37,7 @@ on:
       # stage dangling, the build stayed green, and the container would have
       # died on its first import.
       - "infra/docker/Dockerfile"
-      - "infra/docker/Dockerfile.go_service"
+      - "infra/docker/Dockerfile.go-services"
       - "infra/clickhouse-serverless/**"
       - ".dockerignore"
       - "pnpm-workspace.yaml"
@@ -75,7 +75,7 @@ on:
       # stage dangling, the build stayed green, and the container would have
       # died on its first import.
       - "infra/docker/Dockerfile"
-      - "infra/docker/Dockerfile.go_service"
+      - "infra/docker/Dockerfile.go-services"
       - "infra/clickhouse-serverless/**"
       - ".dockerignore"
       - "pnpm-workspace.yaml"
@@ -151,7 +151,7 @@ jobs:
               - "charts/lib/**"
               - ".github/workflows/langwatch-chart.yml"
               - "infra/docker/Dockerfile"
-              - "infra/docker/Dockerfile.go_service"
+              - "infra/docker/Dockerfile.go-services"
               - "infra/clickhouse-serverless/**"
               - ".dockerignore"
               - "pnpm-workspace.yaml"
@@ -274,6 +274,12 @@ jobs:
       - name: "assert workers get long enough to drain"
         if: "!cancelled()"
         run: ./tests/workers-shutdown.sh
+
+      # A name set in both app and workers extraEnvs must render once on the
+      # workers container: helm upgrade's patch refuses a duplicate env name.
+      - name: "assert workers carry no duplicate extraEnvs name"
+        if: "!cancelled()"
+        run: ./tests/workers-extra-envs.sh
 
       - name: "assert ClickHouse pool sizing follows fleet capacity"
         if: "!cancelled()"
@@ -516,7 +522,7 @@ jobs:
       # the chart e2e can install. values-e2e.yaml overrides
       # gateway.image.{repository,tag,pullPolicy} to match.
       - name: Build gateway image
-        run: docker build -t langwatch/ai-gateway:e2e -f ../../infra/docker/Dockerfile.go_service ../..
+        run: docker build -t langwatch/ai-gateway:e2e -f ../../infra/docker/Dockerfile.go-services --target gateway ../..
       - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
         with:
           cluster_name: ${{ matrix.cluster }}

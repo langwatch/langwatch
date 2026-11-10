@@ -231,6 +231,33 @@ class TestExperimentRunWithDatasetId:
         assert "data" not in run_post["json"]
 
 
+class TestExperimentRunWithDatasetVersion:
+    """when running pinned to a version of the saved dataset"""
+
+    def test_posts_dataset_version(self):
+        _script_full_run()
+        with patch.object(platform_run, "create_client", _FakeClient):
+            experiment_run("rag-eval", dataset_version=1, poll_interval=0)
+
+        run_post = next(p for p in _FakeClient.captured_posts if "/run" in p["url"])
+        assert run_post["json"] == {"dataset_version": 1}
+
+    @pytest.mark.parametrize("version", [0, -1, 1.5, True])
+    def test_refuses_a_version_that_is_not_a_whole_number_from_one(self, version):
+        with patch.object(platform_run, "create_client", _FakeClient):
+            with pytest.raises(ValueError):
+                experiment_run("rag-eval", dataset_version=version)
+
+        assert _FakeClient.captured_posts == []
+
+    def test_refuses_a_version_with_inline_data(self):
+        with patch.object(platform_run, "create_client", _FakeClient):
+            with pytest.raises(ValueError):
+                experiment_run("rag-eval", data=[{"q": "x"}], dataset_version=1)
+
+        assert _FakeClient.captured_posts == []
+
+
 class TestExperimentRunWithParameters:
     """when running with parameters"""
 

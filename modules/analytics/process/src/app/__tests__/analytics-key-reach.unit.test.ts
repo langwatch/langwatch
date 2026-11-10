@@ -24,6 +24,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { AnalyticsModule } from "../analytics.app.ts";
+import { analyticsTestSecrets } from "./analytics-secrets.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-123";
@@ -139,7 +140,7 @@ async function appOver(input: {
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: {} as never,
+    secrets: analyticsTestSecrets(),
   });
 
   return { app, flagsAsked };

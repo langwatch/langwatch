@@ -12,6 +12,8 @@
     ["HostLabel", "hostLabel", []],
     ["LastSeenAt", "lastSeenAt", []],
     ["ArchivedAt", "archivedAt", []],
+    ["CreatedById", "createdById", []],
+    ["UpdatedById", "updatedById", []],
     ["CreatedAt", "createdAt", []],
     ["UpdatedAt", "updatedAt", []]
   ],
@@ -340,6 +342,8 @@
     ["WorkflowId", "workflowId", []],
     ["CopiedFromEvaluatorId", "copiedFromEvaluatorId", []],
     ["ArchivedAt", "archivedAt", []],
+    ["CreatedById", "createdById", []],
+    ["UpdatedById", "updatedById", []],
     ["CreatedAt", "createdAt", []],
     ["UpdatedAt", "updatedAt", []]
   ],
@@ -787,7 +791,10 @@
     ["CreatedAt", "createdAt", []],
     ["UpdatedAt", "updatedAt", []],
     ["AutoPausedAt", "autoPausedAt", []],
-    ["AutoPausedReason", "autoPausedReason", ["output"]]
+    ["AutoPausedReason", "autoPausedReason", ["output"]],
+    ["EvaluatorLabel", "evaluatorLabel", []],
+    ["CreatedById", "createdById", []],
+    ["UpdatedById", "updatedById", []]
   ],
   "notifications": [
     ["TenantId", "projectId", []],

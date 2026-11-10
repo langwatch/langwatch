@@ -60,6 +60,8 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
         options?: { replace?: boolean },
       ) => void;
       navigate: (to: string) => void;
+      /** Whoever owns sign-out ends the session and takes the reader off this page. */
+      signOut: () => Promise<void>;
       failed: (failure: OrganizationFailureNotice) => void;
       overviewCards: readonly AuthenticationOverviewCard[];
       directorySummary: DirectorySummaryBand | undefined;
@@ -152,7 +154,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
   }
 
   signOut(): void {
-    if (typeof window !== "undefined") window.location.assign("/api/auth/logout");
+    void this.deps.signOut();
   }
 
   authenticationOverviewCards(): readonly AuthenticationOverviewCard[] {
@@ -214,6 +216,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
         route: { params: reading.params, query: reading.query },
         setQuery: (next, options) => route.setQuery(next, options),
         navigate: (to) => navigation.navigate(to),
+        signOut: () => session.signOut(),
         failed: (failure) => feedback.failed(failure),
         overviewCards,
         directorySummary,

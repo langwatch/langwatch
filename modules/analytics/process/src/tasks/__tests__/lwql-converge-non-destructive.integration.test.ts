@@ -6,6 +6,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
 import { LWQL_POSTGRES_READER_ROLE } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import { LangWatchQLSelfProvisioningService } from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import {
@@ -22,6 +23,8 @@ import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-cat
 import { convergeLwqlAccessModel, type LwqlConvergencePlan } from "../lwql-provision.task.ts";
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+
+const collectionBinding = LangWatchQLCollectionBindingService.create();
 const POSTGRES_VIEWS = LangWatchQLCatalogShapesService.create().postgresViews(LWQL_VIEW_CATALOG);
 const ENGINE_TABLES = [...new Set(POSTGRES_VIEWS.map((view) => view.sourceTable))];
 
@@ -129,7 +132,9 @@ describe("given a rendered-mode install whose PostgreSQL engine tables work", ()
       startLangWatchQLPostgres(),
     ]);
     names = { ...harness.names, database: harness.factDatabase };
-    collection = selfProvisioning.namedCollection({ names });
+    // Per-suite name, never the server-global lwql_postgres: suites share one ClickHouse server,
+    // and the rendered binding takes the per-database name while no lwql_postgres exists.
+    collection = collectionBinding.namedCollection({ names, mode: "sql" });
     // The app's own reader role, which the deploy's PostgreSQL half converges in production.
     for (const statement of selfProvisioning.postgresReaderStatements({
       readerPassword: postgres.readerPassword,

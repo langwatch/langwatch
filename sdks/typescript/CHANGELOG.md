@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.2.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v2.1.0...typescript-sdk@v2.2.0) (2026-11-03)
+
+
+### Features
+
+* agent and evaluator versioning with deploy labels, plus experiment and dependency fixes ([#9124](https://github.com/langwatch/langwatch/issues/9124)) ([ec774cb](https://github.com/langwatch/langwatch/commit/ec774cb12756a472d7260f6ed5e2292e324906cd))
+* **coding-agent:** capture Grok CLI sessions through its native OpenTelemetry ([#9224](https://github.com/langwatch/langwatch/issues/9224)) ([34c0f70](https://github.com/langwatch/langwatch/commit/34c0f700c4ff679717de20ad9bd15647631b8cec))
+* **coding-agent:** track pi as a natively instrumented coding agent ([#9203](https://github.com/langwatch/langwatch/issues/9203)) ([52eaa9e](https://github.com/langwatch/langwatch/commit/52eaa9e8f38533d84dfdde9896ac0edcd5cffb7a))
+* **dataset:** dataset version history with autosave, compare, restore, retention and run pinning ([#9121](https://github.com/langwatch/langwatch/issues/9121)) ([f50c6f0](https://github.com/langwatch/langwatch/commit/f50c6f0c999e9e1cadf7173db0e87b9d3f1108de))
+
+
+### Bug Fixes
+
+* **model-provider:** drop the Doubleword models shut down on 30 Oct ([#9214](https://github.com/langwatch/langwatch/issues/9214)) ([abfdbbf](https://github.com/langwatch/langwatch/commit/abfdbbfac18f4294d31c06c3460df60741c1c79a))
+
 ## [2.1.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v2.0.0...typescript-sdk@v2.1.0) (2026-10-30)
 
 

@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { docsFixture } from "../../../testing/docs-fixture.ts";
 import { docsNavPlugin } from "../compile/nav-plugin.ts";
 
-vi.mock("../compile/github-stars.ts", () => ({ readStars: async () => null }));
+vi.mock("../compile/github-stars.ts", () => ({
+  readStars: async () => ({ count: null, at: null }),
+}));
 
 let fixture: ReturnType<typeof docsFixture>;
 

@@ -23,6 +23,7 @@ import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding
 import { setFilterChipLabels } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
 import { registerInstantEvalRoute } from "../../../../behavior/langy/instant-eval-route.bridge.ts";
 import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
+import { useOptionalTraceHost } from "../../../../behavior/trace-host.ts";
 import { useFloatRect } from "../../../../behavior/use-float-rect.ts";
 import { useGlobalAiShortcut } from "../../../../behavior/use-global-ai-shortcut.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
@@ -279,6 +280,7 @@ export const SearchBar: React.FC = () => {
   // slow read never hides a feature the project actually has. The server's read also names a
   // refused reader's offer.
   const instantEvalAccess = useInstantEvalAccess({ projectId: project?.id });
+  const canActivateLicense = useOptionalTraceHost()?.hasPermission("organization:manage") ?? false;
   const isInstantEvalAvailable = instantEvalAccess.isAvailable;
   const instantEval = useInstantEvalRoute({
     isInstantEvalAvailable,
@@ -369,6 +371,7 @@ export const SearchBar: React.FC = () => {
         onEnable={instantEval.enableInstantEvals}
         isEnabling={instantEval.isEnabling}
         viaConnect={instantEvalAccess.viaConnect}
+        canActivateLicense={canActivateLicense}
       >
         <Box position="absolute" left={3} bottom={0} width="1px" height="1px" aria-hidden="true" />
       </InstantEvalRefusalPopover>

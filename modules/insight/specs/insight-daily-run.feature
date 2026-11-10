@@ -729,9 +729,9 @@ Feature: The daily insights run
       Then the run's row names the board Costs
 
     @integration
-    Scenario: No thanks from the offer stores off
+    Scenario: Turning off a board never decided on stores off
       Given a board a member never decided on
-      When they say no thanks to the offer
+      When they turn its daily run off
       Then they read off with nothing chosen
       And they can still turn it on
 
@@ -961,7 +961,7 @@ Feature: The daily insights run
 
     @unit
     Scenario: A board that is gone turns off no daily run the person never turned on
-      Given a board a person never decided on, or said no thanks to
+      Given a board a person never decided on, or turned off before choosing a run
       When a run finds the board gone
       Then their setting stays as it was
 
@@ -1031,38 +1031,24 @@ Feature: The daily insights run
       And a header nobody lends to draws nothing more
 
     @integration
-    Scenario: A board a member never answered offers daily insights
+    Scenario: A board a member never answered does not ask by itself
       Given a board with widgets and a member who never answered for it
       When they open the board
-      Then a dialog asks whether to turn on daily insights for that board
-      And the quiet control is in the header
+      Then no dialog opens and nothing is sent to the server
+      And the quiet control is in the header, off
 
     @integration
-    Scenario: A board with no widgets offers nothing
+    Scenario: A board with no widgets shows no control
       Given a board with no widgets and a member who never answered for it
       When they open the board
-      Then no offer opens and the header holds no daily insights control
+      Then no dialog opens and the header holds no daily insights control
 
     @integration
-    Scenario: Closing the offer decides nothing
-      Given the offer is open on a board
-      When the member closes it without an answer
-      Then nothing is sent to the server
-      And the offer stays closed for this visit, with the quiet control in the header
-
-    @integration
-    Scenario: No thanks on the offer sends an off for the board
-      Given the offer is open on a board
-      When the member says no thanks
-      Then an off is sent for that board
-      And the offer closes and the quiet control stays
-
-    @integration
-    Scenario: Turning on from the offer sends the hour, the zone and the maximum
-      Given the offer is open on a board
-      When the member turns it on as offered, or after choosing another hour and maximum
+    Scenario: Turning on from the quiet control sends the hour, the zone and the maximum
+      Given a board with widgets and a member who never answered for it
+      When the member turns it on from the quiet control in the header
       Then the run is set for hour 9, the browser's time zone and at most 3 insights
-      And a changed hour and maximum are sent as chosen
+      And the header shows the dropdown of a board that is on
 
     @unit
     Scenario: A daily run takes any hour, a time zone and one of four maximums
@@ -1078,18 +1064,11 @@ Feature: The daily insights run
       When its time is put in words
       Then it reads around 09:00 Amsterdam time, never at 09:00
 
-    @unit
-    Scenario: A board offers once per visit and never after an answer
-      Given a board that opened with widgets, without widgets, or while its widgets load
-      When the person is undecided, said no, or turned it on, and has or has not closed the offer
-      Then the offer shows only to an undecided person on a board that opened with a widget
-      And not again in a visit where they closed it
-
     @integration
-    Scenario: A board that is off shows the quiet control and no offer
-      Given a member said no thanks to a board, or turned it off
+    Scenario: A board that is off shows the quiet control
+      Given a member turned a board off, with or without a run they chose before
       When they open the board
-      Then no offer opens
+      Then no dialog opens
       And turning it on from the control sends what they last chose, or the defaults
 
     @integration
@@ -1134,17 +1113,25 @@ Feature: The daily insights run
       And after a run it says calmly that Langy cannot read From LangWatch boards yet
 
     @integration
-    Scenario: A From LangWatch board says before the answer that no run reads it yet
-      Given a From LangWatch board a member never answered for
-      When the offer opens
+    Scenario: Turning on a From LangWatch board says no run reads it yet
+      Given a From LangWatch board that a member never turned on
+      When they turn it on from the quiet control
+      Then the message says Langy cannot read From LangWatch boards yet and a run files nothing for now
+      And it does not say Langy reads the board every day
+      And turning on a stored board still says Langy reads it every day
+
+    @integration
+    Scenario: A From LangWatch board's settings say no run reads it yet
+      Given a From LangWatch board that a member turned on
+      When they open Settings from the dropdown
       Then it says Langy cannot read From LangWatch boards yet and a run files nothing for now
-      And the offer on a stored board says no such thing
+      And the settings of a stored board say no such thing
 
     @integration
     Scenario: The control is absent without the flag, the grant or a project that takes runs
       Given the release_insights flag is off, or a member without analytics:view, or an aggregate project
       When a board's header is drawn
-      Then no daily insights control shows, no offer opens and nothing is asked of the server
+      Then no daily insights control shows, no dialog opens and nothing is asked of the server
 
     @integration
     Scenario: The control changes before the server answers

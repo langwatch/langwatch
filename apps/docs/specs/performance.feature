@@ -132,7 +132,8 @@ Feature: Static documentation with progressive interaction
     Then the rules its markup can match are inlined in its head
     And rules for classes or ids found only on other pages are left out
     And rules a script can add at runtime, theme classes and unscoped rules are kept
-    And the shared stylesheet loads without blocking the first paint
+    And the browser asks for the shared stylesheet only once the page has loaded
+    And the font faces are declared only in the page's own styles, so the late stylesheet cannot swap a font in
 
   @unit
   Scenario: Minify the shared stylesheet for the supported browsers
@@ -164,7 +165,7 @@ Feature: Static documentation with progressive interaction
     And the desktop page list sticks beneath the header and scrolls on its own
     And following a page list link keeps that link in view
     And a short contents rail may stick beneath the header
-    And the full-width footer follows the page and never clips navigation
+    And the footer follows the article, beside the page list, and never clips navigation
     And unrelated navigation groups start collapsed
     And the active page remains in an expanded branch
     And initial loading preserves the article heading and top gap
@@ -200,7 +201,7 @@ Feature: Static documentation with progressive interaction
     When a reader opens the page menu or presses the theme button
     Then page actions have readable titles and descriptions
     And copying a page confirms success
-    And the theme button switches between light and dark and the page remembers the choice
+    And the theme button offers System, Light and Dark, and the page remembers the choice
 
   @e2e
   Scenario: Start with a coding agent
@@ -371,3 +372,12 @@ Feature: Static documentation with progressive interaction
     When a page's skill prompt has a heading named like one of the page's own sections
     Then the page's section keeps the plain anchor its links point at
     And the prompt's heading takes a numbered anchor
+
+  @integration
+  Scenario: Choose the light, dark or system theme
+    When a reader opens the theme menu
+    Then it offers System, Light and Dark, with the stored choice ticked and System when there is none
+    When they choose Light or Dark
+    Then the page takes that theme and keeps it on every visit
+    When they choose System
+    Then the page follows the operating system's colour scheme, and keeps following it when it switches

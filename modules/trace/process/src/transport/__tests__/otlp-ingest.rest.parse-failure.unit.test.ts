@@ -25,6 +25,7 @@ const spanDouble = vi.hoisted(() => ({
   setAttribute: vi.fn(),
   setAttributes: vi.fn(),
   recordException: vi.fn(),
+  end: vi.fn(),
 }));
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
@@ -48,7 +49,7 @@ vi.mock("langwatch", async (importOriginal) => {
     getLangWatchTracer: (name: string) =>
       name === "langwatch.otel.traces"
         ? {
-            withActiveSpan: (
+            startActiveSpan: (
               _name: string,
               _options: unknown,
               fn: (span: typeof spanDouble) => unknown,

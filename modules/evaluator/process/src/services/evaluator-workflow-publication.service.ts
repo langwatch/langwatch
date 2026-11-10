@@ -1,7 +1,12 @@
-import { newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
+import {
+  newEvaluatorId,
+  type Evaluator,
+  type EvaluatorCaller,
+} from "@langwatch/evaluator-contract";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { EvaluatorCreationCapService } from "./evaluator-creation-cap.service.ts";
+import type { EvaluatorVersionService } from "./evaluator-version.service.ts";
 import type { EvaluatorService } from "./evaluator.service.ts";
 
 /**
@@ -14,6 +19,7 @@ export class EvaluatorWorkflowPublicationService {
     workflows: Pick<WorkflowApi, "findWorkflowFlags" | "setWorkflowFlags">;
     evaluators: Pick<EvaluatorService, "findByWorkflow" | "create" | "update" | "archive">;
     creationCaps: Pick<EvaluatorCreationCapService, "assertCreationAllowed">;
+    versions: Pick<EvaluatorVersionService, "assertDeletable">;
   }): EvaluatorWorkflowPublicationService {
     return new EvaluatorWorkflowPublicationService(deps);
   }
@@ -57,11 +63,25 @@ export class EvaluatorWorkflowPublicationService {
     }
   }
 
-  /** Nothing keeps an evaluator pointing at a workflow that no longer offers itself as one. */
-  async disableAsEvaluator(input: { workflowId: string; projectId: string }): Promise<void> {
-    await this.deps.workflows.setWorkflowFlags({ ...input, isEvaluator: false });
-
-    const [linked] = await this.deps.evaluators.findByWorkflow(input);
+  /**
+   * Nothing keeps an evaluator pointing at a workflow that no longer offers itself as one. A
+   * deployed evaluator needs `evaluators:deploy` of `caller`, asked before any flag changes.
+   */
+  async disableAsEvaluator(input: {
+    workflowId: string;
+    projectId: string;
+    caller?: EvaluatorCaller;
+  }): Promise<void> {
+    const scope = { workflowId: input.workflowId, projectId: input.projectId };
+    const [linked] = await this.deps.evaluators.findByWorkflow(scope);
+    if (linked) {
+      await this.deps.versions.assertDeletable({
+        projectId: input.projectId,
+        evaluatorId: linked.id,
+        caller: input.caller,
+      });
+    }
+    await this.deps.workflows.setWorkflowFlags({ ...scope, isEvaluator: false });
     if (!linked) return;
 
     await this.deps.evaluators.archive({ id: linked.id, projectId: input.projectId });

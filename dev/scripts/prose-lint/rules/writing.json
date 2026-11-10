@@ -16,7 +16,7 @@
       "kind": "regex",
       "pattern": "\\bhonest(?:ly)?\\b|\\bhinges? on\\b|\\b(?:nobody|no one) can\\b|\\bshows up nowhere\\b",
       "flags": "gi",
-      "note": "honest/honestly as rhetorical framing, hinges on, nobody can / no one can as mystery-framing, shows up nowhere."
+      "note": "honest as rhetorical framing and honestly in any use, discourse markers included (2026-11-08: AI overuses it), hinges on, nobody can / no one can as mystery-framing, shows up nowhere."
     },
     {
       "id": "load-bearing",
@@ -135,9 +135,17 @@
       "name": "Open flat",
       "kind": "judge",
       "scope": "first-section",
-      "instruction": "Does `text` open with a windup instead of naming its subject? A windup is a reframe, a rhetorical question, a quoted saying set up to be dismantled, a one-line hook followed by a colon, or an anonymous scene that withholds what the post is about. An opener that names the real subject in the first sentence (\"We shipped a support bot, and within a week it told a customer they'd get a refund we don't give\", \"Langy is the automated AI engineer inside LangWatch\") is flat and passes.",
-      "yes": "the first sentence is a rhetorical question, a quoted saying, a hook ending in a colon, or a scene whose subject the reader cannot tell yet",
+      "instruction": "Does `text` open with a windup instead of naming its subject? A windup is a reframe, a quoted saying set up to be dismantled, a one-line hook followed by a colon, or an anonymous scene that withholds what the post is about. An opener that names the real subject in the first sentence (\"We shipped a support bot, and within a week it told a customer they'd get a refund we don't give\", \"Langy is the automated AI engineer inside LangWatch\") is flat and passes. An opening question is not judged here; the question-opener rule warns on it.",
+      "yes": "the first sentence is a quoted saying, a hook ending in a colon, or a scene whose subject the reader cannot tell yet",
       "no": "the first sentence says what the text is about or what happened, with the real subject named"
+    },
+    {
+      "id": "question-opener",
+      "name": "A question as the opener (warning)",
+      "kind": "local",
+      "check": "question-opener",
+      "severity": "warning",
+      "note": "Banned by default. Allowed rarely when the answer lands in the same line and the question is the reader's own words (\"Laptop shut? It still works\"). Prints with w and never fails the run; keep the line only with that reason."
     },
     {
       "id": "quoted-cliche-opener",
@@ -400,7 +408,7 @@
       "id": "punchline-section-opener",
       "name": "A punchy line never as a section opener",
       "kind": "judge",
-      "instruction": "Does `text` open its section with a punchline or clever line (\"Two reasons, and neither is that the model is clever.\", \"Cost questions usually get a shrug and a bigger budget.\") instead of starting plainly and getting straight into the substance?",
+      "instruction": "Does `text` open its section with a punchline or clever line (\"Two reasons, and neither is that the model is clever.\", \"Cost questions usually get a shrug and a bigger budget.\") instead of starting plainly and getting straight into the substance? A question is not a punchline here; the question-opener rule warns on an opening question.",
       "yes": "the section's first sentence is a clever or punchy line",
       "no": "the section starts plainly on its substance"
     },

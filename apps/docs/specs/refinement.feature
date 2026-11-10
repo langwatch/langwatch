@@ -32,8 +32,8 @@ Feature: Actionable documentation and restrained reading surfaces
     Then that description is followed by its method and path
     And the description is long enough for a search engine to show it
   @e2e
-  Scenario: Copy a supported coding-agent command on any page
-    Given any documentation page
+  Scenario: Copy a supported coding-agent command where tracing is the subject
+    Given an Observability or Coding Agents page, or one in the Platform section's Observability group
     When I select a supported coding agent in the setup control
     Then copying gives the selected agent's real CLI command
   @unit
@@ -135,7 +135,7 @@ Feature: Actionable documentation and restrained reading surfaces
   Scenario: Choose an agent and copy the complete setup prompt
     Given the sidebar command and setup prompt card are visible
     Then the command has a visible agent picker
-    And the agent names sit on a wheel, fading with distance, that spins to the next agent until I choose one, unless motion is reduced
+    And the agent names sit on a wheel, fading with distance, that stays on the chosen agent until I turn it
     And choosing an agent spins the wheel to it
     And the setup card has one copy action beside its prompt title
     When I select an agent and navigate to another page
@@ -233,3 +233,39 @@ Feature: Actionable documentation and restrained reading surfaces
     Then the panel captions it with at most two lines of its description
     And a quieter line below names the media type and whether the example is declared or generated from the schema
     And the full description stays under Responses in the reference
+
+  @e2e
+  Scenario: Trace the way to the current page through the navigation tree
+    Given a page nested several groups deep in the navigation
+    When the reader opens it
+    Then every group above it shows its title in the accent colour, its guide line tinted
+    And groups that do not hold the page keep their usual colour
+
+  @e2e
+  Scenario: Keep the agent launcher to the pages about tracing
+    Given a page outside the Observability and Coding Agents sections and the Platform section's Observability group
+    Then the sidebar shows no agent launcher
+    Given an Observability or Coding Agents page, or one in the Platform section's Observability group
+    Then the sidebar shows the launcher with its neighbours on the wheel
+    And the wheel does not turn until the reader turns it
+
+  @e2e
+  Scenario: Keep the page list in view down to the footer
+    Given a desktop reader at the bottom of a page
+    Then the footer sits under the page, beside the sidebar rather than across it
+    And the page list is still pinned in view, so the reader can scroll it on its own
+
+  @unit
+  Scenario: Show the live GitHub star count, refreshed from the build's and kept for an hour
+    Given the page shows the star count GitHub reported at build time, and the day GitHub reported it
+    And the build signs its request to GitHub when it has a token, so GitHub does not refuse it
+    When it is still that day or the day after
+    Then the page shows it without asking GitHub
+    When that day is further back, or the page was built without a count
+    And the page is idle and this browser has no count from the last hour
+    Then it asks GitHub once, shows the live count and keeps it in the browser with the time it was read
+    And on a page built without a count, an older kept count shows at once while the fresh one loads
+    When this browser read the count within the hour
+    Then the page shows that count without asking GitHub
+    But an older kept count never replaces the build's count
+    And if GitHub does not answer with a count, the page keeps the count it has and asks again only after the hour

@@ -118,6 +118,7 @@ export class InviteCreationService {
     newInvites: {
       role: OrganizationUserRole;
       teams?: { customRoleId?: string }[];
+      email?: string;
     }[];
     user?: PlanProviderUser;
   }): Promise<void> {
@@ -134,12 +135,26 @@ export class InviteCreationService {
       customRoles.map((r) => [r.id, (r.permissions as string[] | null) ?? []]),
     );
 
-    const { fullMembers: newFullMembers, liteMembers: newLiteMembers } =
+    const classify = (invites: typeof newInvites) =>
       classifyInvitesByMemberType({
-        invites: newInvites,
+        invites,
         customRoleMap,
         isViewOnlyCustomRole: (permissions) => this.deps.seats.isViewOnlyCustomRole(permissions),
       });
+    // A person invited back within their seat hold takes that seat, already counted, not another.
+    const heldEmails = new Set(
+      (
+        (await this.deps.seats.findHeldEmails?.({
+          organizationId,
+          emails: newInvites.flatMap((invite) => (invite.email ? [invite.email] : [])),
+        })) ?? []
+      ).map((email) => email.toLowerCase()),
+    );
+    const { liteMembers: newLiteMembers, fullMembers: newSeatsAsked } = classify(newInvites);
+    const { fullMembers: heldSeatsTakenBack } = classify(
+      newInvites.filter((invite) => invite.email && heldEmails.has(invite.email.toLowerCase())),
+    );
+    const newFullMembers = newSeatsAsked - heldSeatsTakenBack;
 
     if (!subscriptionLimits.overrideAddingLimitations) {
       // A pool this batch adds nobody to is not checked: a Developer-only batch
@@ -306,31 +321,35 @@ export class InviteCreationService {
       organizationId,
     });
 
-    await this.checkLicenseLimits({
+    // Phase 1, under the seat lock: count, validate and write, no side effects.
+    const createdRecords = await this.deps.seats.withSeatLock({
       organizationId,
-      newInvites: invites.map((invite) => ({
-        role: invite.role,
-        teams: invite.teams,
-      })),
-      user,
-    });
-
-    const validInvites = await this.validatedInvites({ organizationId, invites, isStrict });
-
-    // Phase 1: DB operations in a transaction, no side effects.
-    const createdRecords = await this.invites.withTransaction(
-      (transaction) =>
-        this.persistInvites({
-          transaction,
-          invites: validInvites.map((invite) => ({ ...invite, requestedBy: requestedBy ?? null })),
-          organization,
-          isStrict,
-        }),
-      {
-        timeoutMs: INVITE_BATCH_TXN_TIMEOUT_MS,
-        maxWaitMs: INVITE_BATCH_TXN_MAX_WAIT_MS,
+      work: async (lease) => {
+        await this.checkLicenseLimits({
+          organizationId,
+          newInvites: invites.map((invite) => ({
+            role: invite.role,
+            teams: invite.teams,
+            email: invite.email,
+          })),
+          user,
+        });
+        const validInvites = await this.validatedInvites({ organizationId, invites, isStrict });
+        await lease.assertHeld();
+        return this.invites.withTransaction(
+          (transaction) =>
+            this.persistInvites({
+              transaction,
+              invites: validInvites.map((invite) => ({
+                ...invite,
+                requestedBy: requestedBy ?? null,
+              })),
+              organization,
+            }),
+          { timeoutMs: INVITE_BATCH_TXN_TIMEOUT_MS, maxWaitMs: INVITE_BATCH_TXN_MAX_WAIT_MS },
+        );
       },
-    );
+    });
 
     // Phase 2: emails outside the transaction, so a provider failure can
     // never roll back a committed invite.
@@ -387,19 +406,18 @@ export class InviteCreationService {
   }
 
   /**
-   * Writes the prepared invites inside the caller's transaction, skipping the
-   * ones an existing invite already covers (or refusing them in strict mode).
+   * Writes the prepared invites inside the caller's transaction. An address with a live invite
+   * is refused, never skipped, so the caller is not told it sent what it did not. An invite held
+   * for an unpaid seat checkout is not shown to the admin, so a direct invite replaces it.
    */
   private async persistInvites({
     transaction,
     invites,
     organization,
-    isStrict,
   }: {
     transaction: OrganizationInviteRepository;
     invites: CreateAdminInviteInput[];
     organization: Organization;
-    isStrict: boolean;
   }): Promise<{ invite: OrganizationInvite; organization: Organization }[]> {
     const txInviteService = this.onRepository(transaction);
     const records: {
@@ -408,18 +426,11 @@ export class InviteCreationService {
     }[] = [];
 
     for (const invite of invites) {
-      const hasOpenInvite = await txInviteService.hasOpenInvite({
-        email: invite.email,
-        organizationId: invite.organizationId,
-      });
-
-      if (hasOpenInvite) {
-        if (isStrict) {
-          throw new DuplicateInviteError(invite.email);
-        }
-
-        continue;
+      const address = { email: invite.email, organizationId: invite.organizationId };
+      if (await transaction.hasPendingInviteForEmail(address)) {
+        throw new DuplicateInviteError(invite.email);
       }
+      await transaction.deletePaymentPendingInvitesForEmail(address);
 
       records.push({
         invite: await txInviteService.createInviteRow(invite),
@@ -460,7 +471,7 @@ export class InviteCreationService {
 
     return {
       // Stored trimmed, because the reads look the address up as it was
-      // typed: `hasOpenInvite` and the pending-invite lookup both miss
+      // typed: the duplicate check and the pending-invite lookup both miss
       // a row written as " a@b.com ", so the duplicate check never fires and
       // SSO onboarding never finds the invite it should adopt.
       email,

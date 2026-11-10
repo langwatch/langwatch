@@ -88,8 +88,8 @@ await it("serves identical page exports and discovery metadata", async () => {
   });
 });
 
-/** @scenario "Copy a supported coding-agent command on any page" */
-await it("copies supported agent commands on guides, overview and API pages", async () => {
+/** @scenario "Copy a supported coding-agent command where tracing is the subject" */
+await it("copies supported agent commands on Observability and Coding Agents pages", async () => {
   await withPreviewBrowser({
     outDir,
     run: async ({ browser, base }) => {
@@ -100,11 +100,7 @@ await it("copies supported agent commands on guides, overview and API pages", as
       });
       try {
         const page = await context.newPage();
-        for (const slug of [
-          "introduction",
-          "coding-agents/overview",
-          "api-reference/traces/get-trace",
-        ]) {
+        for (const slug of ["integration/quick-start", "coding-agents/overview"]) {
           await page.goto(base + slug);
           const launcher = page.locator(".docs-layout .docs-agent-launcher");
           for (const agent of ["claude", "codex", "copilot", "gemini", "opencode"]) {
@@ -382,6 +378,95 @@ await it("shows each page action on an icon chip with the copy shortcut", async 
         assert.ok(await shortcut.isVisible());
       } finally {
         await context.close();
+      }
+    },
+  });
+});
+
+/** @scenario "Trace the way to the current page through the navigation tree" */
+await it("colours every group above the current page, and no other", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      try {
+        await page.goto(base + "integration/python/tutorials/capturing-mapping-input-output");
+        const tree = page.locator('.docs-left-rail nav[aria-label="Page navigation"]');
+        const current = tree.locator('[aria-current="page"]');
+        const accent = await current.evaluate((node) => getComputedStyle(node).color);
+        const groups = await tree.evaluate((root) =>
+          [...root.querySelectorAll("li:has(> [data-docs-panel]) > a")].map((link) => ({
+            title: link.textContent.trim(),
+            holds: Boolean(
+              link.parentElement.querySelector('[data-docs-panel] [aria-current="page"]'),
+            ),
+            color: getComputedStyle(link).color,
+          })),
+        );
+        const trail = groups.filter((group) => group.holds);
+        assert.ok(trail.length >= 2, `expected nested groups, got ${JSON.stringify(trail)}`);
+        for (const group of trail) assert.equal(group.color, accent, group.title);
+        for (const group of groups.filter((entry) => !entry.holds))
+          assert.notEqual(group.color, accent, group.title);
+      } finally {
+        await page.close();
+      }
+    },
+  });
+});
+
+/** @scenario "Keep the agent launcher to the pages about tracing" */
+await it("shows the launcher only on tracing pages, and its wheel stays put", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      try {
+        for (const slug of [
+          "introduction",
+          "api-reference/traces/get-trace",
+          "api-reference/coding-agents/overview",
+          "self-hosting/overview",
+        ]) {
+          const response = await page.goto(base + slug);
+          assert.equal(response?.status(), 200, `${slug} must be a real page`);
+          assert.equal(await page.locator(".docs-left-rail .docs-agent-launcher").count(), 0, slug);
+        }
+        await page.goto(base + "integration/quick-start");
+        const launcher = page.locator(".docs-left-rail .docs-agent-launcher");
+        assert.equal(await launcher.count(), 1);
+        await page.waitForFunction(() => document.querySelector(".docs-agent-pick[data-reel]"));
+        const centre = () =>
+          launcher.locator('.docs-agent-name[data-distance="0"]').getAttribute("data-agent");
+        const first = await centre();
+        assert.ok((await launcher.locator(".docs-agent-name").count()) > 1);
+        await page.waitForTimeout(4000);
+        assert.equal(await centre(), first);
+      } finally {
+        await page.close();
+      }
+    },
+  });
+});
+
+/** @scenario "Keep the page list in view down to the footer" */
+await it("keeps the page list pinned beside the footer at the bottom of a page", async () => {
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      try {
+        await page.goto(base + "introduction");
+        await page.evaluate(() =>
+          scrollTo({ top: document.body.scrollHeight, behavior: "instant" }),
+        );
+        const footer = await page.locator("footer.docs-site-footer").boundingBox();
+        const rail = await page.locator(".docs-left-rail").boundingBox();
+        assert.ok(footer.y < 900, "the footer is in view");
+        assert.ok(footer.x >= rail.x + rail.width, "the footer starts after the sidebar");
+        assert.ok(rail.y >= 0 && rail.y + rail.height > footer.y, "the page list is still pinned");
+      } finally {
+        await page.close();
       }
     },
   });

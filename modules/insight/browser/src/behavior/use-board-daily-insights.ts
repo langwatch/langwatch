@@ -13,7 +13,7 @@ import type {
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { currentTimeZone } from "@langwatch/time";
 
-import { defaultRunSettings, runTimeWords } from "../model/daily-run.ts";
+import { defaultRunSettings, runTimeWords, TEMPLATE_BOARD_NOTE } from "../model/daily-run.ts";
 import { useInsightHost } from "../model/insight-host.ts";
 import { insightApi } from "./insight-api.ts";
 
@@ -74,7 +74,12 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     write({
       next: (current) => ({ ...current, state: "on", settings, offReason: null }),
       send: (handlers) => configure.mutate({ projectId, board, ...settings }, handlers),
-      done: `${done} Langy reads this board every day ${runTimeWords(settings)}.`,
+      // No run reads a From LangWatch board yet, so its toast says so instead of a promise.
+      done: `${done} ${
+        board.kind === "template"
+          ? TEMPLATE_BOARD_NOTE
+          : `Langy reads this board every day ${runTimeWords(settings)}.`
+      }`,
       fallbackTitle,
     });
   const turnOffWith = ({ done, fallbackTitle }: { done: string; fallbackTitle: string }) =>
@@ -111,12 +116,6 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
       turnOffWith({
         done: "Daily insights off. What Langy filed stays in your inbox.",
         fallbackTitle: "Couldn't turn off daily insights",
-      }),
-    /** "No thanks" on the offer: an off, so the board never asks again. */
-    decline: () =>
-      turnOffWith({
-        done: "OK. Langy will not ask again for this board.",
-        fallbackTitle: "Couldn't save your answer",
       }),
   };
 }

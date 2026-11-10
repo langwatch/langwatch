@@ -20,10 +20,27 @@ export type BuiltinRoleKey =
   | "org-admin"
   | "org-member"
   | "platform-operator"
+  | typeof BILLING_ROLE_KEY
   | typeof PROJECT_READER_ROLE_KEY;
 
 /** The one role the PLATFORM tier accepts, granted to users only (ADR-092). */
 export const PLATFORM_OPERATOR_ROLE_ID = "platform-operator" as const satisfies BuiltinRoleKey;
+
+/**
+ * The Billing role: a USER grant at ORGANIZATION scope for whoever pays. It takes no seat,
+ * confers only its own bag and only on that scope (specs/licensing/billing-role.feature).
+ */
+export const BILLING_ROLE_KEY = "billing" as const;
+
+/** What the Billing role carries; the matcher grants nothing else through it. */
+export const BILLING_PERMISSIONS: readonly AuthzPermission[] = [
+  "organization:view",
+  "subscription:upgrade",
+  "subscription:manage",
+  "seatRequests:view",
+  "seatRequests:manage",
+  "members:view",
+];
 
 /** ADR-177: the role key a shared project-to-project grant carries. */
 export const PROJECT_READER_ROLE_KEY = "project-reader" as const;
@@ -78,6 +95,9 @@ const MEMBER_ADDITIONS: readonly AuthzPermission[] = [
   "triggers:view",
   "triggers:manage",
   "prompts:manage",
+  // A member deploys agents and evaluators as they tag prompts; a custom role can withhold it.
+  "agents:deploy",
+  "evaluators:deploy",
   "scenarios:manage",
   "secrets:manage",
   // Agent cache — a member runs agents, and an agent writes its own run state.
@@ -143,6 +163,8 @@ const LITE_MEMBER: readonly AuthzPermission[] = [
   "scenarios:view",
   "secrets:view",
   "team:view",
+  // Reads who is in the organization, as every organization role does; changes nothing.
+  "members:view",
 ];
 
 /** Demo-project visitor: read-only product tour. Mirrors DEMO_VIEW_PERMISSIONS. */
@@ -204,9 +226,23 @@ const ORG_ADMIN: readonly AuthzPermission[] = [
   "sso:manage",
   // The playground's completion route asks playground:view (Alex, 2026-10-06, Q97).
   "playground:view",
+  "subscription:upgrade",
+  "subscription:manage",
+  "seatRequests:view",
+  "seatRequests:manage",
+  "members:view",
 ];
 
-const ORG_MEMBER: readonly AuthzPermission[] = ["organization:view", "aiTools:view"];
+/**
+ * Every organization role, Lite and Developer included, through the organization floor: the
+ * person with the card may be anyone. `members:view` reads the directory, never changes it.
+ */
+const ORG_MEMBER: readonly AuthzPermission[] = [
+  "organization:view",
+  "aiTools:view",
+  "subscription:upgrade",
+  "members:view",
+];
 
 /** What the platform-operator role carries; no other grant confers these. */
 export const PLATFORM_OPERATOR_PERMISSIONS: readonly AuthzPermission[] = ["ops:view", "ops:manage"];
@@ -220,6 +256,7 @@ const ROLE_PERMISSION_SETS: Record<BuiltinRoleKey, ReadonlySet<string>> = {
   "org-admin": new Set(ORG_ADMIN),
   "org-member": new Set(ORG_MEMBER),
   "platform-operator": new Set(PLATFORM_OPERATOR_PERMISSIONS),
+  billing: new Set(BILLING_PERMISSIONS),
   "project-reader": new Set(PROJECT_READER_PERMISSIONS),
 };
 

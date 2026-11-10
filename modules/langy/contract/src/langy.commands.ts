@@ -282,12 +282,13 @@ export class LangwatchCommandService {
       if (!isLangwatchProgram(tokens[i]!)) continue;
       if (!isInCommandPosition(tokens, i)) continue;
 
-      const resource = tokens[i + 1];
-      const verb = tokens[i + 2];
+      const at = skipGlobalFlags(tokens, i + 1);
+      const resource = tokens[at];
+      const verb = tokens[at + 1];
       if (!resource || !verb) continue;
       if (!IDENTIFIER.test(resource)) continue;
       if (!IDENTIFIER.test(verb)) continue;
-      found.push({ resource, verb, args: parseArgs(tokens, i + 3) });
+      found.push({ resource, verb, args: parseArgs(tokens, at + 2) });
     }
     return found;
   }
