@@ -65569,11 +65569,12 @@ To try the sidecar without changing who takes backups, use `mode: cronjob-observ
 
 <Note>
   Backups are deleted by your object store's lifecycle rule on the `clickhouse-backup/` prefix, not
-  by LangWatch. Set `retentionDays` to the same number of days. An incremental only builds on a full
-  from the last two full intervals plus 2 hours: 26 hours with fulls every 12 hours, 6 days and 2
-  hours with fulls every third day. Every backup restores for at least `retentionDays` less that, so
-  set the rule that much longer than the window you need. If fulls stop for longer, incrementals
-  fail too, and the backup alerts fire.
+  by LangWatch. Set `retentionDays` to the same number of days.
+
+An incremental only builds on a full from the last two full intervals plus 2 hours: 26 hours with
+fulls every 12 hours, 6 days and 2 hours with fulls every third day. Every backup restores for at
+least `retentionDays` less that, so set the rule that much longer than the window you need. If fulls
+stop for longer, incrementals fail too, and the backup alerts fire.
 </Note>
 
 ### Restore from Backup
