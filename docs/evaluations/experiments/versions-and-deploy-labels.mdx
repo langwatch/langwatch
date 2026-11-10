@@ -4,11 +4,13 @@ sidebarTitle: Versions and Deploy Labels
 description: Save agent and evaluator versions, point a deploy label such as production at one, and roll back by moving the label, with no code change.
 ---
 
-Agents, evaluators and datasets keep numbered versions. A deploy label, such as `production`, points at one version of an agent or an evaluator. Experiments and online evaluations follow the label, so you choose what runs in production by moving the label, not by editing the experiment or your code.
+Agents, evaluators and datasets keep numbered versions. A deploy label, such as `production`, points at one version of an agent or an evaluator. Experiments and online evaluations follow the label, so you choose which version they run by moving the label, not by editing the experiment.
+
+Labels move LangWatch configuration only. A connected agent, registered from your code through the SDK, has no platform versions and takes no label: its versions live in your code. An HTTP target calls whatever is deployed behind its URL, so rolling that back is a deploy on your side.
 
 ## Versions
 
-Every save of an agent or an evaluator adds a version: v1, v2, v3 and so on. Saving never changes what production runs. Open **History** on the agent or the evaluator to see every version, newest first, with the labels on each.
+Every save of an agent or an evaluator adds a version: v1, v2, v3 and so on. Saving never changes what a label points at, so anything pinned to `production` keeps running the version it had. Anything without a label, or on `latest`, runs the newest version, so a save changes its next run. Open **History** on the agent or the evaluator to see every version, newest first, with the labels on each.
 
 A dataset saves a version when edits go quiet, when an experiment run starts, when you save one by hand and when you restore one. A version is an immutable snapshot of the dataset's columns and rows.
 
@@ -38,7 +40,9 @@ Each run records the version its label resolved to. The run list shows it next t
 
 ## Rolling back
 
-Point the label back at the old version. If v3 misbehaves, deploy `production` to v2: the next run and the next online evaluation use v2. No code change, no redeploy, and v3 stays in history for when it is fixed.
+Point the label back at the old version. If agent v3 misbehaves, deploy the agent's `production` label to v2: the next experiment run uses v2. No code change, no redeploy, and v3 stays in history for when it is fixed.
+
+Agent and evaluator labels are separate. Moving the agent's label leaves online evaluations alone. To roll back an evaluator, open **History** on the evaluator and deploy its own `production` label to the old version: the next online evaluation uses it.
 
 Agents and evaluators have no **Restore**. Moving the label is the rollback.
 
