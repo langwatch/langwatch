@@ -402,6 +402,7 @@ void describe("given the runner holds each suite's output until it ends", () => 
 });
 
 void describe("given a suite that never ends", () => {
+  /** @scenario "A suite that runs past the limit is killed and failed" */
   void it("kills its process tree, names it and fails it once the limit passes", async () => {
     const out: string[] = [];
     const killed: unknown[] = [];
@@ -424,6 +425,7 @@ void describe("given a suite that never ends", () => {
     assert.ok(out.includes("last words"), "buffered output is printed, not lost");
   });
 
+  /** @scenario "A suite that ends inside the limit is left alone" */
   void it("leaves a suite that ends in time alone", async () => {
     const killed: unknown[] = [];
     const started = fakeProcess();
@@ -442,6 +444,7 @@ void describe("given a suite that never ends", () => {
     assert.deepEqual(killed, []);
   });
 
+  /** @scenario "A malformed suite limit is refused" */
   void it("reads the limit from the env, defaulting when unset", () => {
     assert.equal(parseSuiteTimeoutSeconds(undefined), DEFAULT_SUITE_TIMEOUT_SECONDS);
     assert.equal(parseSuiteTimeoutSeconds("90"), 90);
@@ -1102,10 +1105,11 @@ void describe("given the lanes a leg of the job runs", () => {
   });
 });
 
-describe("tracking running suites for a signal", () => {
+void describe("tracking running suites for a signal", () => {
   const fakeChild = () => Object.assign(new EventEmitter(), { stdout: null, stderr: null });
 
-  it("kills each suite still running and none that has closed", () => {
+  /** @scenario "Killing the tracked suites stops only those still running" */
+  void it("kills each suite still running and none that has closed", () => {
     const running = new Set<ScriptProcess>();
     const live = trackWhileRunning({ running, child: fakeChild() });
     const done = trackWhileRunning({ running, child: fakeChild() });

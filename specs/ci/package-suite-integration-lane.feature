@@ -113,6 +113,34 @@ Feature: A package's integration suite runs in CI when it declares one
       When the package suites job starts
       Then it fails instead of running every package on every shard
 
+  Rule: A suite that hangs is stopped, and so is one the run abandons
+
+    @unit
+    Scenario: A suite that runs past the limit is killed and failed
+      Given a suite is still running when the per-suite limit passes
+      When the limit passes
+      Then its whole process tree is killed
+      And an ::error:: line names the suite and the limit
+      And its output so far is printed and its status is 1
+
+    @unit
+    Scenario: A suite that ends inside the limit is left alone
+      Given a suite ends before the per-suite limit
+      When the limit would have passed
+      Then nothing is killed and its own status stands
+
+    @unit
+    Scenario: A malformed suite limit is refused
+      Given PACKAGE_SUITES_TIMEOUT_SECONDS is set to something that is not a positive integer
+      When the limit is read
+      Then the run refuses it rather than guessing, and an unset value gives the default
+
+    @unit
+    Scenario: Killing the tracked suites stops only those still running
+      Given two suites are tracked and one has already ended
+      When the run kills what it tracks
+      Then the suite still running is killed and the ended one is not
+
   Rule: A pull request runs the suites its change reaches
 
     @unit
