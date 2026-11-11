@@ -83,6 +83,45 @@ Feature: Langy session key lifecycle
       Then it does not retry again
       And the turn fails with an error the user can act on
 
+  Rule: A worker is never spawned without a usable key
+
+    # A blank key is no key: the manager asks the control plane to mint one
+    # rather than boot a CLI that would tell the reader to log in.
+    @unit
+    Scenario: Langy never starts its CLI with a blank key
+      When a worker must be spawned and the session key is only whitespace
+      Then the manager refuses the spawn and says credentials are required
+
+  Rule: A worker never outlives its key
+
+    # The key is injected at spawn and lives six hours, but a conversation that
+    # never idles long enough to be reaped could keep its worker longer. So a
+    # worker has a max age (five hours by default) and is replaced between
+    # turns once it passes it; a running turn is never cut short.
+    @unit
+    Scenario: The probe asks for a fresh key once the worker is past its max age
+      Given a worker is running for the conversation
+      And the worker is older than its max age
+      When the control plane asks whether a live worker exists
+      Then the manager answers that none does
+      And the control plane mints a session key for the next turn
+
+    @unit
+    Scenario: The next turn after the max age runs on a fresh worker with a fresh key
+      Given a worker past its max age is idle between turns
+      When the next turn arrives with a freshly minted key
+      Then the old worker is retired and its key is revoked
+      And a new worker is spawned carrying the new key
+      And the new worker resumes the conversation's session
+
+    @unit
+    Scenario: An over-age worker finishes its running turn before it is retired
+      Given a worker past its max age is running a turn
+      When the manager sweeps for workers to retire
+      Then the worker is kept and its key is not revoked
+      And the running turn completes on it
+      And once it has been quiet between turns the worker is retired and its key revoked
+
   Rule: A key does not outlive its worker
 
     Scenario Outline: Every death path the manager can observe revokes the key
@@ -95,6 +134,7 @@ Feature: Langy session key lifecycle
         | death                                          |
         | is replaced because capabilities changed       |
         | is reaped for being idle                       |
+        | is retired for reaching its max age            |
         | exits on its own                               |
         | is stopped because the manager is shutting down |
 

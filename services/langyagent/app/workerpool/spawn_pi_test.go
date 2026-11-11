@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/services/langyagent/adapters/pi"
@@ -109,6 +110,67 @@ func TestAcquire_ChangedRepositoryScopeReplacesTheWorker(t *testing.T) {
 	require.NoError(t, err, "the next turn with a new scope must boot a fresh worker")
 	require.NotSame(t, first, next, "a changed repository scope must not reuse the old worker")
 	require.Equal(t, 1, activeWorkers(p), "the replaced worker must be gone, not left running beside the new one")
+}
+
+// resumingPiBinary is stubPiBinary that also appends its LANGWATCH_API_KEY to
+// keyLog and, like the real wrapper, announces a resume when the conversation's
+// persistent session dir already holds a session file.
+func resumingPiBinary(t *testing.T, keyLog string) string {
+	t.Helper()
+	bin := filepath.Join(t.TempDir(), "langy-worker")
+	script := "#!/bin/sh\n" +
+		"printf '%s\\n' \"$LANGWATCH_API_KEY\" >> '" + keyLog + "'\n" +
+		"dir=$(sed -n 's/^ *\"sessionDir\": *\"\\(.*\\)\",*$/\\1/p' \"$HOME/" + configFileNameForTest + "\")\n" +
+		"resumed=false\n" +
+		"if [ -f \"$dir/session.jsonl\" ]; then resumed=true; else : > \"$dir/session.jsonl\"; fi\n" +
+		"printf '{\"type\":\"ready\",\"protocol\":1,\"resumed\":%s}\\n' \"$resumed\"\n" +
+		"exec sleep 60\n"
+	require.NoError(t, os.WriteFile(bin, []byte(script), 0o755))
+	return bin
+}
+
+// configFileNameForTest is the wrapper config file the pi adapter writes into
+// the worker home (adapters/pi configFileName).
+const configFileNameForTest = ".langy-worker.json"
+
+// The over-age replacement end to end: the next keyed turn retires the old
+// worker, boots a new one carrying the NEW session key, revokes the old key,
+// and the new worker resumes the conversation's persisted session.
+//
+// @scenario "The next turn after the max age runs on a fresh worker with a fresh key"
+func TestAcquire_OverAgeWorkerIsReplacedWithAFreshKeyAndResumesTheSession(t *testing.T) {
+	keyLog := filepath.Join(t.TempDir(), "keys")
+	rev := &recordingRevoker{}
+	p := newSpawningPool(t, resumingPiBinary(t, keyLog), rev)
+	p.workerMaxAge = time.Hour
+
+	first, err := p.Acquire(context.Background(), "conv-age", spawnableCreds())
+	require.NoError(t, err)
+	old := first.(*Worker)
+	require.False(t, old.promptDelivered, "a new conversation has no session to resume")
+
+	old.mu.Lock()
+	old.spawnedAt = time.Now().Add(-2 * time.Hour)
+	old.mu.Unlock()
+	require.False(t, p.HasLiveWorker("conv-age", sigOf(spawnableCreds())))
+
+	fresh := spawnableCreds()
+	fresh.LangwatchAPIKey = "sk-lw-session-new"
+	fresh.LangwatchAPIKeyID = "key-new"
+	next, err := p.Acquire(context.Background(), "conv-age", fresh)
+	require.NoError(t, err)
+	replacement := next.(*Worker)
+
+	require.NotSame(t, old, replacement, "an over-age worker must not be reused")
+	assert.Equal(t, 1, activeWorkers(p), "the retired worker must be gone, not left beside the new one")
+	assert.Equal(t, "key-new", replacement.apiKeyID)
+	keys, err := os.ReadFile(keyLog)
+	require.NoError(t, err)
+	assert.Equal(t, "sk-lw-session\nsk-lw-session-new\n", string(keys),
+		"the replacement's CLI must run on the new key")
+	assert.True(t, replacement.promptDelivered, "the replacement resumes the conversation's persisted session")
+	assert.Equal(t, []string{"key-old"}, rev.eventually(t, 1), "the retired worker's key is revoked")
+	assert.True(t, p.HasLiveWorker("conv-age", sigOf(fresh)))
 }
 
 func activeWorkers(p *Pool) int {

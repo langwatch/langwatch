@@ -380,13 +380,18 @@ function githubAppNotInstalled({
 
 /**
  * The lines the CLI prints in text mode when it has no key (sdks/typescript/src/cli/utils/
- * apiKey.ts: `missingCredentialsLines` and `checkOrgApiKey`). Matched exactly, never a
- * loose "login" pattern: other tools say "log in" for their own reasons.
+ * apiKey.ts: `missingCredentialsLines` and `checkOrgApiKey`). A whole output line must equal
+ * one, so a tool that only echoes it (a grep hit, a printed log) is not reclassified.
  */
 const CLI_MISSING_KEY_LINES = [
   "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
   "Error: LANGWATCH_API_KEY not found.",
 ];
+
+/** Per line, since `raw` (from rawFailureText) has its colour codes stripped already. */
+function printsCliMissingKeyLine(raw: string): boolean {
+  return raw.split("\n").some((line) => CLI_MISSING_KEY_LINES.includes(line.trim()));
+}
 
 /** Text mode carries no code, so the sandbox CLI's own line stands in for `missing_api_key`. */
 function sandboxMissingKeyFromText({
@@ -396,7 +401,7 @@ function sandboxMissingKeyFromText({
   toolName: string | undefined;
   raw: string | undefined;
 }): LangWatchHandledErrorShape | null {
-  if (!raw || !CLI_MISSING_KEY_LINES.some((line) => raw.includes(line))) return null;
+  if (!raw || !printsCliMissingKeyLine(raw)) return null;
   if (toolName?.startsWith(LOCAL_TOOL_PREFIX)) return null;
   return {
     code: "missing_api_key",

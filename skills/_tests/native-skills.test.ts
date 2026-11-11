@@ -28,6 +28,21 @@ function routingRows(): { skill: string; commands: string }[] {
     });
 }
 
+// Phrases only the excluded login partials carry ("log in" alone also matches
+// sample data such as "i cant log in", so it is not one of them).
+const SIGN_IN_COPY = [
+  "langwatch login",
+  "sign in",
+  "signs this machine in",
+  "where you are logging in",
+  "finishes in the browser",
+];
+
+function signInCopyIn(body: string): string[] {
+  const lower = body.toLowerCase();
+  return SIGN_IN_COPY.filter((phrase) => lower.includes(phrase));
+}
+
 function expectSameSkillFile({
   slug,
   embedRoot,
@@ -219,6 +234,17 @@ describe("native skill generation", () => {
       const body = renderSkill(setup!);
       expect(body).toContain("LANGWATCH_API_KEY");
       expect(body).toContain("LANGWATCH_ENDPOINT");
+    });
+  });
+
+  // The login partials are excluded from Langy's render because Langy already
+  // holds a key: their copy would have it tell a signed-in user to log in.
+  describe("given a skill Langy ships", () => {
+    /** @scenario "No skill Langy ships tells the reader to sign in or set up a key" */
+    it("carries no sign-in or key setup copy", () => {
+      for (const skill of skills) {
+        expect(signInCopyIn(renderSkill(skill)), `${skill.slug}: carries sign-in copy`).toEqual([]);
+      }
     });
   });
 

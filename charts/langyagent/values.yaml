@@ -39,6 +39,10 @@ manager:
   port: 8080
   maxWorkers: 20
   workerIdleMs: 600000 # 10 min — idle workers are reaped
+  # Workers older than this are retired between turns (never mid-turn) and the
+  # next turn spawns a fresh one with a fresh session key. Keep it below the
+  # 6h session key lifetime.
+  workerMaxAgeMs: 18000000 # 5h
   # How long to wait for a freshly-spawned worker to report ready before
   # aborting the spawn. Under gVisor (runsc), process/syscall startup is
   # materially slower than runc: a cold worker boot on the dev gVisor node

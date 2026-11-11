@@ -224,6 +224,18 @@ describe("presentLangyToolError", () => {
       expect(presentation.raw).toBeUndefined();
     });
 
+    /** @scenario "A sandbox tool that only echoes the CLI's missing-key line keeps its own words" */
+    it("does not reclassify a line that only contains the CLI's words", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        toolName: "bash",
+        errorText: "log.txt:Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+      });
+
+      expect(presentation.code).toBeUndefined();
+      expect(presentation.raw).toContain("log.txt:Error:");
+    });
+
     /** @scenario "A missing key printed as plain text on the developer's own machine keeps the CLI's own words" */
     it("keeps the CLI's own sign-in words for a local tool", () => {
       const presentation = presentLangyToolError({

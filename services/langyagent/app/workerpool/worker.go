@@ -77,8 +77,14 @@ type Worker struct {
 	prewarmed bool
 
 	mu sync.Mutex
+	// spawnedAt bounds the worker's life to its session key's (WorkerMaxAge).
+	spawnedAt time.Time
 	// lastSeen drives the idle reaper.
 	lastSeen time.Time
+	// retired is set, between turns only, when the pool takes the worker out of
+	// service. A turn that acquired it just before gets ClaimBusy and is
+	// re-dispatched onto a fresh worker instead of running on a dying one.
+	retired bool
 	// inFlight serializes turns on the same conversation. Two simultaneous
 	// /worker requests for one conversationID would otherwise both subscribe to
 	// the same /event stream and each terminate on the other's terminal event,
@@ -120,13 +126,46 @@ func (w *Worker) Touch() {
 	w.mu.Unlock()
 }
 
-// shouldReap reports whether the worker has been genuinely idle for longer than
-// cutoff. An in-flight turn is never idle, even when it runs longer than the
-// configured idle timeout.
-func (w *Worker) shouldReap(cutoff time.Duration) bool {
+// overAgeQuietPeriod is how long an over-age worker must sit idle before the
+// reaper retires it: a re-dispatch racing a just-finished turn must still find
+// the worker that remembers the turn, or the turn would run twice.
+const overAgeQuietPeriod = time.Minute
+
+// retireIfStale retires the worker when no turn is in flight and it has been
+// idle longer than idleCutoff, or is older than maxAge and quiet. An in-flight
+// turn is never retired, however long it runs. maxAge <= 0 disables the age rule.
+func (w *Worker) retireIfStale(idleCutoff, maxAge time.Duration) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return !w.inFlight && time.Since(w.lastSeen) > cutoff
+	idleFor := time.Since(w.lastSeen)
+	due := idleFor > idleCutoff || (w.overAgeLocked(maxAge) && idleFor > overAgeQuietPeriod)
+	return w.retireBetweenTurnsLocked(due)
+}
+
+// retireIfOverAge retires an over-age worker unless a turn is in flight.
+func (w *Worker) retireIfOverAge(maxAge time.Duration) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.retireBetweenTurnsLocked(w.overAgeLocked(maxAge))
+}
+
+// overAge reports whether the worker has outlived maxAge (<= 0 disables).
+func (w *Worker) overAge(maxAge time.Duration) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.overAgeLocked(maxAge)
+}
+
+func (w *Worker) overAgeLocked(maxAge time.Duration) bool {
+	return maxAge > 0 && time.Since(w.spawnedAt) > maxAge
+}
+
+func (w *Worker) retireBetweenTurnsLocked(due bool) bool {
+	if !due || w.inFlight {
+		return false
+	}
+	w.retired = true
+	return true
 }
 
 // idleSince reports the worker's idle state for capacity eviction: whether no
@@ -156,6 +195,9 @@ func (w *Worker) ClaimTurn(turnID string) app.ClaimOutcome {
 		if _, done := w.handled[turnID]; done {
 			return app.ClaimAlreadyHandled
 		}
+	}
+	if w.retired {
+		return app.ClaimBusy
 	}
 	w.inFlight = true
 	w.currentTurnID = turnID

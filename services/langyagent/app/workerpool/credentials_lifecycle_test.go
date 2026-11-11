@@ -225,3 +225,67 @@ func TestSignatureOf_IgnoresTheSessionKey(t *testing.T) {
 	assert.Equal(t, sigOf(base), sigOf(rotated),
 		"a different session key must not look like a capability change")
 }
+
+// A worker past its max age is retired between turns, never under one: the
+// running turn finishes on it, a keyed turn arriving meanwhile gets the same
+// worker back, and only once the worker has gone quiet is it retired and its
+// key revoked.
+//
+// @scenario "An over-age worker finishes its running turn before it is retired"
+func TestReap_OverAgeWorkerIsNeverRetiredMidTurn(t *testing.T) {
+	rev := &recordingRevoker{}
+	p := newLifecyclePool(t, rev)
+	t.Cleanup(p.Shutdown)
+	p.workerIdle = time.Hour
+	p.workerMaxAge = time.Hour
+
+	creds := spawnableCreds()
+	w := &Worker{
+		conversationID: "conv-old", credSig: sigOf(creds),
+		apiKeyID: "key-old", langwatchEndpoint: "http://cp",
+		spawnedAt: time.Now().Add(-2 * time.Hour), lastSeen: time.Now().Add(-2 * time.Hour),
+	}
+	require.Equal(t, app.ClaimGranted, w.ClaimTurn("turn-long"))
+	p.mu.Lock()
+	p.workers["conv-old"] = w
+	p.mu.Unlock()
+
+	p.reapIdle()
+	got, err := p.Acquire(context.Background(), "conv-old", creds)
+	require.NoError(t, err)
+	assert.Same(t, w, got, "a keyed turn must not replace a worker whose turn is still running")
+	assert.Equal(t, 1, activeWorkers(p), "an over-age worker with a turn in flight must stay in service")
+	time.Sleep(50 * time.Millisecond)
+	assert.Empty(t, rev.revoked(), "the running turn's key must not be revoked under it")
+
+	w.Release()
+	assert.Equal(t, app.ClaimAlreadyHandled, w.ClaimTurn("turn-long"), "the running turn completed on its worker")
+
+	w.mu.Lock()
+	w.lastSeen = time.Now().Add(-2 * overAgeQuietPeriod)
+	w.mu.Unlock()
+	p.reapIdle()
+	assert.Zero(t, activeWorkers(p), "a quiet over-age worker is retired between turns")
+	assert.Equal(t, []string{"key-old"}, rev.eventually(t, 1), "retiring it revokes its key")
+	assert.Equal(t, app.ClaimBusy, w.ClaimTurn("turn-next"),
+		"a turn holding the retired worker is re-dispatched, never run on it")
+}
+
+// An over-age worker's key is close to expiry, so the probe answers false and
+// the control plane mints a fresh key for the next turn.
+//
+// @scenario "The probe asks for a fresh key once the worker is past its max age"
+func TestHasLiveWorker_FalseForAnOverAgeWorker(t *testing.T) {
+	p := newLifecyclePool(t, nil)
+	t.Cleanup(p.Shutdown)
+	p.workerMaxAge = time.Hour
+	sig := sigOf(spawnableCreds())
+
+	p.mu.Lock()
+	p.workers["conv-fresh"] = &Worker{conversationID: "conv-fresh", credSig: sig, spawnedAt: time.Now()}
+	p.workers["conv-aged"] = &Worker{conversationID: "conv-aged", credSig: sig, spawnedAt: time.Now().Add(-2 * time.Hour)}
+	p.mu.Unlock()
+
+	assert.True(t, p.HasLiveWorker("conv-fresh", sig), "a young worker's key is still good")
+	assert.False(t, p.HasLiveWorker("conv-aged", sig), "an over-age worker must make the control plane mint")
+}
