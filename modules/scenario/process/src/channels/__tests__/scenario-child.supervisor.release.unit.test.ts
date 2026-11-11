@@ -72,7 +72,7 @@ async function releaseThenClose({
 
 describe("given a scenario child process", () => {
   describe("when the processor releases it and SIGTERM ends it", () => {
-    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    /** @scenario A child the processor released is logged at info, not error */
     it("logs the close at info and never at error", async () => {
       const log = await releaseThenClose({ killed: true, code: null, signal: "SIGTERM" });
 
@@ -87,7 +87,7 @@ describe("given a scenario child process", () => {
   });
 
   describe("when the processor releases a child that traps SIGTERM and exits with a code", () => {
-    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    /** @scenario A child the processor released is logged at info, not error */
     it("logs the close at info, carrying the exit code and no signal", async () => {
       const log = await releaseThenClose({ killed: true, code: 1, signal: null });
 
@@ -101,7 +101,7 @@ describe("given a scenario child process", () => {
   });
 
   describe("when the processor releases it but something else ended it", () => {
-    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    /** @scenario A released child that something else ended is still logged at error */
     it.each([
       { name: "SIGKILL", killed: true, code: null, signal: "SIGKILL" as const },
       { name: "a numeric exit before the abort", killed: false, code: 1, signal: null },
@@ -120,7 +120,7 @@ describe("given a scenario child process", () => {
   });
 
   describe("when nobody released it and it is killed", () => {
-    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    /** @scenario A child nobody released that dies by itself is logged at error */
     it("still logs the close at error", () => {
       const { child, log } = supervised({ killed: true });
 
@@ -135,7 +135,7 @@ describe("given a scenario child process", () => {
   });
 
   describe("when the processor releases it", () => {
-    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    /** @scenario Stopping a child closes its stdin so a child still reading its job can stop */
     it("ends its stdin after the kill, so a child blocked reading its job can stop", async () => {
       const { child, session, calls } = supervised({ killed: true });
       const aborted = session.abort();
@@ -145,7 +145,7 @@ describe("given a scenario child process", () => {
       expect(calls).toEqual(["kill", "end"]);
     });
 
-    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    /** @scenario Stopping a child closes its stdin so a child still reading its job can stop */
     it("does not throw when a stdin end throws, and still counts as released", async () => {
       const { child, end, log, session } = supervised({ killed: true });
       end.mockImplementation(() => {
@@ -163,7 +163,7 @@ describe("given a scenario child process", () => {
       );
     });
 
-    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    /** @scenario Stopping a child closes its stdin so a child still reading its job can stop */
     it("does not throw after the job was already sent and stdin ended", async () => {
       const { child, session } = supervised({ killed: true });
       const completion = session.execute({} as never);
@@ -176,7 +176,7 @@ describe("given a scenario child process", () => {
   });
 
   describe("when it runs past the timeout", () => {
-    /** @scenario A child the processor released is logged at info, a child that dies by itself still at error */
+    /** @scenario Stopping a child closes its stdin so a child still reading its job can stop */
     it("kills it, then ends its stdin, and logs the timeout at error", () => {
       vi.useFakeTimers();
       try {

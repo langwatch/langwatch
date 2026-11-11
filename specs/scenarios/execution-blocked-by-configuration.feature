@@ -51,15 +51,28 @@ Feature: A simulation blocked by the project's own configuration says so
     And nothing is logged at error level
 
   @unit @scenario-child
-  Scenario: A child the processor released is logged at info, a child that dies by itself still at error
+  Scenario: A child the processor released is logged at info, not error
     Given a scenario child process the processor has released on purpose
     When the child closes because of the SIGTERM the release sent, or exits with a code after trapping it
     Then the close is logged at info level and not at error level
-    But a released child that any other signal killed is logged at error level
-    And a child that exited before the release could signal it is logged at error level
-    And the release closes the child's stdin so a child still reading its job can stop
-    And a child stopped by the timeout has its stdin closed too
-    And a child that closes without an exit code and was not released is logged at error level
+
+  @unit @scenario-child
+  Scenario: A released child that something else ended is still logged at error
+    Given a scenario child process the processor has released on purpose
+    When the child closes from any other signal, or exits before the release could signal it
+    Then the close is logged at error level
+
+  @unit @scenario-child
+  Scenario: A child nobody released that dies by itself is logged at error
+    Given a scenario child process the processor has not released
+    When the child closes without an exit code
+    Then the close is logged at error level
+
+  @unit @scenario-child
+  Scenario: Stopping a child closes its stdin so a child still reading its job can stop
+    Given a scenario child process still reading its job from stdin
+    When the processor releases it, or the timeout stops it
+    Then the child's stdin is closed after the kill
 
   @unit @scenario-prefetch
   Scenario: A failure we do not recognise stays ours

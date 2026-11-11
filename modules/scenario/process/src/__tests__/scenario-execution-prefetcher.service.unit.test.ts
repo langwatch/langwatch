@@ -2855,7 +2855,7 @@ describe("prefetchWithFixture, given a project with no usable model", () => {
     it("refuses the run with the remediation message and logs a warning, not an error", async () => {
       const { result, jobLogger } = await refusalFor(
         new ModelNotConfiguredError({
-          featureKey: "scenarios.simulator",
+          featureKey: "scenarios.user_simulator",
           role: "DEFAULT",
           featureDisplayName: "Scenario simulator",
           projectId,
@@ -2864,7 +2864,7 @@ describe("prefetchWithFixture, given a project with no usable model", () => {
 
       expect(result.reason).toBe("model_not_configured");
       expect(result.error).toBe(
-        `No model configured for "scenarios.simulator" (role: DEFAULT, project: ${projectId}).`,
+        `No model configured for "scenarios.user_simulator" (role: DEFAULT, project: ${projectId}).`,
       );
       expect(jobLogger.error).not.toHaveBeenCalled();
       expect(jobLogger.warn).toHaveBeenCalledWith(
@@ -2878,7 +2878,7 @@ describe("prefetchWithFixture, given a project with no usable model", () => {
     /** @scenario A project whose only models are restricted for a scenario feature gets the run refused, logged as a warning */
     it("refuses the run with the restriction message and logs a warning, not an error", async () => {
       const restricted = new ModelRestrictedForFeatureError({
-        featureKey: "scenarios.simulator",
+        featureKey: "scenarios.user_simulator",
         role: "DEFAULT",
         featureDisplayName: "Scenario simulator",
         projectId,
