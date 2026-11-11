@@ -403,6 +403,50 @@ describe("EvaluatorModule", () => {
       expect(created).toMatchObject({ type: "workflow", workflowId: "workflow-1" });
       expect(resolveModelForFeature).not.toHaveBeenCalled();
     });
+
+    /** @scenario The application refuses an evaluator kind that does not match its workflow link */
+    it("refuses a workflow evaluator that names no workflow", async () => {
+      const { app, repository } = harness();
+      const create = vi.spyOn(repository, "create");
+
+      await expect(
+        app.createWithResolvedDefaults({
+          projectId: "project-1",
+          name: "Unlinked",
+          type: "workflow",
+          config: {},
+        }),
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        meta: { fieldErrors: { workflowId: expect.any(Array) } },
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a non-workflow evaluator names a workflow", () => {
+    /** @scenario The application refuses an evaluator kind that does not match its workflow link */
+    it.each([
+      { type: "code" as const, config: runnableCode },
+      { type: "evaluator" as const, config: { evaluatorType: "langevals/exact_match" } },
+    ])("refuses the $type evaluator before anything is stored", async ({ type, config }) => {
+      const { app, repository } = harness();
+      const create = vi.spyOn(repository, "create");
+
+      await expect(
+        app.createWithResolvedDefaults({
+          projectId: "project-1",
+          name: "Linked",
+          type,
+          config,
+          workflowId: "workflow-1",
+        }),
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        meta: { fieldErrors: { workflowId: expect.any(Array) } },
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
   });
 
   describe("when a code evaluator carries no program", () => {

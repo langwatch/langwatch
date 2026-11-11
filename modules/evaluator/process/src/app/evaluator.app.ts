@@ -518,8 +518,9 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     id?: string;
     caller?: EvaluatorCaller;
   }): Promise<Evaluator> {
-    await this.#dependencies.creationCaps.assertCreationAllowed({ projectId: input.projectId });
     const type = input.type ?? "evaluator";
+    assertWorkflowLink(type, input.workflowId);
+    await this.#dependencies.creationCaps.assertCreationAllowed({ projectId: input.projectId });
     if (type !== "evaluator") {
       return this.#createGuarded({
         id: input.id ?? newEvaluatorId(),
@@ -792,6 +793,23 @@ function usesEmbeddingsModel(config: EvaluatorConfig): boolean {
   if (!definition || !("settings" in definition)) return false;
 
   return "embeddings_model" in definition.settings;
+}
+
+/**
+ * Only a workflow evaluator links a workflow, and it always does: an unlinked one would
+ * fall back to native execution, and a linked code one would archive the workflow with it.
+ */
+function assertWorkflowLink(type: EvaluatorType, workflowId: string | undefined): void {
+  if ((type === "workflow") === Boolean(workflowId)) return;
+
+  const message =
+    type === "workflow"
+      ? 'A "workflow" evaluator needs the workflowId of the workflow it wraps.'
+      : 'Only a "workflow" evaluator names a workflowId.';
+  throw new ValidationError(message, {
+    fault: "customer",
+    meta: { fieldErrors: { workflowId: [message] }, formErrors: [] },
+  });
 }
 
 /** Code evaluators carry their program on `config`; nothing else can run one. */

@@ -22,8 +22,11 @@ const refuse = (message: string, fields: string[]): never => {
 
 /** `name` or `name:type`, the type defaulting to `str` as the editor's does. */
 const parseCodeInput = (spec: string): { identifier: string; type: string } => {
-  const [identifier = "", type = "str"] = spec.split(":", 2).map((part) => part.trim());
-  if (!identifier || !type) refuse(`--input "${spec}" must be name or name:type`, ["input"]);
+  const parts = spec.split(":").map((part) => part.trim());
+  const [identifier = "", type = "str"] = parts;
+  if (parts.length > 2 || !identifier || !type) {
+    refuse(`--input "${spec}" must be name or name:type`, ["input"]);
+  }
   return { identifier, type };
 };
 
@@ -86,6 +89,12 @@ export const createEvaluatorCommand = async (
       "Pass exactly one of --type <evaluatorType> (a built-in evaluator) or --code <file> (a custom code evaluator)",
       ["type", "code"],
     );
+  }
+  if (options.type !== void 0 && options.input?.length) {
+    refuse("--input declares a code evaluator's inputs; a built-in --type takes none", [
+      "type",
+      "input",
+    ]);
   }
   const body =
     options.code === void 0

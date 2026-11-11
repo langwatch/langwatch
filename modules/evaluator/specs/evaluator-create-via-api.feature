@@ -54,6 +54,13 @@ Feature: The public API creates every kind of evaluator the editor can
     Then the request fails as a validation error naming workflowId
     And nothing is created
 
+  @unit
+  Scenario: The application refuses an evaluator kind that does not match its workflow link
+    Given a caller that reaches the application without the REST schema
+    When it creates a workflow evaluator with no workflowId, or a code or built-in one with a workflowId
+    Then the create fails as a validation error naming workflowId
+    And nothing is stored
+
   @integration
   Scenario: A create that names no type still makes a built-in evaluator
     When I POST an evaluator with no type and a config naming a built-in evaluatorType
@@ -64,6 +71,11 @@ Feature: The public API creates every kind of evaluator the editor can
     When I run "langwatch evaluator create 'Exact' --code check.py --input output --input expected_output"
     Then the create request is sent with type "code", the file's code and those inputs
     And no built-in evaluator type is required
+
+  @unit
+  Scenario: The CLI refuses input declarations a code evaluator cannot take
+    When I run "langwatch evaluator create" with "--input output:str:extra", or "--input" beside a built-in "--type"
+    Then the command fails as a validation error before calling the API
 
   @unit
   Scenario: The TypeScript SDK creates a code evaluator

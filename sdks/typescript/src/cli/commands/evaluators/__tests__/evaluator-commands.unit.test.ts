@@ -372,6 +372,26 @@ describe("createEvaluatorCommand()", () => {
 
       expect(mockCreate).not.toHaveBeenCalled();
     });
+
+    /** @scenario The CLI refuses input declarations a code evaluator cannot take */
+    it("refuses an input with more than name and type, before calling the API", async () => {
+      const code = await jsonErrorCode(() =>
+        createEvaluatorCommand("Exact", { code: codeFile, input: ["output:str:extra"] }),
+      );
+
+      expect(code).toBe("validation_error");
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The CLI refuses input declarations a code evaluator cannot take */
+    it("refuses --input beside a built-in --type, before calling the API", async () => {
+      const code = await jsonErrorCode(() =>
+        createEvaluatorCommand("Exact", { type: "langevals/exact_match", input: ["output"] }),
+      );
+
+      expect(code).toBe("validation_error");
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
   });
 });
 
