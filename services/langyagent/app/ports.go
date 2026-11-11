@@ -34,7 +34,7 @@ type WorkerPool interface {
 	// idle worker (a pre-warmed pool must never starve a real turn) and only
 	// returns herr(domain.ErrMaxWorkers) when every worker is busy. A herr with
 	// domain.ErrCredentialsRequired is returned when a spawn is needed but the
-	// credentials carry no session key — see HasLiveWorker. turnID (empty from an
+	// credentials carry no session key; see HasLiveWorker. turnID (empty from an
 	// older control plane) keeps a re-dispatch of a turn on the worker that ran it.
 	Acquire(ctx context.Context, conversationID, turnID string, creds domain.Credentials) (Worker, error)
 	// AcquireWarm is Acquire for a pre-warm: best-effort by contract, so at
