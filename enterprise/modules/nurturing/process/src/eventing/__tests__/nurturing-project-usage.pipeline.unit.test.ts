@@ -23,6 +23,7 @@ import {
   SIMULATION_RUN_EVENT_TYPES,
   SIMULATION_SET_CREATED_EVENT_TYPE,
 } from "@langwatch/scenario-contract";
+import { createTestLogger } from "@langwatch/test-harness";
 import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -388,7 +389,7 @@ describe("the trace syncs", () => {
         sent.push(...calls);
       },
       clock: { nowMs: () => OCCURRED_AT + 60_000 },
-      logger: { warn: () => {} },
+      logger: createTestLogger().logger,
     });
     const { firstTrace } = nurturingTraceUsageSyncSubscribers((input) =>
       usage.tracesChanged(input),

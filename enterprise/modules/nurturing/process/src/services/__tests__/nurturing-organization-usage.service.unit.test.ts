@@ -5,7 +5,8 @@
  */
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 import { createTenantId } from "@langwatch/eventing";
-import { describe, expect, it, vi } from "vitest";
+import { createTestLogger } from "@langwatch/test-harness";
+import { describe, expect, it } from "vitest";
 
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
@@ -26,7 +27,7 @@ import type {
 import { NurturingOrganizationUsageService } from "../nurturing-organization-usage.service.ts";
 
 /** The service's logger, to read what it reported. */
-const logger = { warn: vi.fn() };
+const { logger, lines } = createTestLogger();
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 10, 20, 12);
@@ -363,7 +364,7 @@ describe("NurturingOrganizationUsageService", () => {
 
     /** @scenario "A failed identify is reported and swallowed" */
     it("reports and swallows a refused identify, the group call already sent", async () => {
-      logger.warn.mockClear();
+      lines.length = 0;
       const { service, sent } = await serviceOver({
         placed,
         members: await membersOver(new Map([["admin-1", ["org-1"]]])),
@@ -375,15 +376,14 @@ describe("NurturingOrganizationUsageService", () => {
       await expect(service.usageChanged({ projectId: "project-1" })).resolves.toBeUndefined();
 
       expect(sent.map((calls) => calls.map((call) => call.type))).toEqual([["group"]]);
-      expect(logger.warn).toHaveBeenCalledWith(
-        expect.objectContaining({ organizationId: "org-1" }),
-        expect.any(String),
-      );
+      const warned = lines.filter((line) => line.level === 40);
+      expect(warned).toHaveLength(1);
+      expect(warned[0]).toMatchObject({ organizationId: "org-1", msg: expect.any(String) });
     });
 
     /** @scenario "A failed identify is reported and swallowed" */
     it("reports and swallows a members read that failed", async () => {
-      logger.warn.mockClear();
+      lines.length = 0;
       const { service, sent } = await serviceOver({
         placed,
         members: {
@@ -394,7 +394,7 @@ describe("NurturingOrganizationUsageService", () => {
       await expect(service.usageChanged({ projectId: "project-1" })).resolves.toBeUndefined();
 
       expect(sent).toHaveLength(1);
-      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(lines.filter((line) => line.level === 40)).toHaveLength(1);
     });
   });
 

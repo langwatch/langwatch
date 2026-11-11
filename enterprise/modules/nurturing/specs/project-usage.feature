@@ -203,7 +203,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     And a later batch of the project is dropped at once, with no read, no retry and no failure
     And once the project's copy lands, its first-seen row and that worker's cached drop are deleted
     And its next trace counts
-    And on another worker, once its cached drop is older than ten minutes, the copy is read again and its next trace counts
+    And on another worker, once its cached drop is ten minutes old, the copy is read again and its next trace counts
 
   @unit @integration
   Scenario: The retry window is real time from first seen, shared by every worker and kept across a restart
