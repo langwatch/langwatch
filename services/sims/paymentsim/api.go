@@ -590,7 +590,7 @@ func (s *Server) meterSummaries(r *http.Request, p params) (any, error) {
 		return nil, invalid("start_time", "start_time and end_time must be minute-aligned Unix timestamps, with start_time before end_time.")
 	}
 	summary := map[string]any{
-		"id": s.st.id("mtrusg"), "object": "billing.meter_event_summary", "aggregated_value": s.usage(m.EventName, p.str("customer"), start, end),
+		"id": s.st.id("mtrusg"), "object": "billing.meter_event_summary", "aggregated_value": s.usage(m.EventName, usageWindow{customer: p.str("customer"), from: start, to: end}),
 		"end_time": end, "livemode": false, "meter": m.ID, "start_time": start,
 	}
 	return listOf([]map[string]any{summary}, false, "/v1/billing/meters/"+m.ID+"/event_summaries"), nil

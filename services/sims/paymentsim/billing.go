@@ -81,11 +81,17 @@ func orZero(n *int64) int64 {
 	return *n
 }
 
-// usage sums a customer's meter events for eventName in [from, to).
-func (s *Server) usage(eventName, customer string, from, to int64) float64 {
+// usageWindow is whose meter events to sum, and over which [from, to) period.
+type usageWindow struct {
+	customer string
+	from, to int64
+}
+
+// usage sums a customer's meter events for eventName in the window.
+func (s *Server) usage(eventName string, w usageWindow) float64 {
 	var total float64
 	for _, e := range s.st.meterEvents {
-		if e.EventName == eventName && e.Customer == customer && e.Timestamp >= from && e.Timestamp < to {
+		if e.EventName == eventName && e.Customer == w.customer && e.Timestamp >= w.from && e.Timestamp < w.to {
 			total = addDecimal(total, e.Value)
 		}
 	}
@@ -121,12 +127,12 @@ func meteredAmount(p *Price, used float64) int64 {
 	return amountFor(p, int64(math.Round(used)))
 }
 
-func (s *Server) meteredUsage(p *Price, customer string, from, to int64) float64 {
+func (s *Server) meteredUsage(p *Price, w usageWindow) float64 {
 	if p.Recurring == nil || p.Recurring.Meter == nil {
 		return 0
 	}
 	if m := s.st.meterByID(*p.Recurring.Meter); m != nil {
-		return s.usage(m.EventName, customer, from, to)
+		return s.usage(m.EventName, w)
 	}
 	return 0
 }
@@ -253,7 +259,7 @@ func (s *Server) billPeriod(sub *Subscription, reason string, start, end, usedFr
 		qty, period := orZero(it.Quantity), Period{Start: start, End: end}
 		amount := amountFor(full, qty)
 		if isMetered(it.Price) {
-			used := s.meteredUsage(full, sub.Customer, usedFrom, usedTo)
+			used := s.meteredUsage(full, usageWindow{customer: sub.Customer, from: usedFrom, to: usedTo})
 			qty, amount, period = int64(math.Round(used)), meteredAmount(full, used), Period{Start: usedFrom, End: usedTo}
 		}
 		s.addLine(inv, &Line{Amount: amount, Price: it.Price, Quantity: ptr(qty), Period: period, Subscription: ptr(sub.ID), Type: "subscription"})
