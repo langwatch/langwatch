@@ -10,9 +10,11 @@ const lwqlCapability = LangWatchQLCapabilityService.create();
 
 const logger = createLogger("langwatch:lwql-key-map-service");
 
-/** Where the rows go: the restricted identity's names, and the database the approved views read. */
+/** Where the rows go: the restricted identity's names, the key-map database, and the writer. */
 type LwqlKeyMapTarget = Readonly<{
   connection: LangWatchQLConnection;
+  /** Writes through the LangWatchQL admin target only (ADR-200). */
+  repository: LwqlKeyMapRepository;
   /** The app's own ClickHouse database, which holds the key map (migration 00084). */
   sourceDatabase: string;
 }>;
@@ -25,7 +27,6 @@ type LwqlKeyMapTarget = Readonly<{
 export class LwqlKeyMapService {
   private constructor(
     private readonly deps: {
-      repository: LwqlKeyMapRepository;
       projects: Pick<ProjectApi, "findById">;
       /** Absent where the deployment offers no LangWatchQL. */
       target?: LwqlKeyMapTarget;
@@ -33,7 +34,6 @@ export class LwqlKeyMapService {
   ) {}
 
   static create(options: {
-    repository: LwqlKeyMapRepository;
     projects: Pick<ProjectApi, "findById">;
     target?: LwqlKeyMapTarget;
   }): LwqlKeyMapService {
@@ -42,7 +42,7 @@ export class LwqlKeyMapService {
 
   /** Nothing to write without LangWatchQL, for a deleted project, or for an empty key. */
   async syncProject(input: { projectId: string }): Promise<void> {
-    const { target, projects, repository } = this.deps;
+    const { target, projects } = this.deps;
     if (!target) return;
 
     const project = await projects.findById(input.projectId);
@@ -59,6 +59,6 @@ export class LwqlKeyMapService {
       KeyHash: lwqlCapability.tenantCapability({ secret: project.lwqlKey }),
       TenantId: project.id,
     };
-    await repository.insertRow({ row, sourceDatabase: target.sourceDatabase });
+    await target.repository.insertRow({ row, sourceDatabase: target.sourceDatabase });
   }
 }

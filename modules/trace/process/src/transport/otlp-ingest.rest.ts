@@ -16,6 +16,8 @@ import {
   decodeBase64OpenTelemetryId,
   ingestDoorRefusalBody,
   ingestDoorRefusalStatus,
+  recordIngestDoorRefusal,
+  withClientFaultSpan,
   isIngestDoorRefusal,
   logCorrectedOtlpPath,
   OTLP_CORRECTED_PATH_HEADER,
@@ -79,12 +81,7 @@ export const otlpIngestDoor = defineRestDoor("otlp_ingest", {
     } catch (error) {
       if (!isIngestDoorRefusal(error)) throw error;
 
-      loggerTraces.warn(
-        { ...diagnostics, refusalStatus: ingestDoorRefusalStatus(error) },
-        diagnostics.hasEmptyAuthToken
-          ? "Authentication failed: X-Auth-Token sent but empty"
-          : "Authentication failed",
-      );
+      recordIngestDoorRefusal({ logger: loggerTraces, signal: "traces", error, diagnostics });
       throw error;
     }
   },
@@ -293,9 +290,13 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request, response, session }) =>
     response.write(
-      await getLangWatchTracer("langwatch.otel.traces").withActiveSpan(
-        "TracesV1.handleTracesRequest",
-        { kind: SpanKind.SERVER },
+      await withClientFaultSpan<Span, OtlpAnswer>(
+        (run) =>
+          getLangWatchTracer("langwatch.otel.traces").startActiveSpan(
+            "TracesV1.handleTracesRequest",
+            { kind: SpanKind.SERVER },
+            run,
+          ),
         (span) =>
           handleTracesRequest({ request, span, rawBytes: raw, ports: app, credential: session }),
       ),

@@ -23,7 +23,11 @@ import {
   LWQL_CLICKHOUSE_EVENT_TABLES,
   LWQL_TRACES_CATALOGUE,
 } from "./lwql-catalogue.rules.ts";
-import { contentFilteredMapSql } from "./lwql-content-gating.rules.ts";
+import {
+  contentFilteredMapSql,
+  plainKeyedMapSql,
+  plainStringMapSql,
+} from "./lwql-content-gating.rules.ts";
 import {
   catalogueColumnGates,
   type UngatedViewDefinition,
@@ -369,21 +373,21 @@ const SPANS: UngatedViewDefinition = {
     },
     {
       name: "SpanAttributes",
-      // Not the source's `Map(LowCardinality(String), String)`: `mapFilter`
-      // returns a plain-keyed map, and the catalog publishes what the view
-      // returns rather than what the table stores.
+      // Not the source's `Map(LowCardinality(String), String)`: the view casts to
+      // one type every server version returns (plainStringMapSql).
       type: "Map(String, String)",
       description:
         "Span attributes, with every captured-content key removed. Content is reachable only through CapturedInput and CapturedOutput.",
       sourceColumns: ["SpanAttributes"],
-      expression: (source) => contentFilteredMapSql(source("SpanAttributes")),
+      expression: (source) => plainStringMapSql(contentFilteredMapSql(source("SpanAttributes"))),
     },
     {
       name: "ResourceAttributes",
       type: "Map(String, String)",
       description: "Resource attributes, with every captured-content key removed.",
       sourceColumns: ["ResourceAttributes"],
-      expression: (source) => contentFilteredMapSql(source("ResourceAttributes")),
+      expression: (source) =>
+        plainStringMapSql(contentFilteredMapSql(source("ResourceAttributes"))),
     },
     {
       name: "CapturedInput",
@@ -1609,7 +1613,11 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
       type: "Map(String, UInt32)",
       description: "Calls per tool.",
       sourceColumns: ["ToolCounts"],
-      expression: (source) => contentFilteredMapSql(source("ToolCounts")),
+      expression: (source) =>
+        plainKeyedMapSql({
+          mapSql: contentFilteredMapSql(source("ToolCounts")),
+          valueType: "UInt32",
+        }),
     },
     {
       name: "ToolDurationMs",
@@ -1617,7 +1625,11 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
       unit: "ms",
       description: "Milliseconds spent per tool.",
       sourceColumns: ["ToolDurationMs"],
-      expression: (source) => contentFilteredMapSql(source("ToolDurationMs")),
+      expression: (source) =>
+        plainKeyedMapSql({
+          mapSql: contentFilteredMapSql(source("ToolDurationMs")),
+          valueType: "UInt64",
+        }),
     },
     {
       name: "FilesTouched",
@@ -1772,7 +1784,11 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
       type: "Map(String, UInt32)",
       description: "Compactions by trigger kind.",
       sourceColumns: ["CompactionTriggers"],
-      expression: (source) => contentFilteredMapSql(source("CompactionTriggers")),
+      expression: (source) =>
+        plainKeyedMapSql({
+          mapSql: contentFilteredMapSql(source("CompactionTriggers")),
+          valueType: "UInt32",
+        }),
     },
     {
       name: "CompactionTokensBefore",
@@ -1819,7 +1835,11 @@ const CODING_AGENT_SESSIONS: UngatedViewDefinition = {
       type: "Map(String, UInt32)",
       description: "Failures by error class.",
       sourceColumns: ["ErrorTypes"],
-      expression: (source) => contentFilteredMapSql(source("ErrorTypes")),
+      expression: (source) =>
+        plainKeyedMapSql({
+          mapSql: contentFilteredMapSql(source("ErrorTypes")),
+          valueType: "UInt32",
+        }),
     },
     {
       name: "ApiErrors",
@@ -3061,6 +3081,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       _size_bytes: "inherit",
       ExpectedTargetResults: "inherit",
       ExpectedEvaluatorResults: "inherit",
+      Concurrency: "inherit",
     },
   }),
   gateway_budget_ledger: defineTableCatalogue({
@@ -3157,6 +3178,7 @@ export const LWQL_CLICKHOUSE_CATALOGUE = defineLwqlCatalog({
       TokensInputImage: "inherit",
       TokensOutputImage: "inherit",
       ImageCount: "inherit",
+      WebSearchRequests: "inherit",
     },
   }),
   governance_cost_restatements: defineTableCatalogue({

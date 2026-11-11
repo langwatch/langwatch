@@ -8,6 +8,10 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  DIMENSION_COMPAT_PROBE,
+  dimensionCompatSettingFor,
+} from "@langwatch/clickhouse-migrations";
 
 /**
  * The shipped migration files, resolved through `@langwatch/clickhouse-migrations`,
@@ -60,16 +64,20 @@ export async function replayGooseMigrationUp({
     throw new Error(`no Up statements found in migration ${fileName}`);
   }
 
-  const variables = await resolveMigrationVariables(client);
+  const variables = await resolveMigrationVariables({ client, fileName });
   for (const statement of statements) {
     await client.command({ query: substitute({ statement, variables, fileName }) });
   }
 }
 
 /** The variables goose's own bootstrap resolves, read off the live server. */
-async function resolveMigrationVariables(
-  client: ClickHouseClient,
-): Promise<Record<string, string>> {
+async function resolveMigrationVariables({
+  client,
+  fileName,
+}: {
+  client: ClickHouseClient;
+  fileName: string;
+}): Promise<Record<string, string>> {
   const [databaseRow] = await client
     .query({ query: "SELECT currentDatabase() AS db", format: "JSONEachRow" })
     .then((result) => result.json<{ db: string }>());
@@ -83,11 +91,23 @@ async function resolveMigrationVariables(
     })
     .then((result) => result.json());
   const cluster = process.env.CLICKHOUSE_CLUSTER || undefined;
+  const enforcing = await client
+    .query({
+      query: DIMENSION_COMPAT_PROBE.query,
+      query_params: DIMENSION_COMPAT_PROBE.params,
+      format: "JSONEachRow",
+    })
+    .then((result) => result.json());
+  const dimensionCompat = dimensionCompatSettingFor({
+    version: Number.parseInt(fileName, 10),
+    serverEnforces: enforcing.length > 0,
+  });
 
   return {
     CLICKHOUSE_DATABASE: database,
+    // goose's compat pass rides the same substitution (goose.migration-runner.ts).
     CLICKHOUSE_STORAGE_POLICY_SETTING:
-      policies.length > 0 ? ", storage_policy = 'local_primary'" : "",
+      (policies.length > 0 ? ", storage_policy = 'local_primary'" : "") + dimensionCompat,
     CLICKHOUSE_ENGINE_MERGETREE: cluster ? "ReplicatedMergeTree()" : "MergeTree()",
     CLICKHOUSE_ENGINE_REPLACING_PREFIX: cluster
       ? "ReplicatedReplacingMergeTree("

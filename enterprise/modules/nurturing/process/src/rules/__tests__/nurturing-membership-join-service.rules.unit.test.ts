@@ -2,10 +2,12 @@
  * What an SSO auto-add tells Customer.io.
  * @see specs/features/customer-io-nurturing-integration.feature
  */
+import { Temporal } from "@langwatch/time";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   fireInviteAccepted,
+  fireJoinedOrganization,
   fireSsoAutoAdded,
 } from "../nurturing-membership-join-service.rules.ts";
 
@@ -41,18 +43,21 @@ describe("fireSsoAutoAdded", () => {
 const joinSource = {
   sourceEventId: "event-1",
   tenantId: "org-1",
-  occurredAt: 1_792_664_000_123,
+  occurredAt: Temporal.Instant.from("2026-11-07T00:00:00Z").epochMilliseconds,
   userId: "user-1",
   organizationId: "org-1",
   organizationName: "Acme Corp",
 };
 const noTraces = { hasTraces: false, lastTraceAt: null };
 
-const inviteTrack = (role?: string) =>
+const inviteCalls = (role?: string) =>
   fireInviteAccepted({
     signal: { kind: "invite_accepted", ...joinSource, role },
     traces: noTraces,
-  }).find((call) => call.type === "track");
+  });
+const tracksOf = (calls: ReturnType<typeof inviteCalls>) =>
+  calls.filter((call) => call.type === "track");
+const inviteTrack = (role?: string) => tracksOf(inviteCalls(role))[0];
 
 describe("joined_via_invite", () => {
   describe.each([
@@ -100,5 +105,49 @@ describe("joined_via_sso", () => {
   /** @scenario "A join event with no known role carries no seat" */
   it("omits seat when the event carries no role", () => {
     expect(ssoTrack()).not.toHaveProperty("properties.seat");
+  });
+});
+
+describe("joined_organization", () => {
+  const CUT_OFF = Temporal.Instant.from("2026-11-06T00:00:00Z").epochMilliseconds;
+  const invite = (overrides: { role?: string; occurredAt?: number } = {}) =>
+    fireJoinedOrganization({ kind: "invite_accepted", ...joinSource, ...overrides })[0];
+
+  /** @scenario "A join is tracked as joined_organization beside its own event" */
+  it("is decided with the invite method, the seat and a stable message id", () => {
+    expect(invite({ role: "MEMBER" })).toEqual({
+      type: "track",
+      userId: "user-1",
+      event: "joined_organization",
+      messageId: "joined_organization:user-1:org-1",
+      properties: {
+        organization_id: "org-1",
+        organization_name: "Acme Corp",
+        seat: "member",
+        join_method: "invite",
+      },
+    });
+  });
+
+  /** @scenario "A join is tracked as joined_organization beside its own event" */
+  it("carries the sso method for an SSO add", () => {
+    expect(fireJoinedOrganization({ kind: "sso_auto_added", ...joinSource })[0]).toMatchObject({
+      properties: { join_method: "sso" },
+    });
+  });
+
+  /** @scenario "A join is tracked as joined_organization beside its own event" */
+  it("is not one of the join's own calls, which keep joined_via_invite", () => {
+    expect(tracksOf(inviteCalls()).map((call) => call.event)).toEqual(["joined_via_invite"]);
+  });
+
+  /** @scenario "A join at the cut-off is tracked as joined_organization, one a millisecond earlier is not" */
+  it("is decided for a join at exactly the cut-off", () => {
+    expect(invite({ occurredAt: CUT_OFF })).toMatchObject({ event: "joined_organization" });
+  });
+
+  /** @scenario "A join at the cut-off is tracked as joined_organization, one a millisecond earlier is not" */
+  it("is not decided for a join one millisecond before the cut-off", () => {
+    expect(invite({ occurredAt: CUT_OFF - 1 })).toBeUndefined();
   });
 });

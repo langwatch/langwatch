@@ -42,7 +42,7 @@ function makeTransport(
   context: Partial<LangyTurnRequestContext> = {},
   over: Partial<LangyChatTransportDeps> = {},
 ) {
-  const onIds = vi.fn();
+  const onIds = vi.fn(() => true);
   const deps: LangyChatTransportDeps = {
     client,
     getContext: () => ({
@@ -50,6 +50,7 @@ function makeTransport(
       conversationId: null,
       ...context,
     }),
+    onSendStart: vi.fn(),
     onIds,
     onSignal: vi.fn(),
     onTurnSettled: vi.fn(),
@@ -89,6 +90,7 @@ describe("createLangyChatTransport", () => {
       expect(onIds).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",
+        projectId: "p1",
       });
     });
 
@@ -271,9 +273,41 @@ describe("createLangyChatTransport", () => {
       expect(onIds).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",
+        projectId: "p1",
       });
       // And it got far enough to open the live stream.
       expect(subscription).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a send starts", () => {
+    it("tells the panel before it starts the turn, so the panel knows where it left from", async () => {
+      const calls: string[] = [];
+      const { transport } = makeTransport(
+        {},
+        {
+          onSendStart: () => calls.push("send start"),
+          onIds: () => (calls.push("named"), true),
+        },
+      );
+
+      await transport.sendMessages(options());
+
+      expect(calls).toEqual(["send start", "named"]);
+    });
+  });
+
+  describe("when the panel no longer belongs to the project the send started in", () => {
+    it("streams nothing and never attaches to the turn", async () => {
+      const onIds = vi.fn(() => false);
+      const onTurnSettled = vi.fn();
+      const { transport } = makeTransport({ conversationId: null }, { onIds, onTurnSettled });
+
+      const stream = await transport.sendMessages(options());
+
+      expect((await stream.getReader().read()).done).toBe(true);
+      expect(subscription).not.toHaveBeenCalled();
+      expect(onTurnSettled).not.toHaveBeenCalled();
     });
   });
 

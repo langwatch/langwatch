@@ -1344,7 +1344,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: Boards: every board has the ask bar
     Given any stored or From LangWatch board
     Then "What do you want to know?" sits under the header
-    And without Langy a stored board keeps it to find a widget, and a From LangWatch board has none
+    And without Langy a stored board keeps it to find a widget, and a From LangWatch board has none unless the member may create dashboards
 
   @integration
   Scenario: Boards: every empty board shows one view
@@ -1399,8 +1399,39 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And it opens, with the template's report prompt drafted in Langy, unsent
     # The board's header has no such button: the sidebar menu is the only place
 
+  @integration
+  Scenario: From LangWatch: the ask bar opens Add a widget for a member who may create dashboards
+    Given a member who may create dashboards
+    When the member clicks the ask bar on a From LangWatch board
+    Then "Add a widget" opens
+    And nothing is stored and Langy is asked nothing
+
+  @integration
+  Scenario: From LangWatch: picking a widget makes a new dashboard with only that widget
+    Given "Add a widget" is open on a From LangWatch board
+    When the member picks a widget
+    Then a dashboard named after that widget is made for the project, numbered from 2 when the name is taken
+    And it holds only that widget
+    And the member is taken to it
+    And "dashboards.created.dashboard" is sent with createdFrom "widget_curated" and the From LangWatch board's templateId
+
+  @integration
+  Scenario: From LangWatch: the picker waits for the member's dashboards to load
+    Given "Add a widget" is open on a From LangWatch board and the member's dashboards are still loading
+    Then the picker is not shown and Langy is asked nothing
+    When the dashboards have loaded
+    Then the picker shows, and a new dashboard's name does not repeat one of the loaded dashboards
+
+  @integration
+  Scenario: From LangWatch: the picker has no I'll build it myself
+    Given "Add a widget" is open on a From LangWatch board
+    Then there is no "I'll build it myself" button
+    And Langy stays reachable in the picker
+    And a search that matches nothing shows "No widget matches. Clear the search and filters to see them all."
+
   @unit @integration
-  Scenario: From LangWatch: a template board asks Langy with the board as context
+  Scenario: From LangWatch: the ask bar asks Langy for a member who may not create dashboards
+    Given a member who may not create dashboards
     When the member clicks the ask bar on a From LangWatch board
     Then Langy opens with the cursor in its composer and nothing asked yet
     And the board is attached as context, named as read-only and not stored
@@ -1878,9 +1909,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When its SQL changes, saved from the editor, by Langy or through the API
     Then the card starts the widget over and runs the new SQL
     And the earlier answer is not shown for the new query
-    # What a run is keyed by: widget id and its queries, their sources included, start the frame
-    # over; the period and grain re-run it through the dashboard context. Nothing else caches a
-    # result: analytics.lwql.query is a mutation, and the server keeps no LangWatchQL cache
+    # What a run is keyed by: widget id, its queries (sources included), the chosen period and its
+    # grain start the frame over; a refresh of the same choice moves only the window's end. Nothing
+    # else caches a result: analytics.lwql.query is a mutation, and the server keeps no LangWatchQL cache
 
   # ---------------------------------------------------------------------------
   # A widget query's parameters: sources and projects
@@ -2192,7 +2223,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # Guard rails
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: AC11 Existing boards are unaffected
     Given a board created before this change
     Then its widgets keep their stored code, labels and number format

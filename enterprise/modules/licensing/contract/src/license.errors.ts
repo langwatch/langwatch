@@ -41,6 +41,19 @@ export class LicenseKeyInvalidError extends HandledError {
   }
 }
 
+/** A genuine license, signed for another organization than the one it was entered on. */
+export class LicenseOrganizationMismatchError extends HandledError {
+  declare readonly code: "license_organization_mismatch";
+
+  constructor() {
+    super("license_organization_mismatch", "This license belongs to another organization", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "LicenseOrganizationMismatchError";
+  }
+}
+
 /** The license verifies, but its expiry date has passed. */
 export class LicenseExpiredError extends HandledError {
   declare readonly code: "license_expired";
@@ -121,7 +134,8 @@ export class LicenseSigningFailedError extends HandledError {
  * "invalid".
  */
 export function licenseValidationError(verdict: string | undefined): HandledError {
-  return verdict === LICENSE_ERRORS.EXPIRED
-    ? new LicenseExpiredError()
-    : new LicenseKeyInvalidError();
+  if (verdict === LICENSE_ERRORS.EXPIRED) return new LicenseExpiredError();
+  if (verdict === LICENSE_ERRORS.ORGANIZATION_MISMATCH)
+    return new LicenseOrganizationMismatchError();
+  return new LicenseKeyInvalidError();
 }

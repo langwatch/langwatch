@@ -5,7 +5,6 @@
  */
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { fromDate } from "@langwatch/time";
 import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -14,6 +13,7 @@ import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
+import type { ScimMembers } from "../../channels/scim-channels.registry.ts";
 import type {
   ScimRepository,
   ScimUserRecord,
@@ -31,6 +31,12 @@ import {
 /** Every seat free, so these tests admit full members (seat-limit-at-provisioning.feature). */
 const openSeats = {
   countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+  findLiveHoldUserIds: async () => [],
+  withSeatLock: <T>({
+    work,
+  }: {
+    work: (lease: { assertHeld(): Promise<void> }) => Promise<T>;
+  }): Promise<T> => work({ assertHeld: async () => {} }),
 };
 
 const ORGANIZATION = "org-acme";
@@ -73,11 +79,14 @@ class DirectoryStore {
   }
 
   /** Organization's member removal, over the same memberships the repository reads. */
-  members(): Pick<OrganizationApi, "deleteMember"> {
+  members(): ScimMembers {
     return {
       deleteMember: vi.fn(async ({ organizationId, userId }) => {
         this.memberships.delete(this.key(organizationId, userId));
       }),
+      holdSeatOfDepartingMember: vi.fn(async () => undefined),
+      takeBackHeldSeat: vi.fn(async () => undefined),
+      openSeatRequestForAdmission: vi.fn(async () => undefined),
     };
   }
 

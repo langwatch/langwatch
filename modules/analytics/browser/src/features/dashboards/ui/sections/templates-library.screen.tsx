@@ -29,7 +29,6 @@ import {
   TRUNK_PALETTES,
   TrunkChips,
 } from "../blocks/catalogue-filters.tsx";
-import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
 import { AddTemplateButton, TemplateCard } from "../blocks/template-card.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
@@ -207,7 +206,6 @@ function TemplatesLibrary() {
 export default function TemplatesLibraryScreen() {
   return (
     <DashboardsGate>
-      <OldAnalyticsBanner />
       <TemplatesLibrary />
     </DashboardsGate>
   );

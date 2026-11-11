@@ -121,6 +121,12 @@ export interface InstantEvalClassification {
 /** The model a judge's settings name to be answered by Instant Evals (ADR-174 decision 11). */
 export const INSTANT_EVAL_JUDGE_MODEL_ID = "langwatch/instant-evals";
 
+/**
+ * Switches LangWatch's hosted judge off for an organization, whatever its plan, switch or license;
+ * its own decision models still run. Read by every caller that would reach the hosted judge.
+ */
+export const INSTANT_EVALS_HOSTED_DISABLED_FLAG = "instant_evals_hosted_disabled";
+
 /** One judge call. A signal stops the classifier, never the record of what it was paid. */
 export interface InstantEvalJudgeCall extends InstantEvalClassification {
   /** The evaluation's retry key: the same key gives the same spend id (ADR-174 decision 9). */

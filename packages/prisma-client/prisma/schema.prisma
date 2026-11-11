@@ -177,6 +177,17 @@ model Session {
   @@index([identifierId])
 }
 
+/// One row per erased account, holding only its creation time: no id, name or address. It keeps
+/// the install's first-created account knowable after an erasure deletes that row.
+/// Spec: modules/user/specs/user.feature
+model UserErasure {
+  id               String   @id @default(nanoid())
+  accountCreatedAt DateTime
+  erasedAt         DateTime @default(now())
+
+  @@index([accountCreatedAt])
+}
+
 model User {
   id                            String                   @id @default(nanoid())
   name                          String?
@@ -1097,10 +1108,105 @@ model OrganizationUser {
   /// removing and rejoining therefore cannot revive a delayed old attach.
   membershipStamp String @default(dbgenerated("gen_random_uuid()::text"))
 
+  /// When this membership started holding the full seat it holds now; null means createdAt.
+  /// Anchors the 30-day seat hold (specs/licensing/seat-rotation.feature).
+  fullSeatSince DateTime?
+
+  /// Set when admission wrote this membership disabled because no seat was free: the person
+  /// is waiting for one. Cleared when the membership is enabled.
+  seatPendingSince DateTime?
+
   @@id([userId, organizationId])
   @@index([organizationId])
   @@index([userId])
   @@index([departmentId])
+}
+
+/// A full seat still counted after the person who took it stopped holding it (removed,
+/// disabled or demoted), until 30 days after they took it (specs/licensing/seat-rotation.feature).
+/// One per organization and person; a return within the hold takes the seat back.
+model SeatHold {
+  id             String   @id
+  organizationId String
+  userId         String
+  /// Display copy for the Users list, kept because a removed person has no membership row.
+  email          String?
+  name           String?
+  /// When the person took the seat this hold keeps.
+  seatTakenAt    DateTime
+  /// seatTakenAt plus 30 days; expired holds are ignored by every count and deleted hourly.
+  heldUntil      DateTime
+  /// REMOVED | DISABLED | DEMOTED
+  reason         String
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, userId])
+  @@index([heldUntil])
+}
+
+/// A person asked for a full seat the organization had no room for (modules/organization/specs/
+/// seat-requests.feature). One row per organization and address; reopening reuses the row.
+model SeatRequest {
+  id               String    @id
+  organizationId   String
+  /// Lowercased address of the person asking.
+  email            String
+  /// Null when only the address is known (a sign-in the identity provider refused).
+  userId           String?
+  name             String?
+  /// OPEN | APPROVED | DECLINED
+  status           String
+  /// pending | lite | idp_refused: how the person was left when the request opened.
+  source           String
+  /// The identity provider also refused this person's sign-in.
+  idpRefused       Boolean   @default(false)
+  /// okta | entra | google | onelogin | jumpcloud | ping | auth0 | oidc | saml
+  idpKind          String?
+  /// When sales were told about this request; reset when it reopens.
+  salesNotifiedAt  DateTime?
+  openedAt         DateTime
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  /// Set when an approval claims the request, cleared once its seat is given; an approval
+  /// still pending long after is one whose seat never landed, and is reopened.
+  seatPendingSince DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
+
+  @@unique([organizationId, email])
+  @@index([organizationId, status])
+  @@index([userId])
+}
+
+/// Held by the one seat-taking write running on an organization (seat-requests.feature). A
+/// row past expiresAt is free to take; a holder deletes its own row when its write is done.
+model OrganizationSeatLease {
+  organizationId String   @id
+  /// Random per hold, so a release deletes only its own lease.
+  holder         String
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+}
+
+/// The mail log for seat requests and refused sign-ins: at most one row per organization,
+/// kind, address and UTC day, each mailed at once.
+model OrganizationAccessNotice {
+  id             String    @id
+  organizationId String
+  /// seat_request | idp_refused
+  kind           String
+  email          String
+  name           String?
+  idp            String?
+  /// UTC day the notice was recorded on, YYYY-MM-DD.
+  dayKey         String
+  /// Whether the seat request it announces was also refused by the identity provider.
+  idpRefused     Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  /// Set once the notice was handed to the mailer; null if a send never started.
+  mailedAt       DateTime?
+
+  @@unique([organizationId, kind, email, dayKey])
 }
 
 model Team {
@@ -4563,6 +4669,33 @@ model Subscription {
   maxDashboards         Int?
   maxCustomGraphs       Int?
   maxAutomations        Int?
+  /// Seats paid for this period that stay usable after a seat decrease, until seatsKeptUntil.
+  seatsKept             Int?
+  seatsKeptUntil        DateTime?
+  /// The seat quantity the last finished seat change set the seat line to; provider events never write it.
+  seatLineQuantity      Int?
+  seatLineQuantityAt    DateTime?
+  /// A Stripe seat line write recorded before it is sent and cleared once it is known to have
+  /// finished under the lease; one left behind is settled by the seat line repair.
+  /// Every seat quantity written while this record was pending.
+  seatLineWriteQuantities Int[] @default([])
+  /// The first write still pending; a later holder's write keeps it.
+  seatLineWriteSince    DateTime?
+  /// The latest write sent; the repair waits a grace window after it.
+  seatLineWriteAt       DateTime?
+  seatLineWriteAttempts Int?
+  seatLineWriteFlaggedAt DateTime?
+  /// The seat quantity Stripe should bill if a seat change stops after lifting the seat line; null once settled.
+  seatRepairQuantity    Int?
+  /// The quantity the change lifted the line to; the repair moves the line back only while Stripe still bills it.
+  seatRepairLiftedQuantity Int?
+  seatRepairSince       DateTime?
+  seatRepairAttempts    Int?
+  /// Set once the seat line repair has failed often enough that Ops should look at it.
+  seatRepairFlaggedAt   DateTime?
+  /// The lease a seat change or seat line repair holds while it reads and moves the seat line.
+  seatLineLeaseToken    String?
+  seatLineLeaseUntil    DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]
@@ -7232,6 +7365,23 @@ model ConnectedStatement {
 
   @@unique([accountId, month])
   @@index([accountId])
+}
+
+/// One renewed licence per paid Stripe invoice of a self-serve licence
+/// subscription (specs/licensing/self-serving-license-purchase.feature). A
+/// redelivered invoice event finds the row and mints nothing. A claim never
+/// delivered is taken over once `claimedAt` is older than the claim lease.
+model LicenseRenewalClaim {
+  stripeInvoiceId      String    @id
+  stripeSubscriptionId String
+  /// Fences completion and release to the delivery that holds the claim.
+  claimToken           String
+  claimedAt            DateTime
+  /// The signed licence between minting and mailing, so a retry mails it again instead of minting another; cleared once delivered.
+  issuedLicense        Json?
+  deliveredAt          DateTime?
+  /// The `licenseId` inside the delivered licence.
+  licenseId            String?
 }
 
 /// The identity this install presents to LangWatch (ADR-139, section 2).

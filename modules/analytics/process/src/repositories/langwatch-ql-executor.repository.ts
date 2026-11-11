@@ -13,6 +13,8 @@ export interface LangWatchQLExecutionRequest {
   readonly parameters?: Readonly<Record<string, unknown>>;
   /** The caller's tenant capability, sent as the one changeable setting. */
   readonly tenantCapability: string;
+  /** The projects the capability scopes the run to, named in the query log's comment. */
+  readonly projectIds: readonly string[];
 }
 
 /** The two bounds the service applies to a result; neither is enforced by the executor. */

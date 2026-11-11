@@ -19,10 +19,16 @@ export interface TraceTopicClusteringPageInput {
   topicIds: readonly string[];
   subtopicIds: readonly string[];
   searchAfter?: readonly [number, string];
+  /** Only traces that occurred at or after this instant; an incremental run's watermark. */
+  occurredSinceMs?: number;
+  /** Only traces that occurred before this instant; defaults to now. */
+  occurredBeforeMs?: number;
 }
 
 export interface TraceTopicClusteringPage {
   traces: TraceTopicClusteringTrace[];
   lastSort: [number, string] | undefined;
   returnedCount: number;
+  /** Each returned trace's own OccurredAt, so its topic assignment folds at the trace's time. */
+  occurredAtMsByTraceId: Record<string, number>;
 }

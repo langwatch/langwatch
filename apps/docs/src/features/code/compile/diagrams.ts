@@ -39,7 +39,7 @@ async function renderer() {
     if (pathname === "/")
       return route.fulfill({
         contentType: "text/html",
-        body: '<html><head><style>@font-face{font-family:Inter;src:url(/font.woff2);font-weight:100 900}body{font-family:Inter}</style></head><body><script type="module">import mermaid from "/dist/mermaid.esm.min.mjs"; window.diagramRenderer = mermaid;</script></body></html>',
+        body: '<html><head><style>@font-face{font-family:Inter;src:url(/font.woff2);font-weight:400 700}body{font-family:Inter}</style></head><body><script type="module">import mermaid from "/dist/mermaid.esm.min.mjs"; window.diagramRenderer = mermaid;</script></body></html>',
       });
     if (pathname === "/font.woff2") {
       return route.fulfill({

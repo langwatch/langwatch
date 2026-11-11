@@ -158,6 +158,8 @@ export type CioEventName =
   | "usage_page_viewed"
   | "joined_via_invite"
   | "joined_via_sso"
+  /** Sent beside the two above, for invite and SSO alike; `join_method` tells them apart. */
+  | "joined_organization"
   | "onboarding_paths_selected"
   | "onboarding_path_llmops"
   | "onboarding_path_coding_agents"
@@ -188,6 +190,8 @@ export type CioBatchCall =
       userId: string;
       event: CioEventName;
       properties?: Record<string, unknown>;
+      /** Customer.io drops a second track with the same id, so a replay cannot double-send. */
+      messageId?: string;
     }
   | {
       type: "group";

@@ -303,6 +303,14 @@ export interface ApiKeyApi {
     input: { organizationId: string; apiKeyId: string },
     by: ApiKeyManagementCaller,
   ): Promise<void>;
+  /**
+   * Swaps a key's secret for a new one, keeping its id, settings and grants, and answers the new
+   * token once. The old secret is refused at once: there is no grace period.
+   */
+  rotateKey(
+    input: { organizationId: string; apiKeyId: string },
+    by: ApiKeyManagementCaller,
+  ): Promise<{ token: string; apiKey: ApiKey }>;
   listOrganizationProjects(
     input: { organizationId: string },
     by: ApiKeyManagementCaller,

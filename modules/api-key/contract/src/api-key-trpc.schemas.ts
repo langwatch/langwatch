@@ -105,3 +105,13 @@ export interface ApiKeyTrpcRevokeInputSchema extends Named<
 > {}
 export const apiKeyTrpcRevokeInputSchema: ApiKeyTrpcRevokeInputSchema =
   apiKeyTrpcRevokeInputSchemaDefinition;
+
+const apiKeyTrpcRotateInputSchemaDefinition = z.object({
+  organizationId: z.string(),
+  apiKeyId: z.string(),
+});
+export interface ApiKeyTrpcRotateInputSchema extends Named<
+  typeof apiKeyTrpcRotateInputSchemaDefinition
+> {}
+export const apiKeyTrpcRotateInputSchema: ApiKeyTrpcRotateInputSchema =
+  apiKeyTrpcRotateInputSchemaDefinition;

@@ -59,7 +59,7 @@ export const datasetProcessModule: PublishedProcessModule<
         id: "dataset:create-first-versions",
         kind: "data",
         mode: "background",
-        description: "Saves version 1 of every dataset that has no version history yet.",
+        description: "Saves version 1 of every dataset that has rows and no version history yet.",
         after: ["dataset:move-content-to-object-storage", fillEmptySlugs],
         run: app.firstVersionsRun(),
       }),

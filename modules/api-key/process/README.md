@@ -356,6 +356,14 @@ updateKey(input: UpdateApiKeyManagementInput, by: ApiKeyManagementCaller): Promi
 revokeKey(input: { organizationId: string; apiKeyId: string }, by: ApiKeyManagementCaller): Promise<void>;
 ```
 
+#### `rotateKey`
+
+Swaps a key's secret for a new one, keeping its id, settings and grants, and answers the new token once. The old secret is refused at once: there is no grace period.
+
+```typescript
+rotateKey(input: { organizationId: string; apiKeyId: string }, by: ApiKeyManagementCaller): Promise<{ token: string; apiKey: ApiKey }>;
+```
+
 #### `listOrganizationProjects`
 
 ```typescript
@@ -617,7 +625,7 @@ type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-k
 
 ### `apiKey`
 
-Contract `../contract/src/api-key.trpc.ts:39`, router `src/transport/api-key.trpc.ts:32`.
+Contract `../contract/src/api-key.trpc.ts:40`, router `src/transport/api-key.trpc.ts:32`.
 
 | Procedure                     | Kind     | Gate                                                                                                                                                | Input                                     | Output                       |
 | ----------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ---------------------------- |
@@ -628,6 +636,7 @@ Contract `../contract/src/api-key.trpc.ts:39`, router `src/transport/api-key.trp
 | `apiKey.create`               | mutation | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcCreateInputSchema`             | `apiKeyMintedSchema`         |
 | `apiKey.update`               | mutation | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcUpdateInputSchema`             | `apiKeyUpdatedSchema`        |
 | `apiKey.revoke`               | mutation | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcRevokeInputSchema`             | `apiKeyRevokedSchema`        |
+| `apiKey.rotate`               | mutation | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself                          | `apiKeyTrpcRotateInputSchema`             | `apiKeyMintedSchema`         |
 | `apiKey.orgProjects`          | query    | No permission: any member assigning a key needs the organization's projects, teams and members; the application refuses a non-member before reading | `apiKeyTrpcOrganizationScopeSchema`       | inline                       |
 | `apiKey.orgTeams`             | query    | No permission: any member assigning a key needs the organization's projects, teams and members; the application refuses a non-member before reading | `apiKeyTrpcOrganizationScopeSchema`       | inline                       |
 | `apiKey.orgMembers`           | query    | No permission: any member assigning a key needs the organization's projects, teams and members; the application refuses a non-member before reading | `apiKeyTrpcOrganizationScopeSchema`       | inline                       |
@@ -639,7 +648,7 @@ Contract `../contract/src/api-key.trpc.ts:39`, router `src/transport/api-key.trp
 interface Input {
   organizationId: string;
 }
-// Output: inline, ../contract/src/api-key.trpc.ts:42
+// Output: inline, ../contract/src/api-key.trpc.ts:43
 type Output = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
@@ -660,7 +669,7 @@ interface Input {
   }[];
   ownerUserId?: string;
 }
-// Output: inline, ../contract/src/api-key.trpc.ts:47
+// Output: inline, ../contract/src/api-key.trpc.ts:48
 type Output = string[];
 
 // apiKey.nameById
@@ -669,7 +678,7 @@ interface Input {
   organizationId: string;
   apiKeyId: string;
 }
-// Output: inline, ../contract/src/api-key.trpc.ts:51
+// Output: inline, ../contract/src/api-key.trpc.ts:52
 type Output = {
   name: string;
   revoked: boolean;
@@ -677,7 +686,7 @@ type Output = {
 
 // apiKey.list
 type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:34
-// Output: apiKeyListEntrySchema.array() (inline, ../contract/src/api-key.trpc.ts:55)
+// Output: apiKeyListEntrySchema.array() (inline, ../contract/src/api-key.trpc.ts:56)
 
 // apiKey.create
 type Input = z.infer<typeof apiKeyTrpcCreateInputSchema>; // ../contract/src/api-key-trpc.schemas.ts:79
@@ -711,9 +720,17 @@ interface Output {
   success: boolean;
 }
 
+// apiKey.rotate
+// Input: apiKeyTrpcRotateInputSchema, ../contract/src/api-key-trpc.schemas.ts:117
+interface Input {
+  organizationId: string;
+  apiKeyId: string;
+}
+type Output = z.infer<typeof apiKeyMintedSchema>; // ../contract/src/api-key.responses.ts:43
+
 // apiKey.orgProjects
 type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:34
-// Output: inline, ../contract/src/api-key.trpc.ts:71
+// Output: inline, ../contract/src/api-key.trpc.ts:77
 type Output = {
   id: string;
   name: string;
@@ -722,7 +739,7 @@ type Output = {
 
 // apiKey.orgTeams
 type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:34
-// Output: inline, ../contract/src/api-key.trpc.ts:75
+// Output: inline, ../contract/src/api-key.trpc.ts:81
 type Output = {
   id: string;
   name: string;
@@ -730,7 +747,7 @@ type Output = {
 
 // apiKey.orgMembers
 type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:34
-// Output: inline, ../contract/src/api-key.trpc.ts:79
+// Output: inline, ../contract/src/api-key.trpc.ts:85
 type Output = {
   id: string;
   name: string | null;
@@ -774,10 +791,10 @@ Declared at `src/eventing/api-key.pipeline.ts:90`.
 
 | Kind   | Leaf                 | Environment variable          | Declared at                            |
 | ------ | -------------------- | ----------------------------- | -------------------------------------- |
-| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:184`           |
-| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:185`           |
-| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:186`           |
-| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:188`           |
+| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:180`           |
+| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:181`           |
+| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:182`           |
+| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:184`           |
 | config | `docsOrigins`        | `LANGWATCH_DOCS_ORIGINS`      | `../contract/src/api-key.config.ts:23` |
 | config | `isSaas`             | `IS_SAAS`                     | `../contract/src/api-key.config.ts:25` |
 | config | `publicBaseUrl`      | `BASE_HOST`                   | `../contract/src/api-key.config.ts:27` |

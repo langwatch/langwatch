@@ -1,6 +1,9 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+/** The aggregate the organization records its lifecycle and member facts on. */
+export const ORGANIZATION_AGGREGATE_TYPE = "organization" as const;
+
 /** An organization's membership milestones, which peers react to from their own side (§9). */
 export const ORGANIZATION_SIGNED_UP_EVENT_TYPE = "lw.organization.signed_up" as const;
 export const ORGANIZATION_CREATED_EVENT_TYPE = "lw.organization.created" as const;
@@ -125,6 +128,8 @@ const organizationMemberDisabledEventDataSchemaDefinition = z.object({
   ...envelope,
   /** Who disabled the seat; absent for an organization key with no member. */
   disabledByUserId: z.string().min(1).nullish(),
+  /** Whether the person held a full seat when it was disabled; absent on older facts. */
+  heldFullSeat: z.boolean().nullish(),
 });
 export interface OrganizationMemberDisabledEventDataSchema extends Named<
   typeof organizationMemberDisabledEventDataSchemaDefinition
@@ -161,6 +166,8 @@ const organizationMemberRemovedEventDataSchemaDefinition = z.object({
   ...envelope,
   /** Who removed the member; absent for a removal no member made. */
   removedByUserId: z.string().min(1).nullish(),
+  /** Whether the person held a full seat when removed; absent where it is not known. */
+  heldFullSeat: z.boolean().nullish(),
 });
 export interface OrganizationMemberRemovedEventDataSchema extends Named<
   typeof organizationMemberRemovedEventDataSchemaDefinition

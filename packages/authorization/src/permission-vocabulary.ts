@@ -27,6 +27,8 @@ export const Actions = {
   // personal VKs during off-boarding sweeps. Personal-VK self-view stays
   // implicit on principalUserId match (no perm needed for "see my own").
   VIEW_OTHER_PERSONAL: "viewOtherPersonal",
+  // Starts a paid subscription for the organization.
+  UPGRADE: "upgrade",
 } as const;
 
 export type Action = (typeof Actions)[keyof typeof Actions];
@@ -117,6 +119,9 @@ export const Resources = {
   SSO: "sso",
   AGENTS: "agents",
   EVALUATORS: "evaluators",
+  SUBSCRIPTION: "subscription",
+  SEAT_REQUESTS: "seatRequests",
+  MEMBERS: "members",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];

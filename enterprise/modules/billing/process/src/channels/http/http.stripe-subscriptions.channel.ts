@@ -8,6 +8,7 @@ import type {
   BillingPurchasedLineItem,
   BillingSubscription,
   BillingSubscriptionChange,
+  BillingSubscriptionCheckout,
   BillingSubscriptionPreviewChange,
 } from "../../rules/billing-stripe-shapes.rules.ts";
 import { StripeSubscriptionsChannel } from "../stripe-subscriptions.channel.ts";
@@ -33,12 +34,18 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
   async updateSubscription({
     subscriptionId,
     change,
+    timeoutMs,
   }: {
     subscriptionId: string;
     change: BillingSubscriptionChange;
+    timeoutMs?: number;
   }): Promise<BillingSubscription> {
     return subscriptionOf(
-      await this.stripe.subscriptions.update(subscriptionId, updateParamsOf(change)),
+      await this.stripe.subscriptions.update(
+        subscriptionId,
+        updateParamsOf(change),
+        timeoutMs === undefined ? undefined : { timeout: timeoutMs },
+      ),
     );
   }
 
@@ -98,6 +105,24 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
     }));
   }
 
+  async findSubscriptionCheckouts({
+    subscriptionId,
+  }: {
+    subscriptionId: string;
+  }): Promise<BillingSubscriptionCheckout[]> {
+    const page = await this.stripe.checkout.sessions.list({
+      subscription: subscriptionId,
+      limit: 1,
+    });
+    return page.data.map((session) => {
+      const link = session.payment_link;
+      return {
+        checkoutSessionId: session.id,
+        paymentLinkId: (typeof link === "string" ? link : link?.id) ?? null,
+      };
+    });
+  }
+
   async createBillingPortalSession({
     customerId,
     returnUrl,
@@ -126,6 +151,7 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
     return {
       total: invoice.total,
       amountDue: invoice.amount_due,
+      tax: invoice.total - (invoice.total_excluding_tax ?? invoice.total),
       currency: invoice.currency ?? null,
     };
   }
@@ -148,7 +174,10 @@ function subscriptionOf(subscription: Stripe.Subscription): BillingSubscription 
       priceId: item.price.id,
       unitAmount: item.price.unit_amount ?? null,
       interval: item.price.recurring?.interval ?? null,
+      quantity: item.quantity ?? null,
     })),
+    currentPeriodEnd: subscription.current_period_end,
+    currency: subscription.currency,
   };
 }
 

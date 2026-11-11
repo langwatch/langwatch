@@ -10,11 +10,11 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
 ## Screens
 
-| Page key                      | URL                      | Within   | Label        | Permission          | Flags |
-| ----------------------------- | ------------------------ | -------- | ------------ | ------------------- | ----- |
-| `pages/settings/plans`        | `/settings/plans`        | settings | Plans        | `organization:view` | –     |
-| `pages/settings/subscription` | `/settings/subscription` | settings | Subscription | –                   | –     |
-| `pages/settings/usage`        | `/settings/usage`        | settings | Usage        | `cost:view`         | –     |
+| Page key                      | URL                      | Within   | Label          | Permission          | Flags |
+| ----------------------------- | ------------------------ | -------- | -------------- | ------------------- | ----- |
+| `pages/settings/plans`        | `/settings/plans`        | settings | Plans          | `organization:view` | –     |
+| `pages/settings/subscription` | `/settings/subscription` | settings | Plan & billing | –                   | –     |
+| `pages/settings/usage`        | `/settings/usage`        | settings | Usage          | `cost:view`         | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 

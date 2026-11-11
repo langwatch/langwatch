@@ -112,6 +112,8 @@ export type OrganizationUser = {
   updatedAt: Instant;
   departmentId: string | null;
   disabledAt: Instant | null;
+  /** Set while admission keeps the person waiting for a full seat (seat-rotation.feature). */
+  seatPendingSince?: Instant | null;
 };
 
 export type User = {

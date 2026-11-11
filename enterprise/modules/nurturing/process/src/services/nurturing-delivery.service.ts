@@ -47,6 +47,7 @@ import { firePromptCreated } from "../rules/nurturing-prompt-creation-service.ru
 import { fireSignup } from "../rules/nurturing-signup-identification-service.rules.ts";
 import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
+import { NurturingJoinedOrganizationService } from "./nurturing-joined-organization.service.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import { NurturingOwnCodingDeliveryService } from "./nurturing-own-coding-delivery.service.ts";
 import { NurturingPostHogDeliveryService } from "./nurturing-posthog-delivery.service.ts";
@@ -90,25 +91,29 @@ export class NurturingDeliveryService {
       /** Who hears an organization's fact, and what a joining person is told of traces. */
       memberFacts: NurturingMemberFactsService;
     }>,
-    private readonly postHogDelivery: NurturingPostHogDeliveryService | undefined,
-    private readonly ownCodingDelivery: NurturingOwnCodingDeliveryService | undefined,
+    private readonly parts: Readonly<{
+      postHogDelivery: NurturingPostHogDeliveryService | undefined;
+      ownCodingDelivery: NurturingOwnCodingDeliveryService | undefined;
+      joinedOrganization: NurturingJoinedOrganizationService | undefined;
+    }>,
   ) {}
 
   static create(deps: NurturingDeliveryService["deps"]): NurturingDeliveryService {
-    return new NurturingDeliveryService(
-      deps,
-      deps.posthog && NurturingPostHogDeliveryService.create(deps.posthog),
-      deps.customerIo &&
-        NurturingOwnCodingDeliveryService.create({
-          claims: deps.claims,
-          customerIo: deps.customerIo,
-        }),
-    );
+    const { claims, customerIo, posthog } = deps;
+    return new NurturingDeliveryService(deps, {
+      postHogDelivery: posthog && NurturingPostHogDeliveryService.create(posthog),
+      ownCodingDelivery:
+        customerIo && NurturingOwnCodingDeliveryService.create({ claims, customerIo }),
+      joinedOrganization:
+        customerIo && NurturingJoinedOrganizationService.create({ claims, customerIo }),
+    });
   }
 
   /** `key` names the signal: its kind and source event. A first session also tells its members. */
   async deliver({ key, signal }: { key: string; signal: NurturingSignal }): Promise<void> {
     if (!this.deps.customerIo && !this.deps.posthog) return;
+    // Before the delivered claim: a replay it stops must still send a failed joined_organization.
+    await this.parts.joinedOrganization?.deliver(signal);
     const deliveredClaim = `nurturing:${key}`;
     if (!(await this.deps.claims.claim(deliveredClaim, DELIVERED_WINDOW_SECONDS))) return;
     if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
@@ -116,7 +121,7 @@ export class NurturingDeliveryService {
     this.toCustomerIo(signal);
     this.toPostHogSafely(signal);
     await this.identifyCodingAgentMembers(signal);
-    await this.ownCodingDelivery?.deliver(signal);
+    await this.parts.ownCodingDelivery?.deliver(signal);
     if (memberBatch) this.identifyInBatches(memberBatch);
   }
 
@@ -221,7 +226,7 @@ export class NurturingDeliveryService {
   /** A PostHog channel that throws only logs: analytics never fails the delivery. */
   private toPostHogSafely(signal: NurturingSignal): void {
     try {
-      this.postHogDelivery?.send(signal);
+      this.parts.postHogDelivery?.send(signal);
     } catch (error) {
       reportFailure(error);
     }
@@ -246,9 +251,7 @@ export class NurturingDeliveryService {
             .catch(reportFailure);
           break;
         case "track":
-          void nurturing
-            .trackEvent({ userId: call.userId, event: call.event, properties: call.properties })
-            .catch(reportFailure);
+          void nurturing.trackEvent(call).catch(reportFailure);
           break;
         case "group":
           void nurturing
