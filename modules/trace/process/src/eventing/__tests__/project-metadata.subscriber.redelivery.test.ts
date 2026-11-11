@@ -3,6 +3,8 @@
  * @unit
  * Metadata assertion (idempotent) + milestone (guarded) + reconciliation (unguarded).
  */
+import type { OrgAdminResolution } from "@langwatch/project-contract";
+import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import { createProjectMetadataHandler } from "../project-metadata.subscriber.ts";
@@ -18,6 +20,9 @@ import {
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
+
+/** When the seeded organization was created, epoch ms. */
+const ORGANIZATION_CREATED_AT = 1_700_000_000_000;
 
 /**
  * A project store that behaves like the real one: `updateMetadata` is what a
@@ -36,7 +41,13 @@ function makeProjectStore(initial: { firstMessage: boolean; integrated: boolean 
         writes.push(data);
         Object.assign(project, data);
       },
-      resolveOrgAdmin: async () => ({ userId: "user-1", organizationId: "org-1" }),
+      resolveOrgAdmin: async (): Promise<OrgAdminResolution> => ({
+        userId: "user-1",
+        organizationId: "org-1",
+        firstMessage: project.firstMessage,
+        onboardingVariant: "classic",
+        organizationCreatedAt: Temporal.Instant.fromEpochMilliseconds(ORGANIZATION_CREATED_AT),
+      }),
       findOrganizationId: async () => "org-1",
     },
   };
@@ -80,6 +91,8 @@ describe("given a project receiving its first real trace", () => {
         projectId: TENANT_ID,
         sdkLanguage: "python",
         sdkFramework: "unknown",
+        organizationCreatedAt: ORGANIZATION_CREATED_AT,
+        onboardingVariant: "classic",
       });
       expect(
         recordSignal.mock.calls.filter(([signal]) => signal.recorded === "firstTrace"),
@@ -172,6 +185,9 @@ describe("given a project that was already integrated", () => {
       occurredAt: event.occurredAt,
       userId: "user-1",
       projectId: TENANT_ID,
+      organizationId: "org-1",
+      organizationCreatedAt: ORGANIZATION_CREATED_AT,
+      onboardingVariant: "classic",
     });
   });
 });

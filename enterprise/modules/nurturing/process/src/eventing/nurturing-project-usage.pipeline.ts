@@ -7,7 +7,8 @@
  * Evaluations add a day per project a day. Each change syncs the organization as one Customer.io
  * group call, mirrored onto each member whose latest organization it is (the emails read person
  * attributes; members from nurturing's own copy of the owners' member facts), placed by
- * nurturing's own copy of project and organization creation. It reads no other module. Without a
+ * nurturing's own copy of project and organization creation. It reads no other module's table, and
+ * asks project's API only when an uncopied project was created. Without a
  * Customer.io channel only the copies register: nothing reads the usage rows. Why event
  * driven: https://github.com/langwatch/tasks/issues/1131.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
@@ -323,18 +324,24 @@ export function countedTraceOf({
 }
 
 /**
- * How long a trace whose project nurturing has not copied yet is retried before it is dropped:
+ * How long after a project's creation its traces are retried while nurturing has not copied it:
  * inside group-queue's retry budget (25 attempts, backoff doubling from 0.5 s to a 10-minute cap,
  * about 2.5 hours; packages/group-queue/src/groupQueue.ts JOB_RETRY_CONFIG), so a copy that never
  * lands drops the trace instead of dead-lettering the batch.
  */
 export const UNCOPIED_TRACE_RETRY_MS = 2 * 60 * 60_000;
 
+/** When project created a project, asked only for one nurturing has not copied; null if none. */
+export type ProjectCreatedAt = (
+  input: Readonly<{ projectId: string }>,
+) => Promise<Readonly<{ projectCreatedAt: number | null }>>;
+
 /** What the trace and failure counts read to keep only organizations in their window. */
 export type NurturingTraceCountingDeps = Readonly<{
   traceDays: NurturingTraceDayRepository;
   placements: Pick<NurturingProjectPlacementRepository, "getPlacement">;
   organizationsCreated: Pick<NurturingOrganizationCreatedRepository, "findOrganizationCreatedAt">;
+  projectCreatedAt: ProjectCreatedAt;
   now: () => number;
 }>;
 
@@ -363,10 +370,10 @@ async function copiedProjectOf({
 /**
  * Counts the batch's traces whose organization is inside its counting window, each once,
  * durably (the repository's per-trace rows). The placement copy is written by its own
- * subscriber, so a new project's first traces can come first: a trace younger than
- * `UNCOPIED_TRACE_RETRY_MS` then fails the batch after the rest are counted, and the queue
- * retries; an older one is dropped. A placed project whose organization has no creation copy
- * predates the copy, so its traces are dropped at once: nothing sends its trace traits.
+ * subscriber, so a new project's first traces can come first: an uncopied project created less
+ * than `UNCOPIED_TRACE_RETRY_MS` ago fails the batch after the rest are counted, and the queue
+ * retries; any other predates the copy and is dropped at once, as is a placed project whose
+ * organization has no creation copy: nothing sends their trace traits.
  */
 async function countInWindow({
   traces,
@@ -393,16 +400,18 @@ async function countInWindow({
     }),
   );
   const now = deps.now();
-  const waiting = [
-    ...new Set(
-      traces
-        .filter(
-          (trace) =>
-            projectOf(trace).outcome === "unplaced" && now - trace.at < UNCOPIED_TRACE_RETRY_MS,
-        )
-        .map(({ projectId }) => projectId),
-    ),
-  ];
+  const unplaced = [...projects].flatMap(([projectId, project]) =>
+    project.outcome === "unplaced" ? [projectId] : [],
+  );
+  const waiting = (
+    await Promise.all(
+      unplaced.map(async (projectId) => {
+        const { projectCreatedAt } = await deps.projectCreatedAt({ projectId });
+        const young = projectCreatedAt !== null && now - projectCreatedAt < UNCOPIED_TRACE_RETRY_MS;
+        return young ? [projectId] : [];
+      }),
+    )
+  ).flat();
   if (waiting.length > 0) {
     throw new Error(`nurturing's placement copy of ${waiting.join(", ")} has not landed yet`);
   }
@@ -516,7 +525,7 @@ const traceSyncDataSchema = traceReceivedEventDataSchema.pick({ projectId: true 
  * first_trace_recorded and only later ones as trace_received, so both sync. Each only reads the
  * counts its root span added, so the first trace is counted once.
  */
-export function nurturingTraceUsageSyncSubscribers(usageChanged: UsageChanged): Readonly<{
+export function nurturingTraceUsageSyncSubscribers(tracesChanged: UsageChanged): Readonly<{
   firstTrace: PeerSubscriberDefinition<typeof firstTraceSyncDataSchema>;
   laterTrace: PeerSubscriberDefinition<typeof traceSyncDataSchema>;
 }> {
@@ -530,13 +539,13 @@ export function nurturingTraceUsageSyncSubscribers(usageChanged: UsageChanged): 
       eventType: FIRST_TRACE_RECORDED_EVENT_TYPE,
       data: firstTraceSyncDataSchema,
       options,
-      handle: ({ projectId }) => usageChanged({ projectId }),
+      handle: ({ projectId }) => tracesChanged({ projectId }),
     },
     laterTrace: {
       eventType: TRACE_RECEIVED_EVENT_TYPE,
       data: traceSyncDataSchema,
       options,
-      handle: ({ projectId }) => usageChanged({ projectId }),
+      handle: ({ projectId }) => tracesChanged({ projectId }),
     },
   };
 }
@@ -575,8 +584,11 @@ export type NurturingUsageCopies = Readonly<{
 /** What the usage sync needs; absent without a Customer.io channel, when nothing syncs. */
 export type NurturingUsageSync = Readonly<{
   traceDays: NurturingTraceDayRepository;
+  projectCreatedAt: ProjectCreatedAt;
   now: () => number;
   usageChanged: UsageChanged;
+  /** A trace's sync: the organization's, unless its counting window has ended. */
+  tracesChanged: UsageChanged;
 }>;
 
 function nurturingProjectUsageHost({
@@ -601,6 +613,7 @@ function nurturingProjectUsageHost({
       "organizationCreated",
       nurturingOrganizationCreatedSubscriber(organizationsCreated),
     )
+    .withPeerSubscriber("memberFoundedOrganization", nurturingFounderMembershipSubscriber(members))
     .withPeerSubscriber(
       "memberSignedUp",
       nurturingMembershipSubscriber({
@@ -657,10 +670,10 @@ function nurturingProjectUsageHost({
     );
   // Without a channel no sync reads the usage rows, and none prunes the trace days, so none is kept.
   if (!sync) return copied;
-  const { traceDays, now, usageChanged } = sync;
-  const counting = { traceDays, placements, organizationsCreated, now };
+  const { traceDays, projectCreatedAt, now, usageChanged, tracesChanged } = sync;
+  const counting = { traceDays, placements, organizationsCreated, projectCreatedAt, now };
   const subscribers = [organizationUsageSubscriber(usageChanged)];
-  const traceSyncs = nurturingTraceUsageSyncSubscribers(usageChanged);
+  const traceSyncs = nurturingTraceUsageSyncSubscribers(tracesChanged);
   return (
     copied
       .withPeerFoldProjection(
@@ -742,6 +755,29 @@ export function nurturingMembershipSubscriber<Data extends ParsingSchema<Members
   };
 }
 
+/**
+ * Nurturing's own copy of a founder's membership, from organization's creation fact: an
+ * organization created for an existing user (`createAndAssign`) records no signup. Joined at the
+ * creation's time; a provisioned organization names no founder and records nothing.
+ */
+export function nurturingFounderMembershipSubscriber(
+  members: Pick<NurturingOrganizationMemberRepository, "recordMembershipChange">,
+): PeerSubscriberDefinition<typeof organizationCreatedEventDataSchema> {
+  return {
+    eventType: ORGANIZATION_CREATED_EVENT_TYPE,
+    data: organizationCreatedEventDataSchema,
+    handle: async ({ organizationId, userId, occurredAt }) => {
+      if (!userId) return;
+      await members.recordMembershipChange({
+        organizationId,
+        userId,
+        change: "joined",
+        at: occurredAt,
+      });
+    },
+  };
+}
+
 /** The host pipeline as a TYPE, derived from the builder above. */
 export type NurturingProjectUsagePipeline = ReturnType<
   ReturnType<typeof nurturingProjectUsageHost>["build"]
@@ -766,8 +802,10 @@ export const nurturingProjectUsageEventing = defineEventingModule({
       sync: app.syncsOrganizationUsage()
         ? {
             traceDays: repositories.traceDays,
+            projectCreatedAt: (input) => app.projectCreatedAt(input),
             now: () => nowInstant().epochMilliseconds,
             usageChanged: (input) => app.organizationUsageChanged(input),
+            tracesChanged: (input) => app.organizationTracesChanged(input),
           }
         : undefined,
     }),

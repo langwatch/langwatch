@@ -44,6 +44,9 @@ type OrganizationUsageDependencies = Readonly<{
   clock: Readonly<{ nowMs: () => number }>;
 }>;
 
+/** An organization as nurturing's own copies place and date it. */
+type CopiedOrganization = Readonly<{ organizationId: string; organizationCreatedAt: number }>;
+
 /**
  * Turns a project's changed usage into its organization's traits: sums the organization's projects
  * from nurturing's own rows, sends one group call to the admin, then mirrors the traits onto each
@@ -58,45 +61,63 @@ export class NurturingOrganizationUsageService {
 
   private constructor(private readonly dependencies: OrganizationUsageDependencies) {}
 
-  /** The project's usage or traces changed: its organization's traits go to Customer.io. */
+  /** The project's usage changed: its organization's traits go to Customer.io. */
   async usageChanged({ projectId }: Readonly<{ projectId: string }>): Promise<void> {
-    const {
-      projectUsage,
-      traceDays,
-      placements,
-      organizationsCreated,
-      milestones,
-      sendBatch,
-      clock,
-    } = this.dependencies;
-    if (projectId === "") return;
-    const now = clock.nowMs();
-    const windowStartDay = windowStartDayOf(now);
-    // A path that sends nothing still prunes the changed project's own old rows.
-    const pruneProject = () =>
-      traceDays.pruneBefore({ projectIds: [projectId], beforeDay: windowStartDay });
+    const organization = await this.copiedOrganizationOf({ projectId });
+    if (organization) await this.syncOrganization(organization);
+  }
+
+  /**
+   * The project traced: its organization syncs while inside its counting window. Past it no trait
+   * a trace moves is sent, and the rest are a fold's sync's, so nothing is read or sent.
+   */
+  async tracesChanged({ projectId }: Readonly<{ projectId: string }>): Promise<void> {
+    const organization = await this.copiedOrganizationOf({ projectId });
+    if (!organization) return;
+    const at = this.dependencies.clock.nowMs();
+    if (!isTraceCounted({ organizationCreatedAt: organization.organizationCreatedAt, at })) return;
+    await this.syncOrganization(organization);
+  }
+
+  /**
+   * The project's organization, when nurturing saw both created. One created before nurturing kept
+   * its creation copy may hold projects nurturing never saw created: its sums would be partial.
+   */
+  private async copiedOrganizationOf({
+    projectId,
+  }: Readonly<{ projectId: string }>): Promise<CopiedOrganization | undefined> {
+    const { placements, organizationsCreated } = this.dependencies;
+    if (projectId === "") return undefined;
     const placement = await placements.getPlacement({ projectId });
-    if (placement.outcome !== "known") return pruneProject();
+    if (placement.outcome !== "known") return undefined;
     const { organizationId } = placement;
-    // An organization created before nurturing kept its creation copy may hold projects nurturing
-    // never saw created: its sums would be partial, so it is sent nothing.
     const { organizationCreatedAt } = await organizationsCreated.findOrganizationCreatedAt({
       organizationId,
     });
-    if (organizationCreatedAt === null) return pruneProject();
+    return organizationCreatedAt === null ? undefined : { organizationId, organizationCreatedAt };
+  }
+
+  private async syncOrganization({
+    organizationId,
+    organizationCreatedAt,
+  }: CopiedOrganization): Promise<void> {
+    const { projectUsage, traceDays, placements, milestones, sendBatch, clock } = this.dependencies;
+    const now = clock.nowMs();
+    const windowStartDay = windowStartDayOf(now);
+    const counting = isTraceCounted({ organizationCreatedAt, at: now });
+    const projectIds = await placements.findProjectIds({ organizationId });
+    // Inside the counting window no trace day is older than the usage window, and the window-end
+    // sweep drops them all; past it, only a trace counted late around the sweep can be left.
+    if (!counting) await traceDays.pruneBefore({ projectIds, beforeDay: windowStartDay });
     const [organization] = await milestones.findOrganization({ organizationId });
     const adminUserId = organization?.adminUserId;
-    if (!adminUserId) return pruneProject();
-    const projectIds = await placements.findProjectIds({ organizationId });
-    await traceDays.pruneBefore({ projectIds, beforeDay: windowStartDay });
+    if (!adminUserId) return;
     const [usage, folded] = await Promise.all([
       projectUsage.findForProjects({ projectIds }),
-      traceDays.findForProjects({ projectIds, afterDay: windowStartDay }),
+      counting ? traceDays.findForProjects({ projectIds, afterDay: windowStartDay }) : [],
     ]);
     // Past the counting window no trace is counted, so the last trace traits sent stand.
-    const traces = isTraceCounted({ organizationCreatedAt, at: now })
-      ? traceCountsOf({ days: folded, windowStartDay })
-      : null;
+    const traces = counting ? traceCountsOf({ days: folded, windowStartDay }) : null;
     const traits = organizationUsageTraits({
       projects: usage,
       traces,
@@ -104,14 +125,22 @@ export class NurturingOrganizationUsageService {
       organizationCreatedAt,
     });
     await sendBatch([{ type: "group", userId: adminUserId, groupId: organizationId, traits }]);
-    await this.mirrorOntoMembers({ organizationId, traits });
+    try {
+      await this.mirrorOntoMembers({ organizationId, traits });
+    } catch (error) {
+      // The group call stands, and the next sync mirrors again, as the other sinks' failures.
+      nurturingLogger.warn(
+        { error, organizationId },
+        "an organization's usage could not be mirrored onto its members",
+      );
+    }
   }
 
   /**
    * Ends the trace window of every organization whose window ended in (`after`, `upTo`]: its trace
    * traits go once as null, on the organization and its members, so a rolling trait cannot say
-   * "active" for ever. Later syncs leave them out, and its trace rows are dropped. A refused call
-   * throws, so the sweep retries.
+   * "active" for ever. Later syncs leave them out, and its trace rows are dropped. A refused call,
+   * an identify's too, throws, so the sweep retries; a retry sends the same nulls again.
    */
   async traceWindowsEnded({
     after,
@@ -139,30 +168,22 @@ export class NurturingOrganizationUsageService {
   /**
    * The onboarding emails are person-triggered and read person attributes, so each member gets the
    * traits too, unless they joined another organization since: that one's traits are theirs. A
-   * failure is reported and swallowed, as the other sinks': the group call stands, the next sync
-   * mirrors again.
+   * refused call throws; each caller decides whether it is retried.
    */
   private async mirrorOntoMembers({
     organizationId,
     traits,
   }: Readonly<{ organizationId: string; traits: CioOrganizationUsageTraits }>): Promise<void> {
     const { members, sendBatch } = this.dependencies;
-    try {
-      const userIds = membersWhoseLatestOrganizationIs({
-        memberships: await members.findMembershipsOfMembers({ organizationId }),
-        organizationId,
-      });
-      for (let start = 0; start < userIds.length; start += MEMBER_BATCH_SIZE) {
-        await sendBatch(
-          userIds
-            .slice(start, start + MEMBER_BATCH_SIZE)
-            .map((userId) => ({ type: "identify" as const, userId, traits })),
-        );
-      }
-    } catch (error) {
-      nurturingLogger.warn(
-        { error, organizationId },
-        "an organization's usage could not be mirrored onto its members",
+    const userIds = membersWhoseLatestOrganizationIs({
+      memberships: await members.findMembershipsOfMembers({ organizationId }),
+      organizationId,
+    });
+    for (let start = 0; start < userIds.length; start += MEMBER_BATCH_SIZE) {
+      await sendBatch(
+        userIds
+          .slice(start, start + MEMBER_BATCH_SIZE)
+          .map((userId) => ({ type: "identify" as const, userId, traits })),
       );
     }
   }

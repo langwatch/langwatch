@@ -176,6 +176,7 @@ describe("OrganizationMembershipService", () => {
       expect(mockCreations.created).toHaveBeenCalledWith({
         organizationId: "org-123",
         organizationName: "Acme",
+        userId: "user-456",
       });
     });
   });

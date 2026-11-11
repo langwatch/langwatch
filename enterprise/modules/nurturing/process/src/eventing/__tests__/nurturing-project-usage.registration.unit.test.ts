@@ -23,6 +23,7 @@ import {
 const COPY_LANES = [
   "projectPlacement",
   "organizationCreated",
+  "memberFoundedOrganization",
   "memberSignedUp",
   "memberInviteAccepted",
   "memberSsoAutoAdded",

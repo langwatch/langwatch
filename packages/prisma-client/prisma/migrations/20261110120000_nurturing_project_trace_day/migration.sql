@@ -1,11 +1,12 @@
--- Nurturing's own trace counts, owned by nurturing, from trace's span_received (ARCHITECTURE §9):
--- a root span is one trace, as trace's rollup counts it, with its error status. One row per
--- project and UTC day of append time, its counts incremented in place by one upsert per batch of
--- the day's root spans; a redelivered batch may count twice. The per-email Customer.io traits sum
--- an organization's last 30 days, and the sync deletes older days.
+-- Nurturing's own trace counts per project and UTC day of append time, owned by nurturing:
+-- traceCount from trace's span_received (a root span is one trace), errorCount from trace's
+-- lw.trace.trace_failed (ARCHITECTURE §9). Each batch adds only the traces it newly inserted into
+-- NurturingProjectCountedTrace (migration 20261112120000), so a redelivery counts once. The
+-- per-email Customer.io traits sum an organization's last 30 days; rows are written only inside an
+-- organization's trace counting window and dropped when it ends.
 --
 -- Expand only: a new table nobody else reads or writes. Nothing is altered or dropped.
--- No foreign key: a deleted project's rows are never read again, and age out.
+-- No foreign key: a deleted project's rows are never read again, and are dropped with the window.
 -- Not rebuilt by a projection replay: the rows are written by a subscriber, not a fold.
 --
 -- Spec: enterprise/modules/nurturing/specs/project-usage.feature

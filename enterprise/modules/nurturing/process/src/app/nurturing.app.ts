@@ -10,6 +10,7 @@ import type { EventingCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
+import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
@@ -35,20 +36,27 @@ type NurturingSetup = FeatureSetup<
 /** Nurturing learns from the owners' events; no module names it as a peer, so it can never close a cycle (§9). */
 export class NurturingModule implements NurturingApi {
   static readonly contract = NurturingApi;
-  static readonly dependencies = { users: UserApi, organizations: OrganizationApi };
+  static readonly dependencies = {
+    users: UserApi,
+    organizations: OrganizationApi,
+    projects: ProjectApi,
+  };
   static readonly config = nurturingConfig;
   static readonly secrets = nurturingSecrets;
 
   readonly #pipeline: NurturingPipeline;
   readonly #organizationUsage: NurturingOrganizationUsageService | undefined;
+  readonly #projects: Pick<ProjectApi, "findById">;
   #commands: EventingCommands<NurturingPipeline> | undefined;
 
   private constructor(
     pipeline: NurturingPipeline,
     organizationUsage: NurturingOrganizationUsageService | undefined,
+    projects: Pick<ProjectApi, "findById">,
   ) {
     this.#pipeline = pipeline;
     this.#organizationUsage = organizationUsage;
+    this.#projects = projects;
   }
 
   static async create({
@@ -122,6 +130,7 @@ export class NurturingModule implements NurturingApi {
         forgetErasedUser: (input) => userErasure.forgetUser(input),
       }),
       organizationUsage,
+      dependencies.projects,
     );
   }
 
@@ -134,9 +143,22 @@ export class NurturingModule implements NurturingApi {
     return this.#organizationUsage !== undefined;
   }
 
-  /** A project's usage or traces changed: its organization's traits go to Customer.io. */
+  /** A project's usage changed: its organization's traits go to Customer.io. */
   async organizationUsageChanged(input: Readonly<{ projectId: string }>): Promise<void> {
     await this.#organizationUsage?.usageChanged(input);
+  }
+
+  /** A project traced: its organization's traits sync, unless its counting window ended. */
+  async organizationTracesChanged(input: Readonly<{ projectId: string }>): Promise<void> {
+    await this.#organizationUsage?.tracesChanged(input);
+  }
+
+  /** When project created the project, for a trace nurturing has no placement copy of yet. */
+  async projectCreatedAt({
+    projectId,
+  }: Readonly<{ projectId: string }>): Promise<Readonly<{ projectCreatedAt: number | null }>> {
+    const project = await this.#projects.findById(projectId);
+    return { projectCreatedAt: project ? project.createdAt.getTime() : null };
   }
 
   /** The trace windows that ended in (`after`, `upTo`]: their trace traits go once as null. */

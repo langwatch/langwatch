@@ -187,10 +187,19 @@ describe("NurturingOrganizationUsageService", () => {
     });
   });
 
+  /** Created 60 days before NOW: its window ended on 2026-10-12, the day a late trace left. */
+  const longEnded = new Map([
+    ["org-1", NOW - 60 * DAY_MS],
+    ["org-without-admin", NOW - 60 * DAY_MS],
+  ]);
+
   /** @scenario "Trace days older than the window are deleted" */
-  it("deletes the organization's trace days older than the window", async () => {
-    const { service, traceDays } = await serviceOver({ placed: new Map([["project-1", "org-1"]]) });
-    await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-10-01" });
+  it("deletes an organization's trace days older than the window, once past its counting window", async () => {
+    const { service, traceDays } = await serviceOver({
+      placed: new Map([["project-1", "org-1"]]),
+      createdAt: longEnded,
+    });
+    await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-10-12" });
 
     await service.usageChanged({ projectId: "project-1" });
 
@@ -199,25 +208,13 @@ describe("NurturingOrganizationUsageService", () => {
     ).resolves.toEqual([]);
   });
 
-  /** @scenario "A changed project's old trace days are deleted even without a placement or admin" */
-  it("prunes an unplaced project's old trace days", async () => {
-    const { service, traceDays, sent } = await serviceOver({ placed: new Map() });
-    await seedTraceDay(traceDays, { projectId: "project-9", day: "2026-10-01" });
-
-    await service.usageChanged({ projectId: "project-9" });
-
-    await expect(
-      traceDays.findForProjects({ projectIds: ["project-9"], afterDay: "2000-01-01" }),
-    ).resolves.toEqual([]);
-    expect(sent).toEqual([]);
-  });
-
-  /** @scenario "A changed project's old trace days are deleted even without a placement or admin" */
-  it("prunes an organization without an admin's project", async () => {
+  /** @scenario "A sync past the counting window deletes old trace days, even without an admin" */
+  it("prunes an organization without an admin's old trace days and sends nothing", async () => {
     const { service, traceDays, sent } = await serviceOver({
       placed: new Map([["project-8", "org-without-admin"]]),
+      createdAt: longEnded,
     });
-    await seedTraceDay(traceDays, { projectId: "project-8", day: "2026-10-01" });
+    await seedTraceDay(traceDays, { projectId: "project-8", day: "2026-10-12" });
 
     await service.usageChanged({ projectId: "project-8" });
 
@@ -225,6 +222,19 @@ describe("NurturingOrganizationUsageService", () => {
       traceDays.findForProjects({ projectIds: ["project-8"], afterDay: "2000-01-01" }),
     ).resolves.toEqual([]);
     expect(sent).toEqual([]);
+  });
+
+  /** @scenario "A sync past the counting window deletes old trace days, even without an admin" */
+  it("prunes nothing inside the counting window, where no day can be older than the window", async () => {
+    const { service, traceDays } = await serviceOver({ placed: new Map([["project-1", "org-1"]]) });
+    // Unreachable in production: it only shows the sync leaves the drop to the window-end sweep.
+    await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-10-01" });
+
+    await service.usageChanged({ projectId: "project-1" });
+
+    await expect(
+      traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "2000-01-01" }),
+    ).resolves.toEqual([expect.objectContaining({ day: "2026-10-01" })]);
   });
 
   /** @scenario "Prompt versions, scenario runs and evaluations count toward the habit" */
@@ -402,6 +412,40 @@ describe("NurturingOrganizationUsageService", () => {
     expect(traitsOf(sent[0]?.[0])).toMatchObject({ prompt_count: 0 });
   });
 
+  describe("when a project traces", () => {
+    /** @scenario "A trace past the organization's counting window syncs nothing" */
+    it("syncs its organization while inside the counting window", async () => {
+      const { service, traceDays, sent } = await serviceOver({
+        placed: new Map([["project-1", "org-1"]]),
+      });
+      await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-19" });
+
+      await service.tracesChanged({ projectId: "project-1" });
+
+      expect(traitsOf(sent[0]?.[0])).toMatchObject({ trace_count: 1 });
+    });
+
+    /** @scenario "A trace past the organization's counting window syncs nothing" */
+    it.each([
+      [
+        "an organization past its counting window",
+        new Map([["project-1", "org-1"]]),
+        NOW - 25 * DAY_MS,
+      ],
+      ["an organization never seen created", new Map([["project-1", "org-unknown"]]), NOW - DAY_MS],
+      ["a project never seen created", new Map<string, string>(), NOW - DAY_MS],
+    ])("sends nothing for %s", async (_name, placed, createdAt) => {
+      const { service, sent } = await serviceOver({
+        placed,
+        createdAt: new Map([["org-1", createdAt]]),
+      });
+
+      await service.tracesChanged({ projectId: "project-1" });
+
+      expect(sent).toEqual([]);
+    });
+  });
+
   describe("when an organization's trace window ends", () => {
     const ended = NOW - TRACE_COUNTING_WINDOW_MS;
 
@@ -452,6 +496,34 @@ describe("NurturingOrganizationUsageService", () => {
       await expect(
         traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" }),
       ).resolves.toEqual([]);
+    });
+
+    /** @scenario "The trace traits are removed once when an organization's window ends" */
+    it("throws when a member's identify is refused, and the retried sweep sends the same nulls", async () => {
+      let refuse = true;
+      const { service, sent } = await serviceOver({
+        placed: new Map(),
+        createdAt: new Map([["org-1", ended]]),
+        members: await membersOver(new Map([["member-2", ["org-1"]]])),
+        send: async (calls) => {
+          if (refuse && calls.some((call) => call.type === "identify")) throw new Error("refused");
+        },
+      });
+      const sweep = { after: NOW - 60 * 60 * 1000, upTo: NOW };
+
+      await expect(service.traceWindowsEnded(sweep)).rejects.toThrow("refused");
+      refuse = false;
+      await service.traceWindowsEnded(sweep);
+
+      expect(sent.map((calls) => calls.map((call) => call.type))).toEqual([
+        ["group"],
+        ["group"],
+        ["identify"],
+      ]);
+      expect(sent[1]).toEqual(sent[0]);
+      expect(sent[2]).toEqual([
+        { type: "identify", userId: "member-2", traits: traitsOf(sent[0]?.[0]) },
+      ]);
     });
 
     it("throws when Customer.io refused, so the sweep retries", async () => {

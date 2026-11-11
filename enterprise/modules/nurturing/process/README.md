@@ -40,27 +40,28 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `nurturing_project_usage` (aggregate `nurturing_project_usage_view`)
 
-Declared at `src/eventing/nurturing-project-usage.pipeline.ts:594`.
+Declared at `src/eventing/nurturing-project-usage.pipeline.ts:606`.
 
 | Kind                 | Name                                                              | Handles                                                                                           | Declared at                                            |
 | -------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| peer subscriber      | `projectPlacement`                                                | `lw.project.created` from [project](../../../../modules/project/README.md)                        | `src/eventing/nurturing-project-usage.pipeline.ts:599` |
-| peer subscriber      | `organizationCreated`                                             | `lw.organization.created` from [organization](../../../../modules/organization/README.md)         | `src/eventing/nurturing-project-usage.pipeline.ts:600` |
-| peer subscriber      | `memberSignedUp`                                                  | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md)       | `src/eventing/nurturing-project-usage.pipeline.ts:604` |
-| peer subscriber      | `memberInviteAccepted`                                            | `lw.organization.invite_accepted` from [organization](../../../../modules/organization/README.md) | `src/eventing/nurturing-project-usage.pipeline.ts:613` |
-| peer subscriber      | `memberSsoAutoAdded`                                              | `lw.auth.sso_auto_added` from [auth](../../../../modules/auth/README.md)                          | `src/eventing/nurturing-project-usage.pipeline.ts:622` |
-| peer subscriber      | `memberRemoved`                                                   | `lw.organization.member_removed` from [organization](../../../../modules/organization/README.md)  | `src/eventing/nurturing-project-usage.pipeline.ts:631` |
-| peer subscriber      | `memberDisabled`                                                  | `lw.organization.member_disabled` from [organization](../../../../modules/organization/README.md) | `src/eventing/nurturing-project-usage.pipeline.ts:640` |
-| peer subscriber      | `memberEnabled`                                                   | `lw.organization.member_enabled` from [organization](../../../../modules/organization/README.md)  | `src/eventing/nurturing-project-usage.pipeline.ts:649` |
-| peer subscriber      | `traceDayCount`                                                   | `lw.obs.trace.span_received` from [trace](../../../../modules/trace/README.md)                    | `src/eventing/nurturing-project-usage.pipeline.ts:682` |
-| peer subscriber      | `failedTraceDayCount`                                             | `lw.trace.trace_failed` from [trace](../../../../modules/trace/README.md)                         | `src/eventing/nurturing-project-usage.pipeline.ts:683` |
-| peer subscriber      | `firstTraceUsageSync`                                             | `lw.trace.first_trace_recorded` from [trace](../../../../modules/trace/README.md)                 | `src/eventing/nurturing-project-usage.pipeline.ts:686` |
-| peer subscriber      | `traceUsageSync`                                                  | `lw.trace.trace_received` from [trace](../../../../modules/trace/README.md)                       | `src/eventing/nurturing-project-usage.pipeline.ts:687` |
-| peer subscriber      | `evaluationActiveDay`                                             | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md)   | `src/eventing/nurturing-project-usage.pipeline.ts:688` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "prompt", store })`     | –                                                                                                 | `src/eventing/nurturing-project-usage.pipeline.ts:666` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "evaluator", store })`  | –                                                                                                 | `src/eventing/nurturing-project-usage.pipeline.ts:670` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "scenario", store })`   | –                                                                                                 | `src/eventing/nurturing-project-usage.pipeline.ts:674` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "simulation", store })` | –                                                                                                 | `src/eventing/nurturing-project-usage.pipeline.ts:678` |
+| peer subscriber      | `projectPlacement`                                                | `lw.project.created` from [project](../../../../modules/project/README.md)                        | `src/eventing/nurturing-project-usage.pipeline.ts:611` |
+| peer subscriber      | `organizationCreated`                                             | `lw.organization.created` from [organization](../../../../modules/organization/README.md)         | `src/eventing/nurturing-project-usage.pipeline.ts:612` |
+| peer subscriber      | `memberFoundedOrganization`                                       | `lw.organization.created` from [organization](../../../../modules/organization/README.md)         | `src/eventing/nurturing-project-usage.pipeline.ts:616` |
+| peer subscriber      | `memberSignedUp`                                                  | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md)       | `src/eventing/nurturing-project-usage.pipeline.ts:617` |
+| peer subscriber      | `memberInviteAccepted`                                            | `lw.organization.invite_accepted` from [organization](../../../../modules/organization/README.md) | `src/eventing/nurturing-project-usage.pipeline.ts:626` |
+| peer subscriber      | `memberSsoAutoAdded`                                              | `lw.auth.sso_auto_added` from [auth](../../../../modules/auth/README.md)                          | `src/eventing/nurturing-project-usage.pipeline.ts:635` |
+| peer subscriber      | `memberRemoved`                                                   | `lw.organization.member_removed` from [organization](../../../../modules/organization/README.md)  | `src/eventing/nurturing-project-usage.pipeline.ts:644` |
+| peer subscriber      | `memberDisabled`                                                  | `lw.organization.member_disabled` from [organization](../../../../modules/organization/README.md) | `src/eventing/nurturing-project-usage.pipeline.ts:653` |
+| peer subscriber      | `memberEnabled`                                                   | `lw.organization.member_enabled` from [organization](../../../../modules/organization/README.md)  | `src/eventing/nurturing-project-usage.pipeline.ts:662` |
+| peer subscriber      | `traceDayCount`                                                   | `lw.obs.trace.span_received` from [trace](../../../../modules/trace/README.md)                    | `src/eventing/nurturing-project-usage.pipeline.ts:695` |
+| peer subscriber      | `failedTraceDayCount`                                             | `lw.trace.trace_failed` from [trace](../../../../modules/trace/README.md)                         | `src/eventing/nurturing-project-usage.pipeline.ts:696` |
+| peer subscriber      | `firstTraceUsageSync`                                             | `lw.trace.first_trace_recorded` from [trace](../../../../modules/trace/README.md)                 | `src/eventing/nurturing-project-usage.pipeline.ts:699` |
+| peer subscriber      | `traceUsageSync`                                                  | `lw.trace.trace_received` from [trace](../../../../modules/trace/README.md)                       | `src/eventing/nurturing-project-usage.pipeline.ts:700` |
+| peer subscriber      | `evaluationActiveDay`                                             | `lw.evaluation.lifecycle_completed` from [evaluation](../../../../modules/evaluation/README.md)   | `src/eventing/nurturing-project-usage.pipeline.ts:701` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "prompt", store })`     | –                                                                                                 | `src/eventing/nurturing-project-usage.pipeline.ts:679` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "evaluator", store })`  | –                                                                                                 | `src/eventing/nurturing-project-usage.pipeline.ts:683` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "scenario", store })`   | –                                                                                                 | `src/eventing/nurturing-project-usage.pipeline.ts:687` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "simulation", store })` | –                                                                                                 | `src/eventing/nurturing-project-usage.pipeline.ts:691` |
 
 ### Pipeline `nurturing_trace_window_end` (aggregate `global`)
 
@@ -124,7 +125,7 @@ Declared at `src/eventing/nurturing.pipeline.ts:308`. Events: `nurturingSignalRe
 
 | Kind   | Leaf                | Environment variable   | Declared at                              |
 | ------ | ------------------- | ---------------------- | ---------------------------------------- |
-| secret | `–`                 | `CUSTOMER_IO_API_KEY`  | `src/app/nurturing.app.ts:40`            |
+| secret | `–`                 | `CUSTOMER_IO_API_KEY`  | `src/app/nurturing.app.ts:45`            |
 | config | `customerIoRegion`  | `CUSTOMER_IO_REGION`   | `../contract/src/nurturing.config.ts:8`  |
 | config | `customerIoBaseUrl` | `CUSTOMER_IO_BASE_URL` | `../contract/src/nurturing.config.ts:10` |
 | config | `posthogKey`        | `POSTHOG_KEY`          | `../contract/src/nurturing.config.ts:11` |

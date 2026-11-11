@@ -8,7 +8,10 @@ import {
   EVALUATOR_DELETED_EVENT_TYPE,
 } from "@langwatch/evaluator-contract";
 import { createTenantId, type Event } from "@langwatch/eventing";
-import { organizationSignedUpEventDataSchema } from "@langwatch/organization-contract";
+import {
+  ORGANIZATION_CREATED_EVENT_TYPE,
+  organizationSignedUpEventDataSchema,
+} from "@langwatch/organization-contract";
 import {
   PROMPT_CREATED_EVENT_TYPE,
   PROMPT_DELETED_EVENT_TYPE,
@@ -39,6 +42,7 @@ import {
   UNCOPIED_TRACE_RETRY_MS,
   nurturingEvaluationDaySubscriber,
   nurturingFailedTraceDaySubscriber,
+  nurturingFounderMembershipSubscriber,
   type NurturingProjectUsagePeerEvent,
   nurturingProjectUsagePeerFold,
   nurturingTraceDaySubscriber,
@@ -57,19 +61,22 @@ const LONG_AFTER = Date.UTC(2030, 0, 1);
 /**
  * The trace counts' dependencies: project-1 in org-1, created `createdAt`, once `copied` in
  * nurturing's placement copy and, once `organizationCopied`, in its creation copy; any other
- * project is never placed. `now` is the handling time.
+ * project is never placed. Project holds project-1 as created `projectCreatedAt`, and no other.
+ * `now` is the handling time.
  */
 function countingOver({
   createdAt,
   traceDays = MemoryNurturingTraceDayRepository.create(),
   copied = true,
   organizationCopied = copied,
+  projectCreatedAt = createdAt,
   now = () => LONG_AFTER,
 }: {
   createdAt: number;
   traceDays?: MemoryNurturingTraceDayRepository;
   copied?: boolean;
   organizationCopied?: boolean;
+  projectCreatedAt?: number | null;
   now?: () => number;
 }) {
   const placements = MemoryNurturingProjectPlacementRepository.create({
@@ -82,6 +89,9 @@ function countingOver({
     traceDays,
     placements,
     organizationsCreated,
+    projectCreatedAt: async ({ projectId }: Readonly<{ projectId: string }>) => ({
+      projectCreatedAt: projectId === "project-1" ? projectCreatedAt : null,
+    }),
     now,
     /** The copies' subscribers catch up. */
     landCopies: async () => {
@@ -571,11 +581,12 @@ describe("the trace-day count", () => {
   });
 
   /** @scenario "A new project's first trace waits for nurturing's copies" */
-  it("retries a young trace until its copies land late, then counts it once", async () => {
+  it("retries a young project's trace until its copies land late, then counts it once", async () => {
     let now = NOON + 1000;
     const counting = countingOver({
       createdAt: NOON - 86_400_000,
       copied: false,
+      projectCreatedAt: NOON,
       now: () => now,
     });
     const subscriber = nurturingTraceDaySubscriber(counting);
@@ -595,9 +606,14 @@ describe("the trace-day count", () => {
   });
 
   /** @scenario "A new project's first trace waits for nurturing's copies" */
-  it("drops without failing a trace whose copies never land, once it is past the retry span", async () => {
+  it("drops without failing a trace whose copies never land, once the project is past the retry span", async () => {
     let now = NOON + UNCOPIED_TRACE_RETRY_MS - 1;
-    const counting = countingOver({ createdAt: NOON - 86_400_000, copied: false, now: () => now });
+    const counting = countingOver({
+      createdAt: NOON - 86_400_000,
+      copied: false,
+      projectCreatedAt: NOON,
+      now: () => now,
+    });
     const subscriber = nurturingTraceDaySubscriber(counting);
 
     await expect(subscriber.handleBatch([itemOf(OK, "trace-1")])).rejects.toThrow(
@@ -611,6 +627,28 @@ describe("the trace-day count", () => {
     ).resolves.toEqual([]);
     expect(UNCOPIED_TRACE_RETRY_MS).toBe(2 * 60 * 60_000);
   });
+
+  /** @scenario "A trace of a project older than nurturing's placement copy is dropped at once" */
+  it.each([
+    ["created a day before the trace", NOON - 86_400_000],
+    ["no longer held by project", null],
+  ])(
+    "drops without a retry a young trace of an uncopied project %s",
+    async (_name, projectCreatedAt) => {
+      const counting = countingOver({
+        createdAt: NOON - 86_400_000,
+        copied: false,
+        projectCreatedAt,
+        now: () => NOON + 1000,
+      });
+
+      await nurturingTraceDaySubscriber(counting).handleBatch([itemOf(OK, "trace-1")]);
+
+      await expect(
+        counting.traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" }),
+      ).resolves.toEqual([]);
+    },
+  );
 
   /** @scenario "A trace of an organization older than nurturing's creation copy is dropped" */
   it("drops without a retry a young trace of a placed project whose organization has no creation copy", async () => {
@@ -810,5 +848,36 @@ describe("nurturing's member copy", () => {
         returnedAt: null,
       },
     ]);
+  });
+
+  /** @scenario "Nurturing keeps its own copy of an organization's members" */
+  it("records the founder of a created organization as joined, and no one for a provisioned one", async () => {
+    const members = MemoryNurturingOrganizationMemberRepository.create();
+    const founder = nurturingFounderMembershipSubscriber(members);
+    const created = (organizationId: string, occurredAt: number, userId?: string) =>
+      founder.data.parse({
+        tenantId: organizationId,
+        organizationId,
+        organizationName: "Acme",
+        occurredAt,
+        ...(userId ? { userId } : {}),
+      });
+    if (!founder.handle) throw new Error("a creation fact is handled one at a time");
+
+    expect(founder.eventType).toBe(ORGANIZATION_CREATED_EVENT_TYPE);
+    await founder.handle(created("org-1", 1_000, "user-1"), context);
+    await founder.handle(created("org-1", 1_000, "user-1"), context);
+    await founder.handle(created("org-2", 2_000), context);
+
+    expect(await members.findMembershipsOfMembers({ organizationId: "org-1" })).toEqual([
+      {
+        organizationId: "org-1",
+        userId: "user-1",
+        joinedAt: 1_000,
+        leftAt: null,
+        returnedAt: null,
+      },
+    ]);
+    expect(await members.findMembershipsOfMembers({ organizationId: "org-2" })).toEqual([]);
   });
 });
