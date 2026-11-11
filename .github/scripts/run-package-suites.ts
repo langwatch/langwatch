@@ -442,6 +442,30 @@ export const killProcessTree = (child: ScriptProcess) => {
   }
 };
 
+/** Holds `child` in `running` until it closes, so a signal handler can kill what is live. */
+export const trackWhileRunning = <T extends ScriptProcess>({
+  running,
+  child,
+}: {
+  running: Set<ScriptProcess>;
+  child: T;
+}): T => {
+  running.add(child);
+  child.on("close", () => running.delete(child));
+  return child;
+};
+
+/** Kills the process tree of every tracked suite. */
+export const killAll = ({
+  running,
+  kill = killProcessTree,
+}: {
+  running: Set<ScriptProcess>;
+  kill?: (child: ScriptProcess) => void;
+}) => {
+  for (const child of running) kill(child);
+};
+
 /**
  * Parses `PACKAGE_SUITES_CONCURRENCY`. Absent means one suite at a time; a
  * malformed value is an error, never a silent guess.
@@ -1023,35 +1047,42 @@ if (isEntrypoint()) {
     const extra = extraArgsFor(job.pkg, job.script) ?? [];
     return extra.length > 0 ? ["--filter", job.pkg.name, "run", job.script, ...extra] : undefined;
   };
+  const running = new Set<ScriptProcess>();
   const runner = createSuiteRunner({
     live,
     timeoutMs: suiteTimeoutSeconds * 1000,
     kill: killProcessTree,
     start: (job) =>
-      // The hunt skips nx, whose cache would replay a result instead of rerunning under the seed.
-      spawn("pnpm", huntCommandFor(job) ?? commandFor(job), {
-        detached: true,
-        stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
-        env: {
-          ...process.env,
-          ...workerEnvFor({
-            job,
-            heavy: isHeavyPackage({ weightOf: plan.weightOf, pkg: job.pkg }),
-            cores,
+      trackWhileRunning({
+        running,
+        child:
+          // The hunt skips nx, whose cache would replay a result instead of
+          // rerunning under the seed.
+          spawn("pnpm", huntCommandFor(job) ?? commandFor(job), {
+            detached: true,
+            stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
+            env: {
+              ...process.env,
+              ...workerEnvFor({
+                job,
+                heavy: isHeavyPackage({ weightOf: plan.weightOf, pkg: job.pkg }),
+                cores,
+              }),
+            },
           }),
-        },
       }),
     log: (line) => console.log(line),
     write: (output) => process.stdout.write(output),
   });
-  if (!live) {
-    for (const signal of ["SIGINT", "SIGTERM"] as const) {
-      process.once(signal, () => {
-        runner.flushUnfinished();
-        // Exits once stdout has drained, so the flushed output is not cut short.
-        process.stdout.write("", () => process.exit(1));
-      });
-    }
+  // Suites are detached, so a signal to this process no longer reaches them.
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+      killAll({ running });
+      if (live) process.exit(1);
+      runner.flushUnfinished();
+      // Exits once stdout has drained, so the flushed output is not cut short.
+      process.stdout.write("", () => process.exit(1));
+    });
   }
 
   const statuses = await runJobs({

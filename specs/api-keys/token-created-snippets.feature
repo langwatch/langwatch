@@ -334,3 +334,9 @@ Feature: Token Created modal command snippets
   Scenario: Reopening starts from the new key alone
     Given a second key is minted after the first dialog closed
     Then no earlier token, selection, reveal or copy tick is shown
+
+  @integration
+  Scenario: Unmounting a copy button before its reset leaves no pending timer
+    Given I have clicked a copy button and its Copied state is waiting to reset
+    When the button unmounts before the reset fires
+    Then no reset timer is left pending

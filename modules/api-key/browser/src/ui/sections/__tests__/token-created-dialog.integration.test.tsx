@@ -446,6 +446,26 @@ describe("given a token has just been minted", () => {
       }
     });
 
+    /** @scenario "Unmounting a copy button before its reset leaves no pending timer" */
+    it("leaves no reset timer pending when the dialog unmounts after Copy API key", async () => {
+      renderDialog();
+      const copyButton = screen.getByRole("button", { name: "Copy API key" });
+
+      vi.useFakeTimers();
+      try {
+        const baseline = vi.getTimerCount();
+        fireEvent.click(copyButton);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        cleanup();
+
+        expect(vi.getTimerCount()).toBe(baseline);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     /** @scenario Copy success is announced to assistive tech */
     it("hands the host a success notice for the copy", async () => {
       const host = renderDialog();

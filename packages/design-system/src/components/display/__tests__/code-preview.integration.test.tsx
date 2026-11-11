@@ -14,6 +14,7 @@ afterEach(() => {
 });
 
 describe("Feature: The snippet copy confirmation resets on a timer", () => {
+  /** @scenario "Unmounting a copy button before its reset leaves no pending timer" */
   it("Scenario: Unmounting before the reset leaves no pending timer behind", async () => {
     vi.useFakeTimers();
     const copy = vi.fn(async () => true);
@@ -21,13 +22,13 @@ describe("Feature: The snippet copy confirmation resets on a timer", () => {
       <SnippetPreview code="npm i langwatch" filename="install" codeLanguage="bash" copy={copy} />,
     );
 
+    const baseline = vi.getTimerCount();
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Copy install" }));
     });
-    const pendingAfterCopy = vi.getTimerCount();
     unmount();
 
     expect(copy).toHaveBeenCalledTimes(1);
-    expect(vi.getTimerCount()).toBeLessThan(pendingAfterCopy);
+    expect(vi.getTimerCount()).toBe(baseline);
   });
 });

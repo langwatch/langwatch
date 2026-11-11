@@ -16,6 +16,8 @@ import {
   HEAVY_SECONDS,
   isHeavyPackage,
   jobsFor,
+  killAll,
+  trackWhileRunning,
   laneOf,
   outcomeOf,
   parseConcurrency,
@@ -35,6 +37,7 @@ import {
   wallTimeOf,
   withPackage,
   type DiscoveredPackage,
+  type ScriptProcess,
   type SuiteJob,
   type SuiteOutcome,
 } from "./run-package-suites.ts";
@@ -1096,5 +1099,21 @@ void describe("given the lanes a leg of the job runs", () => {
     void it("refuses it rather than running every lane on every leg", () => {
       assert.throws(() => parseLanes("chromium"));
     });
+  });
+});
+
+describe("tracking running suites for a signal", () => {
+  const fakeChild = () => Object.assign(new EventEmitter(), { stdout: null, stderr: null });
+
+  it("kills each suite still running and none that has closed", () => {
+    const running = new Set<ScriptProcess>();
+    const live = trackWhileRunning({ running, child: fakeChild() });
+    const done = trackWhileRunning({ running, child: fakeChild() });
+    done.emit("close", 0);
+
+    const killed: ScriptProcess[] = [];
+    killAll({ running, kill: (child) => killed.push(child) });
+
+    assert.deepEqual(killed, [live]);
   });
 });
