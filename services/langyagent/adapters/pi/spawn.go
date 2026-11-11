@@ -165,7 +165,8 @@ func modelLane(model string) workerModelConfig {
 		lane.Compat = map[string]any{"supportsStore": false}
 	case strings.HasPrefix(model, "openai/"):
 		lane.API = "openai-responses"
-		lane.Reasoning = true
+		// Let the worker use pi's model catalog instead of declaring every
+		// OpenAI model reasoning-capable. It retains the default for unknown models.
 		lane.Compat = map[string]any{"supportsLongCacheRetention": true}
 	default:
 		lane.API = "openai-completions"
