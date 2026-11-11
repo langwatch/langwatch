@@ -519,6 +519,7 @@ export class DatasetService {
       throw new DatasetValidationError(
         `More than one row holds ${key} = ${duplicated.join(", ")}. ` +
           "Delete the extra rows, then upsert again.",
+        "dataset_has_duplicate_key",
       );
     }
 

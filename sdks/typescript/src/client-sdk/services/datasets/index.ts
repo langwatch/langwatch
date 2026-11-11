@@ -7,6 +7,7 @@ export {
   DatasetValidationError,
   DatasetPlanLimitError,
 } from "./errors";
+export type { DatasetValidationCode } from "./errors";
 export type {
   Dataset,
   DatasetEntry,

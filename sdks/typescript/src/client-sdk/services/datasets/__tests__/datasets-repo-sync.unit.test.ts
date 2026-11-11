@@ -206,7 +206,7 @@ describe("Feature: Keeping a dataset in sync with files held in a repository", (
         langwatch.datasets.upsertRecords("qa-cases", [{ case_id: "c-1", input: "x" }], {
           key: "case_id",
         }),
-      ).rejects.toThrow(/c-1.*Delete the extra rows, then upsert again/);
+      ).rejects.toMatchObject({ code: "dataset_has_duplicate_key" });
       expect(fake.writes()).toEqual([]);
     });
 
@@ -218,7 +218,7 @@ describe("Feature: Keeping a dataset in sync with files held in a repository", (
         langwatch.datasets.upsertRecords("qa-cases", [{ case_id: "c-5" }, { case_id: "c-5" }], {
           key: "case_id",
         }),
-      ).rejects.toThrow(/share the key case_id = "c-5"/);
+      ).rejects.toMatchObject({ code: "duplicate_upsert_key" });
       expect(fake.state.requests).toEqual([]);
     });
 
@@ -228,7 +228,7 @@ describe("Feature: Keeping a dataset in sync with files held in a repository", (
 
       await expect(
         langwatch.datasets.upsertRecords("qa-cases", [{ input: "no key" }], { key: "case_id" }),
-      ).rejects.toThrow(/case_id/);
+      ).rejects.toMatchObject({ code: "missing_upsert_key" });
       expect(fake.state.requests).toEqual([]);
     });
   });

@@ -49,6 +49,7 @@ from .errors import (
     DatasetError,
     DatasetNotFoundError,
     DatasetPlanLimitError,
+    DatasetUpsertKeyError,
 )
 
 __all__ = [
@@ -60,6 +61,7 @@ __all__ = [
     "DatasetApiError",
     "DatasetNotFoundError",
     "DatasetPlanLimitError",
+    "DatasetUpsertKeyError",
     "DatasetInfo",
     "DatasetRecord",
     "PaginatedResult",

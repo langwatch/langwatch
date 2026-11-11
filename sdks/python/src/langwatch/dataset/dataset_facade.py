@@ -23,7 +23,7 @@ from langwatch.utils.initialization import ensure_setup
 from langwatch.state import get_instance
 
 from .dataset_api_service import DatasetApiService
-from .errors import DatasetApiError, DatasetNotFoundError
+from .errors import DatasetApiError, DatasetNotFoundError, DatasetUpsertKeyError
 from .types import (
     Dataset,
     DatasetEntry,
@@ -302,10 +302,16 @@ class DatasetsFacade:
         incoming: Dict[str, Dict[str, Any]] = {}
         for entry in entries:
             if key not in entry:
-                raise ValueError(f"Every entry must hold the key column '{key}'.")
+                raise DatasetUpsertKeyError(
+                    f"Every entry must hold the key column '{key}'.",
+                    code="missing_upsert_key",
+                )
             entry_key = _key_of(entry[key])
             if entry_key in incoming:
-                raise ValueError(f"Two entries share the key {key}={entry[key]!r}.")
+                raise DatasetUpsertKeyError(
+                    f"Two entries share the key {key}={entry[key]!r}.",
+                    code="duplicate_upsert_key",
+                )
             incoming[entry_key] = entry
         if not incoming:
             return UpsertResult()
@@ -321,9 +327,10 @@ class DatasetsFacade:
             if len(existing.get(entry_key, [])) > 1
         ]
         if duplicated:
-            raise ValueError(
+            raise DatasetUpsertKeyError(
                 f"More than one row holds {key} = {', '.join(duplicated)}. "
-                "Delete the extra rows, then upsert again."
+                "Delete the extra rows, then upsert again.",
+                code="dataset_has_duplicate_key",
             )
 
         result = UpsertResult()

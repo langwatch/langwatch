@@ -45,11 +45,21 @@ export class DatasetApiError extends DatasetError {
  * Distinguished from DatasetApiError which represents server-side errors.
  */
 export class DatasetValidationError extends DatasetError {
-  constructor(message: string) {
+  /** Stable code for refusals a caller may branch on; the message may change. */
+  readonly code?: DatasetValidationCode;
+
+  constructor(message: string, code?: DatasetValidationCode) {
     super(message);
     this.name = "DatasetValidationError";
+    this.code = code;
   }
 }
+
+/** Codes an upsert refusal carries. */
+export type DatasetValidationCode =
+  | "missing_upsert_key"
+  | "duplicate_upsert_key"
+  | "dataset_has_duplicate_key";
 
 /**
  * Thrown when a dataset operation exceeds the plan limit (403).

@@ -17,6 +17,7 @@ import pytest
 
 from langwatch.dataset.dataset_api_service import DatasetApiService
 from langwatch.dataset.dataset_facade import DatasetsFacade
+from langwatch.dataset.errors import DatasetUpsertKeyError
 
 pytestmark = pytest.mark.unit
 
@@ -249,35 +250,38 @@ class TestUpsertRecords:
             ]
         )
 
-        with pytest.raises(ValueError, match="c-1.*Delete the extra rows, then upsert again"):
+        with pytest.raises(DatasetUpsertKeyError) as refused:
             _facade(server).upsert_records(
                 "qa-cases",
                 entries=[{"case_id": "c-1", "expected_output": "x"}],
                 key="case_id",
             )
 
+        assert refused.value.code == "dataset_has_duplicate_key"
         assert server.writes() == []
 
     # @scenario "Upserting by a key column refuses two entries with the same key"
     def test_refuses_two_entries_with_the_same_key(self):
         server = self._server()
 
-        with pytest.raises(ValueError, match="c-5"):
+        with pytest.raises(DatasetUpsertKeyError) as refused:
             _facade(server).upsert_records(
                 "qa-cases",
                 entries=[{"case_id": "c-5"}, {"case_id": "c-5"}],
                 key="case_id",
             )
 
+        assert refused.value.code == "duplicate_upsert_key"
         assert server.requests == []
 
     # @scenario "Upserting by a key column refuses an entry without the key"
     def test_refuses_an_entry_without_the_key(self):
         server = self._server()
 
-        with pytest.raises(ValueError, match="case_id"):
+        with pytest.raises(DatasetUpsertKeyError) as refused:
             _facade(server).upsert_records(
                 "qa-cases", entries=[{"input": "no key"}], key="case_id"
             )
 
+        assert refused.value.code == "missing_upsert_key"
         assert server.requests == []

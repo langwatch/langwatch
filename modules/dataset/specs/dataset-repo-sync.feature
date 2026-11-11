@@ -55,15 +55,14 @@ Feature: Keeping a dataset in sync with files held in a repository
     # A dataset filled by the old append-only sync holds such rows on its first upsert.
     Given a dataset holds two rows whose "case_id" is "c-1"
     When a script upserts an entry with "case_id" "c-1"
-    Then the SDK refuses before writing anything and names the duplicated key
-    And the error says to delete the extra rows and upsert again
+    Then the SDK refuses with code "dataset_has_duplicate_key" before writing anything
 
   @unit
   Scenario: Upserting by a key column refuses two entries with the same key
     When a script upserts two entries whose "case_id" is "c-1"
-    Then the SDK refuses before sending any request and names the shared key
+    Then the SDK refuses with code "duplicate_upsert_key" before sending any request
 
   @unit
   Scenario: Upserting by a key column refuses an entry without the key
     When a script upserts an entry that has no "case_id"
-    Then the SDK refuses before sending any request
+    Then the SDK refuses with code "missing_upsert_key" before sending any request
