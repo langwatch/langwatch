@@ -367,9 +367,11 @@ describe("createEvaluatorCommand()", () => {
       expect(mockCreate).not.toHaveBeenCalled();
     });
 
+    /** @scenario Create an evaluator naming neither a type nor a code file */
     it("refuses neither --type nor --code, before calling the API", async () => {
-      await expect(createEvaluatorCommand("Exact", {})).rejects.toThrow(ProcessExitError);
+      const code = await jsonErrorCode(() => createEvaluatorCommand("Exact", {}));
 
+      expect(code).toBe("validation_error");
       expect(mockCreate).not.toHaveBeenCalled();
     });
 

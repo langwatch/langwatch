@@ -404,6 +404,47 @@ describe("EvaluatorModule", () => {
       expect(resolveModelForFeature).not.toHaveBeenCalled();
     });
 
+    /** @scenario The public API publishes the wrapped workflow as an evaluator */
+    it("flags the workflow as an evaluator and not a component, as the Studio switch does", async () => {
+      const setWorkflowFlags = vi.fn(async () => void 0);
+      const { app } = createEvaluatorTestApp({ workflows: { setWorkflowFlags } });
+
+      await app.createWithResolvedDefaults({
+        projectId: "project-1",
+        name: "Judge",
+        type: "workflow",
+        config: {},
+        workflowId: "workflow-1",
+      });
+
+      expect(setWorkflowFlags).toHaveBeenCalledWith({
+        workflowId: "workflow-1",
+        projectId: "project-1",
+        isEvaluator: true,
+        isComponent: false,
+      });
+    });
+
+    /** @scenario The public API publishes the wrapped workflow as an evaluator */
+    it("leaves the workflow's flags alone when the create is refused", async () => {
+      const setWorkflowFlags = vi.fn(async () => void 0);
+      const { app } = createEvaluatorTestApp({ workflows: { setWorkflowFlags } });
+      const create = {
+        projectId: "project-1",
+        type: "workflow" as const,
+        config: {},
+        workflowId: "workflow-1",
+      };
+      await app.createWithResolvedDefaults({ ...create, name: "Judge" });
+      setWorkflowFlags.mockClear();
+
+      await expect(
+        app.createWithResolvedDefaults({ ...create, name: "Second judge" }),
+      ).rejects.toMatchObject({ code: "evaluator_workflow_evaluator_exists" });
+
+      expect(setWorkflowFlags).not.toHaveBeenCalled();
+    });
+
     /** @scenario The application refuses an evaluator kind that does not match its workflow link */
     it("refuses a workflow evaluator that names no workflow", async () => {
       const { app, repository } = harness();

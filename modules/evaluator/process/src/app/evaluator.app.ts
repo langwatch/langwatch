@@ -522,7 +522,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     assertWorkflowLink(type, input.workflowId);
     await this.#dependencies.creationCaps.assertCreationAllowed({ projectId: input.projectId });
     if (type !== "evaluator") {
-      return this.#createGuarded({
+      const created = await this.#createGuarded({
         id: input.id ?? newEvaluatorId(),
         projectId: input.projectId,
         name: input.name,
@@ -531,6 +531,14 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
         ...(input.workflowId !== void 0 && { workflowId: input.workflowId }),
         caller: input.caller,
       });
+      // Flagged only once the row exists: a refused create leaves the workflow as it was.
+      if (input.workflowId !== void 0) {
+        await this.#dependencies.publications.markAsEvaluator({
+          workflowId: input.workflowId,
+          projectId: input.projectId,
+        });
+      }
+      return created;
     }
     const [resolvedDefault, resolvedEmbedding] = await Promise.all([
       this.#dependencies.modelProviders.resolveModelForFeature({

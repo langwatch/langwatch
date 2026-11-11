@@ -110,6 +110,7 @@ export function createEvaluatorTestApp(
         users: input.users ?? createApiFixture<UserApi>({ getProfiles: async () => [] }),
         workflows: createApiFixture<WorkflowApi>({
           assertInProject: async () => void 0,
+          setWorkflowFlags: async () => void 0,
           ...input.workflows,
         }),
         modelProviders,

@@ -55,6 +55,13 @@ Feature: The public API creates every kind of evaluator the editor can
     And nothing is created
 
   @unit
+  Scenario: The public API publishes the wrapped workflow as an evaluator
+    Given a workflow of my project with no evaluator yet
+    When the public API creates a workflow evaluator linked to it
+    Then the workflow is flagged as an evaluator and not a component, as the Studio switch flags it
+    And a create the application refuses leaves the workflow's flags as they were
+
+  @unit
   Scenario: The application refuses an evaluator kind that does not match its workflow link
     Given a caller that reaches the application without the REST schema
     When it creates a workflow evaluator with no workflowId, or a code or built-in one with a workflowId
