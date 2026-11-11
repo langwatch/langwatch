@@ -562,7 +562,9 @@ describe("given Laze asked to connect a project", () => {
           "This code expired. Go back to Laze and press Connect with LangWatch again.",
         ),
       ).toBeInTheDocument();
+      expect(screen.getByText("Connect Laze to LangWatch")).toBeInTheDocument();
       expect(screen.queryByText(/langwatch login/)).toBeNull();
+      expect(document.body.textContent).not.toMatch(cliWording);
     });
   });
 

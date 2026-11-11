@@ -308,6 +308,18 @@ function accessLoadState({
   };
 }
 
+/** The known app (Laze) named on the page instead of the CLI, from a pending or expired code. */
+function clientOf({
+  lookup,
+  requiresProject,
+}: {
+  lookup: DeviceCodeLookupState;
+  requiresProject: boolean;
+}): CliDeviceClient | null {
+  if (lookup.kind === "expired") return lookup.client;
+  return lookup.kind === "ready" && requiresProject ? lookup.client : null;
+}
+
 /** The page heading: a known app connecting a project is named, otherwise the CLI is. */
 function screenHeadingFor({
   requiresProject,
@@ -382,8 +394,7 @@ export default function CliAuthScreen() {
   const credentialType: CliCredentialType =
     lookup.kind === "ready" ? lookup.credentialType : "device_session";
   const requiresProject = credentialType === "project_api_key";
-  // A known app connecting a project (Laze) is named on the page instead of the CLI.
-  const client = lookup.kind === "ready" && requiresProject ? lookup.client : null;
+  const client = clientOf({ lookup, requiresProject });
   // `langwatch login --management` asked for management access on the key.
   const requestsManagement = lookup.kind === "ready" && !requiresProject && lookup.management;
 
