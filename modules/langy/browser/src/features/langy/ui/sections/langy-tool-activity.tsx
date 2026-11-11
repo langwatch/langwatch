@@ -186,6 +186,9 @@ function partToCall(part: ToolPartLike, name: string): CapabilityToolCall {
 const CLI_FAILURE_LINE =
   /^[\s>]*(?:✖|failed to\b|request failed\b|self_signed_cert_in_chain\b)|^error:/im;
 
+/** The leading exit code of a sandbox console (`renderBashOutput`); it wins over the line check. */
+const CONSOLE_EXIT_CODE = /^exit code: (\d+)(?:\n|$)/;
+
 /** The raw text an output carries, bare or in the `{ text }` envelope. */
 function outputText(output: unknown): string | undefined {
   if (typeof output === "string") return output;
@@ -229,6 +232,8 @@ function renderedToolFailure(part: ToolPartLike): boolean {
   const envelope = typeof raw === "string" ? document : raw;
   const consoleText = cliConsoleTextOf(envelope);
   if (consoleText === null) return false;
+  const exitCode = CONSOLE_EXIT_CODE.exec(consoleText)?.[1];
+  if (exitCode !== undefined) return exitCode !== "0";
   return CLI_FAILURE_LINE.test(consoleText);
 }
 
