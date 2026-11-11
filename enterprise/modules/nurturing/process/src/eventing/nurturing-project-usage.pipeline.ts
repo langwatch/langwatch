@@ -8,7 +8,7 @@
  * group call, mirrored onto each member whose latest organization it is (the emails read person
  * attributes; members from nurturing's own copy of the owners' member facts), placed by
  * nurturing's own copy of project and organization creation. It reads no other module. Without a
- * Customer.io channel nothing reads these rows, so nothing here is registered. Why event
+ * Customer.io channel only the copies register: nothing reads the usage rows. Why event
  * driven: https://github.com/langwatch/tasks/issues/1131.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
@@ -565,35 +565,104 @@ export function nurturingEvaluationDaySubscriber(
   };
 }
 
-/** What the usage sync needs; absent without a Customer.io channel, when nothing syncs. */
-export type NurturingUsageSync = Readonly<{
-  traceDays: NurturingTraceDayRepository;
+/** Nurturing's own copies of owner facts, kept whether or not a channel syncs. */
+export type NurturingUsageCopies = Readonly<{
   placements: NurturingProjectPlacementRepository;
   organizationsCreated: NurturingOrganizationCreatedRepository;
   members: NurturingOrganizationMemberRepository;
+}>;
+
+/** What the usage sync needs; absent without a Customer.io channel, when nothing syncs. */
+export type NurturingUsageSync = Readonly<{
+  traceDays: NurturingTraceDayRepository;
   now: () => number;
   usageChanged: UsageChanged;
 }>;
 
 function nurturingProjectUsageHost({
   store,
+  copies,
   sync,
 }: Readonly<{
   store: NurturingProjectUsageRepository;
+  copies: NurturingUsageCopies;
   sync: NurturingUsageSync | undefined;
 }>) {
-  const host = definePipeline({
+  const { placements, organizationsCreated, members } = copies;
+  // The copies always register, as nurturing's other copies do: a channel configured later
+  // then finds the projects, organizations and members created before it.
+  const copied = definePipeline({
     name: NURTURING_PROJECT_USAGE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "nurturing_project_usage_view" }),
-  }).withEvents([]);
-  // Without a channel no sync reads these rows, and none prunes the trace days, so none is kept.
-  if (!sync) return host;
-  const { traceDays, placements, organizationsCreated, members, now, usageChanged } = sync;
+  })
+    .withEvents([])
+    .withPeerSubscriber("projectPlacement", nurturingProjectPlacementSubscriber(placements))
+    .withPeerSubscriber(
+      "organizationCreated",
+      nurturingOrganizationCreatedSubscriber(organizationsCreated),
+    )
+    .withPeerSubscriber(
+      "memberSignedUp",
+      nurturingMembershipSubscriber({
+        eventType: ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+        data: organizationSignedUpEventDataSchema,
+        change: "joined",
+        members,
+      }),
+    )
+    .withPeerSubscriber(
+      "memberInviteAccepted",
+      nurturingMembershipSubscriber({
+        eventType: INVITE_ACCEPTED_EVENT_TYPE,
+        data: inviteAcceptedEventDataSchema,
+        change: "joined",
+        members,
+      }),
+    )
+    .withPeerSubscriber(
+      "memberSsoAutoAdded",
+      nurturingMembershipSubscriber({
+        eventType: SSO_AUTO_ADDED_EVENT_TYPE,
+        data: ssoAutoAddedEventDataSchema,
+        change: "joined",
+        members,
+      }),
+    )
+    .withPeerSubscriber(
+      "memberRemoved",
+      nurturingMembershipSubscriber({
+        eventType: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+        data: organizationMemberRemovedEventDataSchema,
+        change: "left",
+        members,
+      }),
+    )
+    .withPeerSubscriber(
+      "memberDisabled",
+      nurturingMembershipSubscriber({
+        eventType: ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+        data: organizationMemberDisabledEventDataSchema,
+        change: "left",
+        members,
+      }),
+    )
+    .withPeerSubscriber(
+      "memberEnabled",
+      nurturingMembershipSubscriber({
+        eventType: ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
+        data: organizationMemberEnabledEventDataSchema,
+        change: "returned",
+        members,
+      }),
+    );
+  // Without a channel no sync reads the usage rows, and none prunes the trace days, so none is kept.
+  if (!sync) return copied;
+  const { traceDays, now, usageChanged } = sync;
   const counting = { traceDays, placements, organizationsCreated, now };
   const subscribers = [organizationUsageSubscriber(usageChanged)];
   const traceSyncs = nurturingTraceUsageSyncSubscribers(usageChanged);
   return (
-    host
+    copied
       .withPeerFoldProjection(
         nurturingProjectUsagePeerFold({ owner: "prompt", store }),
         subscribers,
@@ -617,65 +686,6 @@ function nurturingProjectUsageHost({
       .withPeerSubscriber("firstTraceUsageSync", traceSyncs.firstTrace)
       .withPeerSubscriber("traceUsageSync", traceSyncs.laterTrace)
       .withPeerSubscriber("evaluationActiveDay", nurturingEvaluationDaySubscriber(store))
-      .withPeerSubscriber("projectPlacement", nurturingProjectPlacementSubscriber(placements))
-      .withPeerSubscriber(
-        "organizationCreated",
-        nurturingOrganizationCreatedSubscriber(organizationsCreated),
-      )
-      .withPeerSubscriber(
-        "memberSignedUp",
-        nurturingMembershipSubscriber({
-          eventType: ORGANIZATION_SIGNED_UP_EVENT_TYPE,
-          data: organizationSignedUpEventDataSchema,
-          change: "joined",
-          members,
-        }),
-      )
-      .withPeerSubscriber(
-        "memberInviteAccepted",
-        nurturingMembershipSubscriber({
-          eventType: INVITE_ACCEPTED_EVENT_TYPE,
-          data: inviteAcceptedEventDataSchema,
-          change: "joined",
-          members,
-        }),
-      )
-      .withPeerSubscriber(
-        "memberSsoAutoAdded",
-        nurturingMembershipSubscriber({
-          eventType: SSO_AUTO_ADDED_EVENT_TYPE,
-          data: ssoAutoAddedEventDataSchema,
-          change: "joined",
-          members,
-        }),
-      )
-      .withPeerSubscriber(
-        "memberRemoved",
-        nurturingMembershipSubscriber({
-          eventType: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
-          data: organizationMemberRemovedEventDataSchema,
-          change: "left",
-          members,
-        }),
-      )
-      .withPeerSubscriber(
-        "memberDisabled",
-        nurturingMembershipSubscriber({
-          eventType: ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
-          data: organizationMemberDisabledEventDataSchema,
-          change: "left",
-          members,
-        }),
-      )
-      .withPeerSubscriber(
-        "memberEnabled",
-        nurturingMembershipSubscriber({
-          eventType: ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
-          data: organizationMemberEnabledEventDataSchema,
-          change: "returned",
-          members,
-        }),
-      )
   );
 }
 
@@ -748,12 +758,14 @@ export const nurturingProjectUsageEventing = defineEventingModule({
   build: ({ repositories, app }: EventingSetup<NurturingRepositories, NurturingModule>) =>
     buildNurturingProjectUsagePipeline({
       store: repositories.projectUsage,
+      copies: {
+        placements: repositories.placements,
+        organizationsCreated: repositories.organizationsCreated,
+        members: repositories.members,
+      },
       sync: app.syncsOrganizationUsage()
         ? {
             traceDays: repositories.traceDays,
-            placements: repositories.placements,
-            organizationsCreated: repositories.organizationsCreated,
-            members: repositories.members,
             now: () => nowInstant().epochMilliseconds,
             usageChanged: (input) => app.organizationUsageChanged(input),
           }

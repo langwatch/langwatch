@@ -20,6 +20,17 @@ import {
 } from "../nurturing-project-usage.pipeline.ts";
 
 /** The usage pipeline's lanes as the module declares them, for an app that syncs or one that does not. */
+const COPY_LANES = [
+  "projectPlacement",
+  "organizationCreated",
+  "memberSignedUp",
+  "memberInviteAccepted",
+  "memberSsoAutoAdded",
+  "memberRemoved",
+  "memberDisabled",
+  "memberEnabled",
+];
+
 function usageLanesWith(syncsOrganizationUsage: boolean): string[] {
   const app = createApiFixture<NurturingModule>({
     syncsOrganizationUsage: () => syncsOrganizationUsage,
@@ -45,12 +56,12 @@ const contextAt = (occurredAt: number) => ({
 });
 
 describe("the usage pipeline's registration", () => {
-  /** @scenario "Without a Customer.io channel nothing is counted" */
-  it("registers no fold and no subscriber without a Customer.io channel", () => {
+  /** @scenario "Without a Customer.io channel nothing is counted, but the copies are kept" */
+  it("registers only the copies without a Customer.io channel", () => {
     const lanes = usageLanesWith(false);
 
     expect(lanes).not.toContain(lane("traceDayCount"));
-    expect(lanes).toEqual([]);
+    expect(lanes.toSorted()).toEqual(COPY_LANES.map(lane).toSorted());
   });
 
   /** @scenario "A project's first trace syncs its organization too" */
@@ -63,8 +74,7 @@ describe("the usage pipeline's registration", () => {
         lane("failedTraceDayCount"),
         lane("firstTraceUsageSync"),
         lane("traceUsageSync"),
-        lane("projectPlacement"),
-        lane("organizationCreated"),
+        ...COPY_LANES.map(lane),
       ]),
     );
   });

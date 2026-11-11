@@ -45,7 +45,9 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   lw.organization.created. It reads no other module's table, and keeps no copy for projects or
   organizations created before it did: those send nothing. It never pulls owner state on a
   schedule, and sends counts and times only, never content. flagged_count waits on its
-  definition. Without a Customer.io channel none of this is registered: nothing is counted.
+  definition. Without a Customer.io channel no fold, trace count or sync is registered: nothing is
+  counted. The placement, organization-creation and member copies always register, so a channel
+  configured later finds them already kept.
 
   @unit
   Scenario: Every owner event becomes the fact its fold counts
@@ -317,6 +319,13 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     When the project's usage changes or it traces
     Then Customer.io receives nothing
 
+  @unit
+  Scenario: An organization nurturing never saw created gets no group call and no member identify
+    Given a project nurturing placed in an organization with an admin and members in nurturing's copy
+    And the organization was created before nurturing kept its copy of organization creation
+    When the project's usage changes or it traces
+    Then Customer.io receives no group call and no member identify, so no partial sum is sent
+
   @unit @integration
   Scenario: A created project is placed in its organization from the creation fact
     Given project records lw.project.created for a project of an organization
@@ -335,13 +344,14 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Given organization records lw.organization.created
     When nurturing's subscriber takes it, once or redelivered with a later time
     Then nurturing keeps the earliest creation time as the organization's signup day
-    And an organization created before nurturing kept the copy sends no signup-day traits
+    And an organization created before nurturing kept the copy has no signup day
 
   @unit
-  Scenario: Without a Customer.io channel nothing is counted
+  Scenario: Without a Customer.io channel nothing is counted, but the copies are kept
     Given nurturing runs without a Customer.io channel
     When its usage pipeline is built
-    Then it registers no fold and no subscriber, so a root span writes no trace day
+    Then it registers no fold, no trace count and no sync, so a root span writes no trace day
+    And it registers the placement, organization-creation and six member copies
 
   @integration
   Scenario: Each owner's fold keeps its own row per project

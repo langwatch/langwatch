@@ -78,15 +78,20 @@ export class NurturingOrganizationUsageService {
     const placement = await placements.getPlacement({ projectId });
     if (placement.outcome !== "known") return pruneProject();
     const { organizationId } = placement;
+    // An organization created before nurturing kept its creation copy may hold projects nurturing
+    // never saw created: its sums would be partial, so it is sent nothing.
+    const { organizationCreatedAt } = await organizationsCreated.findOrganizationCreatedAt({
+      organizationId,
+    });
+    if (organizationCreatedAt === null) return pruneProject();
     const [organization] = await milestones.findOrganization({ organizationId });
     const adminUserId = organization?.adminUserId;
     if (!adminUserId) return pruneProject();
     const projectIds = await placements.findProjectIds({ organizationId });
     await traceDays.pruneBefore({ projectIds, beforeDay: windowStartDay });
-    const [usage, folded, { organizationCreatedAt }] = await Promise.all([
+    const [usage, folded] = await Promise.all([
       projectUsage.findForProjects({ projectIds }),
       traceDays.findForProjects({ projectIds, afterDay: windowStartDay }),
-      organizationsCreated.findOrganizationCreatedAt({ organizationId }),
     ]);
     // Past the counting window no trace is counted, so the last trace traits sent stand.
     const traces = isTraceCounted({ organizationCreatedAt, at: now })

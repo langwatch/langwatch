@@ -127,7 +127,8 @@ export class NurturingModule implements NurturingApi {
 
   /**
    * Whether the per-email usage syncs at all: only with a Customer.io channel. Without one, the
-   * usage pipeline registers nothing, so no row is written that no sync would read or prune.
+   * usage pipeline registers only its copies, so no usage or trace row is written that no sync
+   * would read or prune.
    */
   syncsOrganizationUsage(): boolean {
     return this.#organizationUsage !== undefined;

@@ -15,7 +15,7 @@ Feature: Nurturing sends the signals its owners record
     Given a person created a scenario in a project
     When its signal is delivered
     Then PostHog receives scenario_created with the project
-    And Customer.io is told the project's scenario count and receives scenario_created
+    And Customer.io receives scenario_created and no scenario count
 
   @unit
   Scenario: A first trace reaches PostHog and Customer.io, against the organization's admin

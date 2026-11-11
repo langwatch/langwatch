@@ -264,24 +264,33 @@ describe("NurturingOrganizationUsageService", () => {
   });
 
   /** @scenario "The signup day comes from the organization's creation fact" */
-  it("sends signup-day traits only for an organization nurturing saw created", async () => {
-    const seen = await serviceOver({
+  it("sends signup-day traits from the organization's creation copy", async () => {
+    const { service, traceDays, sent } = await serviceOver({
       placed: new Map([["project-1", "org-1"]]),
       createdAt: new Map([["org-1", NOW - 3 * DAY_MS]]),
     });
-    const unseen = await serviceOver({
+    await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-20" });
+
+    await service.usageChanged({ projectId: "project-1" });
+
+    expect(traitsOf(sent[0]?.[0])).toMatchObject({ back_since_day_0: true });
+  });
+
+  /** @scenario "An organization nurturing never saw created gets no group call and no member identify" */
+  it("sends no group call and no member identify for an organization without a creation copy", async () => {
+    const { service, projectUsage, traceDays, sent } = await serviceOver({
       placed: new Map([["project-1", "org-1"]]),
       createdAt: new Map(),
+      members: await membersOver(new Map([["user-1", ["org-1"]]])),
     });
-    for (const { traceDays } of [seen, unseen]) {
-      await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-20" });
-    }
+    await projectUsage
+      .forOwner("prompt")
+      .store(usageOf("project-1", ["p1"]), storeContext("project-1"));
+    await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-20" });
 
-    await seen.service.usageChanged({ projectId: "project-1" });
-    await unseen.service.usageChanged({ projectId: "project-1" });
+    await service.usageChanged({ projectId: "project-1" });
 
-    expect(traitsOf(seen.sent[0]?.[0])).toMatchObject({ back_since_day_0: true });
-    expect(traitsOf(unseen.sent[0]?.[0])).not.toHaveProperty("back_since_day_0");
+    expect(sent).toEqual([]);
   });
 
   /** @scenario "A project nurturing never saw created sends nothing" */
