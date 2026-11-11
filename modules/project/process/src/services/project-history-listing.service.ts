@@ -28,26 +28,33 @@ export type ProjectHistoryListingReport = {
   orphanProjectIds: string[];
 };
 
-/** The step's saved checkpoint: the last project of a page and the counts so far. */
-export const projectHistoryListingCheckpointSchema = z.object({
+/**
+ * The step's saved checkpoint: the last project of a page and the counts through it, saved in one
+ * write, so a crash after a page's send resumes before that page and counts it once.
+ */
+const projectHistoryListingCheckpointSchema = z.object({
   afterProjectId: z.string(),
   ownerFactsToSend: z.number().int().nonnegative(),
   firstMessageFactsToSend: z.number().int().nonnegative(),
   skippedOrphans: z.number().int().nonnegative(),
   orphanProjectIds: z.array(z.string()),
 });
+export type ProjectHistoryListingCheckpoint = z.infer<typeof projectHistoryListingCheckpointSchema>;
 
 export type ProjectHistoryListingRun = Readonly<{
   dryRun: boolean;
   signal: AbortSignal;
-  afterProjectId: string | null;
-  /** What the run this one resumes had counted, so the report totals every attempt. */
-  countedBefore: ProjectHistoryListingReport;
-  onPageDone: (input: {
-    afterProjectId: string;
-    report: ProjectHistoryListingReport;
-  }) => Promise<void>;
+  /** The last saved checkpoint, as the ledger holds it; a dry run reads the whole table instead. */
+  resumeFrom: unknown;
+  onPageDone: (checkpoint: ProjectHistoryListingCheckpoint) => Promise<void>;
 }>;
+
+const NOTHING_COUNTED: ProjectHistoryListingReport = {
+  ownerFactsToSend: 0,
+  firstMessageFactsToSend: 0,
+  skippedOrphans: 0,
+  orphanProjectIds: [],
+};
 
 export type ProjectHistoryListingSenders = Readonly<{
   recordPersonalOwnerListed: Pick<
@@ -71,6 +78,17 @@ const hasPersonalOwner = (
 ): project is ProjectHistoryRow & { ownerUserId: string } =>
   project.isPersonal && project.ownerUserId !== null;
 
+/** Where a run starts: a dry run counts the whole table, so a saved checkpoint never shrinks it. */
+function startOf({
+  dryRun,
+  resumeFrom,
+}: Readonly<{ dryRun: boolean; resumeFrom: unknown }>): ProjectHistoryListingReport & {
+  afterProjectId: string | null;
+} {
+  const resumed = dryRun ? undefined : projectHistoryListingCheckpointSchema.safeParse(resumeFrom);
+  return resumed?.success ? resumed.data : { afterProjectId: null, ...NOTHING_COUNTED };
+}
+
 /**
  * Lists every personal project's owner and every project that already received its first message,
  * archived ones included, keyed per project so a rerun adds nothing new. A project left without a
@@ -92,15 +110,12 @@ export class ProjectHistoryListingService {
   async sendHistory({
     dryRun,
     signal,
-    afterProjectId,
-    countedBefore,
+    resumeFrom,
     onPageDone,
   }: ProjectHistoryListingRun): Promise<ProjectHistoryListingReport> {
-    const report: ProjectHistoryListingReport = {
-      ...countedBefore,
-      orphanProjectIds: [...countedBefore.orphanProjectIds],
-    };
-    let cursor = afterProjectId;
+    const { afterProjectId, ...counted } = startOf({ dryRun, resumeFrom });
+    let report: ProjectHistoryListingReport = counted;
+    let cursor: string | null = afterProjectId;
     while (!signal.aborted) {
       const occurredAt = nowInstant().epochMilliseconds;
       const page = await this.deps.projects.findHistoryPage({ afterId: cursor, limit: PAGE_SIZE });
@@ -112,15 +127,14 @@ export class ProjectHistoryListingService {
       const firstMessages = projects.filter((project) => project.firstMessage);
       if (!dryRun) await this.#sendPage({ owners, firstMessages, occurredAt });
       this.#warnSkipped(orphanIds);
-      report.ownerFactsToSend += owners.length;
-      report.firstMessageFactsToSend += firstMessages.length;
-      report.skippedOrphans += orphanIds.length;
-      report.orphanProjectIds = [...report.orphanProjectIds, ...orphanIds].slice(
-        0,
-        ORPHAN_IDS_REPORTED,
-      );
+      report = {
+        ownerFactsToSend: report.ownerFactsToSend + owners.length,
+        firstMessageFactsToSend: report.firstMessageFactsToSend + firstMessages.length,
+        skippedOrphans: report.skippedOrphans + orphanIds.length,
+        orphanProjectIds: [...report.orphanProjectIds, ...orphanIds].slice(0, ORPHAN_IDS_REPORTED),
+      };
       cursor = last.kind === "whole" ? last.project.id : last.id;
-      if (!dryRun) await onPageDone({ afterProjectId: cursor, report: { ...report } });
+      if (!dryRun) await onPageDone({ afterProjectId: cursor, ...report });
     }
     return report;
   }

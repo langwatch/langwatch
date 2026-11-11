@@ -6,7 +6,7 @@ The server half of [project](../README.md). Projects: finding them, their summar
 
 ## Installation
 
-`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).provideMiddlewareContext(…).withEventing(projectLifecycleEventing).withMigrations(…)`, `src/project.module.ts:14`.
+`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).provideMiddlewareContext(…).withEventing(projectLifecycleEventing).withMigrations(…)`, `src/project.module.ts:13`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

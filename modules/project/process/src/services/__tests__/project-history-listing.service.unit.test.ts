@@ -15,6 +15,7 @@ import type {
 } from "../../repositories/project.repository.ts";
 import {
   ProjectHistoryListingService,
+  type ProjectHistoryListingCheckpoint,
   type ProjectHistoryListingReport,
 } from "../project-history-listing.service.ts";
 
@@ -56,9 +57,11 @@ type Sent =
 function listingOver(
   projects: readonly ProjectHistoryRow[] = PROJECTS,
   orphanIds: readonly string[] = [],
+  /** Throws instead of saving the nth page's checkpoint, as a worker dying after the send does. */
+  crashBeforeSavingPage?: number,
 ) {
   const batches: Sent[] = [];
-  const saves: unknown[] = [];
+  const saves: ProjectHistoryListingCheckpoint[] = [];
   const { logger, lines } = createTestLogger();
   const service = ProjectHistoryListingService.create({
     projects: {
@@ -81,23 +84,25 @@ function listingOver(
       sendBatch: async (data) => void batches.push({ kind: "firstMessage", data: [...data] }),
     },
   });
+  let pagesDone = 0;
   const run = ({
-    afterProjectId = null,
-    countedBefore = NOTHING_COUNTED,
+    resumeFrom = null,
     dryRun = false,
     signal = new AbortController().signal,
   }: {
-    afterProjectId?: string | null;
-    countedBefore?: ProjectHistoryListingReport;
+    resumeFrom?: unknown;
     dryRun?: boolean;
     signal?: AbortSignal;
   } = {}) =>
     service.sendHistory({
       dryRun,
       signal,
-      afterProjectId,
-      countedBefore,
-      onPageDone: async (page) => void saves.push(page),
+      resumeFrom,
+      onPageDone: async (checkpoint) => {
+        pagesDone += 1;
+        if (pagesDone === crashBeforeSavingPage) throw new Error("worker stopped before saving");
+        saves.push(checkpoint);
+      },
     });
   return { batches, saves, run, warnings: lines };
 }
@@ -147,11 +152,15 @@ describe("given the project history listing over personal, flagged and shared pr
       expect(saves).toEqual([
         {
           afterProjectId: "p1",
-          report: { ...NOTHING_COUNTED, ownerFactsToSend: 1, firstMessageFactsToSend: 2 },
+          ...NOTHING_COUNTED,
+          ownerFactsToSend: 1,
+          firstMessageFactsToSend: 2,
         },
         {
           afterProjectId: "s1",
-          report: { ...NOTHING_COUNTED, ownerFactsToSend: 2, firstMessageFactsToSend: 3 },
+          ...NOTHING_COUNTED,
+          ownerFactsToSend: 2,
+          firstMessageFactsToSend: 3,
         },
       ]);
       expect(report).toEqual({
@@ -177,6 +186,22 @@ describe("given the project history listing over personal, flagged and shared pr
       expect(dryReport.ownerFactsToSend).toBe(named(real.batches, "owner").length);
       expect(dryReport.firstMessageFactsToSend).toBe(named(real.batches, "firstMessage").length);
     });
+
+    /** @scenario "A dry run of the project history listing ignores a saved checkpoint" */
+    it("counts the whole table even when an interrupted run saved a checkpoint", async () => {
+      const interrupted = listingOver();
+      await interrupted.run();
+      const dry = listingOver();
+
+      const dryReport = await dry.run({ dryRun: true, resumeFrom: interrupted.saves[0] });
+
+      expect(dryReport).toEqual({
+        ...NOTHING_COUNTED,
+        ownerFactsToSend: 2,
+        firstMessageFactsToSend: 3,
+      });
+      expect(dry.batches).toEqual([]);
+    });
   });
 
   describe("when a project's team or organization is gone", () => {
@@ -201,8 +226,12 @@ describe("given the project history listing over personal, flagged and shared pr
       const { batches, run } = listingOver();
 
       const report = await run({
-        afterProjectId: "p1",
-        countedBefore: { ...NOTHING_COUNTED, ownerFactsToSend: 1, firstMessageFactsToSend: 2 },
+        resumeFrom: {
+          afterProjectId: "p1",
+          ...NOTHING_COUNTED,
+          ownerFactsToSend: 1,
+          firstMessageFactsToSend: 2,
+        },
       });
 
       expect(batches.flatMap((sent) => sent.data.map((fact) => fact.projectId))).toEqual([
@@ -210,6 +239,28 @@ describe("given the project history listing over personal, flagged and shared pr
         "p2",
       ]);
       expect(report).toMatchObject({ ownerFactsToSend: 2, firstMessageFactsToSend: 3 });
+    });
+  });
+
+  describe("when the worker dies after a page's send and before its checkpoint", () => {
+    /** @scenario "A run that dies between a page's send and its checkpoint counts that page once" */
+    it("resends the page on resume and reports the same counts as a clean run", async () => {
+      const clean = listingOver(PROJECTS, ["o1"]);
+      const crashed = listingOver(PROJECTS, ["o1"], 2);
+
+      const cleanReport = await clean.run();
+      await expect(crashed.run()).rejects.toThrow("worker stopped before saving");
+      const resumedReport = await crashed.run({ resumeFrom: crashed.saves.at(-1) });
+
+      expect(resumedReport).toEqual(cleanReport);
+      expect(crashed.saves.at(-1)).toEqual({ afterProjectId: "s1", ...cleanReport });
+      // The dead page is sent twice; each fact's key collapses the second send.
+      expect(named(crashed.batches, "owner").map((fact) => fact.projectId)).toEqual([
+        "p1",
+        "p2",
+        "p1",
+        "p2",
+      ]);
     });
   });
 

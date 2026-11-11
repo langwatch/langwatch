@@ -36,6 +36,19 @@ Feature: Project lists its personal owners and first messages for peers at upgra
     Then no fact is sent and no checkpoint is saved
     And the report counts the owner and first message facts a real run sends, by the same rule
 
+  @unit
+  Scenario: A dry run of the project history listing ignores a saved checkpoint
+    Given an interrupted run saved a checkpoint part-way through the table
+    When the step runs as a dry run
+    Then the report counts the whole table, not only the projects after the checkpoint
+
+  @unit @regression
+  Scenario: A run that dies between a page's send and its checkpoint counts that page once
+    Given a run sent a page's facts and stopped before saving that page's checkpoint
+    When the step resumes from the last saved checkpoint
+    Then it sends that page again, which the facts' keys collapse
+    And the report and the final checkpoint equal those of a run that never stopped
+
   @unit @regression
   Scenario: The project history listing skips a project whose team or organization is gone
     Given a stored project whose team was deleted

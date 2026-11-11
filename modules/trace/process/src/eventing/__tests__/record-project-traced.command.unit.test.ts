@@ -1,6 +1,6 @@
 /** Spec: modules/trace/specs/project-traced-fact.feature */
 import { createTenantId } from "@langwatch/eventing";
-import { PROJECT_TRACED_EVENT_TYPE } from "@langwatch/trace-contract";
+import { PROJECT_TRACED_EVENT_TYPE, PROJECT_TRACED_EVENT_VERSION } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { RecordProjectTracedCommand } from "../trace-project-milestones.commands.ts";
@@ -22,6 +22,7 @@ describe("RecordProjectTracedCommand", () => {
 
     expect(first).toMatchObject({
       type: PROJECT_TRACED_EVENT_TYPE,
+      version: PROJECT_TRACED_EVENT_VERSION,
       aggregateType: TRACE_PROJECT_AGGREGATE_TYPE,
       aggregateId: "project-1",
       occurredAt: 1_000,

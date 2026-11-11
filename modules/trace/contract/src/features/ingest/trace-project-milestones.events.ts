@@ -47,6 +47,8 @@ export type TraceReceivedEventData = z.infer<typeof traceReceivedEventDataSchema
 
 /** A project's first real trace, recorded with or without an organization admin. */
 export const PROJECT_TRACED_EVENT_TYPE = "lw.trace.project_traced" as const;
+/** A new type starts at its own version, not the pipeline's older one. */
+export const PROJECT_TRACED_EVENT_VERSION = "2026-11-11" as const;
 
 /** Ids only: no person, so an organization without an admin is still told. */
 const projectTracedEventDataSchemaDefinition = z.object({

@@ -16,7 +16,7 @@ import {
 } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { PROJECT_TRACED_EVENT_TYPE } from "@langwatch/trace-contract";
+import { PROJECT_TRACED_EVENT_TYPE, PROJECT_TRACED_EVENT_VERSION } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -175,7 +175,7 @@ function projectTraced({
     type: PROJECT_TRACED_EVENT_TYPE,
     aggregateType: "trace_project_milestone",
     aggregateId: projectId,
-    version: "2026-10-01",
+    version: PROJECT_TRACED_EVENT_VERSION,
     data: { tenantId: projectId, projectId, organizationId, occurredAt: 1_000 },
   });
 }

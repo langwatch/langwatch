@@ -4,6 +4,7 @@ import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   MONTH_TRACE_IDS_LISTED_EVENT_TYPE,
   PROJECT_TRACED_EVENT_TYPE,
+  PROJECT_TRACED_EVENT_VERSION,
   TRACE_RECEIVED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 
@@ -145,7 +146,7 @@ export class RecordProjectTracedCommand implements CommandHandler<
         aggregateId: data.projectId,
         tenantId: createTenantId(command.tenantId),
         type: PROJECT_TRACED_EVENT_TYPE,
-        version: TRACE_PROJECT_MILESTONES_EVENT_VERSION,
+        version: PROJECT_TRACED_EVENT_VERSION,
         data,
         occurredAt: data.occurredAt,
         idempotencyKey: `${data.projectId}:project_traced`,

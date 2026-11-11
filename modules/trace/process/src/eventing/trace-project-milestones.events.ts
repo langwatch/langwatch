@@ -5,6 +5,7 @@ import {
   MONTH_TRACE_IDS_LISTED_EVENT_TYPE,
   monthTraceIdsListedEventDataSchema,
   PROJECT_TRACED_EVENT_TYPE,
+  PROJECT_TRACED_EVENT_VERSION,
   projectTracedEventDataSchema,
   TRACE_RECEIVED_EVENT_TYPE,
   traceReceivedEventDataSchema,
@@ -56,8 +57,10 @@ export const monthTraceIdsListedEventSchema = event(
   recordMonthTraceIdsCommandDataSchema,
 );
 export type MonthTraceIdsListedEvent = z.infer<typeof monthTraceIdsListedEventSchema>;
-export const projectTracedEventSchema = event(
-  PROJECT_TRACED_EVENT_TYPE,
-  recordProjectTracedCommandDataSchema,
-);
+export const projectTracedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PROJECT_TRACED_EVENT_TYPE),
+  version: z.literal(PROJECT_TRACED_EVENT_VERSION),
+  data: recordProjectTracedCommandDataSchema,
+});
 export type ProjectTracedEvent = z.infer<typeof projectTracedEventSchema>;
