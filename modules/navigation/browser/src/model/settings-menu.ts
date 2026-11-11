@@ -258,7 +258,6 @@ function organizationGroup({
 
 function accessGroup({
   enterprisePlan,
-  hasPermission,
   hasOrganizationPermission,
 }: SettingsMenuGates): SettingsMenuGroup {
   return {
