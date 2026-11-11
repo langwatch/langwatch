@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Nurturing learns from the owners' events (§9); an owner that pushes a fact calls this.
 
-Peers call these through the token, declared at `../contract/src/nurturing-types.ts:246`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/nurturing-types.ts:245`; nothing else in this package is public.
 
 #### `recordSignal`
 
