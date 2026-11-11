@@ -74,8 +74,22 @@ Feature: An experiment run shows the agent version and the concurrency it ran wi
   Scenario: The run summary shows the concurrency the run used
     Given a run that recorded concurrency 1
     When the results page lists that run
-    Then its run list entry reads "Concurrency 1"
+    Then its run list entry shows a "Concurrency 1" badge
     And a run with no recorded concurrency shows no concurrency
+
+  @integration
+  Scenario: The concurrency badge explains what it counts
+    Given a run that recorded concurrency 1 and a run that recorded concurrency 10
+    When the results page lists them and shows each in the title
+    Then the concurrency 1 badge explains "Ran one cell at a time. A cell is one row against one target."
+    And the concurrency 10 badge explains "Ran up to 10 cells at once. A cell is one row against one target."
+    And keyboard and screen reader users get the same explanation from the focused run entry or title badge
+
+  @integration
+  Scenario: A run entry with many agent labels stays short
+    Given a run with four label-pinned agent targets
+    When the results page lists that run
+    Then its entry shows the first two label badges and a "+2" badge naming the rest
 
   @unit
   Scenario: A run's state read before the concurrency column exists answers no concurrency
@@ -92,7 +106,7 @@ Feature: An experiment run shows the agent version and the concurrency it ran wi
   @integration
   Scenario: The selected run's title shows the concurrency it used
     Given the results page shows a run that recorded concurrency 1
-    Then the title reads "Concurrency 1"
+    Then the title shows a "Concurrency 1" badge beside the run id
     And a selected run with no recorded concurrency shows no concurrency in the title
 
   @unit

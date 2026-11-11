@@ -97,9 +97,14 @@ export class McpHttpService {
     });
   }
 
-  async readRawBody(req: IncomingMessage, res: ServerResponse): Promise<McpBodyRead> {
+  /** `maxBytes` narrows the endpoint-wide cap for a path whose bodies are always small. */
+  async readRawBody(
+    req: IncomingMessage,
+    res: ServerResponse,
+    { maxBytes = MAX_BODY_BYTES }: { maxBytes?: number } = {},
+  ): Promise<McpBodyRead> {
     try {
-      return { kind: "read", body: await readBody(req) };
+      return { kind: "read", body: await readBody(req, maxBytes) };
     } catch (err) {
       if (err instanceof Error && err.message === BODY_TOO_LARGE) {
         await this.sendHandled(res, new PayloadTooLargeError());
@@ -109,8 +114,12 @@ export class McpHttpService {
     }
   }
 
-  async readJsonBody(req: IncomingMessage, res: ServerResponse): Promise<McpJsonBodyRead> {
-    const raw = await this.readRawBody(req, res);
+  async readJsonBody(
+    req: IncomingMessage,
+    res: ServerResponse,
+    limits: { maxBytes?: number } = {},
+  ): Promise<McpJsonBodyRead> {
+    const raw = await this.readRawBody(req, res, limits);
     if (raw.kind === "answered") return raw;
     try {
       const body: unknown = JSON.parse(raw.body);
@@ -124,7 +133,7 @@ export class McpHttpService {
   }
 }
 
-function readBody(req: IncomingMessage): Promise<string> {
+function readBody(req: IncomingMessage, maxBytes: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let totalBytes = 0;
@@ -132,7 +141,7 @@ function readBody(req: IncomingMessage): Promise<string> {
     req.on("data", (chunk: Buffer) => {
       if (rejected) return;
       totalBytes += chunk.length;
-      if (totalBytes > MAX_BODY_BYTES) {
+      if (totalBytes > maxBytes) {
         rejected = true;
         reject(new Error(BODY_TOO_LARGE));
         req.resume();
