@@ -26,7 +26,7 @@ export { type VendorStatements, vendorQueryClient } from "./vendorQueryClient.ts
  * globalSetup.ts. One symbol rather than one string per call site, so a version
  * bump cannot leave half the suite on the old image.
  */
-export const TEST_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:26.8.34.13";
+export const TEST_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:26.8.36.3";
 
 /**
  * Test container tuning: memory cap, caches off, pools for container. Same

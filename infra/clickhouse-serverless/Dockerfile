@@ -1,4 +1,8 @@
-ARG CLICKHOUSE_VERSION=26.8.34.13
+ARG CLICKHOUSE_VERSION=26.8.36.3
+# The multi-platform index digest of that tag (linux/amd64 and linux/arm64), so
+# a retagged upstream image cannot change what the build ships. Bump it with the
+# version: `docker buildx imagetools inspect clickhouse/clickhouse-server:<version>`.
+ARG CLICKHOUSE_DIGEST=sha256:d426d2f612e1e189c90f9a3f8dcd85a03c6851273833817a296bb327e63aa7a7
 
 # Stage 1: Build Go config generator
 FROM golang:1.27.3-alpine AS builder
@@ -10,7 +14,7 @@ COPY internal/ internal/
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /ch-config ./cmd/ch-config
 
 # Stage 2: ClickHouse image
-FROM clickhouse/clickhouse-server:${CLICKHOUSE_VERSION}
+FROM clickhouse/clickhouse-server:${CLICKHOUSE_VERSION}@${CLICKHOUSE_DIGEST}
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
