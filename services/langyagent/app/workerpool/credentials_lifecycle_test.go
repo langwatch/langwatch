@@ -77,7 +77,7 @@ func TestAcquire_RefusesSpawnWithoutSessionKey(t *testing.T) {
 	p := newLifecyclePool(t, nil)
 	t.Cleanup(p.Shutdown)
 
-	_, err := p.Acquire(context.Background(), "conv-no-key", domain.Credentials{
+	_, err := p.Acquire(context.Background(), "conv-no-key", "", domain.Credentials{
 		// No LangwatchAPIKey — the control plane thought a worker was alive.
 		LLMVirtualKey:     "vk",
 		GatewayBaseURL:    "http://gw",
@@ -97,7 +97,7 @@ func TestAcquire_RefusesSpawnWithBlankSessionKey(t *testing.T) {
 	p := newLifecyclePool(t, nil)
 	t.Cleanup(p.Shutdown)
 
-	_, err := p.Acquire(context.Background(), "conv-blank-key", domain.Credentials{
+	_, err := p.Acquire(context.Background(), "conv-blank-key", "", domain.Credentials{
 		LangwatchAPIKey:   " \t\n",
 		LLMVirtualKey:     "vk",
 		GatewayBaseURL:    "http://gw",
@@ -116,7 +116,7 @@ func TestAcquire_KeylessSpawnDoesNotConsumeCapacity(t *testing.T) {
 	t.Cleanup(p.Shutdown)
 
 	for range 10 {
-		_, _ = p.Acquire(context.Background(), "conv-no-key", domain.Credentials{
+		_, _ = p.Acquire(context.Background(), "conv-no-key", "", domain.Credentials{
 			LLMVirtualKey: "vk", GatewayBaseURL: "http://gw", LangwatchEndpoint: "http://cp",
 		})
 	}
@@ -251,7 +251,7 @@ func TestReap_OverAgeWorkerIsNeverRetiredMidTurn(t *testing.T) {
 	p.mu.Unlock()
 
 	p.reapIdle()
-	got, err := p.Acquire(context.Background(), "conv-old", creds)
+	got, err := p.Acquire(context.Background(), "conv-old", "turn-next", creds)
 	require.NoError(t, err)
 	assert.Same(t, w, got, "a keyed turn must not replace a worker whose turn is still running")
 	assert.Equal(t, 1, activeWorkers(p), "an over-age worker with a turn in flight must stay in service")
@@ -269,6 +269,38 @@ func TestReap_OverAgeWorkerIsNeverRetiredMidTurn(t *testing.T) {
 	assert.Equal(t, []string{"key-old"}, rev.eventually(t, 1), "retiring it revokes its key")
 	assert.Equal(t, app.ClaimBusy, w.ClaimTurn("turn-next"),
 		"a turn holding the retired worker is re-dispatched, never run on it")
+}
+
+// A keyed re-dispatch of a turn the over-age worker already completed (an
+// outbox retry after a lost answer) must reach that worker, which remembers the
+// turn. A fresh replacement would remember nothing and run the turn twice.
+//
+// @scenario "A re-sent turn the over-age worker already ran is not run again"
+func TestAcquire_OverAgeWorkerKeepsATurnItAlreadyRan(t *testing.T) {
+	rev := &recordingRevoker{}
+	p := newLifecyclePool(t, rev)
+	t.Cleanup(p.Shutdown)
+	p.workerMaxAge = time.Hour
+
+	creds := spawnableCreds()
+	w := &Worker{
+		conversationID: "conv-rerun", credSig: sigOf(creds),
+		apiKeyID: "key-old", langwatchEndpoint: "http://cp",
+		spawnedAt: time.Now().Add(-2 * time.Hour), lastSeen: time.Now(),
+	}
+	require.Equal(t, app.ClaimGranted, w.ClaimTurn("turn-done"))
+	w.Release()
+	p.mu.Lock()
+	p.workers["conv-rerun"] = w
+	p.mu.Unlock()
+
+	got, err := p.Acquire(context.Background(), "conv-rerun", "turn-done", creds)
+	require.NoError(t, err)
+	assert.Same(t, w, got, "a re-dispatch of a turn the worker ran must reach that worker")
+	assert.Equal(t, app.ClaimAlreadyHandled, got.ClaimTurn("turn-done"), "the turn must not run twice")
+	assert.Equal(t, 1, activeWorkers(p), "no replacement worker is spawned")
+	time.Sleep(50 * time.Millisecond)
+	assert.Empty(t, rev.revoked(), "the worker's key is not revoked")
 }
 
 // An over-age worker's key is close to expiry, so the probe answers false and

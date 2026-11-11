@@ -142,11 +142,25 @@ func (w *Worker) retireIfStale(idleCutoff, maxAge time.Duration) bool {
 	return w.retireBetweenTurnsLocked(due)
 }
 
-// retireIfOverAge retires an over-age worker unless a turn is in flight.
-func (w *Worker) retireIfOverAge(maxAge time.Duration) bool {
+// retireIfOverAge retires an over-age worker unless a turn is in flight or
+// turnID is one it already ran, decided under one lock with ClaimTurn's state.
+func (w *Worker) retireIfOverAge(maxAge time.Duration, turnID string) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.retireBetweenTurnsLocked(w.overAgeLocked(maxAge))
+	return w.retireBetweenTurnsLocked(w.overAgeLocked(maxAge) && !w.ranTurnLocked(turnID))
+}
+
+// ranTurnLocked reports whether turnID is this worker's current or a recently
+// completed turn. An empty turnID (older control plane) matches nothing.
+func (w *Worker) ranTurnLocked(turnID string) bool {
+	if turnID == "" {
+		return false
+	}
+	if w.currentTurnID == turnID {
+		return true
+	}
+	_, done := w.handled[turnID]
+	return done
 }
 
 // overAge reports whether the worker has outlived maxAge (<= 0 disables).

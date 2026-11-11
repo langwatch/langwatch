@@ -466,14 +466,15 @@ func (p *Pool) capabilitiesFor(creds domain.Credentials) []app.Capability {
 // fresh one is spawned with the new capability set.
 //
 // An over-age worker (WorkerMaxAge) is replaced the same way when the turn
-// carries a fresh session key and no turn is in flight on it; see acquire.
+// carries a fresh session key, no turn is in flight on it, and turnID is not one
+// it already ran; see acquire.
 //
 // A turn's spawn at capacity evicts the least-recently-active IDLE worker
 // instead of failing: pre-warm fills the pool with workers that may never see
 // a message, and a real turn must never queue behind one of those (a two-slot
 // local pool wedged exactly that way). Warm spawns go through AcquireWarm.
-func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
-	return p.acquire(ctx, conversationID, creds, true)
+func (p *Pool) Acquire(ctx context.Context, conversationID, turnID string, creds domain.Credentials) (app.Worker, error) {
+	return p.acquire(ctx, conversationID, turnID, creds, true)
 }
 
 // AcquireWarm is Acquire for a pre-warm, with two softenings that keep a
@@ -487,26 +488,27 @@ func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.
 // replacing it (see acquire): a warm must never kill a worker, least of all
 // one running a turn.
 func (p *Pool) AcquireWarm(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
-	return p.acquire(ctx, conversationID, creds, false)
+	return p.acquire(ctx, conversationID, "", creds, false)
 }
 
-func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.Credentials, forTurn bool) (app.Worker, error) {
+func (p *Pool) acquire(ctx context.Context, conversationID, turnID string, creds domain.Credentials, forTurn bool) (app.Worker, error) {
 	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(p.capabilitiesFor(creds)), creds.DisabledSkillIds, creds.MirrorTier)
 
 	p.mu.Lock()
 	if w, ok := p.workers[conversationID]; ok {
 		if w.credSig == wantedSig {
-			// Only a keyed turn replaces an over-age worker: a keyless one is a
-			// probe race or a re-dispatch of a turn this worker already ran, and
-			// a replacement would answer 428 and then run that turn twice.
-			if !forTurn || !creds.Spawnable() || !w.retireIfOverAge(p.workerMaxAge) {
+			// Only a keyed turn this worker never ran replaces it when over age. A
+			// keyless one is a probe race; a re-dispatch of a turn it ran (keyed
+			// or not) must reach it so ClaimTurn answers ClaimAlreadyHandled. A
+			// replacement would start with no memory of that turn and run it twice.
+			if !forTurn || !creds.Spawnable() || !w.retireIfOverAge(p.workerMaxAge, turnID) {
 				p.mu.Unlock()
 				return w, nil
 			}
 			delete(p.workers, conversationID)
 			p.mu.Unlock()
 			p.teardown(w, "max worker age reached")
-			return p.acquire(ctx, conversationID, creds, forTurn)
+			return p.acquire(ctx, conversationID, turnID, creds, forTurn)
 		}
 		// A warm is a speculative hint, so a signature mismatch returns the
 		// live worker untouched: killing here would tear down a worker that

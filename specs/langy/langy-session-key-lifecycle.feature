@@ -114,6 +114,15 @@ Feature: Langy session key lifecycle
       And a new worker is spawned carrying the new key
       And the new worker resumes the conversation's session
 
+    # The outbox may re-send a turn after its answer was lost. Only the worker
+    # that ran it remembers it; a fresh one would run it a second time.
+    @unit
+    Scenario: A re-sent turn the over-age worker already ran is not run again
+      Given a worker past its max age has completed a turn
+      When the same turn is sent again with a freshly minted key
+      Then the manager keeps the worker that ran it
+      And the turn is answered as already handled, not run again
+
     @unit
     Scenario: An over-age worker finishes its running turn before it is retired
       Given a worker past its max age is running a turn

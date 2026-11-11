@@ -77,7 +77,7 @@ func spawnableCreds() domain.Credentials {
 func TestAcquire_SpawnsThePiAgent(t *testing.T) {
 	p := newSpawningPool(t, stubPiBinary(t), nil)
 
-	got, err := p.Acquire(context.Background(), "conv-pi", spawnableCreds())
+	got, err := p.Acquire(context.Background(), "conv-pi", "", spawnableCreds())
 	require.NoError(t, err, "the spawn path must boot the stub wrapper")
 	w := got.(*Worker)
 
@@ -97,16 +97,16 @@ func TestAcquire_ChangedRepositoryScopeReplacesTheWorker(t *testing.T) {
 	scoped.GithubLogin = "octocat"
 	scoped.GithubRepoScope = "acme/service-x"
 
-	first, err := p.Acquire(context.Background(), "conv-scope", scoped)
+	first, err := p.Acquire(context.Background(), "conv-scope", "", scoped)
 	require.NoError(t, err, "the first turn must boot a worker scoped to acme/service-x")
 
-	same, err := p.Acquire(context.Background(), "conv-scope", scoped)
+	same, err := p.Acquire(context.Background(), "conv-scope", "", scoped)
 	require.NoError(t, err)
 	require.Same(t, first, same, "an unchanged scope reuses the running worker")
 
 	rescoped := scoped
 	rescoped.GithubRepoScope = "acme/other-repo"
-	next, err := p.Acquire(context.Background(), "conv-scope", rescoped)
+	next, err := p.Acquire(context.Background(), "conv-scope", "", rescoped)
 	require.NoError(t, err, "the next turn with a new scope must boot a fresh worker")
 	require.NotSame(t, first, next, "a changed repository scope must not reuse the old worker")
 	require.Equal(t, 1, activeWorkers(p), "the replaced worker must be gone, not left running beside the new one")
@@ -144,7 +144,7 @@ func TestAcquire_OverAgeWorkerIsReplacedWithAFreshKeyAndResumesTheSession(t *tes
 	p := newSpawningPool(t, resumingPiBinary(t, keyLog), rev)
 	p.workerMaxAge = time.Hour
 
-	first, err := p.Acquire(context.Background(), "conv-age", spawnableCreds())
+	first, err := p.Acquire(context.Background(), "conv-age", "", spawnableCreds())
 	require.NoError(t, err)
 	old := first.(*Worker)
 	require.False(t, old.promptDelivered, "a new conversation has no session to resume")
@@ -157,7 +157,7 @@ func TestAcquire_OverAgeWorkerIsReplacedWithAFreshKeyAndResumesTheSession(t *tes
 	fresh := spawnableCreds()
 	fresh.LangwatchAPIKey = "sk-lw-session-new"
 	fresh.LangwatchAPIKeyID = "key-new"
-	next, err := p.Acquire(context.Background(), "conv-age", fresh)
+	next, err := p.Acquire(context.Background(), "conv-age", "turn-after-max-age", fresh)
 	require.NoError(t, err)
 	replacement := next.(*Worker)
 
