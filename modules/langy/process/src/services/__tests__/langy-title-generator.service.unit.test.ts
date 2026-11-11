@@ -1,7 +1,7 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import {
-  ModelNotConfiguredError,
   type ModelDefaultResolveInput,
+  type ModelProviderExecution,
   type ModelProviderApi,
   type ModelProviderTextGenerationInput,
 } from "@langwatch/model-provider-contract";
@@ -33,6 +33,7 @@ function generatorOver(input: {
   text?: string;
   resolvedModel?: string;
   generateFailure?: Error;
+  providers?: Record<string, { enabled: boolean }>;
 }) {
   const resolved: ModelDefaultResolveInput[] = [];
   const completions: ModelProviderTextGenerationInput[] = [];
@@ -51,6 +52,8 @@ function generatorOver(input: {
         },
       };
     },
+    getExecutionProviders: async () =>
+      (input.providers ?? { openai: { enabled: true } }) as Record<string, ModelProviderExecution>,
     generateText: async (request) => {
       completions.push(request);
       if (input.generateFailure) throw input.generateFailure;
@@ -171,19 +174,15 @@ describe("given a conversation the customer never named", () => {
     });
 
     /** @scenario "A Codex title model with no cheap default is not retried" */
-    it("leaves the title unchanged when the cheap default cannot be asked either", async () => {
-      const { service } = generatorOver({
+    it("leaves the title unchanged without asking the model when the cheap default's provider is not connected", async () => {
+      const { service, completions } = generatorOver({
         records,
         resolvedModel: "openai_codex/gpt-5.6-terra",
-        generateFailure: new ModelNotConfiguredError({
-          featureKey: "langy.conversation_title",
-          role: "FAST",
-          featureDisplayName: "Langy chat titles",
-          projectId: PROJECT_ID,
-        }),
+        providers: {},
       });
 
       await expect(service.generate(call)).resolves.toEqual({ outcome: "unchanged" });
+      expect(completions).toHaveLength(0);
     });
   });
 });

@@ -2,6 +2,7 @@ import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import {
   ModelNotConfiguredError,
   type ModelProviderApi,
+  type ModelProviderExecution,
   type ModelProviderResolution,
 } from "@langwatch/model-provider-contract";
 /**
@@ -52,6 +53,8 @@ function modelProviders(
   const generateText = vi.fn(answers.generateText ?? (async () => ({ text: "A title" })));
   const api = createApiFixture<ModelProviderApi>({
     resolveModelForFeature: answers.resolveModelForFeature ?? (async () => RESOLVED),
+    getExecutionProviders: async () =>
+      ({ openai: { enabled: true } }) as Record<string, ModelProviderExecution>,
     generateText,
   });
   return { api, generateText };
