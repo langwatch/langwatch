@@ -22,6 +22,13 @@ import { createTenantId, type EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
 import type { FeatureSetup } from "@langwatch/process";
+import {
+  apiKeyPepper,
+  credentialsSecret,
+  intoKeyPepper,
+  type ScopedSecrets,
+  sessionSecret,
+} from "@langwatch/secrets";
 
 import type { DataPrivacyChannels } from "../channels/data-privacy.channels.ts";
 import { googleApplicationCredentials } from "../channels/google-dlp.channel.ts";
@@ -31,6 +38,7 @@ import {
 } from "../eventing/pii-redaction-spend.pipeline.ts";
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { PII_REDACTION_MODEL_TIMEOUT_MS } from "../rules/pii-redaction-model.rules.ts";
+import { piiRedactionRequestIdKey } from "../rules/pii-redaction-spend.rules.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
 import { DataPrivacyProjectScopeService } from "../services/data-privacy-project-scope.service.ts";
@@ -97,6 +105,28 @@ type DataPrivacySetup = FeatureSetup<
 type GoogleCredentialsUse = <Out>(build: (credential: string | undefined) => Out) => Out;
 
 /** The one public object of the scoped privacy rules. */
+/** The request-id key, or why none is needed: a deployment naming no model prices no call. */
+type RequestIdKey = { kind: "keyed"; key: Uint8Array } | { kind: "no-model" };
+
+/** Refuses the boot when the model is named and no key pepper is set (ADR-201). */
+async function getRequestIdKey({
+  secrets,
+  config,
+}: {
+  secrets: ScopedSecrets;
+  config: DataPrivacyServerConfig;
+}): Promise<RequestIdKey> {
+  // The key is built inside the closure; the pepper itself never leaves it.
+  const key = await intoKeyPepper(secrets, (pepper) =>
+    pepper === void 0 ? void 0 : piiRedactionRequestIdKey(pepper),
+  );
+  if (key !== void 0) return { kind: "keyed", key };
+  if (!config.piiRedactionModelEndpoint) return { kind: "no-model" };
+  throw new Error(
+    "data-privacy.requestIdKey ← API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET: none is set, and PII_REDACTION_MODEL_ENDPOINT is",
+  );
+}
+
 export class DataPrivacyModule implements DataPrivacyApi {
   static readonly contract = DataPrivacyApi;
   static readonly dependencies = {
@@ -104,9 +134,13 @@ export class DataPrivacyModule implements DataPrivacyApi {
     permissions: AuthzApi,
   };
   static readonly config = dataPrivacyConfig;
-  /** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
   static readonly secrets = {
+    /** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
     googleApplicationCredentials,
+    /** The request-id key's pepper, first set wins, as api-key's chain (ADR-201). */
+    requestIdKey: apiKeyPepper,
+    requestIdKeyFallback: credentialsSecret,
+    requestIdKeyLastFallback: sessionSecret,
   } as const;
 
   #privacy: DataPrivacyService;
@@ -164,7 +198,9 @@ export class DataPrivacyModule implements DataPrivacyApi {
     const spendCommands: { current: EventingCommands<PiiRedactionSpendPipeline> | undefined } = {
       current: void 0,
     };
+    const requestIdKey = await getRequestIdKey({ secrets, config });
     const spend = PiiRedactionSpendService.create({
+      requestIdKey: requestIdKey.kind === "keyed" ? requestIdKey.key : void 0,
       featureFlags: dependencies.featureFlags,
       recordSpendPriced: async (fact) => {
         if (!spendCommands.current) {

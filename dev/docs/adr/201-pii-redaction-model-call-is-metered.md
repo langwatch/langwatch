@@ -49,6 +49,11 @@
    attribute set every interval, and a service logs the same line many times. A log record with
    no time carries the time it was accepted, so a retry of it is charged again, as it is also
    stored again.
+   The hash is an HMAC under a key derived from the deployment's key pepper (API_KEY_PEPPER,
+   else CREDENTIALS_SECRET, else NEXTAUTH_SECRET, as api-key's chain), never a plain hash: the
+   id is stored in `gateway_spend` and served back, and a plain hash of a short text such as a
+   phone number could be confirmed by hashing guesses. A deployment that names the model and has
+   no pepper refuses to boot; one that names no model prices no call and needs none.
 5. **Recording never blocks redaction.** A fact that cannot be dispatched is logged at error
    with its amounts and the redacted batch is returned. Under-billing a call is preferred to
    failing a customer's ingestion.

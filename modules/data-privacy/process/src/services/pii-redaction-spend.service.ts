@@ -35,6 +35,11 @@ export type PiiRedactionAnsweredCall = Readonly<{
 }>;
 
 type PiiRedactionSpendDeps = Readonly<{
+  /**
+   * Keys the request id, so it is no hash of the text anyone can recompute. Absent only where
+   * no model is named, which never answers a call; a call reaching here without it is not billed.
+   */
+  requestIdKey: Uint8Array | undefined;
   featureFlags: FeatureFlagApi;
   recordSpendPriced: (fact: PiiRedactionSpendPricedEventData) => Promise<void>;
   log: SpendLogger;
@@ -43,6 +48,7 @@ type PiiRedactionSpendDeps = Readonly<{
 
 export class PiiRedactionSpendService {
   static create(input: {
+    requestIdKey: Uint8Array | undefined;
     featureFlags: FeatureFlagApi;
     recordSpendPriced: (fact: PiiRedactionSpendPricedEventData) => Promise<void>;
     log?: SpendLogger;
@@ -67,8 +73,28 @@ export class PiiRedactionSpendService {
 
   /** Never throws: a call that cannot be billed is logged with its amounts, not failed. */
   async record(call: PiiRedactionAnsweredCall): Promise<void> {
+    const key = this.deps.requestIdKey;
+    if (key === void 0) {
+      this.deps.log.error(
+        {
+          organizationId: call.organizationId,
+          projectId: call.projectId,
+          priceNanoUsd: piiRedactionPriceNanoUsd({
+            characters: batchCharactersOf(call.texts),
+            free: false,
+          }),
+        },
+        "PII redaction model call not billed: no key pepper to derive its request id from",
+      );
+      return;
+    }
     const free = await this.#isFree(call);
-    const fact = piiRedactionSpendFact({ ...call, free, occurredAt: this.deps.now() });
+    const fact = piiRedactionSpendFact({
+      ...call,
+      key,
+      free,
+      occurredAt: this.deps.now(),
+    });
 
     try {
       await this.deps.recordSpendPriced(fact);

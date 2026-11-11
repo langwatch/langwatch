@@ -2,7 +2,7 @@
  * What one PII redaction model call costs the customer and us, and the request id it is billed
  * under (ADR-201). Spec: modules/data-privacy/specs/pii-redaction-billing.feature
  */
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 
 import {
   PII_REDACTION_NANO_USD_PER_CHARACTER,
@@ -24,6 +24,17 @@ const NANO_USD_PER_REQUEST = 200;
 
 const REQUEST_ID_PREFIX = "piiredaction_";
 
+/** What the request-id key is derived under, so it never equals the key pepper itself. */
+const REQUEST_ID_KEY_LABEL = "pii-redaction-request-id";
+
+/**
+ * The request-id key: an HMAC of this label under the deployment's key pepper. A key of its own,
+ * so a request id never yields a hash made under the secret api-key hashes keys with.
+ */
+export function piiRedactionRequestIdKey(keyPepper: string): Uint8Array {
+  return createHmac("sha256", keyPepper).update(REQUEST_ID_KEY_LABEL).digest();
+}
+
 export function piiRedactionPriceNanoUsd({
   characters,
   free,
@@ -40,24 +51,31 @@ export function piiRedactionCostNanoUsd({ durationMs }: { durationMs: number }):
   return Math.round(gbSeconds * NANO_USD_PER_GB_SECOND) + NANO_USD_PER_REQUEST;
 }
 
-/** The project, the record's own key when it has one, and the texts, each length-prefixed. */
+/**
+ * An HMAC of the project, the record's own key when it has one, and the texts, each
+ * length-prefixed. Keyed, so the stored id is no commitment to the text: a short value such as a
+ * phone number cannot be confirmed by hashing guesses without the deployment's key (ADR-201).
+ */
 export function piiRedactionSpendRequestId({
+  key,
   projectId,
   recordKey,
   texts,
 }: {
+  key: Uint8Array;
   projectId: string;
   recordKey?: string | undefined;
   texts: readonly string[];
 }): string {
-  const hash = createHash("sha256");
+  const hmac = createHmac("sha256", key);
   for (const part of [projectId, recordKey ?? "", ...texts]) {
-    hash.update(`${part.length}:${part}`);
+    hmac.update(`${part.length}:${part}`);
   }
-  return `${REQUEST_ID_PREFIX}${hash.digest("hex").slice(0, 32)}`;
+  return `${REQUEST_ID_PREFIX}${hmac.digest("hex").slice(0, 32)}`;
 }
 
 export function piiRedactionSpendFact({
+  key,
   organizationId,
   projectId,
   texts,
@@ -66,6 +84,7 @@ export function piiRedactionSpendFact({
   free,
   occurredAt,
 }: {
+  key: Uint8Array;
   organizationId: string;
   projectId: string;
   texts: readonly string[];
@@ -80,7 +99,7 @@ export function piiRedactionSpendFact({
     occurredAt,
     organizationId,
     projectId,
-    requestId: piiRedactionSpendRequestId({ projectId, recordKey, texts }),
+    requestId: piiRedactionSpendRequestId({ key, projectId, recordKey, texts }),
     model: PII_REDACTION_SPEND_MODEL,
     rateVersion: PII_REDACTION_RATE_VERSION,
     characters,
