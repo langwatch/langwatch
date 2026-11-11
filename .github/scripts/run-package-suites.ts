@@ -414,6 +414,35 @@ export const commandFor = (job: SuiteJob): string[] =>
     : ["--filter", job.pkg.name, "run", job.script];
 
 /**
+ * Default per-script limit: slowest weighted script is 324s, so 900s is about
+ * 2.8x headroom (browser suites run slower under load) and still half the
+ * job's 45 minutes.
+ */
+export const DEFAULT_SUITE_TIMEOUT_SECONDS = 900;
+
+/** Reads PACKAGE_SUITES_TIMEOUT_SECONDS; unset or empty gives the default. */
+export const parseSuiteTimeoutSeconds = (value: string | undefined): number => {
+  if (value === undefined || value.trim() === "") return DEFAULT_SUITE_TIMEOUT_SECONDS;
+  const seconds = Number(value);
+  if (!Number.isInteger(seconds) || seconds < 1)
+    throw new Error(`PACKAGE_SUITES_TIMEOUT_SECONDS must be a positive integer, got "${value}".`);
+  return seconds;
+};
+
+/**
+ * SIGKILLs the script's process group (it is spawned detached), so vitest and
+ * browser workers die too.
+ */
+export const killProcessTree = (child: ScriptProcess) => {
+  if (child.pid === undefined) return;
+  try {
+    process.kill(-child.pid, "SIGKILL");
+  } catch {
+    // Already gone.
+  }
+};
+
+/**
  * Parses `PACKAGE_SUITES_CONCURRENCY`. Absent means one suite at a time; a
  * malformed value is an error, never a silent guess.
  */
@@ -621,6 +650,7 @@ export const outcomeOf = (
 
 /** A started script as the runner sees it: its two output streams, and its end. */
 export interface ScriptProcess {
+  pid?: number;
   stdout: { on(event: "data", listener: (chunk: Buffer) => void): unknown } | null;
   stderr: { on(event: "data", listener: (chunk: Buffer) => void): unknown } | null;
   on(event: "error", listener: (error?: unknown) => void): unknown;
@@ -638,12 +668,18 @@ export const createSuiteRunner = ({
   log,
   write,
   now = Date.now,
+  timeoutMs = Number.POSITIVE_INFINITY,
+  kill = () => {},
 }: {
   live: boolean;
   start: (job: SuiteJob) => ScriptProcess;
   log: (line: string) => void;
   write: (output: Buffer) => void;
   now?: () => number;
+  /** Longest one script may run before it is killed and failed. */
+  timeoutMs?: number;
+  /** Ends a script's whole process tree; a hung suite's workers outlive pnpm. */
+  kill?: (child: ScriptProcess) => void;
 }) => {
   const unfinished = new Map<SuiteJob, { title: string; chunks: Buffer[] }>();
   const report = (job: SuiteJob, title: string, chunks: Buffer[], startedAt: number) => {
@@ -658,7 +694,7 @@ export const createSuiteRunner = ({
     new Promise((settle) => {
       const startedAt = now();
       const title = `${job.pkg.name} (${job.pkg.dir}) — pnpm run ${job.script}`;
-      log(live ? `::group::${title}` : `started: ${title}`);
+      log(openLine({ live, title }));
       const chunks: Buffer[] = [];
       if (!live) unfinished.set(job, { title, chunks });
       const finish = once((status: number) => {
@@ -666,7 +702,17 @@ export const createSuiteRunner = ({
         settle(status);
       });
       const say = (line: string) => (live ? log(line) : chunks.push(Buffer.from(`${line}\n`)));
-      watchScript({ job, start, chunks, say, finish });
+      const child = watchScript({ job, start, chunks, say, finish });
+      if (child === undefined) return;
+      armTimeout({
+        child,
+        job,
+        timeoutMs,
+        elapsedSeconds: () => (now() - startedAt) / 1000,
+        log,
+        kill,
+        finish,
+      });
     });
   /** What the scripts still running have printed so far, for a cancelled run. */
   const flushUnfinished = () => {
@@ -676,6 +722,43 @@ export const createSuiteRunner = ({
     }
   };
   return { run, flushUnfinished };
+};
+
+const openLine = ({ live, title }: { live: boolean; title: string }) =>
+  live ? `::group::${title}` : `started: ${title}`;
+
+/**
+ * `close` waits for every holder of the output pipes, so a hung worker would
+ * never settle the suite: fail it here instead of waiting for it.
+ */
+const armTimeout = ({
+  child,
+  job,
+  timeoutMs,
+  elapsedSeconds,
+  log,
+  kill,
+  finish,
+}: {
+  child: ScriptProcess;
+  job: SuiteJob;
+  timeoutMs: number;
+  elapsedSeconds: () => number;
+  log: (line: string) => void;
+  kill: (child: ScriptProcess) => void;
+  finish: (status: number) => void;
+}) => {
+  if (!Number.isFinite(timeoutMs)) return;
+  const timer = setTimeout(() => {
+    const seconds = Math.round(elapsedSeconds());
+    log(
+      `::error::package suite ${job.pkg.name} (pnpm run ${job.script}) timed out after ${seconds}s`,
+    );
+    kill(child);
+    finish(1);
+  }, timeoutMs);
+  timer.unref();
+  for (const event of ["close", "error"] as const) child.on(event, () => clearTimeout(timer));
 };
 
 const printGroup = ({
@@ -707,16 +790,20 @@ const watchScript = ({
   chunks: Buffer[];
   say: (line: string) => unknown;
   finish: (status: number) => void;
-}) => {
+}): ScriptProcess | undefined => {
   const failToStart = (error: unknown) => {
     say(`could not start pnpm run ${job.script}: ${String(error)}`);
     finish(1);
   };
   const started = startSafely(() => start(job));
-  if ("error" in started) return failToStart(started.error);
+  if ("error" in started) {
+    failToStart(started.error);
+    return undefined;
+  }
   collectOutput(started.child, chunks);
   started.child.on("error", failToStart);
   started.child.on("close", (code: number | null) => finish(code ?? 1));
+  return started.child;
 };
 
 /** Calls `fn` the first time only: a process can report an error and then close. */
@@ -925,15 +1012,25 @@ if (isEntrypoint()) {
   const cores = availableParallelism();
   const live = concurrency === 1;
   console.log(`Running up to ${concurrency} suite(s) at once.`);
+  let suiteTimeoutSeconds: number;
+  try {
+    suiteTimeoutSeconds = parseSuiteTimeoutSeconds(process.env.PACKAGE_SUITES_TIMEOUT_SECONDS);
+  } catch (error) {
+    console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
   const huntCommandFor = (job: SuiteJob): string[] | undefined => {
     const extra = extraArgsFor(job.pkg, job.script) ?? [];
     return extra.length > 0 ? ["--filter", job.pkg.name, "run", job.script, ...extra] : undefined;
   };
   const runner = createSuiteRunner({
     live,
+    timeoutMs: suiteTimeoutSeconds * 1000,
+    kill: killProcessTree,
     start: (job) =>
       // The hunt skips nx, whose cache would replay a result instead of rerunning under the seed.
       spawn("pnpm", huntCommandFor(job) ?? commandFor(job), {
+        detached: true,
         stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
         env: {
           ...process.env,

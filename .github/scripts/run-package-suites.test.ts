@@ -7,6 +7,8 @@ import {
   balanceByWallTime,
   commandFor,
   createSuiteRunner,
+  DEFAULT_SUITE_TIMEOUT_SECONDS,
+  parseSuiteTimeoutSeconds,
   discover,
   exclusionNotices,
   failureAnnotations,
@@ -393,6 +395,54 @@ void describe("given the runner holds each suite's output until it ends", () => 
       assert.equal(await done, 1);
       assert.match(out[1]!, /could not start pnpm run test: Error: spawn pnpm ENOENT/);
     });
+  });
+});
+
+void describe("given a suite that never ends", () => {
+  void it("kills its process tree, names it and fails it once the limit passes", async () => {
+    const out: string[] = [];
+    const killed: unknown[] = [];
+    const started = fakeProcess();
+    const runner = createSuiteRunner({
+      live: false,
+      timeoutMs: 20,
+      start: () => started.child,
+      kill: (child) => void killed.push(child),
+      log: (line) => void out.push(line),
+      write: (output) => void out.push(output.toString()),
+    });
+    const done = runner.run({ pkg: pkg("@fix/a", ["test"]), script: "test" });
+    started.say("last words");
+    assert.equal(await done, 1);
+    assert.deepEqual(killed, [started.child]);
+    assert.ok(
+      out.some((line) => /::error::package suite @fix\/a .* timed out after \d+s/.test(line)),
+    );
+    assert.ok(out.includes("last words"), "buffered output is printed, not lost");
+  });
+
+  void it("leaves a suite that ends in time alone", async () => {
+    const killed: unknown[] = [];
+    const started = fakeProcess();
+    const runner = createSuiteRunner({
+      live: true,
+      timeoutMs: 20,
+      start: () => started.child,
+      kill: (child) => void killed.push(child),
+      log: () => {},
+      write: () => {},
+    });
+    const done = runner.run({ pkg: pkg("@fix/a", ["test"]), script: "test" });
+    started.end(0);
+    assert.equal(await done, 0);
+    await new Promise((settle) => setTimeout(settle, 40));
+    assert.deepEqual(killed, []);
+  });
+
+  void it("reads the limit from the env, defaulting when unset", () => {
+    assert.equal(parseSuiteTimeoutSeconds(undefined), DEFAULT_SUITE_TIMEOUT_SECONDS);
+    assert.equal(parseSuiteTimeoutSeconds("90"), 90);
+    assert.throws(() => parseSuiteTimeoutSeconds("0"), /positive integer/);
   });
 });
 

@@ -22,7 +22,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Check, Clipboard, Eye, EyeOff, Key } from "lucide-react";
-import { type Ref, useMemo, useRef, useState } from "react";
+import { type Ref, useEffect, useMemo, useRef, useState } from "react";
 
 import { useApiKeyHost } from "../../model/api-key-host.ts";
 import {
@@ -167,10 +167,13 @@ function KeyHandOff({
 }) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
   const copyKey = async () => {
     if (!(await copy({ text: token, what: "API key" }))) return;
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 2000);
   };
   return (
     <Card

@@ -1,6 +1,6 @@
 import { Check, Clipboard, Copy, Eye, EyeOff, WandSparkles } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useColorMode } from "../../color-mode/index.tsx";
 import {
@@ -280,11 +280,15 @@ function SnippetCopyButton({
   copyText: SnippetCopy;
 }) {
   const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // A pending reset must not fire after unmount, when the window may be gone.
+  useEffect(() => () => clearTimeout(timer.current), []);
   const name = `Copy ${label.toLowerCase()}`;
   const copy = async (value: string) => {
     if (!(await copyText({ text: value, what: label }))) return;
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 2000);
   };
   return (
     <Tooltip content={copied ? "Copied!" : name} openDelay={0} showArrow>
