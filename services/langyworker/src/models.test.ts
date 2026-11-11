@@ -1,3 +1,6 @@
+import type { Model } from "@earendil-works/pi-ai";
+import { streamSimple } from "@earendil-works/pi-ai/api/openai-responses";
+import { OPENAI_MODELS } from "@earendil-works/pi-ai/providers/openai.models";
 import { describe, expect, it } from "vitest";
 
 import type { LangyWorkerModelConfig } from "./config.js";
@@ -231,5 +234,106 @@ describe("buildModelsJson", () => {
       expect(JSON.stringify(generated)).not.toContain("sk-leaked");
       expect(JSON.stringify(generated)).not.toContain("sk-secret");
     });
+  });
+});
+
+// Exercise the real capability catalogue, not a hand-maintained model allowlist.
+// Every request below ends at the injected transport; none reaches a provider.
+const nonReasoningOpenAIModels = Object.entries(OPENAI_MODELS)
+  .filter(([, entry]) => entry.api === "openai-responses" && !entry.reasoning)
+  .map(([id]) => id);
+const reasoningCases: [string, boolean][] = [
+  ...nonReasoningOpenAIModels.map((id): [string, boolean] => [id, false]),
+  ["gpt-5-mini", true],
+];
+
+describe("when OpenAI reasoning is not explicitly configured", () => {
+  it("covers non-reasoning catalogue entries", () => {
+    expect(nonReasoningOpenAIModels.length).toBeGreaterThan(0);
+  });
+  /** @scenario OpenAI models use catalogue reasoning capabilities without losing unknown-model defaults */
+  it.each([...reasoningCases, ["custom-future-model", true] as [string, boolean]])(
+    "uses the capability for %s",
+    (id, expected) => {
+      const { reasoning: _reasoning, ...defaults } = model;
+      const provider = buildModelsJson({
+        model: { ...defaults, id: `openai/${id}` },
+        env: { OPENAI_BASE_URL: "http://127.0.0.1:41234/v1", OPENAI_API_KEY: "offline" },
+      }).providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+      expect(provider.models[0]?.reasoning).toBe(expected);
+    },
+  );
+
+  it("preserves an explicit disabled setting for an unknown OpenAI model", () => {
+    const provider = buildModelsJson({
+      model: { ...model, id: "openai/custom-future-model", reasoning: false },
+      env: { OPENAI_BASE_URL: "http://127.0.0.1:41234/v1", OPENAI_API_KEY: "offline" },
+    }).providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+    expect(provider.models[0]?.reasoning).toBe(false);
+  });
+});
+
+describe("when the Responses SDK serialises a catalogue-derived model", () => {
+  /** @scenario OpenAI models use catalogue reasoning capabilities without losing unknown-model defaults */
+  it.each(reasoningCases)("sends reasoning only when %s supports it", async (id, reasoning) => {
+    const { reasoning: _reasoning, ...defaults } = model;
+    const provider = buildModelsJson({
+      model: { ...defaults, id: `openai/${id}` },
+      env: { OPENAI_BASE_URL: "http://127.0.0.1:41234/v1", OPENAI_API_KEY: "offline" },
+    }).providers[PROVIDER_ID] as { baseUrl: string; models: Record<string, unknown>[] };
+    let payload: Record<string, unknown> | undefined;
+    const result = streamSimple(
+      {
+        ...provider.models[0],
+        baseUrl: provider.baseUrl,
+        provider: PROVIDER_ID,
+      } as Model<"openai-responses">,
+      { messages: [{ role: "user", content: "offline probe", timestamp: 0 }] },
+      {
+        apiKey: "offline-placeholder",
+        reasoning: "medium",
+        maxRetries: 0,
+        fetch: async (_input, init) => {
+          payload = JSON.parse(String(init?.body));
+          return new Response(
+            JSON.stringify({
+              error: { message: "Offline transport capture", type: "invalid_request_error" },
+            }),
+            {
+              status: 400,
+              headers: { "content-type": "application/json" },
+            },
+          );
+        },
+      },
+    );
+    await result.result();
+    expect(payload).toBeDefined();
+    expect(payload?.reasoning).toEqual(reasoning ? { effort: "medium", summary: "auto" } : void 0);
+  });
+});
+
+describe("when reasoning is explicitly configured", () => {
+  it.each([
+    ...nonReasoningOpenAIModels.map((id): [string, boolean] => [`openai/${id}`, true]),
+    ["openai/gpt-5-mini", false],
+  ])("preserves the explicit setting for %s", (id, reasoning) => {
+    const provider = buildModelsJson({
+      model: { ...model, id, reasoning },
+      env: { OPENAI_BASE_URL: "http://127.0.0.1:41234/v1", OPENAI_API_KEY: "offline" },
+    }).providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+    expect(provider.models[0]?.reasoning).toBe(reasoning);
+  });
+
+  it.each([
+    ["openai/custom-future-model", "openai-completions"],
+    ["custom-future-model", "openai-responses"],
+  ])("does not add an OpenAI default outside its Responses lane: %s %s", (id, api) => {
+    const { reasoning: _reasoning, ...defaults } = model;
+    const provider = buildModelsJson({
+      model: { ...defaults, id, api } as LangyWorkerModelConfig,
+      env: { OPENAI_BASE_URL: "http://127.0.0.1:41234/v1", OPENAI_API_KEY: "offline" },
+    }).providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+    expect(provider.models[0]?.reasoning).toBeUndefined();
   });
 });
