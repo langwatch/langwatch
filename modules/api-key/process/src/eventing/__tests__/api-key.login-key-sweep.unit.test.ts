@@ -63,6 +63,7 @@ async function sweepOver(rows: ApiKeyRow[]) {
       answers: MemoryApiKeyAnswerCacheRepository.create(),
       sandboxKeys: MemorySharedCredentialStore.create(),
       runKeys: MemorySharedCredentialStore.create(),
+      heldKeys: MemorySharedCredentialStore.create(),
     },
     dependencies: {
       authorization,
@@ -78,6 +79,7 @@ async function sweepOver(rows: ApiKeyRow[]) {
       answers: MemoryApiKeyAnswerCacheRepository.create(),
       sandboxKeys: MemorySharedCredentialStore.create(),
       runKeys: MemorySharedCredentialStore.create(),
+      heldKeys: MemorySharedCredentialStore.create(),
     },
     app,
     processStore: InMemoryProcessStore.createForTesting(),

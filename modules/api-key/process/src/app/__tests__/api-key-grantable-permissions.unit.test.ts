@@ -32,6 +32,7 @@ async function appOver({ held }: { held: string[] }) {
       answers: MemoryApiKeyAnswerCacheRepository.create(),
       sandboxKeys: MemorySharedCredentialStore.create(),
       runKeys: MemorySharedCredentialStore.create(),
+      heldKeys: MemorySharedCredentialStore.create(),
     },
     dependencies: {
       authorization: createApiFixture<AuthzApi>({

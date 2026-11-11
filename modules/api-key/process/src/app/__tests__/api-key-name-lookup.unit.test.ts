@@ -53,6 +53,7 @@ async function appOver({ member }: { member: boolean }) {
       answers: MemoryApiKeyAnswerCacheRepository.create(),
       sandboxKeys: MemorySharedCredentialStore.create(),
       runKeys: MemorySharedCredentialStore.create(),
+      heldKeys: MemorySharedCredentialStore.create(),
     },
     dependencies: {
       authorization: createApiFixture<AuthzApi>({ hasPermission: vi.fn(async () => member) }),
