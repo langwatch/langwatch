@@ -291,6 +291,27 @@ describe("a failed step", () => {
     });
 
     /** @scenario "A failed step folds into the record of the work" */
+    it(
+      "folds a CLI console with no exit code whose output opens with an Error line as failed",
+      async () => {
+        const user = userEvent.setup();
+        const finished = {
+          type: "tool-bash",
+          toolCallId: "fail-no-exit-code",
+          state: "output-available",
+          input: { command: "langwatch trace list" },
+          output: JSON.stringify({ kind: "text", text: "Error: dataset not found." }),
+        } as never;
+        const { container } = renderActivity({ parts: [finished, reply], live: false });
+
+        expect(receiptHeader().textContent).toContain("1 action failed");
+        await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
+
+        expect(container.textContent).toContain("dataset not found");
+      },
+    );
+
+    /** @scenario "A failed step folds into the record of the work" */
     it("opens its raw payload in developer mode", async () => {
       devMode = true;
       const user = userEvent.setup();
