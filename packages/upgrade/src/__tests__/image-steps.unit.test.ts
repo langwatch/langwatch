@@ -35,7 +35,10 @@ describe("imageSteps", () => {
     /** @scenario "Two goose files sharing a numeric prefix are refused before the upgrade registers steps" */
     it("refuses with duplicate_step before any step reaches the ledger", () => {
       expect(() => assertUniqueStepIds({ tree })).toThrow(
-        expect.objectContaining({ code: "duplicate_step" }),
+        expect.objectContaining({
+          code: "duplicate_step",
+          message: expect.stringMatching(/clickhouse:00125.*00125_a\.sql.*00125_b\.sql/),
+        }),
       );
     });
 

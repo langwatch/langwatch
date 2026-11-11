@@ -537,10 +537,8 @@ export async function withImageUpgradeRunner<Result>({
   inputs: ImageUpgradeInputs;
   use: (composed: ImageUpgradeRunner) => Promise<Result>;
 }): Promise<Result> {
-  // Before loadReleases so a shared prefix is named with its files, not a manifest parse error.
-  const tree = readImageTree({ codeSteps: inputs.steps.map(codeStepOf) });
-  assertUniqueStepIds({ tree });
   const releases = loadReleases();
+  const tree = readImageTree({ codeSteps: inputs.steps.map(codeStepOf) });
   const release = imageRelease({ manifests: releases.manifests, tree });
   const { targets } = clickhouseTargets(inputs);
   const sharedUrl = targets.find((target) => target.name === "shared")?.url;
@@ -586,14 +584,18 @@ export async function withImageUpgradeRunner<Result>({
   }
 }
 
-/** One upgrade run, narrated from its first line to its closing lines; never throws a failure. */
-export function runImageUpgrade({
+/**
+ * One upgrade run, narrated from its first line to its closing lines; a failed run is an outcome.
+ * Rejects only for a refused tree (shared step id), which read-only `status` must not hit.
+ */
+export async function runImageUpgrade({
   inputs,
   signal,
 }: {
   inputs: ImageUpgradeInputs;
   signal: AbortSignal;
 }): Promise<UpgradeOutcome> {
+  assertUniqueStepIds({ tree: readImageTree({ codeSteps: inputs.steps.map(codeStepOf) }) });
   return withImageUpgradeRunner({
     inputs,
     use: async ({ runner, withClickHouse }) => {

@@ -62,7 +62,7 @@ Feature: Release manifests order every migration step release by release
   @unit
   Scenario: Listing the image steps of a tree with a shared prefix does not throw
     Given an image tree with two goose files that share a numeric prefix
-    When the image steps are listed, as api and worker boot and read-only upgrade status do
+    When the image steps are listed, as api and worker boot and read-only upgrade status and plan do
     Then the steps are returned and nothing is refused
 
   @unit
