@@ -119,8 +119,8 @@ describe("summariseEvaluatorVerdicts", () => {
 
   describe("given a run with no evaluators", () => {
     /** @scenario "A run with no evaluators adds no verdict fields" */
-    it("answers nothing, so the summary keeps its cell counts only", () => {
-      expect(summariseEvaluatorVerdicts({ evaluators: {}, evaluatorScores: {} })).toBeUndefined();
+    it("answers no verdict fields, so the summary keeps its cell counts only", () => {
+      expect(summariseEvaluatorVerdicts({ evaluators: {}, evaluatorScores: {} })).toEqual({});
     });
   });
 });

@@ -22,19 +22,18 @@ export type ExperimentRunEvaluatorTally = {
  * as their default exit gate, so filling it would turn their green CI red.
  */
 export type ExperimentRunVerdictSummary = {
-  evaluators: ExperimentRunEvaluatorTally[];
+  evaluators?: ExperimentRunEvaluatorTally[];
 };
 
-/** Passed over passed plus failed, as a percentage; the board's own pass rate. */
-function passRateOf({ passed, failed }: { passed: number; failed: number }): number | undefined {
-  return passed + failed > 0 ? (passed / (passed + failed)) * 100 : undefined;
+/** Passed over passed plus failed, as a percentage; 0 when no verdict was given. */
+function passRateOf({ passed, failed }: { passed: number; failed: number }): number {
+  return passed + failed > 0 ? (passed / (passed + failed)) * 100 : 0;
 }
 
 /**
- * Rolls each cell's evaluator verdicts up into per-evaluator tallies a CI job can gate
- * on. Only explicit verdicts count: a score with no `passed` adds to the average, not
- * to either count. A crashed evaluator counts as errored, never as passed. Comparison evaluators keep no verdicts, so they never appear.
- * A run with no evaluators answers none, so the summary keeps its cell counts only.
+ * Rolls cell verdicts into per-evaluator tallies a CI job can gate on. A score with no
+ * `passed` only feeds the average; a crashed evaluator counts as errored, never passed.
+ * Comparison evaluators keep no verdicts. No evaluators answers `{}`: cell counts only.
  */
 export function summariseEvaluatorVerdicts({
   evaluators,
@@ -42,9 +41,9 @@ export function summariseEvaluatorVerdicts({
 }: {
   evaluators: Record<string, ExperimentRunFoldEvaluator>;
   evaluatorScores: Record<string, Record<string, ExperimentRunEvaluatorScore>>;
-}): ExperimentRunVerdictSummary | undefined {
+}): ExperimentRunVerdictSummary {
   const tallied = Object.entries(evaluators).filter(([, evaluator]) => !evaluator.comparison);
-  if (tallied.length === 0) return undefined;
+  if (tallied.length === 0) return {};
 
   const cells = Object.values(evaluatorScores);
   const tallies = tallied.map(([evaluatorId, evaluator]) => {
@@ -62,7 +61,7 @@ export function summariseEvaluatorVerdicts({
       passed,
       failed,
       errored,
-      passRate: passRateOf({ passed, failed }) ?? 0,
+      passRate: passRateOf({ passed, failed }),
       ...(scores.length > 0
         ? { avgScore: scores.reduce((sum, score) => sum + score, 0) / scores.length }
         : {}),

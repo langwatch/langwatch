@@ -83,21 +83,11 @@ export const runExperimentCommand = async (
       process.exit(1);
     }
 
-    if (status.status === "completed") {
-      const failures = countRunFailures(status.summary);
-      if (failures.any) {
-        pollSpinner.warn(
-          `Experiment completed with failures: ${failures.evaluations} failed evaluation(s), ` +
-            `${failures.evaluatorErrors} evaluator error(s), ${failures.cells} errored cell(s)`,
-        );
-        // Opt-in, like `scenario run --wait`: the document still prints, then the job fails.
-        if (options.failOnEvaluatorFailures) process.exitCode = 1;
-      } else {
-        pollSpinner.succeed(`Experiment completed! ${status.progress}/${status.total} cells`);
-      }
-    } else {
-      pollSpinner.warn(`Experiment ${status.status}`);
-    }
+    reportFinishedRun({
+      spinner: pollSpinner,
+      status,
+      failOnEvaluatorFailures: options.failOnEvaluatorFailures,
+    });
 
     return {
       data: status,
@@ -108,6 +98,33 @@ export const runExperimentCommand = async (
     process.exit(1);
   }
 };
+
+/** Prints how a finished run ended; an opt-in gate fails the job on any failure. */
+function reportFinishedRun({
+  spinner,
+  status,
+  failOnEvaluatorFailures,
+}: {
+  spinner: ReturnType<typeof createSpinner>;
+  status: Awaited<ReturnType<ExperimentsApiService["getRunStatus"]>>;
+  failOnEvaluatorFailures: boolean | undefined;
+}): void {
+  if (status.status !== "completed") {
+    spinner.warn(`Experiment ${status.status}`);
+    return;
+  }
+  const failures = countRunFailures(status.summary);
+  if (!failures.any) {
+    spinner.succeed(`Experiment completed! ${status.progress}/${status.total} cells`);
+    return;
+  }
+  spinner.warn(
+    `Experiment completed with failures: ${failures.evaluations} failed evaluation(s), ` +
+      `${failures.evaluatorErrors} evaluator error(s), ${failures.cells} errored cell(s)`,
+  );
+  // Opt-in, like `scenario run --wait`: the document still prints, then the job fails.
+  if (failOnEvaluatorFailures) process.exitCode = 1;
+}
 
 /**
  * What a completed run failed on: evaluations that returned a failing verdict,

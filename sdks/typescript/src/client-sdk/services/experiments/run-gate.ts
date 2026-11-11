@@ -1,11 +1,9 @@
 import type { ExperimentRunSummary } from "./platformTypes";
 
 /**
- * Evaluations that failed or crashed across a completed run, summed from the
- * per-evaluator tallies. A crashed evaluator checked nothing, so it counts against the
- * gate: an evaluator that errors on every row must not leave CI green. The server
- * leaves `totalFailed` unset so released clients keep their cell-based exit gate; this
- * is what the opt-in evaluator gate reads instead.
+ * Failed and crashed evaluations summed from the per-evaluator tallies. A crashed
+ * evaluator checked nothing, so it counts against the opt-in gate. The server leaves
+ * `totalFailed` unset so released clients keep their cell-based exit gate.
  */
 export function evaluatorFailuresOf(summary: ExperimentRunSummary | undefined): {
   failed: number;

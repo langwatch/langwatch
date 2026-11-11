@@ -83,7 +83,8 @@ export class ExperimentsFacade {
    * Run a platform-configured experiment (Experiments Workbench). Prints a
    * summary and exits with code 1 on failure, unless `exitOnFailure: false`.
    * @param slug - The slug of the experiment (found in the experiment URL)
-   * @param options - Optional inputs (data, datasetId, parameters, rowIndices), overrides and polling
+   * @param options - Optional inputs (data, datasetId, parameters, rowIndices),
+   *   overrides and polling
    */
   async run(
     slug: string,
