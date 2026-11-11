@@ -168825,8 +168825,10 @@ type GetApiExperimentsRunsByRunIdResponse struct {
 				EvaluatorId string   `json:"evaluatorId"`
 				Failed      float32  `json:"failed"`
 				Name        string   `json:"name"`
-				PassRate    float32  `json:"passRate"`
-				Passed      float32  `json:"passed"`
+
+				// PassRate Percentage of verdicts that passed; absent when the evaluator gave none
+				PassRate *float32 `json:"passRate,omitempty"`
+				Passed   float32  `json:"passed"`
 			} `json:"evaluators,omitempty"`
 			FailedCells float32  `json:"failedCells"`
 			PassRate    *float32 `json:"passRate,omitempty"`
@@ -202058,8 +202060,10 @@ func ParseGetApiExperimentsRunsByRunIdResponse(rsp *http.Response) (*GetApiExper
 					EvaluatorId string   `json:"evaluatorId"`
 					Failed      float32  `json:"failed"`
 					Name        string   `json:"name"`
-					PassRate    float32  `json:"passRate"`
-					Passed      float32  `json:"passed"`
+
+					// PassRate Percentage of verdicts that passed; absent when the evaluator gave none
+					PassRate *float32 `json:"passRate,omitempty"`
+					Passed   float32  `json:"passed"`
 				} `json:"evaluators,omitempty"`
 				FailedCells float32  `json:"failedCells"`
 				PassRate    *float32 `json:"passRate,omitempty"`

@@ -18,8 +18,8 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
         name (str):
         passed (float):
         failed (float):
-        pass_rate (float):
         errored (float | Unset): Cells where the evaluator crashed and gave no verdict
+        pass_rate (float | Unset): Percentage of verdicts that passed; absent when the evaluator gave none
         avg_score (float | Unset):
     """
 
@@ -27,8 +27,8 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
     name: str
     passed: float
     failed: float
-    pass_rate: float
     errored: float | Unset = UNSET
+    pass_rate: float | Unset = UNSET
     avg_score: float | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -40,9 +40,9 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
 
         failed = self.failed
 
-        pass_rate = self.pass_rate
-
         errored = self.errored
+
+        pass_rate = self.pass_rate
 
         avg_score = self.avg_score
 
@@ -54,11 +54,12 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
                 "name": name,
                 "passed": passed,
                 "failed": failed,
-                "passRate": pass_rate,
             }
         )
         if errored is not UNSET:
             field_dict["errored"] = errored
+        if pass_rate is not UNSET:
+            field_dict["passRate"] = pass_rate
         if avg_score is not UNSET:
             field_dict["avgScore"] = avg_score
 
@@ -75,9 +76,9 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
 
         failed = d.pop("failed")
 
-        pass_rate = d.pop("passRate")
-
         errored = d.pop("errored", UNSET)
+
+        pass_rate = d.pop("passRate", UNSET)
 
         avg_score = d.pop("avgScore", UNSET)
 
@@ -86,8 +87,8 @@ class GetApiExperimentsRunsByRunIdResponse200SummaryEvaluatorsItem:
             name=name,
             passed=passed,
             failed=failed,
-            pass_rate=pass_rate,
             errored=errored,
+            pass_rate=pass_rate,
             avg_score=avg_score,
         )
 

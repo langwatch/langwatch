@@ -2,7 +2,11 @@ import chalk from "chalk";
 
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import type { ExperimentRunSummary } from "@/client-sdk/services/experiments/platformTypes";
-import { evaluatorFailuresOf } from "@/client-sdk/services/experiments/run-gate";
+import {
+  evaluatorFailuresOf,
+  evaluatorTalliesMissing,
+  MISSING_TALLIES_MESSAGE,
+} from "@/client-sdk/services/experiments/run-gate";
 
 import { resolveCredentials } from "../../utils/apiKey";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
@@ -113,6 +117,11 @@ function reportFinishedRun({
     spinner.warn(`Experiment ${status.status}`);
     return;
   }
+  if (failOnEvaluatorFailures && evaluatorTalliesMissing(status.summary)) {
+    spinner.warn(`Experiment completed. ${MISSING_TALLIES_MESSAGE}`);
+    process.exitCode = 1;
+    return;
+  }
   const failures = countRunFailures(status.summary);
   if (!failures.any) {
     spinner.succeed(`Experiment completed! ${status.progress}/${status.total} cells`);
@@ -128,8 +137,8 @@ function reportFinishedRun({
 
 /**
  * What a completed run failed on: evaluations that returned a failing verdict,
- * evaluators that crashed instead of judging, and cells that errored. Any of them
- * fails a `--wait --fail-on-evaluator-failures` run.
+ * evaluators that crashed instead of judging, and cells that errored. Any of them,
+ * or a summary with no evaluator results, fails a `--wait --fail-on-evaluator-failures` run.
  */
 export function countRunFailures(summary: ExperimentRunSummary | undefined): {
   evaluations: number;
@@ -188,7 +197,7 @@ function printRunStatus({
     const errored = evaluator.errored ? `, ${chalk.red(`${evaluator.errored} errored`)}` : "";
     // A pass rate over no verdicts would read as "all failed"; say what happened instead.
     const rate =
-      evaluator.passed + evaluator.failed > 0 ? `${evaluator.passRate.toFixed(1)}%` : "no verdicts";
+      evaluator.passRate === undefined ? "no verdicts" : `${evaluator.passRate.toFixed(1)}%`;
     console.log(
       `    ${chalk.gray(`${evaluator.name}:`)} ${evaluator.passed} passed, ${failed}` +
         `${errored} (${rate})`,

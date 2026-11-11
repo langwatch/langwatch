@@ -32,8 +32,8 @@ export type ExperimentRunSummary = {
     failed: number;
     /** Cells where the evaluator crashed and gave no verdict; absent on older servers. */
     errored?: number;
-    /** 0 when the evaluator gave no verdict at all; read `errored` to tell a crash apart. */
-    passRate: number;
+    /** Share of verdicts that passed, in percent; absent when the evaluator gave none. */
+    passRate?: number;
     avgScore?: number;
   }[];
   totalPassed?: number;
@@ -161,7 +161,10 @@ export type ExperimentRunWithResults = {
 export type PrintSummaryOptions = {
   /** Call process.exit(1) on failure. Default true. */
   exitOnFailure?: boolean;
-  /** Also fail when an evaluator returned a failing verdict. Default false. */
+  /**
+   * Also fail when an evaluator returned a failing verdict or errored instead of judging,
+   * or when the server sent no evaluator results. Default false.
+   */
   failOnEvaluatorFailures?: boolean;
 };
 
@@ -179,7 +182,8 @@ export type ExperimentRunResult = {
   summary: ExperimentRunSummary;
   /**
    * Print a CI-friendly summary of the results. Exits 1 when a cell errored; pass
-   * `{ failOnEvaluatorFailures: true }` to also exit 1 when an evaluation failed.
+   * `{ failOnEvaluatorFailures: true }` to also exit 1 when an evaluation failed or an
+   * evaluator errored.
    * @param options - `exitOnFailure` (default true), or the options object
    */
   printSummary: (options?: boolean | PrintSummaryOptions) => void;

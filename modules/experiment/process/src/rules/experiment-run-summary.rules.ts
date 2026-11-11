@@ -11,8 +11,8 @@ export type ExperimentRunEvaluatorTally = {
   failed: number;
   /** Cells where the evaluator crashed and gave no verdict; a gate counts them as failures. */
   errored: number;
-  /** 0 when the evaluator gave no verdict at all; read `errored` to tell a crash apart. */
-  passRate: number;
+  /** Share of verdicts that passed, in percent; absent when the evaluator gave none. */
+  passRate?: number;
   avgScore?: number;
 };
 
@@ -22,18 +22,13 @@ export type ExperimentRunEvaluatorTally = {
  * as their default exit gate, so filling it would turn their green CI red.
  */
 export type ExperimentRunVerdictSummary = {
-  evaluators?: ExperimentRunEvaluatorTally[];
+  evaluators: ExperimentRunEvaluatorTally[];
 };
-
-/** Passed over passed plus failed, as a percentage; 0 when no verdict was given. */
-function passRateOf({ passed, failed }: { passed: number; failed: number }): number {
-  return passed + failed > 0 ? (passed / (passed + failed)) * 100 : 0;
-}
 
 /**
  * Rolls cell verdicts into per-evaluator tallies a CI job can gate on. A score with no
  * `passed` only feeds the average; a crashed evaluator counts as errored, never passed.
- * Comparison evaluators keep no verdicts. No evaluators answers `{}`: cell counts only.
+ * Comparison evaluators are left out. The list is always present, empty or not.
  */
 export function summariseEvaluatorVerdicts({
   evaluators,
@@ -43,8 +38,6 @@ export function summariseEvaluatorVerdicts({
   evaluatorScores: Record<string, Record<string, ExperimentRunEvaluatorScore>>;
 }): ExperimentRunVerdictSummary {
   const tallied = Object.entries(evaluators).filter(([, evaluator]) => !evaluator.comparison);
-  if (tallied.length === 0) return {};
-
   const cells = Object.values(evaluatorScores);
   const tallies = tallied.map(([evaluatorId, evaluator]) => {
     const verdicts = cells.flatMap((byEvaluator) => {
@@ -61,7 +54,7 @@ export function summariseEvaluatorVerdicts({
       passed,
       failed,
       errored,
-      passRate: passRateOf({ passed, failed }),
+      ...(passed + failed > 0 ? { passRate: (passed / (passed + failed)) * 100 } : {}),
       ...(scores.length > 0
         ? { avgScore: scores.reduce((sum, score) => sum + score, 0) / scores.length }
         : {}),

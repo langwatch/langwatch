@@ -346,7 +346,7 @@ describe("the run's progress fold as main's poller JSON", () => {
         failedCells: 1,
         duration: 3_000,
         timestamps: { startedAt: 1_000, finishedAt: 4_000 },
-        // No verdict arrived: each scoring evaluator is listed with zero counts.
+        // No verdict arrived: each scoring evaluator is listed with zero counts, no pass rate.
         evaluators: [
           {
             evaluatorId: "exact",
@@ -354,7 +354,6 @@ describe("the run's progress fold as main's poller JSON", () => {
             passed: 0,
             failed: 0,
             errored: 0,
-            passRate: 0,
           },
           {
             evaluatorId: "saved",
@@ -362,7 +361,6 @@ describe("the run's progress fold as main's poller JSON", () => {
             passed: 0,
             failed: 0,
             errored: 0,
-            passRate: 0,
           },
         ],
         runUrl: "https://app/run_1",

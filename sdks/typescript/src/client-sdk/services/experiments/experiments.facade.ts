@@ -27,7 +27,7 @@ import type {
   ExperimentRunSummary,
 } from "./platformTypes";
 import { printSummary } from "./printSummary";
-import { failedEvaluationsOf } from "./run-gate";
+import { evaluatorTalliesMissing, failedEvaluationsOf, MISSING_TALLIES_MESSAGE } from "./run-gate";
 import { pollExperimentRun, rebaseUrlToEndpoint, fetchResultsWithRetry } from "./run-status";
 import type { ExperimentInitOptions } from "./types";
 
@@ -385,7 +385,10 @@ export class ExperimentsFacade {
 
         // The default gate is unchanged. Failed evaluations fail the job only when asked:
         // failing on them by default would turn existing green CI red.
-        const evaluationsFailed = failOnEvaluatorFailures && failedEvaluationsOf(summary) > 0;
+        const talliesMissing = failOnEvaluatorFailures && evaluatorTalliesMissing(summary);
+        if (talliesMissing) console.error(MISSING_TALLIES_MESSAGE);
+        const evaluationsFailed =
+          talliesMissing || (failOnEvaluatorFailures && failedEvaluationsOf(summary) > 0);
         if (exitOnFailure && (totalFailed > 0 || evaluationsFailed)) {
           process.exit(1);
         }

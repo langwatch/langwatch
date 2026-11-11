@@ -48,7 +48,7 @@ describe("summariseEvaluatorVerdicts", () => {
         },
       });
 
-      expect(summary.evaluators?.[0]).toMatchObject({ passed: 1, failed: 0, errored: 2 });
+      expect(summary.evaluators[0]).toMatchObject({ passed: 1, failed: 0, errored: 2 });
     });
   });
 
@@ -63,7 +63,7 @@ describe("summariseEvaluatorVerdicts", () => {
         },
       });
 
-      expect(summary.evaluators?.[0]).toMatchObject({ passed: 0, failed: 0, errored: 2 });
+      expect(summary.evaluators[0]).toMatchObject({ passed: 0, failed: 0, errored: 2 });
     });
   });
 
@@ -78,8 +78,9 @@ describe("summariseEvaluatorVerdicts", () => {
         },
       });
 
-      expect(summary.evaluators?.[0]).toMatchObject({ passed: 0, failed: 0 });
-      expect(summary.evaluators?.[0]?.avgScore).toBeCloseTo(0.6);
+      expect(summary.evaluators[0]).toMatchObject({ passed: 0, failed: 0 });
+      expect(summary.evaluators[0]?.avgScore).toBeCloseTo(0.6);
+      expect(summary.evaluators[0]).not.toHaveProperty("passRate");
     });
   });
 
@@ -93,7 +94,7 @@ describe("summariseEvaluatorVerdicts", () => {
         },
       });
 
-      expect(summary.evaluators?.[0]).toMatchObject({ failed: 1 });
+      expect(summary.evaluators[0]).toMatchObject({ failed: 1 });
       expect(summary).not.toHaveProperty("totalPassed");
       expect(summary).not.toHaveProperty("totalFailed");
       expect(summary).not.toHaveProperty("passRate");
@@ -113,14 +114,16 @@ describe("summariseEvaluatorVerdicts", () => {
         },
       });
 
-      expect(summary.evaluators?.map((tally) => tally.evaluatorId)).toEqual(["ev_1"]);
+      expect(summary.evaluators.map((tally) => tally.evaluatorId)).toEqual(["ev_1"]);
     });
   });
 
   describe("given a run with no evaluators", () => {
-    /** @scenario "A run with no evaluators adds no verdict fields" */
-    it("answers no verdict fields, so the summary keeps its cell counts only", () => {
-      expect(summariseEvaluatorVerdicts({ evaluators: {}, evaluatorScores: {} })).toEqual({});
+    /** @scenario "A run with no evaluators reports an empty evaluator list" */
+    it("answers an empty evaluator list rather than leaving the field out", () => {
+      expect(summariseEvaluatorVerdicts({ evaluators: {}, evaluatorScores: {} })).toEqual({
+        evaluators: [],
+      });
     });
   });
 });

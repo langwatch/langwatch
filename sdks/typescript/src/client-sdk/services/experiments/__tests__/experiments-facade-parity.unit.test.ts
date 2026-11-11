@@ -9,6 +9,7 @@ import { createLangWatchApiClient } from "@/internal/api/client";
 import { NoOpLogger } from "@/logger";
 
 import { ExperimentsFacade } from "../experiments.facade";
+import { MISSING_TALLIES_MESSAGE } from "../run-gate";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -120,16 +121,23 @@ describe("ExperimentsFacade parity with the Python SDK", () => {
       expect(code).toBeUndefined();
     });
 
-    /** @scenario "Opting in against a server without tallies keeps the cell gate" */
-    it("falls back to the cell gate when the summary has no evaluator tallies", async () => {
+    /** @scenario "Opting in against a server without evaluator results fails the job" */
+    it("exits 1 and says why when the summary has no evaluator results", async () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
       const code = await exitCodeFor({ failedCells: 0 }, { failOnEvaluatorFailures: true });
-      expect(code).toBeUndefined();
+      expect(code).toBe(1);
+      expect(error).toHaveBeenCalledWith(MISSING_TALLIES_MESSAGE);
+    });
+
+    /** @scenario "By default a summary without evaluator results leaves the job green" */
+    it("does not exit by default when the summary has no evaluator results", async () => {
+      expect(await exitCodeFor({ failedCells: 0 })).toBeUndefined();
     });
 
     /** @scenario "Opting in fails the job when an evaluator crashed on every row" */
     it("exits 1 with failOnEvaluatorFailures when the evaluator only errored", async () => {
       const crashed = [
-        { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3, passRate: 0 },
+        { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3 },
       ];
       const code = await exitCodeFor(
         { failedCells: 0, evaluators: crashed },
@@ -141,9 +149,21 @@ describe("ExperimentsFacade parity with the Python SDK", () => {
     /** @scenario "By default a crashed evaluator leaves the job green" */
     it("does not exit by default when the evaluator only errored", async () => {
       const crashed = [
-        { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3, passRate: 0 },
+        { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3 },
       ];
       expect(await exitCodeFor({ failedCells: 0, evaluators: crashed })).toBeUndefined();
+    });
+
+    /** @scenario "A score-only evaluator prints no verdicts, not a 0% pass rate" */
+    it("prints no verdicts for an evaluator that only scored", async () => {
+      const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const scoreOnly = [
+        { evaluatorId: "ev_1", name: "faithfulness", passed: 0, failed: 0, avgScore: 0.6 },
+      ];
+      await exitCodeFor({ failedCells: 0, evaluators: scoreOnly }, { exitOnFailure: false });
+      const printed = log.mock.calls.map((call) => String(call[0])).join("\n");
+      expect(printed).toContain("faithfulness: no verdicts");
+      expect(printed).not.toContain("0.0% pass rate");
     });
 
     /** @scenario "Turning exit off wins over the opt-in" */

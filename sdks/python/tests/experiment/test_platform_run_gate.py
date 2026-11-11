@@ -30,8 +30,10 @@ CRASHED_VERDICT = [
         "passed": 0,
         "failed": 0,
         "errored": 3,
-        "passRate": 0,
     }
+]
+SCORE_ONLY_VERDICT = [
+    {"evaluatorId": "ev_1", "name": "faithfulness", "passed": 0, "failed": 0, "avgScore": 0.6}
 ]
 
 
@@ -69,8 +71,23 @@ def test_opting_in_still_passes_a_run_whose_evaluations_all_passed():
     assert _exit_code(summary, fail_on_evaluator_failures=True) == 0
 
 
-def test_opting_in_against_a_server_without_tallies_keeps_the_cell_gate():
-    assert _exit_code(BASE_SUMMARY, fail_on_evaluator_failures=True) == 0
+def test_opting_in_against_a_server_without_evaluator_results_fails_the_job(capsys):
+    assert _exit_code(BASE_SUMMARY, fail_on_evaluator_failures=True) == 1
+    assert "No evaluator results" in capsys.readouterr().err
+
+
+def test_by_default_a_summary_without_evaluator_results_leaves_the_job_green():
+    assert _exit_code(BASE_SUMMARY) == 0
+
+
+def test_a_score_only_evaluator_prints_no_verdicts_not_a_zero_pass_rate(capsys):
+    result = _build_result(
+        "run_1", "completed", {**BASE_SUMMARY, "evaluators": SCORE_ONLY_VERDICT}, "https://app/run_1"
+    )
+    result.print_summary(exit_on_failure=False)
+    printed = capsys.readouterr().out
+    assert "faithfulness: no verdicts" in printed
+    assert "0.0% pass rate" not in printed
 
 
 def test_turning_exit_off_wins_over_the_opt_in():

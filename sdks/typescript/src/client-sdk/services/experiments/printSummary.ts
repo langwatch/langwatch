@@ -24,7 +24,12 @@ function printEvaluators(summary: ExperimentSummary): void {
   console.log("─".repeat(60));
   console.log("  EVALUATORS:");
   for (const evaluator of summary.evaluators) {
-    console.log(`    ${evaluator.name}: ${evaluator.passRate.toFixed(1)}% pass rate`);
+    // No verdicts is not a 0% pass rate: a score-only evaluator gives none.
+    const rate =
+      evaluator.passRate === undefined
+        ? "no verdicts"
+        : `${evaluator.passRate.toFixed(1)}% pass rate`;
+    console.log(`    ${evaluator.name}: ${rate}`);
     if (evaluator.avgScore !== undefined) {
       console.log(`      Avg score: ${evaluator.avgScore.toFixed(2)}`);
     }

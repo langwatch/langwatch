@@ -190,7 +190,7 @@ describe("runExperimentCommand()", () => {
       { evaluatorId: "ev_1", name: "exact_match", passed: 3, failed: 0, passRate: 100 },
     ];
     const crashedVerdict = [
-      { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3, passRate: 0 },
+      { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3 },
     ];
     const completedWith = (summary: Record<string, unknown>) => ({
       runId: "run_123",
@@ -269,6 +269,19 @@ describe("runExperimentCommand()", () => {
 
       const printed = log.mock.calls.map((call) => String(call[0])).join("\n");
       expect(printed).toMatch(/exact_match:.*0 passed, 0 failed, .*3 errored.*\(no verdicts\)/);
+    });
+
+    /** @scenario "The CLI opt-in fails a waited run whose summary has no evaluator results" */
+    it("fails the job when opted in and the summary has no evaluator results", async () => {
+      mockGetRunStatus.mockResolvedValue(completedWith({ failedCells: 0 }));
+
+      const result = await runExperimentCommand("quality-check", {
+        wait: true,
+        failOnEvaluatorFailures: true,
+      });
+
+      expect(result?.data).toMatchObject({ status: "completed" });
+      expect(process.exitCode).toBe(1);
     });
 
     /** @scenario "The CLI opt-in leaves a clean run green" */

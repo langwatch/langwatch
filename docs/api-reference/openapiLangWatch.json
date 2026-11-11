@@ -54050,6 +54050,7 @@
                                 "type": "number"
                               },
                               "passRate": {
+                                "description": "Percentage of verdicts that passed; absent when the evaluator gave none",
                                 "type": "number"
                               },
                               "avgScore": {
@@ -54060,8 +54061,7 @@
                               "evaluatorId",
                               "name",
                               "passed",
-                              "failed",
-                              "passRate"
+                              "failed"
                             ],
                             "additionalProperties": false
                           }

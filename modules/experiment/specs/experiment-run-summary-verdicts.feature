@@ -46,6 +46,7 @@ Feature: A completed run's summary carries its evaluator verdicts
     Given a run whose evaluator "faithfulness" returned scores 0.4 and 0.8 with no pass or fail
     When the run completes
     Then the summary lists "faithfulness" with 0 passed, 0 failed and an average score of 0.6
+    And "faithfulness" carries no pass rate, so it does not read as every evaluation failing
 
   @unit
   Scenario: A comparison evaluator keeps no verdicts and is left out
@@ -54,7 +55,8 @@ Feature: A completed run's summary carries its evaluator verdicts
     Then the summary lists only the scoring evaluator
 
   @unit
-  Scenario: A run with no evaluators adds no verdict fields
+  Scenario: A run with no evaluators reports an empty evaluator list
     Given a run with targets and no evaluators
     When the run completes
-    Then the summary carries cell counts only
+    Then the summary carries an empty evaluator list
+    And a client can tell it apart from a server that reports no evaluator results
