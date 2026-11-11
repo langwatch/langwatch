@@ -1,10 +1,11 @@
-import { flooredViewName, LWQL_FLOOR_PARAMETER } from "../../../rules/lwql-dedup-floor.rules.ts";
-import { TENANT_COLUMN } from "../../../rules/lwql-view-catalog.rules.ts";
 /**
  * @see ./catalog/lwql-views.ts — the catalog these statements are built from
  * @see ./provisioning.ts — the access model applied over them
  * @see specs/lwql/api.feature
  */
+
+import { flooredViewName, LWQL_FLOOR_PARAMETER } from "../../../rules/lwql-dedup-floor.rules.ts";
+import { TENANT_COLUMN } from "../../../rules/lwql-view-catalog.rules.ts";
 import type { LangWatchQLDedupStrategy } from "../../../rules/lwql-view-dedup-shape.rules.ts";
 import {
   KEY_MAP_COLUMNS,

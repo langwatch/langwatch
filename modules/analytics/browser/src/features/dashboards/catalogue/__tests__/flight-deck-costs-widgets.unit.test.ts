@@ -81,6 +81,9 @@ describe("given the Flight Deck cockpit widgets", () => {
     expect(queries.gap).toContain("x.input AS example");
     // The request's text is read from traces for the shown traces only.
     expect(queries.gap).toContain("AND TraceId IN (SELECT trace_id FROM (");
+    // Its two copies of the topic list must pick the same trace, so the pick is no `any`.
+    expect(queries.gap).toContain("minIf(g.trace_id, g.gaps > 0) AS trace_id");
+    expect(queries.gap).not.toContain("anyIf(");
     expect(queries.gap).toContain("ORDER BY gaps DESC");
     expect(code).toContain("<TraceLink id={top.trace_id} />");
     expect(code).toContain("conversations asked for something my agent cannot do.");

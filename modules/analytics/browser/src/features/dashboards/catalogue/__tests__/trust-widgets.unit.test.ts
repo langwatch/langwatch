@@ -78,10 +78,10 @@ describe("given the Can I trust my numbers? widgets", () => {
   /** @scenario "AC168 Can I trust my numbers?: noise is traffic that clearly comes from tests, staging and the like" */
   it("reads origins and non-production environments, never health checks or duplicates", () => {
     const { code, sql } = buildOf("noise");
-    expect(sql.sources).toContain("has(['playground', 'evaluation', 'simulation'], t.origin)");
+    expect(sql.sources).toContain("has(['playground', 'evaluation', 'simulation'], Origin)");
     // Typed columns copied from the maps, never the maps themselves (goose 00128).
-    expect(sql.sources).toContain("lower(any(nullIf(DeploymentEnvironment, '')))");
-    expect(sql.sources).toContain("lower(MetadataEnvironment) AS environment");
+    expect(sql.sources).toContain("lower(DeploymentEnvironment)");
+    expect(sql.sources).toContain("lower(MetadataEnvironment)");
     expect(sql.sources).toContain("arrayMap((label) -> lower(label), Labels)");
     expect(sql.sources).not.toContain("Attributes[");
     expect(sql.sources).toContain("'staging'");

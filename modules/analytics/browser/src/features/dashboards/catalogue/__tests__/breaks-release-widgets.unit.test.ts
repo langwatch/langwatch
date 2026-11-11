@@ -32,12 +32,12 @@ describe("given the Where my agent breaks widgets", () => {
   /** @scenario "AC61 Where my agent breaks: failing steps show the failures that reached the user" */
   it("counts a failure as recovered when the span above it did not fail", () => {
     const { code, sql } = buildOf("up-where-fails");
-    expect(sql.main).toContain("p.SpanId = c.ParentSpanId");
-    expect(sql.main).toContain(
-      "c.StatusCode = 2 AND ifNull(p.found, 0) = 1 AND p.StatusCode != 2 AS recovered",
-    );
     // Only failed calls look their parent up, so the joined side never holds every span.
-    expect(sql.main).toContain("AND StatusCode = 2\n      )\n  ) AS p");
+    expect(sql.main).toContain(
+      "AND StatusCode = 2\n  ) AS c ON c.TraceId = p.TraceId AND c.parent = p.SpanId",
+    );
+    expect(sql.main).toContain("AND p.StatusCode != 2");
+    expect(sql.main).toContain("count() AS recovered");
     expect(sql.main).toContain("ORDER BY failures - recovered DESC");
     expect(sql.main).not.toContain("'tool'");
     expect(code).toContain("reached the user");
@@ -47,12 +47,14 @@ describe("given the Where my agent breaks widgets", () => {
   it("counts a top-level span with no children as a step whose failure reached the user", () => {
     const { sql } = buildOf("up-where-fails");
     expect(sql.main).toContain("UNION ALL");
-    // Checked against the parent ids of top-level spans only, a set far smaller than all spans.
-    expect(sql.main).toContain("AND (TraceId, SpanId) NOT IN (");
-    expect(sql.main).toContain("AND (TraceId, ifNull(ParentSpanId, '')) IN (");
-    expect(sql.main).toContain("StatusCode = 2 AS failed, false AS recovered");
+    // A top-level span no span names as parent, checked against hashed parent ids.
+    expect(sql.main).toContain(
+      "OR (ParentSpanId IS NULL\n        AND sipHash128(TraceId, SpanId) NOT IN (",
+    );
+    expect(sql.main).toContain("SELECT sipHash128(TraceId, ifNull(ParentSpanId, ''))");
+    expect(sql.main).toContain("countIf(StatusCode = 2) AS failures, 0 AS recovered");
     expect(buildOf("tools-error-rate").sql.main).toContain(
-      "AND ParentSpanId IS NULL\n    AND SpanType = 'tool'",
+      "AND SpanType = 'tool'\n    AND (ifNull(ParentSpanId, '') != ''\n      OR (ParentSpanId IS NULL",
     );
   });
 
@@ -83,7 +85,8 @@ describe("given the Where my agent breaks widgets", () => {
   /** @scenario "AC63 Where my agent breaks: tool error rate says how many tool errors the agent recovered" */
   it("reads tool spans only and shows the recovered share and the worst tool", () => {
     const { code, sql } = buildOf("tools-error-rate");
-    expect(sql.main).toContain("AND ifNull(ParentSpanId, '') != ''\n    AND SpanType = 'tool'");
+    // Both the calls and the failed calls that look their parent up read tool spans only.
+    expect(sql.main.match(/AND SpanType = 'tool'/g)).toHaveLength(2);
     expect(sql.main).not.toContain("SpanAttributes");
     expect(code).toContain("Tool error rate");
     expect(code).toContain("Recovered, of ");

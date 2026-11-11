@@ -321,7 +321,7 @@ function SpanDataFloorNotice({
   readonly queries: readonly { readonly sql: string }[];
   readonly periodStart: number;
 }) {
-  const floor = useSpanDataFloor({ projectId, enabled: true });
+  const floor = useSpanDataFloor({ projectId });
   const notice = spanDataFloorNotice({ queries, periodStart, floor });
   if (!notice) return null;
   return (

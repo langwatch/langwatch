@@ -264,16 +264,19 @@ HAVING calls >= 20
 ORDER BY (errors - recovered) / calls DESC
 LIMIT 1`;
 
-/** Per topic: conversations that ended, those the agent could not serve, and one such trace. */
+/**
+ * Per topic: conversations that ended, those the agent could not serve, and one such trace.
+ * `minIf`, not `anyIf`: `CANNOT_SERVE_SQL` runs this twice, and both must pick the same trace.
+ */
 const GAPS_BY_TOPIC = `SELECT ${TOPIC} AS topic,
     sum(g.gaps) AS gaps,
     sum(g.closed) AS closed,
-    anyIf(g.trace_id, g.gaps > 0) AS trace_id
+    minIf(g.trace_id, g.gaps > 0) AS trace_id
   FROM (
     SELECT topic_id, meta_topic,
       countIf(outcome = 'capability_gap') AS gaps,
       count() AS closed,
-      anyIf(trace_id, outcome = 'capability_gap') AS trace_id
+      minIf(trace_id, outcome = 'capability_gap') AS trace_id
     FROM (${outcomes({ ...PERIOD, withTopic: true })})
     GROUP BY topic_id, meta_topic
   ) AS g
