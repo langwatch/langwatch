@@ -37,6 +37,7 @@ function makeProjectStore(initial: { firstMessage: boolean; integrated: boolean 
         Object.assign(project, data);
       },
       resolveOrgAdmin: async () => ({ userId: "user-1", organizationId: "org-1" }),
+      findOrganizationId: async () => "org-1",
     },
   };
 }

@@ -4,19 +4,14 @@
  * Spec: modules/project/specs/project-history-listing.feature
  */
 import type { EventingCommandSender } from "@langwatch/eventing";
-import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import type {
   RecordProjectFirstMessageListedCommandData,
   RecordProjectPersonalOwnerListedCommandData,
 } from "../eventing/project-lifecycle.events.ts";
-import type { ProjectHistoryRow, ProjectRepository } from "../repositories/project.repository.ts";
-
-const PAGE_SIZE = 2000;
-
-/** How many skipped project ids the report names; the count covers the rest. */
-const ORPHAN_IDS_REPORTED = 20;
+import type { ProjectBackfillRow, ProjectRepository } from "../repositories/project.repository.ts";
+import { ProjectTablePagingService } from "./project-table-paging.service.ts";
 
 export type ProjectHistoryListingReport = {
   /** Personal projects with an owner; a dry run counts them by the rule a run sends by. */
@@ -68,14 +63,14 @@ export type ProjectHistoryListingSenders = Readonly<{
 }>;
 
 type Dependencies = Readonly<{
-  projects: Pick<ProjectRepository, "findHistoryPage">;
+  projects: Pick<ProjectRepository, "findBackfillPage">;
   logger: Readonly<{ warn(payload: Readonly<Record<string, unknown>>, message: string): void }>;
 }>;
 
 /** A personal project with an owner; the dry run and the run both count by it. */
 const hasPersonalOwner = (
-  project: ProjectHistoryRow,
-): project is ProjectHistoryRow & { ownerUserId: string } =>
+  project: ProjectBackfillRow,
+): project is ProjectBackfillRow & { ownerUserId: string } =>
   project.isPersonal && project.ownerUserId !== null;
 
 /** Where a run starts: a dry run counts the whole table, so a saved checkpoint never shrinks it. */
@@ -96,8 +91,11 @@ function startOf({
  */
 export class ProjectHistoryListingService {
   #senders: ProjectHistoryListingSenders | undefined;
+  readonly #table: ProjectTablePagingService;
 
-  private constructor(private readonly deps: Dependencies) {}
+  private constructor(deps: Dependencies) {
+    this.#table = ProjectTablePagingService.create(deps);
+  }
 
   static create(deps: Dependencies): ProjectHistoryListingService {
     return new ProjectHistoryListingService(deps);
@@ -115,27 +113,23 @@ export class ProjectHistoryListingService {
   }: ProjectHistoryListingRun): Promise<ProjectHistoryListingReport> {
     const { afterProjectId, ...counted } = startOf({ dryRun, resumeFrom });
     let report: ProjectHistoryListingReport = counted;
-    let cursor: string | null = afterProjectId;
-    while (!signal.aborted) {
-      const occurredAt = nowInstant().epochMilliseconds;
-      const page = await this.deps.projects.findHistoryPage({ afterId: cursor, limit: PAGE_SIZE });
-      const last = page.at(-1);
-      if (!last) break;
-      const projects = page.flatMap((entry) => (entry.kind === "whole" ? [entry.project] : []));
-      const orphanIds = page.flatMap((entry) => (entry.kind === "orphan" ? [entry.id] : []));
-      const owners = projects.filter(hasPersonalOwner);
-      const firstMessages = projects.filter((project) => project.firstMessage);
-      if (!dryRun) await this.#sendPage({ owners, firstMessages, occurredAt });
-      this.#warnSkipped(orphanIds);
-      report = {
-        ownerFactsToSend: report.ownerFactsToSend + owners.length,
-        firstMessageFactsToSend: report.firstMessageFactsToSend + firstMessages.length,
-        skippedOrphans: report.skippedOrphans + orphanIds.length,
-        orphanProjectIds: [...report.orphanProjectIds, ...orphanIds].slice(0, ORPHAN_IDS_REPORTED),
-      };
-      cursor = last.kind === "whole" ? last.project.id : last.id;
-      if (!dryRun) await onPageDone({ afterProjectId: cursor, ...report });
-    }
+    await this.#table.walk({
+      stepName: "the project history listing",
+      afterProjectId,
+      orphans: report,
+      signal,
+      onPage: async ({ projects, orphans, afterProjectId: cursor, occurredAt }) => {
+        const owners = projects.filter(hasPersonalOwner);
+        const firstMessages = projects.filter((project) => project.firstMessage);
+        if (!dryRun) await this.#sendPage({ owners, firstMessages, occurredAt });
+        report = {
+          ownerFactsToSend: report.ownerFactsToSend + owners.length,
+          firstMessageFactsToSend: report.firstMessageFactsToSend + firstMessages.length,
+          ...orphans,
+        };
+        if (!dryRun) await onPageDone({ afterProjectId: cursor, ...report });
+      },
+    });
     return report;
   }
 
@@ -145,8 +139,8 @@ export class ProjectHistoryListingService {
     firstMessages,
     occurredAt,
   }: {
-    owners: readonly (ProjectHistoryRow & { ownerUserId: string })[];
-    firstMessages: readonly ProjectHistoryRow[];
+    owners: readonly (ProjectBackfillRow & { ownerUserId: string })[];
+    firstMessages: readonly ProjectBackfillRow[];
     occurredAt: number;
   }): Promise<void> {
     const senders = this.#senders;
@@ -170,15 +164,6 @@ export class ProjectHistoryListingService {
           organizationId: project.organizationId,
           occurredAt,
         })),
-      );
-    }
-  }
-
-  #warnSkipped(orphanIds: readonly string[]): void {
-    for (const projectId of orphanIds) {
-      this.deps.logger.warn(
-        { projectId },
-        "the project history listing skipped a project whose team or organization no longer exists",
       );
     }
   }

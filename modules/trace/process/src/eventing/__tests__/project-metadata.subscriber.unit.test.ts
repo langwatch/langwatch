@@ -139,6 +139,9 @@ function createMockProjectService() {
       organizationId: "org-1",
       firstMessage: false,
     }),
+    findOrganizationId: vi.fn<(projectId: string) => Promise<string | undefined>>(
+      async () => "org-1",
+    ),
     repo: {} as any,
   };
 }
@@ -196,13 +199,14 @@ describe("createProjectMetadataHandler()", () => {
       });
     });
 
-    /** @scenario The project metadata subscriber names three capabilities, not a service */
-    it("runs over a project read, a metadata write and an org-admin lookup alone", async () => {
+    /** @scenario The project metadata subscriber names four capabilities, not a service */
+    it("runs over a project read, a metadata write, an org-admin and an organization lookup alone", async () => {
       const subscriber = createProjectMetadataHandler({
         projects: {
           findById: (id) => mockProjects.findById(id),
           updateMetadata: (input) => mockProjects.updateMetadata(input),
           resolveOrgAdmin: (id) => mockProjects.resolveOrgAdmin(id),
+          findOrganizationId: (id) => mockProjects.findOrganizationId(id),
         },
         milestones: milestonesOver(mockRecordSignal),
       });
@@ -354,6 +358,7 @@ describe("createProjectMetadataHandler()", () => {
         organizationId: "org-without-admin",
         firstMessage: false,
       });
+      mockProjects.findOrganizationId.mockResolvedValue("org-without-admin");
       const subscriber = createProjectMetadataHandler(deps);
 
       await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
@@ -373,6 +378,7 @@ describe("createProjectMetadataHandler()", () => {
         organizationId: null,
         firstMessage: false,
       });
+      mockProjects.findOrganizationId.mockResolvedValue(undefined);
       const subscriber = createProjectMetadataHandler(deps);
 
       await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
@@ -380,6 +386,32 @@ describe("createProjectMetadataHandler()", () => {
       expect(projectTraced()).toEqual([
         expect.objectContaining({ projectId: tenantId, organizationId: null }),
       ]);
+    });
+
+    /** @scenario "A failed organization lookup records no project traced fact" */
+    it("records nothing as traced when the organization lookup fails", async () => {
+      // resolveOrgAdmin swallows the same failure as "no organization"; that must not be recorded.
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: null,
+        organizationId: null,
+        firstMessage: false,
+      });
+      mockProjects.findOrganizationId.mockRejectedValue(new Error("database unavailable"));
+      const subscriber = createProjectMetadataHandler(deps);
+
+      await expect(
+        subscriber(createEvent(tenantId), createContext(tenantId, createFoldState())),
+      ).resolves.toBeUndefined();
+
+      expect(projectTraced()).toEqual([]);
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
+        id: tenantId,
+        data: expect.objectContaining({ firstMessage: true }),
+      });
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId }),
+        expect.stringContaining("traced"),
+      );
     });
 
     /** @scenario "A failed traced record still records the first trace" */

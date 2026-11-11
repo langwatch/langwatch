@@ -43,7 +43,6 @@ import { isLegacyKeyRevoked } from "../../rules/legacy-project-key.rules.ts";
 import type {
   LiveLegacyKey,
   ProjectBackfillEntry,
-  ProjectHistoryEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
@@ -269,32 +268,6 @@ export class MemoryProjectRepository implements ProjectRepository {
           presenceEnabled: project.presenceEnabled,
           isArchived: project.archivedAt !== null,
           adminUserId: organization.adminUserIds[0] ?? null,
-        },
-      };
-    });
-  }
-
-  async findHistoryPage({
-    afterId,
-    limit,
-  }: {
-    afterId: string | null;
-    limit: number;
-  }): Promise<ProjectHistoryEntry[]> {
-    const page = this.#database
-      .projects()
-      .filter((project) => afterId === null || project.id > afterId)
-      .toSorted((left, right) => (left.id < right.id ? -1 : 1))
-      .slice(0, limit);
-    return page.map((project): ProjectHistoryEntry => {
-      const organization = this.#database.findOrganizationOf(project);
-      if (!organization) return { kind: "orphan", id: project.id };
-      return {
-        kind: "whole",
-        project: {
-          id: project.id,
-          organizationId: organization.id,
-          isPersonal: project.isPersonal,
           ownerUserId: project.ownerUserId,
           firstMessage: project.firstMessage,
         },

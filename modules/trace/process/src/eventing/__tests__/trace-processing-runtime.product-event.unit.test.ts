@@ -84,6 +84,7 @@ function compose() {
           onboardingVariant: null,
           organizationCreatedAt: null,
         }),
+        findOrganizationId: async () => "org-1",
       }),
     }),
     repositories: MemoryTraceRepositories.create(),

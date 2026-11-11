@@ -56,7 +56,10 @@ export interface ProjectWithOrgAdmin {
   organizationCreatedAt: Instant | null;
 }
 
-/** One stored project as the project facts step reads it, with its organization's oldest admin. */
+/**
+ * One stored project as the project data steps read it (the facts step and the history listing),
+ * with its organization's oldest admin.
+ */
 export type ProjectBackfillRow = Readonly<{
   id: string;
   createdAt: Instant;
@@ -67,28 +70,17 @@ export type ProjectBackfillRow = Readonly<{
   presenceEnabled: boolean;
   isArchived: boolean;
   adminUserId: string | null;
-}>;
-
-/**
- * One row of the projects table for the facts step: a whole project, or an orphan whose team or
- * organization is gone, so nothing can be recorded for it.
- */
-export type ProjectBackfillEntry =
-  | Readonly<{ kind: "whole"; project: ProjectBackfillRow }>
-  | Readonly<{ kind: "orphan"; id: string }>;
-
-/** One stored project as the history listing step reads it: its owner and first message. */
-export type ProjectHistoryRow = Readonly<{
-  id: string;
-  organizationId: string;
-  isPersonal: boolean;
+  /** A personal project's owner; null for a shared project. */
   ownerUserId: string | null;
   firstMessage: boolean;
 }>;
 
-/** One row of the projects table for the history listing: whole, or an orphan it skips. */
-export type ProjectHistoryEntry =
-  | Readonly<{ kind: "whole"; project: ProjectHistoryRow }>
+/**
+ * One row of the projects table for the data steps: a whole project, or an orphan whose team or
+ * organization is gone, so nothing can be recorded for it.
+ */
+export type ProjectBackfillEntry =
+  | Readonly<{ kind: "whole"; project: ProjectBackfillRow }>
   | Readonly<{ kind: "orphan"; id: string }>;
 
 /** Persistence owned by the Project module. It never crosses into a caller. */
@@ -134,8 +126,6 @@ export interface ProjectRepository {
     afterId: string | null;
     limit: number;
   }): Promise<ProjectBackfillEntry[]>;
-  /** Every project, archived ones included, in id order after `afterId`; empty at the end. */
-  findHistoryPage(input: { afterId: string | null; limit: number }): Promise<ProjectHistoryEntry[]>;
   findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null>;
   searchByQuery(input: {
     query: string;

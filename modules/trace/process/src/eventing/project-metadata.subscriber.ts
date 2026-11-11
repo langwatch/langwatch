@@ -19,7 +19,7 @@ import {
 
 import type { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
 
-/** The three things the projectMetadata subscriber does to a project. Narrowed
+/** The four things the projectMetadata subscriber does to a project. Narrowed
  * from the full ProjectApi so background processes can compose just this. */
 interface TraceProjectMetadata {
   findById(id: string): Promise<Project | null>;
@@ -29,6 +29,11 @@ interface TraceProjectMetadata {
    * identifies the same person with in the browser.
    */
   resolveOrgAdmin(projectId: string): Promise<OrgAdminResolution>;
+  /**
+   * The project's organization, undefined when it has none. Unlike
+   * `resolveOrgAdmin`, a failed read throws instead of answering "none".
+   */
+  findOrganizationId(projectId: string): Promise<string | undefined>;
 }
 
 const logger = createLogger("langwatch:trace-processing:project-metadata");
@@ -41,7 +46,7 @@ export const PROJECT_METADATA_WINDOW_MS = 3_000;
 
 export interface ProjectMetadataSubscriberDeps {
   /**
-   * Narrowed from the whole `ProjectApi` to the three capabilities this
+   * Narrowed from the whole `ProjectApi` to the four capabilities this
    * subscriber uses. The published service satisfies the port structurally, so
    * every existing caller passes what it already passed.
    */
@@ -90,23 +95,26 @@ async function trackFirstTraceIntegrated({
   }
 }
 
-/** The project's first real trace with its organization, admin or not; non-fatal. */
+/**
+ * The project's first real trace with its organization, admin or not; non-fatal. A failed
+ * organization read records nothing: the fact is keyed per project, so a null would stand for
+ * good, and a redelivery finds the first message set and never comes back here.
+ */
 async function trackProjectTraced({
   deps,
   source,
   tenantId,
-  organizationId,
 }: {
   deps: ProjectMetadataSubscriberDeps;
   source: FirstTraceSource;
   tenantId: string;
-  organizationId: string | null;
 }): Promise<void> {
   try {
+    const organizationId = await deps.projects.findOrganizationId(tenantId);
     await deps.milestones.recordProjectTraced({
       tenantId,
       projectId: tenantId,
-      organizationId,
+      organizationId: organizationId ?? null,
       occurredAt: source.occurredAt,
     });
   } catch (error) {
@@ -219,8 +227,8 @@ async function markFirstMessage({
   // Fired after the metadata write commits, so a failed write retries
   // the event on the project's next trace instead of dropping it.
   if (!project.firstMessage) {
+    await trackProjectTraced({ deps, source, tenantId });
     const admin = await deps.projects.resolveOrgAdmin(tenantId);
-    await trackProjectTraced({ deps, source, tenantId, organizationId: admin.organizationId });
     await trackFirstTraceIntegrated({ deps, source, tenantId, attrs, admin });
   }
 }

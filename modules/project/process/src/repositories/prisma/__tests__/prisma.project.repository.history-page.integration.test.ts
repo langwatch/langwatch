@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * The history listing's page reads archived projects too, with their owner and first message.
+ * The page both project data steps read carries archived projects too, with their owner and
+ * first message, which the history listing sends.
  * Spec: modules/project/specs/project-history-listing.feature
  */
 import {
@@ -77,9 +78,24 @@ describe.skipIf(!DB_URL)("PrismaProjectRepository history page over Postgres", (
      * @scenario "The project history listing sends each project that received its first message"
      */
     it("returns archived personal and archived flagged projects with their owner and first message", async () => {
-      const page = await repository.findHistoryPage({ afterId: `${ns}-`, limit: 4 });
+      const page = await repository.findBackfillPage({ afterId: `${ns}-`, limit: 4 });
 
-      expect(page).toEqual([
+      expect(
+        page.map((entry) =>
+          entry.kind === "whole"
+            ? {
+                kind: entry.kind,
+                project: {
+                  id: entry.project.id,
+                  organizationId: entry.project.organizationId,
+                  isPersonal: entry.project.isPersonal,
+                  ownerUserId: entry.project.ownerUserId,
+                  firstMessage: entry.project.firstMessage,
+                },
+              }
+            : entry,
+        ),
+      ).toEqual([
         {
           kind: "whole",
           project: {

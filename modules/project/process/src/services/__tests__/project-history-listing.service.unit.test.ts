@@ -3,6 +3,7 @@
  * Spec: modules/project/specs/project-history-listing.feature
  */
 import { createTestLogger } from "@langwatch/test-harness";
+import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -10,8 +11,8 @@ import type {
   RecordProjectPersonalOwnerListedCommandData,
 } from "../../eventing/project-lifecycle.events.ts";
 import type {
-  ProjectHistoryEntry,
-  ProjectHistoryRow,
+  ProjectBackfillEntry,
+  ProjectBackfillRow,
 } from "../../repositories/project.repository.ts";
 import {
   ProjectHistoryListingService,
@@ -19,10 +20,16 @@ import {
   type ProjectHistoryListingReport,
 } from "../project-history-listing.service.ts";
 
-function row(input: Partial<ProjectHistoryRow> & { id: string }): ProjectHistoryRow {
+function row(input: Partial<ProjectBackfillRow> & { id: string }): ProjectBackfillRow {
   return {
+    createdAt: fromDate(new Date("2025-01-01T00:00:00.000Z")),
     organizationId: "org-1",
+    teamId: "team-1",
     isPersonal: false,
+    departmentId: null,
+    presenceEnabled: true,
+    isArchived: false,
+    adminUserId: "admin-1",
     ownerUserId: null,
     firstMessage: false,
     ...input,
@@ -30,14 +37,14 @@ function row(input: Partial<ProjectHistoryRow> & { id: string }): ProjectHistory
 }
 
 /**
- * P1 personal, P2 personal and archived (the page names no archive: archived rows are listed
- * alike), P3 personal with no owner, F1 and F2 flagged and shared, S1 shared and unflagged.
+ * P1 personal, P2 personal and archived (archived rows are listed alike), P3 personal with no
+ * owner, F1 and F2 flagged and shared, S1 shared and unflagged.
  */
-const PROJECTS: readonly ProjectHistoryRow[] = [
+const PROJECTS: readonly ProjectBackfillRow[] = [
   row({ id: "f1", firstMessage: true }),
   row({ id: "f2", organizationId: "org-2", firstMessage: true }),
   row({ id: "p1", isPersonal: true, ownerUserId: "user-1" }),
-  row({ id: "p2", isPersonal: true, ownerUserId: "user-2", firstMessage: true }),
+  row({ id: "p2", isPersonal: true, ownerUserId: "user-2", firstMessage: true, isArchived: true }),
   row({ id: "p3", isPersonal: true }),
   row({ id: "s1" }),
 ];
@@ -55,7 +62,7 @@ type Sent =
 
 /** The step over a projects table served three rows a page, recording each batch it sends. */
 function listingOver(
-  projects: readonly ProjectHistoryRow[] = PROJECTS,
+  projects: readonly ProjectBackfillRow[] = PROJECTS,
   orphanIds: readonly string[] = [],
   /** Throws instead of saving the nth page's checkpoint, as a worker dying after the send does. */
   crashBeforeSavingPage?: number,
@@ -65,10 +72,10 @@ function listingOver(
   const { logger, lines } = createTestLogger();
   const service = ProjectHistoryListingService.create({
     projects: {
-      findHistoryPage: async ({ afterId }) => {
+      findBackfillPage: async ({ afterId }) => {
         const ids = [...projects.map((project) => project.id), ...orphanIds].toSorted();
         const page = ids.filter((id) => afterId === null || id > afterId).slice(0, 3);
-        return page.map((id): ProjectHistoryEntry => {
+        return page.map((id): ProjectBackfillEntry => {
           const project = projects.find((candidate) => candidate.id === id);
           return project ? { kind: "whole", project } : { kind: "orphan", id };
         });

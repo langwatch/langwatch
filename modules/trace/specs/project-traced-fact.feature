@@ -26,6 +26,14 @@ Feature: Trace records that a project was traced, admin or not
     Then the project traced fact names no organization
 
   @unit
+  Scenario: A failed organization lookup records no project traced fact
+    Given reading the project's organization fails
+    When its first real trace is processed
+    Then no project traced fact is recorded, not even one naming no organization
+    And the project is still marked as having received its first message
+    And one error naming the project is logged
+
+  @unit
   Scenario: A redelivered first trace records the project as traced once
     Given a project's first real trace was handled
     When the same trace is delivered again
