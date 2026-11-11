@@ -233,7 +233,7 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     Given Instant Evals are not enabled for the project
     When a statement calling eval is validated
     Then it is refused with APP_FUNCTION_GATED
-    And the message says the feature is not open to this project
+    And the message says to run the query from one project and to switch Instant Evals on for the organization
 
   @unit
   Scenario: An eval function is refused when the deployment has no classifier
