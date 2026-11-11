@@ -20669,6 +20669,62 @@
       ]
     },
     {
+      "name": "NurturingOrganizationMember",
+      "tableName": "NurturingOrganizationMember",
+      "documentation": "Nurturing's own copy of each organization's members, from the owners' member facts (§9):\norganization's signed_up and invite_accepted and auth's sso_auto_added join, member_removed\nand member_disabled leave, member_enabled returns. Each column keeps its latest time.",
+      "primaryKey": [
+        "organizationId",
+        "userId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "joinedAt",
+          "columnName": "joinedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "leftAt",
+          "columnName": "leftAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "returnedAt",
+          "columnName": "returnedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "NurturingOrganizationCreated",
       "tableName": "NurturingOrganizationCreated",
       "documentation": "When an organization was created, from organization's created event: nurturing's own copy for\nthe per-email usage's day offsets. Its own table, so an early creation never adds an unseeded\nNurturingOrganization row.",

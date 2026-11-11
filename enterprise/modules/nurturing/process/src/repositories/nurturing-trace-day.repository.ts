@@ -11,10 +11,12 @@ export interface NurturingTraceDayReadRepository {
     input: Readonly<{ projectIds: readonly string[]; afterDay: string }>,
   ): Promise<NurturingTraceDay[]>;
   /**
-   * Drops the projects' days before `beforeDay`, and every project's counted traces before it:
-   * no read reaches them, and no trace that old is re-stored or redelivered.
+   * Drops the projects' days and counted traces before `beforeDay`: no read reaches them, and no
+   * trace that old is re-stored or redelivered.
    */
   pruneBefore(input: Readonly<{ projectIds: readonly string[]; beforeDay: string }>): Promise<void>;
+  /** Drops every day and counted trace of the projects: past their window nothing reads them. */
+  pruneProjects(input: Readonly<{ projectIds: readonly string[] }>): Promise<void>;
 }
 
 /** Nurturing's per-project, per-day trace counts: the increment, and the read. */

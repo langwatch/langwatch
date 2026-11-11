@@ -6,6 +6,7 @@ import type {
   NurturingTraceMilestonesRepository,
 } from "./nurturing-milestones.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "./nurturing-organization-created.repository.ts";
+import type { NurturingOrganizationMemberRepository } from "./nurturing-organization-member.repository.ts";
 import type { NurturingProjectDirectoryRepository } from "./nurturing-project-directory.repository.ts";
 import type { NurturingProjectPlacementRepository } from "./nurturing-project-placement.repository.ts";
 import type { NurturingProjectUsageRepository } from "./nurturing-project-usage.repository.ts";
@@ -21,6 +22,8 @@ export interface NurturingRepositories {
   readonly placements: NurturingProjectPlacementRepository;
   /** Nurturing's own copy of each organization's creation, from organization's created event. */
   readonly organizationsCreated: NurturingOrganizationCreatedRepository;
+  /** Nurturing's own copy of each organization's members, from the owners' member facts. */
+  readonly members: NurturingOrganizationMemberRepository;
   /** Nurturing's own per-project usage: the peer folds' rows. */
   readonly projectUsage: NurturingProjectUsageRepository;
   /** Nurturing's own trace counts per project and day: the trace-day fold's rows. */

@@ -17,11 +17,13 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   traffic alone. An hourly sweep (a scheduled process, since an organization that stopped tracing
   syncs no more) sends each organization's trace traits once as null when its window ends, so
   Customer.io removes them and a rolling trait never says "active" for ever; later syncs leave
-  them out. Nurturing's copies of placement and organization creation are written by their own
-  subscribers, so a new project's first traces can arrive before them: the owners' rows then tell
-  whether the organization is in its window, and if so the batch fails and the queue retries
-  until the copies land; past the window, or a project the owners do not hold, it is dropped. Rows are kept
-  30 days. No span body reaches nurturing, and the rows are not rebuilt by a projection replay.
+  them out, and its trace rows are dropped. Nurturing's placement copy is written by its own
+  subscriber, so a new project's first traces can arrive before it: while a trace is younger
+  than two hours (inside the queue's retry budget of about 2.5 hours) the batch fails and the
+  queue retries until the copy lands; an older one is dropped. A placed project whose
+  organization has no creation copy belongs to an organization created before the copy existed:
+  its traces are dropped at once, as such organizations get no trace traits. Nothing else is read.
+  Rows are kept 30 days. No span body reaches nurturing, and the rows are not rebuilt by a projection replay.
   Nurturing reads no trace data: trace counts start at the count's deploy, and no cost is sent (a
   span carries no price). When a project's usage changes, or its organization traced (throttled
   to once per 15 minutes), nurturing places it in its organization from its own copy, written
@@ -29,8 +31,12 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   Customer.io as one group call on the admin. The onboarding emails are person-triggered and read
   person attributes, so the same sync then identifies each member with the same traits, unless
   the member has joined another organization since: a member's traits are those of the
-  organization they joined last (organization's mostRecentOrganizationIdForMember).
-  Members are read at need, never stored. A failed identify is reported and swallowed, as the
+  organization they joined last. Members come from nurturing's own copy (NurturingOrganizationMember),
+  written from the owners' member facts: a join by organization's lw.organization.signed_up or
+  lw.organization.invite_accepted or auth's lw.auth.sso_auto_added, a leave by
+  lw.organization.member_removed or member_disabled, a return by member_enabled. Each keeps its
+  latest time, so a redelivery or a late fact changes nothing; "joined last" is the latest join
+  time in the copy. A member who joined before the copy existed is not in it. A failed identify is reported and swallowed, as the
   other sinks' failures are; the group call stands. A project's first trace syncs as later ones do. The
   signup day comes from its own copy of
   lw.organization.created. It reads no other module's table, and keeps no copy for projects or
@@ -165,15 +171,22 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     When the hourly sweep runs, on time or late
     Then its trace traits go once as null on the organization and on each member it is the latest of
     And no other trait is sent with them
+    And its projects' trace days and counted traces are deleted
     And a refused call fails the sweep, so it is retried
 
   @unit
   Scenario: A new project's first trace waits for nurturing's copies
-    Given a project its owners hold, in an organization inside its window, before nurturing's copies landed
-    When its first trace is counted
-    Then the batch fails after counting the rest, and the queue retries it until the copies land
-    And it then counts the trace once
-    And a trace of an uncopied project past its window, or one its owners do not hold, is dropped
+    Given a trace of a project whose placement nurturing has not copied yet
+    When the trace is counted less than two hours after it was appended
+    Then the batch fails after counting the rest, and the queue retries it
+    And once the copies land the trace counts once
+    And when they never land, the trace is dropped without failing once it is two hours old
+
+  @unit
+  Scenario: A trace of an organization older than nurturing's creation copy is dropped
+    Given a project nurturing placed in an organization it has no creation copy of
+    When a trace of the project is counted, however young
+    Then it is dropped without failing the batch, and no count is written
 
   @unit
   Scenario: Folds keyed across aggregates never re-fold from one aggregate's log
@@ -210,7 +223,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   Scenario: Trace days older than the window are deleted
     Given a project's trace day and counted traces older than the 30-day window
     When its organization syncs
-    Then that day's row is deleted, and every project's counted traces that old
+    Then that day's row and the project's counted traces that old are deleted
 
   @unit
   Scenario: A changed project's old trace days are deleted even without a placement or admin
@@ -262,8 +275,15 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     Then Customer.io receives one group call on the admin with the organization's traits
 
   @unit
+  Scenario: Nurturing keeps its own copy of an organization's members
+    Given the owners' facts of a person joining by signup, invite or single sign-on, leaving by removal or disabling, and returning by enabling
+    When nurturing takes them, in any order and any number of times
+    Then the person is a current member when their latest join or return is after their latest leave
+    And their latest organization is their current membership with the latest join
+
+  @unit
   Scenario: Each member of the organization gets its traits as person attributes
-    Given an organization with two members, each of whom joined it last
+    Given an organization with two members in nurturing's copy, each of whom joined it last
     When a project of the organization changes its usage
     Then after the group call, each member is identified with the organization's traits
 
@@ -276,7 +296,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
 
   @unit
   Scenario: A failed identify is reported and swallowed
-    Given Customer.io refuses the members' identify, or the members cannot be read
+    Given Customer.io refuses the members' identify, or nurturing's member copy cannot be read
     When a project of the organization changes its usage
     Then the failure is reported as a warning and the sync does not fail
     And the group call has already been sent

@@ -6,11 +6,13 @@
  * a batch, while the organization is inside its counting window.
  * Evaluations add a day per project a day. Each change syncs the organization as one Customer.io
  * group call, mirrored onto each member whose latest organization it is (the emails read person
- * attributes), placed by nurturing's own copy of project and organization creation. Without a
+ * attributes; members from nurturing's own copy of the owners' member facts), placed by
+ * nurturing's own copy of project and organization creation. It reads no other module. Without a
  * Customer.io channel nothing reads these rows, so nothing here is registered. Why event
  * driven: https://github.com/langwatch/tasks/issues/1131.
  * Spec: enterprise/modules/nurturing/specs/project-usage.feature
  */
+import { SSO_AUTO_ADDED_EVENT_TYPE, ssoAutoAddedEventDataSchema } from "@langwatch/auth-contract";
 import {
   EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
   evaluationLifecycleCompletedEventDataSchema,
@@ -33,11 +35,22 @@ import {
   type PeerFoldSubscriberSpec,
   type PeerSubscriberContext,
   type PeerSubscriberDefinition,
+  type ParsingSchema,
   throttledWindow,
 } from "@langwatch/eventing";
 import {
+  INVITE_ACCEPTED_EVENT_TYPE,
+  inviteAcceptedEventDataSchema,
   ORGANIZATION_CREATED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+  ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   organizationCreatedEventDataSchema,
+  organizationMemberDisabledEventDataSchema,
+  organizationMemberEnabledEventDataSchema,
+  organizationMemberRemovedEventDataSchema,
+  organizationSignedUpEventDataSchema,
 } from "@langwatch/organization-contract";
 import {
   PROJECT_CREATED_EVENT_TYPE,
@@ -59,6 +72,7 @@ import {
   simulationRunFinishedEventDataSchema,
   simulationSetCreatedEventDataSchema,
 } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   firstTraceRecordedEventDataSchema,
@@ -75,7 +89,7 @@ import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
-import type { NurturingProjectDirectoryRepository } from "../repositories/nurturing-project-directory.repository.ts";
+import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import type { NurturingProjectPlacementRepository } from "../repositories/nurturing-project-placement.repository.ts";
 import {
   NURTURING_PROJECT_USAGE_PROJECTION_VERSION,
@@ -84,6 +98,7 @@ import {
 } from "../repositories/nurturing-project-usage.repository.ts";
 import type { NurturingTraceDayRepository } from "../repositories/nurturing-trace-day.repository.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
+import type { NurturingMembershipChange } from "../rules/nurturing-organization-member.rules.ts";
 import {
   emptyProjectUsage,
   foldProjectUsage,
@@ -307,47 +322,51 @@ export function countedTraceOf({
   };
 }
 
+/**
+ * How long a trace whose project nurturing has not copied yet is retried before it is dropped:
+ * inside group-queue's retry budget (25 attempts, backoff doubling from 0.5 s to a 10-minute cap,
+ * about 2.5 hours; packages/group-queue/src/groupQueue.ts JOB_RETRY_CONFIG), so a copy that never
+ * lands drops the trace instead of dead-lettering the batch.
+ */
+export const UNCOPIED_TRACE_RETRY_MS = 2 * 60 * 60_000;
+
 /** What the trace and failure counts read to keep only organizations in their window. */
 export type NurturingTraceCountingDeps = Readonly<{
   traceDays: NurturingTraceDayRepository;
   placements: Pick<NurturingProjectPlacementRepository, "getPlacement">;
   organizationsCreated: Pick<NurturingOrganizationCreatedRepository, "findOrganizationCreatedAt">;
-  /** The owners' rows, asked only when nurturing's copy has not landed. */
-  directory: Pick<NurturingProjectDirectoryRepository, "getPlacement" | "getOrganizationCreatedAt">;
+  now: () => number;
 }>;
 
-/** A project's organization creation, from nurturing's copies or, if one lags, its owners'. */
-type ProjectOrganizationCreation =
-  | Readonly<{ outcome: "copied"; organizationCreatedAt: number }>
-  | Readonly<{ outcome: "notCopied"; organizationCreatedAt: number | null }>;
+/**
+ * A project as nurturing's own copies place it: unplaced until lw.project.created's copy lands;
+ * placed with no creation time when its organization predates nurturing's creation copy.
+ */
+type CopiedProject =
+  | Readonly<{ outcome: "unplaced" }>
+  | Readonly<{ outcome: "placed"; organizationCreatedAt: number | null }>;
 
-async function projectOrganizationCreationOf({
+async function copiedProjectOf({
   projectId,
   placements,
   organizationsCreated,
-  directory,
 }: Readonly<{ projectId: string }> &
-  Omit<NurturingTraceCountingDeps, "traceDays">): Promise<ProjectOrganizationCreation> {
+  Pick<NurturingTraceCountingDeps, "placements" | "organizationsCreated">): Promise<CopiedProject> {
   const placement = await placements.getPlacement({ projectId });
-  if (placement.outcome === "known") {
-    const { organizationCreatedAt } = await organizationsCreated.findOrganizationCreatedAt({
-      organizationId: placement.organizationId,
-    });
-    if (organizationCreatedAt !== null) return { outcome: "copied", organizationCreatedAt };
-  }
-  const owned = await directory.getPlacement({ projectId });
-  if (owned.outcome !== "known") return { outcome: "notCopied", organizationCreatedAt: null };
-  const { organizationCreatedAt } = await directory.getOrganizationCreatedAt({
-    organizationId: owned.organizationId,
+  if (placement.outcome !== "known") return { outcome: "unplaced" };
+  const { organizationCreatedAt } = await organizationsCreated.findOrganizationCreatedAt({
+    organizationId: placement.organizationId,
   });
-  return { outcome: "notCopied", organizationCreatedAt };
+  return { outcome: "placed", organizationCreatedAt };
 }
 
 /**
  * Counts the batch's traces whose organization is inside its counting window, each once,
- * durably (the repository's per-trace rows). Past the window nothing reads the counts. Copies
- * are written by their own subscribers, so a new project's first traces can come first: then the
- * batch throws after counting the rest, and the queue retries until the copy lands.
+ * durably (the repository's per-trace rows). The placement copy is written by its own
+ * subscriber, so a new project's first traces can come first: a trace younger than
+ * `UNCOPIED_TRACE_RETRY_MS` then fails the batch after the rest are counted, and the queue
+ * retries; an older one is dropped. A placed project whose organization has no creation copy
+ * predates the copy, so its traces are dropped at once: nothing sends its trace traits.
  */
 async function countInWindow({
   traces,
@@ -355,31 +374,37 @@ async function countInWindow({
 }: Readonly<{ traces: readonly NurturingCountedTrace[] }> &
   NurturingTraceCountingDeps): Promise<void> {
   if (traces.length === 0) return;
-  const creations = new Map(
+  const projects = new Map(
     await Promise.all(
       [...new Set(traces.map(({ projectId }) => projectId))].map(
-        async (projectId) =>
-          [projectId, await projectOrganizationCreationOf({ projectId, ...deps })] as const,
+        async (projectId) => [projectId, await copiedProjectOf({ projectId, ...deps })] as const,
       ),
     ),
   );
-  const inWindow = (trace: NurturingCountedTrace) =>
-    isTraceCounted({
-      organizationCreatedAt: creations.get(trace.projectId)?.organizationCreatedAt ?? null,
-      at: trace.at,
-    });
-  const copied = (trace: NurturingCountedTrace) =>
-    creations.get(trace.projectId)?.outcome === "copied";
-  await deps.traceDays.countTraces(traces.filter((trace) => copied(trace) && inWindow(trace)));
+  const projectOf = (trace: NurturingCountedTrace) =>
+    projects.get(trace.projectId) ?? { outcome: "unplaced" as const };
+  await deps.traceDays.countTraces(
+    traces.filter((trace) => {
+      const project = projectOf(trace);
+      return (
+        project.outcome === "placed" &&
+        isTraceCounted({ organizationCreatedAt: project.organizationCreatedAt, at: trace.at })
+      );
+    }),
+  );
+  const now = deps.now();
   const waiting = [
     ...new Set(
-      traces.filter((trace) => !copied(trace) && inWindow(trace)).map(({ projectId }) => projectId),
+      traces
+        .filter(
+          (trace) =>
+            projectOf(trace).outcome === "unplaced" && now - trace.at < UNCOPIED_TRACE_RETRY_MS,
+        )
+        .map(({ projectId }) => projectId),
     ),
   ];
   if (waiting.length > 0) {
-    throw new Error(
-      `nurturing's copy of the placement or organization creation of ${waiting.join(", ")} has not landed yet`,
-    );
+    throw new Error(`nurturing's placement copy of ${waiting.join(", ")} has not landed yet`);
   }
 }
 
@@ -545,7 +570,8 @@ export type NurturingUsageSync = Readonly<{
   traceDays: NurturingTraceDayRepository;
   placements: NurturingProjectPlacementRepository;
   organizationsCreated: NurturingOrganizationCreatedRepository;
-  directory: NurturingTraceCountingDeps["directory"];
+  members: NurturingOrganizationMemberRepository;
+  now: () => number;
   usageChanged: UsageChanged;
 }>;
 
@@ -562,8 +588,8 @@ function nurturingProjectUsageHost({
   }).withEvents([]);
   // Without a channel no sync reads these rows, and none prunes the trace days, so none is kept.
   if (!sync) return host;
-  const { traceDays, placements, organizationsCreated, directory, usageChanged } = sync;
-  const counting = { traceDays, placements, organizationsCreated, directory };
+  const { traceDays, placements, organizationsCreated, members, now, usageChanged } = sync;
+  const counting = { traceDays, placements, organizationsCreated, now };
   const subscribers = [organizationUsageSubscriber(usageChanged)];
   const traceSyncs = nurturingTraceUsageSyncSubscribers(usageChanged);
   return (
@@ -596,6 +622,60 @@ function nurturingProjectUsageHost({
         "organizationCreated",
         nurturingOrganizationCreatedSubscriber(organizationsCreated),
       )
+      .withPeerSubscriber(
+        "memberSignedUp",
+        nurturingMembershipSubscriber({
+          eventType: ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+          data: organizationSignedUpEventDataSchema,
+          change: "joined",
+          members,
+        }),
+      )
+      .withPeerSubscriber(
+        "memberInviteAccepted",
+        nurturingMembershipSubscriber({
+          eventType: INVITE_ACCEPTED_EVENT_TYPE,
+          data: inviteAcceptedEventDataSchema,
+          change: "joined",
+          members,
+        }),
+      )
+      .withPeerSubscriber(
+        "memberSsoAutoAdded",
+        nurturingMembershipSubscriber({
+          eventType: SSO_AUTO_ADDED_EVENT_TYPE,
+          data: ssoAutoAddedEventDataSchema,
+          change: "joined",
+          members,
+        }),
+      )
+      .withPeerSubscriber(
+        "memberRemoved",
+        nurturingMembershipSubscriber({
+          eventType: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+          data: organizationMemberRemovedEventDataSchema,
+          change: "left",
+          members,
+        }),
+      )
+      .withPeerSubscriber(
+        "memberDisabled",
+        nurturingMembershipSubscriber({
+          eventType: ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+          data: organizationMemberDisabledEventDataSchema,
+          change: "left",
+          members,
+        }),
+      )
+      .withPeerSubscriber(
+        "memberEnabled",
+        nurturingMembershipSubscriber({
+          eventType: ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
+          data: organizationMemberEnabledEventDataSchema,
+          change: "returned",
+          members,
+        }),
+      )
   );
 }
 
@@ -626,6 +706,32 @@ export function nurturingOrganizationCreatedSubscriber(
   };
 }
 
+/** What every owner member fact carries that nurturing's member copy keeps. */
+type MembershipFact = Readonly<{ organizationId: string; userId: string; occurredAt: number }>;
+
+/**
+ * Nurturing's own copy of a membership, from one owner member fact (§9), parsed by its owner's
+ * schema: a join, a leave or a return, at the fact's time. Idempotent, latest time kept.
+ */
+export function nurturingMembershipSubscriber<Data extends ParsingSchema<MembershipFact>>({
+  eventType,
+  data,
+  change,
+  members,
+}: Readonly<{
+  eventType: string;
+  data: Data;
+  change: NurturingMembershipChange;
+  members: Pick<NurturingOrganizationMemberRepository, "recordMembershipChange">;
+}>): PeerSubscriberDefinition<Data> {
+  return {
+    eventType,
+    data,
+    handle: ({ organizationId, userId, occurredAt }) =>
+      members.recordMembershipChange({ organizationId, userId, change, at: occurredAt }),
+  };
+}
+
 /** The host pipeline as a TYPE, derived from the builder above. */
 export type NurturingProjectUsagePipeline = ReturnType<
   ReturnType<typeof nurturingProjectUsageHost>["build"]
@@ -647,7 +753,8 @@ export const nurturingProjectUsageEventing = defineEventingModule({
             traceDays: repositories.traceDays,
             placements: repositories.placements,
             organizationsCreated: repositories.organizationsCreated,
-            directory: repositories.projects,
+            members: repositories.members,
+            now: () => nowInstant().epochMilliseconds,
             usageChanged: (input) => app.organizationUsageChanged(input),
           }
         : undefined,

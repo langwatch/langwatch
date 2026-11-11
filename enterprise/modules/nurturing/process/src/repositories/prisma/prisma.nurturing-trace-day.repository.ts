@@ -55,6 +55,7 @@ export class PrismaNurturingTraceDayRepository
           ${traces.map(({ day }) => day)}::text[],
           ${traces.map(({ at }) => at)}::double precision[]
         ) AS incoming("projectId", "traceId", "kind", "day", "at")
+        WHERE incoming."projectId" = ANY(${[...new Set(traces.map(({ projectId }) => projectId))]}::text[])
         ON CONFLICT ("projectId", "traceId", "kind") DO NOTHING
         RETURNING "projectId", "kind", "day", "appendedAt"
       )
@@ -97,13 +98,16 @@ export class PrismaNurturingTraceDayRepository
     projectIds,
     beforeDay,
   }: Readonly<{ projectIds: readonly string[]; beforeDay: string }>): Promise<void> {
-    // Every project's: a counted trace of an organization that no longer syncs still goes.
-    await this.#database.nurturingProjectCountedTrace.deleteMany({
-      where: { day: { lt: beforeDay } },
-    });
     if (projectIds.length === 0) return;
-    await this.#database.nurturingProjectTraceDay.deleteMany({
-      where: { projectId: { in: [...projectIds] }, day: { lt: beforeDay } },
-    });
+    const where = { projectId: { in: [...projectIds] }, day: { lt: beforeDay } };
+    await this.#database.nurturingProjectCountedTrace.deleteMany({ where });
+    await this.#database.nurturingProjectTraceDay.deleteMany({ where });
+  }
+
+  async pruneProjects({ projectIds }: Readonly<{ projectIds: readonly string[] }>): Promise<void> {
+    if (projectIds.length === 0) return;
+    const where = { projectId: { in: [...projectIds] } };
+    await this.#database.nurturingProjectCountedTrace.deleteMany({ where });
+    await this.#database.nurturingProjectTraceDay.deleteMany({ where });
   }
 }

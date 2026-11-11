@@ -144,4 +144,25 @@ describe.skipIf(!databaseUrl)("given nurturing's trace-day rows", () => {
       ).resolves.toEqual([]);
     });
   });
+
+  describe("when an organization's window ends", () => {
+    /** @scenario "The trace traits are removed once when an organization's window ends" */
+    it("drops every day and counted trace of its projects, and none of another's", async () => {
+      await repository.countTraces([trace({ projectId: otherProjectId, day: "2026-11-23" })]);
+
+      await repository.pruneProjects({ projectIds: [projectId] });
+
+      await expect(
+        repository.findForProjects({ projectIds: [projectId], afterDay: "2000-01-01" }),
+      ).resolves.toEqual([]);
+      await expect(
+        connection.client.nurturingProjectCountedTrace.count({ where: { projectId } }),
+      ).resolves.toBe(0);
+      const other = await repository.findForProjects({
+        projectIds: [otherProjectId],
+        afterDay: "2000-01-01",
+      });
+      expect(other.length).toBeGreaterThan(0);
+    });
+  });
 });

@@ -5,7 +5,6 @@ import {
   UserNotInOrganizationError,
   type OrganizationTeam,
   type OrganizationTeamPage,
-  type MemberMostRecentOrganization,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaTables } from "@langwatch/prisma-client/ownership";
@@ -249,19 +248,6 @@ export class PrismaTeamRepository extends TeamRepository {
       select: { organizationId: true },
     });
     return memberships.map(({ organizationId }) => organizationId);
-  }
-
-  async mostRecentOrganizationIdForMember(input: {
-    userId: string;
-  }): Promise<MemberMostRecentOrganization> {
-    const newest = await this.database.organizationUser.findFirst({
-      where: { userId: input.userId, disabledAt: null },
-      select: { organizationId: true },
-      orderBy: [{ createdAt: "desc" }, { organizationId: "asc" }],
-    });
-    return newest
-      ? { outcome: "member", organizationId: newest.organizationId }
-      : { outcome: "none" };
   }
 
   async fenceMembershipChange(input: {

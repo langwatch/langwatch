@@ -44,7 +44,6 @@ import {
   OrganizationNotFoundForTeamError,
   type PricingModel,
   type OrganizationCurrency,
-  type MemberMostRecentOrganization,
 } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
@@ -189,13 +188,6 @@ export class OrganizationService {
    *  candidates to filter. */
   organizationIdsForMember(input: { userId: string; activeOnly?: boolean }): Promise<string[]> {
     return this.teams.organizationIdsForMember(input);
-  }
-
-  /** The organization of this person's newest active membership, or null. */
-  mostRecentOrganizationIdForMember(input: {
-    userId: string;
-  }): Promise<MemberMostRecentOrganization> {
-    return this.teams.mostRecentOrganizationIdForMember(input);
   }
 
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]> {

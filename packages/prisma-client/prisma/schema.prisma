@@ -5093,6 +5093,20 @@ model NurturingProject {
   @@index([organizationId])
 }
 
+/// Nurturing's own copy of each organization's members, from the owners' member facts (§9):
+/// organization's signed_up and invite_accepted and auth's sso_auto_added join, member_removed
+/// and member_disabled leave, member_enabled returns. Each column keeps its latest time.
+model NurturingOrganizationMember {
+  organizationId String
+  userId         String
+  joinedAt       DateTime?
+  leftAt         DateTime?
+  returnedAt     DateTime?
+
+  @@id([organizationId, userId])
+  @@index([userId])
+}
+
 /// When an organization was created, from organization's created event: nurturing's own copy for
 /// the per-email usage's day offsets. Its own table, so an early creation never adds an unseeded
 /// NurturingOrganization row.

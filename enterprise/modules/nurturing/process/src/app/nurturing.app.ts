@@ -90,7 +90,7 @@ export class NurturingModule implements NurturingApi {
           placements: repositories.placements,
           organizationsCreated: repositories.organizationsCreated,
           milestones: repositories.milestones,
-          organizations: dependencies.organizations,
+          members: repositories.members,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),
           clock: { nowMs: () => nowInstant().epochMilliseconds },
         })

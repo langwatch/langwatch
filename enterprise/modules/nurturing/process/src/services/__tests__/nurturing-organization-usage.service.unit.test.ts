@@ -5,7 +5,6 @@
  */
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 import { createTenantId } from "@langwatch/eventing";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 const logger = vi.hoisted(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }));
@@ -14,9 +13,11 @@ vi.mock("@langwatch/observability", () => ({ createLogger: () => logger }));
 
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories/memory/memory.nurturing-organization-created.repository.ts";
+import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
+import type { NurturingOrganizationMemberRepository } from "../../repositories/nurturing-organization-member.repository.ts";
 import {
   emptyProjectUsage,
   foldProjectUsage,
@@ -31,36 +32,38 @@ import { NurturingOrganizationUsageService } from "../nurturing-organization-usa
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 10, 20, 12);
 
-/** Each member's organizations, most recently joined first, as organization answers them. */
+/** Each member's organizations, most recently joined first. */
 type Memberships = ReadonlyMap<string, readonly string[]>;
 
-/** The organization's members and their organizations, as the organization module reads them. */
-function organizationsOver(
-  memberships: Memberships,
-): Pick<OrganizationApi, "getAllMembers" | "mostRecentOrganizationIdForMember"> {
-  return {
-    getAllMembers: async ({ organizationId }) =>
-      [...memberships]
-        .filter(([, organizationIds]) => organizationIds.includes(organizationId))
-        .map(([id]) => ({ id })) as never,
-    mostRecentOrganizationIdForMember: async ({ userId }) => {
-      const [organizationId] = memberships.get(userId) ?? [];
-      return organizationId ? { outcome: "member", organizationId } : { outcome: "none" };
-    },
-  };
+/** Nurturing's member copy as the owners' join facts left it: newest join first per member. */
+async function membersOver(memberships: Memberships): Promise<MembersCopy> {
+  const members = MemoryNurturingOrganizationMemberRepository.create();
+  for (const [userId, organizationIds] of memberships) {
+    for (const [order, organizationId] of organizationIds.entries()) {
+      await members.recordMembershipChange({
+        organizationId,
+        userId,
+        change: "joined",
+        at: NOW - (order + 1) * DAY_MS,
+      });
+    }
+  }
+  return members;
 }
+
+type MembersCopy = Pick<NurturingOrganizationMemberRepository, "findMembershipsOfMembers">;
 
 async function serviceOver({
   placed,
   // Inside its trace counting window, so its trace traits are sent.
   createdAt = new Map([["org-1", NOW - DAY_MS]]),
   send = async () => {},
-  organizations = organizationsOver(new Map()),
+  members = MemoryNurturingOrganizationMemberRepository.create(),
 }: {
   placed: ReadonlyMap<string, string>;
   createdAt?: ReadonlyMap<string, number>;
   send?: (calls: CioBatchCall[]) => Promise<void>;
-  organizations?: Pick<OrganizationApi, "getAllMembers" | "mostRecentOrganizationIdForMember">;
+  members?: MembersCopy;
 }) {
   const projectUsage = MemoryNurturingProjectUsageRepository.create();
   const traceDays = MemoryNurturingTraceDayRepository.create();
@@ -77,7 +80,7 @@ async function serviceOver({
     placements: MemoryNurturingProjectPlacementRepository.create({ placed }),
     organizationsCreated: MemoryNurturingOrganizationCreatedRepository.create({ createdAt }),
     milestones,
-    organizations,
+    members,
     sendBatch: async (calls) => {
       await send(calls);
       sent.push(calls);
@@ -300,7 +303,7 @@ describe("NurturingOrganizationUsageService", () => {
     it("identifies each member with the organization's traits after the group call", async () => {
       const { service, projectUsage, sent } = await serviceOver({
         placed,
-        organizations: organizationsOver(
+        members: await membersOver(
           new Map([
             ["admin-1", ["org-1", "org-0"]],
             ["member-2", ["org-1"]],
@@ -326,7 +329,7 @@ describe("NurturingOrganizationUsageService", () => {
     it("leaves out a member whose most recently joined organization is another", async () => {
       const { service, sent } = await serviceOver({
         placed,
-        organizations: organizationsOver(
+        members: await membersOver(
           new Map([
             ["admin-1", ["org-1"]],
             ["member-2", ["org-2", "org-1"]],
@@ -344,7 +347,7 @@ describe("NurturingOrganizationUsageService", () => {
       logger.warn.mockClear();
       const { service, sent } = await serviceOver({
         placed,
-        organizations: organizationsOver(new Map([["admin-1", ["org-1"]]])),
+        members: await membersOver(new Map([["admin-1", ["org-1"]]])),
         send: async (calls) => {
           if (calls.some((call) => call.type === "identify")) throw new Error("refused");
         },
@@ -364,9 +367,8 @@ describe("NurturingOrganizationUsageService", () => {
       logger.warn.mockClear();
       const { service, sent } = await serviceOver({
         placed,
-        organizations: {
-          ...organizationsOver(new Map()),
-          getAllMembers: () => Promise.reject(new Error("organization unavailable")),
+        members: {
+          findMembershipsOfMembers: () => Promise.reject(new Error("member copy unavailable")),
         },
       });
 
@@ -402,7 +404,7 @@ describe("NurturingOrganizationUsageService", () => {
           ["org-1", ended],
           ["org-later", ended + 1],
         ]),
-        organizations: organizationsOver(new Map([["member-2", ["org-1"]]])),
+        members: await membersOver(new Map([["member-2", ["org-1"]]])),
       });
 
       await service.traceWindowsEnded({ after: NOW - 60 * 60 * 1000, upTo: NOW });
@@ -426,6 +428,21 @@ describe("NurturingOrganizationUsageService", () => {
         { type: "identify", userId: "member-2", traits: traitsOf(group?.[0]) },
       ]);
       expect(sent).toHaveLength(2);
+    });
+
+    /** @scenario "The trace traits are removed once when an organization's window ends" */
+    it("drops the organization's trace days and counted traces", async () => {
+      const { service, traceDays } = await serviceOver({
+        placed: new Map([["project-1", "org-1"]]),
+        createdAt: new Map([["org-1", ended]]),
+      });
+      await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-19" });
+
+      await service.traceWindowsEnded({ after: NOW - 60 * 60 * 1000, upTo: NOW });
+
+      await expect(
+        traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" }),
+      ).resolves.toEqual([]);
     });
 
     it("throws when Customer.io refused, so the sweep retries", async () => {

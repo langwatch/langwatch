@@ -4,13 +4,14 @@ import type {
   CioOrganizationUsageTraits,
 } from "@langwatch/enterprise-nurturing-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { NurturingMilestonesRepository } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingOrganizationCreatedRepository } from "../repositories/nurturing-organization-created.repository.ts";
+import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import type { NurturingProjectPlacementRepository } from "../repositories/nurturing-project-placement.repository.ts";
 import type { NurturingProjectUsageReadRepository } from "../repositories/nurturing-project-usage.repository.ts";
 import type { NurturingTraceDayReadRepository } from "../repositories/nurturing-trace-day.repository.ts";
+import { membersWhoseLatestOrganizationIs } from "../rules/nurturing-organization-member.rules.ts";
 import {
   createdRangeOfEndedWindows,
   endedTraceWindowTraits,
@@ -36,8 +37,8 @@ type OrganizationUsageDependencies = Readonly<{
     "findOrganizationCreatedAt" | "findOrganizationIdsCreatedBetween"
   >;
   milestones: Pick<NurturingMilestonesRepository, "findOrganization">;
-  /** The organization's members and each member's organizations, read at need, never stored. */
-  organizations: Pick<OrganizationApi, "getAllMembers" | "mostRecentOrganizationIdForMember">;
+  /** Nurturing's own copy of the organizations' members, from the owners' member facts. */
+  members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfMembers">;
   /** Rejects when Customer.io did not take the call, so the subscriber's job retries. */
   sendBatch: (calls: CioBatchCall[]) => Promise<void>;
   clock: Readonly<{ nowMs: () => number }>;
@@ -104,18 +105,24 @@ export class NurturingOrganizationUsageService {
   /**
    * Ends the trace window of every organization whose window ended in (`after`, `upTo`]: its trace
    * traits go once as null, on the organization and its members, so a rolling trait cannot say
-   * "active" for ever. Later syncs leave them out. A refused call throws, so the sweep retries.
+   * "active" for ever. Later syncs leave them out, and its trace rows are dropped. A refused call
+   * throws, so the sweep retries.
    */
   async traceWindowsEnded({
     after,
     upTo,
   }: Readonly<{ after: number; upTo: number }>): Promise<void> {
-    const { organizationsCreated, milestones, sendBatch } = this.dependencies;
+    const { organizationsCreated, milestones, placements, traceDays, sendBatch } =
+      this.dependencies;
     const ended = await organizationsCreated.findOrganizationIdsCreatedBetween(
       createdRangeOfEndedWindows({ after, upTo }),
     );
     const traits = endedTraceWindowTraits();
     for (const organizationId of ended) {
+      // Nothing reads its trace rows past the window, and a quiet organization never syncs again.
+      await traceDays.pruneProjects({
+        projectIds: await placements.findProjectIds({ organizationId }),
+      });
       const [organization] = await milestones.findOrganization({ organizationId });
       const adminUserId = organization?.adminUserId;
       if (!adminUserId) continue;
@@ -134,21 +141,18 @@ export class NurturingOrganizationUsageService {
     organizationId,
     traits,
   }: Readonly<{ organizationId: string; traits: CioOrganizationUsageTraits }>): Promise<void> {
-    const { organizations, sendBatch } = this.dependencies;
+    const { members, sendBatch } = this.dependencies;
     try {
-      const members = await organizations.getAllMembers({ organizationId });
-      for (let start = 0; start < members.length; start += MEMBER_BATCH_SIZE) {
-        const latestOf = await Promise.all(
-          members.slice(start, start + MEMBER_BATCH_SIZE).map(async ({ id }) => {
-            const latest = await organizations.mostRecentOrganizationIdForMember({ userId: id });
-            return latest.outcome === "member" && latest.organizationId === organizationId
-              ? [id]
-              : [];
-          }),
+      const userIds = membersWhoseLatestOrganizationIs({
+        memberships: await members.findMembershipsOfMembers({ organizationId }),
+        organizationId,
+      });
+      for (let start = 0; start < userIds.length; start += MEMBER_BATCH_SIZE) {
+        await sendBatch(
+          userIds
+            .slice(start, start + MEMBER_BATCH_SIZE)
+            .map((userId) => ({ type: "identify" as const, userId, traits })),
         );
-        const userIds = latestOf.flat();
-        if (userIds.length === 0) continue;
-        await sendBatch(userIds.map((userId) => ({ type: "identify", userId, traits })));
       }
     } catch (error) {
       nurturingLogger.warn(
