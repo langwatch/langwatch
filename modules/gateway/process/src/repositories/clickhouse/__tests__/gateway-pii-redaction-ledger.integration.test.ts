@@ -96,97 +96,100 @@ function fact({
   };
 }
 
-describe.skipIf(!enabled)("the spend record of a PII redaction model call (real ClickHouse)", () => {
-  beforeAll(async () => {
-    ({ client } = await startMigratedGatewayClickHouse());
-    ledger = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseOver(client));
-    store = GatewaySpendStore.create(ledger);
-    protocol = GatewayInternalProtocolService.create(
-      suppliedMembers({
-        spend: {
-          commands: { confirmSpend: { send: confirmThroughTheSpine } },
-          rating: {
-            rate: () => {
-              throw new Error("a self-priced outcome must not be re-rated");
+describe.skipIf(!enabled)(
+  "the spend record of a PII redaction model call (real ClickHouse)",
+  () => {
+    beforeAll(async () => {
+      ({ client } = await startMigratedGatewayClickHouse());
+      ledger = new ClickHouseGatewaySpendEventsRepository(gatewayClickHouseOver(client));
+      store = GatewaySpendStore.create(ledger);
+      protocol = GatewayInternalProtocolService.create(
+        suppliedMembers({
+          spend: {
+            commands: { confirmSpend: { send: confirmThroughTheSpine } },
+            rating: {
+              rate: () => {
+                throw new Error("a self-priced outcome must not be re-rated");
+              },
             },
           },
+        }),
+      );
+    }, 120_000);
+
+    afterAll(async () => {
+      if (!client) return;
+      await client.command({
+        query: "ALTER TABLE gateway_spend DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: PROJECT },
+      });
+    }, 120_000);
+
+    /** @scenario "The ledger row carries the price as its cost and names the PII redaction model" */
+    /** @scenario "The same span redacted twice is one request" */
+    it("holds one row per call, however often its fact arrives, and billing's sum reads them", async () => {
+      const spend = GatewayPiiRedactionSpendService.create({
+        projects: {
+          findWithTeam: async (projectId) =>
+            projectId === PROJECT
+              ? ({
+                  id: projectId,
+                  team: { id: `team-${run}`, organizationId: ORGANIZATION },
+                } as ProjectWithTeam)
+              : null,
         },
-      }),
-    );
-  }, 120_000);
+        recordPricedSpend: (input) => protocol.recordPricedSpend(input),
+      });
+      const first = fact({ requestId: `piiredaction_a${run}`, priceNanoUsd: 600_000_000 });
+      const second = fact({ requestId: `piiredaction_b${run}`, priceNanoUsd: 523_400_000 });
 
-  afterAll(async () => {
-    if (!client) return;
-    await client.command({
-      query: "ALTER TABLE gateway_spend DELETE WHERE TenantId = {tenantId:String}",
-      query_params: { tenantId: PROJECT },
-    });
-  }, 120_000);
+      // The first call's fact is delivered twice, as a retried ingestion would.
+      await spend.recordPiiRedactionSpend({ fact: first });
+      await spend.recordPiiRedactionSpend({ fact: first });
+      await spend.recordPiiRedactionSpend({ fact: second });
 
-  /** @scenario "The ledger row carries the price as its cost and names the PII redaction model" */
-  /** @scenario "The same span redacted twice is one request" */
-  it("holds one row per call, however often its fact arrives, and billing's sum reads them", async () => {
-    const spend = GatewayPiiRedactionSpendService.create({
-      projects: {
-        findWithTeam: async (projectId) =>
-          projectId === PROJECT
-            ? ({
-                id: projectId,
-                team: { id: `team-${run}`, organizationId: ORGANIZATION },
-              } as ProjectWithTeam)
-            : null,
-      },
-      recordPricedSpend: (input) => protocol.recordPricedSpend(input),
-    });
-    const first = fact({ requestId: `piiredaction_a${run}`, priceNanoUsd: 600_000_000 });
-    const second = fact({ requestId: `piiredaction_b${run}`, priceNanoUsd: 523_400_000 });
-
-    // The first call's fact is delivered twice, as a retried ingestion would.
-    await spend.recordPiiRedactionSpend({ fact: first });
-    await spend.recordPiiRedactionSpend({ fact: first });
-    await spend.recordPiiRedactionSpend({ fact: second });
-
-    const result = await client.query({
-      query: `
+      const result = await client.query({
+        query: `
         SELECT GatewayRequestId, Status, RequestType, Model, OrganizationId, VirtualKeyId,
                TokensInput, CostNanoUSD, Metadata
         FROM gateway_spend FINAL
         WHERE TenantId = {tenantId:String}
         ORDER BY GatewayRequestId`,
-      query_params: { tenantId: PROJECT },
-      format: "JSONEachRow",
-    });
-    const rows = await result.json<{
-      GatewayRequestId: string;
-      Status: string;
-      RequestType: string;
-      Model: string;
-      OrganizationId: string;
-      VirtualKeyId: string;
-      TokensInput: number | string;
-      CostNanoUSD: number | string;
-      Metadata: string;
-    }>();
-    expect(rows.map((row) => row.GatewayRequestId)).toEqual([first.requestId, second.requestId]);
-    expect(rows[0]).toMatchObject({
-      Status: "confirmed",
-      RequestType: "pii_redaction",
-      Model: "pii-redaction-model",
-      OrganizationId: ORGANIZATION,
-      VirtualKeyId: "",
-    });
-    expect(Number(rows[0]?.TokensInput)).toBe(0);
-    expect(Number(rows[0]?.CostNanoUSD)).toBe(600_000_000);
-    expect(JSON.parse(rows[0]?.Metadata ?? "{}")).toEqual({
-      pii_redaction: { cost_usd: 0.000093534, characters: 1_200_000, texts: 3 },
-    });
+        query_params: { tenantId: PROJECT },
+        format: "JSONEachRow",
+      });
+      const rows = await result.json<{
+        GatewayRequestId: string;
+        Status: string;
+        RequestType: string;
+        Model: string;
+        OrganizationId: string;
+        VirtualKeyId: string;
+        TokensInput: number | string;
+        CostNanoUSD: number | string;
+        Metadata: string;
+      }>();
+      expect(rows.map((row) => row.GatewayRequestId)).toEqual([first.requestId, second.requestId]);
+      expect(rows[0]).toMatchObject({
+        Status: "confirmed",
+        RequestType: "pii_redaction",
+        Model: "pii-redaction-model",
+        OrganizationId: ORGANIZATION,
+        VirtualKeyId: "",
+      });
+      expect(Number(rows[0]?.TokensInput)).toBe(0);
+      expect(Number(rows[0]?.CostNanoUSD)).toBe(600_000_000);
+      expect(JSON.parse(rows[0]?.Metadata ?? "{}")).toEqual({
+        pii_redaction: { cost_usd: 0.000093534, characters: 1_200_000, texts: 3 },
+      });
 
-    const total = await GatewaySpendEventsService.create(ledger).sumSpendNanoUsdByRequestType({
-      tenantIds: [PROJECT],
-      requestType: "pii_redaction",
-      fromMs: Date.UTC(2026, 10, 1),
-      toMs: Date.UTC(2026, 11, 1),
+      const total = await GatewaySpendEventsService.create(ledger).sumSpendNanoUsdByRequestType({
+        tenantIds: [PROJECT],
+        requestType: "pii_redaction",
+        fromMs: Date.UTC(2026, 10, 1),
+        toMs: Date.UTC(2026, 11, 1),
+      });
+      expect(total).toBe(1_123_400_000);
     });
-    expect(total).toBe(1_123_400_000);
-  });
-});
+  },
+);
