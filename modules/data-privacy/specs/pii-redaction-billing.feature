@@ -124,6 +124,13 @@ Feature: A PII redaction model call is priced per character, written to the spen
       When the model answers another of its batches
       Then the free list is not read again
 
+    @unit
+    Scenario: A call whose free list cannot be read is not recorded
+      Given an organization whose free-list entry cannot be read
+      When the model answers a strict batch of 1,000 characters
+      Then no priced fact is recorded, so no call is fixed at a price of zero
+      And the failure is logged at error with the organization, the project and the full price
+
   Rule: Gateway writes one ledger row per priced fact
 
     @unit

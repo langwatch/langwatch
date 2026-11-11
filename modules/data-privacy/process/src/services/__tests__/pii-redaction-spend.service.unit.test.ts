@@ -130,12 +130,13 @@ describe("PiiRedactionSpendService", () => {
   });
 
   describe("when the free list cannot be read", () => {
-    it("records the call at zero and logs its full price at error", async () => {
+    /** @scenario "A call whose free list cannot be read is not recorded" */
+    it("records no fact and logs its full price at error", async () => {
       const { spend, facts, errors } = setup({ flagFails: true });
 
       await spend.record(call);
 
-      expect(facts[0]).toMatchObject({ priceNanoUsd: 0 });
+      expect(facts).toEqual([]);
       expect(errors).toEqual([
         expect.objectContaining({
           fields: expect.objectContaining({

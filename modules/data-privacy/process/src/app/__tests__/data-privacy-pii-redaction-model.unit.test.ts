@@ -4,6 +4,7 @@
  * the metrics a model call must keep apart from Presidio's.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { ConfigParseError } from "@langwatch/config";
 import { LangevalsPiiDetectionError } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
@@ -122,13 +123,14 @@ describe("given the PII redaction model wired into the module", () => {
   describe("when the deployment names the model and has no key pepper", () => {
     /** @scenario "A deployment that calls the model and has no key pepper refuses to boot" */
     it("refuses to boot", async () => {
-      await expect(
-        createDataPrivacyTestApp({
-          dependencies: { featureFlags: flagsOff().featureFlags, permissions },
-          settings: { langevalsEndpoint: LANGEVALS, piiRedactionModelEndpoint: ALIAS_ARN },
-          keyPepper: null,
-        }),
-      ).rejects.toThrow(/API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET/);
+      const boot = createDataPrivacyTestApp({
+        dependencies: { featureFlags: flagsOff().featureFlags, permissions },
+        settings: { langevalsEndpoint: LANGEVALS, piiRedactionModelEndpoint: ALIAS_ARN },
+        keyPepper: null,
+      });
+
+      await expect(boot).rejects.toBeInstanceOf(ConfigParseError);
+      await expect(boot).rejects.toThrow(/API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET/);
     });
   });
 
