@@ -7264,6 +7264,9 @@ importers:
       '@langwatch/aws-client':
         specifier: workspace:*
         version: link:../../../packages/aws-client
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../contract

@@ -62,7 +62,9 @@
    cost nothing here. It is for margin reports only and is never billed.
 7. **A free list records at price zero.** Organizations on `release_pii_redaction_model_free` get a
    priced fact with a price of zero and the cost kept. The release flag still says who may use
-   the model; the free list says who pays nothing.
+   the model; the free list says who pays nothing. A free list that cannot be read records
+   nothing and logs the full price at error: a recorded fact fixes its request id's price for
+   good, so a guessed zero would stay, and a guessed full price could charge a free org.
 8. **The spend is outside gateway budgets.** The debits process skips `pii_redaction`
    outcomes, so a spent AI budget never turns redaction off.
 9. **A meter of its own, reported only once Stripe holds it.** `langwatch_pii_redaction_usd`,

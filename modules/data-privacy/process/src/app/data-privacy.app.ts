@@ -1,3 +1,4 @@
+import { ConfigParseError } from "@langwatch/config";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
@@ -104,7 +105,6 @@ type DataPrivacySetup = FeatureSetup<
 /** Applies a closure to the resolved credential without handing the value out. */
 type GoogleCredentialsUse = <Out>(build: (credential: string | undefined) => Out) => Out;
 
-/** The one public object of the scoped privacy rules. */
 /** The request-id key, or why none is needed: a deployment naming no model prices no call. */
 type RequestIdKey = { kind: "keyed"; key: Uint8Array } | { kind: "no-model" };
 
@@ -122,11 +122,12 @@ async function getRequestIdKey({
   );
   if (key !== void 0) return { kind: "keyed", key };
   if (!config.piiRedactionModelEndpoint) return { kind: "no-model" };
-  throw new Error(
+  throw new ConfigParseError([
     "data-privacy.requestIdKey ← API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET: none is set, and PII_REDACTION_MODEL_ENDPOINT is",
-  );
+  ]);
 }
 
+/** The one public object of the scoped privacy rules. */
 export class DataPrivacyModule implements DataPrivacyApi {
   static readonly contract = DataPrivacyApi;
   static readonly dependencies = {

@@ -25,7 +25,7 @@ type SpendLogger = { error(fields: Record<string, unknown>, message: string): vo
 const FREE_LIST_TTL_MS = 60_000;
 
 /** One call the model answered, as the model service saw it. */
-export type PiiRedactionAnsweredCall = Readonly<{
+type PiiRedactionAnsweredCall = Readonly<{
   organizationId: string;
   projectId: string;
   texts: readonly string[];
@@ -33,6 +33,9 @@ export type PiiRedactionAnsweredCall = Readonly<{
   recordKey?: string | undefined;
   durationMs: number;
 }>;
+
+/** Whether the organization pays nothing, or that the free list could not say. */
+type FreeListRead = { kind: "read"; free: boolean } | { kind: "unread" };
 
 type PiiRedactionSpendDeps = Readonly<{
   /**
@@ -88,7 +91,9 @@ export class PiiRedactionSpendService {
       );
       return;
     }
-    const free = await this.#isFree(call);
+    const freeList = await this.#readFreeList(call);
+    if (freeList.kind === "unread") return;
+    const free = freeList.free;
     const fact = piiRedactionSpendFact({
       ...call,
       key,
@@ -112,15 +117,19 @@ export class PiiRedactionSpendService {
     }
   }
 
-  /** A free list that cannot be read records the call at zero, never charging a free org. */
-  async #isFree(call: PiiRedactionAnsweredCall): Promise<boolean> {
+  /**
+   * A free list that cannot be read records nothing: a fact fixes its price for good, so a
+   * guessed zero would stay and a guessed full price could charge a free org (ADR-201).
+   */
+  async #readFreeList(call: PiiRedactionAnsweredCall): Promise<FreeListRead> {
     try {
-      return await this.#free.get(call.organizationId, () =>
+      const free = await this.#free.get(call.organizationId, () =>
         this.deps.featureFlags.isEnabled(PII_REDACTION_MODEL_FREE_FLAG, {
           kind: "organization",
           organizationId: call.organizationId,
         }),
       );
+      return { kind: "read", free };
     } catch (error) {
       const characters = batchCharactersOf(call.texts);
       this.deps.log.error(
@@ -130,9 +139,9 @@ export class PiiRedactionSpendService {
           priceNanoUsd: piiRedactionPriceNanoUsd({ characters, free: false }),
           errorName: error instanceof Error ? error.name : typeof error,
         },
-        "PII redaction free list could not be read: the call is recorded at zero",
+        "PII redaction model call not billed: its organization's free list could not be read",
       );
-      return true;
+      return { kind: "unread" };
     }
   }
 }

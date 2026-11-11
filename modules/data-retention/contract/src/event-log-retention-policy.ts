@@ -91,6 +91,7 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   organization_audit: "indefinite",
   organization_seat_limit: "indefinite",
   organization_two_step_requirement: "indefinite",
+  pii_redaction_spend: "indefinite",
   platform_operator_seed: "indefinite",
   project: "indefinite",
   projection_replay: "indefinite",
