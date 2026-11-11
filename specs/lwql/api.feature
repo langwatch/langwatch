@@ -332,9 +332,6 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When an administrative identity reads those tables
     Then rows of both tenants are returned
 
-  # Does not hold on ClickHouse 26.8 yet: FINAL on the fact tables loses
-  # partition pruning, so its test is it.fails until the LangWatchQL
-  # performance change replaces FINAL.
   @integration
   Scenario: A time predicate on a LangWatchQL view prunes partitions
     Given seeded fact rows spread across several weekly partitions
