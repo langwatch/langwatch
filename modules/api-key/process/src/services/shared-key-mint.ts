@@ -1,0 +1,163 @@
+import type { CreateApiKeyInput } from "@langwatch/api-key-contract";
+import { AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
+import {
+  SharedCredentialPendingError,
+  mintOnce,
+  type SharedCredentialAddress,
+  type SharedCredentialHold,
+  type SharedCredentialStore,
+} from "@langwatch/secrets/shared-credential";
+import { Temporal, nowInstant, type Instant } from "@langwatch/time";
+import { z } from "zod";
+
+import type { DisabledApiKey } from "./api-key-lifecycle.service.ts";
+import type { ApiKeyService } from "./api-key.service.ts";
+
+type SharedKeyWriter = Pick<ApiKeyService, "writeDisabled" | "reopenDisabled"> & {
+  grantAndActivate(key: DisabledApiKey): Promise<{ token: string }>;
+};
+
+/** A key as every server shares it, sealed: its token, and whether its grants have landed. */
+const sharedKeySchema = z.object({
+  apiKeyId: z.string(),
+  token: z.string(),
+  expiresAtMs: z.number(),
+  active: z.boolean(),
+  /** Whose key it is, so a held value never serves another identity at the same address. */
+  identity: z.string().optional(),
+});
+type SharedKey = z.infer<typeof sharedKeySchema>;
+
+/** The held values that read as a shared key; one written in another shape is minted over. */
+function sharedKeys(values: readonly string[]): SharedKey[] {
+  return values.flatMap((value) => {
+    const parsed = sharedKeySchema.safeParse(parseJson(value));
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
+function parseJson(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Mints a key once across every server (`mintOnce`): the claimant writes the key, shares it sealed
+ * while its grants fold, then shares it active; every other server waits for that same token. A
+ * key whose grants have not landed is granted again by the next attempt, never written anew.
+ * `written` says whether this call activated the key, so a caller counts each key once, not its reuses.
+ */
+export async function mintSharedKey(input: {
+  apiKeys: SharedKeyWriter;
+  store: SharedCredentialStore;
+  address: SharedCredentialAddress;
+  /** Stamped on the shared value; a value of another identity is never reused. */
+  identity?: string;
+  /** The expiry of a key about to be written. */
+  newExpiresAt: () => Instant;
+  /** The key to write, or to reopen when an earlier attempt already wrote it. */
+  keyFor: (expiresAt: Instant) => CreateApiKeyInput;
+  /** Whether a shared key still serves this caller (long enough, say). */
+  reusable: (shared: { expiresAtMs: number }) => boolean;
+  /** Whether the key's row is still live: a key retired elsewhere is minted over. */
+  isLive?: (apiKeyId: string) => Promise<boolean>;
+  /** Told to a caller whose grant has not landed, so its retry waits for the fold. */
+  retryAfterMs?: number;
+}): Promise<{ token: string; apiKeyId: string; expiresAtMs: number; written: boolean }> {
+  const { apiKeys, identity } = input;
+  const ours = (shared: SharedKey) => shared.identity === identity;
+  let written = false;
+  try {
+    const value = await mintOnce({
+      store: input.store,
+      address: input.address,
+      isReady: async (held) => {
+        const [shared] = sharedKeys([held]);
+        return (
+          shared !== undefined &&
+          shared.active &&
+          ours(shared) &&
+          input.reusable(shared) &&
+          (input.isLive ? await input.isLive(shared.apiKeyId) : true)
+        );
+      },
+      mint: async ({ earlier, hold }) => {
+        const [pending] = sharedKeys(earlier).filter(
+          (shared) => !shared.active && ours(shared) && input.reusable(shared),
+        );
+        const { shared, key } = pending
+          ? await reopen({ apiKeys, pending, input })
+          : await write({ apiKeys, hold, input });
+        await apiKeys.grantAndActivate(key);
+        // Counted where the key goes live, so a key written by one try and activated by a later one is one mint.
+        written = true;
+        const ttlMs = shared.expiresAtMs - nowInstant().epochMilliseconds;
+        return { value: JSON.stringify({ ...shared, active: true }), ttlMs };
+      },
+    });
+    const [shared] = sharedKeys([value]);
+    if (!shared) throw new Error("The shared key could not be read back");
+    return { ...shared, written };
+  } catch (error) {
+    if (
+      error instanceof SharedCredentialPendingError ||
+      (AuthzGrantNotConfirmedError.is(error) && !error.retryable)
+    ) {
+      throw new AuthzGrantNotConfirmedError({
+        retryable: true,
+        ...(input.retryAfterMs ? { retryAfterMs: input.retryAfterMs } : {}),
+      });
+    }
+    throw error;
+  }
+}
+
+type Mint = Parameters<typeof mintSharedKey>[0];
+
+/** Writes the key revoked and shares it before its grants, so a retry resumes it. */
+async function write({
+  apiKeys,
+  hold,
+  input,
+}: {
+  apiKeys: SharedKeyWriter;
+  hold: (held: SharedCredentialHold) => Promise<void>;
+  input: Mint;
+}): Promise<{ shared: SharedKey; key: DisabledApiKey }> {
+  const expiresAt = input.newExpiresAt();
+  const key = await apiKeys.writeDisabled(input.keyFor(expiresAt));
+  const shared = {
+    apiKeyId: key.id,
+    token: key.token,
+    expiresAtMs: expiresAt.epochMilliseconds,
+    active: false,
+    ...(input.identity === undefined ? {} : { identity: input.identity }),
+  };
+  await hold({
+    value: JSON.stringify(shared),
+    ttlMs: Math.max(1, shared.expiresAtMs - nowInstant().epochMilliseconds),
+  });
+  return { shared, key };
+}
+
+/** The key an earlier attempt wrote and shared, to be granted again with the same token. */
+async function reopen({
+  apiKeys,
+  pending,
+  input,
+}: {
+  apiKeys: SharedKeyWriter;
+  pending: SharedKey;
+  input: Mint;
+}): Promise<{ shared: SharedKey; key: DisabledApiKey }> {
+  const expiresAt = Temporal.Instant.fromEpochMilliseconds(pending.expiresAtMs);
+  const key = await apiKeys.reopenDisabled({
+    id: pending.apiKeyId,
+    token: pending.token,
+    input: input.keyFor(expiresAt),
+  });
+  return { shared: pending, key };
+}

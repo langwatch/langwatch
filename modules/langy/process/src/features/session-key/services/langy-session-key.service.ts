@@ -1,4 +1,8 @@
-import { LANGY_SESSION_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-contract";
+import {
+  LANGY_SESSION_API_KEY_NAME,
+  type ApiKeyApi,
+  type CreateApiKeyInput,
+} from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -37,6 +41,12 @@ type LangySessionKeyMintInput = {
    * shows its confirmation card there; a key minted with none can delete nothing.
    */
   conversation?: { id: string; turnId?: string };
+  /**
+   * Names the run this key serves: a retry with the same name gets the same key and its pending
+   * grant, so a grant that folds slowly is waited on across retries instead of being minted again.
+   * Revoke it with the same `holdKey`, so the next mint is a fresh key, not the revoked one.
+   */
+  holdKey?: string;
 };
 
 /** Where a minted key's conversation is written, so a delete it asks for can show its card. */
@@ -45,7 +55,12 @@ type LangySessionKeyBindings = Pick<LangyDeleteConfirmationRepository, "saveKeyB
 /** Mints and revokes the restricted worker session credential. */
 export abstract class LangySessionKey {
   abstract mint(input: LangySessionKeyMintInput): Promise<{ token: string; apiKeyId: string }>;
-  abstract revoke(input: { apiKeyId: string; projectId: string }): Promise<void>;
+  abstract revoke(input: {
+    apiKeyId: string;
+    projectId: string;
+    /** The name the key was minted under, when it was held. */
+    holdKey?: string;
+  }): Promise<void>;
 }
 
 const logger = createLogger("langwatch:langy:session-key");
@@ -141,7 +156,7 @@ export class LangySessionKeyService extends LangySessionKey {
       );
     }
 
-    const result = await this.apiKeys.create({
+    const key = {
       isSystemManaged: true,
       name: LANGY_SESSION_API_KEY_NAME,
       description: KEY_DESCRIPTION[ceiling],
@@ -152,11 +167,17 @@ export class LangySessionKeyService extends LangySessionKey {
       permissions: permissionsToGrant,
       bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: input.projectId }],
       expiresAt: toDate(nowInstant().add({ milliseconds: sessionKeyLifetimeMs })),
-    });
-    this.metrics.record({ operation: "minted" });
+    } satisfies CreateApiKeyInput;
+    const { created, ...result } = input.holdKey
+      ? await this.apiKeys.createHeld({ holdKey: input.holdKey, key })
+      : await this.apiKeys
+          .create(key)
+          .then(({ token, apiKey }) => ({ token, apiKeyId: apiKey.id, created: true }));
+    // A retry that found its held key minted nothing.
+    if (created) this.metrics.record({ operation: "minted" });
     if (input.conversation && this.bindings) {
       await this.bindings.saveKeyBinding({
-        apiKeyId: result.apiKey.id,
+        apiKeyId: result.apiKeyId,
         binding: {
           projectId: input.projectId,
           conversationId: input.conversation.id,
@@ -166,7 +187,7 @@ export class LangySessionKeyService extends LangySessionKey {
       });
     }
 
-    return { token: result.token, apiKeyId: result.apiKey.id };
+    return result;
   }
 
   mintForUser(input: {
@@ -183,8 +204,12 @@ export class LangySessionKeyService extends LangySessionKey {
     });
   }
 
-  async revoke(input: { apiKeyId: string; projectId: string }): Promise<void> {
+  async revoke(input: { apiKeyId: string; projectId: string; holdKey?: string }): Promise<void> {
     await this.revokeManaged(input);
+    if (!input.holdKey) return;
+    // A held key retired while its entry stays would be handed out again to the retry.
+    const { organizationId } = await this.repository.getProjectScope(input.projectId);
+    await this.apiKeys.releaseHeld({ organizationId, holdKey: input.holdKey });
   }
 
   async revokeManaged(input: {

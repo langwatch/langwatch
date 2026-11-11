@@ -130,7 +130,7 @@ nobody's seen, done or kept state.
 **Every run records an outcome.** `filed`, `nothing`, `failed` or `skipped`, each
 with a reason where one applies. The outcome counts what was filed and what was renewed
 apart; a run that only renewed is `nothing`, since seen again is not news. A failure is thrown for the outbox to retry; the
-third attempt records `failed` first. One run is in flight per person and board. A
+last (fourth) attempt records `failed` first. One run is in flight per person and board. A
 run that recorded no outcome within every attempt's lease stops holding the board. A
 request is answered with a request id, never a run id: whether it starts a run is the
 worker's call, made after the answer. An event is taken only on the schedule its own

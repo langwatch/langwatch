@@ -557,3 +557,50 @@ describe("given a key minted for a conversation's turn", () => {
     });
   });
 });
+
+describe("LangySessionKeyService held keys", () => {
+  function heldService({ created }: { created: boolean }) {
+    const released: { organizationId: string; holdKey: string }[] = [];
+    const apiKeys: ApiKeyApi = Object.create(null);
+    apiKeys.createHeld = async () => ({ token: "held-token", apiKeyId: "key-1", created });
+    apiKeys.releaseHeld = async (input) => {
+      released.push(input);
+    };
+    const authz: AuthzApi = createApiFixture<AuthzApi>();
+    authz.effectivePermissions = async () => ["traces:view"];
+    const metrics = new SessionKeyMetrics();
+    const service = createService({
+      repository: new SessionKeyRepository(),
+      apiKeys,
+      authz,
+      metrics,
+    });
+    return { service, metrics, released };
+  }
+  const mintInput = {
+    session: { user: { id: "user-1" } },
+    projectId: "project-1",
+    organizationId: "organization-1",
+    ceiling: "unattended" as const,
+    holdKey: "turn-1",
+  };
+
+  it("counts a mint only for the call that wrote the key", async () => {
+    const reused = heldService({ created: false });
+    const written = heldService({ created: true });
+
+    await reused.service.mint(mintInput);
+    await written.service.mint(mintInput);
+
+    expect(reused.metrics.record).not.toHaveBeenCalled();
+    expect(written.metrics.record).toHaveBeenCalledWith({ operation: "minted" });
+  });
+
+  it("drops the held entry when the key is revoked under its name", async () => {
+    const { service, released } = heldService({ created: true });
+
+    await service.revoke({ apiKeyId: "key-1", projectId: "project-1", holdKey: "turn-1" });
+
+    expect(released).toEqual([{ organizationId: "organization-1", holdKey: "turn-1" }]);
+  });
+});

@@ -90,7 +90,8 @@ type MintOnceInput = {
   /** How long a caller waits on another's mint before {@link SharedCredentialPendingError}. */
   waitMs?: number;
   pollMs?: number;
-  isReady?: (value: string) => boolean;
+  /** May look the value up elsewhere (is the credential still live?), hence async-capable. */
+  isReady?: (value: string) => boolean | Promise<boolean>;
   onUnreadable?: (error: SharedCredentialUnreadableError) => void;
   mint: Mint;
 };
@@ -106,7 +107,7 @@ export async function mintOnce(input: MintOnceInput): Promise<string> {
   const read = readOnce(input);
 
   for (let first = true; ; first = false) {
-    const [ready] = (await read()).filter(input.isReady ?? always);
+    const [ready] = await readyOf(await read(), input.isReady);
     if (ready !== undefined) return ready;
     if (!first && nowInstant().epochMilliseconds >= deadline) {
       throw new SharedCredentialPendingError();
@@ -119,6 +120,14 @@ export async function mintOnce(input: MintOnceInput): Promise<string> {
 
 function always(): boolean {
   return true;
+}
+
+async function readyOf(
+  values: string[],
+  isReady: (value: string) => boolean | Promise<boolean> = always,
+): Promise<string[]> {
+  const verdicts = await Promise.all(values.map(isReady));
+  return values.filter((_, index) => verdicts[index]);
 }
 
 /** Reads the held value; an unreadable one reads as none, reported once per call. */
@@ -150,7 +159,7 @@ async function mintIfClaimed({
   try {
     // Read again under the claim: an earlier claimant may have finished since.
     const earlier = await read();
-    const finished = earlier.filter(isReady);
+    const finished = await readyOf(earlier, isReady);
     if (finished.length > 0) return finished;
     const hold = (held: SharedCredentialHold) => store.hold({ address, ...held });
     const minted = await mint({ earlier, hold });

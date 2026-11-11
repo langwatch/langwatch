@@ -16,4 +16,6 @@ export interface ApiKeyRepositories {
   readonly sandboxKeys: SharedCredentialStore;
   /** Each run's key, minted once across every server and shared sealed until it expires. */
   readonly runKeys: SharedCredentialStore;
+  /** Each retried caller's held key, kept apart from the run keys, until revoked or expired. */
+  readonly heldKeys: SharedCredentialStore;
 }

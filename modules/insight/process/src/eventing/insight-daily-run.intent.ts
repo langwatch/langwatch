@@ -9,8 +9,12 @@ import { z } from "zod";
 
 export const INSIGHT_DAILY_RUN_INTENT = "runBoard" as const;
 
-/** A model call that fails for good is not worth a fourth try. */
-export const INSIGHT_DAILY_RUN_MAX_ATTEMPTS = 3;
+/**
+ * Four tries, not three: Langy's session key is held across them, and a try that finds its grant
+ * unlanded fails with `retryAfterMs` set, which the outbox honours. Two such waits outlast two
+ * ~50 s authz folds. A model call that fails for good is not worth a fifth.
+ */
+export const INSIGHT_DAILY_RUN_MAX_ATTEMPTS = 4;
 
 /** Longer than a run may wait for Langy, so a slow run is never handed to a second pod. */
 export const INSIGHT_DAILY_RUN_LEASE_MS = 20 * 60_000;

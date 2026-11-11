@@ -6,7 +6,11 @@
  * @see modules/langy/specs/langy-unattended-turn.feature
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { AuthzApi, AuthzEffectivePermissionsOutput } from "@langwatch/authz-contract";
+import {
+  AuthzGrantNotConfirmedError,
+  type AuthzApi,
+  type AuthzEffectivePermissionsOutput,
+} from "@langwatch/authz-contract";
 import { LANGY_CONVERSATION_STATUS, LangyTurnsRateLimitedError } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
@@ -75,6 +79,11 @@ function sessionKeysHolding(held: AuthzEffectivePermissionsOutput) {
     created.push([...(input.permissions ?? [])]);
     return { token: "session-key", apiKey: Object.assign(Object.create(null), { id: "key-1" }) };
   };
+  // An unattended turn's key is held across its retries, so it is asked for by name.
+  apiKeys.createHeld = async ({ key }) => {
+    created.push([...(key.permissions ?? [])]);
+    return { token: "session-key", apiKeyId: "key-1", created: true };
+  };
   const authz = createApiFixture<AuthzApi>({ effectivePermissions: async () => held });
   const service = LangySessionKeyService.create({
     repository: new SessionKeyScope(),
@@ -136,6 +145,9 @@ function makeFixture({
   );
   const stash = vi.fn<LangyTurnServiceDependencies["handoffStore"]["stash"]>(async () => undefined);
   const abort = vi.fn(async () => undefined);
+  const revoke = vi.fn<LangyTurnServiceDependencies["sessionKeys"]["revoke"]>(
+    async () => undefined,
+  );
   const render = vi.fn<LangyTurnServiceDependencies["context"]["render"]>(() => null);
   const warm = vi.fn<LangyWorker["warm"]>(async () => undefined);
 
@@ -174,7 +186,7 @@ function makeFixture({
       check: vi.fn(async () => ({ allowed: true })),
     },
     perDayPrCap: 5,
-    sessionKeys: { mint, revoke: vi.fn(async () => undefined) },
+    sessionKeys: { mint, revoke },
     context: { render },
     uiActionSurface: { resolve: vi.fn(async () => true) },
     skillGates: { resolveDisabled: vi.fn(async () => []) },
@@ -210,7 +222,7 @@ function makeFixture({
       session: { user: { id: "user-1" } },
       requestedConversationId: conversationId,
     });
-  return { start, warmUp, dispatch, acceptTurn, mint, stash, abort, render, warm };
+  return { start, warmUp, dispatch, acceptTurn, mint, revoke, stash, abort, render, warm };
 }
 
 /** A conversation a module started for the person: its row reads the origin `run`. */
@@ -246,6 +258,37 @@ describe("an unattended Langy turn", () => {
           }),
         }),
       );
+    });
+
+    it("holds the key under the turn's id and revokes it by that name when the turn is abandoned", async () => {
+      const fixture = makeFixture();
+      fixture.acceptTurn.mockRejectedValueOnce(new Error("the turn could not be recorded"));
+
+      await expect(fixture.start(unattendedTurn)).rejects.toThrow();
+
+      expect(fixture.mint).toHaveBeenCalledWith(expect.objectContaining({ holdKey: "turn-1" }));
+      expect(fixture.revoke).toHaveBeenCalledWith({
+        apiKeyId: "key-1",
+        projectId: "project-1",
+        holdKey: "turn-1",
+      });
+    });
+
+    it("lets a held key's refusal reach the caller with the pace it asked for", async () => {
+      const refusal = new AuthzGrantNotConfirmedError({ retryable: true, retryAfterMs: 40_000 });
+      const fixture = makeFixture({
+        sessionKeys: {
+          mint: async () => {
+            throw refusal;
+          },
+          revoke: async () => undefined,
+        },
+      });
+
+      await expect(fixture.start(unattendedTurn)).rejects.toMatchObject({
+        code: "authz_grant_not_confirmed",
+        retryAfterMs: 40_000,
+      });
     });
 
     /** @scenario "A chat turn keeps the full ceiling and its GitHub token" */
@@ -380,6 +423,18 @@ describe("a turn in a run conversation", () => {
       expect(dispatched.credentials).not.toHaveProperty("githubToken");
       expect(dispatched.credentials).not.toHaveProperty("githubLogin");
       expect(fixture.stash.mock.calls[0]![0].credentials).not.toHaveProperty("githubToken");
+    });
+
+    it("keeps the reply's key unheld and still revokes it when the turn is abandoned", async () => {
+      const fixture = makeFixture({ existing: RUN_CONVERSATION });
+      fixture.acceptTurn.mockRejectedValueOnce(new Error("the turn could not be recorded"));
+
+      await expect(fixture.start(replyIn("conversation-1"))).rejects.toThrow();
+
+      expect(fixture.mint).toHaveBeenCalledWith(
+        expect.not.objectContaining({ holdKey: expect.anything() }),
+      );
+      expect(fixture.revoke).toHaveBeenCalledWith({ apiKeyId: "key-1", projectId: "project-1" });
     });
 
     it("starts no new conversation for the reply, so the conversation stays a run", async () => {
