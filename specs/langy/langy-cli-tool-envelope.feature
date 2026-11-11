@@ -114,6 +114,12 @@ Feature: Langy recognises its own CLI behind a shell tool call
       And it then tells the reader who to ask for it
       And the card never shows an internal permission name as its headline
 
+    @unit
+    Scenario: A reader who lost access is told so
+      When Langy's tool call is refused because the reader's access was removed or reduced mid-conversation
+      Then the card says they can no longer do it in this project, naming the action when it is known
+      And it tells the reader who to ask
+
     # The sandbox's `gh` has no login when the GitHub App is not installed, and
     # it says so in its own words: "To get started with GitHub CLI, please run:
     # gh auth login". That is a shell the customer cannot reach. The manager's

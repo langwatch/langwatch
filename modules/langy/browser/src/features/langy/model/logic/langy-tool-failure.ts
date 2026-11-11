@@ -160,9 +160,16 @@ const ACCESS_DENIAL_CODES = new Set([
   "api_key_permission_denied",
   "api_key_not_owned",
   "api_key_scope_violation",
-  // The CLI's own status-derived code, for a 403 that carried no body.
+  "permission_denied",
+  "project_permission_denied",
+  // From the governance CLI client; a body-less 403 becomes "unauthorized" in codeForStatus.
   "forbidden",
 ]);
+
+/**
+ * The denial reasons that mean the reader's own access was removed or reduced since the key was minted.
+ */
+const ACCESS_REMOVED_REASONS = new Set(["owner-ceiling", "no-membership", "membership-disabled"]);
 
 /**
  * The codes that mean a CLI credential was missing or refused. In the sandbox that is
@@ -310,8 +317,20 @@ function describeFailure({
   }
 
   if (isAccessDenial(domain)) {
-    // ONE sentence for the fact, one for what to do.
     const needed = humanPermission(domain.meta.permission);
+    const reason = domain.meta.denialReason;
+    if (typeof reason === "string" && ACCESS_REMOVED_REASONS.has(reason)) {
+      // owner-ceiling is also a role change, so it names the one permission lost.
+      return {
+        message:
+          reason === "owner-ceiling" && needed
+            ? `You can no longer ${needed} in this project.`
+            : "You no longer have access to this project.",
+        detail: "Ask whoever manages access for your team if you need it back.",
+        remediationApplies: false,
+      };
+    }
+    // ONE sentence for the fact, one for what to do.
     return {
       message: needed
         ? `You can't ${needed} in this project.`
