@@ -22,7 +22,7 @@ describe("summariseEvaluatorVerdicts", () => {
         },
       });
 
-      expect(summary?.evaluators).toEqual([
+      expect(summary.evaluators).toEqual([
         {
           evaluatorId: "ev_1",
           name: "exact_match",
@@ -48,7 +48,7 @@ describe("summariseEvaluatorVerdicts", () => {
         },
       });
 
-      expect(summary?.evaluators[0]).toMatchObject({ passed: 1, failed: 0, errored: 2 });
+      expect(summary.evaluators?.[0]).toMatchObject({ passed: 1, failed: 0, errored: 2 });
     });
   });
 
@@ -63,7 +63,7 @@ describe("summariseEvaluatorVerdicts", () => {
         },
       });
 
-      expect(summary?.evaluators[0]).toMatchObject({ passed: 0, failed: 0, errored: 2 });
+      expect(summary.evaluators?.[0]).toMatchObject({ passed: 0, failed: 0, errored: 2 });
     });
   });
 
@@ -78,8 +78,8 @@ describe("summariseEvaluatorVerdicts", () => {
         },
       });
 
-      expect(summary?.evaluators[0]).toMatchObject({ passed: 0, failed: 0 });
-      expect(summary?.evaluators[0]?.avgScore).toBeCloseTo(0.6);
+      expect(summary.evaluators?.[0]).toMatchObject({ passed: 0, failed: 0 });
+      expect(summary.evaluators?.[0]?.avgScore).toBeCloseTo(0.6);
     });
   });
 
@@ -93,7 +93,7 @@ describe("summariseEvaluatorVerdicts", () => {
         },
       });
 
-      expect(summary?.evaluators[0]).toMatchObject({ failed: 1 });
+      expect(summary.evaluators?.[0]).toMatchObject({ failed: 1 });
       expect(summary).not.toHaveProperty("totalPassed");
       expect(summary).not.toHaveProperty("totalFailed");
       expect(summary).not.toHaveProperty("passRate");
@@ -113,7 +113,7 @@ describe("summariseEvaluatorVerdicts", () => {
         },
       });
 
-      expect(summary?.evaluators.map((tally) => tally.evaluatorId)).toEqual(["ev_1"]);
+      expect(summary.evaluators?.map((tally) => tally.evaluatorId)).toEqual(["ev_1"]);
     });
   });
 
