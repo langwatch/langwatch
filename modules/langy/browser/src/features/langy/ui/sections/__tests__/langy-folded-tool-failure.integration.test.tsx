@@ -274,12 +274,12 @@ describe("a failed step", () => {
       const user = userEvent.setup();
       const finished = {
         type: "tool-bash",
-        toolCallId: "fail-login",
+        toolCallId: "fail-text",
         state: "output-available",
         input: { command: "langwatch trace list" },
         output: JSON.stringify({
           kind: "text",
-          text: "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+          text: "Error: dataset not found.",
         }),
       } as never;
       const { container } = renderActivity({ parts: [finished, reply], live: false });
@@ -287,7 +287,7 @@ describe("a failed step", () => {
       expect(receiptHeader().textContent).toContain("1 action failed");
       await user.click(receiptSteps().getByRole("button", { name: /failed/ }));
 
-      expect(container.textContent).toContain("you're not logged in");
+      expect(container.textContent).toContain("dataset not found");
     });
 
     /** @scenario "A failed step folds into the record of the work" */
